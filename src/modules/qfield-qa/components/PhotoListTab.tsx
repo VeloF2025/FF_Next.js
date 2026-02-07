@@ -1,41 +1,24 @@
 /**
  * Photo List Tab Component
  * Shows paginated list of photos with filters and bulk actions
+ *
+ * Follows FibreFlow UI patterns:
+ * - CSS variables for dark mode compatibility
+ * - Semi-transparent backgrounds for badges
  */
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Grid,
-  Typography,
-  Checkbox,
-  Chip,
-  IconButton,
-  Pagination,
-  TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Button,
-  Menu,
-  Tooltip,
-} from '@mui/material';
+import { useState } from 'react';
 import {
   Search,
-  Filter,
   CheckCircle,
   XCircle,
-  AlertTriangle,
   RotateCw,
-  UserPlus,
-  MoreVertical,
   Clock,
   Camera,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus } from '../types';
@@ -71,12 +54,9 @@ export function PhotoListTab({
   onSelectionChange,
   onApprove,
   onReject,
-  onEscalate,
   onRevalidate,
-  onAssign,
 }: PhotoListTabProps) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
-  const [bulkMenuAnchor, setBulkMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
@@ -103,7 +83,6 @@ export function PhotoListTab({
 
   // Handle bulk actions
   const handleBulkAction = async (action: 'approve' | 'reject' | 'revalidate') => {
-    setBulkMenuAnchor(null);
     if (selectedIds.length === 0) return;
 
     switch (action) {
@@ -123,210 +102,206 @@ export function PhotoListTab({
   const someSelected = selectedIds.length > 0 && selectedIds.length < validations.length;
 
   return (
-    <Box>
+    <div className="space-y-4">
       {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search photos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                InputProps={{
-                  startAdornment: <Search className="w-4 h-4 mr-2 text-gray-400" />,
-                }}
-              />
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Project</InputLabel>
-                <Select
-                  value={filters.projectId || ''}
-                  label="Project"
-                  onChange={(e) => onFilterChange({ projectId: e.target.value || undefined })}
-                >
-                  <MenuItem value="">All Projects</MenuItem>
-                  {projects.map(p => (
-                    <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Work Type</InputLabel>
-                <Select
-                  value={filters.workType || ''}
-                  label="Work Type"
-                  onChange={(e) => onFilterChange({ workType: e.target.value as any || undefined })}
-                >
-                  <MenuItem value="">All Types</MenuItem>
-                  <MenuItem value="pole_installation">Pole Installation</MenuItem>
-                  <MenuItem value="cable_stringing">Cable Stringing</MenuItem>
-                  <MenuItem value="dome_joint">Dome Joint</MenuItem>
-                  <MenuItem value="activation">Activation</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={filters.workflowStatus || ''}
-                  label="Status"
-                  onChange={(e) => onFilterChange({ workflowStatus: e.target.value as WorkflowStatus || undefined })}
-                >
-                  <MenuItem value="">All Statuses</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="in_review">In Review</MenuItem>
-                  <MenuItem value="approved">Approved</MenuItem>
-                  <MenuItem value="rejected">Rejected</MenuItem>
-                  <MenuItem value="escalated">Escalated</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} sm={3} md={2}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Priority</InputLabel>
-                <Select
-                  value={filters.priority || ''}
-                  label="Priority"
-                  onChange={(e) => onFilterChange({ priority: e.target.value as Priority || undefined })}
-                >
-                  <MenuItem value="">All Priorities</MenuItem>
-                  <MenuItem value="urgent">Urgent</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
-                  <MenuItem value="normal">Normal</MenuItem>
-                  <MenuItem value="low">Low</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} sm={3} md={1}>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setSearchTerm('');
-                  onFilterChange({
-                    projectId: undefined,
-                    workType: undefined,
-                    workflowStatus: undefined,
-                    priority: undefined,
-                    search: undefined,
-                  });
-                }}
-                sx={{ minWidth: 'auto' }}
-              >
-                Clear
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+            <input
+              type="text"
+              placeholder="Search photos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+            />
+          </div>
+
+          {/* Project Filter */}
+          <select
+            value={filters.projectId || ''}
+            onChange={(e) => onFilterChange({ projectId: e.target.value || undefined })}
+            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="">All Projects</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+
+          {/* Work Type Filter */}
+          <select
+            value={filters.workType || ''}
+            onChange={(e) => onFilterChange({ workType: e.target.value as any || undefined })}
+            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="">All Types</option>
+            <option value="pole_installation">Pole Installation</option>
+            <option value="cable_stringing">Cable Stringing</option>
+            <option value="dome_joint">Dome Joint</option>
+            <option value="activation">Activation</option>
+          </select>
+
+          {/* Status Filter */}
+          <select
+            value={filters.workflowStatus || ''}
+            onChange={(e) => onFilterChange({ workflowStatus: e.target.value as WorkflowStatus || undefined })}
+            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="in_review">In Review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="escalated">Escalated</option>
+          </select>
+
+          {/* Priority Filter */}
+          <select
+            value={filters.priority || ''}
+            onChange={(e) => onFilterChange({ priority: e.target.value as Priority || undefined })}
+            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          >
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+
+          {/* Clear Button */}
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              onFilterChange({
+                projectId: undefined,
+                workType: undefined,
+                workflowStatus: undefined,
+                priority: undefined,
+                search: undefined,
+              });
+            }}
+            className="px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
 
       {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
-        <Box sx={{
-          mb: 2,
-          p: 2,
-          bgcolor: 'primary.light',
-          borderRadius: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <Typography variant="body2" fontWeight="bold" color="primary.contrastText">
+        <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-400">
             {selectedIds.length} photo{selectedIds.length !== 1 ? 's' : ''} selected
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              size="small"
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircle className="w-4 h-4" />}
+          </span>
+          <div className="flex gap-2">
+            <button
               onClick={() => handleBulkAction('approve')}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
+              <CheckCircle className="w-4 h-4" />
               Approve
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              color="error"
-              startIcon={<XCircle className="w-4 h-4" />}
+            </button>
+            <button
               onClick={() => handleBulkAction('reject')}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
+              <XCircle className="w-4 h-4" />
               Reject
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<RotateCw className="w-4 h-4" />}
+            </button>
+            <button
               onClick={() => handleBulkAction('revalidate')}
-              sx={{ bgcolor: 'white' }}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
             >
+              <RotateCw className="w-4 h-4" />
               Re-validate
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
+            </button>
+            <button
               onClick={() => onSelectionChange([])}
-              sx={{ bgcolor: 'white' }}
+              className="px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
             >
               Clear
-            </Button>
-          </Box>
-        </Box>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Photo List Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, px: 1 }}>
-        <Checkbox
+      <div className="flex items-center gap-2 px-1">
+        <input
+          type="checkbox"
           checked={allSelected}
-          indeterminate={someSelected}
+          ref={(el) => {
+            if (el) el.indeterminate = someSelected;
+          }}
           onChange={(e) => handleSelectAll(e.target.checked)}
-          size="small"
+          className="w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500/50"
         />
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+        <span className="text-sm text-[var(--ff-text-secondary)]">
           {pagination.total} photos total • Page {pagination.page} of {pagination.totalPages}
-        </Typography>
-      </Box>
+        </span>
+      </div>
 
       {/* Photo Cards */}
       {validations.length === 0 ? (
-        <Card sx={{ p: 4, textAlign: 'center' }}>
-          <Camera className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-          <Typography color="text.secondary">No photos found</Typography>
-        </Card>
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-8 text-center">
+          <Camera className="w-12 h-12 mx-auto mb-2 text-[var(--ff-text-tertiary)]" />
+          <p className="text-[var(--ff-text-secondary)]">No photos found</p>
+        </div>
       ) : (
-        <Grid container spacing={2}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {validations.map((photo) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={photo.id}>
-              <PhotoCard
-                photo={photo}
-                selected={selectedIds.includes(photo.id)}
-                onSelect={(checked) => handleSelect(photo.id, checked)}
-                onClick={() => onPhotoClick(photo)}
-              />
-            </Grid>
+            <PhotoCard
+              key={photo.id}
+              photo={photo}
+              selected={selectedIds.includes(photo.id)}
+              onSelect={(checked) => handleSelect(photo.id, checked)}
+              onClick={() => onPhotoClick(photo)}
+            />
           ))}
-        </Grid>
+        </div>
       )}
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={pagination.totalPages}
-            page={pagination.page}
-            onChange={(_, page) => onPageChange(page)}
-            color="primary"
-          />
-        </Box>
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            onClick={() => onPageChange(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className="p-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+          </button>
+          <div className="flex gap-1">
+            {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+              const page = i + 1;
+              return (
+                <button
+                  key={page}
+                  onClick={() => onPageChange(page)}
+                  className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                    pagination.page === page
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => onPageChange(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+            className="p-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+          >
+            <ChevronRight className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+          </button>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }
 
@@ -343,124 +318,102 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
   const confidence = photo.vlm_confidence !== null ? (photo.vlm_confidence * 100).toFixed(0) : null;
 
   return (
-    <Card
-      sx={{
-        cursor: 'pointer',
-        border: selected ? '2px solid' : '1px solid',
-        borderColor: selected ? 'primary.main' : 'divider',
-        transition: 'all 0.2s',
-        '&:hover': { boxShadow: 4 },
-      }}
+    <div
+      className={`bg-[var(--ff-bg-secondary)] border rounded-lg overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
+        selected
+          ? 'border-blue-500 border-2'
+          : 'border-[var(--ff-border-light)]'
+      }`}
     >
-      <Box sx={{ position: 'relative' }}>
-        <Checkbox
+      <div className="relative">
+        <input
+          type="checkbox"
           checked={selected}
           onChange={(e) => {
             e.stopPropagation();
             onSelect(e.target.checked);
           }}
-          sx={{ position: 'absolute', top: 4, left: 4, bgcolor: 'rgba(255,255,255,0.8)', borderRadius: 1 }}
-          size="small"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-2 left-2 w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500/50 bg-white/80 z-10"
         />
-        <Box
+        <div
           onClick={onClick}
-          sx={{
-            height: 160,
-            bgcolor: 'grey.200',
-            backgroundImage: `url(${photoUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
+          className="h-40 bg-[var(--ff-bg-tertiary)] bg-cover bg-center"
+          style={{ backgroundImage: `url(${photoUrl})` }}
         />
         {/* Status Badge */}
-        <Box sx={{ position: 'absolute', top: 4, right: 4 }}>
+        <div className="absolute top-2 right-2">
           <StatusBadge status={photo.workflow_status} />
-        </Box>
+        </div>
         {/* Confidence Badge */}
         {confidence !== null && (
-          <Box sx={{ position: 'absolute', bottom: 4, right: 4 }}>
-            <Chip
-              label={`${confidence}%`}
-              size="small"
-              sx={{
-                bgcolor: getConfidenceColor(photo.vlm_confidence || 0),
-                color: 'white',
-                fontWeight: 'bold',
-              }}
-            />
-          </Box>
+          <div className="absolute bottom-2 right-2">
+            <span
+              className="px-2 py-0.5 text-xs font-bold text-white rounded"
+              style={{ backgroundColor: getConfidenceColor(photo.vlm_confidence || 0) }}
+            >
+              {confidence}%
+            </span>
+          </div>
         )}
-      </Box>
-      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }} onClick={onClick}>
-        <Typography variant="body2" fontWeight="medium" noWrap title={filename}>
+      </div>
+      <div className="p-3" onClick={onClick}>
+        <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate" title={filename}>
           {filename}
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-          <Chip
-            label={formatWorkType(photo.work_type)}
-            size="small"
-            variant="outlined"
-            sx={{ fontSize: '0.65rem', height: 20 }}
-          />
-          {photo.priority !== 'normal' && (
-            <PriorityChip priority={photo.priority} />
+        </p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="px-2 py-0.5 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded">
+            {formatWorkType(photo.work_type)}
+          </span>
+          {photo.priority && photo.priority !== 'normal' && (
+            <PriorityBadge priority={photo.priority} />
           )}
-        </Box>
+        </div>
         {photo.assigned_to && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1.5">
             Assigned to: {photo.assigned_to}
-          </Typography>
+          </p>
         )}
         {photo.due_date && new Date(photo.due_date) < new Date() && photo.workflow_status !== 'approved' && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, color: 'error.main' }}>
+          <div className="flex items-center gap-1 mt-1.5 text-red-400">
             <Clock className="w-3 h-3" />
-            <Typography variant="caption">Overdue</Typography>
-          </Box>
+            <span className="text-xs">Overdue</span>
+          </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
 function StatusBadge({ status }: { status: WorkflowStatus }) {
   const config = {
-    pending: { label: 'Pending', color: '#eab308' },
-    in_review: { label: 'In Review', color: '#3b82f6' },
-    approved: { label: 'Approved', color: '#22c55e' },
-    rejected: { label: 'Rejected', color: '#ef4444' },
-    escalated: { label: 'Escalated', color: '#f97316' },
-  }[status] || { label: status, color: '#6b7280' };
+    pending: { label: 'Pending', classes: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+    in_review: { label: 'In Review', classes: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    approved: { label: 'Approved', classes: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    rejected: { label: 'Rejected', classes: 'bg-red-500/20 text-red-400 border-red-500/30' },
+    escalated: { label: 'Escalated', classes: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  }[status] || { label: status, classes: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
 
   return (
-    <Chip
-      label={config.label}
-      size="small"
-      sx={{
-        bgcolor: config.color,
-        color: 'white',
-        fontSize: '0.65rem',
-        height: 20,
-      }}
-    />
+    <span className={`px-2 py-0.5 text-xs font-medium rounded border ${config.classes}`}>
+      {config.label}
+    </span>
   );
 }
 
-function PriorityChip({ priority }: { priority: Priority }) {
+function PriorityBadge({ priority }: { priority: Priority }) {
   const config = {
-    urgent: { label: 'Urgent', color: 'error' as const },
-    high: { label: 'High', color: 'warning' as const },
-    low: { label: 'Low', color: 'default' as const },
+    urgent: { label: 'Urgent', classes: 'bg-red-500/20 text-red-400' },
+    high: { label: 'High', classes: 'bg-orange-500/20 text-orange-400' },
+    low: { label: 'Low', classes: 'bg-gray-500/20 text-gray-400' },
   }[priority];
 
   if (!config) return null;
 
   return (
-    <Chip
-      label={config.label}
-      size="small"
-      color={config.color}
-      sx={{ fontSize: '0.65rem', height: 20 }}
-    />
+    <span className={`px-2 py-0.5 text-xs font-medium rounded ${config.classes}`}>
+      {config.label}
+    </span>
   );
 }
 

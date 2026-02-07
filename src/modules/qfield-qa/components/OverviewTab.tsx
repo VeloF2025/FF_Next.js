@@ -1,11 +1,14 @@
 /**
  * Overview Tab Component
  * Shows summary statistics and recent activity
+ *
+ * Follows FibreFlow UI patterns:
+ * - CSS variables for dark mode compatibility
+ * - Semi-transparent backgrounds for badges
  */
 
 'use client';
 
-import { Box, Card, CardContent, Grid, Typography, Button, Chip, LinearProgress } from '@mui/material';
 import { ArrowRight, TrendingUp, TrendingDown, Clock, Activity } from 'lucide-react';
 import type { QAStats, ActionType } from '../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -30,251 +33,260 @@ export function OverviewTab({ stats, recentActivity, onViewAll }: OverviewTabPro
     : '0';
 
   return (
-    <Box>
+    <div className="space-y-6">
       {/* Work Type Stats */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        By Work Type
-      </Typography>
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        {stats.by_work_type.map((wt) => {
-          const total = wt.total || 1;
-          const approvedPercent = (wt.approved / total) * 100;
-          const rejectedPercent = (wt.rejected / total) * 100;
-          const pendingPercent = (wt.pending / total) * 100;
+      <div>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+          By Work Type
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.by_work_type.map((wt) => {
+            const total = wt.total || 1;
+            const approvedPercent = (wt.approved / total) * 100;
+            const rejectedPercent = (wt.rejected / total) * 100;
+            const pendingPercent = (wt.pending / total) * 100;
 
-          return (
-            <Grid item xs={12} sm={6} md={3} key={wt.work_type}>
-              <Card>
-                <CardContent>
-                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                    {formatWorkType(wt.work_type)}
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
-                    {wt.total}
-                  </Typography>
-                  <Box sx={{ mb: 1 }}>
-                    <Box sx={{ display: 'flex', height: 8, borderRadius: 1, overflow: 'hidden' }}>
-                      <Box sx={{ width: `${approvedPercent}%`, bgcolor: 'success.main' }} />
-                      <Box sx={{ width: `${rejectedPercent}%`, bgcolor: 'error.main' }} />
-                      <Box sx={{ width: `${pendingPercent}%`, bgcolor: 'warning.main' }} />
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                    <span style={{ color: '#22c55e' }}>{wt.approved} approved</span>
-                    <span style={{ color: '#ef4444' }}>{wt.rejected} rejected</span>
-                  </Box>
-                  {wt.avg_confidence && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                      Avg confidence: {(parseFloat(wt.avg_confidence) * 100).toFixed(0)}%
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
+            return (
+              <div
+                key={wt.work_type}
+                className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4"
+              >
+                <p className="text-sm text-[var(--ff-text-secondary)] mb-1">
+                  {formatWorkType(wt.work_type)}
+                </p>
+                <p className="text-3xl font-bold text-[var(--ff-text-primary)] mb-2">
+                  {wt.total}
+                </p>
+                <div className="flex h-2 rounded overflow-hidden mb-2">
+                  <div style={{ width: `${approvedPercent}%` }} className="bg-green-500" />
+                  <div style={{ width: `${rejectedPercent}%` }} className="bg-red-500" />
+                  <div style={{ width: `${pendingPercent}%` }} className="bg-yellow-500" />
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-green-400">{wt.approved} approved</span>
+                  <span className="text-red-400">{wt.rejected} rejected</span>
+                </div>
+                {wt.avg_confidence && (
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-2">
+                    Avg confidence: {(parseFloat(wt.avg_confidence) * 100).toFixed(0)}%
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* AI Validation Stats */}
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        AI Validation Summary
-      </Typography>
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Confidence Distribution
-                </Typography>
-                <Chip
-                  label={`${passRate}% Pass Rate`}
-                  color={parseFloat(passRate) > 70 ? 'success' : parseFloat(passRate) > 50 ? 'warning' : 'error'}
-                  size="small"
-                />
-              </Box>
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">High Confidence (80%+)</Typography>
-                  <Typography variant="body2" fontWeight="bold" color="success.main">
-                    {stats.ai_confidence.high_confidence}
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={(stats.ai_confidence.high_confidence / (totalValidated || 1)) * 100}
-                  sx={{ height: 8, borderRadius: 1, bgcolor: 'grey.200', '& .MuiLinearProgress-bar': { bgcolor: 'success.main' } }}
-                />
-              </Box>
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">Medium Confidence (60-80%)</Typography>
-                  <Typography variant="body2" fontWeight="bold" color="warning.main">
-                    {stats.ai_confidence.medium_confidence}
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={(stats.ai_confidence.medium_confidence / (totalValidated || 1)) * 100}
-                  sx={{ height: 8, borderRadius: 1, bgcolor: 'grey.200', '& .MuiLinearProgress-bar': { bgcolor: 'warning.main' } }}
-                />
-              </Box>
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">Low Confidence (&lt;60%)</Typography>
-                  <Typography variant="body2" fontWeight="bold" color="error.main">
-                    {stats.ai_confidence.low_confidence}
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={(stats.ai_confidence.low_confidence / (totalValidated || 1)) * 100}
-                  sx={{ height: 8, borderRadius: 1, bgcolor: 'grey.200', '& .MuiLinearProgress-bar': { bgcolor: 'error.main' } }}
-                />
-              </Box>
-              <Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                  <Typography variant="body2">Not Validated</Typography>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary">
-                    {stats.ai_confidence.not_validated}
-                  </Typography>
-                </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={(stats.ai_confidence.not_validated / (stats.summary.total || 1)) * 100}
-                  sx={{ height: 8, borderRadius: 1, bgcolor: 'grey.200', '& .MuiLinearProgress-bar': { bgcolor: 'grey.500' } }}
-                />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+      <div>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+          AI Validation Summary
+        </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Confidence Distribution */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-sm text-[var(--ff-text-secondary)]">
+                Confidence Distribution
+              </p>
+              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                parseFloat(passRate) > 70
+                  ? 'bg-green-500/20 text-green-400'
+                  : parseFloat(passRate) > 50
+                  ? 'bg-yellow-500/20 text-yellow-400'
+                  : 'bg-red-500/20 text-red-400'
+              }`}>
+                {passRate}% Pass Rate
+              </span>
+            </div>
 
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                Priority Queue
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <PriorityBadge label="Urgent" count={stats.by_priority.urgent} color="#dc2626" />
-                <PriorityBadge label="High" count={stats.by_priority.high} color="#f97316" />
-                <PriorityBadge label="Normal" count={stats.by_priority.normal} color="#3b82f6" />
-                <PriorityBadge label="Low" count={stats.by_priority.low} color="#6b7280" />
-              </Box>
+            <ProgressBar
+              label="High Confidence (80%+)"
+              value={stats.ai_confidence.high_confidence}
+              total={totalValidated || 1}
+              color="green"
+            />
+            <ProgressBar
+              label="Medium Confidence (60-80%)"
+              value={stats.ai_confidence.medium_confidence}
+              total={totalValidated || 1}
+              color="yellow"
+            />
+            <ProgressBar
+              label="Low Confidence (<60%)"
+              value={stats.ai_confidence.low_confidence}
+              total={totalValidated || 1}
+              color="red"
+            />
+            <ProgressBar
+              label="Not Validated"
+              value={stats.ai_confidence.not_validated}
+              total={stats.summary.total || 1}
+              color="gray"
+            />
+          </div>
 
-              {stats.summary.overdue > 0 && (
-                <Box sx={{ mt: 3, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Clock className="w-5 h-5 text-red-600" />
-                    <Typography variant="body2" fontWeight="bold" color="error.dark">
-                      {stats.summary.overdue} overdue items
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+          {/* Priority Queue */}
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              Priority Queue
+            </p>
+            <div className="flex gap-4 flex-wrap">
+              <PriorityBadge label="Urgent" count={stats.by_priority.urgent} color="red" />
+              <PriorityBadge label="High" count={stats.by_priority.high} color="orange" />
+              <PriorityBadge label="Normal" count={stats.by_priority.normal} color="blue" />
+              <PriorityBadge label="Low" count={stats.by_priority.low} color="gray" />
+            </div>
+
+            {stats.summary.overdue > 0 && (
+              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-red-400" />
+                  <span className="text-sm font-medium text-red-400">
+                    {stats.summary.overdue} overdue items
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Recent Activity */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
-          Recent Activity
-        </Typography>
-        <Button variant="text" endIcon={<ArrowRight className="w-4 h-4" />} onClick={onViewAll}>
-          View All Photos
-        </Button>
-      </Box>
-      <Card>
-        <CardContent sx={{ p: 0 }}>
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            Recent Activity
+          </h3>
+          <button
+            onClick={onViewAll}
+            className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            View All Photos
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
           {recentActivity.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: 'center' }}>
-              <Activity className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <Typography color="text.secondary">No recent activity</Typography>
-            </Box>
+            <div className="p-8 text-center">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-[var(--ff-text-tertiary)]" />
+              <p className="text-[var(--ff-text-secondary)]">No recent activity</p>
+            </div>
           ) : (
-            <Box>
+            <div className="divide-y divide-[var(--ff-border-light)]">
               {recentActivity.slice(0, 5).map((activity, index) => (
-                <Box
+                <div
                   key={index}
-                  sx={{
-                    px: 3,
-                    py: 2,
-                    borderBottom: index < recentActivity.length - 1 ? '1px solid' : 'none',
-                    borderColor: 'divider',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
+                  className="px-4 py-3 flex justify-between items-center"
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <div className="flex items-center gap-3">
                     <ActionIcon action={activity.action_type} />
-                    <Box>
-                      <Typography variant="body2">
-                        <strong>{activity.action_by}</strong>
+                    <div>
+                      <p className="text-sm text-[var(--ff-text-primary)]">
+                        <span className="font-medium">{activity.action_by}</span>
                         {' '}
                         {formatAction(activity.action_type)}
-                      </Typography>
+                      </p>
                       {activity.notes && (
-                        <Typography variant="caption" color="text.secondary">
+                        <p className="text-xs text-[var(--ff-text-tertiary)]">
                           {activity.notes}
-                        </Typography>
+                        </p>
                       )}
-                    </Box>
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
+                    </div>
+                  </div>
+                  <span className="text-xs text-[var(--ff-text-tertiary)]">
                     {formatDistanceToNow(new Date(activity.action_at), { addSuffix: true })}
-                  </Typography>
-                </Box>
+                  </span>
+                </div>
               ))}
-            </Box>
+            </div>
           )}
-        </CardContent>
-      </Card>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function PriorityBadge({ label, count, color }: { label: string; count: number; color: string }) {
+function ProgressBar({
+  label,
+  value,
+  total,
+  color,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  color: 'green' | 'yellow' | 'red' | 'gray';
+}) {
+  const percent = (value / total) * 100;
+  const colorClasses = {
+    green: 'bg-green-500',
+    yellow: 'bg-yellow-500',
+    red: 'bg-red-500',
+    gray: 'bg-gray-500',
+  };
+  const textClasses = {
+    green: 'text-green-400',
+    yellow: 'text-yellow-400',
+    red: 'text-red-400',
+    gray: 'text-[var(--ff-text-tertiary)]',
+  };
+
   return (
-    <Box sx={{ textAlign: 'center', minWidth: 80 }}>
-      <Box
-        sx={{
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mx: 'auto',
-          mb: 0.5,
-          bgcolor: `${color}20`,
-          border: `2px solid ${color}`,
-        }}
+    <div className="mb-3 last:mb-0">
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-[var(--ff-text-secondary)]">{label}</span>
+        <span className={`font-medium ${textClasses[color]}`}>{value}</span>
+      </div>
+      <div className="h-2 bg-[var(--ff-bg-tertiary)] rounded overflow-hidden">
+        <div
+          className={`h-full ${colorClasses[color]} rounded transition-all`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PriorityBadge({
+  label,
+  count,
+  color,
+}: {
+  label: string;
+  count: number;
+  color: 'red' | 'orange' | 'blue' | 'gray';
+}) {
+  const colorClasses = {
+    red: 'bg-red-500/20 border-red-500 text-red-400',
+    orange: 'bg-orange-500/20 border-orange-500 text-orange-400',
+    blue: 'bg-blue-500/20 border-blue-500 text-blue-400',
+    gray: 'bg-gray-500/20 border-gray-500 text-gray-400',
+  };
+
+  return (
+    <div className="text-center min-w-[80px]">
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-1 border-2 ${colorClasses[color]}`}
       >
-        <Typography variant="h6" sx={{ color, fontWeight: 'bold' }}>
-          {count}
-        </Typography>
-      </Box>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-    </Box>
+        <span className="text-lg font-bold">{count}</span>
+      </div>
+      <span className="text-xs text-[var(--ff-text-secondary)]">{label}</span>
+    </div>
   );
 }
 
 function ActionIcon({ action }: { action: ActionType }) {
-  const iconClass = "w-5 h-5";
+  const iconClass = 'w-5 h-5';
   switch (action) {
     case 'approve':
-      return <Box sx={{ color: 'success.main' }}><TrendingUp className={iconClass} /></Box>;
+      return <TrendingUp className={`${iconClass} text-green-400`} />;
     case 'reject':
-      return <Box sx={{ color: 'error.main' }}><TrendingDown className={iconClass} /></Box>;
+      return <TrendingDown className={`${iconClass} text-red-400`} />;
     case 'escalate':
-      return <Box sx={{ color: 'warning.main' }}><Activity className={iconClass} /></Box>;
+      return <Activity className={`${iconClass} text-yellow-400`} />;
     default:
-      return <Box sx={{ color: 'text.secondary' }}><Activity className={iconClass} /></Box>;
+      return <Activity className={`${iconClass} text-[var(--ff-text-tertiary)]`} />;
   }
 }
 
