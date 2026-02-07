@@ -128,32 +128,56 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           continue;
         }
 
-        // DR found on 1Map - classify
-        const record = searchResult.records[0];
+        // Classify ALL records (prop IDs) for this DR
         const oesSerial = item.oes_serial.trim().toUpperCase();
-        const oneMapSerial = record.ph_ont?.trim().toUpperCase() || null;
+        const records = searchResult.records;
+
+        let correctCount = 0;
+        let emptyCount = 0;
+        let wrongCount = 0;
+        let swapCount = 0;
+        let firstWrongSerial: string | null = null;
+        let firstUpsSerial: string | null = null;
+
+        for (const rec of records) {
+          const ont = rec.ph_ont?.trim().toUpperCase() || null;
+          const ups = rec.br_ser?.trim().toUpperCase() || null;
+
+          if (ont === oesSerial) {
+            correctCount++;
+          } else if (!ont) {
+            emptyCount++;
+          } else if (ups === oesSerial && isUpsSerial(ont)) {
+            swapCount++;
+            if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
+          } else {
+            wrongCount++;
+            if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
+          }
+        }
 
         let mismatchType = 'match';
         let fixStatus = 'pending';
         let hasUpsSwap = false;
 
-        if (!oneMapSerial) {
-          mismatchType = 'note4_empty_barcode';
-          fixStatus = 'pending';
-        } else if (oesSerial === oneMapSerial) {
+        if (correctCount === records.length) {
           mismatchType = 'match';
-        } else {
-          hasUpsSwap = isUpsSerial(oneMapSerial);
-          mismatchType = hasUpsSwap ? 'note4_ups_swap' : 'note4_wrong_serial';
-          fixStatus = 'pending';
+        } else if (swapCount > 0) {
+          mismatchType = 'note4_ups_swap';
+          hasUpsSwap = true;
+        } else if (wrongCount > 0) {
+          mismatchType = 'note4_wrong_serial';
+        } else if (emptyCount > 0) {
+          mismatchType = 'note4_empty_barcode';
         }
 
+        const bestRecord = records.find(r => r.ph_ont) || records[0];
         await client.query(
           `UPDATE olt_onemap_lookup_queue
            SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
                mismatch_type = $3, processed_at = NOW()
            WHERE id = $4`,
-          [record.ph_ont, record.br_ser, mismatchType, item.id]
+          [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
         );
 
         if (mismatchType !== 'match' && importId) {
@@ -161,7 +185,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             importId,
             dropNumber: item.drop_number,
             oltSerial: item.oes_serial,
-            wrongOneMapSerial: record.ph_ont,
+            wrongOneMapSerial: firstWrongSerial || bestRecord.ph_ont,
             fixStatus,
             hasUpsSwap,
             oesBatchId: item.oes_batch_id,
@@ -262,7 +286,8 @@ async function insertMismatchIfNew(
     if (ex.fix_status === 'fixed' && ex.olt_serial?.toUpperCase() === data.oltSerial.toUpperCase()) {
       return; // Already fixed with same serial
     }
-    if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial') {
+    if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
+        || ex.fix_status === 'not_found') {
       // Update existing pending
       await client.query(
         `UPDATE olt_mismatch_records

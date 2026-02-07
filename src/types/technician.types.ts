@@ -142,6 +142,15 @@ export interface ActivatorPerformance {
     firstPassRate: number;
     serialComplianceRate: number;
   }[];
+
+  /** List of DRs worked on */
+  recentDRs: {
+    dropNumber: string;
+    project: string | null;
+    date: string;
+    submissionCount: number;
+    qaDecision: string | null;
+  }[];
 }
 
 /**
@@ -191,6 +200,14 @@ export interface InstallerPerformance {
   commonFailures: {
     step: string;
     failCount: number;
+  }[];
+
+  /** List of DRs worked on */
+  recentDRs: {
+    dropNumber: string;
+    project: string | null;
+    date: string;
+    qaDecision: string | null;
   }[];
 }
 
