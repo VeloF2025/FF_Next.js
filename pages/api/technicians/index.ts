@@ -16,7 +16,13 @@ import { Pool } from 'pg';
 import { log } from '@/lib/logger';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import type { TechnicianSummary, TechnicianType, TechnicianStatus } from '@/types/technician.types';
+import type {
+  TechnicianSummary,
+  ActivatorSummary,
+  InstallerSummary,
+  TechnicianType,
+  TechnicianStatus
+} from '@/types/technician.types';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -74,7 +80,16 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
     return apiResponse.success(res, result.rows[0]);
   }
 
-  // Build query for list with optional stats
+  // Determine if we're filtering by specific type
+  const typeFilter = type && type !== 'all' ? String(type) : null;
+
+  // Fetch activators and installers with their respective stats
+  if (includeStats === 'true') {
+    const technicians = await fetchTechniciansWithStats(typeFilter, status, search);
+    return apiResponse.success(res, { technicians, total: technicians.length });
+  }
+
+  // Simple query without stats
   let query = `
     SELECT
       wc.id,
@@ -83,49 +98,16 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
       wc.role as type,
       wc.team as contractor,
       CASE WHEN wc.is_active THEN 'active' ELSE 'inactive' END as status
+    FROM wa_contacts wc
   `;
-
-  if (includeStats === 'true') {
-    query += `,
-      COALESCE(stats.total_submissions, 0)::INTEGER as total_submissions,
-      COALESCE(stats.first_pass_rate, 0)::INTEGER as first_pass_rate,
-      COALESCE(stats.serial_compliance, 0)::INTEGER as serial_compliance_rate,
-      stats.last_active::TEXT as last_active_date
-    `;
-  }
-
-  query += ` FROM wa_contacts wc`;
-
-  if (includeStats === 'true') {
-    // Note: qa_photo_reviews uses user_name as the identifier (sender_phone is often empty)
-    // wa_contacts.sender_phone stores the user_name value from qa_photo_reviews
-    query += `
-      LEFT JOIN (
-        SELECT
-          qpr.user_name as identifier,
-          COUNT(*) as total_submissions,
-          ROUND(
-            100.0 * COUNT(*) FILTER (WHERE upr.submission_count = 1) / NULLIF(COUNT(*), 0)
-          ) as first_pass_rate,
-          ROUND(
-            100.0 * COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL) / NULLIF(COUNT(*), 0)
-          ) as serial_compliance,
-          MAX(qpr.created_at) as last_active
-        FROM qa_photo_reviews qpr
-        LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
-        WHERE qpr.user_name IS NOT NULL
-        GROUP BY qpr.user_name
-      ) stats ON wc.sender_phone = stats.identifier
-    `;
-  }
 
   const conditions: string[] = [];
   const params: (string | boolean)[] = [];
   let paramIndex = 1;
 
-  if (type && type !== 'all') {
+  if (typeFilter) {
     conditions.push(`wc.role = $${paramIndex++}`);
-    params.push(String(type));
+    params.push(typeFilter);
   }
 
   if (status && status !== 'all') {
@@ -142,35 +124,207 @@ async function handleGet(req: AuthenticatedNextApiRequest, res: NextApiResponse)
       wc.team ILIKE $${paramIndex}
     )`);
     params.push(`%${String(search)}%`);
-    paramIndex++;
   }
 
   if (conditions.length > 0) {
     query += ` WHERE ${conditions.join(' AND ')}`;
   }
 
-  if (includeStats === 'true') {
-    query += ` ORDER BY COALESCE(stats.total_submissions, 0) DESC, name`;
-  } else {
-    query += ` ORDER BY name`;
-  }
+  query += ` ORDER BY name`;
 
   const result = await pool.query(query, params);
 
-  const technicians: TechnicianSummary[] = result.rows.map(row => ({
-    id: row.id,
-    name: row.name,
-    phone: row.phone,
-    type: row.type as TechnicianType,
-    contractor: row.contractor,
-    status: row.status as TechnicianStatus,
-    totalSubmissions: row.total_submissions ?? 0,
-    firstPassRate: row.first_pass_rate ?? 0,
-    serialComplianceRate: row.serial_compliance_rate ?? 0,
-    lastActiveDate: row.last_active_date,
-  }));
+  // Return basic summaries without stats
+  const technicians = result.rows.map(row => {
+    const base = {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      contractor: row.contractor,
+      status: row.status as TechnicianStatus,
+      lastActiveDate: null,
+    };
+
+    if (row.type === 'installer') {
+      return {
+        ...base,
+        type: 'installer' as const,
+        totalInstallations: 0,
+        qaPassRate: 0,
+        reworkRate: 0,
+      } as InstallerSummary;
+    }
+    return {
+      ...base,
+      type: 'activator' as const,
+      totalSubmissions: 0,
+      firstPassRate: 0,
+      serialComplianceRate: 0,
+    } as ActivatorSummary;
+  });
 
   return apiResponse.success(res, { technicians, total: technicians.length });
+}
+
+/**
+ * Fetch technicians with role-appropriate stats
+ * - Activators: stats from qa_photo_reviews (submissions, first pass, serial compliance)
+ * - Installers: stats from drops + dr_photo_unified_reviews (QA outcomes)
+ */
+async function fetchTechniciansWithStats(
+  typeFilter: string | null,
+  status: string | string[] | undefined,
+  search: string | string[] | undefined
+): Promise<TechnicianSummary[]> {
+  const technicians: TechnicianSummary[] = [];
+
+  // Build WHERE conditions
+  const buildConditions = (paramOffset: number) => {
+    const conditions: string[] = [];
+    const params: (string | boolean)[] = [];
+    let idx = paramOffset;
+
+    if (status && status !== 'all') {
+      const isActive = status === 'active';
+      conditions.push(`wc.is_active = $${idx++}`);
+      params.push(isActive);
+    }
+
+    if (search) {
+      conditions.push(`(
+        wc.formal_name ILIKE $${idx} OR
+        wc.wa_display_name ILIKE $${idx} OR
+        wc.sender_phone ILIKE $${idx} OR
+        wc.team ILIKE $${idx}
+      )`);
+      params.push(`%${String(search)}%`);
+    }
+
+    return { conditions, params };
+  };
+
+  // Fetch activators if not filtering to installers only
+  if (!typeFilter || typeFilter === 'activator') {
+    const { conditions, params } = buildConditions(1);
+    conditions.unshift(`wc.role = 'activator'`);
+
+    const activatorQuery = `
+      SELECT
+        wc.id,
+        COALESCE(wc.formal_name, wc.wa_display_name, wc.sender_phone) as name,
+        wc.sender_phone as phone,
+        wc.team as contractor,
+        CASE WHEN wc.is_active THEN 'active' ELSE 'inactive' END as status,
+        COALESCE(stats.total_submissions, 0)::INTEGER as total_submissions,
+        COALESCE(stats.first_pass_rate, 0)::INTEGER as first_pass_rate,
+        COALESCE(stats.serial_compliance, 0)::INTEGER as serial_compliance_rate,
+        stats.last_active::TEXT as last_active_date
+      FROM wa_contacts wc
+      LEFT JOIN (
+        SELECT
+          qpr.user_name as identifier,
+          COUNT(*) as total_submissions,
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE upr.submission_count = 1) / NULLIF(COUNT(*), 0)
+          ) as first_pass_rate,
+          ROUND(
+            100.0 * COUNT(*) FILTER (WHERE upr.ont_serial_scanned IS NOT NULL) / NULLIF(COUNT(*), 0)
+          ) as serial_compliance,
+          MAX(qpr.created_at) as last_active
+        FROM qa_photo_reviews qpr
+        LEFT JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+        WHERE qpr.user_name IS NOT NULL
+        GROUP BY qpr.user_name
+      ) stats ON wc.sender_phone = stats.identifier
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY COALESCE(stats.total_submissions, 0) DESC, name
+    `;
+
+    const activatorResult = await pool.query(activatorQuery, params);
+
+    for (const row of activatorResult.rows) {
+      technicians.push({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        type: 'activator',
+        contractor: row.contractor,
+        status: row.status as TechnicianStatus,
+        totalSubmissions: row.total_submissions ?? 0,
+        firstPassRate: row.first_pass_rate ?? 0,
+        serialComplianceRate: row.serial_compliance_rate ?? 0,
+        lastActiveDate: row.last_active_date,
+      } as ActivatorSummary);
+    }
+  }
+
+  // Fetch installers if not filtering to activators only
+  if (!typeFilter || typeFilter === 'installer') {
+    const { conditions, params } = buildConditions(1);
+    conditions.unshift(`wc.role = 'installer'`);
+
+    const installerQuery = `
+      SELECT
+        wc.id,
+        COALESCE(wc.formal_name, wc.wa_display_name, wc.sender_phone) as name,
+        wc.sender_phone as phone,
+        wc.team as contractor,
+        CASE WHEN wc.is_active THEN 'active' ELSE 'inactive' END as status,
+        COALESCE(stats.total_installations, 0)::INTEGER as total_installations,
+        COALESCE(stats.qa_pass_rate, 0)::INTEGER as qa_pass_rate,
+        COALESCE(stats.rework_rate, 0)::INTEGER as rework_rate,
+        stats.last_active::TEXT as last_active_date
+      FROM wa_contacts wc
+      LEFT JOIN (
+        SELECT
+          d.installed_by_name as identifier,
+          COUNT(DISTINCT d.drop_number) as total_installations,
+          ROUND(
+            100.0 * COUNT(DISTINCT d.drop_number) FILTER (WHERE upr.qa_decision = 'PASS') / NULLIF(COUNT(DISTINCT d.drop_number), 0)
+          ) as qa_pass_rate,
+          ROUND(
+            100.0 * COUNT(DISTINCT d.drop_number) FILTER (WHERE upr.qa_decision = 'REWORK_NEEDED') / NULLIF(COUNT(DISTINCT d.drop_number), 0)
+          ) as rework_rate,
+          MAX(d.created_at) as last_active
+        FROM drops d
+        LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+        WHERE d.installed_by_name IS NOT NULL
+        GROUP BY d.installed_by_name
+      ) stats ON wc.formal_name = stats.identifier
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY COALESCE(stats.total_installations, 0) DESC, name
+    `;
+
+    const installerResult = await pool.query(installerQuery, params);
+
+    for (const row of installerResult.rows) {
+      technicians.push({
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        type: 'installer',
+        contractor: row.contractor,
+        status: row.status as TechnicianStatus,
+        totalInstallations: row.total_installations ?? 0,
+        qaPassRate: row.qa_pass_rate ?? 0,
+        reworkRate: row.rework_rate ?? 0,
+        lastActiveDate: row.last_active_date,
+      } as InstallerSummary);
+    }
+  }
+
+  // Sort combined results by activity count
+  technicians.sort((a, b) => {
+    const aCount = a.type === 'activator'
+      ? (a as ActivatorSummary).totalSubmissions
+      : (a as InstallerSummary).totalInstallations;
+    const bCount = b.type === 'activator'
+      ? (b as ActivatorSummary).totalSubmissions
+      : (b as InstallerSummary).totalInstallations;
+    return bCount - aCount;
+  });
+
+  return technicians;
 }
 
 async function handlePost(req: AuthenticatedNextApiRequest, res: NextApiResponse) {

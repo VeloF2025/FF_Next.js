@@ -48,31 +48,74 @@ export interface Technician {
   updatedAt: Date;
 }
 
-export interface TechnicianSummary {
+/**
+ * Summary for activators (DR photo submitters via WhatsApp)
+ */
+export interface ActivatorSummary {
   id: string;
   name: string;
   phone: string | null;
-  type: TechnicianType;
+  type: 'activator';
   contractor: string | null;
   status: TechnicianStatus;
-  
-  // Performance stats (calculated)
-  totalSubmissions: number;
-  firstPassRate: number;
-  serialComplianceRate: number;
+
+  // Activator-specific stats
+  totalSubmissions: number;      // DRs submitted via WhatsApp
+  firstPassRate: number;         // % passed QA on first submission
+  serialComplianceRate: number;  // % with ONT serial scanned
   lastActiveDate: string | null;
 }
 
-export interface TechnicianPerformance {
+/**
+ * Summary for installers (field technicians who do installations)
+ */
+export interface InstallerSummary {
+  id: string;
+  name: string;
+  phone: string | null;
+  type: 'installer';
+  contractor: string | null;
+  status: TechnicianStatus;
+
+  // Installer-specific stats (from QA review outcomes)
+  totalInstallations: number;    // DRs with this installer in drops table
+  qaPassRate: number;            // % of installations with qa_decision = 'PASS'
+  reworkRate: number;            // % with qa_decision = 'REWORK_NEEDED'
+  lastActiveDate: string | null;
+}
+
+/**
+ * Union type for directory listing - can be either activator or installer
+ */
+export type TechnicianSummary = ActivatorSummary | InstallerSummary;
+
+/**
+ * Helper to check if a technician is an activator
+ */
+export function isActivator(tech: TechnicianSummary): tech is ActivatorSummary {
+  return tech.type === 'activator';
+}
+
+/**
+ * Helper to check if a technician is an installer
+ */
+export function isInstaller(tech: TechnicianSummary): tech is InstallerSummary {
+  return tech.type === 'installer';
+}
+
+/**
+ * Performance metrics for activators (DR photo submitters)
+ */
+export interface ActivatorPerformance {
   technicianId: string;
   technicianName: string;
-  type: TechnicianType;
-  
+  type: 'activator';
+
   dateRange: {
     from: string;
     to: string;
   };
-  
+
   summary: {
     totalSubmissions: number;
     firstPassSuccess: number;
@@ -85,20 +128,85 @@ export interface TechnicianPerformance {
     projectsWorked: string[];
     activeDays: number;
   };
-  
+
   trend: {
     date: string;
     submissions: number;
     firstPass: number;
     resubmissions: number;
   }[];
-  
+
   projectBreakdown: {
     project: string;
     submissions: number;
     firstPassRate: number;
     serialComplianceRate: number;
   }[];
+}
+
+/**
+ * Performance metrics for installers (based on QA review outcomes)
+ */
+export interface InstallerPerformance {
+  technicianId: string;
+  technicianName: string;
+  type: 'installer';
+
+  dateRange: {
+    from: string;
+    to: string;
+  };
+
+  summary: {
+    totalInstallations: number;
+    qaPassedCount: number;
+    qaPassRate: number;
+    qaFailedCount: number;
+    reworkCount: number;
+    reworkRate: number;
+    avgStepsCompliance: number;    // Avg % of 12 steps passed
+    activatedCount: number;        // Count that appear on OES
+    activationRate: number;
+    projectsWorked: string[];
+    activeDays: number;
+  };
+
+  trend: {
+    date: string;
+    installations: number;
+    passed: number;
+    failed: number;
+  }[];
+
+  projectBreakdown: {
+    project: string;
+    installations: number;
+    qaPassRate: number;
+  }[];
+
+  commonFailures: {
+    step: string;
+    failCount: number;
+  }[];
+}
+
+/**
+ * Union type for performance data
+ */
+export type TechnicianPerformance = ActivatorPerformance | InstallerPerformance;
+
+/**
+ * Helper to check if performance is for an activator
+ */
+export function isActivatorPerformance(perf: TechnicianPerformance): perf is ActivatorPerformance {
+  return perf.type === 'activator';
+}
+
+/**
+ * Helper to check if performance is for an installer
+ */
+export function isInstallerPerformance(perf: TechnicianPerformance): perf is InstallerPerformance {
+  return perf.type === 'installer';
 }
 
 export interface DiscoveredTechnician {

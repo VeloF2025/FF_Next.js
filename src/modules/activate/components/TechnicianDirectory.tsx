@@ -34,7 +34,14 @@ import {
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Badge } from '@/shared/components/ui/Badge';
-import type { TechnicianSummary, DiscoveredTechnician, TechnicianType } from '@/types/technician.types';
+import type {
+  TechnicianSummary,
+  ActivatorSummary,
+  InstallerSummary,
+  DiscoveredTechnician,
+  TechnicianType
+} from '@/types/technician.types';
+import { isActivator, isInstaller } from '@/types/technician.types';
 
 interface TechnicianDirectoryProps {
   onViewTechnician?: (id: string) => void;
@@ -280,13 +287,13 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
                     Type
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
-                    Submissions
+                    {typeFilter === 'installer' ? 'Installations' : typeFilter === 'activator' ? 'Submissions' : 'Activity'}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
-                    First Pass
+                    {typeFilter === 'installer' ? 'QA Pass Rate' : 'First Pass'}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
-                    Serial Compliance
+                    {typeFilter === 'installer' ? 'Rework Rate' : 'Serial Compliance'}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
                     Status
@@ -298,72 +305,12 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
                 {technicians.map((tech) => (
-                  <tr key={tech.id} className="hover:bg-[var(--ff-bg-hover)]">
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="font-medium text-[var(--ff-text-primary)]">{tech.name}</p>
-                        {tech.phone && (
-                          <p className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-1">
-                            <Phone className="w-3 h-3" /> {tech.phone}
-                          </p>
-                        )}
-                        {tech.contractor && (
-                          <p className="text-xs text-[var(--ff-text-tertiary)]">{tech.contractor}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={tech.type === 'activator' ? 'success' : 'warning'}>
-                        {tech.type}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="font-medium text-[var(--ff-text-primary)]">
-                        {tech.totalSubmissions}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`font-medium ${
-                        tech.firstPassRate >= 85 ? 'text-green-500' :
-                        tech.firstPassRate >= 70 ? 'text-yellow-500' : 'text-red-500'
-                      }`}>
-                        {tech.firstPassRate}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`font-medium ${
-                        tech.serialComplianceRate >= 95 ? 'text-green-500' :
-                        tech.serialComplianceRate >= 80 ? 'text-yellow-500' : 'text-red-500'
-                      }`}>
-                        {tech.serialComplianceRate}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={tech.status === 'active' ? 'success' : 'secondary'}>
-                        {tech.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingTechnician(tech)}
-                          title="Edit technician"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onViewTechnician?.(tech.id)}
-                          title="View details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+                  <TechnicianRow
+                    key={tech.id}
+                    tech={tech}
+                    onEdit={() => setEditingTechnician(tech)}
+                    onView={() => onViewTechnician?.(tech.id)}
+                  />
                 ))}
               </tbody>
             </table>
@@ -394,6 +341,144 @@ export function TechnicianDirectory({ onViewTechnician }: TechnicianDirectoryPro
       )}
     </div>
   );
+}
+
+/**
+ * Helper component to render a technician row with type-specific stats
+ */
+function TechnicianRow({
+  tech,
+  onEdit,
+  onView,
+}: {
+  tech: TechnicianSummary;
+  onEdit: () => void;
+  onView: () => void;
+}) {
+  // Render activator-specific stats
+  if (isActivator(tech)) {
+    return (
+      <tr className="hover:bg-[var(--ff-bg-hover)]">
+        <td className="px-4 py-3">
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">{tech.name}</p>
+            {tech.phone && (
+              <p className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-1">
+                <Phone className="w-3 h-3" /> {tech.phone}
+              </p>
+            )}
+            {tech.contractor && (
+              <p className="text-xs text-[var(--ff-text-tertiary)]">{tech.contractor}</p>
+            )}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant="success">activator</Badge>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="font-medium text-[var(--ff-text-primary)]">
+            {tech.totalSubmissions}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className={`font-medium ${
+            tech.firstPassRate >= 85 ? 'text-green-500' :
+            tech.firstPassRate >= 70 ? 'text-yellow-500' : 'text-red-500'
+          }`}>
+            {tech.firstPassRate}%
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className={`font-medium ${
+            tech.serialComplianceRate >= 95 ? 'text-green-500' :
+            tech.serialComplianceRate >= 80 ? 'text-yellow-500' : 'text-red-500'
+          }`}>
+            {tech.serialComplianceRate}%
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant={tech.status === 'active' ? 'success' : 'secondary'}>
+            {tech.status}
+          </Badge>
+        </td>
+        <td className="px-4 py-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={onEdit} title="Edit technician">
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onView} title="View details">
+              <Eye className="w-4 h-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  // Render installer-specific stats
+  if (isInstaller(tech)) {
+    return (
+      <tr className="hover:bg-[var(--ff-bg-hover)]">
+        <td className="px-4 py-3">
+          <div>
+            <p className="font-medium text-[var(--ff-text-primary)]">{tech.name}</p>
+            {tech.phone && (
+              <p className="text-xs text-[var(--ff-text-secondary)] flex items-center gap-1">
+                <Phone className="w-3 h-3" /> {tech.phone}
+              </p>
+            )}
+            {tech.contractor && (
+              <p className="text-xs text-[var(--ff-text-tertiary)]">{tech.contractor}</p>
+            )}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant="warning">installer</Badge>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span className="font-medium text-[var(--ff-text-primary)]">
+            {tech.totalInstallations}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          {/* QA Pass Rate: Green ≥90%, Yellow 75-90%, Red <75% */}
+          <span className={`font-medium ${
+            tech.qaPassRate >= 90 ? 'text-green-500' :
+            tech.qaPassRate >= 75 ? 'text-yellow-500' : 'text-red-500'
+          }`}>
+            {tech.qaPassRate}%
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          {/* Rework Rate: Inverse - Green ≤5%, Yellow 5-15%, Red >15% */}
+          <span className={`font-medium ${
+            tech.reworkRate <= 5 ? 'text-green-500' :
+            tech.reworkRate <= 15 ? 'text-yellow-500' : 'text-red-500'
+          }`}>
+            {tech.reworkRate}%
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <Badge variant={tech.status === 'active' ? 'success' : 'secondary'}>
+            {tech.status}
+          </Badge>
+        </td>
+        <td className="px-4 py-3 text-right">
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={onEdit} title="Edit technician">
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onView} title="View details">
+              <Eye className="w-4 h-4" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  // Fallback (should never hit)
+  return null;
 }
 
 interface EditTechnicianModalProps {

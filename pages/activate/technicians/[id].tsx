@@ -14,7 +14,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { activateConfig } from '@/modules/navigation';
-import type { TechnicianPerformance } from '@/types/technician.types';
+import type { TechnicianPerformance, ActivatorPerformance, InstallerPerformance } from '@/types/technician.types';
+import { isActivatorPerformance, isInstallerPerformance } from '@/types/technician.types';
 
 type TimeRange = '7d' | '30d' | '90d';
 
@@ -119,6 +120,51 @@ const TechnicianDetailPage: NextPage = () => {
 
   if (!performance) return null;
 
+  // Render based on technician type
+  if (isInstallerPerformance(performance)) {
+    return (
+      <InstallerDetailView
+        performance={performance}
+        timeRange={timeRange}
+        setTimeRange={setTimeRange}
+        onRefresh={fetchData}
+        onBack={handleBack}
+        isLoading={isLoading}
+      />
+    );
+  }
+
+  // Default: Activator view
+  return (
+    <ActivatorDetailView
+      performance={performance as ActivatorPerformance}
+      timeRange={timeRange}
+      setTimeRange={setTimeRange}
+      onRefresh={fetchData}
+      onBack={handleBack}
+      isLoading={isLoading}
+    />
+  );
+};
+
+/**
+ * Detail view for Activators (DR photo submitters)
+ */
+function ActivatorDetailView({
+  performance,
+  timeRange,
+  setTimeRange,
+  onRefresh,
+  onBack,
+  isLoading,
+}: {
+  performance: ActivatorPerformance;
+  timeRange: TimeRange;
+  setTimeRange: (range: TimeRange) => void;
+  onRefresh: () => void;
+  onBack: () => void;
+  isLoading: boolean;
+}) {
   const { summary } = performance;
   const firstPassPercent = summary.firstPassRate;
   const serialPercent = summary.serialComplianceRate;
@@ -133,16 +179,11 @@ const TechnicianDetailPage: NextPage = () => {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {performance.technicianName}
               </h1>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                performance.type === 'activator'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                  : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-              }`}>
-                {performance.type}
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                activator
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Time Range Selector */}
               <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 {(['7d', '30d', '90d'] as TimeRange[]).map((range) => (
                   <button
@@ -159,7 +200,7 @@ const TechnicianDetailPage: NextPage = () => {
                 ))}
               </div>
               <button
-                onClick={fetchData}
+                onClick={onRefresh}
                 disabled={isLoading}
                 className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
               >
@@ -201,26 +242,16 @@ const TechnicianDetailPage: NextPage = () => {
 
           {/* Performance & Projects Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Performance Gauges */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
                 Performance Scores
               </h3>
               <div className="space-y-4">
-                <ProgressBar
-                  label="First Pass Rate"
-                  value={firstPassPercent}
-                  target={85}
-                />
-                <ProgressBar
-                  label="Serial Compliance"
-                  value={serialPercent}
-                  target={95}
-                />
+                <ProgressBar label="First Pass Rate" value={firstPassPercent} target={85} />
+                <ProgressBar label="Serial Compliance" value={serialPercent} target={95} />
               </div>
             </div>
 
-            {/* Projects Worked */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
                 Projects Worked
@@ -228,10 +259,7 @@ const TechnicianDetailPage: NextPage = () => {
               {summary.projectsWorked.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {summary.projectsWorked.map(project => (
-                    <span
-                      key={project}
-                      className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-sm"
-                    >
+                    <span key={project} className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-sm">
                       {project}
                     </span>
                   ))}
@@ -242,7 +270,7 @@ const TechnicianDetailPage: NextPage = () => {
             </div>
           </div>
 
-          {/* Daily Activity Chart (simplified as table) */}
+          {/* Daily Activity */}
           {performance.trend.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
               <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
@@ -324,9 +352,7 @@ const TechnicianDetailPage: NextPage = () => {
           {summary.totalSubmissions === 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-gray-700 text-center">
               <div className="text-4xl mb-4">📊</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No Submissions Found
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Submissions Found</h3>
               <p className="text-gray-600 dark:text-gray-400">
                 No DR submissions found for this technician in the selected time range.
               </p>
@@ -336,7 +362,7 @@ const TechnicianDetailPage: NextPage = () => {
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
-              onClick={handleBack}
+              onClick={onBack}
               className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
               ← Back to Directory
@@ -346,7 +372,246 @@ const TechnicianDetailPage: NextPage = () => {
       </ModulePage>
     </AppLayout>
   );
-};
+}
+
+/**
+ * Detail view for Installers (based on QA review outcomes)
+ */
+function InstallerDetailView({
+  performance,
+  timeRange,
+  setTimeRange,
+  onRefresh,
+  onBack,
+  isLoading,
+}: {
+  performance: InstallerPerformance;
+  timeRange: TimeRange;
+  setTimeRange: (range: TimeRange) => void;
+  onRefresh: () => void;
+  onBack: () => void;
+  isLoading: boolean;
+}) {
+  const { summary } = performance;
+
+  return (
+    <AppLayout>
+      <ModulePage config={activateConfig}>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {performance.technicianName}
+              </h1>
+              <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                installer
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                {(['7d', '30d', '90d'] as TimeRange[]).map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setTimeRange(range)}
+                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                      timeRange === range
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {range.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={onRefresh}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Stats Cards - Installer specific */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon="🔧"
+              label="Total Installations"
+              value={summary.totalInstallations}
+              detail={`${summary.activeDays} active days`}
+            />
+            <StatCard
+              icon="✅"
+              label="QA Pass Rate"
+              value={`${summary.qaPassRate}%`}
+              detail={`${summary.qaPassedCount} / ${summary.totalInstallations}`}
+              highlight={summary.qaPassRate >= 90 ? 'green' : summary.qaPassRate >= 75 ? 'yellow' : 'red'}
+            />
+            <StatCard
+              icon="🔄"
+              label="Rework Rate"
+              value={`${summary.reworkRate}%`}
+              detail={`${summary.reworkCount} reworks`}
+              highlight={summary.reworkRate <= 5 ? 'green' : summary.reworkRate <= 15 ? 'yellow' : 'red'}
+            />
+            <StatCard
+              icon="📋"
+              label="Steps Compliance"
+              value={`${summary.avgStepsCompliance}%`}
+              detail="Avg 12-step checklist"
+              highlight={summary.avgStepsCompliance >= 90 ? 'green' : summary.avgStepsCompliance >= 75 ? 'yellow' : 'red'}
+            />
+          </div>
+
+          {/* Performance & Projects Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Performance Gauges */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Performance Scores
+              </h3>
+              <div className="space-y-4">
+                <ProgressBar label="QA Pass Rate" value={summary.qaPassRate} target={90} />
+                <ProgressBar label="Steps Compliance" value={summary.avgStepsCompliance} target={90} />
+                <ProgressBar label="Activation Rate" value={summary.activationRate} target={85} />
+              </div>
+            </div>
+
+            {/* Common Failures */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Common Failures
+              </h3>
+              {performance.commonFailures.length > 0 ? (
+                <div className="space-y-2">
+                  {performance.commonFailures.map((f) => (
+                    <div key={f.step} className="flex items-center justify-between">
+                      <span className="text-gray-700 dark:text-gray-300">{f.step}</span>
+                      <span className="px-2 py-0.5 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded text-sm font-medium">
+                        {f.failCount} fails
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400">No common failures recorded</p>
+              )}
+            </div>
+          </div>
+
+          {/* Projects Worked */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+              Projects Worked
+            </h3>
+            {summary.projectsWorked.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {summary.projectsWorked.map(project => (
+                  <span key={project} className="px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full text-sm">
+                    {project}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 dark:text-gray-400">No projects recorded</p>
+            )}
+          </div>
+
+          {/* Daily Activity */}
+          {performance.trend.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Daily Activity ({timeRange === '7d' ? 'Last 7 Days' : timeRange === '30d' ? 'Last 30 Days' : 'Last 90 Days'})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Date</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Installations</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Passed</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Failed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.trend.slice(-10).map((t) => (
+                      <tr key={t.date} className="border-b border-gray-100 dark:border-gray-700/50">
+                        <td className="py-2 text-gray-900 dark:text-white">{t.date}</td>
+                        <td className="py-2 text-center text-gray-900 dark:text-white">{t.installations}</td>
+                        <td className="py-2 text-center text-green-600 dark:text-green-400">{t.passed}</td>
+                        <td className="py-2 text-center text-red-600 dark:text-red-400">{t.failed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Project Breakdown */}
+          {performance.projectBreakdown.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+                Project Breakdown
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Project</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Installations</th>
+                      <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">QA Pass Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.projectBreakdown.map((p) => (
+                      <tr key={p.project} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="py-2 text-gray-900 dark:text-white font-medium">{p.project}</td>
+                        <td className="py-2 text-center text-gray-900 dark:text-white">{p.installations}</td>
+                        <td className="py-2 text-center">
+                          <span className={`font-medium ${
+                            p.qaPassRate >= 90 ? 'text-green-600 dark:text-green-400' :
+                            p.qaPassRate >= 75 ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-red-600 dark:text-red-400'
+                          }`}>
+                            {p.qaPassRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* No Data State */}
+          {summary.totalInstallations === 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-gray-700 text-center">
+              <div className="text-4xl mb-4">🔧</div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Installations Found</h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                No installations found for this technician in the selected time range.
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Directory
+            </button>
+          </div>
+        </div>
+      </ModulePage>
+    </AppLayout>
+  );
+}
 
 function StatCard({
   icon,
