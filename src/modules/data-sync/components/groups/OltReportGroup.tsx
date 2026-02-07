@@ -788,10 +788,16 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 text-xs text-[var(--ff-text-secondary)]">
-              <span>{autoDetectStatus.run.matches} matches</span>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-green-400">{autoDetectStatus.run.matches} matches</span>
               {(autoDetectStatus.run.mismatchesNote4 > 0) && (
                 <span className="text-amber-400">{autoDetectStatus.run.mismatchesNote4} mismatches</span>
+              )}
+              {(autoDetectStatus.run.mismatchesNote2 > 0) && (
+                <span className="text-red-400">{autoDetectStatus.run.mismatchesNote2} not found</span>
+              )}
+              {(autoDetectStatus.run.upsSwaps > 0) && (
+                <span className="text-orange-400">{autoDetectStatus.run.upsSwaps} swaps</span>
               )}
             </div>
           </div>
