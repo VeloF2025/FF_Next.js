@@ -289,7 +289,7 @@ async function getInstallerPerformance(
         p.project_name,
         d.created_at::DATE as install_date,
         upr.qa_decision,
-        d.is_activated,
+        d.oes_confirmed,
         -- Count steps passed (12 boolean step columns)
         (
           CASE WHEN upr.step_01_house_photo THEN 1 ELSE 0 END +
@@ -318,7 +318,7 @@ async function getInstallerPerformance(
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'FAIL') as qa_failed,
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'REWORK_NEEDED') as rework,
       COALESCE(ROUND(AVG(steps_passed) / 12.0 * 100), 0) as avg_steps_compliance,
-      COUNT(DISTINCT drop_number) FILTER (WHERE is_activated = true) as activated,
+      COUNT(DISTINCT drop_number) FILTER (WHERE oes_confirmed = true) as activated,
       ARRAY_AGG(DISTINCT project_name) FILTER (WHERE project_name IS NOT NULL) as projects,
       COUNT(DISTINCT install_date) as active_days
     FROM installer_data
