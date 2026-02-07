@@ -293,16 +293,16 @@ async function getInstallerPerformance(
         -- Count steps passed (12 boolean step columns)
         (
           CASE WHEN upr.step_01_house_photo THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_02_cable_entry THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_03_cable_routing THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_04_splitter THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_05_drop_cable THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_06_ont_serial THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_07_ont_mounted THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_08_power_meter THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_09_ont_lights THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_10_router_setup THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_11_speed_test THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_02_cable_from_pole THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_03_entry_outside THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_04_entry_inside THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_05_wall THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_06_ont_back THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_07_power_meter THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_08_ont_barcode THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_09_ups_serial THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_10_final_installation THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_11_green_lights THEN 1 ELSE 0 END +
           CASE WHEN upr.step_12_signature THEN 1 ELSE 0 END
         ) as steps_passed
       FROM drops d
@@ -390,16 +390,16 @@ async function getInstallerPerformance(
     WITH step_failures AS (
       SELECT
         CASE WHEN NOT COALESCE(upr.step_01_house_photo, false) THEN 'House Photo' END as step_01,
-        CASE WHEN NOT COALESCE(upr.step_02_cable_entry, false) THEN 'Cable Entry' END as step_02,
-        CASE WHEN NOT COALESCE(upr.step_03_cable_routing, false) THEN 'Cable Routing' END as step_03,
-        CASE WHEN NOT COALESCE(upr.step_04_splitter, false) THEN 'Splitter' END as step_04,
-        CASE WHEN NOT COALESCE(upr.step_05_drop_cable, false) THEN 'Drop Cable' END as step_05,
-        CASE WHEN NOT COALESCE(upr.step_06_ont_serial, false) THEN 'ONT Serial' END as step_06,
-        CASE WHEN NOT COALESCE(upr.step_07_ont_mounted, false) THEN 'ONT Mounted' END as step_07,
-        CASE WHEN NOT COALESCE(upr.step_08_power_meter, false) THEN 'Power Meter' END as step_08,
-        CASE WHEN NOT COALESCE(upr.step_09_ont_lights, false) THEN 'ONT Lights' END as step_09,
-        CASE WHEN NOT COALESCE(upr.step_10_router_setup, false) THEN 'Router Setup' END as step_10,
-        CASE WHEN NOT COALESCE(upr.step_11_speed_test, false) THEN 'Speed Test' END as step_11,
+        CASE WHEN NOT COALESCE(upr.step_02_cable_from_pole, false) THEN 'Cable from Pole' END as step_02,
+        CASE WHEN NOT COALESCE(upr.step_03_entry_outside, false) THEN 'Entry Outside' END as step_03,
+        CASE WHEN NOT COALESCE(upr.step_04_entry_inside, false) THEN 'Entry Inside' END as step_04,
+        CASE WHEN NOT COALESCE(upr.step_05_wall, false) THEN 'Wall Installation' END as step_05,
+        CASE WHEN NOT COALESCE(upr.step_06_ont_back, false) THEN 'ONT Back' END as step_06,
+        CASE WHEN NOT COALESCE(upr.step_07_power_meter, false) THEN 'Power Meter' END as step_07,
+        CASE WHEN NOT COALESCE(upr.step_08_ont_barcode, false) THEN 'ONT Barcode' END as step_08,
+        CASE WHEN NOT COALESCE(upr.step_09_ups_serial, false) THEN 'UPS Serial' END as step_09,
+        CASE WHEN NOT COALESCE(upr.step_10_final_installation, false) THEN 'Final Installation' END as step_10,
+        CASE WHEN NOT COALESCE(upr.step_11_green_lights, false) THEN 'Green Lights' END as step_11,
         CASE WHEN NOT COALESCE(upr.step_12_signature, false) THEN 'Signature' END as step_12
       FROM drops d
       INNER JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
