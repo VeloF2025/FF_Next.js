@@ -83,6 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.fix_old_value,
         r.has_ups_swap,
         r.detection_source,
+        r.investigation_context,
         r.resolution_type,
         r.resolution_notes,
         r.escalated_at,

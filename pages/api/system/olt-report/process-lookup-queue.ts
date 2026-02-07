@@ -180,6 +180,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
         );
 
+        // For wrong serials, check if they belong to another DR
+        let investigationContext: string | null = null;
+        if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
+          const ownerLookup = await client.query(
+            `SELECT drop_number, serial_number, team, status
+             FROM oes_activations
+             WHERE UPPER(serial_number) = $1
+             ORDER BY created_at DESC LIMIT 1`,
+            [firstWrongSerial.toUpperCase()]
+          );
+          if (ownerLookup.rows.length > 0) {
+            const owner = ownerLookup.rows[0];
+            if (owner.drop_number !== item.drop_number) {
+              fixStatus = 'needs_investigation';
+              investigationContext = JSON.stringify({
+                reason: 'cross_dr_conflict',
+                wrongSerial: firstWrongSerial,
+                wrongUps: firstUpsSerial,
+                belongsToDr: owner.drop_number,
+                belongsToTeam: owner.team,
+                belongsToStatus: owner.status,
+                totalPropRecords: records.length,
+                correctRecords: correctCount,
+                wrongRecords: wrongCount,
+                swappedRecords: swapCount,
+                message: `ONT ${firstWrongSerial} on 1Map belongs to ${owner.drop_number} (${owner.team}). Cannot auto-fix without losing equipment tracking.`,
+              });
+            }
+          }
+        }
+
         if (mismatchType !== 'match' && importId) {
           await insertMismatchIfNew(client, {
             importId,
@@ -190,6 +221,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             hasUpsSwap,
             oesBatchId: item.oes_batch_id,
             oesSource: 'api',
+            investigationContext,
           });
           mismatchesCreated++;
         } else {
@@ -271,6 +303,7 @@ async function insertMismatchIfNew(
     hasUpsSwap: boolean;
     oesBatchId: string;
     oesSource: string;
+    investigationContext?: string | null;
   }
 ): Promise<void> {
   const existing = await client.query(
@@ -293,10 +326,12 @@ async function insertMismatchIfNew(
         `UPDATE olt_mismatch_records
          SET olt_serial = $1, wrong_onemap_serial = $2,
              has_ups_swap = $3, detection_source = 'auto',
-             oes_batch_id = $4, onemap_source = $5
-         WHERE id = $6`,
+             oes_batch_id = $4, onemap_source = $5,
+             fix_status = $6, investigation_context = $7
+         WHERE id = $8`,
         [data.oltSerial, data.wrongOneMapSerial, data.hasUpsSwap,
-         data.oesBatchId, data.oesSource, ex.id]
+         data.oesBatchId, data.oesSource, data.fixStatus,
+         data.investigationContext || null, ex.id]
       );
       return;
     }
@@ -305,10 +340,11 @@ async function insertMismatchIfNew(
   await client.query(
     `INSERT INTO olt_mismatch_records
       (import_id, drop_number, olt_serial, wrong_onemap_serial, fix_status,
-       has_ups_swap, detection_source, oes_batch_id, onemap_source)
-     VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8)`,
+       has_ups_swap, detection_source, oes_batch_id, onemap_source, investigation_context)
+     VALUES ($1, $2, $3, $4, $5, $6, 'auto', $7, $8, $9)`,
     [data.importId, data.dropNumber, data.oltSerial, data.wrongOneMapSerial,
-     data.fixStatus, data.hasUpsSwap, data.oesBatchId, data.oesSource]
+     data.fixStatus, data.hasUpsSwap, data.oesBatchId, data.oesSource,
+     data.investigationContext || null]
   );
 }
 

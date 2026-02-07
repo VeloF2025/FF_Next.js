@@ -66,12 +66,29 @@ interface OltRecord {
   fix_status?: string;
   fix_result?: string | null;
   fix_old_value?: string | null;
+  investigation_context?: string | null;
+  has_ups_swap?: boolean;
+  detection_source?: string;
   status?: string;
   comparison_status?: string;
   row_index?: number;
   import_filename?: string;
   import_date?: string;
   project?: string;
+}
+
+interface InvestigationContext {
+  reason: string;
+  wrongSerial: string;
+  wrongUps?: string | null;
+  belongsToDr: string;
+  belongsToTeam: string;
+  belongsToStatus: string;
+  totalPropRecords: number;
+  correctRecords: number;
+  wrongRecords: number;
+  swappedRecords: number;
+  message: string;
 }
 
 interface ImportRecord {
@@ -1264,8 +1281,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                 </thead>
                 <tbody>
                   {records.map((record) => (
+                    <React.Fragment key={record.id}>
                     <tr
-                      key={record.id}
                       className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${
                         selectedIds.has(record.id) ? 'bg-[var(--ff-accent)]/10' : ''
                       }`}
@@ -1304,11 +1321,18 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                               ? 'bg-green-500/20 text-green-400'
                               : record.fix_status === 'escalated'
                               ? 'bg-red-500/20 text-red-400'
+                              : record.fix_status === 'needs_investigation'
+                              ? 'bg-purple-500/20 text-purple-400'
                               : 'bg-amber-500/20 text-amber-400'
                           }`}
                         >
                           {record.fix_status || 'pending'}
                         </span>
+                        {record.has_ups_swap && (
+                          <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-orange-500/20 text-orange-400">
+                            UPS Swap
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -1365,7 +1389,59 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    {/* Investigation context row - shown below the record on Investigate tab */}
+                    {currentTab === 'investigate' && record.investigation_context && (() => {
+                      try {
+                        const ctx: InvestigationContext = JSON.parse(record.investigation_context);
+                        return (
+                          <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
+                            <td colSpan={5} className="py-2 px-4">
+                              <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-3 text-xs space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                                  <span className="font-semibold text-purple-300">
+                                    Cross-DR Conflict Detected
+                                  </span>
+                                </div>
+                                <p className="text-[var(--ff-text-secondary)] leading-relaxed">
+                                  The ONT serial <span className="font-mono text-red-400">{ctx.wrongSerial}</span> currently on 1Map
+                                  belongs to <a
+                                    href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${ctx.belongsToDr}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-mono text-[var(--ff-accent)] hover:underline"
+                                  >{ctx.belongsToDr}</a> ({ctx.belongsToTeam}).
+                                  {ctx.wrongUps && (
+                                    <> UPS: <span className="font-mono text-orange-400">{ctx.wrongUps}</span>.</>
+                                  )}
+                                </p>
+                                <div className="flex gap-4 text-[var(--ff-text-tertiary)]">
+                                  <span>1Map records: {ctx.totalPropRecords}</span>
+                                  <span className="text-green-400">Correct: {ctx.correctRecords}</span>
+                                  <span className="text-red-400">Wrong: {ctx.wrongRecords}</span>
+                                  {ctx.swappedRecords > 0 && (
+                                    <span className="text-orange-400">Swapped: {ctx.swappedRecords}</span>
+                                  )}
+                                </div>
+                                <div className="mt-1 pt-2 border-t border-purple-500/10">
+                                  <p className="font-medium text-[var(--ff-text-primary)] mb-1">Resolution Options:</p>
+                                  <ul className="list-disc list-inside space-y-0.5 text-[var(--ff-text-secondary)]">
+                                    <li>Check if <span className="font-mono text-[var(--ff-accent)]">{ctx.belongsToDr}</span> has correct photos and activation data</li>
+                                    <li>Verify if equipment was physically moved between drops</li>
+                                    <li>Contact {ctx.belongsToTeam} team to confirm which DR has the equipment</li>
+                                    <li>Update both DRs in 1Map once confirmed</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      } catch {
+                        return null;
+                      }
+                    })()}
+                  </React.Fragment>
+                ))}
                 </tbody>
               </table>
             </div>
