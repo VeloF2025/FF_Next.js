@@ -164,9 +164,13 @@ export interface InstallerPerformance {
     qaFailedCount: number;
     reworkCount: number;
     reworkRate: number;
-    avgStepsCompliance: number;    // Avg % of 12 steps passed
+    avgStepsCompliance: number;    // Avg % of 10 steps passed
     activatedCount: number;        // Count that appear on OES
     activationRate: number;
+    // Signal quality metrics (from VLM power meter extraction)
+    avgDbReading: number | null;   // Average dBm reading
+    dbInRangeCount: number;        // Count with dBm in valid range (-18 to -24)
+    dbInRangeRate: number;         // % with valid dBm
     projectsWorked: string[];
     activeDays: number;
   };

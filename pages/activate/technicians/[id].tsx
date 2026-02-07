@@ -460,8 +460,15 @@ function InstallerDetailView({
               icon="📋"
               label="Steps Compliance"
               value={`${summary.avgStepsCompliance}%`}
-              detail="Avg 12-step checklist"
+              detail="Avg 10-step checklist"
               highlight={summary.avgStepsCompliance >= 90 ? 'green' : summary.avgStepsCompliance >= 75 ? 'yellow' : 'red'}
+            />
+            <StatCard
+              icon="📶"
+              label="Signal Quality"
+              value={summary.avgDbReading !== null ? `${summary.avgDbReading} dBm` : 'N/A'}
+              detail={`${summary.dbInRangeRate}% in range (-18 to -24)`}
+              highlight={summary.dbInRangeRate >= 90 ? 'green' : summary.dbInRangeRate >= 75 ? 'yellow' : 'red'}
             />
           </div>
 
@@ -475,6 +482,7 @@ function InstallerDetailView({
               <div className="space-y-4">
                 <ProgressBar label="QA Pass Rate" value={summary.qaPassRate} target={90} />
                 <ProgressBar label="Steps Compliance" value={summary.avgStepsCompliance} target={90} />
+                <ProgressBar label="Signal In Range" value={summary.dbInRangeRate} target={90} />
                 <ProgressBar label="Activation Rate" value={summary.activationRate} target={85} />
               </div>
             </div>

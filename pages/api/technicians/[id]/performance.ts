@@ -280,7 +280,7 @@ async function getInstallerPerformance(
 
   const matchParams = [dateFromStr, dateToStr, installerName];
 
-  // Get performance summary with 10-step compliance
+  // Get performance summary with 10-step compliance and dB metrics
   const summaryResult = await pool.query(
     `
     WITH installer_data AS (
@@ -290,6 +290,7 @@ async function getInstallerPerformance(
         d.created_at::DATE as install_date,
         upr.qa_decision,
         d.oes_confirmed,
+        upr.vlm_power_meter_dbm,
         -- Count steps passed (10 boolean step columns)
         (
           CASE WHEN upr.step_01_house_photo THEN 1 ELSE 0 END +
@@ -317,6 +318,10 @@ async function getInstallerPerformance(
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'REWORK_NEEDED') as rework,
       COALESCE(ROUND(AVG(steps_passed) / 10.0 * 100), 0) as avg_steps_compliance,
       COUNT(DISTINCT drop_number) FILTER (WHERE oes_confirmed = true) as activated,
+      -- Signal quality metrics (valid range: -18 to -24 dBm)
+      ROUND(AVG(vlm_power_meter_dbm)::NUMERIC, 1) as avg_db_reading,
+      COUNT(DISTINCT drop_number) FILTER (WHERE vlm_power_meter_dbm IS NOT NULL AND vlm_power_meter_dbm BETWEEN -24 AND -18) as db_in_range,
+      COUNT(DISTINCT drop_number) FILTER (WHERE vlm_power_meter_dbm IS NOT NULL) as db_readings_count,
       ARRAY_AGG(DISTINCT project_name) FILTER (WHERE project_name IS NOT NULL) as projects,
       COUNT(DISTINCT install_date) as active_days
     FROM installer_data
@@ -330,6 +335,9 @@ async function getInstallerPerformance(
   const qaFailedCount = parseInt(summary.qa_failed) || 0;
   const reworkCount = parseInt(summary.rework) || 0;
   const activatedCount = parseInt(summary.activated) || 0;
+  const avgDbReading = summary.avg_db_reading ? parseFloat(summary.avg_db_reading) : null;
+  const dbInRangeCount = parseInt(summary.db_in_range) || 0;
+  const dbReadingsCount = parseInt(summary.db_readings_count) || 0;
 
   // Get daily trend
   const trendResult = await pool.query(
@@ -434,6 +442,10 @@ async function getInstallerPerformance(
       avgStepsCompliance: parseInt(summary.avg_steps_compliance) || 0,
       activatedCount,
       activationRate: totalInstallations > 0 ? Math.round((activatedCount / totalInstallations) * 100) : 0,
+      // Signal quality metrics
+      avgDbReading,
+      dbInRangeCount,
+      dbInRangeRate: dbReadingsCount > 0 ? Math.round((dbInRangeCount / dbReadingsCount) * 100) : 0,
       projectsWorked: summary.projects || [],
       activeDays: parseInt(summary.active_days) || 0,
     },
