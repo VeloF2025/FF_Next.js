@@ -25,14 +25,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Get latest run
+    // Get active run first (running/processing_queue), fall back to latest
     const runResult = await pool.query(
       `SELECT id, oes_batch_id, total_oes_rows, cache_hits, cache_misses,
               matches, mismatches_note2, mismatches_note4, ups_swaps,
               duplicates_skipped, api_lookups_queued, status,
               started_at, completed_at, error_message
        FROM olt_auto_detect_runs
-       ORDER BY id DESC
+       ORDER BY
+         CASE WHEN status IN ('running', 'processing_queue') THEN 0 ELSE 1 END,
+         id DESC
        LIMIT 1`
     );
 
@@ -42,11 +44,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const run = runResult.rows[0];
 
-    // Get queue progress
+    // Get queue progress - check across ALL batches for this run's batch,
+    // but also check global pending items (in case run was cleaned up)
     const queueResult = await pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
          COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+         COUNT(*) FILTER (WHERE status = 'processing')::int AS processing,
          COUNT(*) FILTER (WHERE status = 'error')::int AS errors,
          COUNT(*)::int AS total
        FROM olt_onemap_lookup_queue
@@ -54,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       [run.oes_batch_id]
     );
 
-    const queue = queueResult.rows[0] || { pending: 0, completed: 0, errors: 0, total: 0 };
+    const queue = queueResult.rows[0] || { pending: 0, completed: 0, processing: 0, errors: 0, total: 0 };
 
     return apiResponse.success(res, {
       hasRun: true,
