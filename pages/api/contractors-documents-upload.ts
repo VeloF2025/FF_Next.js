@@ -22,6 +22,18 @@ import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
+/** Validate file content matches expected type by checking magic bytes */
+function validateMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('FFD8FF')) return { valid: true, detectedType: 'image/jpeg' };
+  if (hex.startsWith('89504E47')) return { valid: true, detectedType: 'image/png' };
+  if (hex.startsWith('25504446')) return { valid: true, detectedType: 'application/pdf' };
+  if (hex.startsWith('D0CF11E0')) return { valid: true, detectedType: 'application/msword' }; // DOC/XLS (OLE2)
+  if (hex.startsWith('504B0304')) return { valid: true, detectedType: 'application/zip' }; // DOCX/XLSX (ZIP-based)
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // Disable body parser to handle multipart form data
 // Increase response size limit to allow 10MB file uploads
 export const config = {
@@ -98,6 +110,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Read file buffer
     const fileBuffer = await fs.promises.readFile(file.filepath);
+
+    // Validate magic bytes match an allowed file type
+    const { valid, detectedType } = validateMagicBytes(fileBuffer);
+    if (!valid) {
+      await fs.promises.unlink(file.filepath).catch(() => {});
+      return res.status(400).json({
+        error: `File content does not match an allowed type (detected: ${detectedType}). Allowed: PDF, JPG, PNG, Word, Excel`
+      });
+    }
 
     // Upload to VF Storage API
     // Path convention: contractors/documents/{contractorId}_{timestamp}_{filename}

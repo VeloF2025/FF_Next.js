@@ -8,6 +8,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import ws from 'ws';
 import type { WaMessageLogFilters } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -146,7 +147,7 @@ async function handler(
     return res.status(200).send(csv);
 
   } catch (error) {
-    console.error('[WA Logs Export API] Error:', error);
+    log.error('[WA Logs Export API] Error', { error });
     return res.status(500).json({ error: 'Failed to export logs' });
   }
 }

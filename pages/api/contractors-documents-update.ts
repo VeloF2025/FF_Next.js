@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -63,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error updating document:', error);
+    log.error('Error updating document', { error });
     return res.status(500).json({
       error: 'Failed to update document',
       message: error.message

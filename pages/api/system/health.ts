@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { performHealthCheck, getHealthHistory } from '@/modules/system/services/infrastructureHealthService';
 import type { SystemHealthResponse } from '@/modules/system/types/infrastructure.types';
+import { log } from '@/lib/logger';
 
 interface HealthHistoryResponse {
   entries: SystemHealthResponse['summary'][];
@@ -70,7 +71,7 @@ export default async function handler(
 
     return res.status(statusCode).json(healthStatus);
   } catch (error) {
-    console.error('Health check failed:', error);
+    log.error('Health check failed', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Health check failed',
     });

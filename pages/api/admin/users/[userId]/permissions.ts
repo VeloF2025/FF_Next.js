@@ -18,6 +18,7 @@ import {
   getPermissions,
 } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -117,7 +118,7 @@ async function handleGet(
       overrideCount: overrides.length,
     });
   } catch (error) {
-    console.error('Error fetching user permissions:', error);
+    log.error('Error fetching user permissions', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -190,7 +191,7 @@ async function handlePost(
       actions,
     });
   } catch (error) {
-    console.error('Error updating user permission:', error);
+    log.error('Error updating user permission', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -227,7 +228,7 @@ async function handleDelete(
       permissionKey,
     });
   } catch (error) {
-    console.error('Error removing user permission override:', error);
+    log.error('Error removing user permission override', { error });
     return apiResponse.internalError(res, error);
   }
 }

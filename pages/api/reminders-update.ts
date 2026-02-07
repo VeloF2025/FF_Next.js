@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -78,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       data: result[0]
     });
   } catch (error) {
-    console.error('Reminder update error:', error);
+    log.error('Reminder update error', { error });
     return res.status(500).json({
       success: false,
       error: 'Internal server error'

@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { vfStorage } from '@/services/vfStorageAdapter';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -46,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }
     } catch (storageError) {
-      console.error('VF Storage delete error:', storageError);
+      log.error('VF Storage delete error', { error: storageError });
       // Continue even if file delete fails (file might already be gone)
     }
 
@@ -60,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error deleting document:', errorMessage);
+    log.error('Error deleting document', { error: errorMessage });
     return res.status(500).json({
       error: 'Failed to delete document',
       message: errorMessage

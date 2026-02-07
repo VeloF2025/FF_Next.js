@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -28,7 +29,7 @@ export default async function handler(
       environment: process.env.NODE_ENV || 'development'
     });
   } catch (error) {
-    console.error('Health check error:', error);
+    log.error('Health check error', { error });
     return res.status(503).json({ 
       status: 'unhealthy',
       database: 'disconnected',

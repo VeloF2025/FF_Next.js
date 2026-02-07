@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { safeArrayQuery, safeMutation } from '../../../../lib/safe-query';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -24,7 +25,7 @@ async function handler(
         message: 'Schedules functionality is being migrated'
       });
     } catch (error) {
-      console.error('Error fetching schedules:', error);
+      log.error('Error fetching schedules', { error });
       res.status(500).json({ error: 'Failed to fetch schedules' });
     }
   } else if (req.method === 'POST') {

@@ -9,7 +9,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
-
+import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -49,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         },
       });
     } catch (error) {
-      console.error('Error fetching stock item:', error);
+      log.error('Error fetching stock item', { error });
       return res.status(500).json({ error: 'Failed to fetch stock item' });
     }
   }
@@ -105,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(200).json({ data: mapDbToStockItem(updated) });
     } catch (error: any) {
-      console.error('Error updating stock item:', error);
+      log.error('Error updating stock item', { error });
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Item with this code already exists' });
       }
@@ -140,7 +140,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(200).json({ success: true, message: 'Stock item deleted successfully' });
     } catch (error) {
-      console.error('Error deleting stock item:', error);
+      log.error('Error deleting stock item', { error });
       return res.status(500).json({ error: 'Failed to delete stock item' });
     }
   }

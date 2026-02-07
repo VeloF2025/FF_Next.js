@@ -18,6 +18,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -73,7 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, { drops, total: drops.length });
     } catch (error: any) {
-      console.error('Error fetching drops:', error);
+      log.error('Error fetching drops', { error });
       return apiResponse.internalError(res, error, 'Failed to fetch drops');
     }
   }
@@ -210,7 +211,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error: any) {
-      console.error('Error validating CSV:', error);
+      log.error('Error validating CSV', { error });
       return apiResponse.internalError(res, error, 'Failed to validate CSV');
     }
   }
@@ -282,7 +283,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ids: insertedIds,
       }, `${insertedIds.length} drop(s) added successfully`);
     } catch (error: any) {
-      console.error('Error adding drops:', error);
+      log.error('Error adding drops', { error });
       return apiResponse.internalError(res, error, 'Failed to add drops');
     }
   }
@@ -310,7 +311,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, { deleted: true, id });
     } catch (error: any) {
-      console.error('Error deleting drop:', error);
+      log.error('Error deleting drop', { error });
       return apiResponse.internalError(res, error, 'Failed to delete drop');
     }
   }

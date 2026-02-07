@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 /**
  * SOW Tables Check API Route
@@ -46,10 +47,10 @@ async function handler(
       error: result.error,
     });
   } catch (error) {
-    console.error('SOW tables check error:', error);
-    return res.status(500).json({ 
+    log.error('SOW tables check error', { error });
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to check SOW tables' 
+      error: error instanceof Error ? error.message : 'Failed to check SOW tables'
     });
   }
 }

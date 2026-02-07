@@ -7,6 +7,7 @@ import type { NextApiResponse } from 'next';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getPermissions, getPermissionTree } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: AuthenticatedNextApiRequest,
@@ -55,7 +56,7 @@ async function handler(
       total: permissions.length,
     });
   } catch (error) {
-    console.error('Error fetching permissions:', error);
+    log.error('Error fetching permissions', { error });
     return apiResponse.internalError(res, error);
   }
 }

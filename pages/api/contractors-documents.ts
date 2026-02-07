@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -75,7 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error fetching documents:', error);
+    log.error('Error fetching documents', { error });
     return res.status(500).json({
       error: 'Failed to fetch documents',
       message: error.message

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -182,10 +183,10 @@ async function handler(
         return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('Client API error:', error);
-    return res.status(500).json({ 
+    log.error('Client API error', { error });
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal server error' 
+      error: error instanceof Error ? error.message : 'Internal server error'
     });
   }
 }

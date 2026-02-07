@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -85,7 +86,7 @@ async function handler(
         });
     }
   } catch (error: any) {
-    console.error('Import Status API Error:', error);
+    log.error('Import Status API Error', { error });
     return res.status(500).json({ success: false, data: null, error: 'Internal server error' });
   }
 }

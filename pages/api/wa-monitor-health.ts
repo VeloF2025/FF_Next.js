@@ -14,6 +14,7 @@ import { neon } from '@neondatabase/serverless';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const execAsync = promisify(exec);
 const sql = neon(process.env.DATABASE_URL || '');
@@ -100,7 +101,7 @@ async function handler(
       },
     });
   } catch (error) {
-    console.error('Health check error:', error);
+    log.error('Health check error', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Health check failed',
     });

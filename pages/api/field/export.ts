@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -27,7 +28,7 @@ async function handler(
     
     res.status(200).send(csv);
   } catch (error) {
-    console.error('Error exporting data:', error);
+    log.error('Error exporting data', { error });
     res.status(500).json({ error: 'Failed to export data' });
   }
 }

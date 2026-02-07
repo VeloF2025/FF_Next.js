@@ -14,6 +14,7 @@ import type {
   WaPhoneNumber,
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -70,7 +71,7 @@ async function handleGet(
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('[WA Phone API] GET error:', error);
+    log.error('[WA Phone API] GET error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -149,7 +150,7 @@ async function handlePut(
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('[WA Phone API] PUT error:', error);
+    log.error('[WA Phone API] PUT error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -229,7 +230,7 @@ async function handleDelete(
       message: 'Phone number deleted',
     });
   } catch (error) {
-    console.error('[WA Phone API] DELETE error:', error);
+    log.error('[WA Phone API] DELETE error', { error });
     return apiResponse.internalError(res, error);
   }
 }

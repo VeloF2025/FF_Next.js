@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 
 const pool = new Pool({
@@ -63,7 +64,7 @@ async function handler(
         `);
         viewDefinition = defResult.rows[0]?.view_definition;
       } catch (e) {
-        console.error('Error querying view:', e);
+        log.error('Error querying view', { error: e });
       }
     }
 
@@ -104,7 +105,7 @@ WHERE oes.latitude IS NOT NULL
     });
 
   } catch (error) {
-    console.error('Check OES view error:', error);
+    log.error('Check OES view error', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to check OES view'
     });

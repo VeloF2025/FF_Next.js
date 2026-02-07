@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -142,7 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
     } catch (error) {
-      console.error('Error fetching Nokia velocity data:', error);
+      log.error('Error fetching Nokia velocity data', { error });
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch Nokia velocity data'

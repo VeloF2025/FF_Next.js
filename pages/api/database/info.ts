@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-
+import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 /**
  * Database Info API Route
@@ -40,7 +40,7 @@ async function handler(
       error: result.error,
     });
   } catch (error) {
-    console.error('Database info error:', error);
+    log.error('Database info error', { error });
     return res.status(500).json({ 
       success: false,
       connected: false,

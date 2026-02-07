@@ -1,6 +1,7 @@
 // Recordings API - List and Delete recordings
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
 
@@ -71,7 +72,7 @@ async function handler(
 
             return res.status(200).json({ recordings });
         } catch (error: any) {
-            console.error('Error listing recordings:', error);
+            log.error('Error listing recordings', { error });
             return res.status(500).json({ error: error.message });
         }
     }
@@ -106,7 +107,7 @@ async function handler(
 
             return res.status(200).json({ success: true });
         } catch (error: any) {
-            console.error('Error deleting recording:', error);
+            log.error('Error deleting recording', { error });
             return res.status(500).json({ error: error.message });
         }
     }

@@ -12,6 +12,7 @@ import {
   deleteAllUserSessions,
   AUTH_COOKIE_NAME,
 } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 interface LogoutRequestBody {
   allDevices?: boolean;
@@ -65,7 +66,7 @@ export default async function handler(
       data: { message: allDevices ? 'Logged out from all devices' : 'Logged out successfully' },
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    log.error('Logout error', { error });
 
     // Still clear the cookie even on error
     const cookie = serialize(AUTH_COOKIE_NAME, '', {

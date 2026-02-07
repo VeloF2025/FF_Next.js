@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: NextApiRequest,
@@ -49,7 +50,7 @@ async function handler(
       data: evaluation,
     });
   } catch (error) {
-    console.error('Error fetching evaluation:', error);
+    log.error('Error fetching evaluation', { error });
     return res.status(500).json({
       error: 'Failed to fetch evaluation',
       message: error instanceof Error ? error.message : 'Unknown error',

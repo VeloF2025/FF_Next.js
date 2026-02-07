@@ -12,6 +12,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { createBOQImportEnhanced, ImportOptions } from '@/services/procurement/import';
 import type { BOQImportResult } from '@/types/procurement/material-catalog.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Disable body parser for file upload
 export const config = {
@@ -91,7 +92,7 @@ async function handler(
       });
     }
   } catch (error) {
-    console.error('BOQ Import Error:', error);
+    log.error('BOQ Import Error', { error });
     return apiResponse.internalError(res, error, 'Failed to import BOQ');
   }
 }

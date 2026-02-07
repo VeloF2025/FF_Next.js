@@ -6,6 +6,7 @@ import { withAuth } from '@/lib/auth';
 import { startRecording, stopRecording } from '@/modules/livekit/services/livekitService';
 import type { RecordingRequest, RecordingResponse } from '@/modules/livekit/types/livekit.types';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -59,7 +60,7 @@ async function handler(
 
         return res.status(400).json({ success: false, error: 'Invalid action' });
     } catch (error: any) {
-        console.error('Recording API error:', error);
+        log.error('Recording API error', { error });
         return res.status(500).json({ success: false, error: error.message });
     }
 }

@@ -21,6 +21,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -122,7 +123,7 @@ async function updateOnemapSerials(
 
     return true;
   } catch (error) {
-    console.error(`Error updating onemap_properties for ${dropNumber}:`, error);
+    log.error(`Error updating onemap_properties for ${dropNumber}`, { error });
     return false;
   }
 }

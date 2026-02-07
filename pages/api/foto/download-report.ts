@@ -9,6 +9,7 @@ import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR } from '@/modules/photo-review/services/fotoDbService';
 import { generateMarkdownReport, generateReportFilename } from '@/modules/photo-review/services/markdownReportService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: NextApiRequest,
@@ -62,7 +63,7 @@ async function handler(
     // Send markdown content
     return res.status(200).send(markdownContent);
   } catch (error) {
-    console.error('Error generating report:', error);
+    log.error('Error generating report', { error });
     return res.status(500).json({
       error: 'Failed to generate report',
       message: error instanceof Error ? error.message : 'Unknown error',

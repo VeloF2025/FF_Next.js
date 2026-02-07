@@ -8,6 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Pool } from 'pg';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 
 const pool = new Pool({
@@ -105,7 +106,7 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('Check OES coordinates error:', error);
+    log.error('Check OES coordinates error', { error });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to check OES coordinates'
     });

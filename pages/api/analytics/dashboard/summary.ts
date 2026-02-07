@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Initialize Neon client
 const sql = neon(process.env.DATABASE_URL!);
@@ -136,8 +137,8 @@ async function handler(
       data: summary
     });
   } catch (error) {
-    console.error('Dashboard summary error:', error);
-    
+    log.error('Dashboard summary error', { error });
+
     return res.status(200).json({
       success: true,
       data: {

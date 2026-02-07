@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import path from 'path';
+import { log } from '@/lib/logger';
 
 // MIME type mapping for common file types
 const MIME_TYPES: Record<string, string> = {
@@ -85,7 +86,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Send the file
     return res.status(200).send(fileBuffer);
   } catch (error) {
-    console.error('File serving error:', error);
+    log.error('File serving error', { error });
     return res.status(500).json({ error: 'Failed to serve file' });
   }
 }

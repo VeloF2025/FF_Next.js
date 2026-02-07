@@ -6,6 +6,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -91,7 +92,7 @@ async function handler(
     });
     
   } catch (error: any) {
-    console.error('Polling error:', error);
+    log.error('Polling error', { error });
     res.status(500).json({
       error: 'Failed to fetch changes',
       message: error.message

@@ -15,6 +15,7 @@ import type {
   WaAdminApiResponse
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -49,7 +50,7 @@ async function handler(
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'POST']);
     }
   } catch (error) {
-    console.error('[WA Template API] Error:', error);
+    log.error('[WA Template API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -283,7 +284,7 @@ async function logAdminAction(
       ]
     );
   } catch (error) {
-    console.error('[WA Admin] Failed to log audit action:', error);
+    log.error('[WA Admin] Failed to log audit action', { error });
   }
 }
 

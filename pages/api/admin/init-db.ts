@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL');
 
@@ -187,10 +188,10 @@ async function handler(
     });
 
   } catch (error: any) {
-    console.error('Error initializing database:', error);
-    return res.status(500).json({ 
+    log.error('Error initializing database', { error });
+    return res.status(500).json({
       error: 'Failed to initialize database',
-      details: error.message 
+      details: error.message
     });
   }
 }

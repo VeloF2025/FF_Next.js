@@ -4,6 +4,7 @@ import formidable from 'formidable';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Configure formidable to handle file uploads
 export const config = {
@@ -231,7 +232,7 @@ async function storeInDatabase(records: any[], importId: string) {
       
       recordsImported++;
     } catch (error) {
-      console.error(`Error processing record ${record.property_id}:`, error);
+      log.error(`Error processing record ${record.property_id}`, { error });
       // Continue with next record
     }
   }
@@ -317,10 +318,10 @@ async function handler(
     }
 
   } catch (error) {
-    console.error('File upload error:', error);
-    return res.status(500).json({ 
+    log.error('File upload error', { error });
+    return res.status(500).json({
       error: 'Failed to process file',
-      details: error.message 
+      details: error.message
     });
   }
 }

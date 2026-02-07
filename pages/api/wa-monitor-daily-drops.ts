@@ -16,6 +16,7 @@ import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { getDailyDropsPerProject } from '@/modules/wa-monitor/services/waMonitorService';
 import { withArcjetProtection, ajWaMonitor } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
@@ -36,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error in wa-monitor-daily-drops API:', error);
+    log.error('Error in wa-monitor-daily-drops API', { error });
     return apiResponse.internalError(res, error, 'Failed to fetch daily drops');
   }
 }

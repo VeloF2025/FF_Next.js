@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL');
 
@@ -38,7 +39,7 @@ async function handler(
         return res.status(405).json({ success: false, data: null, message: `Method ${req.method} not allowed` });
     }
   } catch (error: any) {
-    console.error('Poles API Error:', error);
+    log.error('Poles API Error', { error });
     return res.status(500).json({ success: false, data: null, error: 'Internal server error' });
   }
 }
@@ -115,7 +116,7 @@ async function handleGetPoles(req: NextApiRequest, res: NextApiResponse<PoleData
     });
     
   } catch (error: any) {
-    console.error('Error fetching poles:', error);
+    log.error('Error fetching poles', { error });
     return res.status(500).json({ success: false, data: null, error: 'Failed to fetch poles' });
   }
 }
@@ -154,7 +155,7 @@ async function handleCreatePole(req: NextApiRequest, res: NextApiResponse<PoleDa
     return res.status(201).json({ success: true, data: newPole[0] });
     
   } catch (error: any) {
-    console.error('Error creating pole:', error);
+    log.error('Error creating pole', { error });
     return res.status(500).json({ success: false, data: null, error: 'Failed to create pole' });
   }
 }
@@ -198,7 +199,7 @@ async function handleUpdatePole(req: NextApiRequest, res: NextApiResponse<PoleDa
     return res.status(200).json({ success: true, data: updatedPole[0] });
     
   } catch (error: any) {
-    console.error('Error updating pole:', error);
+    log.error('Error updating pole', { error });
     return res.status(500).json({ success: false, data: null, error: 'Failed to update pole' });
   }
 }
@@ -216,7 +217,7 @@ async function handleDeletePole(req: NextApiRequest, res: NextApiResponse<PoleDa
     return res.status(200).json({ success: true, data: null, message: 'Pole deleted successfully' });
     
   } catch (error: any) {
-    console.error('Error deleting pole:', error);
+    log.error('Error deleting pole', { error });
     return res.status(500).json({ success: false, data: null, error: 'Failed to delete pole' });
   }
 }

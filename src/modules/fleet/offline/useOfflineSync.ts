@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { syncOfflineData, getSyncStatus, SyncProgress, SyncResult } from './syncEngine';
 import { useOnlineStatus } from './useOnlineStatus';
+import { log } from '@/lib/logger';
 
 interface UseSyncState {
   isSyncing: boolean;
@@ -45,14 +46,14 @@ export function useOfflineSync(): UseOfflineSyncReturn {
         checkInCount: status.checkIns,
       }));
     } catch (error) {
-      console.error('[useOfflineSync] Error refreshing status:', error);
+      log.error('[useOfflineSync] Error refreshing status', { error });
     }
   }, []);
 
   // Trigger sync
   const triggerSync = useCallback(async (): Promise<SyncResult | null> => {
     if (!isOnline || syncInProgress.current) {
-      console.log('[useOfflineSync] Cannot sync: offline or already syncing');
+      log.info('[useOfflineSync] Cannot sync: offline or already syncing');
       return null;
     }
 
@@ -75,7 +76,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
 
       return result;
     } catch (error) {
-      console.error('[useOfflineSync] Sync error:', error);
+      log.error('[useOfflineSync] Sync error', { error });
       setState((prev) => ({
         ...prev,
         isSyncing: false,
@@ -106,7 +107,7 @@ export function useOfflineSync(): UseOfflineSyncReturn {
   // Auto-sync when coming back online
   useEffect(() => {
     if (wasOffline && isOnline && state.pendingCount > 0 && !state.isSyncing) {
-      console.log('[useOfflineSync] Back online with pending items, triggering sync');
+      log.info('[useOfflineSync] Back online with pending items, triggering sync');
       // Small delay to ensure connection is stable
       const timer = setTimeout(() => {
         triggerSync();

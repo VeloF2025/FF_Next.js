@@ -12,6 +12,7 @@ import { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaMonitoredGroup, WaMonitoredGroupInput, WaAdminApiResponse } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
@@ -43,7 +44,7 @@ async function handler(
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('[WA Group API] Error:', error);
+    log.error('[WA Group API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -163,7 +164,7 @@ async function handlePut(
   try {
     await fetch('http://72.61.197.178:8083/reload-groups', { method: 'GET' });
   } catch (e) {
-    console.warn('[WA Groups] Failed to trigger bridge reload:', e);
+    log.warn('[WA Groups] Failed to trigger bridge reload', { error: e });
   }
 
   return res.status(200).json({
@@ -202,7 +203,7 @@ async function handleDelete(
   try {
     await fetch('http://72.61.197.178:8083/reload-groups', { method: 'GET' });
   } catch (e) {
-    console.warn('[WA Groups] Failed to trigger bridge reload:', e);
+    log.warn('[WA Groups] Failed to trigger bridge reload', { error: e });
   }
 
   return res.status(200).json({

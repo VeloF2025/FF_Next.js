@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Initialize database connection
 const sql = neon(process.env.DATABASE_URL!);
@@ -92,7 +93,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
       }
     });
   } catch (error) {
-    console.error('Error in GET /api/sow:', error);
+    log.error('Error in GET /api/sow', { error });
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch SOW data',
@@ -179,7 +180,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
       errors: processedResult.errors,
     });
   } catch (error) {
-    console.error('Error in POST /api/sow:', error);
+    log.error('Error in POST /api/sow', { error });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -202,10 +203,10 @@ async function handleGetStatus(req: NextApiRequest, res: NextApiResponse, userId
     if (!sowImport[0]) {
       return res.status(404).json({ error: 'Import not found' });
     }
-    
+
     return res.status(200).json(sowImport[0]);
   } catch (error) {
-    console.error('Error in GET /api/sow/status:', error);
+    log.error('Error in GET /api/sow/status', { error });
     return res.status(500).json({ error: 'Failed to fetch import status' });
   }
 }

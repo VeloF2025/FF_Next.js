@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { safeArrayQuery } from '../../../../lib/safe-query';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: NextApiRequest,
@@ -29,7 +30,7 @@ async function handler(
         message: 'Quality checks functionality is being migrated'
       });
     } catch (error) {
-      console.error('Error fetching quality checks:', error);
+      log.error('Error fetching quality checks', { error });
       res.status(500).json({ error: 'Failed to fetch quality checks' });
     }
   } else if (req.method === 'POST') {

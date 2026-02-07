@@ -5,6 +5,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 import { getQFieldPoles } from '@/modules/qfield-sync/services/qfieldcloudApiService';
 
@@ -92,7 +93,7 @@ async function handler(
         source: 'qfieldcloud'
       }));
     } catch (error) {
-      console.error('Error fetching QFieldCloud poles:', error);
+      log.error('Error fetching QFieldCloud poles', { error });
       // If QFieldCloud fails, continue with empty array
       qfieldData = [];
     }
@@ -152,7 +153,7 @@ async function handler(
 
     res.status(200).json(response);
   } catch (error) {
-    console.error('Error fetching pole data:', error);
+    log.error('Error fetching pole data', { error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pole data',

@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { log } from '@/lib/logger';
 
 interface ServiceWorkerState {
   isSupported: boolean;
@@ -30,7 +31,7 @@ export function useServiceWorker() {
     setState((prev) => ({ ...prev, isSupported }));
 
     if (!isSupported) {
-      console.log('[SW] Service Workers not supported');
+      log.info('[SW] Service Workers not supported');
       return;
     }
 
@@ -40,7 +41,7 @@ export function useServiceWorker() {
           scope: '/fleet/',
         });
 
-        console.log('[SW] Service Worker registered:', registration.scope);
+        log.info('[SW] Service Worker registered', { scope: registration.scope });
 
         setState((prev) => ({
           ...prev,
@@ -54,7 +55,7 @@ export function useServiceWorker() {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[SW] New version available');
+                log.info('[SW] New version available');
                 setState((prev) => ({ ...prev, updateAvailable: true }));
               }
             });
@@ -63,7 +64,7 @@ export function useServiceWorker() {
 
         // Listen for messages from SW
         navigator.serviceWorker.addEventListener('message', (event) => {
-          console.log('[SW] Message from Service Worker:', event.data);
+          log.info('[SW] Message from Service Worker', { data: event.data });
 
           if (event.data.type === 'SYNC_REQUESTED') {
             // Trigger sync from the app
@@ -71,7 +72,7 @@ export function useServiceWorker() {
           }
         });
       } catch (error) {
-        console.error('[SW] Registration failed:', error);
+        log.error('[SW] Registration failed', { error });
         setState((prev) => ({
           ...prev,
           error: error instanceof Error ? error.message : 'Registration failed',
@@ -85,7 +86,7 @@ export function useServiceWorker() {
   // Request background sync
   const requestSync = useCallback(async () => {
     if (!state.registration) {
-      console.log('[SW] No registration, cannot request sync');
+      log.info('[SW] No registration, cannot request sync');
       return false;
     }
 
@@ -93,15 +94,15 @@ export function useServiceWorker() {
       // Check if background sync is supported
       if ('sync' in state.registration) {
         await (state.registration as ServiceWorkerRegistration & { sync: { register: (tag: string) => Promise<void> } }).sync.register('fleet-sync');
-        console.log('[SW] Background sync registered');
+        log.info('[SW] Background sync registered');
         return true;
       } else {
-        console.log('[SW] Background sync not supported, triggering manual sync');
+        log.info('[SW] Background sync not supported, triggering manual sync');
         window.dispatchEvent(new CustomEvent('fleet-sync-requested'));
         return true;
       }
     } catch (error) {
-      console.error('[SW] Sync registration failed:', error);
+      log.error('[SW] Sync registration failed', { error });
       return false;
     }
   }, [state.registration]);

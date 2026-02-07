@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
+import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, dashboardData, 'Dashboard data retrieved successfully');
 
   } catch (error) {
-    console.error('QField Sync Dashboard API error:', error);
+    log.error('QField Sync Dashboard API error', { error });
     return apiResponse.internalError(res, error);
   }
 }

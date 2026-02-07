@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { ActionItemUpdateInput } from '@/types/action-items.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -36,7 +37,7 @@ async function handler(
 
       return apiResponse.success(res, item[0]);
     } catch (error: any) {
-      console.error('Error fetching action item:', error);
+      log.error('Error fetching action item', { error });
       return apiResponse.internalError(res, error);
     }
   }
@@ -172,7 +173,7 @@ async function handler(
 
       return apiResponse.success(res, result[0], 'Action item updated successfully');
     } catch (error: any) {
-      console.error('Error updating action item:', error);
+      log.error('Error updating action item', { error });
       return apiResponse.internalError(res, error);
     }
   }
@@ -192,7 +193,7 @@ async function handler(
 
       return apiResponse.success(res, { id: deleted.id }, 'Action item deleted successfully');
     } catch (error: any) {
-      console.error('Error deleting action item:', error);
+      log.error('Error deleting action item', { error });
       return apiResponse.internalError(res, error);
     }
   }

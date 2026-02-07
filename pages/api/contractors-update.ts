@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -61,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(200).json({ data: mapDbToContractor(updated) });
   } catch (error: any) {
-    console.error('Error updating contractor:', error);
+    log.error('Error updating contractor', { error });
     if (error.code === '23505') {
       return res.status(409).json({
         error: 'Contractor with this registration number or email already exists'

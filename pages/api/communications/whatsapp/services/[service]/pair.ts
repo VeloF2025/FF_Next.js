@@ -12,6 +12,7 @@ import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -119,7 +120,7 @@ async function handler(
       },
     });
   } catch (error) {
-    console.error(`[WA Pair API] Error for ${serviceName}:`, error);
+    log.error('[WA Pair API] Error for service', { service: serviceName, error });
 
     if (error instanceof Error && error.name === 'AbortError') {
       return res.status(504).json({

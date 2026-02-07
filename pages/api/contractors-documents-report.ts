@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { generateContractorDocumentReport } from '@/modules/contractor-documents-report/services/documentReportService';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -35,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, report);
   } catch (error) {
-    console.error('[contractors-documents-report] Error:', error);
+    log.error('[contractors-documents-report] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

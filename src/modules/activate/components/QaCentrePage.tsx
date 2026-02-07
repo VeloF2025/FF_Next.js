@@ -23,6 +23,7 @@ import type {
   QaDecision,
   SerialValidationStatus,
 } from '../services/activateDataService';
+import { log } from '@/lib/logger';
 
 // ============================================================================
 // BADGE COLOR REFERENCE
@@ -439,8 +440,7 @@ function QaCentrePageContent() {
       window.URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Export error:', err);
+      log.error('Export error', { error: err });
       alert('Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);

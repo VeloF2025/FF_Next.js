@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -79,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, job, 'Sync job started successfully');
 
   } catch (error) {
-    console.error('QField Sync Start API error:', error);
+    log.error('QField Sync Start API error', { error });
 
     // Check if the error is because the table doesn't exist
     if (error instanceof Error && error.message.includes('does not exist')) {
@@ -121,7 +122,7 @@ async function simulateSyncCompletion(jobId: string) {
     await syncSampleFiberCables();
 
   } catch (error) {
-    console.error('Error completing sync job:', error);
+    log.error('Error completing sync job', { error });
 
     // Mark job as failed
     await sql`
@@ -183,7 +184,7 @@ async function syncSampleFiberCables() {
         `;
       }
     } catch (error) {
-      console.error('Error syncing sample cable:', error);
+      log.error('Error syncing sample cable', { error });
     }
   }
 }
@@ -236,7 +237,7 @@ async function createSyncTables() {
     `;
 
   } catch (error) {
-    console.error('Error creating sync tables:', error);
+    log.error('Error creating sync tables', { error });
     throw error;
   }
 }

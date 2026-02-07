@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 /**
  * SOW Import Status API Route
@@ -49,11 +50,11 @@ async function handler(
     const result = await response.json();
     return res.status(200).json(result);
   } catch (error) {
-    console.error('Import status error:', error);
-    return res.status(500).json({ 
+    log.error('Import status error', { error });
+    return res.status(500).json({
       success: false,
       status: 'error',
-      error: error instanceof Error ? error.message : 'Failed to get import status' 
+      error: error instanceof Error ? error.message : 'Failed to get import status'
     });
   }
 }

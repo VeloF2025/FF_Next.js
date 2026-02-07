@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -39,7 +40,7 @@ async function handler(
 
       res.status(200).json(mockTask);
     } catch (error) {
-      console.error('Error fetching task:', error);
+      log.error('Error fetching task', { error });
       res.status(500).json({ error: 'Failed to fetch task' });
     }
   } else if (req.method === 'PATCH') {
@@ -52,7 +53,7 @@ async function handler(
         task: { id, ...updates, updatedAt: new Date().toISOString() }
       });
     } catch (error) {
-      console.error('Error updating task:', error);
+      log.error('Error updating task', { error });
       res.status(500).json({ error: 'Failed to update task' });
     }
   } else if (req.method === 'DELETE') {
@@ -63,7 +64,7 @@ async function handler(
         message: 'Task deleted successfully'
       });
     } catch (error) {
-      console.error('Error deleting task:', error);
+      log.error('Error deleting task', { error });
       res.status(500).json({ error: 'Failed to delete task' });
     }
   } else {

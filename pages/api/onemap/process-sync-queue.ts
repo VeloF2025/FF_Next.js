@@ -18,6 +18,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 const DR_PHOTO_API_URL = process.env.DR_PHOTO_API_URL || 'http://100.96.203.105:8003';
@@ -97,7 +98,7 @@ async function updateOnemapSerials(
 
     return true;
   } catch (error) {
-    console.error(`Error updating onemap_properties for ${dropNumber}:`, error);
+    log.error(`Error updating onemap_properties for ${dropNumber}`, { error });
     return false;
   }
 }
@@ -230,7 +231,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       },
     });
   } catch (error) {
-    console.error('Error processing sync queue:', error);
+    log.error('Error processing sync queue', { error });
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to process sync queue',

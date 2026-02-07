@@ -3,6 +3,8 @@
  * Handles IndexedDB operations for offline data persistence
  */
 
+import { log } from '@/lib/logger';
+
 const DB_NAME = 'FleetOfflineDB';
 const DB_VERSION = 1;
 
@@ -95,19 +97,19 @@ class OfflineStorageService {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.error('[OfflineStorage] Failed to open database:', request.error);
+        log.error('[OfflineStorage] Failed to open database', { error: request.error });
         reject(request.error);
       };
 
       request.onsuccess = () => {
         this.db = request.result;
-        console.log('[OfflineStorage] Database opened successfully');
+        log.info('[OfflineStorage] Database opened successfully');
         resolve(this.db);
       };
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        console.log('[OfflineStorage] Upgrading database schema');
+        log.info('[OfflineStorage] Upgrading database schema');
 
         // Pending fuel transactions store
         if (!db.objectStoreNames.contains(STORES.FUEL_TRANSACTIONS)) {
@@ -179,7 +181,7 @@ class OfflineStorageService {
       queueStore.put(queueItem);
 
       tx.oncomplete = () => {
-        console.log('[OfflineStorage] Fuel transaction saved:', transaction.id);
+        log.info('[OfflineStorage] Fuel transaction saved', { id: transaction.id });
         resolve();
       };
       tx.onerror = () => reject(tx.error);
@@ -261,7 +263,7 @@ class OfflineStorageService {
       queueStore.put(queueItem);
 
       tx.oncomplete = () => {
-        console.log('[OfflineStorage] Check-in saved:', checkIn.id);
+        log.info('[OfflineStorage] Check-in saved', { id: checkIn.id });
         resolve();
       };
       tx.onerror = () => reject(tx.error);
@@ -325,7 +327,7 @@ class OfflineStorageService {
       const store = tx.objectStore(STORES.PHOTOS);
       store.put(photo);
       tx.oncomplete = () => {
-        console.log('[OfflineStorage] Photo saved:', photo.id);
+        log.info('[OfflineStorage] Photo saved', { id: photo.id });
         resolve();
       };
       tx.onerror = () => reject(tx.error);
@@ -435,7 +437,7 @@ class OfflineStorageService {
       tx.objectStore(STORES.SYNC_QUEUE).clear();
 
       tx.oncomplete = () => {
-        console.log('[OfflineStorage] All data cleared');
+        log.info('[OfflineStorage] All data cleared');
         resolve();
       };
       tx.onerror = () => reject(tx.error);

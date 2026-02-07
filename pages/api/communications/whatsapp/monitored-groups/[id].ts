@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { WaMonitoredGroup, WaMonitoredGroupInput } from '@/modules/communications/whatsapp/types/wa-admin.types';
+import { log } from '@/lib/logger';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
@@ -38,7 +39,7 @@ async function handler(
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
-    console.error('[WA Monitored Groups API] Error:', error);
+    log.error('[WA Monitored Groups API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

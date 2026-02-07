@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { Client } from 'pg';
+import { log } from '@/lib/logger';
 
 const connectionString = process.env.DATABASE_URL || 'process.env.DATABASE_URL';
 
@@ -65,7 +66,7 @@ async function handler(
       type as string,
       searchResults.rows.length,
       50 // You could measure actual duration
-    ]).catch(err => console.error('Failed to record search:', err));
+    ]).catch(err => log.error('Failed to record search', { error: err }));
 
     // Update popular searches count
     client.query(`
@@ -75,7 +76,7 @@ async function handler(
       DO UPDATE SET 
         search_count = popular_searches.search_count + 1,
         last_searched = CURRENT_TIMESTAMP
-    `, [q, type]).catch(err => console.error('Failed to update popular searches:', err));
+    `, [q, type]).catch(err => log.error('Failed to update popular searches', { error: err }));
 
     // Format response
     const response = {
@@ -96,10 +97,10 @@ async function handler(
     return res.status(200).json(response);
 
   } catch (error) {
-    console.error('Search error:', error);
-    return res.status(500).json({ 
+    log.error('Search error', { error });
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Search failed' 
+      error: error instanceof Error ? error.message : 'Search failed'
     });
   } finally {
     await client.end();

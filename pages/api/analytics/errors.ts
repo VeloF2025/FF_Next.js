@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
+import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 type ErrorSeverity = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
@@ -44,7 +44,7 @@ interface ErrorEvent {
 function storeError(error: ErrorEvent): void {
   // In development, log to console
   if (process.env.NODE_ENV === 'development') {
-    console.error('[Error Tracking]', {
+    log.error('[Error Tracking]', {
       severity: error.severity,
       message: error.message,
       page: error.context.page?.pathname,
@@ -63,7 +63,7 @@ function storeError(error: ErrorEvent): void {
   // 5. Log aggregation service (DataDog, LogRocket, etc.)
 
   // For now, log errors (in production, integrate with service)
-  console.error('[Error Tracking] Production error:', {
+  log.error('[Error Tracking] Production error', {
     message: error.message,
     severity: error.severity,
     pathname: error.context.page?.pathname,
@@ -99,7 +99,7 @@ function storeError(error: ErrorEvent): void {
       ]
     );
   } catch (dbError) {
-    console.error('[Error Tracking] Failed to store error:', dbError);
+    log.error('[Error Tracking] Failed to store error', { error: dbError });
   }
   */
 }
@@ -171,7 +171,7 @@ async function handler(
     // Return success
     res.status(200).json({ received: true });
   } catch (error) {
-    console.error('[Error Tracking API] Error:', error);
+    log.error('[Error Tracking API] Error', { error });
     res.status(500).json({ error: 'Internal server error' });
   }
 }

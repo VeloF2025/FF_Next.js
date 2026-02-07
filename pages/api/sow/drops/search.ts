@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -85,7 +86,7 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('Error searching drops:', error);
+    log.error('Error searching drops', { error });
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to search drops'

@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/db/pool';
-
+import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 async function handler(
   req: NextApiRequest,
@@ -22,8 +22,8 @@ async function handler(
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Database health check failed:', error);
-    
+    log.error('Database health check failed', { error });
+
     return res.status(503).json({
       status: 'unhealthy',
       error: 'Database connection failed',

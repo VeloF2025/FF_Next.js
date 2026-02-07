@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { getQFieldDrops } from '@/modules/qfield-sync/services/qfieldcloudApiService';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -92,7 +93,7 @@ async function handler(
         source: 'qfieldcloud'
       }));
     } catch (error) {
-      console.error('Error fetching QFieldCloud drops:', error);
+      log.error('Error fetching QFieldCloud drops', { error });
       // If QFieldCloud fails, continue with empty array
       qfieldData = [];
     }
@@ -156,7 +157,7 @@ async function handler(
 
     res.status(200).json(response);
   } catch (error) {
-    console.error('Error fetching drop data:', error);
+    log.error('Error fetching drop data', { error });
     res.status(500).json({
       success: false,
       error: 'Failed to fetch drop data',

@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getUserEffectivePermissions, getUserPermissionOverrides } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -96,7 +97,7 @@ async function handleGet(
       overrides,
     });
   } catch (error) {
-    console.error('Error fetching user:', error);
+    log.error('Error fetching user', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -184,7 +185,7 @@ async function handlePatch(
 
     return apiResponse.success(res, { message: 'User updated successfully' });
   } catch (error) {
-    console.error('Error updating user:', error);
+    log.error('Error updating user', { error });
     return apiResponse.internalError(res, error);
   }
 }

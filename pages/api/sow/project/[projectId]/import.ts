@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 /**
  * SOW Import API Route
@@ -52,10 +53,10 @@ async function handler(
     const result = await response.json();
     return res.status(200).json(result);
   } catch (error) {
-    console.error('SOW import error:', error);
-    return res.status(500).json({ 
+    log.error('SOW import error', { error });
+    return res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to import SOW data' 
+      error: error instanceof Error ? error.message : 'Failed to import SOW data'
     });
   }
 }

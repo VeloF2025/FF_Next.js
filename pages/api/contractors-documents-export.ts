@@ -8,6 +8,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { generateContractorDocumentReport } from '@/modules/contractor-documents-report/services/documentReportService';
 import { generateContractorReportCSV } from '@/modules/contractor-documents-report/services/documentExportService';
 
@@ -54,7 +55,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(400).json({ error: 'Invalid format' });
   } catch (error) {
-    console.error('[contractors-documents-export] Error:', error);
+    log.error('[contractors-documents-export] Error', { error });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

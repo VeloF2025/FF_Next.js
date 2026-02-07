@@ -12,6 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -36,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(200).json({ data: mapDbToContractor(contractor) });
     } catch (error) {
-      console.error('Error fetching contractor:', error);
+      log.error('Error fetching contractor', { error });
       return res.status(500).json({ error: 'Failed to fetch contractor' });
     }
   }
@@ -84,7 +85,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(200).json({ data: mapDbToContractor(updated) });
     } catch (error: any) {
-      console.error('Error updating contractor:', error);
+      log.error('Error updating contractor', { error });
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Contractor with this registration number or email already exists' });
       }
@@ -103,7 +104,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await sql`DELETE FROM contractors WHERE id = ${id}`;
       return res.status(200).json({ success: true, message: 'Contractor deleted successfully' });
     } catch (error) {
-      console.error('Error deleting contractor:', error);
+      log.error('Error deleting contractor', { error });
       return res.status(500).json({ error: 'Failed to delete contractor' });
     }
   }

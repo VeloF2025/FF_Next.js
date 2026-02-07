@@ -9,6 +9,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import { getAllProjectsStatsSummary } from '@/modules/wa-monitor/services/waMonitorService';
 
@@ -30,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, summary);
 
   } catch (error: any) {
-    console.error('Error in wa-monitor-projects-summary API:', error);
+    log.error('Error in wa-monitor-projects-summary API', { error });
     return apiResponse.internalError(res, error, 'Failed to fetch projects summary');
   }
 }

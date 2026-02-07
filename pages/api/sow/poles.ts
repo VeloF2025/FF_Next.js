@@ -12,6 +12,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -96,7 +97,7 @@ async function handler(
         totalPages: Math.ceil(total / limitNum)
       });
     } catch (error) {
-      console.error('Error fetching poles:', error);
+      log.error('Error fetching poles', { error });
       return res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch poles'
@@ -237,7 +238,7 @@ async function handler(
     });
 
   } catch (error) {
-    console.error('Poles upload error:', error);
+    log.error('Poles upload error', { error });
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to upload poles data'

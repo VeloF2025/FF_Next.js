@@ -10,6 +10,7 @@ import {
   PendingPhoto,
   SyncQueueItem,
 } from './offlineStorage';
+import { log } from '@/lib/logger';
 
 export interface SyncProgress {
   total: number;
@@ -52,14 +53,14 @@ async function uploadPhotoBlob(
     });
 
     if (!response.ok) {
-      console.error('[SyncEngine] Photo upload failed:', response.status);
+      log.error('[SyncEngine] Photo upload failed', { status: response.status });
       return null;
     }
 
     const data = await response.json();
     return data.data?.url || null;
   } catch (error) {
-    console.error('[SyncEngine] Photo upload error:', error);
+    log.error('[SyncEngine] Photo upload error', { error });
     return null;
   }
 }
@@ -206,7 +207,7 @@ async function processSyncItem(
   let lastError: string | undefined;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    console.log(`[SyncEngine] Processing ${item.type} ${item.itemId} (attempt ${attempt}/${MAX_RETRIES})`);
+    log.info('[SyncEngine] Processing sync item', { type: item.type, itemId: item.itemId, attempt, maxRetries: MAX_RETRIES });
 
     let result: { success: boolean; error?: string };
 
@@ -283,7 +284,7 @@ export async function syncOfflineData(
       return result;
     }
 
-    console.log(`[SyncEngine] Starting sync of ${queue.length} items`);
+    log.info('[SyncEngine] Starting sync', { queueLength: queue.length });
     onProgress?.(progress);
 
     // Process each item in order
@@ -307,7 +308,7 @@ export async function syncOfflineData(
 
         result.synced++;
         progress.completed++;
-        console.log(`[SyncEngine] Synced ${item.type} ${item.itemId}`);
+        log.info('[SyncEngine] Synced item', { type: item.type, itemId: item.itemId });
       } else {
         // Failed - mark as failed and continue
         await offlineStorage.updateSyncQueueItem(item.id, { status: 'failed' });
@@ -316,7 +317,7 @@ export async function syncOfflineData(
         progress.failed++;
         result.errors.push({ id: item.itemId, error: syncResult.error || 'Unknown error' });
         progress.errors.push({ id: item.itemId, error: syncResult.error || 'Unknown error' });
-        console.error(`[SyncEngine] Failed to sync ${item.type} ${item.itemId}:`, syncResult.error);
+        log.error('[SyncEngine] Failed to sync item', { type: item.type, itemId: item.itemId, error: syncResult.error });
       }
 
       onProgress?.(progress);
@@ -327,10 +328,10 @@ export async function syncOfflineData(
     progress.current = null;
     onProgress?.(progress);
 
-    console.log(`[SyncEngine] Sync complete: ${result.synced} synced, ${result.failed} failed`);
+    log.info('[SyncEngine] Sync complete', { synced: result.synced, failed: result.failed });
     return result;
   } catch (error) {
-    console.error('[SyncEngine] Sync error:', error);
+    log.error('[SyncEngine] Sync error', { error });
     progress.status = 'error';
     progress.current = null;
     onProgress?.(progress);

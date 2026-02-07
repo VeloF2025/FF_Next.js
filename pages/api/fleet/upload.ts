@@ -12,6 +12,18 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 import { withFleetAuth } from '@/lib/auth/middleware';
 
+/** Validate file content matches expected type by checking magic bytes */
+function validateMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('FFD8FF')) return { valid: true, detectedType: 'image/jpeg' };
+  if (hex.startsWith('89504E47')) return { valid: true, detectedType: 'image/png' };
+  if (hex.startsWith('25504446')) return { valid: true, detectedType: 'application/pdf' };
+  if (hex.startsWith('47494638')) return { valid: true, detectedType: 'image/gif' };
+  if (hex.startsWith('52494646')) return { valid: true, detectedType: 'image/webp' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 export const config = {
   api: {
     bodyParser: false,
@@ -77,6 +89,16 @@ async function handler(
 
     // Read file buffer
     const buffer = await fs.promises.readFile(file.filepath);
+
+    // Validate magic bytes match an allowed file type
+    const { valid, detectedType } = validateMagicBytes(buffer);
+    if (!valid) {
+      await fs.promises.unlink(file.filepath).catch(() => {});
+      return res.status(400).json({
+        success: false,
+        error: { message: `File content does not match an allowed image type (detected: ${detectedType})`, code: 'INVALID_FILE_CONTENT' }
+      });
+    }
 
     // Build the category path
     // folder format: "fleet/vehicles/{vehicleId}/fuel-receipts"

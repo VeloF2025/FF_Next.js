@@ -12,6 +12,7 @@ import {
 } from '@/modules/livekit/services/livekitService';
 import type { CreateRoomRequest, LiveKitRoom } from '@/modules/livekit/types/livekit.types';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -33,7 +34,7 @@ async function handler(
             const rooms = await listRooms();
             return res.status(200).json({ success: true, rooms });
         } catch (error: any) {
-            console.error('List rooms error:', error);
+            log.error('List rooms error', { error });
             return res.status(500).json({ success: false, error: error.message });
         }
     }
@@ -77,7 +78,7 @@ async function handler(
                 token: tokenResult.token,
             });
         } catch (error: any) {
-            console.error('Create room error:', error);
+            log.error('Create room error', { error });
             return res.status(500).json({ success: false, error: error.message });
         }
     }
@@ -104,7 +105,7 @@ async function handler(
 
             return res.status(200).json({ success: deleted });
         } catch (error: any) {
-            console.error('Delete room error:', error);
+            log.error('Delete room error', { error });
             return res.status(500).json({ success: false, error: error.message });
         }
     }

@@ -17,6 +17,7 @@ import {
   SEVERITY_TO_PRIORITY,
   SEVERITY_SLA_HOURS,
 } from '@/modules/health-safety/types/ticket.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -31,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
     }
   } catch (error) {
-    console.error('[H&S Incidents API] Error:', error);
+    log.error('[H&S Incidents API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -12,6 +12,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { apiResponse } from '@/modules/wa-monitor/lib/apiResponse';
 import {
   getPaginatedDrops,
@@ -103,7 +104,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error in wa-monitor-drops API:', error);
+    log.error('Error in wa-monitor-drops API', { error });
     return apiResponse.internalError(res, error, 'Failed to fetch QA review drops');
   }
 }

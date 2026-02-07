@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
-
+import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
@@ -236,7 +236,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         },
       });
     } catch (error) {
-      console.error('Error fetching stock items:', error);
+      log.error('Error fetching stock items', { error });
       return res.status(500).json({ error: 'Failed to fetch stock items' });
     }
   }
@@ -281,7 +281,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(201).json({ data: mapDbToStockItem(created as Record<string, unknown>) });
     } catch (error: unknown) {
-      console.error('Error creating stock item:', error);
+      log.error('Error creating stock item', { error });
       if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
         return res.status(409).json({ error: 'Item with this code already exists' });
       }

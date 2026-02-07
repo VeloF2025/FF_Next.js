@@ -11,6 +11,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { DOCUMENT_TYPES } from '@/modules/health-safety/types/compliance.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -33,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
     }
   } catch (error) {
-    console.error('[H&S Document Detail API] Error:', error);
+    log.error('[H&S Document Detail API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

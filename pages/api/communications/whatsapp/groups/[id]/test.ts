@@ -10,6 +10,7 @@ import { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
@@ -93,7 +94,7 @@ If you received this message, the connection is working! ✅`;
         ]
       );
     } catch (logError) {
-      console.warn('[WA Test] Failed to log message:', logError);
+      log.warn('[WA Test] Failed to log message', { logError });
     }
 
     if (!sendResult.success) {
@@ -111,7 +112,7 @@ If you received this message, the connection is working! ✅`;
     });
 
   } catch (error) {
-    console.error('[WA Test Message API] Error:', error);
+    log.error('[WA Test Message API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

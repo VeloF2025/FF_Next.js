@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { ActionItemStats } from '@/types/action-items.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -27,7 +28,7 @@ async function handler(
 
     return apiResponse.success(res, stats as ActionItemStats);
   } catch (error: any) {
-    console.error('Error fetching action item stats:', error);
+    log.error('Error fetching action item stats', { error });
     return apiResponse.internalError(res, error);
   }
 }

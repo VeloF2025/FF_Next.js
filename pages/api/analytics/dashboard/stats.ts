@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth, withRole } from '@/lib/auth';
 import { createLoggedSql } from '@/lib/db-logger';
+import { log } from '@/lib/logger';
 
 // Initialize Neon client with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -156,8 +157,8 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
       data: stats
     });
   } catch (error) {
-    console.error('Dashboard stats error:', error);
-    
+    log.error('Dashboard stats error', { error });
+
     // Return zeros on error (no mock data)
     res.status(200).json({
       success: true,

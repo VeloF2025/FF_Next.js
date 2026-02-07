@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -49,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(405).json({ error: `Method ${req.method} not allowed` });
     }
   } catch (error) {
-    console.error('SOW Project API error:', error);
+    log.error('SOW Project API error', { error });
     return res.status(500).json({
       error: 'Failed to fetch SOW project data',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import type { ContractorProject, ContractorProjectWithDetails } from '@/types/contractor-project.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -65,7 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error fetching contractor projects:', error);
+    log.error('Error fetching contractor projects', { error });
     return res.status(500).json({
       error: 'Failed to fetch contractor projects',
       message: error.message
@@ -158,7 +159,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error creating contractor assignment:', error);
+    log.error('Error creating contractor assignment', { error });
     return res.status(500).json({
       error: 'Failed to create contractor assignment',
       message: error.message

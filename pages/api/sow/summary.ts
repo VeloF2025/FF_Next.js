@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '../../../lib/db.mjs';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 type SummarData = {
   success: boolean;
@@ -103,7 +104,7 @@ async function handler(
         });
     }
   } catch (error: any) {
-    console.error('Summary API Error:', error);
+    log.error('Summary API Error', { error });
     return res.status(500).json({ success: false, data: null, error: 'Internal server error' });
   }
 }

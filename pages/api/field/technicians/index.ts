@@ -3,6 +3,7 @@ import type { FieldTechnician } from '../../../../src/modules/field-app/types/fi
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
+import { log } from '@/lib/logger';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -83,7 +84,7 @@ export default withAuth(withErrorHandler(async (
         ...stats
       });
     } catch (error) {
-      console.error('Error fetching technicians:', error);
+      log.error('Error fetching technicians', { error });
       res.status(500).json({ error: 'Failed to fetch technicians' });
     }
   } else if (req.method === 'POST') {
@@ -128,7 +129,7 @@ export default withAuth(withErrorHandler(async (
         technician: insertedStaff[0]
       });
     } catch (error) {
-      console.error('Error adding technician:', error);
+      log.error('Error adding technician', { error });
       res.status(500).json({ error: 'Failed to add technician' });
     }
   } else {

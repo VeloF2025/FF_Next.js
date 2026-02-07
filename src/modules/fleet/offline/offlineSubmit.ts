@@ -11,6 +11,7 @@ import {
   PendingPhoto,
 } from './offlineStorage';
 import { captureGPS } from './gpsCapture';
+import { log } from '@/lib/logger';
 
 export interface OfflineFuelSubmission {
   vehicleId: string;
@@ -139,7 +140,7 @@ export async function saveOfflineFuelTransaction(
     // Save transaction
     await offlineStorage.saveFuelTransaction(transaction);
 
-    console.log('[OfflineSubmit] Fuel transaction saved offline:', id);
+    log.info('[OfflineSubmit] Fuel transaction saved offline', { id });
 
     return {
       success: true,
@@ -147,7 +148,7 @@ export async function saveOfflineFuelTransaction(
       isOffline: true,
     };
   } catch (error) {
-    console.error('[OfflineSubmit] Failed to save fuel transaction:', error);
+    log.error('[OfflineSubmit] Failed to save fuel transaction', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save offline',
@@ -214,7 +215,7 @@ export async function saveOfflineCheckIn(
     // Save check-in
     await offlineStorage.saveCheckIn(checkIn);
 
-    console.log('[OfflineSubmit] Check-in saved offline:', id);
+    log.info('[OfflineSubmit] Check-in saved offline', { id });
 
     return {
       success: true,
@@ -222,7 +223,7 @@ export async function saveOfflineCheckIn(
       isOffline: true,
     };
   } catch (error) {
-    console.error('[OfflineSubmit] Failed to save check-in:', error);
+    log.error('[OfflineSubmit] Failed to save check-in', { error });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save offline',

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 // Initialize Neon client
 const sql = neon(process.env.DATABASE_URL!);
@@ -109,8 +110,8 @@ async function handler(
       }
     });
   } catch (error) {
-    console.error('Dashboard trends error:', error);
-    
+    log.error('Dashboard trends error', { error });
+
     // Return stable trends on error
     const stableTrend = {
       value: 0,

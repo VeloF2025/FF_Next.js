@@ -3,6 +3,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { generateToken } from '@/modules/livekit/services/livekitService';
 import type { TokenRequest, TokenResponse } from '@/modules/livekit/types/livekit.types';
 
@@ -37,7 +38,7 @@ async function handler(
 
         return res.status(200).json(result);
     } catch (error: any) {
-        console.error('Token API error:', error);
+        log.error('Token API error', { error });
         return res.status(500).json({ success: false, error: error.message });
     }
 }

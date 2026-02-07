@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -113,7 +114,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     });
   } catch (error: any) {
-    console.error('Marketing activations API error:', error);
+    log.error('Marketing activations API error', { error });
     return res.status(500).json({
       success: false,
       error: error.message || 'Internal server error'

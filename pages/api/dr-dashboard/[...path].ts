@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 const BACKEND_URL = process.env.DR_DASHBOARD_API_URL || 'http://100.96.203.105:8082';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -57,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         res.status(response.status).json(data || { error: 'Empty response' });
     } catch (error) {
-        console.error('DR Dashboard API proxy error:', error);
+        log.error('DR Dashboard API proxy error', { error });
         res.status(502).json({
             error: 'Failed to connect to DR Dashboard backend',
             details: error instanceof Error ? error.message : 'Unknown error',

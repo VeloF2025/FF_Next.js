@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 const VLM_URL = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_MODEL = process.env.VLM_MODEL || 'dr-verifier';
 
@@ -230,7 +231,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('VLM API error:', errorText);
+            log.error('VLM API error', { errorText });
             return res.status(response.status).json({
                 error: 'VLM API error',
                 details: errorText
@@ -271,7 +272,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
-        console.error('VLM evaluation error:', error);
+        log.error('VLM evaluation error', { error });
         return res.status(502).json({
             error: 'Failed to connect to VLM service',
             details: error instanceof Error ? error.message : 'Unknown error',

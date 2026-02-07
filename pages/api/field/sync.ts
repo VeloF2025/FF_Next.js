@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { safeObjectQuery, safeMutation } from '../../../lib/safe-query';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -41,7 +42,7 @@ async function handler(
       
       res.status(200).json(syncStatus);
     } catch (error) {
-      console.error('Error getting sync status:', error);
+      log.error('Error getting sync status', { error });
       res.status(500).json({ error: 'Failed to get sync status' });
     }
   } else if (req.method === 'POST') {
@@ -72,7 +73,7 @@ async function handler(
       
       res.status(200).json(syncResult);
     } catch (error) {
-      console.error('Error syncing field data:', error);
+      log.error('Error syncing field data', { error });
       res.status(500).json({ error: 'Failed to sync field data' });
     }
   } else if (req.method === 'PUT') {
@@ -88,7 +89,7 @@ async function handler(
         message: 'Conflict resolution acknowledged'
       });
     } catch (error) {
-      console.error('Error resolving sync conflicts:', error);
+      log.error('Error resolving sync conflicts', { error });
       res.status(500).json({ error: 'Failed to resolve sync conflicts' });
     }
   } else {

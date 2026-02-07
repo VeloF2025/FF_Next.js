@@ -17,6 +17,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -54,7 +55,7 @@ async function fetch1MapData(drNumber: string): Promise<OneMapResponse | null> {
 
     return await response.json();
   } catch (error) {
-    console.error(`1Map fetch error for ${drNumber}:`, error);
+    log.error(`1Map fetch error for ${drNumber}`, { error });
     return null;
   }
 }
@@ -124,7 +125,7 @@ async function handler(
         drops: rows,
       });
     } catch (error) {
-      console.error('Error fetching drops:', error);
+      log.error('Error fetching drops', { error });
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch drops',
@@ -269,7 +270,7 @@ async function handler(
         results,
       });
     } catch (error) {
-      console.error('Error syncing serials:', error);
+      log.error('Error syncing serials', { error });
       return res.status(500).json({
         success: false,
         error: 'Failed to sync serials',

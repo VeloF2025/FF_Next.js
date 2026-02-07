@@ -8,6 +8,7 @@ import {
   ActionItemFilters,
   ActionItemStats,
 } from '@/types/action-items.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -100,7 +101,7 @@ async function handler(
 
       return apiResponse.success(res, items as ActionItem[]);
     } catch (error: any) {
-      console.error('Error fetching action items:', error);
+      log.error('Error fetching action items', { error });
       return apiResponse.internalError(res, error);
     }
   }
@@ -146,7 +147,7 @@ async function handler(
 
       return apiResponse.created(res, item, 'Action item created successfully');
     } catch (error: any) {
-      console.error('Error creating action item:', error);
+      log.error('Error creating action item', { error });
       return apiResponse.internalError(res, error);
     }
   }

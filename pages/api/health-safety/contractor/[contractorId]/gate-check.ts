@@ -9,6 +9,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { checkContractorGate } from '@/modules/health-safety/services/gateService';
@@ -63,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         : `Contractor cannot be assigned to projects: ${gateResult.blockingReasons.join(', ')}`,
     });
   } catch (error) {
-    console.error('[H&S Gate Check API] Error:', error);
+    log.error('[H&S Gate Check API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

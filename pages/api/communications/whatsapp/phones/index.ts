@@ -14,6 +14,7 @@ import type {
   WaPhoneNumberInput,
 } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -59,7 +60,7 @@ async function handleGet(
       data: result.rows,
     });
   } catch (error) {
-    console.error('[WA Phones API] GET error:', error);
+    log.error('[WA Phones API] GET error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -141,7 +142,7 @@ async function handlePost(
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('[WA Phones API] POST error:', error);
+    log.error('[WA Phones API] POST error', { error });
     return apiResponse.internalError(res, error);
   }
 }

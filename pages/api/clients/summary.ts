@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -56,7 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     res.status(200).json({ success: true, data: summary });
   } catch (error) {
-    console.error('Client Summary API Error:', error);
+    log.error('Client Summary API Error', { error });
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 }

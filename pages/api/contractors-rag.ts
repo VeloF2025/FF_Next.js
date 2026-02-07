@@ -11,6 +11,7 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { calculateContractorRag, prepareRagInputFromDbRow, calculateBulkRag } from '@/modules/rag/services/ragCalculationService';
 import type { ContractorRagStatus } from '@/modules/rag/types/rag.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -46,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
   } catch (error: any) {
-    console.error('Error fetching RAG status:', error);
+    log.error('Error fetching RAG status', { error });
     return res.status(500).json({
       error: 'Failed to fetch RAG status',
       message: error.message

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -89,7 +90,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   } catch (error) {
-    console.error('Reminder preferences API error:', error);
+    log.error('Reminder preferences API error', { error });
     return res.status(500).json({
       success: false,
       error: 'Internal server error'

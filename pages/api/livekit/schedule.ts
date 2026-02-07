@@ -3,6 +3,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
@@ -152,7 +153,7 @@ async function sendMeetingInvite(
         });
         return { success: true };
     } catch (error: any) {
-        console.error('Failed to send email to', attendee.email, error);
+        log.error('Failed to send email to attendee', { email: attendee.email, error });
         return { success: false, error: error.message };
     }
 }
@@ -188,7 +189,7 @@ async function handler(
 
             return res.status(200).json({ meetings });
         } catch (error: any) {
-            console.error('Error listing meetings:', error);
+            log.error('Error listing meetings', { error });
             return res.status(500).json({ error: error.message });
         }
     }
@@ -253,7 +254,7 @@ async function handler(
                 calendarLinks,
             });
         } catch (error: any) {
-            console.error('Error scheduling meeting:', error);
+            log.error('Error scheduling meeting', { error });
             return res.status(500).json({ error: error.message });
         }
     }
@@ -275,7 +276,7 @@ async function handler(
 
             return res.status(200).json({ success: true });
         } catch (error: any) {
-            console.error('Error cancelling meeting:', error);
+            log.error('Error cancelling meeting', { error });
             return res.status(500).json({ error: error.message });
         }
     }

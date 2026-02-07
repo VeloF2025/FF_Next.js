@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
+import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -69,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, response, 'Sync history retrieved');
 
   } catch (error) {
-    console.error('QField Sync History API error:', error);
+    log.error('QField Sync History API error', { error });
 
     // Check if the error is because the table doesn't exist
     if (error instanceof Error && error.message.includes('does not exist')) {

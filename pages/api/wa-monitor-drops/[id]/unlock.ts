@@ -5,6 +5,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -72,7 +73,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
     } catch (error) {
-      console.error('Error unlocking drop:', error);
+      log.error('Error unlocking drop', { error });
       return res.status(500).json({
         success: false,
         error: { message: 'Failed to unlock drop' }

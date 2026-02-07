@@ -6,6 +6,7 @@ import {
   parseFirefliesActionItems,
   findAssigneeEmail,
 } from '@/services/action-items/actionItemsParser';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -121,7 +122,7 @@ async function handler(
       `Extracted ${inserted.length} action items from meeting`
     );
   } catch (error: any) {
-    console.error('Error extracting action items:', error);
+    log.error('Error extracting action items', { error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -99,7 +100,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, mapped);
   } catch (error) {
-    console.error('[H&S Incidents API] Error:', error);
+    log.error('[H&S Incidents API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

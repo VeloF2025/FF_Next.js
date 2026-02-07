@@ -6,7 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-
+import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -52,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, null, 'No active sync job');
 
   } catch (error) {
-    console.error('QField Sync Current Job API error:', error);
+    log.error('QField Sync Current Job API error', { error });
 
     // Check if the error is because the table doesn't exist
     if (error instanceof Error && error.message.includes('does not exist')) {

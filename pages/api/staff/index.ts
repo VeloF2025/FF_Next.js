@@ -4,6 +4,7 @@ import { logCreate, logUpdate, logDelete } from '@/lib/db-logger';
 import { getSql } from '@/lib/neon-sql';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { checkStaffAccess, filterStaffFields, filterStaffList } from '@/services/staff/staffAccessService';
+import { log } from '@/lib/logger';
 
 // Create a new SQL instance for each request to avoid connection issues
 const getSqlInstance = () => getSql();
@@ -767,8 +768,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (error: any) {
-    console.error('API Error:', error);
-    
+    log.error('API Error', { error });
+
     // Handle specific database errors
     if (error.code === '23503') { // Foreign key constraint violation
       const constraintMatch = error.message?.match(/constraint "([^"]+)"/);

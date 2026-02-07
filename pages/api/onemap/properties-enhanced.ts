@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -162,7 +163,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
     } catch (error) {
-      console.error('Error fetching OneMap data:', error);
+      log.error('Error fetching OneMap data', { error });
       return res.status(500).json({
         success: false,
         error: 'Failed to fetch OneMap data'

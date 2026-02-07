@@ -7,6 +7,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { calculateContractorHSScore } from '@/modules/health-safety/services/scoringService';
@@ -31,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
     }
   } catch (error) {
-    console.error('[H&S Contractor Compliance API] Error:', error);
+    log.error('[H&S Contractor Compliance API] Error', { error });
     return apiResponse.internalError(res, error);
   }
 }

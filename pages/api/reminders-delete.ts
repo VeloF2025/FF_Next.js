@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -40,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       message: 'Reminder deleted successfully'
     });
   } catch (error) {
-    console.error('Reminder delete error:', error);
+    log.error('Reminder delete error', { error });
     return res.status(500).json({
       success: false,
       error: 'Internal server error'
