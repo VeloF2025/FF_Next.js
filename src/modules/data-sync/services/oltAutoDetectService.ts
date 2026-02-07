@@ -154,17 +154,13 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       cacheHits++;
 
       if (!oneMapSerial) {
-        // 1Map row exists but ONT barcode is empty -> Note 4
-        mismatchesNote4++;
-        mismatchInserts.push({
-          importId: importId,
+        // 1Map cache row exists but ONT barcode is empty -> queue for API
+        // (99%+ of cache entries lack barcode data, need live API check)
+        cacheMisses++;
+        queueInserts.push({
           dropNumber: row.drop_number,
-          oltSerial: row.oes_serial,
-          wrongOneMapSerial: null,
-          fixStatus: 'pending',
-          hasUpsSwap: false,
-          oesSource: 'cache',
-          oesBatchId,
+          oesSerial: row.oes_serial,
+          team: row.team,
         });
         continue;
       }
