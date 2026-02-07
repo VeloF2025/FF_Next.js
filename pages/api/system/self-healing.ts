@@ -251,7 +251,7 @@ async function handleAction(req: NextApiRequest, res: NextApiResponse) {
       try {
         const { execSync } = await import('child_process');
         execSync(
-          `sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl start ai-recovery-agent.service"`,
+          `sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl start ai-recovery-agent.service"`,
           { timeout: 10000 }
         );
         return apiResponse.success(res, {
@@ -267,7 +267,7 @@ async function handleAction(req: NextApiRequest, res: NextApiResponse) {
       try {
         const { execSync } = await import('child_process');
         execSync(
-          `sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl stop ai-recovery-agent.service"`,
+          `sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl stop ai-recovery-agent.service"`,
           { timeout: 10000 }
         );
         return apiResponse.success(res, {

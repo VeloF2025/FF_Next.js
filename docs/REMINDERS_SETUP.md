@@ -26,7 +26,7 @@ The daily reminders system allows users to create personal reminders and receive
 #### VPS (Production)
 ```bash
 # SSH into VPS
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 # Edit environment file
 nano /var/www/fibreflow/.env.production

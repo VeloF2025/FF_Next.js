@@ -81,7 +81,7 @@ Key parameter: `--max-num-seqs` (concurrent inference sequences)
 
 ```bash
 # Change max-num-seqs (requires sudo via velo user)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
   "sudo sed -i 's/--max-num-seqs [0-9]*/--max-num-seqs 8/' /etc/systemd/system/vllm-qwen.service && \
    sudo systemctl daemon-reload && sudo systemctl restart vllm-qwen"
 ```

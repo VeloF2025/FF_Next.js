@@ -49,7 +49,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const ODOO_URL = process.env.ODOO_URL || 'https://velocityfibre.odoo.com';
 const ODOO_DB = process.env.ODOO_DB || 'velocityfibre';
 const ODOO_USERNAME = process.env.ODOO_USERNAME || 'hein@velocityfibre.co.za';
-const ODOO_PASSWORD = process.env.ODOO_PASSWORD || 'Velocity@2025!';
+const ODOO_PASSWORD = process.env.ODOO_PASSWORD || 'process.env.ODOO_PASSWORD';
 
 // ============================================================================
 // CLI Argument Parsing

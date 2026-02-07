@@ -85,7 +85,7 @@ class DatabaseManager:
 
 ```bash
 # Connect to database
-psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 
 # Count production drops
 SELECT COUNT(*) FROM public.qa_photo_reviews;

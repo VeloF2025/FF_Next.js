@@ -19,7 +19,7 @@ async function verifyMigration() {
   console.log('🔍 Verifying Migration 033: DR Photo Unified Reviews\n');
 
   const pool = new Pool({
-    connectionString: 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+    connectionString: 'process.env.DATABASE_URL',
   });
 
   try {

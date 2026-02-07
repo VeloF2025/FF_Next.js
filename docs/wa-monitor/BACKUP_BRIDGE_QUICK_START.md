@@ -70,7 +70,7 @@ tail -20 /opt/velo-test-monitor/logs/whatsapp-bridge.log | grep DR9999999
 tail -20 /opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log | grep DR9999999
 
 # Check database (should be only ONE entry)
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "SELECT drop_number, bridge_source FROM qa_photo_reviews WHERE drop_number = 'DR9999999';"
 ```
 
@@ -87,7 +87,7 @@ tail -f /opt/velo-test-monitor/logs/whatsapp-bridge.log
 tail -f /opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log
 
 # Check message counts
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "SELECT bridge_source, COUNT(*) FROM qa_photo_reviews WHERE DATE(created_at) = CURRENT_DATE GROUP BY bridge_source;"
 ```
 

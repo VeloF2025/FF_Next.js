@@ -210,7 +210,7 @@ curl -X POST http://localhost:8080/send-message \
 
 ```bash
 # Deploy to DEV first (for testing)
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
 
 # Test at: https://dev.fibreflow.app/wa-monitor
@@ -245,7 +245,7 @@ sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
 
 6. **Check database:**
    ```bash
-   psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' \
+   psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' \
      -c "SELECT drop_number, submitted_by, feedback_sent FROM qa_photo_reviews WHERE drop_number = 'DR9999999';"
 
    # Should show:
@@ -264,7 +264,7 @@ git merge develop
 git push origin master
 
 # Deploy to production
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
 
 # Test at: https://app.fibreflow.app/wa-monitor

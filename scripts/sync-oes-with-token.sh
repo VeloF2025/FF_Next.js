@@ -55,7 +55,7 @@ echo ""
 echo "Checking OES data..."
 python3 -c "
 import psycopg2
-conn = psycopg2.connect('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require')
+conn = psycopg2.connect('process.env.DATABASE_URL')
 cur = conn.cursor()
 cur.execute('SELECT COUNT(*) FROM v_qfield_oes_activations')
 count = cur.fetchone()[0]

@@ -2,7 +2,7 @@ const { neon } = require('@neondatabase/serverless');
 const fs = require('fs');
 const path = require('path');
 
-const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL');
 
 async function runMigration() {
   try {
@@ -12,7 +12,7 @@ async function runMigration() {
     console.log('Running migration: create-foto-ai-reviews-table.sql');
 
     // Execute the migration SQL using sql.query for raw SQL
-    const client = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require', {
+    const client = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL', {
       fullResults: true
     });
 

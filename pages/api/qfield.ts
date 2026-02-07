@@ -15,7 +15,7 @@ const execAsync = promisify(exec);
 // Server configuration
 const VELOCITY_SERVER = '100.96.203.105';
 const SSH_USER = 'velo';
-const SSH_PASS = 'velo2026';
+const SSH_PASS = '$VELO_SSH_PASSWORD';
 
 interface HealthStatus {
   services: {
@@ -67,8 +67,8 @@ async function sshCommand(command: string): Promise<string> {
 async function getHealthStatus(): Promise<HealthStatus> {
   const results = await Promise.allSettled([
     // Services status
-    sshCommand("echo 'velo2026' | sudo -S systemctl is-active qfield-sync.service 2>/dev/null"),
-    sshCommand("echo 'velo2026' | sudo -S systemctl is-active cloudflared-qfield.service 2>/dev/null"),
+    sshCommand("echo '$VELO_SSH_PASSWORD' | sudo -S systemctl is-active qfield-sync.service 2>/dev/null"),
+    sshCommand("echo '$VELO_SSH_PASSWORD' | sudo -S systemctl is-active cloudflared-qfield.service 2>/dev/null"),
 
     // Container status
     sshCommand("docker ps --filter 'name=qfieldcloud' --format '{{.Names}}|{{.Status}}' | sort"),
@@ -248,9 +248,9 @@ async function clearStuckJobs(jobIds?: string[]): Promise<{ success: boolean; cl
 
 async function restartService(service: 'qfield-sync' | 'cloudflared-qfield'): Promise<{ success: boolean; message: string }> {
   try {
-    await sshCommand(`echo 'velo2026' | sudo -S systemctl restart ${service}.service`);
+    await sshCommand(`echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart ${service}.service`);
     await new Promise(resolve => setTimeout(resolve, 2000));
-    const status = await sshCommand(`echo 'velo2026' | sudo -S systemctl is-active ${service}.service`);
+    const status = await sshCommand(`echo '$VELO_SSH_PASSWORD' | sudo -S systemctl is-active ${service}.service`);
     return {
       success: status === 'active',
       message: status === 'active' ? `${service} restarted successfully` : `${service} failed to restart`,

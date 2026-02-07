@@ -23,11 +23,11 @@
 ssh root@72.60.17.245
 
 # Run migration
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   < /var/www/fibreflow/scripts/db/create-auto-processor-state-table.sql
 
 # Verify table created
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "SELECT * FROM foto_auto_processor_state;"
 ```
 
@@ -106,7 +106,7 @@ tail -f /var/log/fibreflow/auto-evaluator.log
 pm2 logs fibreflow-prod --lines 100 | grep AUTO
 
 # Check processing stats
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "SELECT * FROM foto_auto_processor_state;"
 ```
 

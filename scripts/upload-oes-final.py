@@ -18,7 +18,7 @@ QFIELD_API_TOKEN = "a7XqW1AwhYU6fo81s7VI3JJRCnWRZoQmGoY2oY9vodiR59htA2rPQNXoSh1y
 PROJECT_ID = "ad3b1035-ddb3-42a3-8077-175f9400b38a"  # OES_Project_Progress
 
 # Neon database connection
-NEON_DATABASE_URL = "postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+NEON_DATABASE_URL = "process.env.DATABASE_URL"
 
 def fetch_oes_data():
     """Fetch OES data from Neon database."""

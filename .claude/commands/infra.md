@@ -25,7 +25,7 @@ Manage and troubleshoot all FibreFlow environments (dev, staging, production).
 | **Local** | localhost:3004 | 3004 | manual | Local machine |
 
 **Server:** 100.96.203.105 (Velocity via Tailscale)
-**SSH:** `velo@100.96.203.105` (password: velo2026)
+**SSH:** `velo@100.96.203.105` (password: $VELO_SSH_PASSWORD)
 
 ## Quick Diagnostic
 
@@ -46,7 +46,7 @@ curl -s -o /dev/null -w 'LOCAL: %{http_code}\n' http://localhost:3004/api/health
 
 ### Step 2: Test Localhost on Server
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
   echo 'PROD (3000):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
   echo 'STAGING (3006):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
   echo 'DEV (3005):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
@@ -55,7 +55,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "
 
 ### Step 3: Test Nginx Proxy
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
   echo 'PROD nginx:' \$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: app.fibreflow.app' http://127.0.0.1:80/api/health)
   echo 'STAGING nginx:' \$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: vf.fibreflow.app' http://127.0.0.1:80/api/health)
 "
@@ -76,113 +76,113 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "
 
 **Restart all services:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart nginx fibreflow-production.service cloudflared-tunnel.service && sleep 10"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart nginx fibreflow-production.service cloudflared-tunnel.service && sleep 10"
 ```
 
 **Restart app only:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 **View logs:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-production.service -n 50 --no-pager"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow-production.service -n 50 --no-pager"
 ```
 
 **Deploy:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ### Staging (vf.fibreflow.app)
 
 **Restart all services:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart nginx fibreflow.service cloudflared-tunnel.service && sleep 10"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart nginx fibreflow.service cloudflared-tunnel.service && sleep 10"
 ```
 
 **Restart app only:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 **View logs:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
 ```
 
 **Deploy:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
 ```
 
 **Fix port conflict:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S fuser -k 3006/tcp && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S fuser -k 3006/tcp && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 **Fix DB auth:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/apps/fibreflow && sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' .env.production"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/apps/fibreflow && sed -i 's/npg_aRNLhZc1G2CD/$NEON_DB_PASSWORD/g' .env.production"
 ```
 
 **Check DATABASE_URL exists:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production || echo 'MISSING DATABASE_URL!'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production || echo 'MISSING DATABASE_URL!'"
 ```
 
 **Fix missing DATABASE_URL:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' >> /home/louis/apps/fibreflow/.env.production && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo 'DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' >> /home/louis/apps/fibreflow/.env.production && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ### Dev (dev.fibreflow.app)
 
 **Restart app:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 **View logs:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-dev.service -n 50 --no-pager"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow-dev.service -n 50 --no-pager"
 ```
 
 **Deploy:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull origin master && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 **Fix port conflict:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S fuser -k 3005/tcp && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S fuser -k 3005/tcp && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 ## Cloudflared Tunnel Management
 
 **Check status:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl status cloudflared-tunnel.service --no-pager | head -15"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status cloudflared-tunnel.service --no-pager | head -15"
 ```
 
 **Check for errors:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u cloudflared-tunnel.service -n 30 --no-pager 2>/dev/null | grep -iE 'error|ERR|terminated|failed'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u cloudflared-tunnel.service -n 30 --no-pager 2>/dev/null | grep -iE 'error|ERR|terminated|failed'"
 ```
 
 **Check metrics:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep -E 'cloudflared_tunnel_ha_connections|requests'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep -E 'cloudflared_tunnel_ha_connections|requests'"
 ```
 
 **Restart tunnel:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart cloudflared-tunnel.service && sleep 8"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart cloudflared-tunnel.service && sleep 8"
 ```
 
 **Verify config (should show root, HOME, http2):**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S cat /etc/systemd/system/cloudflared-tunnel.service 2>/dev/null | grep -E 'User=|Group=|Environment=|ExecStart='"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S cat /etc/systemd/system/cloudflared-tunnel.service 2>/dev/null | grep -E 'User=|Group=|Environment=|ExecStart='"
 ```
 
 **Expected cloudflared config:**
@@ -196,7 +196,7 @@ ExecStart=/home/louis/cloudflared --config /home/louis/.cloudflared/config.yml -
 
 **Fix cloudflared config (if wrong):**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'cat > /etc/systemd/system/cloudflared-tunnel.service << EOF
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'cat > /etc/systemd/system/cloudflared-tunnel.service << EOF
 [Unit]
 Description=Cloudflare Tunnel for vf.fibreflow.app
 After=network.target
@@ -215,7 +215,7 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOF
-' && echo 'velo2026' | sudo -S systemctl daemon-reload && echo 'velo2026' | sudo -S systemctl restart cloudflared-tunnel.service"
+' && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl daemon-reload && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart cloudflared-tunnel.service"
 ```
 
 **Cloudflared ingress routes:**
@@ -231,22 +231,22 @@ EOF
 
 **Check status:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl status nginx --no-pager | head -10"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status nginx --no-pager | head -10"
 ```
 
 **Test config:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -t"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S nginx -t"
 ```
 
 **View error logs:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S tail -30 /var/log/nginx/error.log"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S tail -30 /var/log/nginx/error.log"
 ```
 
 **Restart nginx:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart nginx"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart nginx"
 ```
 
 ## Common Issues Reference
@@ -257,7 +257,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemc
 | **Cloudflared perms** | 502, "Connection terminated" | louis user GID issues | Run as root with `HOME=/home/louis` |
 | **Cloudflared certs** | 502, "Cannot determine origin certificate" | root can't find certs | Set `Environment=HOME=/home/louis` |
 | **Port conflict** | 500, EADDRINUSE | Stale process | `fuser -k [port]/tcp` |
-| **DB auth** | 500, "password authentication failed" | Wrong password in .env | Fix password: `npg_MIUZXrg1tEY0` |
+| **DB auth** | 500, "password authentication failed" | Wrong password in .env | Fix password: `$NEON_DB_PASSWORD` |
 | **Missing DATABASE_URL** | 500, "NEON_DATABASE_URL is not defined" | DATABASE_URL not in .env.production | Add `DATABASE_URL=...` to .env.production |
 | **Old build** | Missing features | Stale .next cache | `rm -rf .next && npm run build` |
 | **Git perms** | "Permission denied" on git | Wrong ownership | `chown -R louis:louis .git` |
@@ -307,10 +307,10 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemc
 
 All environments share the same **production database** (Neon PostgreSQL):
 ```
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 ```
 
 **Dev branch (for safe experiments):**
 ```
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-aged-poetry-a9bbd8e9-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 ```

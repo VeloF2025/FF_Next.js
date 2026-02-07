@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS oes_activations_import AS
 SELECT * FROM dblink(
   'host=ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
    dbname=neondb user=neondb_owner
-   password=npg_MIUZXrg1tEY0 sslmode=require',
+   password=$NEON_DB_PASSWORD sslmode=require',
   'SELECT * FROM v_qfield_oes_activations'
 ) AS t(...);
 ```

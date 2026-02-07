@@ -65,7 +65,7 @@ graph TB
 | WA Proxy | 8092 | `wa-proxy.service` | WA routing |
 | VF Storage | 8091 | `vf-storage.service` | File proxy |
 
-**Access**: `ssh velo@100.96.203.105` (password: velo2026)
+**Access**: `ssh velo@100.96.203.105` (password: $VELO_SSH_PASSWORD)
 
 ### VPS Server (72.61.197.178)
 
@@ -109,16 +109,16 @@ graph TB
 
 ```bash
 # Development
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Staging (vf.fibreflow.app)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/louis/apps/fibreflow && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "cd /home/louis/apps/fibreflow && git pull && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # Production
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-production && git pull && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 ### Deploy Flow

@@ -115,7 +115,7 @@ go run main.go
 
 4. **Verify Database Updated**:
    ```bash
-   psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+   psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
      -c "SELECT drop_number, feedback_sent FROM qa_photo_reviews WHERE feedback_sent IS NOT NULL ORDER BY feedback_sent DESC LIMIT 5;"
    ```
 

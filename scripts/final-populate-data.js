@@ -6,7 +6,7 @@
 const { neon } = require('@neondatabase/serverless');
 
 // Database connection
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const connectionString = process.env.DATABASE_URL || 'process.env.DATABASE_URL';
 const sql = neon(connectionString);
 
 // Utility functions

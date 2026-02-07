@@ -66,7 +66,7 @@ const randomHelpers = {
   }
 };
 
-const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL');
 
 // Johannesburg area coordinates with ±0.5° variation
 const JHB_CENTER = { lat: -26.2041, lng: 28.0473 };

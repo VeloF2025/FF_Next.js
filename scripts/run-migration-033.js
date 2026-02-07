@@ -7,7 +7,7 @@ const { neon } = require('@neondatabase/serverless');
 require('dotenv').config();
 
 // Production database URL (fallback if not in env)
-const PRODUCTION_DB_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const PRODUCTION_DB_URL = 'process.env.DATABASE_URL';
 
 async function runMigration() {
   const databaseUrl = process.env.DATABASE_URL || PRODUCTION_DB_URL;

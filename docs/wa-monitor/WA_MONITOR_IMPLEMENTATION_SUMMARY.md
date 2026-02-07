@@ -46,7 +46,7 @@ npm run build
 PORT=3005 npm start
 
 # Deploy to VPS (production)
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
 ```
 

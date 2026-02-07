@@ -23,7 +23,7 @@ const projectFilter = args.includes('--project') ? args[args.indexOf('--project'
 const outputFormat = args.includes('--output') ? args[args.indexOf('--output') + 1] : 'summary';
 
 const DATABASE_URL = process.env.DATABASE_URL ||
-  'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  'process.env.DATABASE_URL';
 
 const sql = neon(DATABASE_URL);
 

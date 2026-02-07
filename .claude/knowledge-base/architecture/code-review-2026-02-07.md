@@ -22,7 +22,7 @@ FibreFlow is a rapidly growing application (40+ modules, 2,435 source files, 580
 ### 1. DATABASE CREDENTIALS COMMITTED TO GIT
 **Severity:** CRITICAL | **Reviewer:** Devil's Advocate
 - `CLAUDE.md:33-38` - Full production DATABASE_URL with password
-- `docs/INFRASTRUCTURE.md:30-38` - Same credentials + SSH passwords (`velo2026`)
+- `docs/INFRASTRUCTURE.md:30-38` - Same credentials + SSH passwords (`$VELO_SSH_PASSWORD`)
 - Repo has GitHub remotes - if repo is/becomes public, all credentials are exposed
 - **Action:** Rotate DB password immediately, rewrite git history to remove secrets, use env vars only
 

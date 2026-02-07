@@ -5,7 +5,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 
-const sql = neon(process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = neon(process.env.DATABASE_URL || 'process.env.DATABASE_URL&channel_binding=require');
 
 async function backupMohadinDrops() {
   console.log('📦 Backing up Mohadin drops for 2025-11-10...');

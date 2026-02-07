@@ -169,7 +169,7 @@ docker logs vllm-qwen3
 ssh root@72.61.197.178 "systemctl restart whatsapp-sender"
 
 # Check wa-feedback proxy on Velocity
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"
+ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback"
 ```
 
 ## Related Modules

@@ -10,7 +10,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 
 // Production database connection
-const DATABASE_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require';
+const DATABASE_URL = 'process.env.DATABASE_URL&channel_binding=require';
 
 // BOQ file path
 const BOQ_FILE = '/home/hein/Downloads/LAW.01-00.798038.BoQ.20250417.V01 BOQ.xlsx';

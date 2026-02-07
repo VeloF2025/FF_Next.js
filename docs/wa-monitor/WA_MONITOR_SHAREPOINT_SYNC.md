@@ -47,7 +47,7 @@ Sent to: **ai@velocityfibre.co.za**, **louisrdup@gmail.com**
 ## 🚀 Setup Instructions
 
 ### Prerequisites
-- VPS access: `ssh root@72.60.17.245` (password: VeloF@2025@@)
+- VPS access: `ssh root@72.60.17.245` (password: $VPS_SSH_PASSWORD)
 - SharePoint credentials (already configured)
 - Resend API key for email notifications
 

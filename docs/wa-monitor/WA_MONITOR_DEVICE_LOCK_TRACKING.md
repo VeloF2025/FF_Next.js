@@ -23,7 +23,7 @@
 
 ```bash
 # Generate new pairing code
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password root@72.60.17.245 \
   "systemctl restart whatsapp-bridge-dev && sleep 5 && tail -30 /opt/wa-monitor/dev/logs/whatsapp-bridge-dev.log | grep -A 2 'PAIRING CODE'"
 
 # Try pairing - if it fails with same error, lock is still active

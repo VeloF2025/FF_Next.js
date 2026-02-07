@@ -250,34 +250,34 @@ WhatsApp now uses LID (Linked ID) instead of phone numbers:
 
 ```bash
 # Check service status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl status whatsapp-bridge.service --no-pager | head -15"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status whatsapp-bridge.service --no-pager | head -15"
 
 # Restart bridge
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
 
 # View recent logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "tail -100 /home/louis/whatsapp-bridge-go/bridge.log"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -100 /home/louis/whatsapp-bridge-go/bridge.log"
 
 # Filter for DR processing
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E 'DR[0-9]{6,7}' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'DR[0-9]{6,7}' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
 
 # Filter for acknowledgments
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E '(ACK|Sent ack|photos:)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(ACK|Sent ack|photos:)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
 
 # Filter for errors
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -iE '(ERROR|WARN|FAIL)' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -iE '(ERROR|WARN|FAIL)' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
 
 # Filter for validation
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E '(NOT_FOUND|MISMATCH|validation)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(NOT_FOUND|MISMATCH|validation)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
 
 # Check if process is running
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "pgrep -a whatsapp-bridge"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "pgrep -a whatsapp-bridge"
 
 # View service logs via journald
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
 
 # Rebuild bridge (if code changed)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge main.go"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge main.go"
 ```
 
 ## Log Patterns
@@ -318,7 +318,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go
 
 **Diagnosis**:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
 ```
 
 **Common Causes**:
@@ -333,7 +333,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journal
 **Diagnosis**:
 ```bash
 # Check if bridge is receiving messages
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep 'Message from' /home/louis/whatsapp-bridge-go/bridge.log | tail -10"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep 'Message from' /home/louis/whatsapp-bridge-go/bridge.log | tail -10"
 ```
 
 **Common Causes**:
@@ -347,7 +347,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep 'Message from' /home/louis/w
 
 **Diagnosis**:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E 'ACK|ack' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'ACK|ack' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
 ```
 
 **Common Causes**:
@@ -401,13 +401,13 @@ Include `QuotedMessage` - WhatsApp uses it for LID resolution.
 
 **Diagnosis**:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "ps aux | grep whatsapp-bridge"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "ps aux | grep whatsapp-bridge"
 ```
 
 **Fix**:
 Restart service to clear memory:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
 ```
 
 ## Environment Variables

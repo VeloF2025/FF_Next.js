@@ -23,12 +23,12 @@ const CONFIG = {
   vps: {
     host: '100.96.203.105',
     user: 'velo',
-    password: 'velo2026',
+    password: '$VELO_SSH_PASSWORD',
     messagesDb: '/home/louis/whatsapp-bridge-go/store/messages.db',
   },
   database: {
     url: process.env.DATABASE_URL ||
-      'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+      'process.env.DATABASE_URL',
   },
   // Group JID to project mapping
   groupMappings: {

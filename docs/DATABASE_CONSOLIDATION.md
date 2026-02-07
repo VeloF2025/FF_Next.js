@@ -16,7 +16,7 @@ All FibreFlow services (app and WA Monitor) now share a single Neon PostgreSQL d
 - **Region**: Azure GWC (Global West Coast)
 - **Connection URL**:
   ```
-  postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+  postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
   ```
 
 ### Tables in Database
@@ -39,7 +39,7 @@ All FibreFlow services (app and WA Monitor) now share a single Neon PostgreSQL d
 ### 1. FibreFlow App
 **File**: `/home/louisdup/VF/Apps/FF_React/.env.production.local`
 ```bash
-DATABASE_URL="postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
+DATABASE_URL="postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
 ```
 
 **Access**:
@@ -50,7 +50,7 @@ DATABASE_URL="postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-p
 ### 2. WA Monitor Service
 **File**: `/home/louisdup/VF/deployments/railway/WA_monitor _Velo_Test/.env`
 ```bash
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **Service Components**:
@@ -163,7 +163,7 @@ cd /home/louisdup/VF/deployments/railway/WA_monitor\ _Velo_Test
 DATABASE_URL=postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb
 
 # AFTER (CORRECT!)
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 **2. FibreFlow Development (VPS)**
@@ -173,7 +173,7 @@ DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-po
 DATABASE_URL=postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb
 
 # AFTER (CORRECT!)
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 **3. Drop Monitor (VPS Python Service)**
@@ -183,7 +183,7 @@ DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-po
 NEON_DATABASE_URL=postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb
 
 # AFTER (CORRECT!)
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 ### Schema & Data Migration (Nov 7, 2025)

@@ -7,7 +7,7 @@
 const { neon } = require('@neondatabase/serverless');
 
 // Configuration
-const DATABASE_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 const SMARTSHEET_API_TOKEN = process.env.SMARTSHEET_API_TOKEN || 'X6McWWfPeBK7G3t7c5qIwQUfJu2gGbtatV2sz';
 const SMARTSHEET_API_BASE = 'https://api.smartsheet.com/2.0';
 const VF_STORAGE_URL = 'http://100.96.203.105:8091';

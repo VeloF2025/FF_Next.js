@@ -168,7 +168,7 @@ var PROJECTS = map[string]map[string]string{
     // ... other projects
 }
 
-const NEON_DB_URL = "postgresql://neondb_owner:npg_MIUZXrg1tEY0@..."
+const NEON_DB_URL = "postgresql://neondb_owner:$NEON_DB_PASSWORD@..."
 const FIBREFLOW_API_URL = "https://vf.fibreflow.app/api/activate/process-new-dr"
 const FIBREFLOW_ACK_API_URL = "https://vf.fibreflow.app/api/activate/dr-acknowledgment"
 ```
@@ -185,10 +185,10 @@ const FIBREFLOW_ACK_API_URL = "https://vf.fibreflow.app/api/activate/dr-acknowle
 /etc/systemd/system/whatsapp-bridge.service
 
 # Check status
-echo 'velo2026' | sudo -S systemctl status whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-bridge.service
 
 # Restart
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 
 # View logs
 tail -f /home/louis/whatsapp-bridge-go/bridge.log
@@ -345,11 +345,11 @@ Called to validate and process new DR submissions.
 
 ```bash
 # Connect to server
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 
 # Check all WhatsApp services
-echo 'velo2026' | sudo -S systemctl status whatsapp-bridge.service
-echo 'velo2026' | sudo -S systemctl status wa-feedback.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status wa-feedback.service
 
 # View bridge logs
 tail -f /home/louis/whatsapp-bridge-go/bridge.log
@@ -358,7 +358,7 @@ tail -f /home/louis/whatsapp-bridge-go/bridge.log
 grep -E 'DR[0-9]+|Ack|acknowledgment' /home/louis/whatsapp-bridge-go/bridge.log | tail -30
 
 # Restart bridge
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 
 # Check ports
 netstat -tlnp | grep -E '(8081|8083|8090|8092)'
@@ -390,7 +390,7 @@ curl -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
 
 **Fix:**
 ```bash
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ### Issue: Feedback not sending
@@ -408,7 +408,7 @@ docker logs drop-number-api --tail 50
 **Fix:**
 ```bash
 # Restart wa-feedback service
-echo 'velo2026' | sudo -S systemctl restart wa-feedback.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback.service
 
 # Or restart Docker container
 docker restart drop-number-api
@@ -453,7 +453,7 @@ var PROJECTS = map[string]map[string]string{
 ```bash
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge main.go
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ### 3. Update FibreFlow API
@@ -470,8 +470,8 @@ const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
 
 ### 4. Deploy FibreFlow
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/louis/apps/fibreflow && git pull && npm ci && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "cd /home/louis/apps/fibreflow && git pull && npm ci && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ## Security Considerations

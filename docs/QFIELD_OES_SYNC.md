@@ -142,7 +142,7 @@ curl -X POST http://100.96.203.105:8095/sync/full
 
 ```bash
 # SSH to server
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 
 # Check status
 sudo systemctl status qfield-sync.service
@@ -167,7 +167,7 @@ tail -f /var/log/qfield-sync.log
 Host: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
 Database: neondb
 User: neondb_owner
-Password: npg_MIUZXrg1tEY0
+Password: $NEON_DB_PASSWORD
 SSL: required
 
 View: v_qfield_oes_activations
@@ -295,7 +295,7 @@ curl -X POST http://100.96.203.105:8095/sync/full
 # Test Neon connection (from VF server)
 ssh velo@100.96.203.105
 source /opt/qfield-sync/venv/bin/activate
-python3 -c "import psycopg2; c=psycopg2.connect('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'); print('Neon OK')"
+python3 -c "import psycopg2; c=psycopg2.connect('postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'); print('Neon OK')"
 
 # Test QFieldCloud connection
 python3 -c "import psycopg2; c=psycopg2.connect(host='localhost',port=5433,database='qfieldcloud_db',user='qfieldcloud_db_admin',password='c6ce1f02f798c5776fee9e6857f628ff775c75e5eb3b7753'); print('QField OK')"

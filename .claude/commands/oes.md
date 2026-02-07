@@ -24,20 +24,20 @@ Import and manage Nokia OES activation reports.
 
 ```bash
 # OES record count
-PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) as total_oes_records FROM oes_activations;"
+PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) as total_oes_records FROM oes_activations;"
 
 # Recent imports
-PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT filename, total_rows, matched_drops, imported_at FROM oes_import_batches ORDER BY imported_at DESC LIMIT 5;"
+PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT filename, total_rows, matched_drops, imported_at FROM oes_import_batches ORDER BY imported_at DESC LIMIT 5;"
 
 # OES coverage
-PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) FILTER (WHERE oes_confirmed = true) AS confirmed, COUNT(*) AS total FROM drops;"
+PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) FILTER (WHERE oes_confirmed = true) AS confirmed, COUNT(*) AS total FROM drops;"
 ```
 
 ## Restart Staging Server
 
 ```bash
 # Restart service (port 3006)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # Verify
 sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://100.96.203.105:3006/
@@ -49,26 +49,26 @@ sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://100.96.203.105:
 
 ```bash
 # Check service status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
 
 # Pull latest code and rebuild
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
 
 # Restart
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ### Wrong Insert/Update Counts
 
 Ensure latest code deployed (commit: `fix(oes-import): use count-based approach`):
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
 ```
 
 ### View Logs
 
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
 ```
 
 ## Expected Results

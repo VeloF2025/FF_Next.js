@@ -151,17 +151,17 @@ Master list for validation (Mohadin only):
 
 ### SSH Access
 ```bash
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 ```
 
 ### Service Management
 
 ```bash
 # Check all WA services
-echo 'velo2026' | sudo -S systemctl status whatsapp-sender.service whatsapp-bridge.service wa-monitor-prod
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-sender.service whatsapp-bridge.service wa-monitor-prod
 
 # Restart sender and bridge
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender.service whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-sender.service whatsapp-bridge.service
 
 # View logs
 tail -f /home/louis/whatsapp-sender/sender.log
@@ -179,7 +179,7 @@ curl http://localhost:8081/health
 
 ```bash
 # Connection string
-DATABASE_URL="postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 
 # Daily drop counts
 psql $DATABASE_URL -c "
@@ -207,13 +207,13 @@ curl http://localhost:8081/health
 # Should show: {"connected":true,"service":"whatsapp-sender","status":"ok"}
 
 # 2. Check service status
-echo 'velo2026' | sudo -S systemctl status whatsapp-sender.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-sender.service
 
 # 3. Check logs
 tail -50 /home/louis/whatsapp-sender/sender.log
 
 # 4. Restart if needed
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-sender.service
 ```
 
 ### 2. Delete Sent Messages
@@ -248,7 +248,7 @@ if strings.Contains(content, "Received!") ||
 ```bash
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge *.go
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ### 4. Adding New WhatsApp Group (5 Minutes)
@@ -407,7 +407,7 @@ When invoked, this agent can:
 ## Important Reminders
 
 1. **Server**: Velocity Server 100.96.203.105 (NOT old VPS 72.60.17.245)
-2. **SSH**: `ssh velo@100.96.203.105` with password `velo2026`
+2. **SSH**: `ssh velo@100.96.203.105` with password `$VELO_SSH_PASSWORD`
 3. **Sender Phone**: +27 82 418 9511 (unified for ALL messages)
 4. **Bridge Phone**: +27 64 041 2391 (listens only, routes through Sender)
 5. **ALWAYS** use `/opt/wa-monitor/prod/restart-monitor.sh` for monitor restarts

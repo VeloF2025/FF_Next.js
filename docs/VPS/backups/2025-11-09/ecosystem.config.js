@@ -13,7 +13,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3005,
-        DATABASE_URL: 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+        DATABASE_URL: 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
       },
       error_file: '/var/log/pm2/fibreflow-prod-error.log',
       out_file: '/var/log/pm2/fibreflow-prod-out.log',
@@ -32,7 +32,7 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 3006,
-        DATABASE_URL: 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+        DATABASE_URL: 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
       },
       error_file: '/var/log/pm2/fibreflow-dev-error.log',
       out_file: '/var/log/pm2/fibreflow-dev-out.log',

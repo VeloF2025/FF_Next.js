@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { neon } from '@neondatabase/serverless';
 import { sql } from 'drizzle-orm';
 
-const DATABASE_URL = 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 
 async function populateFieldOperations() {
   console.log('🚀 Starting Field Operations Data Population...\n');

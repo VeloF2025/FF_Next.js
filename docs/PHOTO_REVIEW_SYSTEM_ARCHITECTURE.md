@@ -664,7 +664,7 @@ onemap_properties (id PK)
 
 ### Shared Database (All Services)
 ```env
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 ### Photo Review (Next.js)

@@ -101,14 +101,14 @@ curl -X POST https://vf.fibreflow.app/api/activate/process-new-dr \
 
 ### Check Go Bridge logs
 ```bash
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 tail -50 /home/louis/whatsapp-bridge-go/bridge.log
 ```
 
 ### Restart Go Bridge
 ```bash
 ssh velo@100.96.203.105
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ---

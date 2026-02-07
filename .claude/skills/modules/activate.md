@@ -831,13 +831,13 @@ curl -s -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
   -d '{"dropNumber":"DR1750922","project":"Lawley"}' | jq .
 
 # Check Go bridge logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "tail -50 /home/louis/whatsapp-bridge-go/bridge.log"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -50 /home/louis/whatsapp-bridge-go/bridge.log"
 
 # Filter for acknowledgment logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E '(Sent ack|photos:|ACK)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(Sent ack|photos:|ACK)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
 
 # Restart Go bridge
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
 
 # Check VLM server
 curl -s http://100.96.203.105:8100/v1/models | jq .
@@ -846,7 +846,7 @@ curl -s http://100.96.203.105:8100/v1/models | jq .
 curl -s http://100.96.203.105:8090/health | jq .
 
 # Restart WA Feedback
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback"
 ```
 
 ## Database Queries
@@ -901,7 +901,7 @@ WHERE drop_number = 'DR1234567';
 **Diagnosis**:
 ```bash
 # Check Go bridge logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "grep -E 'ACK|ERROR' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'ACK|ERROR' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
 ```
 
 **Common Causes**:
@@ -942,13 +942,13 @@ ContextInfo: &waProto.ContextInfo{
 curl -s http://100.96.203.105:8100/v1/models | jq .
 
 # Check docker
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker ps | grep vllm"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker ps | grep vllm"
 ```
 
 **Fix**:
 ```bash
 # Restart VLM container
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
 ```
 
 ---

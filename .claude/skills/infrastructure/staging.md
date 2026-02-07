@@ -141,22 +141,22 @@ Live monitoring mode for active deployments.
 ```bash
 # Two users needed:
 # - hein (0203): git operations, npm build
-# - velo (velo2026): sudo/service restart
+# - velo ($VELO_SSH_PASSWORD): sudo/service restart
 
 # Deploy master (or any branch) - use hein for git/build
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash --include-untracked && git fetch origin && git checkout master && git pull origin master && npm install && npm run build"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash --include-untracked && git fetch origin && git checkout master && git pull origin master && npm install && npm run build"
 
 # Restart service - use velo for sudo
-sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # Check status
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Branch:' && git branch --show-current && echo 'Commit:' && git log -1 --oneline && echo 'Service:' && systemctl is-active fibreflow.service"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Branch:' && git branch --show-current && echo 'Commit:' && git log -1 --oneline && echo 'Service:' && systemctl is-active fibreflow.service"
 
 # Service logs - use velo for sudo
-sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 50"
+sshpass -p '$VELO_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50"
 
 # List stashed changes
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash list"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash list"
 
 # HTTP check
 curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app
@@ -304,7 +304,7 @@ After deploying, Claude should:
 ### Quick Diagnosis Command
 ```bash
 # Run this first to diagnose most issues:
-sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo '=== Git ===' && git log -1 --oneline && echo '=== DB Password ===' && grep DATABASE_URL .env.production | grep -o 'npg_[^@]*' && echo '=== Service Dir ===' && grep WorkingDirectory /etc/systemd/system/fibreflow.service && echo '=== Logs ===' && tail -20 /var/log/fibreflow.error.log 2>/dev/null"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo '=== Git ===' && git log -1 --oneline && echo '=== DB Password ===' && grep DATABASE_URL .env.production | grep -o 'npg_[^@]*' && echo '=== Service Dir ===' && grep WorkingDirectory /etc/systemd/system/fibreflow.service && echo '=== Logs ===' && tail -20 /var/log/fibreflow.error.log 2>/dev/null"
 ```
 
 ---
@@ -321,19 +321,19 @@ The `.env.production` file has the wrong database password. This happens when:
 1. Git pull overwrites with old password from an outdated branch
 2. Someone manually edited the file incorrectly
 
-**Correct Password:** `npg_MIUZXrg1tEY0`
+**Correct Password:** `$NEON_DB_PASSWORD`
 **Wrong Password:** `npg_aRNLhZc1G2CD` (old/revoked)
 
 **Fix:**
 ```bash
 # Check current password
-sshpass -p '0203' ssh hein@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "grep DATABASE_URL /home/louis/apps/fibreflow/.env.production"
 
 # Fix if wrong
-sshpass -p '0203' ssh hein@100.96.203.105 "sed -i 's/npg_aRNLhZc1G2CD/npg_MIUZXrg1tEY0/g' /home/louis/apps/fibreflow/.env.production"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "sed -i 's/npg_aRNLhZc1G2CD/$NEON_DB_PASSWORD/g' /home/louis/apps/fibreflow/.env.production"
 
 # Restart service
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 **Prevention:**
@@ -354,7 +354,7 @@ The systemd service is pointing to the wrong directory (e.g., `fibreflow-product
 
 **Diagnosis:**
 ```bash
-sshpass -p '0203' ssh hein@100.96.203.105 "grep WorkingDirectory /etc/systemd/system/fibreflow.service"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "grep WorkingDirectory /etc/systemd/system/fibreflow.service"
 ```
 
 **Expected:** `WorkingDirectory=/home/louis/apps/fibreflow`
@@ -362,7 +362,7 @@ sshpass -p '0203' ssh hein@100.96.203.105 "grep WorkingDirectory /etc/systemd/sy
 
 **Fix:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S sed -i 's|fibreflow-production|fibreflow|g' /etc/systemd/system/fibreflow.service && sudo systemctl daemon-reload && sudo systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S sed -i 's|fibreflow-production|fibreflow|g' /etc/systemd/system/fibreflow.service && sudo systemctl daemon-reload && sudo systemctl restart fibreflow.service"
 ```
 
 ---
@@ -377,19 +377,19 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S sed -i 
 **Diagnosis:**
 ```bash
 # Check current commit vs master
-sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Local:' && git log -1 --oneline && echo 'Remote:' && git fetch origin && git log -1 --oneline origin/master"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Local:' && git log -1 --oneline && echo 'Remote:' && git fetch origin && git log -1 --oneline origin/master"
 ```
 
 **Fix:**
 ```bash
 # Force reset to origin/master (discards local changes)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'chown -R louis:louis /home/louis/apps/fibreflow/.git && su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout master && git reset --hard origin/master\"'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'chown -R louis:louis /home/louis/apps/fibreflow/.git && su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout master && git reset --hard origin/master\"'"
 
 # Then rebuild
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
 
 # Restart
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ---
@@ -405,7 +405,7 @@ Mixed file ownership in `.git` directory (some files owned by velo, some by loui
 
 **Fix:**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
 ```
 
 ---
@@ -418,7 +418,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S chown -
 **Fix:**
 ```bash
 # Discard local changes and checkout master
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git checkout -- . && git checkout master && git reset --hard origin/master\"'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git checkout -- . && git checkout master && git reset --hard origin/master\"'"
 ```
 
 ---
@@ -428,13 +428,13 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c
 **Diagnosis:**
 ```bash
 # Check service status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl status fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status fibreflow.service"
 
 # View logs
-sshpass -p '0203' ssh hein@100.96.203.105 "tail -50 /var/log/fibreflow.error.log"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "tail -50 /var/log/fibreflow.error.log"
 
 # View journald logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 100"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 100"
 ```
 
 **Common Causes:**
@@ -459,7 +459,7 @@ Missing or incorrect environment variables in `.env.production`:
 
 **Diagnosis:**
 ```bash
-sshpass -p '0203' ssh hein@100.96.203.105 "grep -E 'VLM_API_URL|NEXT_PUBLIC_APP_URL' /home/louis/apps/fibreflow/.env.production"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "grep -E 'VLM_API_URL|NEXT_PUBLIC_APP_URL' /home/louis/apps/fibreflow/.env.production"
 ```
 
 **Expected Values:**
@@ -471,14 +471,14 @@ NEXT_PUBLIC_APP_URL=http://localhost:3006
 **Fix:**
 ```bash
 # Add/fix environment variables
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'cat >> /home/louis/apps/fibreflow/.env.production << EOF
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'cat >> /home/louis/apps/fibreflow/.env.production << EOF
 VLM_API_URL=http://localhost:8100
 NEXT_PUBLIC_APP_URL=http://localhost:3006
 EOF
 chown louis:louis /home/louis/apps/fibreflow/.env.production'"
 
 # Restart service
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 **Why localhost?**
@@ -496,13 +496,13 @@ Cloudflare tunnel can't reach the service.
 **Fix:**
 ```bash
 # Check if service is running
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
 
 # Restart if not active
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # Verify local response
-sshpass -p '0203' ssh hein@100.96.203.105 "curl -s -o /dev/null -w '%{http_code}' http://localhost:3006"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "curl -s -o /dev/null -w '%{http_code}' http://localhost:3006"
 ```
 
 ---
@@ -511,7 +511,7 @@ sshpass -p '0203' ssh hein@100.96.203.105 "curl -s -o /dev/null -w '%{http_code}
 
 **Diagnosis:**
 ```bash
-sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && npm run build 2>&1 | tail -100"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "cd /home/louis/apps/fibreflow && npm run build 2>&1 | tail -100"
 ```
 
 **Common Fixes:**
@@ -527,19 +527,19 @@ When staging is broken, run these in order:
 
 ```bash
 # 1. Check what's wrong
-sshpass -p '0203' ssh hein@100.96.203.105 "tail -30 /var/log/fibreflow.error.log"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh hein@100.96.203.105 "tail -30 /var/log/fibreflow.error.log"
 
 # 2. Fix permissions if needed
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S chown -R louis:louis /home/louis/apps/fibreflow/.git"
 
 # 3. Reset to master
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout -- . && git reset --hard origin/master\"'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && git fetch origin && git checkout -- . && git reset --hard origin/master\"'"
 
 # 4. Rebuild
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'su louis -c \"cd /home/louis/apps/fibreflow && npm install && npm run build\"'"
 
 # 5. Restart service
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # 6. Verify
 curl -s "https://vf.fibreflow.app/api/ticketing/tickets?pageSize=1" | jq -r '.success'

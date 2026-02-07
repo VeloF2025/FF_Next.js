@@ -24,7 +24,7 @@ import {
 
 // Use connection string from environment or default
 const connectionString = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  'process.env.DATABASE_URL';
 
 const neonClient = neon(connectionString);
 const db = drizzle(neonClient as any);

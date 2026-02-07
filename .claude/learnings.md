@@ -2523,7 +2523,7 @@ server {
 
 Apply changes:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -t && echo 'velo2026' | sudo -S systemctl reload nginx"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S nginx -t && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl reload nginx"
 ```
 
 **Recommended Timeouts by Data Size:**
@@ -3913,10 +3913,10 @@ The bridge source is on Velocity (`/home/louis/whatsapp-bridge-go/`), compiled t
 **Solution — Use local machine as relay:**
 ```bash
 # Compile on Velocity
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge ."
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge ."
 
 # Copy to local machine
-sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
 
 # Copy to VPS
 scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
@@ -3936,7 +3936,7 @@ Multiple attempts to edit `main.go` via sed, Python heredocs, and cat heredocs a
 cat /tmp/fix.py | base64 > /tmp/fix.b64
 
 # Execute on remote server
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo '$(cat /tmp/fix.b64)' | base64 -d | python3"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$(cat /tmp/fix.b64)' | base64 -d | python3"
 ```
 
 This bypasses all intermediate shell escaping issues.

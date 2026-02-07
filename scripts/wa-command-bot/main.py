@@ -33,7 +33,7 @@ from aiohttp import web
 import asyncpg
 
 # Configuration
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require')
+DATABASE_URL = os.getenv('DATABASE_URL', 'process.env.DATABASE_URL')
 SQLITE_DB_PATH = os.getenv('SQLITE_DB_PATH', '/opt/whatsapp-bridge/store/messages.db')
 WA_SENDER_URL = os.getenv('WA_SENDER_URL', 'http://localhost:8081')
 WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '8086'))
@@ -339,10 +339,10 @@ vlm, qfield, production, staging, dev, grafana, portainer, pdfcraft, wa-feedback
             if command_type == 'ssh' and action.get('ssh_host'):
                 # SSH command - would need SSH key setup
                 # For now, use sshpass if available
-                full_cmd = f"sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no {action['ssh_user']}@{action['ssh_host']} \"{command}\""
+                full_cmd = f"sshpass -p "$VELO_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no {action['ssh_user']}@{action['ssh_host']} \"{command}\""
             else:
                 # Local bash command
-                full_cmd = f"echo 'velo2026' | sudo -S {command}"
+                full_cmd = f"echo '$VELO_SSH_PASSWORD' | sudo -S {command}"
 
             logger.info(f"Executing: {command}")
 

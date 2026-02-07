@@ -43,7 +43,7 @@ const SITE_ID = 'blitzfibre.sharepoint.com,cf8186e7-97cd-4aff-9d7f-e41cf213eff8,
 const SHARING_URL = 'https://blitzfibre.sharepoint.com/:x:/s/Velocity_Manco/EYm7g0w6Y1dFgGB_m4YlBxgBeVJpoDXAYjdvK-ZfgHoOqA';
 
 // Database
-const DATABASE_URL = 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 
 async function getAccessToken() {
   return new Promise((resolve, reject) => {

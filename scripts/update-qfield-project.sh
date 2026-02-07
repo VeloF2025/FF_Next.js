@@ -23,7 +23,7 @@ QFIELD_API_URL=https://qfield.fibreflow.app/api/v1
 QFIELD_LAYER_NAME=oes_activations
 
 # Database Configuration
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+NEON_DATABASE_URL=process.env.DATABASE_URL
 QFIELD_DB_HOST=localhost
 QFIELD_DB_PORT=5433
 QFIELD_DB_NAME=qfieldcloud_db

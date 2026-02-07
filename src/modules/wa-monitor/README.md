@@ -25,7 +25,7 @@ This module is **fully isolated** and operates independently from the main Fibre
 - Check VPS sender health: `curl http://72.61.197.178:8081/health`
 - Check wa-feedback proxy: `curl http://100.96.203.105:8092/health`
 - Restart VPS services: `ssh root@72.61.197.178 "systemctl restart whatsapp-sender whatsapp-bridge"`
-- Restart wa-feedback: `ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart wa-feedback"`
+- Restart wa-feedback: `ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback"`
 
 ## Overview
 
@@ -369,15 +369,15 @@ PORT=3005 npm start
 
 ### Deploy to Staging
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "echo 'velo2026' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "echo '$VELO_SSH_PASSWORD' | sudo -S bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
 # Visit: https://vf.fibreflow.app/wa-monitor
 ```
 
 ### Deploy to Production
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-production.service"
 # Visit: https://app.fibreflow.app/wa-monitor
 ```
 

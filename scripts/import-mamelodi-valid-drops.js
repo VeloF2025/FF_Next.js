@@ -35,7 +35,7 @@ const os = require('os');
 // Configuration
 const EXCEL_FILE = path.join(os.homedir(), 'Downloads', 'HLD HOME_Mamelodi POP1.xlsx');
 const SHEET_NAME = 'HLD_Home'; // Try this first, will auto-detect if wrong
-const DATABASE_URL = 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 
 async function readExcelFile() {
   console.log('📖 Reading Excel file...');

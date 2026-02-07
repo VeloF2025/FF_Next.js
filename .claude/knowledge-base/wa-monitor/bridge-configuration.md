@@ -77,7 +77,7 @@ Known maintenance group JIDs:
 
 ### Compile
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge .
 ```
@@ -86,7 +86,7 @@ go build -o whatsapp-bridge .
 Velocity and VPS cannot SSH to each other. Must relay via local machine:
 ```bash
 # 1. Copy from Velocity to local
-sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
 
 # 2. Copy from local to VPS
 scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
@@ -112,7 +112,7 @@ PYEOF
 
 # Base64 encode and execute remotely
 B64=$(base64 -w0 /tmp/fix.py)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo '$B64' | base64 -d | python3"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$B64' | base64 -d | python3"
 ```
 
 ## Systemd Service (VPS)

@@ -226,7 +226,7 @@ ff-deploy() {
   echo ""
 
   # Step 1: Build (as hein)
-  sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd $deploy_dir && \
+  sshpass -p "$HEIN_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd $deploy_dir && \
     echo '📦 Stashing changes...' && git stash --include-untracked && \
     echo '📥 Fetching...' && git fetch origin && \
     echo '🔀 Checking out $branch...' && git checkout $branch && git pull origin $branch && \
@@ -236,8 +236,8 @@ ff-deploy() {
 
   # Step 2: Restart (as velo)
   echo "🔄 Restarting service..."
-  sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 \
-    "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+  sshpass -p "$VELO_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no velo@100.96.203.105 \
+    "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
   sleep 3
 
   echo ""
@@ -252,11 +252,11 @@ ff-deploy() {
 # === STAGING STATUS ===
 ff-deploy-status() {
   echo "=== FF Staging Status ==="
-  sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 \
+  sshpass -p "$HEIN_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no hein@100.96.203.105 \
     "cd /home/louis/apps/fibreflow && echo 'Branch:' && git branch --show-current && echo 'Commit:' && git log -1 --oneline"
 
   echo ""
-  echo "Service: $(sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 'systemctl is-active fibreflow.service')"
+  echo "Service: $(sshpass -p "$HEIN_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no hein@100.96.203.105 'systemctl is-active fibreflow.service')"
 
   local status=$(curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app)
   echo "HTTP: $status"
@@ -266,8 +266,8 @@ ff-deploy-status() {
 ff-deploy-logs() {
   local lines="${1:-50}"
   echo "=== FF Staging Logs (last $lines lines) ==="
-  sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 \
-    "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n $lines"
+  sshpass -p "$VELO_SSH_PASSWORD" ssh -o StrictHostKeyChecking=no velo@100.96.203.105 \
+    "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n $lines"
 }
 
 # === HELP ===

@@ -147,7 +147,7 @@ projects:
 # Production Environment
 
 # Database
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # WhatsApp
 WHATSAPP_DB_PATH=/opt/wa-monitor/shared/whatsapp-bridge/store/messages.db
@@ -163,7 +163,7 @@ LOG_FILE=/opt/wa-monitor/prod/logs/wa-monitor-prod.log
 # Development Environment
 
 # Database (same as prod for now, can be separate later)
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # WhatsApp (shared)
 WHATSAPP_DB_PATH=/opt/wa-monitor/shared/whatsapp-bridge/store/messages.db

@@ -22,7 +22,7 @@ SSH into the VPS and add/verify these variables in `/var/www/fibreflow/.env.prod
 
 ```bash
 # SSH into VPS
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 # Edit environment file
 nano /var/www/fibreflow/.env.production

@@ -245,7 +245,7 @@ tail -f /opt/wa-monitor/dev/logs/wa-monitor-dev.log | grep "Velo Test"
 
 ```bash
 # Database
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # WhatsApp
 WHATSAPP_DB_PATH=/opt/velo-test-monitor/services/whatsapp-bridge/store/messages.db

@@ -234,13 +234,13 @@ tail -f /opt/whatsapp-bridge/bridge.log
 
 ```bash
 # Velocity (wa-feedback proxy only)
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 
 # Check wa-feedback health
 curl http://100.96.203.105:8092/health
 
 # Restart wa-feedback
-echo 'velo2026' | sudo -S systemctl restart wa-feedback
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback
 ```
 
 ### Monitoring

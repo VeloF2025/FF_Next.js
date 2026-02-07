@@ -195,7 +195,7 @@ psql $DATABASE_URL -c "SELECT project, COUNT(*) FROM valid_drop_numbers GROUP BY
 
 **Upload:**
 ```bash
-sshpass -p 'VeloF@2025@@' scp \
+sshpass -p "$VPS_SSH_PASSWORD" scp \
   /home/louisdup/VF/Apps/FF_React/scripts/monitor-updated.py \
   root@72.60.17.245:/opt/wa-monitor/prod/modules/monitor.py
 ```

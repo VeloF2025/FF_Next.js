@@ -1,6 +1,6 @@
 const { Client } = require('pg');
 
-const connectionString = 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const connectionString = 'process.env.DATABASE_URL';
 
 async function completeSearchIndexes() {
     const client = new Client({ connectionString });

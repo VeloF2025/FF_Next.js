@@ -76,8 +76,8 @@ npm run build
 
 **Velocity Server (permissions issue):**
 ```bash
-echo 'velo2026' | sudo -S rm -rf .next
-echo 'velo2026' | sudo -S chown -R velo:velo .
+echo '$VELO_SSH_PASSWORD' | sudo -S rm -rf .next
+echo '$VELO_SSH_PASSWORD' | sudo -S chown -R velo:velo .
 mkdir -p .next
 npm run build
 ```
@@ -465,13 +465,13 @@ ls /home/louis/apps/fibreflow/.next/static/chunks/ | head
 **Correct Deploy Commands for Staging:**
 ```bash
 # SSH to Velocity server
-sshpass -p 'velo2026' ssh velo@100.96.203.105
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
 
 # Deploy to staging (CORRECT directory)
 cd /home/louis/apps/fibreflow && \
-  echo 'velo2026' | sudo -S git pull && \
-  echo 'velo2026' | sudo -S npm run build && \
-  echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+  echo '$VELO_SSH_PASSWORD' | sudo -S git pull && \
+  echo '$VELO_SSH_PASSWORD' | sudo -S npm run build && \
+  echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service
 ```
 
 **All Service Directories:**

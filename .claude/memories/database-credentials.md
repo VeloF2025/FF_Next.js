@@ -5,10 +5,10 @@
 ## Production Database (FF_React project, production branch)
 
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 ```
 
-**Password:** `npg_MIUZXrg1tEY0`
+**Password:** `$NEON_DB_PASSWORD`
 **Endpoint:** `ep-dry-night-a9qyh4sj-pooler`
 **Required params:** `sslmode=require&channel_binding=require`
 
@@ -21,10 +21,10 @@ ALWAYS source from .env.local or use the correct DATABASE_URL:
 source .env.local && node scripts/run-migration.js
 
 # Option 2: Inline with correct password (note: single quotes required!)
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require' node scripts/run-migration.js
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require' node scripts/run-migration.js
 
 # Option 3: For psql direct connection
-psql 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 ```
 
 ## WRONG Password (DO NOT USE)
@@ -33,5 +33,5 @@ psql 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gw
 ## Development Branch
 - Branch: `hein-dev`
 - Endpoint: `ep-aged-poetry-a9bbd8e9`
-- Same password: `npg_MIUZXrg1tEY0`
-- Full URL: `postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require`
+- Same password: `$NEON_DB_PASSWORD`
+- Full URL: `postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require`

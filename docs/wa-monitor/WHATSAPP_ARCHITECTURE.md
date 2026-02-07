@@ -122,12 +122,12 @@ if strings.Contains(content, "Received!") ||
 
 ### SSH Access
 ```bash
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 ```
 
 ### Check Status
 ```bash
-echo 'velo2026' | sudo -S systemctl status whatsapp-sender.service whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-sender.service whatsapp-bridge.service
 ```
 
 ### View Logs
@@ -141,7 +141,7 @@ tail -f /home/louis/whatsapp-bridge-go/bridge.log
 
 ### Restart Services
 ```bash
-echo 'velo2026' | sudo -S systemctl restart whatsapp-sender.service whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-sender.service whatsapp-bridge.service
 ```
 
 ### Test Health
@@ -158,7 +158,7 @@ curl http://localhost:8083/health  # Bridge (may return 404, check logs)
 
 1. **Check service status:**
    ```bash
-   echo 'velo2026' | sudo -S systemctl status whatsapp-sender.service
+   echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-sender.service
    ```
 
 2. **Check sender health:**
@@ -174,7 +174,7 @@ curl http://localhost:8083/health  # Bridge (may return 404, check logs)
 
 4. **Restart if needed:**
    ```bash
-   echo 'velo2026' | sudo -S systemctl restart whatsapp-sender.service
+   echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-sender.service
    ```
 
 ### Duplicate Messages
@@ -197,7 +197,7 @@ if strings.Contains(content, "Received!") ||
 ```bash
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge *.go
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ### Delete Sent Messages

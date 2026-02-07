@@ -146,8 +146,8 @@ Look for files with 4+ sequential `await` calls on independent queries.
 ### Permission Issues with `.next`
 ```bash
 # Always clean with sudo on Velocity server
-echo 'velo2026' | sudo -S rm -rf .next
-echo 'velo2026' | sudo -S chown -R velo:velo .
+echo '$VELO_SSH_PASSWORD' | sudo -S rm -rf .next
+echo '$VELO_SSH_PASSWORD' | sudo -S chown -R velo:velo .
 mkdir -p .next
 npm run build
 ```

@@ -1,5 +1,5 @@
 const { neon } = require('@neondatabase/serverless');
-const sql = neon('postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = neon('process.env.DATABASE_URL');
 
 const corrections = [
   { drop: 'DR1732094', date: '2025-11-05 18:01:03+00:00' },

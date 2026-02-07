@@ -13,7 +13,7 @@
 
 ### Production Connection String
 ```bash
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 ### Environment Variable Name
@@ -53,7 +53,7 @@ For WA Monitor Python service, use:
 ### 1. Direct SQL (psql)
 ```bash
 # From command line
-psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 
 # Example queries
 SELECT COUNT(*) FROM projects;
@@ -65,7 +65,7 @@ SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' O
 ```javascript
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon('postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = neon('postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require');
 
 // Query example
 const projects = await sql`SELECT * FROM projects`;
@@ -77,7 +77,7 @@ console.log(projects);
 import pg from 'pg';
 
 const client = new pg.Client({
-  connectionString: 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
+  connectionString: 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require'
 });
 
 await client.connect();
@@ -127,7 +127,7 @@ Neon provides:
 ## Security
 
 **Credentials Management:**
-- ✅ Database password: `npg_aRNLhZc1G2CD` (stored in environment variables)
+- ✅ Database password: `$NEON_DB_PASSWORD_OLD` (stored in environment variables)
 - ✅ SSL/TLS required: `sslmode=require`
 - ✅ Channel binding: `channel_binding=require`
 - ⚠️ **Never commit credentials to git** - Use environment files (.env)
@@ -148,7 +148,7 @@ Neon provides:
 
 ```bash
 # Test connection
-psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require' -c "SELECT version();"
+psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require' -c "SELECT version();"
 
 # List all tables
 psql "$DATABASE_URL" -c "\dt"

@@ -38,10 +38,10 @@ Ensure these are configured in your system:
 # VPS credentials (already in approved commands)
 VPS_HOST=72.60.17.245
 VPS_USER=root
-VPS_PASSWORD='VeloF@2025@@'
+VPS_PASSWORD='$VPS_SSH_PASSWORD'
 
 # Database connection (Neon)
-DATABASE_URL='postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
 
 # Production/Dev URLs
 PROD_URL=https://app.fibreflow.app
@@ -193,7 +193,7 @@ Run a query and see if it works
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
 ```
 
 **Expected output**:

@@ -36,7 +36,7 @@ curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/h
 curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health
 
 # Internal (localhost on server)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
   echo 'PROD (3000):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
   echo 'STAGING (3006):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
   echo 'DEV (3005):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
@@ -59,7 +59,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "
 ### 1.3 Critical Services (Server)
 
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
   echo '=== SERVICES ==='
   echo 'nginx:' \$(systemctl is-active nginx)
   echo 'cloudflared:' \$(systemctl is-active cloudflared-tunnel.service)
@@ -79,7 +79,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "
 
 ```bash
 # Check tunnel connections
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep cloudflared_tunnel_ha_connections"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep cloudflared_tunnel_ha_connections"
 ```
 
 **Expected:** `cloudflared_tunnel_ha_connections 4`
@@ -88,7 +88,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/me
 
 ```bash
 # Test direct query
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 sql\`SELECT 1 as ok\`.then(r => console.log('DB:', r[0].ok === 1 ? 'CONNECTED' : 'FAILED'));
@@ -412,7 +412,7 @@ Quick checks for Role-Based Access Control system. For comprehensive RBAC audit,
 ### 7.1 Database Tables Exist
 
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 (async () => {
@@ -425,7 +425,7 @@ const sql = neon(process.env.DATABASE_URL);
 ### 7.2 Permission Data Seeded
 
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 (async () => {
@@ -444,7 +444,7 @@ const sql = neon(process.env.DATABASE_URL);
 ### 7.3 Super Admin Has 'all' Permission
 
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 (async () => {

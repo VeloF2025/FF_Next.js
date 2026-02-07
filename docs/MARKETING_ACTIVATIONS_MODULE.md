@@ -398,7 +398,7 @@ data.submissions.forEach(sub => {
 ## Support
 
 **VPS Access:** `ssh root@72.60.17.245`
-**Database:** `postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb`
+**Database:** `postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb`
 **Monitor Logs:** `/opt/wa-monitor/prod/logs/wa-monitor-prod.log`
 **WhatsApp Bridge Logs:** `/opt/velo-test-monitor/logs/whatsapp-bridge.log`
 

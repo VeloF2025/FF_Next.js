@@ -183,7 +183,7 @@ const DEFAULT_WHATSAPP_DB = "/opt/whatsapp-bridge-backup/store/whatsapp.db"
 
 // Line ~1200: Update Neon connection (same database)
 NEON_DB_URL := os.Getenv("NEON_DATABASE_URL",
-  "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require")
+  "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require")
 
 // Line ~60: Add identifier to logs
 log.Println("🔄 [BACKUP] WhatsApp Bridge starting...")
@@ -240,7 +240,7 @@ StandardOutput=append:/opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.lo
 StandardError=append:/opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log
 
 # Environment variables
-Environment="NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+Environment="NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 Environment="PORT=8082"
 Environment="MESSAGES_DB=/opt/whatsapp-bridge-backup/store/messages.db"
 Environment="WHATSAPP_DB=/opt/whatsapp-bridge-backup/store/whatsapp.db"
@@ -573,7 +573,7 @@ netstat -tuln | grep 8082
 
 ```bash
 # Test Neon connection
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "SELECT COUNT(*) FROM qa_photo_reviews;"
 
 # Should return current count
@@ -955,7 +955,7 @@ Restart=always
 RestartSec=10
 StandardOutput=append:/opt/velo-test-monitor/logs/whatsapp-bridge.log
 StandardError=append:/opt/velo-test-monitor/logs/whatsapp-bridge.log
-Environment="NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+Environment="NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 Environment="PORT=8080"
 
 [Install]

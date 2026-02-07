@@ -4,7 +4,7 @@ const { neon } = require('@neondatabase/serverless');
 const crypto = require('crypto');
 
 // Database connection
-const sql = neon('postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon('process.env.DATABASE_URL');
 
 // Simple password hash for demo (in production, use bcrypt)
 function hashPassword(password) {

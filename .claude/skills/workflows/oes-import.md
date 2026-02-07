@@ -280,30 +280,30 @@ updated = total_rows - inserted = 6259 - 500 = 5759 updated
 
 ```bash
 # Server users:
-# - velo (velo2026): sudo/service operations
+# - velo ($VELO_SSH_PASSWORD): sudo/service operations
 # - hein (0203): git operations (not needed for OES)
 
 # Check staging server status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
 
 # Restart staging server (port 3006)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # View service logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
 
 # Check what's using port 3006
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "ss -tlnp | grep 3006"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "ss -tlnp | grep 3006"
 
 # HTTP health check
 curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
 
 # Pull latest code and rebuild
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
 
 # Full restart sequence
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build" && \
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build" && \
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ## Database Queries
@@ -367,15 +367,15 @@ Old code used `RETURNING (xmax = 0)` which caused performance issues with 6000+ 
 **Fix**:
 1. Check server has latest code:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
 ```
 
 2. Should show commit: `fix(oes-import): use count-based approach`
 
 3. If not, pull and restart:
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 ---
@@ -409,7 +409,7 @@ SELECT COUNT(*) FROM oes_activations;
 **Fix**:
 ```bash
 # Restart the service (it will take over port 3006)
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 **Note**: Don't try to kill processes manually. The systemd service manages port 3006.
@@ -425,10 +425,10 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemc
 **Fix**:
 ```bash
 # Check if service is running
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
 
 # If not active, restart
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # Verify local response
 curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
@@ -445,7 +445,7 @@ curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
 **Check**:
 ```bash
 # Test database connection
-PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) FROM oes_activations;"
+PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) FROM oes_activations;"
 ```
 
 **Common Causes**:
@@ -486,7 +486,7 @@ Nginx proxy_read_timeout too low for large imports (7000+ rows). The `maxDuratio
 Increase nginx proxy timeouts:
 ```bash
 # Check current config
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow"
 
 # Add timeout settings to dev server block (if missing)
 # proxy_connect_timeout 300s;
@@ -494,7 +494,7 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S grep pr
 # proxy_read_timeout 300s;
 
 # Reload nginx
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S nginx -t && echo 'velo2026' | sudo -S systemctl reload nginx"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S nginx -t && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl reload nginx"
 ```
 
 **Required Timeouts**:
@@ -541,16 +541,16 @@ When OES import is broken:
 
 ```bash
 # 1. Check service status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -10"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -10"
 
 # 2. Pull latest code
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull"
 
 # 3. Rebuild
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && npm run build"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && npm run build"
 
 # 4. Restart service
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 
 # 5. Verify
 sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
@@ -618,13 +618,13 @@ Bad GPS coordinates are filtered out:
 
 ```bash
 # Check sync status
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s http://localhost:8095/status"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s http://localhost:8095/status"
 
 # Trigger manual sync
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "curl -s -X POST http://localhost:8095/sync/oes -H 'Content-Type: application/json' -d '{\"batchId\": \"manual\"}'"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s -X POST http://localhost:8095/sync/oes -H 'Content-Type: application/json' -d '{\"batchId\": \"manual\"}'"
 
 # View sync logs
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "tail -30 /var/log/qfield-oes-sync.log"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -30 /var/log/qfield-oes-sync.log"
 ```
 
 ### Sync Script Location

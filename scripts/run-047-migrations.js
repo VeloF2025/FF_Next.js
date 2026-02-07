@@ -19,8 +19,8 @@ const path = require('path');
 
 // Database configurations
 const DB_CONFIGS = {
-  dev: 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require',
-  prod: 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+  dev: 'process.env.DATABASE_URL',
+  prod: 'process.env.DATABASE_URL'
 };
 
 // Migration files in order

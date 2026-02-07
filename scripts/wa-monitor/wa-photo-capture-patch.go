@@ -155,7 +155,7 @@ func processDropNumbers(client *whatsmeow.Client, content, chatJID, sender strin
 
 /*
 1. SSH to Velocity server:
-   sshpass -p 'velo2026' ssh velo@100.96.203.105
+   sshpass -p "$VELO_SSH_PASSWORD" ssh velo@100.96.203.105
 
 2. Backup current code:
    cp /home/louis/whatsapp-bridge-go/main.go /home/louis/whatsapp-bridge-go/main.go.backup.$(date +%Y%m%d_%H%M%S)
@@ -168,7 +168,7 @@ func processDropNumbers(client *whatsmeow.Client, content, chatJID, sender strin
    go build -o whatsapp-bridge main.go
 
 5. Restart the service:
-   echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+   echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 
 6. Check logs:
    tail -f /home/louis/whatsapp-bridge-go/bridge.log

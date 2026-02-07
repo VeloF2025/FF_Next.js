@@ -65,7 +65,7 @@ systemctl restart whatsapp-bridge
 Routes FibreFlow API calls to unified bridge:
 ```bash
 curl http://100.96.203.105:8092/health
-echo 'velo2026' | sudo -S systemctl restart wa-feedback
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback
 # Config: /etc/systemd/system/wa-feedback.service
 # Code: /home/louis/wa-feedback-service/wa-feedback-service.js
 ```
@@ -241,7 +241,7 @@ Steps are stored as `step_01` through `step_12` boolean columns in database.
 
 ### SSH Access
 ```bash
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 ```
 
 ### Service Management
@@ -253,13 +253,13 @@ systemctl restart whatsapp-bridge
 tail -f /opt/whatsapp-bridge/bridge.log
 
 # Bridge source on Velocity (100.96.203.105)
-sshpass -p 'velo2026' ssh velo@100.96.203.105
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
 cd /home/louis/whatsapp-bridge-go
 # Edit main.go, then compile:
 go build -o whatsapp-bridge .
 
 # Deploy binary (relay via local machine — servers can't SSH to each other)
-sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/
 scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/
 ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
@@ -323,7 +323,7 @@ ssh root@72.61.197.178 "tail -100 /opt/whatsapp-bridge/bridge.log" | grep "Messa
 ```bash
 node -e "
 const { neon } = require('@neondatabase/serverless');
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon('postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
 (async () => {
   const result = await sql\`
     INSERT INTO wa_monitored_groups (group_jid, group_name, project_name, group_type, description, is_active)
@@ -338,7 +338,7 @@ Group types: `dr_submission` (activations), `maintenance`, `admin`
 
 **Step 3: Add to main.go PROJECTS map**
 ```bash
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": {/i\\
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": {/i\\
 \	\"New Group Name\": {\\
 \		\"group_jid\":          \"120363XXXXXXXXXX@g.us\",\\
 \		\"project_name\":       \"Project\",\\
@@ -350,10 +350,10 @@ sshpass -p 'velo2026' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": {/i\\
 **Step 4: Compile and Deploy**
 ```bash
 # Compile on Velocity
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && echo 'velo2026' | sudo -S go build -o whatsapp-bridge-new ."
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && echo '$VELO_SSH_PASSWORD' | sudo -S go build -o whatsapp-bridge-new ."
 
 # Copy via local machine (servers can't SSH to each other)
-sshpass -p 'velo2026' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
 scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
 
 # Deploy and restart on VPS

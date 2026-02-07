@@ -10,7 +10,7 @@ import crypto from 'crypto';
 
 // Database connection
 const DATABASE_URL = process.env.DATABASE_URL || 
-  'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  'process.env.DATABASE_URL';
 
 const client = new Client({
   connectionString: DATABASE_URL,

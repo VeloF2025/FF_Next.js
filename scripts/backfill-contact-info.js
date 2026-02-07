@@ -10,7 +10,7 @@
 const { Pool } = require('pg');
 
 const DATABASE_URL = process.env.DATABASE_URL ||
-  'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  'process.env.DATABASE_URL';
 
 const BOSS_API_HOST = 'http://100.96.203.105:8003';
 

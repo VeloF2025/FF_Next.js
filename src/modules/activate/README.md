@@ -578,8 +578,8 @@ Event logging for full DR lifecycle tracking.
 
 ### VLM Not Responding
 ```bash
-ssh velo@100.96.203.105  # Password: velo2026
-echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status vllm-qwen.service
 /home/velo/scripts/vllm/startup.sh  # Restart
 ```
 
@@ -587,13 +587,13 @@ echo 'velo2026' | sudo -S systemctl status vllm-qwen.service
 ```bash
 ssh velo@100.96.203.105
 tail -f /home/louis/whatsapp-bridge-go/bridge.log
-echo 'velo2026' | sudo -S systemctl restart whatsapp-bridge.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 ```
 
 ### WA Feedback Not Sending
 ```bash
 curl http://100.96.203.105:8090/health
-echo 'velo2026' | sudo -S systemctl restart wa-feedback
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback
 ```
 
 ### Photos Not Categorizing

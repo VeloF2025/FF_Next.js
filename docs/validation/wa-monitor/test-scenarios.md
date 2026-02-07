@@ -94,7 +94,7 @@ ssh root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
 ```
 
 **Expected Output**:
@@ -165,7 +165,7 @@ curl -s https://app.fibreflow.app/api/wa-monitor-drops | jq '.success'
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, project, submitted_by FROM qa_photo_reviews ORDER BY whatsapp_message_date DESC LIMIT 1;\""
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, project, submitted_by FROM qa_photo_reviews ORDER BY whatsapp_message_date DESC LIMIT 1;\""
 ```
 
 **Expected Output**:
@@ -302,7 +302,7 @@ curl -s "https://app.fibreflow.app/api/wa-monitor-daily-drops" | jq .
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, COUNT(*) as count FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1;\""
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, COUNT(*) as count FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1;\""
 ```
 
 **Expected Output**:
@@ -343,7 +343,7 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, submitted_by, LENGTH(submitted_by) as len FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11 LIMIT 5;\""
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, submitted_by, LENGTH(submitted_by) as len FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11 LIMIT 5;\""
 ```
 
 **Expected Output**:
@@ -476,7 +476,7 @@ ssh root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/dev/logs/wa-monitor-dev.
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, incorrect_steps, incorrect_comments FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL AND jsonb_array_length(incorrect_steps) > 0 LIMIT 1;\""
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, incorrect_steps, incorrect_comments FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL AND jsonb_array_length(incorrect_steps) > 0 LIMIT 1;\""
 ```
 
 **Expected Output**:

@@ -9,7 +9,7 @@
 const { Client } = require('pg');
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = process.env.DATABASE_URL || 'process.env.DATABASE_URL';
 
 // Parse CLI args
 const args = process.argv.slice(2);

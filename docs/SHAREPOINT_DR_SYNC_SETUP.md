@@ -150,7 +150,7 @@ SHAREPOINT_DR_ROOT_FOLDER_ID=your-projects-folder-id
 SHAREPOINT_DR_SYNC_ENABLED=true
 
 # Restart the service
-echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service
 ```
 
 ---

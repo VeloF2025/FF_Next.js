@@ -13,8 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Database URLs
-const DEV_DATABASE_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech/neondb?sslmode=require';
-const PROD_DATABASE_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DEV_DATABASE_URL = 'process.env.DATABASE_URL';
+const PROD_DATABASE_URL = 'process.env.DATABASE_URL';
 
 // Migration files in order
 const MIGRATIONS = [

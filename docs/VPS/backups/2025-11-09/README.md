@@ -78,7 +78,7 @@ See `DATABASE_SCHEMA_CHANGES.md` for:
 
 ### Database Connection (Correct)
 ```
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 ### VPS Paths
@@ -106,7 +106,7 @@ systemctl status drop-monitor
 pm2 list
 
 # 3. Test database connection
-psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c "SELECT COUNT(*) FROM qa_photo_reviews WHERE resubmitted=TRUE;"
+psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c "SELECT COUNT(*) FROM qa_photo_reviews WHERE resubmitted=TRUE;"
 
 # 4. Check production app
 curl -s https://app.fibreflow.app/api/wa-monitor-drops | jq '.data[0] | {dropNumber, resubmitted}'

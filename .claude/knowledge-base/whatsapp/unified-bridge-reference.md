@@ -88,7 +88,7 @@ ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log | grep 'Storing
 
 #### Step 3: Add to database
 ```bash
-DATABASE_URL='postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
+DATABASE_URL='postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' node -e "
 const { neon } = require('@neondatabase/serverless');
 const sql = neon(process.env.DATABASE_URL);
 (async () => {
@@ -113,7 +113,7 @@ curl http://72.61.197.178:8083/reload-groups
 ssh root@72.61.197.178
 
 # Velocity (FibreFlow apps)
-ssh velo@100.96.203.105  # Password: velo2026
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 ```
 
 ## Service Management (VPS)

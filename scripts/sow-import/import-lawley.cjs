@@ -6,7 +6,7 @@ require('dotenv').config();
 
 // Database configuration
 const pgConfig = {
-  connectionString: process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require',
+  connectionString: process.env.DATABASE_URL || 'process.env.DATABASE_URL',
   ssl: { rejectUnauthorized: false }
 };
 

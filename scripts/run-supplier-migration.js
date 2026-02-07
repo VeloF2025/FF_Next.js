@@ -6,7 +6,7 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DATABASE_URL = 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 
 async function runMigration() {
   console.log('🚀 Starting supplier tables migration...\n');

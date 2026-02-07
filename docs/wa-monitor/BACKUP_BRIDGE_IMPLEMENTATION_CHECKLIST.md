@@ -131,7 +131,7 @@ RestartSec=10
 StandardOutput=append:/opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log
 StandardError=append:/opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log
 
-Environment="NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+Environment="NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 Environment="PORT=8082"
 Environment="MESSAGES_DB=/opt/whatsapp-bridge-backup/store/messages.db"
 Environment="WHATSAPP_DB=/opt/whatsapp-bridge-backup/store/whatsapp.db"
@@ -229,7 +229,7 @@ tail -f /opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log | grep "Rece
 
 ```bash
 # Run database migration
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" <<EOF
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" <<EOF
 ALTER TABLE qa_photo_reviews
 ADD COLUMN IF NOT EXISTS bridge_source VARCHAR(20) DEFAULT 'primary';
 
@@ -240,7 +240,7 @@ EOF
 
 **Verify migration:**
 ```bash
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" \
   -c "\d qa_photo_reviews" | grep bridge_source
 ```
 
@@ -367,7 +367,7 @@ tail -20 /opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log | grep "DR9
 #### Test 4: Database Deduplication
 
 ```bash
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
   SELECT drop_number, bridge_source, created_at
   FROM qa_photo_reviews
   WHERE drop_number = 'DR9999901';
@@ -398,7 +398,7 @@ systemctl stop whatsapp-bridge-prod
 tail -20 /opt/whatsapp-bridge-backup/logs/whatsapp-bridge-backup.log | grep "DR9999902"
 
 # Check database
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
   SELECT drop_number, bridge_source
   FROM qa_photo_reviews
   WHERE drop_number = 'DR9999902';
@@ -460,7 +460,7 @@ tmux new-session \; \
 
 ```bash
 # Compare message counts
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
   SELECT bridge_source, COUNT(*) as message_count
   FROM qa_photo_reviews
   WHERE DATE(created_at) = CURRENT_DATE
@@ -484,7 +484,7 @@ psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gw
 /opt/whatsapp-bridge-backup/health-check.sh
 
 # Daily statistics
-psql "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
+psql "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require" -c "
   SELECT
     DATE(created_at) as date,
     bridge_source,

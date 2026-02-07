@@ -305,7 +305,7 @@ INSERT INTO wa_service_config (config_key, config_value, config_type, category, 
   -- VPS SSH (sensitive - don't expose values)
   ('vps_host', '100.96.203.105', 'string', 'service', 'VPS host for SSH commands', true),
   ('vps_user', 'velo', 'string', 'service', 'VPS SSH username', true),
-  ('vps_password', 'velo2026', 'string', 'service', 'VPS SSH password', true)
+  ('vps_password', '$VELO_SSH_PASSWORD', 'string', 'service', 'VPS SSH password', true)
 ON CONFLICT (config_key) DO UPDATE SET
   config_value = EXCLUDED.config_value,
   config_type = EXCLUDED.config_type,

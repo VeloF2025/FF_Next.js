@@ -180,11 +180,11 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 curl http://100.96.203.105:8100/v1/models
 
 # Check docker container
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker ps | grep vllm"
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker logs vllm-qwen3 --tail 50"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker ps | grep vllm"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker logs vllm-qwen3 --tail 50"
 
 # Restart if needed
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
 ```
 
 ### Validation Always Failing

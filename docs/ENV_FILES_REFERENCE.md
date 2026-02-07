@@ -14,8 +14,8 @@ All FibreFlow environment files now point to the single consolidated database (e
 **Database**: ep-dry-night (FibreFlow consolidated DB)
 
 ```bash
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **Fix History**: Updated Nov 7, 2025 (was pointing to ep-damp-credit)
@@ -28,7 +28,7 @@ NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4
 **Database**: ep-dry-night (FibreFlow consolidated DB)
 
 ```bash
-DATABASE_URL="postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
+DATABASE_URL="postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
 ```
 
 **Status**: Already correct (Nov 6, 2025)
@@ -43,7 +43,7 @@ DATABASE_URL="postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-p
 **Database**: ep-dry-night (FibreFlow consolidated DB)
 
 ```bash
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **Fix History**: Updated Nov 7, 2025 (was pointing to ep-damp-credit)
@@ -64,7 +64,7 @@ cat /var/www/fibreflow/.env.production | grep DATABASE_URL
 **Database**: ep-dry-night (FibreFlow consolidated DB)
 
 ```bash
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **Fix History**: Updated Nov 7, 2025 (was pointing to ep-damp-credit)
@@ -85,7 +85,7 @@ cat /var/www/fibreflow-dev/.env.production | grep DATABASE_URL
 **Database**: ep-dry-night (FibreFlow consolidated DB)
 
 ```bash
-NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **Fix History**: Updated Nov 7, 2025 (was pointing to ep-damp-credit)
@@ -124,11 +124,11 @@ Loads in this order (first found wins):
 - **Endpoint**: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
 - **Database**: neondb
 - **User**: neondb_owner
-- **Password**: npg_aRNLhZc1G2CD
+- **Password**: $NEON_DB_PASSWORD_OLD
 
 **Full Connection String:**
 ```
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 ---

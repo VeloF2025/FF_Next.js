@@ -277,7 +277,7 @@ Compliance reporting required - certain actions need audit trail.
 ssh velo@100.96.203.105
 cd /home/velo/fibreflow
 git pull && npm ci && npm run build
-echo 'velo2026' | sudo -S systemctl restart fibreflow.service
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service
 ```
 
 **Verified Jan 2026:** All three pages work after rebuild. The APIs (`/api/procurement/requisitions`, etc.) work fine - only the page SSR was affected.

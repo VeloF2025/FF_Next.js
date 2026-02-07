@@ -225,7 +225,7 @@ OLD DATABASE (should NOT be used):
 postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb
 
 CORRECT DATABASE (production):
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 **Files Using WRONG Database:**
@@ -481,7 +481,7 @@ grep "DATABASE_URL" /var/www/fibreflow/.env.production
 grep "DATABASE_URL" /var/www/ecosystem.config.js
 ```
 
-**CORRECT URL:** `postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb`
+**CORRECT URL:** `postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb`
 
 If ANY are wrong, update them!
 
@@ -595,7 +595,7 @@ PROJECTS = {
 }
 
 # Line 70: Hardcoded database URL
-NEON_DB_URL = "postgresql://neondb_owner:npg_aRNLhZc1G2CD@..."
+NEON_DB_URL = "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@..."
 
 # Line 71: Hardcoded SQLite path
 MESSAGES_DB_PATH = "/opt/velo-test-monitor/services/..."

@@ -316,7 +316,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- VLM Recovery Actions
 INSERT INTO recovery_actions (service_id, action_name, description, command, command_type, ssh_host, ssh_user, risk_level, requires_approval, execution_order) VALUES
-  ('00000000-0000-0000-0000-000000000004', 'Restart VLM Service', 'Restart the VLLM Qwen service', 'echo ''velo2026'' | sudo -S systemctl restart vllm-qwen.service', 'ssh', '100.96.203.105', 'velo', 'safe', false, 1),
+  ('00000000-0000-0000-0000-000000000004', 'Restart VLM Service', 'Restart the VLLM Qwen service', 'echo ''$VELO_SSH_PASSWORD'' | sudo -S systemctl restart vllm-qwen.service', 'ssh', '100.96.203.105', 'velo', 'safe', false, 1),
   ('00000000-0000-0000-0000-000000000004', 'Clear GPU Memory', 'Clear GPU memory and restart', '/home/velo/scripts/vllm/startup.sh', 'ssh', '100.96.203.105', 'velo', 'moderate', true, 2)
 ON CONFLICT DO NOTHING;
 
@@ -332,14 +332,14 @@ ON CONFLICT DO NOTHING;
 
 -- FibreFlow Production Recovery Actions
 INSERT INTO recovery_actions (service_id, action_name, description, command, command_type, ssh_host, ssh_user, risk_level, requires_approval, execution_order) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'Restart Production', 'Restart FibreFlow production service', 'echo ''velo2026'' | sudo -S systemctl restart fibreflow-production.service', 'ssh', '100.96.203.105', 'velo', 'moderate', true, 1),
-  ('00000000-0000-0000-0000-000000000001', 'Rebuild Production', 'Pull latest and rebuild', 'cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo ''velo2026'' | sudo -S systemctl restart fibreflow-production.service', 'ssh', '100.96.203.105', 'velo', 'dangerous', true, 2)
+  ('00000000-0000-0000-0000-000000000001', 'Restart Production', 'Restart FibreFlow production service', 'echo ''$VELO_SSH_PASSWORD'' | sudo -S systemctl restart fibreflow-production.service', 'ssh', '100.96.203.105', 'velo', 'moderate', true, 1),
+  ('00000000-0000-0000-0000-000000000001', 'Rebuild Production', 'Pull latest and rebuild', 'cd /home/velo/fibreflow-production && git pull origin master && npm run build && echo ''$VELO_SSH_PASSWORD'' | sudo -S systemctl restart fibreflow-production.service', 'ssh', '100.96.203.105', 'velo', 'dangerous', true, 2)
 ON CONFLICT DO NOTHING;
 
 -- FibreFlow Staging Recovery Actions
 INSERT INTO recovery_actions (service_id, action_name, description, command, command_type, ssh_host, ssh_user, risk_level, requires_approval, execution_order) VALUES
-  ('00000000-0000-0000-0000-000000000002', 'Restart Staging', 'Restart FibreFlow staging service', 'echo ''velo2026'' | sudo -S systemctl restart fibreflow.service', 'ssh', '100.96.203.105', 'velo', 'safe', false, 1),
-  ('00000000-0000-0000-0000-000000000002', 'Rebuild Staging', 'Pull latest and rebuild', 'cd /home/louis/apps/fibreflow && git pull origin master && npm run build && echo ''velo2026'' | sudo -S systemctl restart fibreflow.service', 'ssh', '100.96.203.105', 'velo', 'moderate', true, 2)
+  ('00000000-0000-0000-0000-000000000002', 'Restart Staging', 'Restart FibreFlow staging service', 'echo ''$VELO_SSH_PASSWORD'' | sudo -S systemctl restart fibreflow.service', 'ssh', '100.96.203.105', 'velo', 'safe', false, 1),
+  ('00000000-0000-0000-0000-000000000002', 'Rebuild Staging', 'Pull latest and rebuild', 'cd /home/louis/apps/fibreflow && git pull origin master && npm run build && echo ''$VELO_SSH_PASSWORD'' | sudo -S systemctl restart fibreflow.service', 'ssh', '100.96.203.105', 'velo', 'moderate', true, 2)
 ON CONFLICT DO NOTHING;
 
 -- WA Monitor Recovery Actions

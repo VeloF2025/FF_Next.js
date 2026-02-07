@@ -65,7 +65,7 @@ This module validates the foundational database layer that all FibreFlow feature
 ### Primary Database (MUST USE)
 
 ```
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
 ```
 
 **Project**: FF_React

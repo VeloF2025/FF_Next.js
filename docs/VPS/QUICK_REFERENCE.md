@@ -97,7 +97,7 @@ df -h
 
 ## Password & Access
 
-**SSH Password:** VeloF@2025@@
+**SSH Password:** $VPS_SSH_PASSWORD
 **Server:** root@72.60.17.245
 
 *Keep this secure. Consider using SSH keys instead of passwords.*

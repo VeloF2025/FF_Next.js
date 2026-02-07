@@ -1,6 +1,6 @@
 const { neon } = require('@neondatabase/serverless');
 
-const sql = neon('postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require');
+const sql = neon('process.env.DATABASE_URL');
 
 (async () => {
   console.log('🔧 Running database migration: add_whatsapp_message_date');

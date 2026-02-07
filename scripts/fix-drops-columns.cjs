@@ -4,7 +4,7 @@ const ws = require('ws');
 neonConfig.webSocketConstructor = ws;
 
 const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require'
+  connectionString: 'process.env.DATABASE_URL'
 });
 
 async function main() {

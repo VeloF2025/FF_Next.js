@@ -18,8 +18,8 @@ This document ensures the WhatsApp Monitor (Drop Monitor) and FibreFlow producti
 Host: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
 Database: neondb
 User: neondb_owner
-Password: npg_aRNLhZc1G2CD
-Full URL: postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+Password: $NEON_DB_PASSWORD_OLD
+Full URL: postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
 ```
 
 **Old Database (DEPRECATED - DO NOT USE):**
@@ -35,7 +35,7 @@ Host: ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech ❌
 **Line:** 66
 
 ```python
-NEON_DB_URL = os.getenv('NEON_DATABASE_URL', 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require')
+NEON_DB_URL = os.getenv('NEON_DATABASE_URL', 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require')
 ```
 
 **How to verify:**
@@ -49,7 +49,7 @@ ssh root@72.60.17.245 "grep -n 'NEON_DB_URL = os.getenv' /opt/velo-test-monitor/
 **Section:** `[Service]`
 
 ```ini
-Environment="NEON_DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+Environment="NEON_DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
 ```
 
 **How to verify:**
@@ -76,7 +76,7 @@ ssh root@72.60.17.245 "ls -lh /opt/velo-test-monitor/services/whatsapp-bridge/st
 **File:** `/var/www/fibreflow/.env.production`
 
 ```bash
-DATABASE_URL=postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
 **How to verify:**
@@ -165,7 +165,7 @@ curl -s "https://app.fibreflow.app/api/wa-monitor-daily-drops" | jq '.data'
 ssh root@72.60.17.245 "tail -20 /opt/velo-test-monitor/logs/drop_monitor.log"
 
 # Direct database query to confirm
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) as total_drops FROM qa_photo_reviews;'"
+ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) as total_drops FROM qa_photo_reviews;'"
 ```
 
 ## Troubleshooting
@@ -188,7 +188,7 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 1. Verify database URL is correct (ep-dry-night)
 2. Check the NEW database has `qa_photo_reviews` table:
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c '\dt qa_photo_reviews'"
+   ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c '\dt qa_photo_reviews'"
    ```
 
 ### Issue: Drop monitor can't find WhatsApp database (/app/store/messages.db)

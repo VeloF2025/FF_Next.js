@@ -2,7 +2,7 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const PROD_URL = 'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const PROD_URL = 'process.env.DATABASE_URL';
 
 const MIGRATIONS = [
   'scripts/migrations/049_purchase_requisitions.sql',

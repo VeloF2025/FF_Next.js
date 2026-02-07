@@ -35,7 +35,7 @@ ssh root@72.61.197.178 "systemctl restart whatsapp-sender.service whatsapp-bridg
 ```bash
 node -e "
 const { neon } = require('@neondatabase/serverless');
-const sql = neon('postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon('postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
 (async () => {
   const records = await sql\`
     SELECT drop_number, created_at, user_name, project

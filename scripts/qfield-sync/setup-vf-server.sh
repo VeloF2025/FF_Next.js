@@ -10,7 +10,7 @@ set -e
 
 VPS_HOST="100.96.203.105"
 VPS_USER="velo"
-VPS_PASS="velo2026"
+VPS_PASS="$VELO_SSH_PASSWORD"
 DEPLOY_DIR="/opt/qfield-sync"
 
 echo "=============================================="
@@ -63,7 +63,7 @@ After=network.target docker.service
 [Service]
 User=$VPS_USER
 WorkingDirectory=$DEPLOY_DIR
-Environment=NEON_DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+Environment=NEON_DATABASE_URL=process.env.DATABASE_URL
 Environment=QFIELD_DB_HOST=localhost
 Environment=QFIELD_DB_PORT=5433
 Environment=QFIELD_DB_NAME=qfieldcloud_db

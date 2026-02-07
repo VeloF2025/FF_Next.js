@@ -7,7 +7,7 @@ We are migrating from Firebase/Firestore to Neon PostgreSQL for all data storage
 - **Firebase Dependencies**: 133 files using Firebase
 - **Already on Neon**: 31 API endpoints (staff, clients, projects, SOW, procurement, analytics)
 - **Authentication**: Currently Firebase, migrating to Clerk
-- **Database URL**: `postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require`
+- **Database URL**: `postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require`
 
 ## Why Neon PostgreSQL?
 

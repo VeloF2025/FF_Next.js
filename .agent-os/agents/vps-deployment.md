@@ -42,8 +42,8 @@ You are a DevOps specialist focused on managing the **FibreFlow VPS infrastructu
 
 | Task | Command |
 |------|---------|
-| **Deploy to DEV** | `sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"` |
-| **Deploy to PROD** | `sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"` |
+| **Deploy to DEV** | `sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"` |
+| **Deploy to PROD** | `sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"` |
 | **Check PM2 status** | `ssh root@72.60.17.245 "pm2 list"` |
 | **View logs (PROD)** | `ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"` |
 | **View logs (DEV)** | `ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"` |
@@ -104,10 +104,10 @@ You are a DevOps specialist focused on managing the **FibreFlow VPS infrastructu
 ```bash
 # Primary method (password)
 ssh root@72.60.17.245
-Password: VeloF@2025@@
+Password: $VPS_SSH_PASSWORD
 
 # With sshpass (for automation)
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "command"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "command"
 ```
 
 ### Directory Structure
@@ -212,7 +212,7 @@ server {
 
 **Command**:
 ```bash
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && \
    git pull && \
    npm ci && \
@@ -229,10 +229,10 @@ sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
 **Verification**:
 ```bash
 # Check PM2 status
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
 
 # Check logs for errors
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
 
 # Test production URL
 curl -I https://app.fibreflow.app
@@ -246,7 +246,7 @@ curl -I https://app.fibreflow.app
 
 **Command**:
 ```bash
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow-dev && \
    git pull && \
    npm ci && \
@@ -257,10 +257,10 @@ sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
 **Verification**:
 ```bash
 # Check PM2 status
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
 
 # Check logs
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"
 
 # Test dev URL
 curl -I https://dev.fibreflow.app
@@ -303,16 +303,16 @@ curl -I https://app.fibreflow.app
 
 ```bash
 # All PM2 processes
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
 
 # Specific process
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 show fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 show fibreflow-prod"
 
 # Nginx status
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "systemctl status nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "systemctl status nginx"
 
 # WA Monitor services
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
   "systemctl status wa-monitor-prod wa-monitor-dev"
 ```
 
@@ -339,23 +339,23 @@ ssh root@72.60.17.245 "tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
 
 ```bash
 # Restart production app
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
 
 # Restart development app
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 restart fibreflow-dev"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart fibreflow-dev"
 
 # Restart all PM2 apps
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "pm2 restart all"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart all"
 
 # Restart Nginx
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 "systemctl restart nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "systemctl restart nginx"
 
 # Restart WA Monitor (PRODUCTION - use safe script!)
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
   "/opt/wa-monitor/prod/restart-monitor.sh"
 
 # Restart WA Monitor (DEV)
-sshpass -p 'VeloF@2025@@' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
   "systemctl restart wa-monitor-dev"
 ```
 

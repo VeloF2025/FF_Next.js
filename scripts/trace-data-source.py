@@ -2,7 +2,7 @@
 """Trace where today's Lawley data came from"""
 
 import os
-os.environ['DATABASE_URL'] = "postgresql://neondb_owner:npg_RIgDxzo4St6d@ep-damp-credit-a857vku0-pooler.eastus2.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
+os.environ['DATABASE_URL'] = "process.env.DATABASE_URL"
 
 import psycopg2
 from datetime import datetime

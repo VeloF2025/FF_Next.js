@@ -18,7 +18,7 @@ PROJECT_NAME="OES_Data_Jan2026"
 PROJECT_ID="84de3884-4fb2-40bc-980d-2190405b057f"
 
 # Database
-NEON_DB="postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require"
+NEON_DB="process.env.DATABASE_URL"
 
 # ========================================
 # FUNCTIONS

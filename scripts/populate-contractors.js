@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { faker } from '@faker-js/faker';
 
 // Database connection
-const DATABASE_URL = 'postgresql://neondb_owner:npg_jUJCNFiG38aY@ep-mute-brook-a99vppmn-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = 'process.env.DATABASE_URL';
 const sql = neon(DATABASE_URL);
 const db = drizzle(sql);
 

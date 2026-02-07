@@ -21,7 +21,7 @@ except ImportError:
     logging.warning("Google Sheets libraries not available")
 
 # Configuration
-NEON_DB_URL = "postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
+NEON_DB_URL = "postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 # Google Sheets configuration
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]

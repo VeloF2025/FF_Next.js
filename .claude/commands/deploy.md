@@ -16,16 +16,16 @@ Deploy FibreFlow to staging environment (vf.fibreflow.app).
 
 Two users needed:
 - **hein** (0203): git operations, npm build
-- **velo** (velo2026): sudo/service restart
+- **velo** ($VELO_SSH_PASSWORD): sudo/service restart
 
 ### Step 1: Build (as hein)
 ```bash
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash --include-untracked && git fetch origin && git checkout master && git pull origin master && npm install && npm run build"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash --include-untracked && git fetch origin && git checkout master && git pull origin master && npm install && npm run build"
 ```
 
 ### Step 2: Restart (as velo)
 ```bash
-sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sshpass -p '$VELO_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
 ```
 
 For a different branch, replace `master` with the branch name.
@@ -33,7 +33,7 @@ For a different branch, replace `master` with the branch name.
 ## Check Status
 
 ```bash
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Branch:' && git branch --show-current && echo 'Commit:' && git log -1 --oneline && echo 'Service:' && systemctl is-active fibreflow.service"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && echo 'Branch:' && git branch --show-current && echo 'Commit:' && git log -1 --oneline && echo 'Service:' && systemctl is-active fibreflow.service"
 ```
 
 Also verify HTTP response:
@@ -44,13 +44,13 @@ curl -s -o /dev/null -w "HTTP: %{http_code}\n" https://vf.fibreflow.app
 ## View Service Logs
 
 ```bash
-sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow.service -n 50"
+sshpass -p '$VELO_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50"
 ```
 
 ## List Stashed Changes
 
 ```bash
-sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash list"
+sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash list"
 ```
 
 ## Rollback
@@ -59,8 +59,8 @@ sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/
 2. Confirm target with user
 3. Pop stash and rebuild:
    ```bash
-   sshpass -p '0203' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash pop && npm install && npm run build"
-   sshpass -p 'velo2026' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+   sshpass -p '$HEIN_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no hein@100.96.203.105 "cd /home/louis/apps/fibreflow && git stash pop && npm install && npm run build"
+   sshpass -p '$VELO_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
    ```
 
 ## Output Format

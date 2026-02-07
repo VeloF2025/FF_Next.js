@@ -360,7 +360,7 @@ git merge feature/branch-name
 git push origin develop
 
 # Deploy to dev site
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
 ```
 
@@ -374,7 +374,7 @@ git merge develop
 git push origin master
 
 # Deploy to production
-sshpass -p 'VeloF@2025@@' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
 ```
 

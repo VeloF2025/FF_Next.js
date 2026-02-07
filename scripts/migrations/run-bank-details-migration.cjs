@@ -11,7 +11,7 @@ const path = require('path');
 
 async function runMigration() {
   const connectionString = process.env.DATABASE_URL ||
-    'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+    'process.env.DATABASE_URL';
 
   const client = new Client({
     connectionString,

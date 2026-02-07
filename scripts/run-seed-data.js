@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Database connection
-const sql = neon('postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require');
+const sql = neon('process.env.DATABASE_URL');
 
 async function runSeedData() {
     console.log('🌱 Starting seed data insertion...\n');

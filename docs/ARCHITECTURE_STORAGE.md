@@ -298,7 +298,7 @@ curl -X POST http://100.96.203.105:8091/upload/test/temp \
 ### Service Status (on Velocity server)
 ```bash
 ssh velo@100.96.203.105
-echo 'velo2026' | sudo -S systemctl status vf-storage
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status vf-storage
 ```
 
 ---

@@ -192,7 +192,7 @@ ps aux | grep realtime_drop_monitor.py
 
 **Single Database for All Services:**
 ```
-postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
+postgresql://neondb_owner:$NEON_DB_PASSWORD_OLD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb
 ```
 
 **Services Using Consolidated Database:**

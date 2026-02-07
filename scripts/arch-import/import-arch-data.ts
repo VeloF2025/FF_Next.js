@@ -17,7 +17,7 @@ import { neon } from '@neondatabase/serverless';
 
 // Configuration
 const DATABASE_URL = process.env.DATABASE_URL ||
-  'postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require';
+  'process.env.DATABASE_URL';
 
 const sql = neon(DATABASE_URL);
 

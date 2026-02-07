@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/wa-command-bot
-Environment=DATABASE_URL=postgresql://neondb_owner:npg_MIUZXrg1tEY0@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+Environment=DATABASE_URL=process.env.DATABASE_URL
 Environment=WA_SENDER_URL=http://localhost:8081
 Environment=WEBHOOK_PORT=8086
 Environment=LOG_LEVEL=INFO
