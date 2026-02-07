@@ -175,6 +175,12 @@ export default function VehiclePortalPage() {
   const [odometerPhotoFile, setOdometerPhotoFile] = useState<File | null>(null);
   const [odometerPhotoUrl, setOdometerPhotoUrl] = useState<string | null>(null);
   const [scanningOdometer, setScanningOdometer] = useState(false);
+
+  // File input refs for reliable mobile camera access
+  const receiptCameraRef = useRef<HTMLInputElement>(null);
+  const receiptUploadRef = useRef<HTMLInputElement>(null);
+  const odometerCameraRef = useRef<HTMLInputElement>(null);
+  const odometerUploadRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Calibration state
@@ -1147,40 +1153,46 @@ export default function VehiclePortalPage() {
                 ) : (
                   <div className="flex gap-3">
                     <input
+                      ref={receiptCameraRef}
                       type="file"
                       accept="image/*"
                       capture="environment"
-                      className="hidden"
-                      id="receipt-camera"
+                      className="absolute opacity-0 w-0 h-0"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleReceiptScan(file);
+                        // Reset input so same file can be selected again
+                        e.target.value = '';
                       }}
                     />
-                    <label
-                      htmlFor="receipt-camera"
+                    <button
+                      type="button"
+                      onClick={() => receiptCameraRef.current?.click()}
                       className="flex-1 py-3 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Camera className="w-5 h-5" />
                       Camera
-                    </label>
+                    </button>
                     <input
+                      ref={receiptUploadRef}
                       type="file"
                       accept="image/*"
-                      className="hidden"
-                      id="receipt-upload"
+                      className="absolute opacity-0 w-0 h-0"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleReceiptScan(file);
+                        // Reset input so same file can be selected again
+                        e.target.value = '';
                       }}
                     />
-                    <label
-                      htmlFor="receipt-upload"
+                    <button
+                      type="button"
+                      onClick={() => receiptUploadRef.current?.click()}
                       className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
                       Upload
-                    </label>
+                    </button>
                   </div>
                 )}
               </div>
@@ -1231,40 +1243,44 @@ export default function VehiclePortalPage() {
                 ) : (
                   <div className="flex gap-3">
                     <input
+                      ref={odometerCameraRef}
                       type="file"
                       accept="image/*"
                       capture="environment"
-                      className="hidden"
-                      id="odometer-camera"
+                      className="absolute opacity-0 w-0 h-0"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleOdometerScan(file);
+                        e.target.value = '';
                       }}
                     />
-                    <label
-                      htmlFor="odometer-camera"
+                    <button
+                      type="button"
+                      onClick={() => odometerCameraRef.current?.click()}
                       className="flex-1 py-3 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Camera className="w-5 h-5" />
                       Camera
-                    </label>
+                    </button>
                     <input
+                      ref={odometerUploadRef}
                       type="file"
                       accept="image/*"
-                      className="hidden"
-                      id="odometer-upload"
+                      className="absolute opacity-0 w-0 h-0"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) handleOdometerScan(file);
+                        e.target.value = '';
                       }}
                     />
-                    <label
-                      htmlFor="odometer-upload"
+                    <button
+                      type="button"
+                      onClick={() => odometerUploadRef.current?.click()}
                       className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <Upload className="w-5 h-5" />
                       Upload
-                    </label>
+                    </button>
                   </div>
                 )}
               </div>
