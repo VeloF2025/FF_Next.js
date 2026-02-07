@@ -9,7 +9,8 @@
 
 'use client';
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import toast from 'react-hot-toast';
 import {
   Upload,
   AlertTriangle,
@@ -388,15 +389,42 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   }, []);
 
-  // Poll auto-detect status when on import tab and a run is active
+  // Track previous run status for toast notification
+  const prevRunStatusRef = useRef<string | undefined>(undefined);
+
+  // Poll auto-detect status - poll more frequently on import tab, background poll on other tabs
   useEffect(() => {
-    if (currentTab !== 'import') return;
     fetchAutoDetectStatus();
     const isRunning = autoDetectStatus?.run?.status === 'running' || autoDetectStatus?.run?.status === 'processing_queue';
     if (!isRunning) return;
-    const interval = setInterval(fetchAutoDetectStatus, 5000);
+    const pollInterval = currentTab === 'import' ? 5000 : 15000;
+    const interval = setInterval(fetchAutoDetectStatus, pollInterval);
     return () => clearInterval(interval);
   }, [currentTab, autoDetectStatus?.run?.status, fetchAutoDetectStatus]);
+
+  // Show toast when auto-detect run completes
+  useEffect(() => {
+    const currentStatus = autoDetectStatus?.run?.status;
+    const prevStatus = prevRunStatusRef.current;
+    prevRunStatusRef.current = currentStatus;
+
+    if (!prevStatus || !currentStatus) return;
+
+    const wasRunning = prevStatus === 'running' || prevStatus === 'processing_queue';
+    if (wasRunning && currentStatus === 'completed') {
+      const run = autoDetectStatus?.run;
+      const queue = autoDetectStatus?.queue;
+      const totalMismatches = (run?.mismatchesNote4 || 0) + (queue?.completed || 0) - (run?.matches || 0);
+      toast.success(
+        `OLT Auto-Detect Complete: ${run?.matches || 0} matches, ${run?.mismatchesNote4 || 0} mismatches found from ${run?.totalOesRows || 0} OES rows`,
+        { duration: 8000 }
+      );
+      // Refresh stats to reflect new mismatch records
+      fetchStats();
+    } else if (wasRunning && currentStatus === 'error') {
+      toast.error('OLT Auto-Detect failed. Check the status card for details.', { duration: 8000 });
+    }
+  }, [autoDetectStatus?.run?.status, autoDetectStatus?.run, autoDetectStatus?.queue, fetchStats]);
 
   // Load data based on current tab
   useEffect(() => {
@@ -1041,21 +1069,37 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                 {/* Queue progress bar */}
                 {autoDetectStatus.queue && autoDetectStatus.queue.total > 0 && (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between text-xs text-[var(--ff-text-secondary)] mb-1">
-                      <span>API Lookups: {autoDetectStatus.queue.completed}/{autoDetectStatus.queue.total}</span>
-                      {autoDetectStatus.queue.pending > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          {autoDetectStatus.queue.pending} remaining
-                        </span>
-                      )}
-                      {autoDetectStatus.queue.errors > 0 && (
-                        <span className="text-red-400">{autoDetectStatus.queue.errors} errors</span>
-                      )}
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[var(--ff-text-secondary)] font-medium">
+                        1Map API Lookups: {autoDetectStatus.queue.completed}/{autoDetectStatus.queue.total}
+                        {autoDetectStatus.queue.total > 0 && (
+                          <span className="ml-1 text-[var(--ff-text-tertiary)]">
+                            ({Math.round((autoDetectStatus.queue.completed / autoDetectStatus.queue.total) * 100)}%)
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {autoDetectStatus.queue.errors > 0 && (
+                          <span className="text-red-400">{autoDetectStatus.queue.errors} errors</span>
+                        )}
+                        {autoDetectStatus.queue.pending > 0 ? (
+                          <span className="flex items-center gap-1 text-blue-400">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            {autoDetectStatus.queue.pending} remaining
+                          </span>
+                        ) : (
+                          <span className="text-green-400 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            Done
+                          </span>
+                        )}
+                      </span>
                     </div>
-                    <div className="h-1.5 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          autoDetectStatus.queue.pending === 0 ? 'bg-green-500' : 'bg-purple-500'
+                        }`}
                         style={{ width: `${autoDetectStatus.queue.total > 0 ? (autoDetectStatus.queue.completed / autoDetectStatus.queue.total) * 100 : 0}%` }}
                       />
                     </div>

@@ -33,6 +33,7 @@ interface AutoDetectResult {
   upsSwaps: number;
   duplicatesSkipped: number;
   apiLookupsQueued: number;
+  alreadyVerified: number;
 }
 
 interface JoinedRow {
@@ -108,6 +109,17 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       [totalOesRows, runId]
     );
 
+    // Load previously verified DR+serial combos (skip re-checking)
+    const prevVerified = await client.query(
+      `SELECT drop_number, UPPER(oes_serial) as oes_serial, mismatch_type
+       FROM olt_onemap_lookup_queue
+       WHERE status = 'completed'`
+    );
+    const verifiedMap = new Map<string, string>();
+    for (const pv of prevVerified.rows) {
+      verifiedMap.set(`${pv.drop_number}|${pv.oes_serial}`, pv.mismatch_type);
+    }
+
     let cacheHits = 0;
     let cacheMisses = 0;
     let matches = 0;
@@ -115,6 +127,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
     let mismatchesNote4 = 0;
     let upsSwaps = 0;
     let duplicatesSkipped = 0;
+    let alreadyVerified = 0;
 
     // Collect inserts for batch processing
     const mismatchInserts: Array<{
@@ -138,8 +151,17 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       const oesSerial = row.oes_serial.trim().toUpperCase();
       const oneMapSerial = row.onemap_serial?.trim().toUpperCase() || null;
 
+      // Skip if already verified with same serial in a previous run
+      const verifyKey = `${row.drop_number}|${oesSerial}`;
+      if (verifiedMap.has(verifyKey)) {
+        const prevType = verifiedMap.get(verifyKey)!;
+        if (prevType === 'match') matches++;
+        alreadyVerified++;
+        continue;
+      }
+
       if (!row.has_onemap_row) {
-        // No 1Map row at all -> Note 2 (not on 1Map), queue for API
+        // No 1Map row at all -> queue for API
         cacheMisses++;
         mismatchesNote2++;
         queueInserts.push({
@@ -155,7 +177,6 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
 
       if (!oneMapSerial) {
         // 1Map cache row exists but ONT barcode is empty -> queue for API
-        // (99%+ of cache entries lack barcode data, need live API check)
         cacheMisses++;
         queueInserts.push({
           dropNumber: row.drop_number,
@@ -253,6 +274,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       upsSwaps,
       duplicatesSkipped,
       apiLookupsQueued,
+      alreadyVerified,
     };
 
     log.info('OltAutoDetect', `Run #${runId} cache phase complete`, result);
