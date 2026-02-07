@@ -318,4 +318,14 @@ async function insertMismatchIfNew(
   );
 }
 
-export default withAuth(withRole('manager')(handler));
+// Allow internal trigger via API key (for server-side fire-and-forget after restarts)
+function withInternalKey(wrapped: typeof handler) {
+  return (req: NextApiRequest, res: NextApiResponse) => {
+    if (req.headers['x-internal-key'] === 'olt-queue-processor-2026') {
+      return wrapped(req, res);
+    }
+    return withAuth(withRole('manager')(wrapped))(req, res);
+  };
+}
+
+export default withInternalKey(handler);
