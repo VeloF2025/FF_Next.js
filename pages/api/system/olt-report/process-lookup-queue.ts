@@ -160,15 +160,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         let fixStatus = 'pending';
         let hasUpsSwap = false;
 
-        if (correctCount === records.length) {
-          mismatchType = 'match';
-        } else if (swapCount > 0) {
+        if (swapCount > 0) {
           mismatchType = 'note4_ups_swap';
           hasUpsSwap = true;
         } else if (wrongCount > 0) {
           mismatchType = 'note4_wrong_serial';
-        } else if (emptyCount > 0) {
+        } else if (emptyCount > 0 && correctCount === 0) {
           mismatchType = 'note4_empty_barcode';
+        } else {
+          mismatchType = 'match';
         }
 
         const bestRecord = records.find(r => r.ph_ont) || records[0];

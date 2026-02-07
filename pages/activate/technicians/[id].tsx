@@ -447,6 +447,11 @@ function ActivatorDetailView({
             </div>
           )}
 
+          {/* Recent DRs List */}
+          {performance.recentDRs && performance.recentDRs.length > 0 && (
+            <RecentDRsList recentDRs={performance.recentDRs} type="activator" />
+          )}
+
           {/* No Data State */}
           {summary.totalSubmissions === 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-gray-700 text-center">
@@ -688,6 +693,11 @@ function InstallerDetailView({
             </div>
           )}
 
+          {/* Recent DRs List */}
+          {performance.recentDRs && performance.recentDRs.length > 0 && (
+            <RecentDRsList recentDRs={performance.recentDRs} type="installer" />
+          )}
+
           {/* No Data State */}
           {summary.totalInstallations === 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-gray-700 text-center">
@@ -745,6 +755,95 @@ function StatCard({
       {detail && (
         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{detail}</div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Recent DRs List Component - Shows DRs worked on with links to QA Centre
+ */
+function RecentDRsList({
+  recentDRs,
+  type,
+}: {
+  recentDRs: Array<{
+    dropNumber: string;
+    project: string | null;
+    date: string;
+    qaDecision: string | null;
+    submissionCount?: number;
+  }>;
+  type: 'activator' | 'installer';
+}) {
+  if (!recentDRs || recentDRs.length === 0) {
+    return null;
+  }
+
+  const getQAStatusBadge = (qaDecision: string | null) => {
+    if (!qaDecision) return null;
+    const colors = {
+      PASS: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      FAIL: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      REWORK_NEEDED: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      PENDING: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+    };
+    return (
+      <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[qaDecision as keyof typeof colors] || colors.PENDING}`}>
+        {qaDecision.replace('_', ' ')}
+      </span>
+    );
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-4 uppercase tracking-wide">
+        Recent DRs ({recentDRs.length})
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">DR Number</th>
+              <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Project</th>
+              <th className="text-left py-2 text-gray-500 dark:text-gray-400 font-medium">Date</th>
+              {type === 'activator' && (
+                <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Submissions</th>
+              )}
+              <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">QA Status</th>
+              <th className="text-center py-2 text-gray-500 dark:text-gray-400 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentDRs.map((dr) => (
+              <tr key={dr.dropNumber} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <td className="py-2 text-gray-900 dark:text-white font-medium">{dr.dropNumber}</td>
+                <td className="py-2 text-gray-600 dark:text-gray-400">{dr.project || '-'}</td>
+                <td className="py-2 text-gray-600 dark:text-gray-400">{dr.date}</td>
+                {type === 'activator' && (
+                  <td className="py-2 text-center">
+                    <span className={`font-medium ${
+                      (dr.submissionCount ?? 1) === 1 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'
+                    }`}>
+                      {dr.submissionCount ?? 1}
+                    </span>
+                  </td>
+                )}
+                <td className="py-2 text-center">{getQAStatusBadge(dr.qaDecision)}</td>
+                <td className="py-2 text-center">
+                  <a
+                    href={`/activate/qa-centre/${dr.dropNumber}`}
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View DR
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

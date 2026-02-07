@@ -112,6 +112,7 @@ async function getActivatorPerformance(
       },
       trend: [],
       projectBreakdown: [],
+      recentDRs: [],
     } as ActivatorPerformance);
   }
 
@@ -207,6 +208,26 @@ async function getActivatorPerformance(
     matchParams
   );
 
+  // Get recent DRs for this activator
+  const recentDRsResult = await pool.query(
+    `
+    SELECT DISTINCT ON (qpr.drop_number)
+      qpr.drop_number,
+      qpr.project,
+      COALESCE(upr.submitted_date, upr.created_at::DATE)::TEXT as date,
+      upr.submission_count,
+      upr.qa_decision
+    FROM qa_photo_reviews qpr
+    INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+    WHERE ${matchClause}
+      AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+      AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+    ORDER BY qpr.drop_number, COALESCE(upr.submitted_date, upr.created_at::DATE) DESC
+    LIMIT 50
+    `,
+    matchParams
+  );
+
   const response: ActivatorPerformance = {
     technicianId: tech.id,
     technicianName: tech.name,
@@ -235,6 +256,13 @@ async function getActivatorPerformance(
       submissions: parseInt(r.submissions) || 0,
       firstPassRate: parseInt(r.first_pass_rate) || 0,
       serialComplianceRate: parseInt(r.serial_compliance_rate) || 0,
+    })),
+    recentDRs: recentDRsResult.rows.map((r) => ({
+      dropNumber: r.drop_number,
+      project: r.project,
+      date: r.date,
+      submissionCount: parseInt(r.submission_count) || 1,
+      qaDecision: r.qa_decision,
     })),
   };
 
@@ -269,12 +297,16 @@ async function getInstallerPerformance(
         avgStepsCompliance: 0,
         activatedCount: 0,
         activationRate: 0,
+        avgDbReading: null,
+        dbInRangeCount: 0,
+        dbInRangeRate: 0,
         projectsWorked: [],
         activeDays: 0,
       },
       trend: [],
       projectBreakdown: [],
       commonFailures: [],
+      recentDRs: [],
     } as InstallerPerformance);
   }
 
@@ -427,6 +459,26 @@ async function getInstallerPerformance(
     matchParams
   );
 
+  // Get recent DRs for this installer
+  const recentDRsResult = await pool.query(
+    `
+    SELECT DISTINCT ON (d.drop_number)
+      d.drop_number,
+      p.project_name as project,
+      d.created_at::DATE::TEXT as date,
+      upr.qa_decision
+    FROM drops d
+    LEFT JOIN projects p ON d.project_id = p.id
+    LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+    WHERE d.installed_by_name = $3
+      AND d.created_at >= $1::DATE
+      AND d.created_at <= $2::DATE
+    ORDER BY d.drop_number, d.created_at DESC
+    LIMIT 50
+    `,
+    matchParams
+  );
+
   const response: InstallerPerformance = {
     technicianId: tech.id,
     technicianName: tech.name,
@@ -463,6 +515,12 @@ async function getInstallerPerformance(
     commonFailures: failuresResult.rows.map((r) => ({
       step: r.step,
       failCount: parseInt(r.fail_count) || 0,
+    })),
+    recentDRs: recentDRsResult.rows.map((r) => ({
+      dropNumber: r.drop_number,
+      project: r.project,
+      date: r.date,
+      qaDecision: r.qa_decision,
     })),
   };
 

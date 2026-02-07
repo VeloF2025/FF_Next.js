@@ -145,15 +145,17 @@ export async function processLookupQueue(runId?: number): Promise<void> {
           let fixStatus = 'pending';
           let hasUpsSwap = false;
 
-          if (correctCount === records.length) {
-            mismatchType = 'match';
-          } else if (swapCount > 0) {
+          if (swapCount > 0) {
             mismatchType = 'note4_ups_swap';
             hasUpsSwap = true;
           } else if (wrongCount > 0) {
             mismatchType = 'note4_wrong_serial';
-          } else if (emptyCount > 0) {
+          } else if (emptyCount > 0 && correctCount === 0) {
+            // All records empty, none correct → empty barcode
             mismatchType = 'note4_empty_barcode';
+          } else {
+            // All non-empty records have correct serial → match
+            mismatchType = 'match';
           }
 
           // Use the first record with data for queue tracking
