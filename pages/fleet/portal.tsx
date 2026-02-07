@@ -416,7 +416,9 @@ export default function VehiclePortalPage() {
         `Receipt scanned (${Math.round((results.confidence || 0) * 100)}% confidence)`
       );
     } catch (err) {
-      toast.error('Failed to scan receipt');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Receipt Scan Error]', err);
+      toast.error(`Failed to scan receipt: ${errorMessage}`);
     } finally {
       setScanningReceipt(false);
     }
