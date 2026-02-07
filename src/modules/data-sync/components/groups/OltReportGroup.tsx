@@ -1803,66 +1803,6 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
       {currentTab === 'history' && (
         <div className="space-y-6">
-          {/* Import History */}
-          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-            <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
-              <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Import History</h3>
-            </div>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
-              </div>
-            ) : imports.length === 0 ? (
-              <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
-                No imports yet
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Filename
-                      </th>
-                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Project
-                      </th>
-                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Total
-                      </th>
-                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Mismatches
-                      </th>
-                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Imported
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {imports.map((imp) => (
-                      <tr
-                        key={imp.id}
-                        className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
-                      >
-                        <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
-                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                          {imp.project || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">
-                          {imp.total_records}
-                        </td>
-                        <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
-                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                          {new Date(imp.imported_at).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
           {/* Fix Activity */}
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
             <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
@@ -1936,6 +1876,66 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Import History */}
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+            <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
+              <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Import History</h3>
+            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
+              </div>
+            ) : imports.length === 0 ? (
+              <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
+                No imports yet
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Filename
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Project
+                      </th>
+                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Total
+                      </th>
+                      <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Mismatches
+                      </th>
+                      <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                        Imported
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {imports.map((imp) => (
+                      <tr
+                        key={imp.id}
+                        className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]"
+                      >
+                        <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
+                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                          {imp.project || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">
+                          {imp.total_records}
+                        </td>
+                        <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
+                        <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                          {new Date(imp.imported_at).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
