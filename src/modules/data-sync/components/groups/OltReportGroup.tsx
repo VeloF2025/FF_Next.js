@@ -1578,9 +1578,15 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                           {/* Comparison card */}
                                           <div className="grid grid-cols-2 gap-3 bg-[var(--ff-bg-primary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
                                             <div>
-                                              <p className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase mb-1">
-                                                DR A (<a href={`/activate/${lookup.drA.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-[var(--ff-accent)] hover:underline" onClick={e => e.stopPropagation()}>{lookup.drA.drNumber}</a>)
-                                              </p>
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase">DR A ({lookup.drA.drNumber})</span>
+                                                <a href={`/activate/${lookup.drA.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-[var(--ff-accent)] hover:text-[var(--ff-accent)]/80" title="DR Review" onClick={e => e.stopPropagation()}>
+                                                  <Search className="w-3 h-3" />
+                                                </a>
+                                                <a href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${lookup.drA.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300" title="View in 1Map" onClick={e => e.stopPropagation()}>
+                                                  <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                              </div>
                                               <p className="text-xs text-[var(--ff-text-secondary)]">
                                                 OES: <span className="font-mono text-green-400">{lookup.drA.oesSerial}</span>
                                               </p>
@@ -1589,9 +1595,15 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                               </p>
                                             </div>
                                             <div>
-                                              <p className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase mb-1">
-                                                DR B (<a href={`/activate/${lookup.drB.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-[var(--ff-accent)] hover:underline" onClick={e => e.stopPropagation()}>{lookup.drB.drNumber}</a>)
-                                              </p>
+                                              <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-[10px] font-semibold text-[var(--ff-text-secondary)] uppercase">DR B ({lookup.drB.drNumber})</span>
+                                                <a href={`/activate/${lookup.drB.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-[var(--ff-accent)] hover:text-[var(--ff-accent)]/80" title="DR Review" onClick={e => e.stopPropagation()}>
+                                                  <Search className="w-3 h-3" />
+                                                </a>
+                                                <a href={`https://www.1map.co.za/apps/app?workspace=Fibertime%20Installations&selected=${lookup.drB.drNumber}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300" title="View in 1Map" onClick={e => e.stopPropagation()}>
+                                                  <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                              </div>
                                               <p className="text-xs text-[var(--ff-text-secondary)]">
                                                 OES: <span className="font-mono text-green-400">{lookup.drB.oesSerial || 'N/A'}</span>
                                               </p>
