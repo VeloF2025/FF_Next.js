@@ -15,8 +15,34 @@ import {
   type AuthUser,
   type AuthRole,
 } from '@/lib/auth';
+import { createLogger } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
+const log = createLogger('auth:login');
+
+// In-memory rate limiter for login attempts (per IP)
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_ATTEMPTS;
+}
+
+// Clean up stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of loginAttempts) {
+    if (now > entry.resetAt) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
 
 interface LoginRequestBody {
   email: string;
@@ -32,6 +58,16 @@ export default async function handler(
     return res.status(405).json({
       success: false,
       error: { code: 'METHOD_NOT_ALLOWED', message: 'Only POST allowed' },
+    });
+  }
+
+  // Rate limit by IP
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    log.warn({ ip: clientIp }, 'Login rate limited');
+    return res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many login attempts. Please try again later.' },
     });
   }
 
@@ -146,7 +182,7 @@ export default async function handler(
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    log.error({ error }, 'Login error');
     return res.status(500).json({
       success: false,
       error: { code: 'LOGIN_ERROR', message: 'An error occurred during login' },

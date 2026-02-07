@@ -18,6 +18,16 @@ export interface NotificationPayload {
   metadata?: Record<string, any>;
 }
 
+/** Escape HTML entities to prevent XSS in email templates */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export class EmailNotificationService {
   /**
    * Send email notification
@@ -123,13 +133,13 @@ export class EmailNotificationService {
         <body>
           <div class="container">
             <div class="header">
-              <h2>${payload.subject}</h2>
+              <h2>${escapeHtml(payload.subject)}</h2>
             </div>
             <div class="content">
-              <p>${payload.message}</p>
+              <p>${escapeHtml(payload.message)}</p>
               ${payload.metadata?.actionUrl ? `
                 <p style="text-align: center; margin-top: 30px;">
-                  <a href="${payload.metadata.actionUrl}" class="button">View Details</a>
+                  <a href="${encodeURI(payload.metadata.actionUrl)}" class="button">View Details</a>
                 </p>
               ` : ''}
             </div>

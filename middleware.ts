@@ -39,6 +39,17 @@ function edgeLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, da
   }
 }
 
+function setSecurityHeaders(response: NextResponse) {
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (process.env.NODE_ENV === 'production') {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+}
+
 // TODO: Re-enable when adding Clerk auth back
 // const isPublicRoute = createRouteMatcher([
 //   '/sign-in(.*)',
@@ -69,13 +80,11 @@ export async function middleware(request: NextRequest) {
       ip: request.ip || request.headers.get('x-forwarded-for'),
       userAgent: request.headers.get('user-agent')
     });
-    
-    // Clone response to log status
+
     const response = NextResponse.next();
-    
-    // Log response time
     response.headers.set('X-Response-Time', `${Date.now() - startTime}ms`);
-    
+    setSecurityHeaders(response);
+
     // Log slow requests
     const responseTime = Date.now() - startTime;
     if (responseTime > 1000) {
@@ -84,18 +93,14 @@ export async function middleware(request: NextRequest) {
         responseTime: `${responseTime}ms`
       });
     }
-    
+
     return response;
   }
 
-  // TODO: Re-enable when adding Clerk auth back
-  // if (!isPublicRoute(request)) {
-  //   auth().protect();
-  // }
-
-  // For pages, just add response time header
+  // For pages, add response time and security headers
   const response = NextResponse.next();
   response.headers.set('X-Response-Time', `${Date.now() - startTime}ms`);
+  setSecurityHeaders(response);
 
   return response;
 }

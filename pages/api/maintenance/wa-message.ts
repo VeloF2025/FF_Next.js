@@ -19,7 +19,7 @@ import {
 const logger = createLogger('api:maintenance:wa-message');
 
 // Shared secret for Bridge authentication (same as whatsapp/inbound)
-const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET || 'fibreflow-bridge-2026';
+const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 
 // Known maintenance group JIDs
 const MAINTENANCE_GROUP_JIDS = new Set([
@@ -49,6 +49,10 @@ async function handler(
     const body = req.body as IncomingWAMessage & { secret?: string };
 
     // Validate bridge secret
+    if (!BRIDGE_SECRET) {
+      logger.error('WA_BRIDGE_SECRET env var not set');
+      return res.status(500).json({ success: false, error: 'Server configuration error' });
+    }
     if (body.secret !== BRIDGE_SECRET) {
       logger.warn('Invalid or missing bridge secret');
       return res.status(401).json({
