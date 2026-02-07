@@ -17,7 +17,7 @@ import { activateConfig } from '@/modules/navigation';
 import type { TechnicianPerformance, ActivatorPerformance, InstallerPerformance } from '@/types/technician.types';
 import { isActivatorPerformance, isInstallerPerformance } from '@/types/technician.types';
 
-type TimeRange = '7d' | '30d' | '90d';
+type TimeRange = '7d' | '30d' | '90d' | 'all' | 'custom';
 
 const TechnicianDetailPage: NextPage = () => {
   const router = useRouter();
@@ -25,30 +25,37 @@ const TechnicianDetailPage: NextPage = () => {
 
   const [performance, setPerformance] = useState<TechnicianPerformance | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+  const [customDateFrom, setCustomDateFrom] = useState<string>('');
+  const [customDateTo, setCustomDateTo] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const getDateRange = useCallback(() => {
     const today = new Date();
-    const to = today.toISOString().split('T')[0];
+    const to = today.toISOString().split('T')[0] ?? '';
     let from: string;
 
     switch (timeRange) {
       case '7d':
-        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
       case '30d':
-        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
       case '90d':
-        from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
         break;
+      case 'all':
+        from = '2020-01-01'; // Start from beginning of records
+        break;
+      case 'custom':
+        return { from: customDateFrom || to, to: customDateTo || to };
       default:
-        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        from = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '';
     }
 
     return { from, to };
-  }, [timeRange]);
+  }, [timeRange, customDateFrom, customDateTo]);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -127,6 +134,10 @@ const TechnicianDetailPage: NextPage = () => {
         performance={performance}
         timeRange={timeRange}
         setTimeRange={setTimeRange}
+        customDateFrom={customDateFrom}
+        customDateTo={customDateTo}
+        setCustomDateFrom={setCustomDateFrom}
+        setCustomDateTo={setCustomDateTo}
         onRefresh={fetchData}
         onBack={handleBack}
         isLoading={isLoading}
@@ -140,6 +151,10 @@ const TechnicianDetailPage: NextPage = () => {
       performance={performance as ActivatorPerformance}
       timeRange={timeRange}
       setTimeRange={setTimeRange}
+      customDateFrom={customDateFrom}
+      customDateTo={customDateTo}
+      setCustomDateFrom={setCustomDateFrom}
+      setCustomDateTo={setCustomDateTo}
       onRefresh={fetchData}
       onBack={handleBack}
       isLoading={isLoading}
@@ -148,12 +163,106 @@ const TechnicianDetailPage: NextPage = () => {
 };
 
 /**
+ * Time Range Selector Component
+ * Provides preset ranges (7d, 30d, 90d, all) and custom date picker
+ */
+function TimeRangeSelector({
+  timeRange,
+  setTimeRange,
+  customDateFrom,
+  customDateTo,
+  setCustomDateFrom,
+  setCustomDateTo,
+  onRefresh,
+  isLoading,
+}: {
+  timeRange: TimeRange;
+  setTimeRange: (range: TimeRange) => void;
+  customDateFrom: string;
+  customDateTo: string;
+  setCustomDateFrom: (date: string) => void;
+  setCustomDateTo: (date: string) => void;
+  onRefresh: () => void;
+  isLoading: boolean;
+}) {
+  const presetRanges: { value: TimeRange; label: string }[] = [
+    { value: '7d', label: '7D' },
+    { value: '30d', label: '30D' },
+    { value: '90d', label: '90D' },
+    { value: 'all', label: 'All' },
+  ];
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* Preset buttons */}
+      <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+        {presetRanges.map((range) => (
+          <button
+            key={range.value}
+            onClick={() => setTimeRange(range.value)}
+            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+              timeRange === range.value
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            {range.label}
+          </button>
+        ))}
+        <button
+          onClick={() => setTimeRange('custom')}
+          className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+            timeRange === 'custom'
+              ? 'bg-blue-600 text-white'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          Custom
+        </button>
+      </div>
+
+      {/* Custom date pickers - shown when custom is selected */}
+      {timeRange === 'custom' && (
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={customDateFrom}
+            onChange={(e) => setCustomDateFrom(e.target.value)}
+            className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+          <span className="text-gray-500 dark:text-gray-400">to</span>
+          <input
+            type="date"
+            value={customDateTo}
+            onChange={(e) => setCustomDateTo(e.target.value)}
+            className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          />
+        </div>
+      )}
+
+      {/* Refresh button */}
+      <button
+        onClick={onRefresh}
+        disabled={isLoading}
+        className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+      >
+        🔄 Refresh
+      </button>
+    </div>
+  );
+}
+
+/**
  * Detail view for Activators (DR photo submitters)
  */
 function ActivatorDetailView({
   performance,
   timeRange,
   setTimeRange,
+  customDateFrom,
+  customDateTo,
+  setCustomDateFrom,
+  setCustomDateTo,
   onRefresh,
   onBack,
   isLoading,
@@ -161,6 +270,10 @@ function ActivatorDetailView({
   performance: ActivatorPerformance;
   timeRange: TimeRange;
   setTimeRange: (range: TimeRange) => void;
+  customDateFrom: string;
+  customDateTo: string;
+  setCustomDateFrom: (date: string) => void;
+  setCustomDateTo: (date: string) => void;
   onRefresh: () => void;
   onBack: () => void;
   isLoading: boolean;
@@ -183,30 +296,16 @@ function ActivatorDetailView({
                 activator
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                {(['7d', '30d', '90d'] as TimeRange[]).map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setTimeRange(range)}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      timeRange === range
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {range.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={onRefresh}
-                disabled={isLoading}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-              >
-                🔄 Refresh
-              </button>
-            </div>
+            <TimeRangeSelector
+              timeRange={timeRange}
+              setTimeRange={setTimeRange}
+              customDateFrom={customDateFrom}
+              customDateTo={customDateTo}
+              setCustomDateFrom={setCustomDateFrom}
+              setCustomDateTo={setCustomDateTo}
+              onRefresh={onRefresh}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Stats Cards */}
@@ -381,6 +480,10 @@ function InstallerDetailView({
   performance,
   timeRange,
   setTimeRange,
+  customDateFrom,
+  customDateTo,
+  setCustomDateFrom,
+  setCustomDateTo,
   onRefresh,
   onBack,
   isLoading,
@@ -388,6 +491,10 @@ function InstallerDetailView({
   performance: InstallerPerformance;
   timeRange: TimeRange;
   setTimeRange: (range: TimeRange) => void;
+  customDateFrom: string;
+  customDateTo: string;
+  setCustomDateFrom: (date: string) => void;
+  setCustomDateTo: (date: string) => void;
   onRefresh: () => void;
   onBack: () => void;
   isLoading: boolean;
@@ -408,30 +515,16 @@ function InstallerDetailView({
                 installer
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                {(['7d', '30d', '90d'] as TimeRange[]).map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setTimeRange(range)}
-                    className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                      timeRange === range
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    {range.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={onRefresh}
-                disabled={isLoading}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-              >
-                🔄 Refresh
-              </button>
-            </div>
+            <TimeRangeSelector
+              timeRange={timeRange}
+              setTimeRange={setTimeRange}
+              customDateFrom={customDateFrom}
+              customDateTo={customDateTo}
+              setCustomDateFrom={setCustomDateFrom}
+              setCustomDateTo={setCustomDateTo}
+              onRefresh={onRefresh}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* Stats Cards - Installer specific */}
