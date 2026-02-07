@@ -17,7 +17,8 @@ const pool = new Pool({
 });
 
 const BATCH_SIZE = 50;
-const API_DELAY_MS = 100;
+const CONCURRENCY = 5;
+const STAGGER_MS = 50;
 
 function isUpsSerial(serial: string | null): boolean {
   return !!serial && serial.toUpperCase().startsWith('GU18');
@@ -70,179 +71,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const importId = importRow.rows[0]?.id;
 
     let processed = 0;
-    let matchesFound = 0;
-    let mismatchesCreated = 0;
-    let notFoundCount = 0;
     let errorsCount = 0;
 
-    for (const item of items) {
-      try {
-        // Mark as processing
-        await client.query(
-          `UPDATE olt_onemap_lookup_queue
-           SET status = 'processing', attempts = attempts + 1
-           WHERE id = $1`,
-          [item.id]
-        );
-
-        // Search 1Map API
-        const searchResult = await oneMapApi.searchDR(item.drop_number);
-
-        if (!searchResult.success) {
-          await client.query(
-            `UPDATE olt_onemap_lookup_queue
-             SET status = 'error', error_message = $1, processed_at = NOW()
-             WHERE id = $2`,
-            [searchResult.error || 'API search failed', item.id]
-          );
-          errorsCount++;
-          continue;
-        }
-
-        if (searchResult.records.length === 0) {
-          // DR genuinely not on 1Map - create Note 2 mismatch
-          await client.query(
-            `UPDATE olt_onemap_lookup_queue
-             SET status = 'completed', mismatch_type = 'note2_not_on_1map',
-                 processed_at = NOW()
-             WHERE id = $1`,
-            [item.id]
-          );
-
-          // Insert mismatch record (not_found = DR not in 1Map)
-          if (importId) {
-            await insertMismatchIfNew(client, {
-              importId,
-              dropNumber: item.drop_number,
-              oltSerial: item.oes_serial,
-              wrongOneMapSerial: null,
-              fixStatus: 'not_found',
-              hasUpsSwap: false,
-              oesBatchId: item.oes_batch_id,
-              oesSource: 'api',
-            });
-          }
-
-          notFoundCount++;
-          processed++;
-          continue;
-        }
-
-        // Classify ALL records (prop IDs) for this DR
-        const oesSerial = item.oes_serial.trim().toUpperCase();
-        const records = searchResult.records;
-
-        let correctCount = 0;
-        let emptyCount = 0;
-        let wrongCount = 0;
-        let swapCount = 0;
-        let firstWrongSerial: string | null = null;
-        let firstUpsSerial: string | null = null;
-
-        for (const rec of records) {
-          const ont = rec.ph_ont?.trim().toUpperCase() || null;
-          const ups = rec.br_ser?.trim().toUpperCase() || null;
-
-          if (ont === oesSerial) {
-            correctCount++;
-          } else if (!ont) {
-            emptyCount++;
-          } else if (ups === oesSerial && isUpsSerial(ont)) {
-            swapCount++;
-            if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-          } else {
-            wrongCount++;
-            if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
-          }
-        }
-
-        let mismatchType = 'match';
-        let fixStatus = 'pending';
-        let hasUpsSwap = false;
-
-        if (swapCount > 0) {
-          mismatchType = 'note4_ups_swap';
-          hasUpsSwap = true;
-        } else if (wrongCount > 0) {
-          mismatchType = 'note4_wrong_serial';
-        } else if (emptyCount > 0 && correctCount === 0) {
-          mismatchType = 'note4_empty_barcode';
-        } else {
-          mismatchType = 'match';
-        }
-
-        const bestRecord = records.find(r => r.ph_ont) || records[0];
-        await client.query(
-          `UPDATE olt_onemap_lookup_queue
-           SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
-               mismatch_type = $3, processed_at = NOW()
-           WHERE id = $4`,
-          [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
-        );
-
-        // For wrong serials, check if they belong to another DR
-        let investigationContext: string | null = null;
-        if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
-          const ownerLookup = await client.query(
-            `SELECT drop_number, serial_number, team, status
-             FROM oes_activations
-             WHERE UPPER(serial_number) = $1
-             ORDER BY created_at DESC LIMIT 1`,
-            [firstWrongSerial.toUpperCase()]
-          );
-          if (ownerLookup.rows.length > 0) {
-            const owner = ownerLookup.rows[0];
-            if (owner.drop_number !== item.drop_number) {
-              fixStatus = 'needs_investigation';
-              investigationContext = JSON.stringify({
-                reason: 'cross_dr_conflict',
-                wrongSerial: firstWrongSerial,
-                wrongUps: firstUpsSerial,
-                belongsToDr: owner.drop_number,
-                belongsToTeam: owner.team,
-                belongsToStatus: owner.status,
-                totalPropRecords: records.length,
-                correctRecords: correctCount,
-                wrongRecords: wrongCount,
-                swappedRecords: swapCount,
-                message: `ONT ${firstWrongSerial} on 1Map belongs to ${owner.drop_number} (${owner.team}). Cannot auto-fix without losing equipment tracking.`,
-              });
-            }
-          }
-        }
-
-        if (mismatchType !== 'match' && importId) {
-          await insertMismatchIfNew(client, {
-            importId,
-            dropNumber: item.drop_number,
-            oltSerial: item.oes_serial,
-            wrongOneMapSerial: firstWrongSerial || bestRecord.ph_ont,
-            fixStatus,
-            hasUpsSwap,
-            oesBatchId: item.oes_batch_id,
-            oesSource: 'api',
-            investigationContext,
-          });
-          mismatchesCreated++;
-        } else {
-          matchesFound++;
-        }
-
-        processed++;
-      } catch (itemError) {
-        log.error('OltQueueProcessor', `Failed to process queue item ${item.id}`, { itemError });
-        await client.query(
-          `UPDATE olt_onemap_lookup_queue
-           SET status = 'pending', error_message = $1
-           WHERE id = $2`,
-          [itemError instanceof Error ? itemError.message : 'Unknown error', item.id]
-        ).catch(() => { /* best effort */ });
-        errorsCount++;
-      }
-
-      // Rate limit: delay between API calls
-      if (processed < items.length) {
-        await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
+    // Process items in concurrent chunks for speed
+    for (let i = 0; i < items.length; i += CONCURRENCY) {
+      const chunk = items.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map((item, idx) =>
+          new Promise(r => setTimeout(r, idx * STAGGER_MS)).then(() =>
+            processOneQueueItem(client, item, importId)
+          )
+        )
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') processed++;
+        else errorsCount++;
       }
     }
 
@@ -269,15 +112,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       );
     }
 
-    log.info('OltQueueProcessor', `Processed ${processed} items`, {
-      matchesFound, mismatchesCreated, notFoundCount, errorsCount, remaining,
+    log.info('OltQueueProcessor', `Processed ${processed} items (${CONCURRENCY} concurrent)`, {
+      errorsCount, remaining,
     });
 
     return apiResponse.success(res, {
       processed,
-      matchesFound,
-      mismatchesCreated,
-      notFoundCount,
       errors: errorsCount,
       remaining,
     });
@@ -286,6 +126,136 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.internalError(res, error);
   } finally {
     client.release();
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function processOneQueueItem(client: any, item: any, importId: string | undefined): Promise<void> {
+  await client.query(
+    `UPDATE olt_onemap_lookup_queue
+     SET status = 'processing', attempts = attempts + 1
+     WHERE id = $1`,
+    [item.id]
+  );
+
+  let searchResult;
+  try {
+    searchResult = await oneMapApi.searchDR(item.drop_number);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    await client.query(
+      `UPDATE olt_onemap_lookup_queue
+       SET status = 'error', error_message = $1, processed_at = NOW()
+       WHERE id = $2`,
+      [msg, item.id]
+    );
+    throw err;
+  }
+
+  if (!searchResult.success) {
+    await client.query(
+      `UPDATE olt_onemap_lookup_queue
+       SET status = 'error', error_message = $1, processed_at = NOW()
+       WHERE id = $2`,
+      [searchResult.error || 'API search failed', item.id]
+    );
+    throw new Error(searchResult.error || 'API search failed');
+  }
+
+  if (searchResult.records.length === 0) {
+    await client.query(
+      `UPDATE olt_onemap_lookup_queue
+       SET status = 'completed', mismatch_type = 'note2_not_on_1map',
+           processed_at = NOW()
+       WHERE id = $1`,
+      [item.id]
+    );
+    if (importId) {
+      await insertMismatchIfNew(client, {
+        importId, dropNumber: item.drop_number,
+        oltSerial: item.oes_serial, wrongOneMapSerial: null,
+        fixStatus: 'not_found', hasUpsSwap: false,
+        oesBatchId: item.oes_batch_id, oesSource: 'api',
+      });
+    }
+    return;
+  }
+
+  const oesSerial = item.oes_serial.trim().toUpperCase();
+  const records = searchResult.records;
+  let correctCount = 0, emptyCount = 0, wrongCount = 0, swapCount = 0;
+  let firstWrongSerial: string | null = null;
+  let firstUpsSerial: string | null = null;
+
+  for (const rec of records) {
+    const ont = rec.ph_ont?.trim().toUpperCase() || null;
+    const ups = rec.br_ser?.trim().toUpperCase() || null;
+    if (ont === oesSerial) { correctCount++; }
+    else if (!ont) { emptyCount++; }
+    else if (ups === oesSerial && isUpsSerial(ont)) {
+      swapCount++;
+      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
+    } else {
+      wrongCount++;
+      if (!firstWrongSerial) { firstWrongSerial = rec.ph_ont; firstUpsSerial = rec.br_ser; }
+    }
+  }
+
+  let mismatchType = 'match';
+  let fixStatus = 'pending';
+  let hasUpsSwap = false;
+  if (swapCount > 0) { mismatchType = 'note4_ups_swap'; hasUpsSwap = true; }
+  else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
+  else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
+
+  const bestRecord = records.find(r => r.ph_ont) || records[0];
+  await client.query(
+    `UPDATE olt_onemap_lookup_queue
+     SET status = 'completed', onemap_serial = $1, onemap_ups_serial = $2,
+         mismatch_type = $3, processed_at = NOW()
+     WHERE id = $4`,
+    [bestRecord.ph_ont, bestRecord.br_ser, mismatchType, item.id]
+  );
+
+  let investigationContext: string | null = null;
+  if ((wrongCount > 0 || swapCount > 0) && firstWrongSerial) {
+    const ownerLookup = await client.query(
+      `SELECT drop_number, serial_number, team, status
+       FROM oes_activations
+       WHERE UPPER(serial_number) = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [firstWrongSerial.toUpperCase()]
+    );
+    if (ownerLookup.rows.length > 0) {
+      const owner = ownerLookup.rows[0];
+      if (owner.drop_number !== item.drop_number) {
+        fixStatus = 'needs_investigation';
+        investigationContext = JSON.stringify({
+          reason: 'cross_dr_conflict',
+          wrongSerial: firstWrongSerial,
+          wrongUps: firstUpsSerial,
+          belongsToDr: owner.drop_number,
+          belongsToTeam: owner.team,
+          belongsToStatus: owner.status,
+          totalPropRecords: records.length,
+          correctRecords: correctCount,
+          wrongRecords: wrongCount,
+          swappedRecords: swapCount,
+          message: `ONT ${firstWrongSerial} on 1Map belongs to ${owner.drop_number} (${owner.team}). Cannot auto-fix without losing equipment tracking.`,
+        });
+      }
+    }
+  }
+
+  if (mismatchType !== 'match' && importId) {
+    await insertMismatchIfNew(client, {
+      importId, dropNumber: item.drop_number,
+      oltSerial: item.oes_serial,
+      wrongOneMapSerial: firstWrongSerial || bestRecord.ph_ont,
+      fixStatus, hasUpsSwap,
+      oesBatchId: item.oes_batch_id, oesSource: 'api',
+      investigationContext,
+    });
   }
 }
 
