@@ -280,7 +280,7 @@ async function getInstallerPerformance(
 
   const matchParams = [dateFromStr, dateToStr, installerName];
 
-  // Get performance summary with 12-step compliance
+  // Get performance summary with 10-step compliance
   const summaryResult = await pool.query(
     `
     WITH installer_data AS (
@@ -290,7 +290,7 @@ async function getInstallerPerformance(
         d.created_at::DATE as install_date,
         upr.qa_decision,
         d.oes_confirmed,
-        -- Count steps passed (12 boolean step columns)
+        -- Count steps passed (10 boolean step columns)
         (
           CASE WHEN upr.step_01_house_photo THEN 1 ELSE 0 END +
           CASE WHEN upr.step_02_cable_from_pole THEN 1 ELSE 0 END +
@@ -299,11 +299,9 @@ async function getInstallerPerformance(
           CASE WHEN upr.step_05_wall THEN 1 ELSE 0 END +
           CASE WHEN upr.step_06_ont_back THEN 1 ELSE 0 END +
           CASE WHEN upr.step_07_power_meter THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_08_ont_barcode THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_09_ups_serial THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_10_final_installation THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_11_green_lights THEN 1 ELSE 0 END +
-          CASE WHEN upr.step_12_signature THEN 1 ELSE 0 END
+          CASE WHEN upr.step_08_final_installation THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_09_green_lights THEN 1 ELSE 0 END +
+          CASE WHEN upr.step_10_signature THEN 1 ELSE 0 END
         ) as steps_passed
       FROM drops d
       LEFT JOIN projects p ON d.project_id = p.id
@@ -317,7 +315,7 @@ async function getInstallerPerformance(
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'PASS') as qa_passed,
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'FAIL') as qa_failed,
       COUNT(DISTINCT drop_number) FILTER (WHERE qa_decision = 'REWORK_NEEDED') as rework,
-      COALESCE(ROUND(AVG(steps_passed) / 12.0 * 100), 0) as avg_steps_compliance,
+      COALESCE(ROUND(AVG(steps_passed) / 10.0 * 100), 0) as avg_steps_compliance,
       COUNT(DISTINCT drop_number) FILTER (WHERE oes_confirmed = true) as activated,
       ARRAY_AGG(DISTINCT project_name) FILTER (WHERE project_name IS NOT NULL) as projects,
       COUNT(DISTINCT install_date) as active_days
@@ -396,11 +394,9 @@ async function getInstallerPerformance(
         CASE WHEN NOT COALESCE(upr.step_05_wall, false) THEN 'Wall Installation' END as step_05,
         CASE WHEN NOT COALESCE(upr.step_06_ont_back, false) THEN 'ONT Back' END as step_06,
         CASE WHEN NOT COALESCE(upr.step_07_power_meter, false) THEN 'Power Meter' END as step_07,
-        CASE WHEN NOT COALESCE(upr.step_08_ont_barcode, false) THEN 'ONT Barcode' END as step_08,
-        CASE WHEN NOT COALESCE(upr.step_09_ups_serial, false) THEN 'UPS Serial' END as step_09,
-        CASE WHEN NOT COALESCE(upr.step_10_final_installation, false) THEN 'Final Installation' END as step_10,
-        CASE WHEN NOT COALESCE(upr.step_11_green_lights, false) THEN 'Green Lights' END as step_11,
-        CASE WHEN NOT COALESCE(upr.step_12_signature, false) THEN 'Signature' END as step_12
+        CASE WHEN NOT COALESCE(upr.step_08_final_installation, false) THEN 'Final Installation' END as step_08,
+        CASE WHEN NOT COALESCE(upr.step_09_green_lights, false) THEN 'Green Lights' END as step_09,
+        CASE WHEN NOT COALESCE(upr.step_10_signature, false) THEN 'Signature' END as step_10
       FROM drops d
       INNER JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
       WHERE d.installed_by_name = $3
@@ -409,8 +405,8 @@ async function getInstallerPerformance(
     ),
     unpivoted AS (
       SELECT step FROM step_failures, LATERAL (
-        VALUES (step_01), (step_02), (step_03), (step_04), (step_05), (step_06),
-               (step_07), (step_08), (step_09), (step_10), (step_11), (step_12)
+        VALUES (step_01), (step_02), (step_03), (step_04), (step_05),
+               (step_06), (step_07), (step_08), (step_09), (step_10)
       ) AS t(step)
       WHERE step IS NOT NULL
     )
