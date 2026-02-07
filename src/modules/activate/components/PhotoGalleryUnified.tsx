@@ -418,7 +418,8 @@ function PhotoSourceBadge({ source }: PhotoSourceBadgeProps) {
     local: { label: 'Local Cache', color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' },
   };
 
-  const config = source ? sourceConfig[source] : { label: 'Unknown', color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' };
+  const fallback = { label: source || 'Unknown', color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' };
+  const config = (source && sourceConfig[source]) || fallback;
 
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${config.color}`}>
