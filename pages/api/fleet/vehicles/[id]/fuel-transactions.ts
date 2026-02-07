@@ -270,8 +270,9 @@ async function handlePost(
     }
   }
 
-  // Calculate price per litre if not provided
-  const pricePerLitre = body.pricePerLitre ?? (body.amountRand / body.litres);
+  // Always calculate price per litre from amount/litres for accuracy
+  // (VLM-extracted price may not match due to rounding on receipt)
+  const pricePerLitre = body.amountRand / body.litres;
 
   const source = body.source || 'manual';
 
@@ -459,7 +460,8 @@ async function handlePatch(
   const transactionDate = body.transactionDate || current.transaction_date;
   const amountRand = body.amountRand ?? parseFloat(current.amount_rand);
   const litres = body.litres ?? parseFloat(current.litres);
-  const pricePerLitre = body.pricePerLitre ?? (amountRand / litres);
+  // Always calculate price per litre from amount/litres for accuracy
+  const pricePerLitre = amountRand / litres;
   const odometerReading = body.odometerReading ?? current.odometer_reading;
   const stationName = body.stationName !== undefined ? body.stationName : current.station_name;
   const stationLocation = body.stationLocation !== undefined ? body.stationLocation : current.station_location;
