@@ -73,7 +73,8 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
     );
     const importId = importResult.rows[0].id;
 
-    // Single JOIN: OES activations vs 1Map cache
+    // Single JOIN: OES activations vs deduplicated 1Map cache
+    // onemap_properties has duplicate drop_numbers (up to 42x), so use DISTINCT ON
     const joinResult = await client.query<JoinedRow>(
       `SELECT
          oa.drop_number,
@@ -83,8 +84,13 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
          op.ups_serial AS onemap_ups,
          (op.id IS NOT NULL) AS has_onemap_row
        FROM oes_activations oa
-       LEFT JOIN onemap_properties op
-         ON UPPER(oa.drop_number) = UPPER(op.drop_number)
+       LEFT JOIN (
+         SELECT DISTINCT ON (UPPER(drop_number))
+           id, drop_number, ont_barcode, ups_serial
+         FROM onemap_properties
+         WHERE drop_number IS NOT NULL AND drop_number != 'no drop allocated'
+         ORDER BY UPPER(drop_number), updated_at DESC NULLS LAST
+       ) op ON UPPER(oa.drop_number) = UPPER(op.drop_number)
        WHERE oa.import_batch_id = $1
          AND oa.serial_number IS NOT NULL
          AND oa.serial_number != ''`,
@@ -198,17 +204,6 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
 
     // Batch insert queue items
     if (queueInserts.length > 0) {
-      const queueValues: string[] = [];
-      const queueParams: (string | null)[] = [];
-      let paramIdx = 1;
-
-      for (const q of queueInserts) {
-        queueValues.push(`($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3})`);
-        queueParams.push(q.dropNumber, q.oesSerial, oesBatchId, q.team);
-        paramIdx += 4;
-      }
-
-      // Insert in batches to avoid too many params
       for (let i = 0; i < queueInserts.length; i += BATCH_SIZE) {
         const batchItems = queueInserts.slice(i, i + BATCH_SIZE);
         const batchVals: string[] = [];
@@ -238,6 +233,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
     );
 
     // Update run tracking
+    const apiLookupsQueued = queueInserts.length;
     await client.query(
       `UPDATE olt_auto_detect_runs
        SET cache_hits = $1, cache_misses = $2, matches = $3,
@@ -247,7 +243,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
            completed_at = CASE WHEN $8 = 0 THEN NOW() ELSE NULL END
        WHERE id = $9`,
       [cacheHits, cacheMisses, matches, mismatchesNote2, mismatchesNote4,
-       upsSwaps, duplicatesSkipped, queueInserts.length, runId]
+       upsSwaps, duplicatesSkipped, apiLookupsQueued, runId]
     );
 
     const result: AutoDetectResult = {
@@ -260,13 +256,23 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
       mismatchesNote4,
       upsSwaps,
       duplicatesSkipped,
-      apiLookupsQueued: queueInserts.length,
+      apiLookupsQueued,
     };
 
     log.info('OltAutoDetect', `Run #${runId} cache phase complete`, result);
     return result;
   } catch (error) {
     log.error('OltAutoDetect', 'Auto-detect failed', { oesBatchId, error });
+    // Update run tracking with error status
+    try {
+      await client.query(
+        `UPDATE olt_auto_detect_runs
+         SET status = 'error', error_message = $1, completed_at = NOW()
+         WHERE id = (SELECT id FROM olt_auto_detect_runs
+                     WHERE oes_batch_id = $2 ORDER BY id DESC LIMIT 1)`,
+        [error instanceof Error ? error.message : 'Unknown error', oesBatchId]
+      );
+    } catch { /* best effort */ }
     throw error;
   } finally {
     client.release();
@@ -339,8 +345,9 @@ async function insertMismatchBatch(
         continue;
       }
 
-      if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial') {
-        // Already pending -> update serial data
+      if (ex.fix_status === 'pending' || ex.fix_status === 'empty_serial'
+          || ex.fix_status === 'not_found') {
+        // Already tracked -> update serial data
         await client.query(
           `UPDATE olt_mismatch_records
            SET olt_serial = $1, wrong_onemap_serial = $2,
@@ -352,7 +359,7 @@ async function insertMismatchBatch(
         );
         continue;
       }
-      // For other statuses, allow new insert
+      // For other statuses (needs_reinvestigation etc), allow new insert
     }
 
     // New record
