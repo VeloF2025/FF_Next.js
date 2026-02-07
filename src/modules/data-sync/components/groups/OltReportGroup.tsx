@@ -801,7 +801,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
         // Re-sync photos from 1Map for affected DRs (fire-and-forget)
         const drsToSync = [lookup.drA.drNumber];
-        if (scenario === 'clean_swap') drsToSync.push(lookup.drB.drNumber);
+        if (scenario === 'clean_swap' || lookup.upsTransfer?.needed) drsToSync.push(lookup.drB.drNumber);
         for (const dr of drsToSync) {
           fetch('/api/activate/fetch-photos', {
             method: 'POST',
@@ -1589,7 +1589,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                       const isFixing = swapLoading.has(`fix-${record.id}`);
                                       const scenarioLabels: Record<string, { label: string; color: string }> = {
                                         clean_swap: { label: 'Clean Swap', color: 'text-green-400' },
-                                        fix_a_only: { label: 'Fix DR A Only', color: 'text-blue-400' },
+                                        fix_a_only: { label: lookup.upsTransfer?.needed ? 'Fix A + Transfer UPS' : 'Fix DR A Only', color: lookup.upsTransfer?.needed ? 'text-amber-400' : 'text-blue-400' },
                                         fix_a_flag_b: { label: 'Fix A + Flag B', color: 'text-amber-400' },
                                         fix_a_b_missing: { label: 'Fix A (B Missing)', color: 'text-amber-400' },
                                       };
@@ -1692,10 +1692,10 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                               <button
                                                 onClick={(e) => { e.stopPropagation(); handleSwapFix(record, lookup, false); }}
                                                 disabled={isFixing}
-                                                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50"
+                                                className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs rounded disabled:opacity-50 ${lookup.upsTransfer?.needed ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                               >
                                                 {isFixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                                                Fix DR A Only
+                                                {lookup.upsTransfer?.needed ? 'Fix A + Transfer UPS' : 'Fix DR A Only'}
                                               </button>
                                             </div>
                                           </div>

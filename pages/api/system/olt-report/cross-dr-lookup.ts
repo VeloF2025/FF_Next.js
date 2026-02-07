@@ -115,9 +115,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       recommendation = `Clean swap detected. DR B has ${drAOesSerial} and DR A has ${wrongSerial}. Both can be fixed atomically.`;
       canAutoSwap = true;
     } else if (drBOneMapSerial?.toUpperCase() === drBOesSerial?.toUpperCase()) {
-      // Scenario 2: DR B already correct
+      // Scenario 2: DR B ONT already correct (may still need UPS transfer + photo sync)
       scenario = 'fix_a_only';
-      recommendation = `DR B (${belongsToDr}) already has correct serial ${drBOneMapSerial}. Only DR A needs fixing.`;
+      recommendation = upsTransferNeeded
+        ? `DR B (${belongsToDr}) ONT is correct (${drBOneMapSerial}). Fix DR A ONT + transfer UPS to DR B + sync photos.`
+        : `DR B (${belongsToDr}) already has correct serial ${drBOneMapSerial}. Only DR A needs fixing.`;
       canAutoSwap = true;
     } else {
       // Scenario 3: DR B has a different wrong serial
