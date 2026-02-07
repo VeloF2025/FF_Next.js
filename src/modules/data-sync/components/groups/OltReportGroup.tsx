@@ -95,8 +95,9 @@ interface InvestigationContext {
 }
 
 interface SwapLookupResult {
-  drA: { drNumber: string; oesSerial: string; oneMapSerial: string };
-  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; foundOn1Map: boolean };
+  drA: { drNumber: string; oesSerial: string; oneMapSerial: string; oneMapUps: string | null };
+  drB: { drNumber: string; oesSerial: string | null; oneMapSerial: string | null; oneMapUps: string | null; foundOn1Map: boolean };
+  upsTransfer: { needed: boolean; serial: string | null; from: string; to: string } | null;
   scenario: 'clean_swap' | 'fix_a_only' | 'fix_a_flag_b' | 'fix_a_b_missing';
   recommendation: string;
   canAutoSwap: boolean;
@@ -784,16 +785,36 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           drBCorrectSerial: lookup.drB.oesSerial,
           drBWrongSerial: lookup.drB.oneMapSerial,
           scenario,
+          upsTransfer: lookup.upsTransfer,
         }),
       });
       const data = await res.json();
       const result = data.data || data;
       if (result.success) {
-        toast.success(
-          scenario === 'clean_swap'
-            ? `Swapped serials on both ${lookup.drA.drNumber} and ${lookup.drB.drNumber}`
-            : `Fixed ${lookup.drA.drNumber}` + (scenario === 'fix_a_flag_b' ? ` and flagged ${lookup.drB.drNumber}` : '')
-        );
+        let msg = scenario === 'clean_swap'
+          ? `Swapped serials on both ${lookup.drA.drNumber} and ${lookup.drB.drNumber}`
+          : `Fixed ${lookup.drA.drNumber}` + (scenario === 'fix_a_flag_b' ? ` and flagged ${lookup.drB.drNumber}` : '');
+        if (result.upsTransfer?.success) {
+          msg += ` | UPS ${result.upsTransfer.serial} transferred to ${lookup.drB.drNumber}`;
+        }
+        toast.success(msg);
+
+        // Re-sync photos from 1Map for affected DRs (fire-and-forget)
+        const drsToSync = [lookup.drA.drNumber];
+        if (scenario === 'clean_swap') drsToSync.push(lookup.drB.drNumber);
+        for (const dr of drsToSync) {
+          fetch('/api/activate/fetch-photos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dropNumber: dr, force: true }),
+          }).then(r => r.json()).then(d => {
+            const photoResult = d.data || d;
+            if (photoResult.count > 0) {
+              toast.success(`${dr}: ${photoResult.count} photos synced from 1Map`);
+            }
+          }).catch(() => { /* non-fatal */ });
+        }
+
         // Clean up state and refresh
         setSwapLookups(prev => { const n = { ...prev }; delete n[record.id]; return n; });
         fetchRecords('needs_investigation');
@@ -1593,6 +1614,12 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                               <p className="text-xs text-[var(--ff-text-secondary)]">
                                                 1Map: <span className="font-mono text-red-400">{lookup.drA.oneMapSerial}</span> <XCircle className="w-3 h-3 inline text-red-400" />
                                               </p>
+                                              {lookup.drA.oneMapUps && (
+                                                <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                  UPS: <span className={`font-mono ${lookup.upsTransfer?.needed ? 'text-amber-400' : 'text-gray-400'}`}>{lookup.drA.oneMapUps}</span>
+                                                  {lookup.upsTransfer?.needed && <span className="text-[10px] text-amber-400 ml-1">(belongs to DR B)</span>}
+                                                </p>
+                                              )}
                                             </div>
                                             <div>
                                               <div className="flex items-center gap-2 mb-1">
@@ -1621,8 +1648,28 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                                   <span className="text-gray-500 italic">Not on 1Map</span>
                                                 )}
                                               </p>
+                                              {lookup.drB.foundOn1Map && (
+                                                <p className="text-xs text-[var(--ff-text-secondary)]">
+                                                  UPS: {lookup.drB.oneMapUps ? (
+                                                    <span className="font-mono text-gray-400">{lookup.drB.oneMapUps}</span>
+                                                  ) : (
+                                                    <span className={`italic ${lookup.upsTransfer?.needed ? 'text-amber-400' : 'text-gray-500'}`}>
+                                                      {lookup.upsTransfer?.needed ? 'Empty — will receive transfer' : 'Empty'}
+                                                    </span>
+                                                  )}
+                                                </p>
+                                              )}
                                             </div>
                                           </div>
+                                          {/* UPS transfer notice */}
+                                          {lookup.upsTransfer?.needed && (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded border border-amber-500/20">
+                                              <ArrowLeftRight className="w-3 h-3 text-amber-400" />
+                                              <span className="text-[10px] text-amber-400">
+                                                UPS {lookup.upsTransfer.serial} will transfer: {lookup.upsTransfer.from} → {lookup.upsTransfer.to}
+                                              </span>
+                                            </div>
+                                          )}
                                           {/* Scenario + actions */}
                                           <div className="flex items-center justify-between">
                                             <span className={`text-xs font-medium ${sc.color}`}>
