@@ -24,9 +24,6 @@ async function handler(
     const currentUser = authReq.user?.email || authReq.user?.username;
     const { projectId } = req.query;
 
-    // Build base filter
-    const projectFilter = projectId ? `AND project_id = '${projectId}'::uuid` : '';
-
     // Get overall counts by workflow status
     const statusCounts = await sql`
       SELECT

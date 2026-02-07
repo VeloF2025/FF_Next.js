@@ -31,8 +31,48 @@ export default withAuth(withErrorHandler(async (
       
       if (technicianId || status || priority || category || dateFrom || dateTo || search) {
         // Build parameterized query for filters
-        let baseQuery = `
-          SELECT 
+        const conditions: string[] = [];
+        const params: (string | Date)[] = [];
+        let paramIndex = 1;
+
+        if (technicianId) {
+          conditions.push(`t.assigned_to = $${paramIndex++}`);
+          params.push(technicianId as string);
+        }
+        if (status) {
+          conditions.push(`t.status = $${paramIndex++}`);
+          params.push(status as string);
+        }
+        if (priority) {
+          conditions.push(`t.priority = $${paramIndex++}`);
+          params.push(priority as string);
+        }
+        if (category) {
+          conditions.push(`t.category = $${paramIndex++}`);
+          params.push(category as string);
+        }
+        if (dateFrom) {
+          conditions.push(`t.due_date >= $${paramIndex++}`);
+          params.push(new Date(dateFrom as string).toISOString());
+        }
+        if (dateTo) {
+          conditions.push(`t.due_date <= $${paramIndex++}`);
+          params.push(new Date(dateTo as string).toISOString());
+        }
+        if (search) {
+          const searchParam = `%${search}%`;
+          conditions.push(`(t.title ILIKE $${paramIndex} OR t.description ILIKE $${paramIndex})`);
+          paramIndex++;
+          params.push(searchParam);
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        const limitParam = paramIndex++;
+        const offsetParam = paramIndex++;
+        params.push(String(Number(limit)) as any, String(Number(offset)) as any);
+
+        const baseQuery = `
+          SELECT
             t.*,
             u.first_name,
             u.last_name,
@@ -41,32 +81,21 @@ export default withAuth(withErrorHandler(async (
           FROM tasks t
           LEFT JOIN users u ON t.assigned_to = u.id
           LEFT JOIN projects p ON t.project_id = p.id
-          WHERE 1=1
-        `;
-        
-        if (technicianId) baseQuery += ` AND t.assigned_to = '${technicianId}'`;
-        if (status) baseQuery += ` AND t.status = '${status}'`;
-        if (priority) baseQuery += ` AND t.priority = '${priority}'`;
-        if (category) baseQuery += ` AND t.category = '${category}'`;
-        if (dateFrom) baseQuery += ` AND t.due_date >= '${new Date(dateFrom as string).toISOString()}'`;
-        if (dateTo) baseQuery += ` AND t.due_date <= '${new Date(dateTo as string).toISOString()}'`;
-        if (search) baseQuery += ` AND (t.title ILIKE '%${search}%' OR t.description ILIKE '%${search}%')`;
-        
-        baseQuery += `
-          ORDER BY 
-            CASE t.priority 
-              WHEN 'urgent' THEN 1 
-              WHEN 'high' THEN 2 
-              WHEN 'medium' THEN 3 
-              WHEN 'low' THEN 4 
-              ELSE 5 
+          ${whereClause}
+          ORDER BY
+            CASE t.priority
+              WHEN 'urgent' THEN 1
+              WHEN 'high' THEN 2
+              WHEN 'medium' THEN 3
+              WHEN 'low' THEN 4
+              ELSE 5
             END,
             t.created_at DESC
-          LIMIT ${Number(limit)}
-          OFFSET ${Number(offset)}
+          LIMIT $${limitParam}
+          OFFSET $${offsetParam}
         `;
-        
-        taskData = await sql.unsafe(baseQuery);
+
+        taskData = await sql.unsafe(baseQuery, params);
       } else {
         // Simple query without filters
         taskData = await sql`

@@ -1,4 +1,4 @@
-import { NextApiResponse } from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 
 /**
@@ -319,11 +319,20 @@ export class ApiResponseHelper {
    */
   static setCorsHeaders(
     res: NextApiResponse,
-    origin = '*',
+    origin = '',
     methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     headers = ['Content-Type', 'Authorization']
   ): void {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    const allowedOrigins = [
+      'https://app.fibreflow.app',
+      'https://vf.fibreflow.app',
+      'https://dev.fibreflow.app',
+      'http://localhost:3004',
+      'http://localhost:3005',
+    ];
+    const safeOrigin = origin && allowedOrigins.includes(origin) ? origin : '';
+    if (!safeOrigin) return;
+    res.setHeader('Access-Control-Allow-Origin', safeOrigin);
     res.setHeader('Access-Control-Allow-Methods', methods.join(', '));
     res.setHeader('Access-Control-Allow-Headers', headers.join(', '));
   }
@@ -331,8 +340,8 @@ export class ApiResponseHelper {
   /**
    * Handle OPTIONS request for CORS
    */
-  static handleOptions(res: NextApiResponse): void {
-    this.setCorsHeaders(res);
+  static handleOptions(req: NextApiRequest, res: NextApiResponse): void {
+    this.setCorsHeaders(res, req.headers.origin || '');
     res.status(200).end();
   }
 }

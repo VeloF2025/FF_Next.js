@@ -109,7 +109,7 @@ git checkout your-branch
 # Build and deploy
 npm install
 npm run build
-echo "VeloBoss@2026" | sudo -S systemctl restart fibreflow.service
+echo "$VELO_SSH_PASSWORD" | sudo -S systemctl restart fibreflow.service
 ```
 
 **Note**: Even manual deployments are tracked via git commits!
@@ -136,7 +136,7 @@ cd /home/louis/apps/fibreflow
 git branch -a | grep backup  # List all backups
 git checkout auto-backup-20260115-114500  # Restore specific backup
 npm install && npm run build
-echo "VeloBoss@2026" | sudo -S systemctl restart fibreflow.service
+echo "$VELO_SSH_PASSWORD" | sudo -S systemctl restart fibreflow.service
 ```
 
 ## Benefits of New System

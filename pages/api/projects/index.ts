@@ -18,12 +18,9 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Enable CORS for Vercel deployment
-  apiResponse.setCorsHeaders(res);
-
   // Handle OPTIONS request for CORS
   if (req.method === 'OPTIONS') {
-    return apiResponse.handleOptions(res);
+    return apiResponse.handleOptions(req, res);
   }
 
   // Check authentication

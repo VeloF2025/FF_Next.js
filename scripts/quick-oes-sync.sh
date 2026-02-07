@@ -36,7 +36,7 @@ echo "Updating configuration and running sync..."
 
 # Update the token on the server
 ssh -i ~/.ssh/vf_server_key louis@100.96.203.105 << EOF
-echo "VeloBoss@2026" | sudo -S bash -c "
+echo "$VELO_SSH_PASSWORD" | sudo -S bash -c "
 # Update token in upload script
 sed -i 's/QFIELD_API_TOKEN = .*/QFIELD_API_TOKEN = \"$QFIELD_API_TOKEN\"/' /home/louisdup/Agents/claude/VF/fibreflow-app/scripts/upload-oes-to-qfield.py 2>/dev/null
 

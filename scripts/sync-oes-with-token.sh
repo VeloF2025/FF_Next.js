@@ -27,7 +27,7 @@ echo ""
 # STEP 2: Update server configuration
 echo "Updating server configuration..."
 ssh -i ~/.ssh/vf_server_key louis@100.96.203.105 << EOF
-echo "VeloBoss@2026" | sudo -S bash -c "
+echo "$VELO_SSH_PASSWORD" | sudo -S bash -c "
 # Update the token in config
 sed -i '/QFIELD_API_TOKEN=/d' /opt/qfield-sync/config.env 2>/dev/null
 echo 'QFIELD_API_TOKEN=$QFIELD_API_TOKEN' >> /opt/qfield-sync/config.env

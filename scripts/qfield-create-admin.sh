@@ -10,7 +10,7 @@ echo ""
 
 SERVER="100.96.203.105"
 SSH_USER="louis"
-SSH_PASS="VeloBoss@2026"
+SSH_PASS="${VELO_SSH_PASSWORD:?ERROR: VELO_SSH_PASSWORD not set}"
 
 echo "1. Creating admin user in QFieldCloud Django..."
 

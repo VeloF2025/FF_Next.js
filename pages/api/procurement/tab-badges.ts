@@ -16,9 +16,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { projectId } = req.query;
 
-    // Build project filter
-    const projectFilter = projectId ? `AND project_id = '${projectId}'` : '';
-
     const [boqCount, rfqCount, quoteCount, poCount, stockAlerts] = await Promise.all([
       sql`SELECT COUNT(*)::int as count FROM boqs WHERE status IN ('draft', 'review') ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,
       sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'open' ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,

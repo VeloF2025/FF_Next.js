@@ -83,7 +83,7 @@ If QFieldCloud continues to have authentication issues:
 ssh -i ~/.ssh/vf_server_key louis@100.96.203.105
 
 # Upload data directly to PostGIS
-echo "VeloBoss@2026" | sudo -S docker exec -it qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db
+echo "$VELO_SSH_PASSWORD" | sudo -S docker exec -it qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db
 
 # In PostgreSQL:
 CREATE TABLE IF NOT EXISTS oes_activations_import AS

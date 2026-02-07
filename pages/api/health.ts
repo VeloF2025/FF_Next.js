@@ -39,14 +39,12 @@ export default async function handler(
     return res.status(405).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
       checks: {
         database: 'error',
         memory: 'error',
         environment: 'error',
       },
-      details: {},
-    });
+    } as HealthCheck);
   }
 
   const health: HealthCheck = {
@@ -151,6 +149,10 @@ export default async function handler(
       environment: 'error',
     };
     
-    return res.status(503).json(health);
+    return res.status(503).json({
+      status: health.status,
+      timestamp: health.timestamp,
+      checks: health.checks,
+    } as HealthCheck);
   }
 }
