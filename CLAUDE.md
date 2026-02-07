@@ -99,14 +99,22 @@ Run `ls .claude/modules/` for full list (40+ modules).
 | VPS Backup | backup.fibreflow.app | 3005 | `fibreflow-backup.service` |
 | Local | localhost:3004 | 3004 | manual |
 
-**Server Access & Deploy Commands:** See `.claude/credentials.local.md`
+**Server Access:**
 ```bash
-ssh velo@100.96.203.105  # Velocity
+ssh velo@100.96.203.105  # Velocity - Password: velo2026
 ssh root@72.61.197.178   # VPS (WhatsApp services)
-# Full deploy commands with credentials in .claude/credentials.local.md
 ```
 
-**Full details:** `docs/INFRASTRUCTURE.md`
+**Deploy Commands:**
+```bash
+# Dev
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+
+# Production
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+```
+
+**Full details:** `docs/INFRASTRUCTURE.md` | Credentials: `.claude/credentials.local.md`
 
 ## Services Quick Reference
 

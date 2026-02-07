@@ -118,3 +118,6 @@ nul
 
 # Server-specific env (has secrets)
 .env.production
+
+# Local credentials (never commit)
+.claude/credentials.local.md
