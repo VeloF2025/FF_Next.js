@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Car,
   ArrowLeft,
@@ -2061,13 +2062,17 @@ function FuelSpendTab({
   summary,
   loading,
   onRefresh,
+  userRole,
 }: {
   vehicleId: string;
   transactions: FuelTransaction[];
   summary: FuelSummary | null;
   loading: boolean;
   onRefresh: () => void;
+  userRole?: string;
 }) {
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<FuelTransaction | null>(null);
@@ -2269,6 +2274,34 @@ function FuelSpendTab({
     });
     setReceiptPhotoUrl(tx.receiptPhotoUrl);
     setShowEditModal(true);
+  };
+
+  const handleDelete = async (transactionId: string) => {
+    if (!confirm('Are you sure you want to delete this fuel transaction?')) {
+      return;
+    }
+
+    setDeletingId(transactionId);
+    try {
+      const res = await fetch(`/api/fleet/vehicles/${vehicleId}/fuel-transactions`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ transactionId }),
+      });
+
+      if (res.ok) {
+        toast.success('Transaction deleted');
+        onRefresh();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete transaction');
+      }
+    } catch (err) {
+      toast.error('Failed to delete transaction');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleUpdateSubmit = async () => {
@@ -2475,13 +2508,29 @@ function FuelSpendTab({
                     </td>
                     {/* Actions Column */}
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => handleEdit(tx)}
-                        className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)] transition-colors"
-                        title="Edit transaction"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleEdit(tx)}
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-primary)] transition-colors"
+                          title="Edit transaction"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            disabled={deletingId === tx.id}
+                            className="inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-red-50 text-[var(--ff-text-secondary)] hover:text-red-600 transition-colors disabled:opacity-50"
+                            title="Delete transaction"
+                          >
+                            {deletingId === tx.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2874,6 +2923,7 @@ function FuelSpendTab({
 export default function VehicleDetailPage() {
   const router = useRouter();
   const { id, tab } = router.query;
+  const { currentUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [vehicle, setVehicle] = useState<FleetVehicle | null>(null);
@@ -3659,6 +3709,7 @@ export default function VehicleDetailPage() {
                 summary={fuelSummary}
                 loading={fuelLoading}
                 onRefresh={fetchFuelTransactions}
+                userRole={currentUser?.role}
               />
             )}
             {activeTab === 'photos' && (
