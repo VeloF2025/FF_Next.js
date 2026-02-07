@@ -21,6 +21,7 @@ export interface OfflineFuelSubmission {
   pricePerLitre?: number;
   odometerReading?: number;
   stationName?: string;
+  fuelLevelAfter?: number;
   driverName?: string;
   receiptPhoto?: {
     file: File;
@@ -86,6 +87,7 @@ export async function saveOfflineFuelTransaction(
       pricePerLitre: submission.pricePerLitre,
       odometerReading: submission.odometerReading,
       stationName: submission.stationName,
+      fuelLevelAfter: submission.fuelLevelAfter,
       driverName: submission.driverName,
       gpsLat: gpsResult.coordinates?.latitude,
       gpsLng: gpsResult.coordinates?.longitude,

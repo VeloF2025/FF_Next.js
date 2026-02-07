@@ -24,6 +24,7 @@ export interface PendingFuelTransaction {
   pricePerLitre?: number;
   odometerReading?: number;
   stationName?: string;
+  fuelLevelAfter?: number;
   receiptPhotoId?: string;
   odometerPhotoId?: string;
   gpsLat?: number;

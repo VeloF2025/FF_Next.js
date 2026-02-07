@@ -104,6 +104,7 @@ interface FuelFormData {
   pricePerLitre: string;
   odometerReading: string;
   stationName: string;
+  fuelLevelAfter: string;
 }
 
 export default function VehiclePortalPage() {
@@ -168,6 +169,7 @@ export default function VehiclePortalPage() {
     pricePerLitre: '',
     odometerReading: '',
     stationName: '',
+    fuelLevelAfter: '',
   });
   const [receiptPhotoFile, setReceiptPhotoFile] = useState<File | null>(null);
   const [receiptPhotoUrl, setReceiptPhotoUrl] = useState<string | null>(null);
@@ -332,6 +334,7 @@ export default function VehiclePortalPage() {
       pricePerLitre: '',
       odometerReading: '',
       stationName: '',
+      fuelLevelAfter: '',
     });
     setReceiptPhotoFile(null);
     setReceiptPhotoUrl(null);
@@ -560,6 +563,9 @@ export default function VehiclePortalPage() {
             ? parseInt(fuelForm.odometerReading, 10)
             : undefined,
           stationName: fuelForm.stationName || undefined,
+          fuelLevelAfter: fuelForm.fuelLevelAfter
+            ? parseInt(fuelForm.fuelLevelAfter, 10)
+            : undefined,
           driverName: portalDriver?.name || session?.driverName,
           receiptPhoto: receiptPhotoFile
             ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
@@ -623,6 +629,9 @@ export default function VehiclePortalPage() {
               ? parseInt(fuelForm.odometerReading, 10)
               : undefined,
             stationName: fuelForm.stationName || undefined,
+            fuelLevelAfter: fuelForm.fuelLevelAfter
+              ? parseInt(fuelForm.fuelLevelAfter, 10)
+              : undefined,
             receiptPhotoUrl: uploadedReceiptUrl,
             odometerPhotoUrl: uploadedOdometerUrl || undefined,
             gpsLat: gpsResult.coordinates?.latitude,
@@ -658,6 +667,9 @@ export default function VehiclePortalPage() {
             ? parseInt(fuelForm.odometerReading, 10)
             : undefined,
           stationName: fuelForm.stationName || undefined,
+          fuelLevelAfter: fuelForm.fuelLevelAfter
+            ? parseInt(fuelForm.fuelLevelAfter, 10)
+            : undefined,
           driverName: portalDriver?.name || session?.driverName,
           receiptPhoto: receiptPhotoFile
             ? { file: receiptPhotoFile, previewUrl: receiptPhotoUrl || '' }
@@ -1381,6 +1393,26 @@ export default function VehiclePortalPage() {
                     }
                     className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tank Level After (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="100"
+                    value={fuelForm.fuelLevelAfter}
+                    onChange={(e) =>
+                      setFuelForm({ ...fuelForm, fuelLevelAfter: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg bg-gray-50 dark:bg-gray-900 dark:border-gray-700"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Optional - Updates the fuel gauge reading
+                  </p>
                 </div>
               </div>
 
