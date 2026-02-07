@@ -579,13 +579,75 @@ async function handleDelete(
     WHERE id = ${transactionId}
   `;
 
+  // Recalculate L/100km for all remaining transactions
+  const recalculated = await recalculateFuelEfficiency(vehicleId);
+
   log.info('Deleted fuel transaction', {
     vehicleId,
     transactionId,
     deletedBy: user.role,
+    recalculatedCount: recalculated,
   });
 
-  return apiResponse.success(res, { deleted: true, transactionId });
+  return apiResponse.success(res, { deleted: true, transactionId, recalculated });
+}
+
+/**
+ * Recalculate L/100km for all transactions of a vehicle
+ * Called after delete to ensure efficiency values are correct
+ */
+async function recalculateFuelEfficiency(vehicleId: string): Promise<number> {
+  // Get all transactions with odometer readings, ordered by odometer
+  const transactions = await sql`
+    SELECT id, odometer_reading, litres
+    FROM fleet_fuel_transactions
+    WHERE vehicle_id = ${vehicleId}
+      AND odometer_reading IS NOT NULL
+    ORDER BY odometer_reading ASC
+  ` as Array<{ id: string; odometer_reading: number; litres: string }>;
+
+  if (transactions.length === 0) {
+    return 0;
+  }
+
+  let updatedCount = 0;
+
+  // First transaction has no previous - set to null
+  await sql`
+    UPDATE fleet_fuel_transactions
+    SET km_since_last_fill = NULL, litres_per_100km = NULL
+    WHERE id = ${transactions[0].id}
+  `;
+
+  // Calculate for each subsequent transaction
+  for (let i = 1; i < transactions.length; i++) {
+    const current = transactions[i];
+    const previous = transactions[i - 1];
+
+    const kmSinceLastFill = current.odometer_reading - previous.odometer_reading;
+    const litres = parseFloat(current.litres);
+
+    let litresPer100km: number | null = null;
+    if (kmSinceLastFill > 0 && litres > 0) {
+      litresPer100km = (litres / kmSinceLastFill) * 100;
+    }
+
+    await sql`
+      UPDATE fleet_fuel_transactions
+      SET km_since_last_fill = ${kmSinceLastFill},
+          litres_per_100km = ${litresPer100km}
+      WHERE id = ${current.id}
+    `;
+    updatedCount++;
+  }
+
+  log.info('Recalculated fuel efficiency', {
+    vehicleId,
+    totalTransactions: transactions.length,
+    updatedCount,
+  });
+
+  return updatedCount;
 }
 
 export default withFleetAuth(handler);
