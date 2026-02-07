@@ -13,12 +13,6 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse<SummarData>
 ) {
-  // Enable CORS for Vercel deployment
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Handle OPTIONS request for CORS
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }

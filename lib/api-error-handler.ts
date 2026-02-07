@@ -34,10 +34,20 @@ export function withErrorHandler<T = any, R extends NextApiRequest = NextApiRequ
     const startTime = Date.now();
     
     try {
-      // Set CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      // Set CORS headers - restrict to known origins
+      const allowedOrigins = [
+        'https://app.fibreflow.app',
+        'https://vf.fibreflow.app',
+        'https://dev.fibreflow.app',
+        'http://localhost:3004',
+        'http://localhost:3005',
+      ];
+      const origin = req.headers.origin;
+      if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      }
 
       // Handle OPTIONS request for CORS
       if (req.method === 'OPTIONS') {
