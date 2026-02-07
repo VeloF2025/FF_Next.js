@@ -335,6 +335,37 @@ async function handlePost(
 
   const transaction = rowToTransaction(rows[0]);
 
+  // Sync odometer reading to fleet_odometer_history for consistent stats
+  if (body.odometerReading) {
+    try {
+      // Get previous reading from odometer history
+      const prevReading = await sql`
+        SELECT reading FROM fleet_odometer_history
+        WHERE vehicle_id = ${vehicleId}
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      ` as Array<{ reading: number }>;
+
+      const previousReading = prevReading[0]?.reading ?? null;
+      const kmSinceLast = previousReading !== null ? body.odometerReading - previousReading : null;
+
+      // Only insert if this reading is higher than the latest
+      if (previousReading === null || body.odometerReading > previousReading) {
+        await sql`
+          INSERT INTO fleet_odometer_history (
+            vehicle_id, reading, source, previous_reading, km_since_last, recorded_at
+          ) VALUES (
+            ${vehicleId}, ${body.odometerReading}, 'fuel_transaction', ${previousReading}, ${kmSinceLast}, NOW()
+          )
+        `;
+        log.info('Synced fuel transaction odometer to history', { vehicleId, reading: body.odometerReading });
+      }
+    } catch (syncError) {
+      // Log but don't fail the request - fuel transaction is primary
+      log.warn('Failed to sync odometer to history', { error: syncError, vehicleId });
+    }
+  }
+
   log.info('Created fuel transaction', {
     vehicleId,
     amountRand: body.amountRand,

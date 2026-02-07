@@ -74,35 +74,23 @@ async function handler(
       const customStats = await sql`
         WITH readings AS (
           SELECT
-            odometer_reading,
-            check_date,
-            LAG(odometer_reading) OVER (ORDER BY check_date, check_time) as prev_reading
-          FROM fleet_check_records
+            reading,
+            recorded_at::date as reading_date,
+            km_since_last
+          FROM fleet_odometer_history
           WHERE vehicle_id = ${vehicleId}
-            AND odometer_reading IS NOT NULL
-            AND check_date >= ${customStartDate}::date
-            AND check_date <= ${customEndDate}::date
-          ORDER BY check_date, check_time
-        ),
-        km_diffs AS (
-          SELECT
-            check_date,
-            odometer_reading,
-            CASE
-              WHEN prev_reading IS NOT NULL AND odometer_reading >= prev_reading
-              THEN odometer_reading - prev_reading
-              ELSE 0
-            END as km_travelled
-          FROM readings
+            AND recorded_at::date >= ${customStartDate}::date
+            AND recorded_at::date <= ${customEndDate}::date
+          ORDER BY recorded_at
         )
         SELECT
-          COALESCE(SUM(km_travelled), 0) as total_km,
-          COALESCE(MAX(odometer_reading), 0) as end_reading,
-          COALESCE(MIN(odometer_reading), 0) as start_reading,
+          COALESCE(SUM(COALESCE(km_since_last, 0)), 0) as total_km,
+          COALESCE(MAX(reading), 0) as end_reading,
+          COALESCE(MIN(reading), 0) as start_reading,
           COUNT(*) as readings_count,
-          MIN(check_date) as first_date,
-          MAX(check_date) as last_date
-        FROM km_diffs
+          MIN(reading_date) as first_date,
+          MAX(reading_date) as last_date
+        FROM readings
       ` as Array<{
         total_km: string;
         end_reading: string;
@@ -139,40 +127,28 @@ async function handler(
       }
     }
 
-    // Get odometer statistics from check-in records
+    // Get odometer statistics from odometer history (the source of truth)
     const odometerStats = await sql`
       WITH readings AS (
         SELECT
-          odometer_reading,
-          check_date,
-          LAG(odometer_reading) OVER (ORDER BY check_date, check_time) as prev_reading
-        FROM fleet_check_records
+          reading,
+          recorded_at::date as reading_date,
+          km_since_last
+        FROM fleet_odometer_history
         WHERE vehicle_id = ${vehicleId}
-          AND odometer_reading IS NOT NULL
-        ORDER BY check_date DESC, check_time DESC
-      ),
-      km_diffs AS (
-        SELECT
-          check_date,
-          odometer_reading,
-          CASE
-            WHEN prev_reading IS NOT NULL AND odometer_reading >= prev_reading
-            THEN odometer_reading - prev_reading
-            ELSE 0
-          END as km_travelled
-        FROM readings
+        ORDER BY recorded_at DESC
       )
       SELECT
-        COALESCE(SUM(CASE WHEN check_date = CURRENT_DATE THEN km_travelled ELSE 0 END), 0) as today_km,
-        COALESCE(SUM(CASE WHEN check_date >= date_trunc('week', CURRENT_DATE) THEN km_travelled ELSE 0 END), 0) as week_km,
-        COALESCE(SUM(CASE WHEN check_date >= date_trunc('month', CURRENT_DATE) THEN km_travelled ELSE 0 END), 0) as month_km,
-        COALESCE(SUM(CASE WHEN check_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
-                          AND check_date < date_trunc('month', CURRENT_DATE) THEN km_travelled ELSE 0 END), 0) as last_month_km,
-        COALESCE(SUM(km_travelled), 0) as total_km,
-        COALESCE(MAX(odometer_reading), 0) as latest_reading,
-        COALESCE(MIN(odometer_reading), 0) as earliest_reading,
+        COALESCE(SUM(CASE WHEN reading_date = CURRENT_DATE THEN COALESCE(km_since_last, 0) ELSE 0 END), 0) as today_km,
+        COALESCE(SUM(CASE WHEN reading_date >= date_trunc('week', CURRENT_DATE) THEN COALESCE(km_since_last, 0) ELSE 0 END), 0) as week_km,
+        COALESCE(SUM(CASE WHEN reading_date >= date_trunc('month', CURRENT_DATE) THEN COALESCE(km_since_last, 0) ELSE 0 END), 0) as month_km,
+        COALESCE(SUM(CASE WHEN reading_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+                          AND reading_date < date_trunc('month', CURRENT_DATE) THEN COALESCE(km_since_last, 0) ELSE 0 END), 0) as last_month_km,
+        COALESCE(SUM(COALESCE(km_since_last, 0)), 0) as total_km,
+        COALESCE(MAX(reading), 0) as latest_reading,
+        COALESCE(MIN(reading), 0) as earliest_reading,
         COUNT(*) as readings_count
-      FROM km_diffs
+      FROM readings
     ` as Array<{
       today_km: string;
       week_km: string;
