@@ -809,24 +809,26 @@ async function handler(
       // Compare OES serials against 1Map cache to auto-detect mismatches
       let oltAutoDetectTriggered = false;
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
-        fetch(`${baseUrl}/api/system/olt-report/auto-detect`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oesBatchId: batchId }),
-        })
-        .then(async (response) => {
-          if (response.ok) {
-            const result = await response.json();
-            log.info('OESImport', 'OLT auto-detect completed', result.data || result);
-          } else {
-            log.warn('OESImport', `OLT auto-detect returned ${response.status}`);
-          }
-        })
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Unknown error';
-          log.warn('OESImport', 'OLT auto-detect failed (non-blocking)', msg);
-        });
+        const { runAutoDetect } = await import('@/modules/data-sync/services/oltAutoDetectService');
+        runAutoDetect(batchId)
+          .then((result) => {
+            log.info('OESImport', 'OLT auto-detect completed', result);
+            // If cache misses, trigger queue processor via HTTP (runs in same process)
+            if (result.apiLookupsQueued > 0) {
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || '3005'}`;
+              fetch(`${baseUrl}/api/system/olt-report/process-lookup-queue`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ runId: result.runId }),
+              }).catch(err => {
+                log.warn('OESImport', 'OLT queue processor trigger failed (non-blocking)', err);
+              });
+            }
+          })
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            log.error('OESImport', 'OLT auto-detect failed (non-blocking)', msg);
+          });
         oltAutoDetectTriggered = true;
       } catch (error) {
         log.error('OESImport', 'Failed to trigger OLT auto-detect', error);

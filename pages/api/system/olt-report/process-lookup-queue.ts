@@ -200,7 +200,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // If more items, self-invoke to continue processing
     if (remaining > 0) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || '3005'}`;
       fetch(`${baseUrl}/api/system/olt-report/process-lookup-queue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
