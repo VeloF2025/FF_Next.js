@@ -14,6 +14,30 @@ import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// In-memory rate limiter for forgot password attempts (per IP)
+const forgotPasswordAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_FORGOT_ATTEMPTS = 3;
+const FORGOT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = forgotPasswordAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    forgotPasswordAttempts.set(ip, { count: 1, resetAt: now + FORGOT_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_FORGOT_ATTEMPTS;
+}
+
+// Clean up stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of forgotPasswordAttempts) {
+    if (now > entry.resetAt) forgotPasswordAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
+
 // Email sending configuration
 const SMTP_ENABLED = process.env.SMTP_HOST && process.env.SMTP_USER;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
@@ -123,6 +147,16 @@ export default async function handler(
     return res.status(405).json({
       success: false,
       error: { code: 'METHOD_NOT_ALLOWED', message: 'Only POST allowed' },
+    });
+  }
+
+  // Rate limit by IP
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    log.warn('forgot-password', { ip: clientIp, message: 'Rate limited' });
+    return res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many password reset attempts. Please try again later.' },
     });
   }
 

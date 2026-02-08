@@ -179,13 +179,24 @@ async function getSOWData(
 ) {
   const { projectId, status, search, limit, offset, sortBy, sortOrder } = params;
 
+  // Validate table name against allowlist to prevent SQL injection
+  const ALLOWED_TABLES: Record<string, string> = {
+    poles: 'poles',
+    drops: 'drops',
+    fibre_segments: 'fibre_segments'
+  };
+  const safeTable = ALLOWED_TABLES[table];
+  if (!safeTable) {
+    throw new Error(`Invalid table name: ${table}`);
+  }
+
   // Validate sortBy against allowlist to prevent SQL injection
   const validSortColumns = ['created_at', 'updated_at', 'pole_number', 'drop_number', 'cable_id', 'status', 'location', 'address', 'start_location', 'end_location'];
   const safeSortBy = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
   const safeSortOrder = sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-  const whereConditions = [];
-  const queryParams = [];
+  const whereConditions: string[] = [];
+  const queryParams: any[] = [];
   
   if (projectId) {
     whereConditions.push(`s.project_id = $${queryParams.length + 1}::uuid`);
@@ -198,11 +209,11 @@ async function getSOWData(
   }
   
   if (search) {
-    if (table === 'poles') {
+    if (safeTable === 'poles') {
       whereConditions.push(`(s.pole_number ILIKE $${queryParams.length + 1} OR s.location ILIKE $${queryParams.length + 1})`);
-    } else if (table === 'drops') {
+    } else if (safeTable === 'drops') {
       whereConditions.push(`(s.drop_number ILIKE $${queryParams.length + 1} OR s.address ILIKE $${queryParams.length + 1})`);
-    } else if (table === 'fibre_segments') {
+    } else if (safeTable === 'fibre_segments') {
       whereConditions.push(`(s.cable_id ILIKE $${queryParams.length + 1} OR s.start_location ILIKE $${queryParams.length + 1} OR s.end_location ILIKE $${queryParams.length + 1})`);
     }
     queryParams.push(`%${search}%`);
@@ -210,25 +221,27 @@ async function getSOWData(
   
   const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
   
-  // Get count
-  const countQuery = `SELECT COUNT(*) FROM ${table} s ${whereClause}`;
+  // Get count - use safeTable (validated against allowlist)
+  const countQuery = `SELECT COUNT(*) FROM ${safeTable} s ${whereClause}`;
   const countResults = await sql.unsafe(countQuery, queryParams);
   const countResult = Array.isArray(countResults) ? countResults[0] : countResults;
   const count = parseInt(countResult?.count || '0');
-  
-  // Get data with project info
+
+  // Get data with project info - use safeTable (validated against allowlist)
   let dataQuery = `
     SELECT s.*, p.project_name, p.project_code
-    FROM ${table} s
+    FROM ${safeTable} s
     LEFT JOIN projects p ON s.project_id = p.id
     ${whereClause}
     ORDER BY s.${safeSortBy} ${safeSortOrder}
   `;
-  
+
+  // Parameterize LIMIT and OFFSET to prevent SQL injection
   if (limit !== undefined && offset !== undefined) {
-    dataQuery += ` LIMIT ${limit} OFFSET ${offset}`;
+    dataQuery += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
   }
-  
+
   const dataResults = await sql.unsafe(dataQuery, queryParams);
   const data = Array.isArray(dataResults) ? dataResults : [];
   

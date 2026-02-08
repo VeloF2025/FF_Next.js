@@ -20,6 +20,7 @@ async function handler(
   res: NextApiResponse<PoleData>
 ) {
   // Check authentication
+  const userId = (req as any).user?.id;
   if (!userId) {
     return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
   }
@@ -87,32 +88,38 @@ async function handleGetPoles(req: NextApiRequest, res: NextApiResponse<PoleData
     }
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-    const offset = (parseInt(page as string) - 1) * parseInt(pageSize as string);
-    
+
+    // Validate pagination parameters to prevent SQL injection
+    const validatedPage = Math.max(1, parseInt(page as string, 10) || 1);
+    const validatedPageSize = Math.min(1000, Math.max(1, parseInt(pageSize as string, 10) || 50));
+    const offset = (validatedPage - 1) * validatedPageSize;
+
     // Get total count
     const countQuery = `SELECT COUNT(*) FROM sow_poles p ${whereClause}`;
-    const [countResult] = await sql.unsafe(countQuery, queryParams);
-    const total = parseInt(countResult.count);
-    
-    // Get paginated results with project info
+    const countResults = await sql.unsafe(countQuery, queryParams as any);
+    const countResult = Array.isArray(countResults) ? countResults[0] : countResults;
+    const total = parseInt(countResult?.count || '0');
+
+    // Get paginated results with project info - parameterize LIMIT/OFFSET
     const dataQuery = `
       SELECT p.*, pr.project_name, pr.project_code
       FROM sow_poles p
       LEFT JOIN projects pr ON p.project_id = pr.id
       ${whereClause}
       ORDER BY p.created_at DESC
-      LIMIT ${pageSize}
-      OFFSET ${offset}
+      LIMIT $${queryParams.length + 1}
+      OFFSET $${queryParams.length + 2}
     `;
-    
-    const poles = await sql.unsafe(dataQuery, queryParams);
+    queryParams.push(validatedPageSize, offset);
+
+    const poles = await sql.unsafe(dataQuery, queryParams as any);
     
     return res.status(200).json({
       success: true,
       data: poles,
       total,
-      page: parseInt(page as string),
-      pageSize: parseInt(pageSize as string)
+      page: validatedPage,
+      pageSize: validatedPageSize
     });
     
   } catch (error: any) {

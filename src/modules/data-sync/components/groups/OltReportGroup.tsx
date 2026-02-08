@@ -156,6 +156,7 @@ interface Stats {
   escalated: number;
   empty: number;
   total: number;
+  investigateBreakdown?: { cross_dr: number; not_found: number; other: number };
 }
 
 interface OltReportGroupProps {
@@ -373,12 +374,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   // Fetch records based on tab
   const fetchRecords = useCallback(
-    async (status: string) => {
+    async (status: string, subStatus?: string) => {
       setIsLoading(true);
       setError(null);
       try {
+        const params = new URLSearchParams({ status, page: String(page), pageSize: String(pageSize) });
+        if (subStatus && subStatus !== 'all') params.set('subStatus', subStatus);
         const res = await fetch(
-          `/api/system/olt-report/records?status=${status}&page=${page}&pageSize=${pageSize}`
+          `/api/system/olt-report/records?${params.toString()}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -537,7 +540,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     if (currentTab === 'pending') {
       fetchRecords('pending');
     } else if (currentTab === 'investigate') {
-      fetchRecords('needs_investigation');
+      fetchRecords('needs_investigation', investigateSubFilter);
     } else if (currentTab === 'escalations') {
       fetchRecords('escalated');
     } else if (currentTab === 'history') {
@@ -545,7 +548,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     } else if (currentTab === 'reporting') {
       fetchReportData();
     }
-  }, [currentTab, page, fetchStats, fetchRecords, fetchImports, fetchReportData]);
+  }, [currentTab, page, investigateSubFilter, fetchStats, fetchRecords, fetchImports, fetchReportData]);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -955,29 +958,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const fixableRecords = records.filter((r) => r.olt_serial);
   const allSelected = fixableRecords.length > 0 && selectedIds.size === fixableRecords.length;
 
-  // Sub-filter counts and filtered records for Investigate tab
-  const investigateSubCounts = useMemo(() => {
-    if (currentTab !== 'investigate') return { needs_investigation: 0, not_found: 0, other: 0, total: records.length };
-    let ni = 0, nf = 0, other = 0;
-    for (const r of records) {
-      const s = r.fix_status || '';
-      if (s === 'needs_investigation' || s === 'needs_reinvestigation') ni++;
-      else if (s === 'not_found') nf++;
-      else other++;
-    }
-    return { needs_investigation: ni, not_found: nf, other, total: records.length };
-  }, [currentTab, records]);
-
-  const displayRecords = useMemo(() => {
-    if (currentTab !== 'investigate' || investigateSubFilter === 'all') return records;
-    if (investigateSubFilter === 'needs_investigation') {
-      return records.filter(r => r.fix_status === 'needs_investigation' || r.fix_status === 'needs_reinvestigation');
-    }
-    if (investigateSubFilter === 'not_found') {
-      return records.filter(r => r.fix_status === 'not_found');
-    }
-    return records;
-  }, [currentTab, investigateSubFilter, records]);
+  // Investigate sub-filter counts from stats API
+  const investigateSubCounts = stats.investigateBreakdown || { cross_dr: 0, not_found: 0, other: 0 };
 
   // Show loading state while permissions are being resolved
   if (permissionsLoading) {
@@ -1524,13 +1506,13 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
             <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
               <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
               {([
-                { key: 'all', label: 'All', count: investigateSubCounts.total },
-                { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.needs_investigation },
+                { key: 'all', label: 'All', count: stats.needs_investigation },
+                { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.cross_dr },
                 { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
               ] as const).map(({ key, label, count }) => (
                 <button
                   key={key}
-                  onClick={() => setInvestigateSubFilter(key)}
+                  onClick={() => { setInvestigateSubFilter(key); setPage(1); }}
                   className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                     investigateSubFilter === key
                       ? 'bg-[var(--ff-accent)] text-white border-[var(--ff-accent)]'
@@ -1589,7 +1571,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  {displayRecords.map((record) => (
+                  {records.map((record) => (
                     <React.Fragment key={record.id}>
                     <tr
                       className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${

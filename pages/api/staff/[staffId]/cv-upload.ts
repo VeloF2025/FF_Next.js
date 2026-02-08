@@ -16,6 +16,16 @@ import { withAuth } from '@/lib/auth';
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffCVUploadAPI');
 
+/** Validate file content matches expected type by checking magic bytes */
+function validateMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('25504446')) return { valid: true, detectedType: 'application/pdf' };
+  if (hex.startsWith('D0CF11E0')) return { valid: true, detectedType: 'application/msword' };
+  if (hex.startsWith('504B0304')) return { valid: true, detectedType: 'application/zip' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // Disable body parser for file uploads
 export const config = {
   api: {
@@ -87,6 +97,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Upload new CV
       const fileBuffer = fs.readFileSync(file.filepath);
+      const { valid: magicValid } = validateMagicBytes(fileBuffer);
+      if (!magicValid) {
+        fs.unlinkSync(file.filepath);
+        return res.status(400).json({ error: 'File content does not match an allowed type (PDF, DOC, DOCX).' });
+      }
       const extension = file.originalFilename?.split('.').pop() || 'pdf';
       const filename = `cv-${Date.now()}.${extension}`;
 

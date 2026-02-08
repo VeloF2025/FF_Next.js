@@ -20,8 +20,33 @@ import {
   type AuthRole,
 } from '@/lib/auth';
 import logger from '@/lib/logger';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+// In-memory rate limiter for setup password attempts (per IP)
+const setupPasswordAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_SETUP_ATTEMPTS = 5;
+const SETUP_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = setupPasswordAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    setupPasswordAttempts.set(ip, { count: 1, resetAt: now + SETUP_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_SETUP_ATTEMPTS;
+}
+
+// Clean up stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of setupPasswordAttempts) {
+    if (now > entry.resetAt) setupPasswordAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
 
 interface SetupPasswordRequest {
   email: string;
@@ -37,6 +62,16 @@ export default async function handler(
     return res.status(405).json({
       success: false,
       error: { code: 'METHOD_NOT_ALLOWED', message: 'Only POST allowed' },
+    });
+  }
+
+  // Rate limit by IP
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    log.warn('setup-password', { ip: clientIp, message: 'Rate limited' });
+    return res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many password setup attempts. Please try again later.' },
     });
   }
 

@@ -88,7 +88,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       stats.total += count;
     }
 
-    return apiResponse.success(res, stats);
+    // Investigate sub-counts (breakdown of needs_investigation group)
+    const subResult = await pool.query(`
+      SELECT
+        CASE
+          WHEN fix_status IN ('needs_investigation', 'needs_reinvestigation') THEN 'cross_dr'
+          WHEN fix_status = 'not_found' THEN 'not_found'
+          ELSE 'other'
+        END as sub_category,
+        COUNT(*)::int as count
+      FROM olt_mismatch_records
+      WHERE (fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR olt_serial IS NULL)
+        ${dateFilter}
+      GROUP BY sub_category
+    `, params);
+
+    const investigateBreakdown: Record<string, number> = { cross_dr: 0, not_found: 0, other: 0 };
+    for (const row of subResult.rows) {
+      investigateBreakdown[row.sub_category] = row.count;
+    }
+
+    return apiResponse.success(res, { ...stats, investigateBreakdown });
   } catch (error) {
     return apiResponse.internalError(res, error);
   }

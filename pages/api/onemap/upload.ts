@@ -16,6 +16,15 @@ export const config = {
 // Database connection
 const sql = neon(process.env.NEON_DATABASE_URL!);
 
+/** Validate file content matches Excel format by checking magic bytes */
+function validateExcelMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('D0CF11E0')) return { valid: true, detectedType: 'application/vnd.ms-excel' };
+  if (hex.startsWith('504B0304')) return { valid: true, detectedType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // Helper function to parse coordinates
 function parseCoordinate(value: any): number | null {
   if (!value) return null;
@@ -260,6 +269,14 @@ async function handler(
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    // Validate magic bytes match Excel format
+    const fileBuffer = fs.readFileSync(file.filepath);
+    const { valid: magicValid } = validateExcelMagicBytes(Buffer.from(fileBuffer));
+    if (!magicValid) {
+      fs.unlinkSync(file.filepath);
+      return res.status(400).json({ error: 'File content does not match Excel format (.xls or .xlsx).' });
+    }
+
     // Create import record
     const importResult = await sql`
       INSERT INTO onemap_imports (
@@ -326,4 +343,4 @@ async function handler(
   }
 }
 
-export default withAuth(parseOneMapFile);
+export default withAuth(handler);

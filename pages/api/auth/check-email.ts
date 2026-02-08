@@ -12,8 +12,33 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import logger from '@/lib/logger';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+// In-memory rate limiter for check-email attempts (per IP)
+const checkEmailAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_CHECK_ATTEMPTS = 10;
+const CHECK_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = checkEmailAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    checkEmailAttempts.set(ip, { count: 1, resetAt: now + CHECK_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > MAX_CHECK_ATTEMPTS;
+}
+
+// Clean up stale entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of checkEmailAttempts) {
+    if (now > entry.resetAt) checkEmailAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
 
 interface CheckEmailRequest {
   email: string;
@@ -55,6 +80,16 @@ export default async function handler(
     return res.status(405).json({
       success: false,
       error: { code: 'METHOD_NOT_ALLOWED', message: 'Only POST allowed' },
+    });
+  }
+
+  // Rate limit by IP
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    log.warn('check-email', { ip: clientIp, message: 'Rate limited' });
+    return res.status(429).json({
+      success: false,
+      error: { code: 'RATE_LIMITED', message: 'Too many email check attempts. Please try again later.' },
     });
   }
 

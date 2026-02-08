@@ -23,6 +23,17 @@ export const config = {
 
 const sql = neon(process.env.DATABASE_URL!);
 
+/** Validate file content by checking magic bytes */
+function validateImageMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('FFD8FF')) return { valid: true, detectedType: 'image/jpeg' };
+  if (hex.startsWith('89504E47')) return { valid: true, detectedType: 'image/png' };
+  if (hex.startsWith('47494638')) return { valid: true, detectedType: 'image/gif' };
+  if (hex.startsWith('52494646')) return { valid: true, detectedType: 'image/webp' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // Valid photo types
 const VALID_PHOTO_TYPES = [
   'before',
@@ -108,6 +119,16 @@ async function handler(
 
     // Read file buffer
     const buffer = await fs.promises.readFile(file.filepath);
+
+    // Validate magic bytes match an allowed image type
+    const { valid: magicValid } = validateImageMagicBytes(buffer);
+    if (!magicValid) {
+      await fs.promises.unlink(file.filepath).catch(() => {});
+      return res.status(400).json({
+        success: false,
+        error: 'File content does not match expected image format.'
+      });
+    }
 
     // Upload to VF Storage
     // Path convention: poles/{projectId}/{poleId}/{photoType}_{filename}

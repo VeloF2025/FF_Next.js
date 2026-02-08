@@ -32,6 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const status = String(req.query.status || 'pending');
     const source = req.query.source ? String(req.query.source) : null;
+    const subStatus = req.query.subStatus ? String(req.query.subStatus) : null;
     const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
     const dateTo = req.query.dateTo ? String(req.query.dateTo) : null;
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
@@ -63,6 +64,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       whereClause = whereClause
         ? `${whereClause} AND ${sourceCondition}`
         : `WHERE ${sourceCondition}`;
+    }
+
+    // Optional sub-status filter (within needs_investigation group)
+    const validSubStatuses = ['needs_investigation', 'not_found', 'empty_serial'];
+    if (subStatus && validSubStatuses.includes(subStatus)) {
+      if (subStatus === 'needs_investigation') {
+        const cond = `r.fix_status IN ('needs_investigation', 'needs_reinvestigation')`;
+        whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+      } else {
+        params.push(subStatus);
+        const cond = `r.fix_status = $${params.length}`;
+        whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+      }
     }
 
     // Optional date range filter

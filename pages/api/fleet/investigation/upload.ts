@@ -29,6 +29,15 @@ export const config = {
 
 const getSqlInstance = () => getSql();
 
+/** Validate file content matches Excel format by checking magic bytes */
+function validateExcelMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('D0CF11E0')) return { valid: true, detectedType: 'application/vnd.ms-excel' };
+  if (hex.startsWith('504B0304')) return { valid: true, detectedType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // Max file size: 50MB
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
@@ -111,6 +120,13 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
     // Read file buffer
     const fileBuffer = await fs.promises.readFile(uploadedFile.filepath);
+
+    // Validate magic bytes match Excel format
+    const { valid: magicValid } = validateExcelMagicBytes(fileBuffer);
+    if (!magicValid) {
+      await fs.promises.unlink(uploadedFile.filepath).catch(() => {});
+      return apiResponse.validationError(res, { file: 'File content does not match Excel format (.xls or .xlsx).' });
+    }
 
     // Clean up temp file
     await fs.promises.unlink(uploadedFile.filepath).catch(() => {});

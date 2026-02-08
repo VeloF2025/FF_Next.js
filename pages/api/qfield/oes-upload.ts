@@ -14,6 +14,15 @@ import { log } from '@/lib/logger';
 
 const execAsync = promisify(exec);
 
+/** Validate file content matches Excel format by checking magic bytes (skip for CSV) */
+function validateExcelMagicBytes(buffer: Buffer): { valid: boolean; detectedType: string } {
+  if (buffer.length < 4) return { valid: false, detectedType: 'unknown' };
+  const hex = buffer.subarray(0, 8).toString('hex').toUpperCase();
+  if (hex.startsWith('D0CF11E0')) return { valid: true, detectedType: 'application/vnd.ms-excel' };
+  if (hex.startsWith('504B0304')) return { valid: true, detectedType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+  return { valid: false, detectedType: 'unknown' };
+}
+
 // VPS Configuration
 const VPS_HOST = process.env.VPS_HOST || '72.61.166.168';
 const VPS_USER = process.env.VPS_USER || 'root';
@@ -70,6 +79,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({
         error: 'File too large. Maximum size: 50MB'
       });
+    }
+
+    // Validate magic bytes for binary formats (Excel). CSV has no magic bytes.
+    const isCsv = /\.csv$/i.test(file.originalFilename || '');
+    if (!isCsv) {
+      const fileBuffer = await fs.promises.readFile(file.filepath);
+      const { valid: magicValid } = validateExcelMagicBytes(fileBuffer);
+      if (!magicValid) {
+        await fs.promises.unlink(file.filepath).catch(() => {});
+        return res.status(400).json({ error: 'File content does not match Excel format (.xls or .xlsx).' });
+      }
     }
 
     // Determine target filename based on extension
