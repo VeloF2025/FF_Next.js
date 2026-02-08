@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -23,6 +23,7 @@ import {
   CardContent,
   LinearProgress,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   X,
@@ -63,13 +64,39 @@ export function PhotoDetailModal({
 }: PhotoDetailModalProps) {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [revalidating, setRevalidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Reset state when photo changes
+  useEffect(() => {
+    setNotes('');
+    setError(null);
+    setSuccess(null);
+  }, [photo.id]);
 
   const photoUrl = qfieldQaApiService.getPhotoUrl(photo.photo_key);
   const filename = photo.photo_key.split('/').pop() || photo.photo_key;
   const confidence = photo.vlm_confidence !== null ? (photo.vlm_confidence * 100).toFixed(0) : null;
 
   const handleAction = async (action: 'approve' | 'reject' | 'escalate' | 'revalidate') => {
+    // Revalidate has its own flow - don't close modal
+    if (action === 'revalidate') {
+      setRevalidating(true);
+      setError(null);
+      setSuccess(null);
+      try {
+        await onRevalidate();
+        setSuccess('AI validation triggered. Results will update shortly.');
+        // Don't close - let user see the result or take further action
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Validation failed');
+      } finally {
+        setRevalidating(false);
+      }
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -88,9 +115,6 @@ export function PhotoDetailModal({
           }
           await onEscalate(notes);
           break;
-        case 'revalidate':
-          await onRevalidate();
-          break;
       }
       onClose();
     } catch (err) {
@@ -106,7 +130,14 @@ export function PhotoDetailModal({
       onClose={onClose}
       maxWidth="lg"
       fullWidth
-      PaperProps={{ sx: { minHeight: '80vh' } }}
+      PaperProps={{
+        sx: {
+          minHeight: '80vh',
+          bgcolor: 'rgb(17, 24, 39)', // gray-900
+          backgroundImage: 'none',
+          color: 'white',
+        },
+      }}
     >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -125,7 +156,7 @@ export function PhotoDetailModal({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ bgcolor: 'rgb(17, 24, 39)', borderColor: 'rgb(55, 65, 81)' }}>
         <Grid container spacing={3}>
           {/* Photo */}
           <Grid item xs={12} md={6}>
@@ -147,7 +178,7 @@ export function PhotoDetailModal({
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               />
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'rgb(156, 163, 175)' }}>
               {filename}
             </Typography>
           </Grid>
@@ -155,20 +186,25 @@ export function PhotoDetailModal({
           {/* Details */}
           <Grid item xs={12} md={6}>
             {/* AI Validation Card */}
-            <Card sx={{ mb: 2 }}>
+            <Card sx={{ mb: 2, bgcolor: 'rgb(31, 41, 55)', border: '1px solid rgb(55, 65, 81)' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle1" fontWeight="bold">
+                  <Typography variant="subtitle1" fontWeight="bold" color="white">
                     AI Validation
                   </Typography>
                   <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<RotateCw className="w-4 h-4" />}
+                    startIcon={revalidating ? <CircularProgress size={16} /> : <RotateCw className="w-4 h-4" />}
                     onClick={() => handleAction('revalidate')}
-                    disabled={loading}
+                    disabled={loading || revalidating}
+                    sx={{
+                      borderColor: 'rgb(59, 130, 246)',
+                      color: 'rgb(59, 130, 246)',
+                      '&:hover': { borderColor: 'rgb(96, 165, 250)', bgcolor: 'rgba(59, 130, 246, 0.1)' },
+                    }}
                   >
-                    Re-validate
+                    {revalidating ? 'Validating...' : 'Re-validate'}
                   </Button>
                 </Box>
 
@@ -179,7 +215,7 @@ export function PhotoDetailModal({
                         <Typography variant="h3" fontWeight="bold" sx={{ color: getConfidenceColor(photo.vlm_confidence || 0) }}>
                           {confidence}%
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{ color: 'rgb(156, 163, 175)' }}>
                           Confidence
                         </Typography>
                       </Box>
@@ -190,7 +226,7 @@ export function PhotoDetailModal({
                           sx={{
                             height: 10,
                             borderRadius: 5,
-                            bgcolor: 'grey.200',
+                            bgcolor: 'rgb(55, 65, 81)',
                             '& .MuiLinearProgress-bar': {
                               bgcolor: getConfidenceColor(photo.vlm_confidence || 0),
                             },
@@ -208,11 +244,11 @@ export function PhotoDetailModal({
                     </Box>
 
                     {photo.vlm_feedback && (
-                      <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1 }}>
-                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                      <Box sx={{ bgcolor: 'rgb(55, 65, 81)', p: 2, borderRadius: 1 }}>
+                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1, color: 'white' }}>
                           Feedback
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: 'rgb(156, 163, 175)' }}>
                           {photo.vlm_feedback}
                         </Typography>
                       </Box>
@@ -220,12 +256,12 @@ export function PhotoDetailModal({
 
                     {photo.vlm_raw_response?.issues && photo.vlm_raw_response.issues.length > 0 && (
                       <Box sx={{ mt: 2 }}>
-                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1, color: 'white' }}>
                           Issues Found
                         </Typography>
                         <Box component="ul" sx={{ m: 0, pl: 2 }}>
                           {photo.vlm_raw_response.issues.map((issue, i) => (
-                            <Typography component="li" variant="body2" color="error.main" key={i}>
+                            <Typography component="li" variant="body2" sx={{ color: '#f87171' }} key={i}>
                               {issue}
                             </Typography>
                           ))}
@@ -242,9 +278,9 @@ export function PhotoDetailModal({
             </Card>
 
             {/* Feature Context Card */}
-            <Card sx={{ mb: 2 }}>
+            <Card sx={{ mb: 2, bgcolor: 'rgb(31, 41, 55)', border: '1px solid rgb(55, 65, 81)' }}>
               <CardContent>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, color: 'white' }}>
                   Feature Details
                 </Typography>
 
@@ -296,9 +332,9 @@ export function PhotoDetailModal({
 
             {/* Assignment Info */}
             {(photo.assigned_to || photo.manual_reviewed_by) && (
-              <Card sx={{ mb: 2 }}>
+              <Card sx={{ mb: 2, bgcolor: 'rgb(31, 41, 55)', border: '1px solid rgb(55, 65, 81)' }}>
                 <CardContent>
-                  <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                  <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, color: 'white' }}>
                     Review Info
                   </Typography>
                   <Grid container spacing={1}>
@@ -357,7 +393,17 @@ export function PhotoDetailModal({
               placeholder="Add notes for approval/rejection..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              sx={{ mb: 2 }}
+              sx={{
+                mb: 2,
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: 'rgb(31, 41, 55)',
+                  color: 'white',
+                  '& fieldset': { borderColor: 'rgb(55, 65, 81)' },
+                  '&:hover fieldset': { borderColor: 'rgb(75, 85, 99)' },
+                  '&.Mui-focused fieldset': { borderColor: 'rgb(59, 130, 246)' },
+                },
+                '& .MuiInputBase-input::placeholder': { color: 'rgb(107, 114, 128)' },
+              }}
             />
 
             {error && (
@@ -365,12 +411,26 @@ export function PhotoDetailModal({
                 {error}
               </Alert>
             )}
+
+            {success && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                {success}
+              </Alert>
+            )}
           </Grid>
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button variant="outlined" onClick={onClose}>
+      <DialogActions sx={{ p: 2, gap: 1, bgcolor: 'rgb(17, 24, 39)', borderTop: '1px solid rgb(55, 65, 81)' }}>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{
+            borderColor: 'rgb(75, 85, 99)',
+            color: 'rgb(156, 163, 175)',
+            '&:hover': { borderColor: 'rgb(107, 114, 128)', bgcolor: 'rgba(75, 85, 99, 0.2)' },
+          }}
+        >
           Cancel
         </Button>
         <Button
@@ -435,13 +495,13 @@ function InfoRow({
       <Grid item xs={4}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           {icon}
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: 'rgb(156, 163, 175)' }}>
             {label}
           </Typography>
         </Box>
       </Grid>
       <Grid item xs={8}>
-        <Typography variant="body2">{value}</Typography>
+        <Typography variant="body2" sx={{ color: 'white' }}>{value}</Typography>
       </Grid>
     </>
   );
