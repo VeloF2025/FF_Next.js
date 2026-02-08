@@ -76,6 +76,12 @@ async function handler(
   try {
     const { validationIds, photoKeys, workType } = req.body as ValidationRequest;
 
+    log.info('qfield-qa-validate', {
+      validationIdCount: validationIds?.length || 0,
+      photoKeyCount: photoKeys?.length || 0,
+      workType
+    }, 'Validation request received');
+
     if (!validationIds?.length && !photoKeys?.length) {
       return apiResponse.badRequest(res, 'Either validationIds or photoKeys required');
     }
@@ -183,7 +189,7 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     // The 'local' alias is pre-configured in the container
     const command = `docker exec qfieldcloud-minio-1 mc cat 'local/${MINIO_BUCKET}/${objectPath}' 2>/dev/null | base64 -w 0`;
 
-    log.debug('qfield-qa-validate', { photoKey, command: command.substring(0, 100) }, 'Fetching photo');
+    log.info('qfield-qa-validate', { photoKey: photoKey.substring(0, 80) }, 'Fetching photo via Docker mc');
 
     const base64Data = execSync(command, {
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer
@@ -192,14 +198,21 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     }).trim();
 
     if (!base64Data || base64Data.length < 100) {
+      log.error('qfield-qa-validate', { photoKey, dataLen: base64Data?.length || 0 }, 'Empty or invalid image data');
       throw new Error('Empty or invalid image data returned');
     }
 
-    log.debug('qfield-qa-validate', { size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched');
+    // Check for mc error messages in output
+    if (base64Data.startsWith('mc:') || base64Data.includes('ERROR') || base64Data.includes('does not exist')) {
+      log.error('qfield-qa-validate', { photoKey, error: base64Data.substring(0, 200) }, 'mc command returned error');
+      throw new Error(`MinIO error: ${base64Data.substring(0, 200)}`);
+    }
+
+    log.info('qfield-qa-validate', { size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched successfully');
     return base64Data;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('qfield-qa-validate', { photoKey, error: message }, 'Failed to fetch photo');
+    log.error('qfield-qa-validate', { photoKey: photoKey.substring(0, 80), error: message.substring(0, 200) }, 'Failed to fetch photo');
     throw new Error(`Failed to fetch photo: ${message}`);
   }
 }
@@ -293,10 +306,17 @@ async function processOneValidation(
   feedback?: string;
   error?: string;
 }> {
+  const effectiveWorkType = validation.work_type || workType || 'pole_installation';
+  log.info('qfield-qa-validate', {
+    id: validation.id,
+    photoKey: validation.photo_key?.substring(0, 60),
+    workType: effectiveWorkType
+  }, 'Processing single validation');
+
   try {
     const vlmResult = await validatePhoto(
       validation.photo_key,
-      validation.work_type || workType || 'pole_installation'
+      effectiveWorkType
     );
 
     // Update validation record
