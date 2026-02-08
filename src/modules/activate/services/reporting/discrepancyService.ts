@@ -2,13 +2,15 @@
  * Discrepancy Report (WhatsApp vs OES)
  */
 
+import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
-import { pool } from './_shared';
 import type {
   DiscrepancyReportResponse,
   DiscrepancyRecord,
   DiscrepancyType,
 } from '../../types/reporting.types';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * Get discrepancy report between WhatsApp and OES
@@ -35,53 +37,80 @@ export async function getDiscrepancyReport(
       project,
     });
 
-    const result = await pool.query(
-      `
-      WITH wa_submissions AS (
+    // Use neon() tagged template (HTTP-based) instead of Pool (WebSocket)
+    // to avoid "socket hang up" errors in production
+    let rows;
+    if (project) {
+      rows = await sql`
+        WITH wa_submissions AS (
+          SELECT drop_number, project,
+            COALESCE(whatsapp_message_date, created_at) as submitted_at,
+            user_name, sender_phone
+          FROM qa_photo_reviews
+          WHERE COALESCE(whatsapp_message_date, created_at)::DATE = ${waDate}::DATE
+            AND project = ${project}
+        ),
+        oes_activations_filtered AS (
+          SELECT drop_number, serial_number, activation_date, team, status
+          FROM oes_activations
+          WHERE activation_date = ${actualOesDate}::DATE
+        )
         SELECT
-          drop_number,
-          project,
-          COALESCE(whatsapp_message_date, created_at) as submitted_at,
-          user_name,
-          sender_phone
-        FROM qa_photo_reviews
-        WHERE COALESCE(whatsapp_message_date, created_at)::DATE = $1::DATE
-          AND ($3::TEXT IS NULL OR project = $3)
-      ),
-      oes_activations_filtered AS (
+          COALESCE(w.drop_number, o.drop_number) as drop_number,
+          w.project,
+          CASE
+            WHEN w.drop_number IS NOT NULL AND o.drop_number IS NOT NULL THEN 'matched'
+            WHEN w.drop_number IS NOT NULL THEN 'wa_only'
+            ELSE 'oes_only'
+          END as discrepancy_type,
+          w.submitted_at as wa_submitted_at,
+          w.user_name as wa_submitted_by,
+          w.sender_phone as wa_sender_phone,
+          o.activation_date as oes_activation_date,
+          o.team as oes_team,
+          o.status as oes_status,
+          o.serial_number as oes_serial_number
+        FROM wa_submissions w
+        FULL OUTER JOIN oes_activations_filtered o ON w.drop_number = o.drop_number
+        ORDER BY discrepancy_type, drop_number
+      `;
+    } else {
+      rows = await sql`
+        WITH wa_submissions AS (
+          SELECT drop_number, project,
+            COALESCE(whatsapp_message_date, created_at) as submitted_at,
+            user_name, sender_phone
+          FROM qa_photo_reviews
+          WHERE COALESCE(whatsapp_message_date, created_at)::DATE = ${waDate}::DATE
+        ),
+        oes_activations_filtered AS (
+          SELECT drop_number, serial_number, activation_date, team, status
+          FROM oes_activations
+          WHERE activation_date = ${actualOesDate}::DATE
+        )
         SELECT
-          drop_number,
-          serial_number,
-          activation_date,
-          team,
-          status
-        FROM oes_activations
-        WHERE activation_date = $2::DATE
-      )
-      SELECT
-        COALESCE(w.drop_number, o.drop_number) as drop_number,
-        w.project,
-        CASE
-          WHEN w.drop_number IS NOT NULL AND o.drop_number IS NOT NULL THEN 'matched'
-          WHEN w.drop_number IS NOT NULL THEN 'wa_only'
-          ELSE 'oes_only'
-        END as discrepancy_type,
-        w.submitted_at as wa_submitted_at,
-        w.user_name as wa_submitted_by,
-        w.sender_phone as wa_sender_phone,
-        o.activation_date as oes_activation_date,
-        o.team as oes_team,
-        o.status as oes_status,
-        o.serial_number as oes_serial_number
-      FROM wa_submissions w
-      FULL OUTER JOIN oes_activations_filtered o ON w.drop_number = o.drop_number
-      ORDER BY discrepancy_type, drop_number
-      `,
-      [waDate, actualOesDate, project || null]
-    );
+          COALESCE(w.drop_number, o.drop_number) as drop_number,
+          w.project,
+          CASE
+            WHEN w.drop_number IS NOT NULL AND o.drop_number IS NOT NULL THEN 'matched'
+            WHEN w.drop_number IS NOT NULL THEN 'wa_only'
+            ELSE 'oes_only'
+          END as discrepancy_type,
+          w.submitted_at as wa_submitted_at,
+          w.user_name as wa_submitted_by,
+          w.sender_phone as wa_sender_phone,
+          o.activation_date as oes_activation_date,
+          o.team as oes_team,
+          o.status as oes_status,
+          o.serial_number as oes_serial_number
+        FROM wa_submissions w
+        FULL OUTER JOIN oes_activations_filtered o ON w.drop_number = o.drop_number
+        ORDER BY discrepancy_type, drop_number
+      `;
+    }
 
     // Map results
-    const records: DiscrepancyRecord[] = result.rows.map((row) => ({
+    const records: DiscrepancyRecord[] = rows.map((row) => ({
       drop_number: row.drop_number,
       project: row.project,
       discrepancy_type: row.discrepancy_type as DiscrepancyType,
