@@ -315,6 +315,10 @@ interface PhotoCardProps {
 function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
   const photoUrl = qfieldQaApiService.getPhotoUrl(photo.photo_key);
   const filename = photo.photo_key.split('/').pop() || photo.photo_key;
+  // Show pole number if available, otherwise fall back to filename
+  const displayTitle = photo.feature_id && /^[A-Z]{3}\.[PS]\.[A-Z]?\d+/.test(photo.feature_id)
+    ? photo.feature_id
+    : filename;
   const confidence = photo.vlm_confidence !== null ? (photo.vlm_confidence * 100).toFixed(0) : null;
 
   return (
@@ -358,12 +362,12 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
         )}
       </div>
       <div className="p-3" onClick={onClick}>
-        <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate" title={filename}>
-          {filename}
+        <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate" title={displayTitle}>
+          {displayTitle}
         </p>
-        <div className="flex items-center gap-2 mt-1.5">
-          <span className="px-2 py-0.5 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded">
-            {formatWorkType(photo.work_type)}
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className="px-2 py-0.5 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded capitalize">
+            {photo.feature_type || formatWorkType(photo.work_type)}
           </span>
           {photo.priority && photo.priority !== 'normal' && (
             <PriorityBadge priority={photo.priority} />
