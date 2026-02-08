@@ -1,6 +1,9 @@
 /**
  * POST /api/qfield/qa-actions
  * Execute QA actions: approve, reject, escalate, assign, revalidate
+ *
+ * HITL corrections are recorded to the VLM learning system when
+ * human reviewers disagree with AI validation results.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -8,6 +11,7 @@ import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { recordVlmCorrection } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -51,9 +55,11 @@ async function handler(
 
     for (const validationId of validationIds) {
       try {
-        // Get current state for audit trail
+        // Get current state for audit trail and VLM learning
         const current = await sql`
-          SELECT workflow_status, assigned_to, escalation_level, manual_status
+          SELECT workflow_status, assigned_to, escalation_level, manual_status,
+                 vlm_confidence, vlm_feedback, vlm_raw_response, needs_retake,
+                 photo_key, work_type, project_id, feature_id
           FROM qfield_photo_validations
           WHERE id = ${validationId}::uuid
         `;
@@ -81,6 +87,35 @@ async function handler(
               WHERE id = ${validationId}::uuid
             `;
             newValue = { manual_status: 'approved', workflow_status: 'approved' };
+
+            // Record HITL correction if human disagrees with AI (AI said fail, human approves)
+            if (previousValue.vlm_confidence !== null && previousValue.needs_retake) {
+              try {
+                await recordVlmCorrection({
+                  module: 'qfield',
+                  analysisType: 'qfield_photo_qa',
+                  sourceId: validationId,
+                  sourceTable: 'qfield_photo_validations',
+                  photoUrl: `/api/qfield/photo-proxy?key=${encodeURIComponent(previousValue.photo_key || '')}`,
+                  vlmExtractedValue: 'fail',
+                  vlmConfidence: previousValue.vlm_confidence,
+                  correctedValue: 'pass',
+                  correctionReason: 'interpretation_error',
+                  correctionNotes: notes || `Human approved despite AI flagging. Work type: ${previousValue.work_type}`,
+                  context: {
+                    workType: previousValue.work_type,
+                    projectId: previousValue.project_id,
+                    featureId: previousValue.feature_id,
+                    vlmFeedback: previousValue.vlm_feedback,
+                    vlmIssues: previousValue.vlm_raw_response?.issues,
+                  },
+                  correctedByName: userId,
+                });
+                log.info('qfield-qa-actions', { validationId }, 'HITL correction recorded: AI fail → Human approve');
+              } catch (correctionError) {
+                log.error('qfield-qa-actions', { validationId, error: correctionError }, 'Failed to record HITL correction');
+              }
+            }
             break;
 
           case 'reject':
@@ -96,6 +131,35 @@ async function handler(
               WHERE id = ${validationId}::uuid
             `;
             newValue = { manual_status: 'rejected', workflow_status: 'rejected' };
+
+            // Record HITL correction if human disagrees with AI (AI said pass, human rejects)
+            if (previousValue.vlm_confidence !== null && !previousValue.needs_retake) {
+              try {
+                await recordVlmCorrection({
+                  module: 'qfield',
+                  analysisType: 'qfield_photo_qa',
+                  sourceId: validationId,
+                  sourceTable: 'qfield_photo_validations',
+                  photoUrl: `/api/qfield/photo-proxy?key=${encodeURIComponent(previousValue.photo_key || '')}`,
+                  vlmExtractedValue: 'pass',
+                  vlmConfidence: previousValue.vlm_confidence,
+                  correctedValue: 'fail',
+                  correctionReason: 'interpretation_error',
+                  correctionNotes: notes || `Human rejected despite AI passing. Work type: ${previousValue.work_type}`,
+                  context: {
+                    workType: previousValue.work_type,
+                    projectId: previousValue.project_id,
+                    featureId: previousValue.feature_id,
+                    vlmFeedback: previousValue.vlm_feedback,
+                    humanFeedback: notes,
+                  },
+                  correctedByName: userId,
+                });
+                log.info('qfield-qa-actions', { validationId }, 'HITL correction recorded: AI pass → Human reject');
+              } catch (correctionError) {
+                log.error('qfield-qa-actions', { validationId, error: correctionError }, 'Failed to record HITL correction');
+              }
+            }
             break;
 
           case 'escalate':
