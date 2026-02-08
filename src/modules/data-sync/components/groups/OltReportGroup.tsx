@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowLeftRight,
+  Info,
 } from 'lucide-react';
 import type { OltTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
@@ -242,6 +243,9 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
   const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
   const [swapErrors, setSwapErrors] = useState<Record<string, string>>({});
+
+  // Displaced ONT tracking state
+  const [displacedInfo, setDisplacedInfo] = useState<Record<string, { activated: boolean; ownerDr?: string; ownerTeam?: string; ownerStatus?: string }>>({});
 
   // Projects state
   const [projects, setProjects] = useState<
@@ -558,6 +562,25 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [investigateSubFilter]);
+
+  // Batch-check displaced ONT activation status when Fixable tab records load
+  useEffect(() => {
+    if (currentTab !== 'pending' || records.length === 0) return;
+    const wrongSerials = records
+      .filter(r => r.wrong_onemap_serial && !isStatusMismatch(r))
+      .map(r => r.wrong_onemap_serial as string);
+    if (wrongSerials.length === 0) { setDisplacedInfo({}); return; }
+    const unique = [...new Set(wrongSerials)];
+    fetch('/api/system/olt-report/check-displaced', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serials: unique }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.data) setDisplacedInfo(data.data); })
+      .catch(() => { /* non-fatal */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab, records]);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1642,6 +1665,24 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                               Status: {ctx?.currentStatus || 'wrong'}
                             </span>
                           );
+                        })()}
+                        {currentTab === 'pending' && record.wrong_onemap_serial && displacedInfo[record.wrong_onemap_serial] && (() => {
+                          const info = displacedInfo[record.wrong_onemap_serial!];
+                          if (info.activated && info.ownerDr && info.ownerDr !== record.drop_number) {
+                            return (
+                              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400 inline-flex items-center gap-0.5" title={`Displaced ONT belongs to ${info.ownerDr} (${info.ownerTeam || 'unknown team'})`}>
+                                <Info className="w-3 h-3" /> {info.ownerDr}
+                              </span>
+                            );
+                          }
+                          if (!info.activated) {
+                            return (
+                              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 inline-flex items-center gap-0.5" title="Displaced ONT is not activated in OES — untracked physical ONT">
+                                <Info className="w-3 h-3" /> Unactivated ONT
+                              </span>
+                            );
+                          }
+                          return null;
                         })()}
                       </td>
                       <td className="py-3 px-4 text-right">

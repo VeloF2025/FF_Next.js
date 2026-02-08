@@ -155,6 +155,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       userId || 'system'
     );
 
+    // Look up displaced ONT activation status for DR A's wrong serial
+    let displacedInfoA: { activated: boolean; ownerDr: string | null; ownerTeam: string | null } | null = null;
+    if (drAWrongSerial) {
+      try {
+        const displacedLookup = await client.query(
+          `SELECT drop_number, team, status FROM oes_activations
+           WHERE UPPER(serial_number) = $1 ORDER BY created_at DESC LIMIT 1`,
+          [drAWrongSerial.toUpperCase()]
+        );
+        const row = displacedLookup.rows[0];
+        displacedInfoA = {
+          activated: !!row,
+          ownerDr: row?.drop_number || null,
+          ownerTeam: row?.team || null,
+        };
+      } catch {
+        // Non-fatal
+      }
+    }
+
     // Record DR A in serial_change_history
     await client.query(
       `INSERT INTO serial_change_history
@@ -165,7 +185,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         drAOldValue || null,
         drACorrectSerial,
         userId || 'system',
-        JSON.stringify({ scenario, otherDr: drBNumber, wrongPropId, source: 'olt_report' }),
+        JSON.stringify({
+          scenario, otherDr: drBNumber, wrongPropId, source: 'olt_report',
+          displaced_serial: drAWrongSerial || null,
+          displaced_activated: displacedInfoA?.activated ?? null,
+          displaced_owner_dr: displacedInfoA?.ownerDr ?? null,
+          displaced_owner_team: displacedInfoA?.ownerTeam ?? null,
+        }),
       ]
     );
 
@@ -208,6 +234,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           userId || 'system'
         );
 
+        // Look up displaced ONT activation status for DR B's wrong serial
+        let displacedInfoB: { activated: boolean; ownerDr: string | null; ownerTeam: string | null } | null = null;
+        if (drBWrongSerial) {
+          try {
+            const displacedLookupB = await client.query(
+              `SELECT drop_number, team, status FROM oes_activations
+               WHERE UPPER(serial_number) = $1 ORDER BY created_at DESC LIMIT 1`,
+              [drBWrongSerial.toUpperCase()]
+            );
+            const rowB = displacedLookupB.rows[0];
+            displacedInfoB = {
+              activated: !!rowB,
+              ownerDr: rowB?.drop_number || null,
+              ownerTeam: rowB?.team || null,
+            };
+          } catch {
+            // Non-fatal
+          }
+        }
+
         // Record DR B in serial_change_history
         await client.query(
           `INSERT INTO serial_change_history
@@ -218,7 +264,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             drBOldValue || null,
             drBCorrectSerial,
             userId || 'system',
-            JSON.stringify({ scenario, otherDr: drANumber, source: 'olt_report' }),
+            JSON.stringify({
+              scenario, otherDr: drANumber, source: 'olt_report',
+              displaced_serial: drBWrongSerial || null,
+              displaced_activated: displacedInfoB?.activated ?? null,
+              displaced_owner_dr: displacedInfoB?.ownerDr ?? null,
+              displaced_owner_team: displacedInfoB?.ownerTeam ?? null,
+            }),
           ]
         );
       }

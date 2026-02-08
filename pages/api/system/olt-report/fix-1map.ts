@@ -250,6 +250,26 @@ async function fixSingleDR(
         });
       }
 
+      // Look up displaced ONT activation status before recording history
+      let displacedInfo: { activated: boolean; ownerDr: string | null; ownerTeam: string | null } | null = null;
+      if (wrongSerial && !alreadyCorrect) {
+        try {
+          const displacedLookup = await client.query(
+            `SELECT drop_number, team, status FROM oes_activations
+             WHERE UPPER(serial_number) = $1 ORDER BY created_at DESC LIMIT 1`,
+            [wrongSerial.toUpperCase()]
+          );
+          const row = displacedLookup.rows[0];
+          displacedInfo = {
+            activated: !!row,
+            ownerDr: row?.drop_number || null,
+            ownerTeam: row?.team || null,
+          };
+        } catch {
+          // Non-fatal — continue without displaced info
+        }
+      }
+
       // Record in serial_change_history for DR Review Serial History tab
       const propId = 'propId' in result ? result.propId : null;
       await client.query(
@@ -267,6 +287,10 @@ async function fixSingleDR(
             source: 'olt_report',
             fix_type: alreadyCorrect ? 'already_correct' : 'onemap_fix_success',
             wrong_onemap_serial: wrongSerial || null,
+            displaced_serial: wrongSerial || null,
+            displaced_activated: displacedInfo?.activated ?? null,
+            displaced_owner_dr: displacedInfo?.ownerDr ?? null,
+            displaced_owner_team: displacedInfo?.ownerTeam ?? null,
             totalRecords,
             updatedCount,
             alreadyCorrectCount,
