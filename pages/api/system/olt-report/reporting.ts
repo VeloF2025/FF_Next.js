@@ -56,8 +56,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const client = await pool.connect();
-
   try {
     const period = (req.query.period as Period) || 'all';
     const format = (req.query.format as string) || 'json';
@@ -82,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Get all records with details
-    const recordsResult = await client.query(`
+    const recordsResult = await pool.query(`
       SELECT
         m.id,
         m.drop_number,
@@ -119,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     // Get fixes by day for chart
-    const fixesByDayResult = await client.query(`
+    const fixesByDayResult = await pool.query(`
       SELECT
         DATE(fix_attempted_at) as date,
         COUNT(*) as count
@@ -133,7 +131,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `, start ? [...params, start.toISOString()] : params);
 
     // Get imports summary
-    const importsResult = await client.query(`
+    const importsResult = await pool.query(`
       SELECT
         i.id,
         i.filename,
@@ -232,8 +230,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     log.error('OltReportReporting', 'Failed to fetch reporting data', { error });
     return apiResponse.internalError(res, error);
-  } finally {
-    client.release();
   }
 }
 

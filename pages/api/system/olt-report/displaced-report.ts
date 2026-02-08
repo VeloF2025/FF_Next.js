@@ -27,7 +27,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const filter = (req.query.filter as string) || 'all';
   const format = (req.query.format as string) || 'json';
 
-  const client = await pool.connect();
   try {
     // Build WHERE clause for filter
     let filterClause = '';
@@ -37,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       filterClause = "AND (metadata->>'displaced_activated')::boolean = true";
     }
 
-    const result = await client.query(`
+    const result = await pool.query(`
       SELECT drop_number, old_value, new_value, created_at,
              metadata->>'displaced_serial' as displaced_serial,
              (metadata->>'displaced_activated')::boolean as displaced_activated,
@@ -52,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `);
 
     // Get summary counts
-    const counts = await client.query(`
+    const counts = await pool.query(`
       SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE (metadata->>'displaced_activated')::boolean = false) as unactivated,
@@ -106,8 +105,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     return apiResponse.internalError(res, error);
-  } finally {
-    client.release();
   }
 }
 
