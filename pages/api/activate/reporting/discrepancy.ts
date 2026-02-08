@@ -54,13 +54,21 @@ async function handler(
     const data = await getDiscrepancyReport(waDateStr, oesDateStr || undefined, projectStr || undefined);
 
     return res.status(200).json(data);
-  } catch (error) {
-    log.error('DiscrepancyAPI', 'Failed to fetch discrepancy report', { error });
-    const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
-    log.error('DiscrepancyAPI', `Error details: ${errMsg}`);
-    return res.status(500).json({
-      error: errMsg,
-    });
+  } catch (error: unknown) {
+    let errMsg = 'Unknown error';
+    if (error instanceof Error) {
+      errMsg = error.message;
+    } else if (typeof error === 'string') {
+      errMsg = error;
+    } else if (error && typeof error === 'object') {
+      // Neon/pg errors may not extend Error - extract all props
+      const props = Object.getOwnPropertyNames(error);
+      const extracted: Record<string, unknown> = {};
+      for (const p of props) extracted[p] = (error as Record<string, unknown>)[p];
+      errMsg = JSON.stringify(extracted);
+    }
+    log.error('DiscrepancyAPI', `Discrepancy error: ${errMsg}`);
+    return res.status(500).json({ error: errMsg });
   }
 }
 
