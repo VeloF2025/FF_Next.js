@@ -11,12 +11,15 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { execSync } from 'child_process';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// VLM service configuration
-const VLM_ENDPOINT = process.env.VLM_ENDPOINT || 'http://100.96.203.105:8100/api/vlm';
-const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT || 'http://100.96.203.105:9000';
+// VLM service configuration - use OpenAI-compatible endpoint
+const VLM_API_BASE = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
+const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
+const VLM_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
+const VLM_TIMEOUT_MS = 60000; // 60 seconds
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 
 // Work type prompts for VLM validation
@@ -183,37 +186,89 @@ async function handler(
   }
 }
 
-async function validatePhoto(photoKey: string, workType: string): Promise<VLMResponse> {
-  // Construct MinIO URL for the photo
+/**
+ * Fetch photo from MinIO via mc cat (inside Docker container)
+ * Returns base64 encoded image data
+ */
+async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
   const objectPath = photoKey.startsWith('/') ? photoKey.slice(1) : photoKey;
-  const photoUrl = `${MINIO_ENDPOINT}/${MINIO_BUCKET}/${objectPath}`;
+
+  try {
+    // Use mc cat inside the MinIO Docker container to fetch the photo
+    // The 'local' alias is pre-configured in the container
+    const command = `docker exec qfieldcloud-minio-1 mc cat 'local/${MINIO_BUCKET}/${objectPath}' 2>/dev/null | base64 -w 0`;
+
+    log.debug('qfield-qa-validate', { photoKey, command: command.substring(0, 100) }, 'Fetching photo');
+
+    const base64Data = execSync(command, {
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer
+      encoding: 'utf-8',
+      timeout: 30000,
+    }).trim();
+
+    if (!base64Data || base64Data.length < 100) {
+      throw new Error('Empty or invalid image data returned');
+    }
+
+    log.debug('qfield-qa-validate', { size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched');
+    return base64Data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error('qfield-qa-validate', { photoKey, error: message }, 'Failed to fetch photo');
+    throw new Error(`Failed to fetch photo: ${message}`);
+  }
+}
+
+async function validatePhoto(photoKey: string, workType: string): Promise<VLMResponse> {
+  // Fetch the photo as base64
+  const base64Image = await fetchPhotoAsBase64(photoKey);
+
+  // Determine mime type from photo key
+  const isJpeg = photoKey.toLowerCase().includes('.jpg') || photoKey.toLowerCase().includes('.jpeg');
+  const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
+  const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
   // Get the appropriate prompt
   const prompt = VALIDATION_PROMPTS[workType] || VALIDATION_PROMPTS.pole_installation;
 
-  // Call VLM service
-  const response = await fetch(VLM_ENDPOINT, {
+  // Call VLM service with OpenAI-compatible format
+  const response = await fetch(VLM_API_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      image_url: photoUrl,
-      prompt,
+      model: VLM_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: dataUrl },
+            },
+            {
+              type: 'text',
+              text: prompt,
+            },
+          ],
+        },
+      ],
       max_tokens: 500,
+      temperature: 0.1,
     }),
-    signal: AbortSignal.timeout(30000), // 30 second timeout
+    signal: AbortSignal.timeout(VLM_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    throw new Error(`VLM service error: ${response.status} ${response.statusText}`);
+    const errorText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`VLM service error: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
   const result = await response.json();
 
-  // Parse VLM response - it should be JSON in the response text
+  // Parse VLM response from OpenAI-compatible format
   let vlmData: VLMResponse;
   try {
-    // The VLM might return the JSON in a text field or directly
-    const responseText = result.text || result.response || JSON.stringify(result);
+    const responseText = result.choices?.[0]?.message?.content || '';
     // Try to extract JSON from the response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
