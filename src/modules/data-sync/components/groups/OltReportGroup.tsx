@@ -2329,16 +2329,16 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               {/* Records View */}
               {reportView === 'records' && (
                 <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-                  <div className="overflow-x-auto max-h-[500px]">
-                    <table className="w-full text-sm">
+                  <div className="overflow-y-auto max-h-[500px]">
+                    <table className="w-full text-sm table-fixed">
                       <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
                         <tr className="border-b border-[var(--ff-border-light)]">
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OLT Serial</th>
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">1Map Serial</th>
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Import File</th>
-                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Date</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[12%]">DR Number</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">OLT Serial</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">1Map Serial</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Status</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[30%]">Import File</th>
+                          <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Date</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2347,11 +2347,11 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                           .slice(0, 100)
                           .map((record) => (
                             <tr key={record.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                              <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{record.drop_number}</td>
-                              <td className="py-3 px-4 text-green-400 font-mono">{record.olt_serial || '-'}</td>
-                              <td className="py-3 px-4 text-red-400 font-mono">{record.wrong_onemap_serial || '-'}</td>
-                              <td className="py-3 px-4">
-                                <span className={`px-2 py-1 rounded text-xs ${
+                              <td className="py-2 px-3 text-[var(--ff-text-primary)] font-mono text-xs">{record.drop_number}</td>
+                              <td className="py-2 px-3 text-green-400 font-mono text-xs truncate">{record.olt_serial || '-'}</td>
+                              <td className="py-2 px-3 text-red-400 font-mono text-xs truncate">{record.wrong_onemap_serial || '-'}</td>
+                              <td className="py-2 px-3">
+                                <span className={`px-1.5 py-0.5 rounded text-xs ${
                                   record.fix_status === 'fixed' ? 'bg-green-500/20 text-green-400' :
                                   record.fix_status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
                                   record.fix_status === 'not_found' ? 'bg-red-500/20 text-red-400' :
@@ -2360,8 +2360,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                   {record.fix_status || 'unknown'}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{record.import_filename || '-'}</td>
-                              <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                              <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs truncate">{record.import_filename || '-'}</td>
+                              <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">
                                 {record.created_at ? new Date(record.created_at).toLocaleDateString() : '-'}
                               </td>
                             </tr>
@@ -2381,27 +2381,27 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               {reportView === 'imports' && (
                 <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
                   {reportData.imports.length > 0 ? (
-                    <div className="overflow-x-auto max-h-[500px]">
-                      <table className="w-full text-sm">
+                    <div className="overflow-y-auto max-h-[500px]">
+                      <table className="w-full text-sm table-fixed">
                         <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
                           <tr className="border-b border-[var(--ff-border-light)]">
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Filename</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Project</th>
-                            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Mismatches</th>
-                            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Fixed</th>
-                            <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Pending</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Imported</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[40%]">Filename</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Project</th>
+                            <th className="text-right py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Mismatches</th>
+                            <th className="text-right py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[8%]">Fixed</th>
+                            <th className="text-right py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[8%]">Pending</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[18%]">Imported</th>
                           </tr>
                         </thead>
                         <tbody>
                           {reportData.imports.map((imp) => (
                             <tr key={imp.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                              <td className="py-3 px-4 text-[var(--ff-text-primary)]">{imp.filename}</td>
-                              <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{imp.project || '-'}</td>
-                              <td className="py-3 px-4 text-right text-amber-400">{imp.mismatch_count}</td>
-                              <td className="py-3 px-4 text-right text-green-400">{imp.fixed_count}</td>
-                              <td className="py-3 px-4 text-right text-[var(--ff-text-secondary)]">{imp.pending_count}</td>
-                              <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                              <td className="py-2 px-3 text-[var(--ff-text-primary)] text-xs truncate">{imp.filename}</td>
+                              <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">{imp.project || '-'}</td>
+                              <td className="py-2 px-3 text-right text-amber-400 text-xs">{imp.mismatch_count}</td>
+                              <td className="py-2 px-3 text-right text-green-400 text-xs">{imp.fixed_count}</td>
+                              <td className="py-2 px-3 text-right text-[var(--ff-text-secondary)] text-xs">{imp.pending_count}</td>
+                              <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">
                                 {new Date(imp.imported_at).toLocaleString()}
                               </td>
                             </tr>
@@ -2433,17 +2433,17 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                       <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" />
                     </div>
                   ) : displacedReport && displacedReport.records.length > 0 ? (
-                    <div className="overflow-x-auto max-h-[500px]">
-                      <table className="w-full text-sm">
+                    <div className="overflow-y-auto max-h-[500px]">
+                      <table className="w-full text-sm table-fixed">
                         <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
                           <tr className="border-b border-[var(--ff-border-light)]">
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Displaced Serial</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Type</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OES Status</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Owner</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Replaced With</th>
-                            <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Fixed On</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[11%]">DR</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">Displaced Serial</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[7%]">Type</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">OES Status</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[18%]">Owner</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">Replaced With</th>
+                            <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Fixed On</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2455,29 +2455,29 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                             const typeColor = isOnt ? 'text-blue-400' : isUps ? 'text-orange-400' : 'text-gray-400';
                             return (
                               <tr key={`${rec.drop_number}-${idx}`} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                                <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{rec.drop_number}</td>
-                                <td className="py-3 px-4 font-mono text-red-400">{rec.displaced_serial}</td>
-                                <td className="py-3 px-4">
-                                  <span className={`px-2 py-0.5 rounded text-xs ${typeColor} ${isOnt ? 'bg-blue-500/10' : isUps ? 'bg-orange-500/10' : 'bg-gray-500/10'}`}>
+                                <td className="py-2 px-3 text-[var(--ff-text-primary)] font-mono text-xs">{rec.drop_number}</td>
+                                <td className="py-2 px-3 font-mono text-red-400 text-xs truncate">{rec.displaced_serial}</td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-1.5 py-0.5 rounded text-xs ${typeColor} ${isOnt ? 'bg-blue-500/10' : isUps ? 'bg-orange-500/10' : 'bg-gray-500/10'}`}>
                                     {typeLabel}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4">
+                                <td className="py-2 px-3">
                                   {rec.displaced_activated ? (
-                                    <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">Activated</span>
+                                    <span className="px-1.5 py-0.5 rounded text-xs bg-green-500/20 text-green-400">Activated</span>
                                   ) : (
-                                    <span className="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400">Unactivated</span>
+                                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400">Unactivated</span>
                                   )}
                                 </td>
-                                <td className="py-3 px-4 text-[var(--ff-text-secondary)] font-mono">
+                                <td className="py-2 px-3 text-[var(--ff-text-secondary)] font-mono text-xs truncate">
                                   {rec.displaced_owner_dr ? (
                                     <span>{rec.displaced_owner_dr} <span className="text-[var(--ff-text-tertiary)]">({rec.displaced_owner_team || '-'})</span></span>
                                   ) : (
                                     <span className="text-[var(--ff-text-tertiary)]">-</span>
                                   )}
                                 </td>
-                                <td className="py-3 px-4 font-mono text-green-400">{rec.new_value}</td>
-                                <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                                <td className="py-2 px-3 font-mono text-green-400 text-xs truncate">{rec.new_value}</td>
+                                <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">
                                   {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'}
                                 </td>
                               </tr>
