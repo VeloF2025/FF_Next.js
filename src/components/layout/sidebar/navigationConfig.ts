@@ -27,8 +27,8 @@ export const navItems: NavSection[] = [
   peopleSection,          // 8. HUMAN RESOURCES - Staff
   analyticsSection,       // 9. ANALYTICS - Performance metrics
   communicationsSection,  // 10. COMMUNICATIONS - WhatsApp, meetings
-  systemSection,          // 11. SYSTEM - Admin tools (always last)
+  fieldOperationsSection, // 11. FIELD OPERATIONS - Field App, QField QA, WA Monitor
+  systemSection,          // 12. SYSTEM - Admin tools (always last)
   // contractorsSection - MOVED to projectSection
   // clientsSection - MOVED to projectSection
-  // fieldOperationsSection - HIDDEN (legacy)
 ];
