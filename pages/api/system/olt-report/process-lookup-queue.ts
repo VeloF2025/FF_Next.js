@@ -17,8 +17,8 @@ const pool = new Pool({
 });
 
 const BATCH_SIZE = 50;
-const CONCURRENCY = 3;
-const STAGGER_MS = 150;
+const CONCURRENCY = 2; // Reduced from 3 - fewer concurrent 1Map calls = faster individual responses
+const STAGGER_MS = 500; // Increased stagger to avoid overwhelming 1Map
 
 function isUpsSerial(serial: string | null): boolean {
   return !!serial && serial.toUpperCase().startsWith('GU18');

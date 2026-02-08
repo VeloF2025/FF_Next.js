@@ -20,7 +20,7 @@ const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
 const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
 const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
-const FETCH_TIMEOUT_MS = 5000; // 5 second timeout per request (5 requests max = 25s total)
+const FETCH_TIMEOUT_MS = 30000; // 30 second timeout - 1Map search can take 10-15s under load
 
 /**
  * Fetch with timeout
