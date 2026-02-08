@@ -187,8 +187,9 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
   const [odometerVerifiedOverride, setOdometerVerifiedOverrideState] = useState(false);
   const [verificationPhotoDataUrl, setVerificationPhotoDataUrl] = useState<string | null>(null);
 
-  // Track if odometer was manually overridden (for correct source tracking)
+  // Track if odometer/fuel was manually overridden (for correct source tracking)
   const [odometerWasOverridden, setOdometerWasOverridden] = useState(false);
+  const [fuelWasOverridden, setFuelWasOverridden] = useState(false);
 
   // Get required photos based on check type
   const requiredPhotos = checkType === 'daily' ? DAILY_PHOTOS : WEEKLY_PHOTOS;
@@ -307,6 +308,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       setOdometerWasOverridden(true);
     } else if (photoType === 'fuel_gauge') {
       setFormState(prev => ({ ...prev, fuelLevel: String(numValue) }));
+      // Track that this is a manual override (HITL correction)
+      setFuelWasOverridden(true);
     }
 
     // Mark VLM result as overridden
@@ -517,10 +520,12 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
       }
 
       // Determine fuel source based on how the value was entered
-      // Priority: vlm (if confidence > 0.5) > check_in (manual entry)
+      // Priority: manual_override (HITL correction) > vlm (if confidence > 0.5) > check_in (manual entry)
       let fuelSource: 'check_in' | 'vlm' | 'manual_override' = 'check_in';
       const fuelVlm = vlmResults.get('fuel_gauge');
-      if (fuelVlm?.extractedNumeric !== null && (fuelVlm?.confidence ?? 0) > 0.5) {
+      if (fuelWasOverridden) {
+        fuelSource = 'manual_override';
+      } else if (fuelVlm?.extractedNumeric !== null && (fuelVlm?.confidence ?? 0) > 0.5) {
         fuelSource = 'vlm';
       }
 
@@ -654,6 +659,8 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
 
               if (base64) {
                 // Fire and forget - don't block submission for VLM persistence
+                // persistResultsOnly=true: only save VLM results to fleet_photo_vlm_results,
+                // skip fuel/odometer history recording (already recorded by createCheckRecord with user's final values)
                 fetch('/api/fleet/check-in/process-vlm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -664,6 +671,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
                     analysisType: photoConfig.vlmType,
                     base64Image: base64,
                     expectedPlate: vehicleRegistration,
+                    persistResultsOnly: true,
                   }),
                 })
                   .then(r => {
@@ -722,7 +730,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, hasLowVlmConfidence, requiredPhotos, vehicleId, vehicleRegistration, vlmResults, odometerWasOverridden, odometerVerifiedOverride]);
+  }, [canSubmit, formState, driverId, driverName, hasCriticalFailures, hasMinorFailures, hasLowVlmConfidence, requiredPhotos, vehicleId, vehicleRegistration, vlmResults, odometerWasOverridden, odometerVerifiedOverride, fuelWasOverridden]);
 
   // Reset form
   const reset = useCallback(() => {

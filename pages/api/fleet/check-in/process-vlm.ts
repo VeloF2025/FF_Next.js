@@ -32,6 +32,7 @@ interface ProcessVlmRequest {
   analysisType: VlmAnalysisType;
   base64Image: string;
   expectedPlate?: string; // For license plate verification
+  persistResultsOnly?: boolean; // When true, only save VLM results - skip fuel/odometer history recording
 }
 
 interface ProcessVlmResponse {
@@ -69,6 +70,7 @@ async function handler(
       analysisType,
       base64Image,
       expectedPlate,
+      persistResultsOnly,
     } = req.body as ProcessVlmRequest;
 
     // Validate required fields
@@ -136,9 +138,9 @@ async function handler(
           log.warn('FleetVlmApi', `ODO Extraction warning: ${extractionWarning}`);
         }
 
-        // Only record odometer reading if not in preview mode, extraction succeeded,
-        // and validation doesn't suggest rejection
-        if (!isPreviewMode && odometerResult.reading !== null) {
+        // Only record odometer reading if not in preview mode, not persist-only mode,
+        // extraction succeeded, and validation doesn't suggest rejection
+        if (!isPreviewMode && !persistResultsOnly && odometerResult.reading !== null) {
           if (validation.suggestedAction === 'reject') {
             log.warn('FleetVlmApi', `ODO rejected by validation: ${validation.warning}`);
             result.error = validation.warning || 'Reading failed validation';
@@ -183,8 +185,8 @@ async function handler(
           error: fuelResult.error,
         };
 
-        // Only record fuel level if not in preview mode and extraction succeeded
-        if (!isPreviewMode && fuelResult.level !== null) {
+        // Only record fuel level if not in preview mode, not persist-only mode, and extraction succeeded
+        if (!isPreviewMode && !persistResultsOnly && fuelResult.level !== null) {
           await recordFuelLevel({
             vehicleId,
             checkRecordId: recordId,
