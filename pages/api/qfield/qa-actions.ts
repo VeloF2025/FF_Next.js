@@ -12,6 +12,11 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { recordVlmCorrection } from '@/services/vlmLearningService';
+import {
+  sendRejectionNotification,
+  sendEscalationNotification,
+  sendAssignmentNotification,
+} from '@/modules/qfield-qa/services/qfieldNotificationService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -160,6 +165,17 @@ async function handler(
                 log.error('qfield-qa-actions', { validationId, error: correctionError }, 'Failed to record HITL correction');
               }
             }
+
+            // Send WhatsApp notification (fire-and-forget)
+            sendRejectionNotification({
+              validationId,
+              photoKey: previousValue.photo_key || '',
+              projectId: previousValue.project_id,
+              notes: notes || undefined,
+              sentBy: userId,
+            }).catch((err) => {
+              log.error('qfield-qa-actions', { validationId, error: err }, 'Failed to send rejection notification');
+            });
             break;
 
           case 'escalate':
@@ -174,6 +190,17 @@ async function handler(
               WHERE id = ${validationId}::uuid
             `;
             newValue = { escalation_level: newLevel, workflow_status: 'escalated' };
+
+            // Send WhatsApp notification (fire-and-forget)
+            sendEscalationNotification({
+              validationId,
+              photoKey: previousValue.photo_key || '',
+              projectId: previousValue.project_id,
+              notes: escalationReason || notes || undefined,
+              sentBy: userId,
+            }).catch((err) => {
+              log.error('qfield-qa-actions', { validationId, error: err }, 'Failed to send escalation notification');
+            });
             break;
 
           case 'assign':
