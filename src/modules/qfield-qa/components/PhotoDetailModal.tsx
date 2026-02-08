@@ -151,8 +151,14 @@ export function PhotoDetailModal({
             />
           )}
         </Box>
-        <IconButton onClick={onClose}>
-          <X className="w-5 h-5" />
+        <IconButton
+          onClick={onClose}
+          sx={{
+            color: 'rgb(156, 163, 175)',
+            '&:hover': { bgcolor: 'rgba(156, 163, 175, 0.1)', color: 'white' },
+          }}
+        >
+          <X className="w-6 h-6" />
         </IconButton>
       </DialogTitle>
 
@@ -210,37 +216,44 @@ export function PhotoDetailModal({
 
                 {confidence !== null ? (
                   <>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h3" fontWeight="bold" sx={{ color: getConfidenceColor(photo.vlm_confidence || 0) }}>
+                    {/* Clear PASS/FAIL Status */}
+                    <Box sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: photo.needs_retake ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)', border: `1px solid ${photo.needs_retake ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)'}` }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {photo.needs_retake ? (
+                            <XCircle className="w-5 h-5" style={{ color: '#ef4444' }} />
+                          ) : (
+                            <CheckCircle className="w-5 h-5" style={{ color: '#22c55e' }} />
+                          )}
+                          <Typography variant="subtitle1" fontWeight="bold" sx={{ color: photo.needs_retake ? '#ef4444' : '#22c55e' }}>
+                            {photo.needs_retake ? 'FAILED - Retake Required' : 'PASSED'}
+                          </Typography>
+                        </Box>
+                        <Typography variant="h5" fontWeight="bold" sx={{ color: getConfidenceColor(photo.vlm_confidence || 0, photo.needs_retake) }}>
                           {confidence}%
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'rgb(156, 163, 175)' }}>
-                          Confidence
-                        </Typography>
                       </Box>
+                    </Box>
+
+                    {/* Confidence Bar */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Typography variant="caption" sx={{ color: 'rgb(156, 163, 175)', minWidth: 70 }}>
+                        Confidence
+                      </Typography>
                       <Box sx={{ flex: 1 }}>
                         <LinearProgress
                           variant="determinate"
                           value={photo.vlm_confidence ? photo.vlm_confidence * 100 : 0}
                           sx={{
-                            height: 10,
-                            borderRadius: 5,
+                            height: 8,
+                            borderRadius: 4,
                             bgcolor: 'rgb(55, 65, 81)',
                             '& .MuiLinearProgress-bar': {
-                              bgcolor: getConfidenceColor(photo.vlm_confidence || 0),
+                              bgcolor: getConfidenceColor(photo.vlm_confidence || 0, photo.needs_retake),
                             },
                           }}
                         />
                       </Box>
-                      {photo.needs_retake && (
-                        <Chip
-                          label="Needs Retake"
-                          size="small"
-                          color="error"
-                          icon={<AlertTriangle className="w-3 h-3" />}
-                        />
-                      )}
                     </Box>
 
                     {photo.vlm_feedback && (
@@ -507,9 +520,14 @@ function InfoRow({
   );
 }
 
-function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.8) return '#22c55e';
-  if (confidence >= 0.6) return '#f97316';
+function getConfidenceColor(confidence: number, needsRetake?: boolean): string {
+  // If photo needs retake (failed), always show red/orange regardless of confidence
+  if (needsRetake) {
+    return confidence >= 0.8 ? '#ef4444' : '#f97316'; // High confidence fail = red, low confidence = orange
+  }
+  // If photo passed, show green
+  if (confidence >= 0.7) return '#22c55e';
+  if (confidence >= 0.5) return '#f97316';
   return '#ef4444';
 }
 
