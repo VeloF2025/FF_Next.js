@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Search,
   CheckCircle,
@@ -21,6 +21,8 @@ import {
   ChevronRight,
   Loader2,
   Zap,
+  UserPlus,
+  Calendar,
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus } from '../types';
@@ -57,11 +59,36 @@ export function PhotoListTab({
   onApprove,
   onReject,
   onRevalidate,
+  onAssign,
 }: PhotoListTabProps) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
   const [showBulkModal, setShowBulkModal] = useState<'approve' | 'reject' | null>(null);
   const [bulkNotes, setBulkNotes] = useState('');
+
+  // Assignment modal state
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignee, setAssignee] = useState('');
+  const [assignDueDate, setAssignDueDate] = useState('');
+  const [assignPriority, setAssignPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
+  const [assignNotes, setAssignNotes] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+
+  // Fetch available users for assignment
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const res = await fetch('/api/users?limit=100&active=true');
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableUsers(data.data || []);
+        }
+      } catch {
+        // Fallback to empty - assignment will still work with email input
+      }
+    }
+    fetchUsers();
+  }, []);
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
@@ -120,6 +147,32 @@ export function PhotoListTab({
   const confirmBulkAction = () => {
     if (showBulkModal) {
       handleBulkAction(showBulkModal, bulkNotes || undefined);
+    }
+  };
+
+  // Open assignment modal
+  const openAssignModal = () => {
+    setShowAssignModal(true);
+    setAssignee('');
+    setAssignDueDate('');
+    setAssignPriority('normal');
+    setAssignNotes('');
+  };
+
+  // Handle bulk assignment
+  const handleBulkAssign = async () => {
+    if (!assignee || selectedIds.length === 0) return;
+
+    setBulkActionLoading('assign');
+    try {
+      await onAssign(selectedIds, assignee, {
+        dueDate: assignDueDate || undefined,
+        priority: assignPriority,
+        notes: assignNotes || undefined,
+      });
+      setShowAssignModal(false);
+    } finally {
+      setBulkActionLoading(null);
     }
   };
 
@@ -259,6 +312,18 @@ export function PhotoListTab({
               Run AI
             </button>
             <button
+              onClick={openAssignModal}
+              disabled={bulkActionLoading !== null}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkActionLoading === 'assign' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4" />
+              )}
+              Assign
+            </button>
+            <button
               onClick={() => onSelectionChange([])}
               disabled={bulkActionLoading !== null}
               className="px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
@@ -318,6 +383,123 @@ export function PhotoListTab({
                       <XCircle className="w-4 h-4" />
                     )}
                     {showBulkModal === 'approve' ? 'Approve All' : 'Reject All'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
+              Assign {selectedIds.length} Photos
+            </h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              Assign selected photos to a reviewer for QA review.
+            </p>
+
+            {/* Assignee Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                Assign To *
+              </label>
+              {availableUsers.length > 0 ? (
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">Select reviewer...</option>
+                  {availableUsers.map((user) => (
+                    <option key={user.id} value={user.email || user.name}>
+                      {user.name} {user.email ? `(${user.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="email"
+                  placeholder="Enter reviewer email..."
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+              )}
+            </div>
+
+            {/* Due Date */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Due Date
+              </label>
+              <input
+                type="date"
+                value={assignDueDate}
+                onChange={(e) => setAssignDueDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+
+            {/* Priority */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                Priority
+              </label>
+              <select
+                value={assignPriority}
+                onChange={(e) => setAssignPriority(e.target.value as typeof assignPriority)}
+                className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              >
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+
+            {/* Notes */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                Notes
+              </label>
+              <textarea
+                placeholder="Add notes for the reviewer (optional)..."
+                value={assignNotes}
+                onChange={(e) => setAssignNotes(e.target.value)}
+                rows={2}
+                className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowAssignModal(false)}
+                disabled={bulkActionLoading !== null}
+                className="px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkAssign}
+                disabled={!assignee || bulkActionLoading !== null}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkActionLoading === 'assign' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" />
+                    Assign {selectedIds.length} Photos
                   </>
                 )}
               </button>
