@@ -289,6 +289,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const [customDate, setCustomDate] = useState<string>('');
   // Status filter — 'all' shows everything, otherwise filters by fix_status category
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  // Sub-status filter for Investigate tab (filter within needs_investigation records)
+  const [investigateSubFilter, setInvestigateSubFilter] = useState<string>('all');
 
   // Auto-detect status state
   const [autoDetectStatus, setAutoDetectStatus] = useState<{
@@ -529,6 +531,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     setBulkFixResult(null);
     setFixErrors({});
     setSelectedIds(new Set());
+    setInvestigateSubFilter('all');
 
     fetchStats();
     if (currentTab === 'pending') {
@@ -951,6 +954,30 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   const fixableRecords = records.filter((r) => r.olt_serial);
   const allSelected = fixableRecords.length > 0 && selectedIds.size === fixableRecords.length;
+
+  // Sub-filter counts and filtered records for Investigate tab
+  const investigateSubCounts = useMemo(() => {
+    if (currentTab !== 'investigate') return { needs_investigation: 0, not_found: 0, other: 0, total: records.length };
+    let ni = 0, nf = 0, other = 0;
+    for (const r of records) {
+      const s = r.fix_status || '';
+      if (s === 'needs_investigation' || s === 'needs_reinvestigation') ni++;
+      else if (s === 'not_found') nf++;
+      else other++;
+    }
+    return { needs_investigation: ni, not_found: nf, other, total: records.length };
+  }, [currentTab, records]);
+
+  const displayRecords = useMemo(() => {
+    if (currentTab !== 'investigate' || investigateSubFilter === 'all') return records;
+    if (investigateSubFilter === 'needs_investigation') {
+      return records.filter(r => r.fix_status === 'needs_investigation' || r.fix_status === 'needs_reinvestigation');
+    }
+    if (investigateSubFilter === 'not_found') {
+      return records.filter(r => r.fix_status === 'not_found');
+    }
+    return records;
+  }, [currentTab, investigateSubFilter, records]);
 
   // Show loading state while permissions are being resolved
   if (permissionsLoading) {
@@ -1492,6 +1519,30 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
             </div>
           )}
 
+          {/* Investigate sub-status filter */}
+          {currentTab === 'investigate' && records.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
+              <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
+              {([
+                { key: 'all', label: 'All', count: investigateSubCounts.total },
+                { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.needs_investigation },
+                { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
+              ] as const).map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => setInvestigateSubFilter(key)}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    investigateSubFilter === key
+                      ? 'bg-[var(--ff-accent)] text-white border-[var(--ff-accent)]'
+                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:border-[var(--ff-accent)]'
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-[var(--ff-accent)]" />
@@ -1538,7 +1589,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((record) => (
+                  {displayRecords.map((record) => (
                     <React.Fragment key={record.id}>
                     <tr
                       className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${
