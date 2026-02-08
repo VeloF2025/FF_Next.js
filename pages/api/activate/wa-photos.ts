@@ -7,7 +7,7 @@
  */
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/db';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';

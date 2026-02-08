@@ -591,7 +591,6 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       fetchReportData();
       fetchDisplacedReport();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab, page, fetchStats, fetchRecords, fetchImports, fetchReportData, fetchDisplacedReport]);
 
   // Re-fetch investigate records when sub-filter changes

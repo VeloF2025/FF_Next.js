@@ -25,7 +25,7 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { log } from '@/lib/logger';
-import { sql } from '@/lib/db';
+import { sql } from '@/lib/neon';
 import {
   computeAndPersistVerification,
   type SerialVerificationResult,

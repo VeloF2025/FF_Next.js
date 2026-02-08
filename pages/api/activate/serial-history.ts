@@ -13,7 +13,7 @@ import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSerialHistory } from '@/modules/activate/services/activityLogService';
-import { sql } from '@/lib/db';
+import { sql } from '@/lib/neon';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
