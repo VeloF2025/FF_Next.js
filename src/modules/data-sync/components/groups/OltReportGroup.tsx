@@ -479,21 +479,33 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   }, []);
 
-  // Export CSV
+  // Export CSV — routes to correct API based on active report view
   const handleExportCSV = async () => {
     setExporting(true);
     try {
-      const res = await fetch(
-        `/api/system/olt-report/reporting?period=${reportPeriod}&status=${reportStatusFilter}&format=csv`
-      );
+      let exportUrl: string;
+      let downloadName: string;
+      const today = new Date().toISOString().split('T')[0];
+
+      if (reportView === 'imports') {
+        exportUrl = `/api/system/olt-report/reporting?period=${reportPeriod}&view=imports&format=csv`;
+        downloadName = `olt-imports-${reportPeriod}-${today}.csv`;
+      } else if (reportView === 'displaced') {
+        exportUrl = `/api/system/olt-report/displaced-report?format=csv`;
+        downloadName = `olt-displaced-onts-${today}.csv`;
+      } else {
+        const statusLabel = reportStatusFilter === 'all' ? 'all-records' : reportStatusFilter.replace(/_/g, '-');
+        exportUrl = `/api/system/olt-report/reporting?period=${reportPeriod}&status=${reportStatusFilter}&format=csv`;
+        downloadName = `olt-report-${statusLabel}-${reportPeriod}-${today}.csv`;
+      }
+
+      const res = await fetch(exportUrl);
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        // Build descriptive filename matching the current filter
-        const statusLabel = reportStatusFilter === 'all' ? 'all-records' : reportStatusFilter.replace(/_/g, '-');
-        a.download = `olt-report-${statusLabel}-${reportPeriod}-${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = downloadName;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -2209,14 +2221,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
               onClick={handleExportCSV}
               disabled={exporting || !reportData}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-              title={`Export ${reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
+              title={`Export ${reportView === 'displaced' ? 'displaced ONTs' : reportView === 'imports' ? 'imports' : reportStatusFilter === 'all' ? 'all records' : reportStatusFilter.replace(/_/g, ' ')} to CSV`}
             >
               {exporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
-              Export {reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
+              Export {reportView === 'displaced' ? 'Displaced' : reportView === 'imports' ? 'Imports' : reportStatusFilter === 'all' ? 'All' : reportStatusFilter.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} CSV
             </button>
           </div>
 

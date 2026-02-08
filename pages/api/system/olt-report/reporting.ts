@@ -7,21 +7,19 @@
  * - period: 'today' | 'yesterday' | 'week' | '30days' | 'all' (default: 'all')
  * - format: 'json' | 'csv' (default: 'json')
  * - status: 'all' | 'fixed' | 'pending' | 'empty_serial' | 'not_found' (default: 'all')
+ * - view: 'records' | 'imports' (default: 'records') — which data to export as CSV
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
  */
 
+import pool from '@/lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 type Period = 'today' | 'yesterday' | 'week' | '30days' | 'all';
 
@@ -64,6 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const period = (req.query.period as Period) || 'all';
     const format = (req.query.format as string) || 'json';
     const statusFilter = (req.query.status as string) || 'all';
+    const view = (req.query.view as string) || 'records';
     const { start, end } = getDateRange(period);
 
     // Build date condition
@@ -153,15 +152,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // CSV Export
     if (format === 'csv') {
-      // Filter records based on status filter
-      const filteredRecords = statusFilter === 'all'
-        ? records
-        : records.filter(r => r.fix_status === statusFilter);
-
       // Helper to safely escape CSV values
       const escapeCSV = (val: unknown): string => {
         const str = String(val ?? '');
-        // Escape quotes by doubling them
         return `"${str.replace(/"/g, '""')}"`;
       };
 
@@ -174,6 +167,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return '';
         }
       };
+
+      if (view === 'imports') {
+        // Imports CSV
+        const imports = importsResult.rows;
+        const csvRows = [
+          ['Filename', 'Project', 'Total Records', 'Mismatches', 'Fixed', 'Pending', 'Imported At'].join(','),
+          ...imports.map(i => [
+            escapeCSV(i.filename),
+            escapeCSV(i.project),
+            escapeCSV(i.total_records),
+            escapeCSV(i.mismatch_count),
+            escapeCSV(i.fixed_count),
+            escapeCSV(i.pending_count),
+            escapeCSV(formatDate(i.imported_at)),
+          ].join(','))
+        ].join('\n');
+
+        const filename = `olt-imports-${period}-${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        return res.send(csvRows);
+      }
+
+      // Records CSV (default)
+      const filteredRecords = statusFilter === 'all'
+        ? records
+        : records.filter(r => r.fix_status === statusFilter);
 
       const csvRows = [
         ['DR Number', 'ONT Serial (Correct)', '1Map Serial (Wrong)', 'Status', 'Old Value', 'Fixed At', 'Source', 'Import File', 'Project', 'Imported At', 'Fixed By'].join(','),

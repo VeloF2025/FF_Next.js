@@ -6,20 +6,18 @@
  *
  * Query params:
  * - filter: 'all' | 'unactivated' | 'activated' (default: 'all')
+ * - format: 'json' | 'csv' (default: 'json')
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
  */
 
+import pool from '@/lib/db';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -27,6 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const filter = (req.query.filter as string) || 'all';
+  const format = (req.query.format as string) || 'json';
 
   const client = await pool.connect();
   try {
@@ -64,6 +63,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `);
 
     const summary = counts.rows[0];
+
+    // CSV Export
+    if (format === 'csv') {
+      const escapeCSV = (val: unknown): string => {
+        const str = String(val ?? '');
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+      const classifySerial = (serial: string): string => {
+        const s = (serial || '').toUpperCase();
+        if (/^ALCL|^HWTC/.test(s)) return 'ONT';
+        if (s.startsWith('GU18')) return 'UPS';
+        return 'Invalid';
+      };
+
+      const csvRows = [
+        ['DR Number', 'Displaced Serial', 'Type', 'OES Status', 'Owner DR', 'Owner Team', 'Replaced With', 'Fixed On'].join(','),
+        ...result.rows.map(r => [
+          escapeCSV(r.drop_number),
+          escapeCSV(r.displaced_serial),
+          escapeCSV(classifySerial(r.displaced_serial)),
+          escapeCSV(r.displaced_activated ? 'Activated' : 'Unactivated'),
+          escapeCSV(r.displaced_owner_dr),
+          escapeCSV(r.displaced_owner_team),
+          escapeCSV(r.new_value),
+          escapeCSV(r.created_at ? new Date(r.created_at).toISOString() : ''),
+        ].join(','))
+      ].join('\n');
+
+      const filterLabel = filter === 'all' ? 'all' : filter;
+      const filename = `olt-displaced-onts-${filterLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+      return res.send(csvRows);
+    }
 
     return apiResponse.success(res, {
       total: parseInt(summary.total),
