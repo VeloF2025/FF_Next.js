@@ -122,11 +122,32 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
   }, [fetchValidations]);
 
   // Trigger validation
-  const triggerValidation = useCallback(async (validationIds: string[]) => {
+  const triggerValidation = useCallback(async (validationIds: string[]): Promise<{
+    mode?: 'background' | 'sync';
+    queued?: number;
+    success?: number;
+    failed?: number;
+    total: number;
+    message?: string;
+  }> => {
     try {
       const result = await qfieldQaApiService.triggerValidation({ validationIds });
-      await fetchValidations(false);
-      return result;
+      // Refresh data after a short delay for background mode
+      const data = result.data as { mode?: string; queued?: number; success?: number; failed?: number; total?: number; message?: string };
+      if (data.mode === 'background') {
+        // For background processing, refresh after a delay to show "validating" status
+        setTimeout(() => fetchValidations(false), 1000);
+      } else {
+        await fetchValidations(false);
+      }
+      return {
+        mode: data.mode as 'background' | 'sync' | undefined,
+        queued: data.queued,
+        success: data.success,
+        failed: data.failed,
+        total: data.total || validationIds.length,
+        message: data.message,
+      };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Validation failed');
       throw err;

@@ -142,13 +142,28 @@ export function QFieldQaDashboard() {
     }
   };
 
+  // State for validation feedback
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+
   // Handle re-validate
   const handleRevalidate = async (ids: string[]) => {
     try {
-      await triggerValidation(ids);
+      const result = await triggerValidation(ids);
       setSelectedIds([]);
+
+      // Show feedback based on processing mode
+      if (result.mode === 'background') {
+        setValidationMessage(`Queued ${result.total} photos for AI validation. Results will appear as they complete.`);
+        // Auto-clear message after 10 seconds
+        setTimeout(() => setValidationMessage(null), 10000);
+      } else if (result.success !== undefined) {
+        setValidationMessage(`Validated ${result.success}/${result.total} photos`);
+        setTimeout(() => setValidationMessage(null), 5000);
+      }
     } catch (err) {
       log.error('QFieldQaDashboard', { action: 'revalidate', error: err }, 'Revalidate failed');
+      setValidationMessage('Validation failed. Please try again.');
+      setTimeout(() => setValidationMessage(null), 5000);
     }
   };
 
@@ -277,6 +292,20 @@ export function QFieldQaDashboard() {
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <p className="text-sm text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Validation Status Banner */}
+      {validationMessage && (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 flex items-center gap-3">
+          <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+          <p className="text-sm text-blue-400">{validationMessage}</p>
+          <button
+            onClick={() => setValidationMessage(null)}
+            className="ml-auto text-blue-400 hover:text-blue-300"
+          >
+            ✕
+          </button>
         </div>
       )}
 

@@ -4,6 +4,9 @@
  *
  * Calls the VLM service on Velocity to validate QField photos
  * against FiberTime standards and stores results.
+ *
+ * For bulk validation (>5 photos), processing runs in the background
+ * and returns immediately with a queued status.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,6 +24,10 @@ const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
 const VLM_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
 const VLM_TIMEOUT_MS = 60000; // 60 seconds
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
+
+// Batch processing settings
+const BATCH_THRESHOLD = 5; // Process in background if more than this many
+const CONCURRENT_VALIDATIONS = 3; // Process this many photos at once
 
 // Work type prompts for VLM validation
 const VALIDATION_PROMPTS: Record<string, string> = {
@@ -83,16 +90,16 @@ async function handler(
     }> = [];
 
     // Get validations to process
-    let validations;
+    let validations: Array<{ id: string; photo_key: string; work_type: string; project_id: string }> = [];
     if (validationIds?.length) {
-      validations = await sql`
+      const rows = await sql`
         SELECT id, photo_key, work_type, project_id
         FROM qfield_photo_validations
         WHERE id = ANY(${validationIds}::uuid[])
       `;
+      validations = rows as typeof validations;
     } else if (photoKeys?.length) {
       // Create new validation records for photo keys
-      validations = [];
       for (const key of photoKeys) {
         const existing = await sql`
           SELECT id, photo_key, work_type, project_id
@@ -101,7 +108,7 @@ async function handler(
           LIMIT 1
         `;
         if (existing.length > 0) {
-          validations.push(existing[0]);
+          validations.push(existing[0] as typeof validations[0]);
         } else {
           // Create new record
           const created = await sql`
@@ -116,70 +123,48 @@ async function handler(
             )
             RETURNING id, photo_key, work_type, project_id
           `;
-          validations.push(created[0]);
+          validations.push(created[0] as typeof validations[0]);
         }
       }
     }
 
-    // Process each validation
-    for (const validation of validations || []) {
-      try {
-        const vlmResult = await validatePhoto(
-          validation.photo_key,
-          validation.work_type || workType || 'pole_installation'
-        );
+    // For bulk validation, process in background and return immediately
+    if (validations.length > BATCH_THRESHOLD) {
+      log.info('qfield-qa-validate', { count: validations.length }, 'Starting background validation');
 
-        // Update validation record
-        const needsRetake = vlmResult.confidence < 0.6;
-        await sql`
-          UPDATE qfield_photo_validations
-          SET
-            vlm_confidence = ${vlmResult.confidence},
-            vlm_feedback = ${vlmResult.feedback},
-            vlm_raw_response = ${JSON.stringify(vlmResult)}::jsonb,
-            needs_retake = ${needsRetake},
-            validated_at = NOW(),
-            workflow_status = CASE
-              WHEN ${needsRetake} THEN 'pending'
-              ELSE workflow_status
-            END
-          WHERE id = ${validation.id}::uuid
-        `;
+      // Mark all as "validating" in DB
+      const ids = validations.map(v => v.id);
+      await sql`
+        UPDATE qfield_photo_validations
+        SET workflow_status = 'validating'
+        WHERE id = ANY(${ids}::uuid[])
+      `;
 
-        results.push({
-          id: validation.id,
-          photo_key: validation.photo_key,
-          success: true,
-          confidence: vlmResult.confidence,
-          feedback: vlmResult.feedback,
-        });
+      // Process in background (fire-and-forget)
+      processValidationsInBackground(validations, workType).catch(err => {
+        log.error('qfield-qa-validate', { error: err }, 'Background validation failed');
+      });
 
-        log.debug('qfield-qa-validate', {
-          id: validation.id,
-          confidence: vlmResult.confidence,
-          needsRetake,
-        }, 'Validation completed');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        results.push({
-          id: validation.id,
-          photo_key: validation.photo_key,
-          success: false,
-          error: errorMessage,
-        });
-        log.error('qfield-qa-validate', { id: validation.id, error: errorMessage }, 'Validation failed');
-      }
+      return apiResponse.success(res, {
+        total: validations.length,
+        queued: validations.length,
+        mode: 'background',
+        message: 'Validation started in background. Refresh to see results.',
+      }, `Queued ${validations.length} photos for validation`);
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failCount = results.length - successCount;
+    // For small batches, process synchronously with concurrency
+    const processedResults = await processValidationsConcurrently(validations, workType, CONCURRENT_VALIDATIONS);
+
+    const successCount = processedResults.filter(r => r.success).length;
+    const failCount = processedResults.length - successCount;
 
     return apiResponse.success(res, {
-      total: results.length,
+      total: processedResults.length,
       success: successCount,
       failed: failCount,
-      results,
-    }, `Validated ${successCount}/${results.length} photos`);
+      results: processedResults,
+    }, `Validated ${successCount}/${processedResults.length} photos`);
   } catch (error) {
     log.error('qfield-qa-validate', error instanceof Error ? { message: error.message } : { error }, 'Handler error');
     return apiResponse.internalError(res, error);
@@ -292,6 +277,157 @@ async function validatePhoto(photoKey: string, workType: string): Promise<VLMRes
   }
 
   return vlmData;
+}
+
+/**
+ * Process a single validation and update DB
+ */
+async function processOneValidation(
+  validation: { id: string; photo_key: string; work_type: string; project_id: string },
+  workType?: string
+): Promise<{
+  id: string;
+  photo_key: string;
+  success: boolean;
+  confidence?: number;
+  feedback?: string;
+  error?: string;
+}> {
+  try {
+    const vlmResult = await validatePhoto(
+      validation.photo_key,
+      validation.work_type || workType || 'pole_installation'
+    );
+
+    // Update validation record
+    const needsRetake = !vlmResult.valid || vlmResult.confidence < 0.6;
+    await sql`
+      UPDATE qfield_photo_validations
+      SET
+        vlm_confidence = ${vlmResult.confidence},
+        vlm_feedback = ${vlmResult.feedback},
+        vlm_raw_response = ${JSON.stringify(vlmResult)}::jsonb,
+        needs_retake = ${needsRetake},
+        validated_at = NOW(),
+        workflow_status = 'pending'
+      WHERE id = ${validation.id}::uuid
+    `;
+
+    log.debug('qfield-qa-validate', {
+      id: validation.id,
+      confidence: vlmResult.confidence,
+      needsRetake,
+    }, 'Validation completed');
+
+    return {
+      id: validation.id,
+      photo_key: validation.photo_key,
+      success: true,
+      confidence: vlmResult.confidence,
+      feedback: vlmResult.feedback,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Update record with error
+    await sql`
+      UPDATE qfield_photo_validations
+      SET
+        workflow_status = 'pending',
+        vlm_feedback = ${'Validation error: ' + errorMessage}
+      WHERE id = ${validation.id}::uuid
+    `.catch(() => {}); // Ignore DB errors here
+
+    log.error('qfield-qa-validate', { id: validation.id, error: errorMessage }, 'Validation failed');
+
+    return {
+      id: validation.id,
+      photo_key: validation.photo_key,
+      success: false,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * Process validations with concurrency limit (for small batches)
+ */
+async function processValidationsConcurrently(
+  validations: Array<{ id: string; photo_key: string; work_type: string; project_id: string }>,
+  workType?: string,
+  concurrency = 3
+): Promise<Array<{
+  id: string;
+  photo_key: string;
+  success: boolean;
+  confidence?: number;
+  feedback?: string;
+  error?: string;
+}>> {
+  const results: Array<{
+    id: string;
+    photo_key: string;
+    success: boolean;
+    confidence?: number;
+    feedback?: string;
+    error?: string;
+  }> = [];
+
+  // Process in chunks
+  for (let i = 0; i < validations.length; i += concurrency) {
+    const chunk = validations.slice(i, i + concurrency);
+    const chunkResults = await Promise.all(
+      chunk.map(v => processOneValidation(v, workType))
+    );
+    results.push(...chunkResults);
+  }
+
+  return results;
+}
+
+/**
+ * Process validations in background (fire-and-forget)
+ */
+async function processValidationsInBackground(
+  validations: Array<{ id: string; photo_key: string; work_type: string; project_id: string }>,
+  workType?: string
+): Promise<void> {
+  const startTime = Date.now();
+  let successCount = 0;
+  let failCount = 0;
+
+  log.info('qfield-qa-validate', { total: validations.length }, 'Background validation started');
+
+  // Process with concurrency
+  for (let i = 0; i < validations.length; i += CONCURRENT_VALIDATIONS) {
+    const chunk = validations.slice(i, i + CONCURRENT_VALIDATIONS);
+    const chunkResults = await Promise.all(
+      chunk.map(v => processOneValidation(v, workType))
+    );
+
+    for (const r of chunkResults) {
+      if (r.success) successCount++;
+      else failCount++;
+    }
+
+    // Log progress every 10 photos
+    if ((i + chunk.length) % 10 === 0 || i + chunk.length === validations.length) {
+      log.info('qfield-qa-validate', {
+        processed: i + chunk.length,
+        total: validations.length,
+        success: successCount,
+        failed: failCount,
+      }, 'Background validation progress');
+    }
+  }
+
+  const duration = Math.round((Date.now() - startTime) / 1000);
+  log.info('qfield-qa-validate', {
+    total: validations.length,
+    success: successCount,
+    failed: failCount,
+    durationSeconds: duration,
+  }, 'Background validation completed');
 }
 
 export default withAuth(handler);
