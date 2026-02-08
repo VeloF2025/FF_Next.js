@@ -97,6 +97,8 @@ interface OltRecord {
   onemap_fix_old_value?: string | null;
   onemap_fix_at?: string | null;
   fix_status?: string;
+  fix_attempted_at?: string | null;
+  created_at?: string | null;
   fix_result?: string | null;
   fix_old_value?: string | null;
   investigation_context?: string | null;
@@ -285,6 +287,8 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   // Date filter state for stats cards and history
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [customDate, setCustomDate] = useState<string>('');
+  // Status filter — 'all' shows everything, otherwise filters by fix_status category
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Auto-detect status state
   const [autoDetectStatus, setAutoDetectStatus] = useState<{
@@ -390,7 +394,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     [page]
   );
 
-  // Fetch imports history + recent fixes (with date filter)
+  // Fetch imports history + recent fixes (with date + status filter)
   const fetchImports = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -399,7 +403,9 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       if (range.dateFrom) dateParams.set('dateFrom', range.dateFrom);
       if (range.dateTo) dateParams.set('dateTo', range.dateTo);
       const dateQs = dateParams.toString();
-      const fixUrl = `/api/system/olt-report/records?status=fixed&page=1&pageSize=200${dateQs ? `&${dateQs}` : ''}`;
+      // Map statusFilter to API status param
+      const apiStatus = statusFilter === 'all' ? 'all' : statusFilter;
+      const fixUrl = `/api/system/olt-report/records?status=${apiStatus}&page=1&pageSize=200${dateQs ? `&${dateQs}` : ''}`;
 
       const [importsRes, fixesRes] = await Promise.all([
         fetch('/api/system/olt-report/imports'),
@@ -420,7 +426,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [dateFilter, customDate]);
+  }, [dateFilter, customDate, statusFilter]);
 
   // Fetch reporting data
   const fetchReportData = useCallback(async () => {
@@ -1012,32 +1018,29 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         />
       </div>
 
-      {/* Stats Bar */}
+      {/* Stats Bar — clickable cards filter history by status */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.pending}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Pending Fixes</div>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-amber-400">{stats.needs_investigation}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Needs Investigation</div>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-red-400">{stats.escalated}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Escalated</div>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-green-400">{stats.fixed}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Fixed</div>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-blue-400">{stats.resolved}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Resolved</div>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-          <div className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.total}</div>
-          <div className="text-sm text-[var(--ff-text-secondary)]">Total Records</div>
-        </div>
+        {([
+          { key: 'pending', label: 'Pending Fixes', value: stats.pending, color: 'text-[var(--ff-text-primary)]', ring: 'ring-[var(--ff-accent)]' },
+          { key: 'needs_investigation', label: 'Needs Investigation', value: stats.needs_investigation, color: 'text-amber-400', ring: 'ring-amber-400' },
+          { key: 'escalated', label: 'Escalated', value: stats.escalated, color: 'text-red-400', ring: 'ring-red-400' },
+          { key: 'fixed', label: 'Fixed', value: stats.fixed, color: 'text-green-400', ring: 'ring-green-400' },
+          { key: 'resolved', label: 'Resolved', value: stats.resolved, color: 'text-blue-400', ring: 'ring-blue-400' },
+          { key: 'all', label: 'Total Records', value: stats.total, color: 'text-[var(--ff-text-primary)]', ring: 'ring-[var(--ff-accent)]' },
+        ] as const).map(({ key, label, value, color, ring }) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(statusFilter === key ? 'all' : key)}
+            className={`bg-[var(--ff-bg-secondary)] rounded-lg p-4 border text-left transition-all cursor-pointer ${
+              statusFilter === key
+                ? `border-transparent ring-2 ${ring}`
+                : 'border-[var(--ff-border-light)] hover:border-[var(--ff-text-tertiary)]'
+            }`}
+          >
+            <div className={`text-2xl font-bold ${color}`}>{value}</div>
+            <div className="text-sm text-[var(--ff-text-secondary)]">{label}</div>
+          </button>
+        ))}
       </div>
 
       {/* Background Process Status Banner - visible on ALL tabs */}
@@ -1891,12 +1894,13 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
             <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
               <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">
-                Fixes {dateFilter !== 'all' ? `(${fixHistory.length} of ${total})` : `(${total})`}
+                {statusFilter === 'all' ? 'All Records' : statusFilter === 'fixed' ? 'Fixes' : statusFilter === 'pending' ? 'Pending' : statusFilter === 'needs_investigation' ? 'Investigate' : statusFilter === 'escalated' ? 'Escalated' : statusFilter === 'resolved' ? 'Resolved' : 'Records'}{' '}
+                {fixHistory.length < total ? `(${fixHistory.length} of ${total})` : `(${total})`}
               </h3>
             </div>
             {fixHistory.length === 0 ? (
               <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
-                No fixes recorded yet
+                No records found for this filter
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1909,14 +1913,19 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                       <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
                         OLT Serial
                       </th>
+                      {statusFilter !== 'fixed' && (
+                        <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
+                          Status
+                        </th>
+                      )}
                       <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Result
+                        {statusFilter === 'fixed' ? 'Result' : '1Map Serial'}
                       </th>
                       <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Old Value
+                        {statusFilter === 'fixed' ? 'Old Value' : 'Details'}
                       </th>
                       <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">
-                        Fixed At
+                        Date
                       </th>
                     </tr>
                   </thead>
@@ -1927,6 +1936,18 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                         const parsed = record.fix_old_value ? JSON.parse(record.fix_old_value) : null;
                         oldVal = parsed?.ont_old || '-';
                       } catch { oldVal = record.fix_old_value || '-'; }
+
+                      const statusBadge = (() => {
+                        const s = record.fix_status || 'pending';
+                        if (s === 'fixed') return { cls: 'bg-green-500/20 text-green-400', text: 'fixed' };
+                        if (s === 'pending') return { cls: 'bg-amber-500/20 text-amber-400', text: 'pending' };
+                        if (s === 'needs_investigation') return { cls: 'bg-orange-500/20 text-orange-400', text: 'investigate' };
+                        if (s === 'not_found') return { cls: 'bg-red-500/20 text-red-400', text: 'not found' };
+                        if (s === 'escalated') return { cls: 'bg-red-500/20 text-red-400', text: 'escalated' };
+                        if (s === 'resolved') return { cls: 'bg-blue-500/20 text-blue-400', text: 'resolved' };
+                        return { cls: 'bg-gray-500/20 text-gray-400', text: s };
+                      })();
+
                       return (
                         <tr
                           key={record.id}
@@ -1938,23 +1959,34 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                           <td className="py-3 px-4 text-green-400 font-mono text-xs">
                             {record.olt_serial || '-'}
                           </td>
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-0.5 rounded text-xs ${
-                              record.fix_result === 'success'
-                                ? 'bg-green-500/20 text-green-400'
-                                : record.fix_result === 'already_correct'
-                                ? 'bg-blue-500/20 text-blue-400'
-                                : 'bg-amber-500/20 text-amber-400'
-                            }`}>
-                              {record.fix_result === 'already_correct' ? 'verified' : record.fix_result || 'fixed'}
-                            </span>
+                          {statusFilter !== 'fixed' && (
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded text-xs ${statusBadge.cls}`}>
+                                {statusBadge.text}
+                              </span>
+                            </td>
+                          )}
+                          <td className="py-3 px-4 font-mono text-xs">
+                            {statusFilter === 'fixed' ? (
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                record.fix_result === 'success'
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : record.fix_result === 'already_correct'
+                                  ? 'bg-blue-500/20 text-blue-400'
+                                  : 'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {record.fix_result === 'already_correct' ? 'verified' : record.fix_result || 'fixed'}
+                              </span>
+                            ) : (
+                              <span className="text-red-400">{record.wrong_onemap_serial || '-'}</span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-red-400 font-mono text-xs">
-                            {oldVal}
+                            {statusFilter === 'fixed' ? oldVal : (record.wrong_onemap_serial && record.wrong_onemap_serial !== record.olt_serial ? `Wrong: ${record.wrong_onemap_serial}` : '-')}
                           </td>
                           <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                            {record.fix_attempted_at
-                              ? new Date(record.fix_attempted_at).toLocaleString()
+                            {(record.fix_attempted_at || record.created_at)
+                              ? new Date(record.fix_attempted_at || record.created_at || '').toLocaleString()
                               : '-'}
                           </td>
                         </tr>
