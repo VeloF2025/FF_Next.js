@@ -7,6 +7,8 @@
  * - status: pending | needs_investigation | fixed | escalated | all
  * - page: page number (default 1)
  * - pageSize: records per page (default 50, max 100)
+ * - dateFrom: ISO date string (filter by date range)
+ * - dateTo: ISO date string (filter by date range)
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -30,6 +32,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const status = String(req.query.status || 'pending');
     const source = req.query.source ? String(req.query.source) : null;
+    const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
+    const dateTo = req.query.dateTo ? String(req.query.dateTo) : null;
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '50'), 10)));
     const offset = (page - 1) * pageSize;
@@ -41,7 +45,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (status === 'pending') {
       whereClause = "WHERE r.fix_status = 'pending' AND r.olt_serial IS NOT NULL";
     } else if (status === 'needs_investigation') {
-      whereClause = "WHERE r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR r.olt_serial IS NULL";
+      whereClause = "WHERE (r.fix_status IN ('not_found', 'needs_investigation', 'needs_reinvestigation', 'empty_serial') OR r.olt_serial IS NULL)";
     } else if (status === 'fixed') {
       whereClause = "WHERE r.fix_status = 'fixed'";
     } else if (status === 'escalated') {
@@ -59,6 +63,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       whereClause = whereClause
         ? `${whereClause} AND ${sourceCondition}`
         : `WHERE ${sourceCondition}`;
+    }
+
+    // Optional date range filter
+    if (dateFrom) {
+      params.push(dateFrom);
+      const cond = `COALESCE(r.fix_attempted_at, r.created_at) >= $${params.length}::timestamptz`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      const cond = `COALESCE(r.fix_attempted_at, r.created_at) < $${params.length}::timestamptz`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
     }
 
     // Get total count

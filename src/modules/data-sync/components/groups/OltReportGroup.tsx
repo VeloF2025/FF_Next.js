@@ -50,6 +50,36 @@ const TABS: { id: OltTabId; label: string; icon: React.ElementType; permissionKe
 ];
 
 type ReportPeriod = 'today' | 'yesterday' | 'week' | '30days' | 'all';
+type DateFilter = 'today' | 'yesterday' | '7d' | '30d' | 'all' | 'custom';
+
+function getDateRange(filter: DateFilter, customDate?: string): { dateFrom?: string; dateTo?: string } {
+  if (filter === 'all') return {};
+  const now = new Date();
+  if (filter === 'custom' && customDate) {
+    const d = new Date(customDate);
+    const next = new Date(d);
+    next.setDate(next.getDate() + 1);
+    return { dateFrom: d.toISOString(), dateTo: next.toISOString() };
+  }
+  if (filter === 'today') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { dateFrom: start.toISOString() };
+  }
+  if (filter === 'yesterday') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
+  }
+  if (filter === '7d') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    return { dateFrom: start.toISOString() };
+  }
+  if (filter === '30d') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
+    return { dateFrom: start.toISOString() };
+  }
+  return {};
+}
 
 interface OltRecord {
   id: string;
@@ -252,6 +282,10 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   const [reportLoading, setReportLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Date filter state for stats cards and history
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [customDate, setCustomDate] = useState<string>('');
+
   // Auto-detect status state
   const [autoDetectStatus, setAutoDetectStatus] = useState<{
     hasRun: boolean;
@@ -313,10 +347,15 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     fetchAdminUsers();
   }, []);
 
-  // Fetch stats
+  // Fetch stats (with optional date filter)
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/system/olt-report/stats');
+      const range = getDateRange(dateFilter, customDate);
+      const params = new URLSearchParams();
+      if (range.dateFrom) params.set('dateFrom', range.dateFrom);
+      if (range.dateTo) params.set('dateTo', range.dateTo);
+      const qs = params.toString();
+      const res = await fetch(`/api/system/olt-report/stats${qs ? `?${qs}` : ''}`);
       if (res.ok) {
         const data = await res.json();
         setStats(data.data || data);
@@ -324,7 +363,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     } catch {
       // Silently fail
     }
-  }, []);
+  }, [dateFilter, customDate]);
 
   // Fetch records based on tab
   const fetchRecords = useCallback(
@@ -351,13 +390,20 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     [page]
   );
 
-  // Fetch imports history + recent fixes
+  // Fetch imports history + recent fixes (with date filter)
   const fetchImports = useCallback(async () => {
     setIsLoading(true);
     try {
+      const range = getDateRange(dateFilter, customDate);
+      const dateParams = new URLSearchParams();
+      if (range.dateFrom) dateParams.set('dateFrom', range.dateFrom);
+      if (range.dateTo) dateParams.set('dateTo', range.dateTo);
+      const dateQs = dateParams.toString();
+      const fixUrl = `/api/system/olt-report/records?status=fixed&page=1&pageSize=200${dateQs ? `&${dateQs}` : ''}`;
+
       const [importsRes, fixesRes] = await Promise.all([
         fetch('/api/system/olt-report/imports'),
-        fetch('/api/system/olt-report/records?status=fixed&page=1&pageSize=50'),
+        fetch(fixUrl),
       ]);
       if (importsRes.ok) {
         const data = await importsRes.json();
@@ -367,13 +413,14 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
         const data = await fixesRes.json();
         const fixedRecords = data.data?.records || data.records || [];
         setFixHistory(fixedRecords);
+        setTotal(data.data?.total || data.total || 0);
       }
     } catch {
       // Silently fail
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dateFilter, customDate]);
 
   // Fetch reporting data
   const fetchReportData = useCallback(async () => {
@@ -928,6 +975,43 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
   return (
     <div className="space-y-6">
+      {/* Date Filter Bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-[var(--ff-text-secondary)] mr-1">
+          <Calendar className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+          Period:
+        </span>
+        {([
+          { key: 'today', label: 'Today' },
+          { key: 'yesterday', label: 'Yesterday' },
+          { key: '7d', label: '7 Days' },
+          { key: '30d', label: '30 Days' },
+          { key: 'all', label: 'All' },
+        ] as const).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => { setDateFilter(key); setCustomDate(''); }}
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+              dateFilter === key
+                ? 'bg-[var(--ff-accent)] text-white border-[var(--ff-accent)]'
+                : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:border-[var(--ff-accent)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={customDate}
+          onChange={(e) => {
+            setCustomDate(e.target.value);
+            if (e.target.value) setDateFilter('custom');
+          }}
+          className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
+          title="Pick a specific date"
+        />
+      </div>
+
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
@@ -1807,7 +1891,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
             <div className="px-5 py-3 border-b border-[var(--ff-border-light)]">
               <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">
-                Recent Fixes ({fixHistory.length})
+                Fixes {dateFilter !== 'all' ? `(${fixHistory.length} of ${total})` : `(${total})`}
               </h3>
             </div>
             {fixHistory.length === 0 ? (

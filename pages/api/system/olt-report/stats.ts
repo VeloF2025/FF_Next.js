@@ -2,6 +2,9 @@
  * OLT Report Stats API
  *
  * GET: Return counts by fix_status for OLT mismatch records
+ * Optional query params:
+ * - dateFrom: ISO date string (filter records created/fixed after this date)
+ * - dateTo: ISO date string (filter records created/fixed before this date)
  *
  * Status: WORKING
  * NLNH Confidence: HIGH
@@ -33,9 +36,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Get counts with more nuanced grouping
-    // "Pending/Fixable" = only 'pending' status with OLT serial (DR exists in 1Map, can be auto-fixed)
-    // "Needs Investigation" = 'not_found' (DR not in 1Map), empty_serial, or no OLT serial
+    const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
+    const dateTo = req.query.dateTo ? String(req.query.dateTo) : null;
+
+    // Build date filter — uses created_at for pending/investigate, fix_attempted_at for fixed
+    const params: string[] = [];
+    let dateFilter = '';
+    if (dateFrom) {
+      params.push(dateFrom);
+      dateFilter += ` AND COALESCE(fix_attempted_at, created_at) >= $${params.length}::timestamptz`;
+    }
+    if (dateTo) {
+      params.push(dateTo);
+      dateFilter += ` AND COALESCE(fix_attempted_at, created_at) < $${params.length}::timestamptz`;
+    }
+
     const result = await pool.query(`
       SELECT
         CASE
@@ -45,8 +60,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         END as category,
         COUNT(*)::int as count
       FROM olt_mismatch_records
+      WHERE 1=1 ${dateFilter}
       GROUP BY category
-    `);
+    `, params);
 
     const stats: Stats = {
       pending: 0,
