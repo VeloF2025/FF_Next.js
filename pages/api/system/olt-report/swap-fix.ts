@@ -377,12 +377,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (wrongRecordPhotos.length > 0) {
       try {
         // Build photo metadata entries from 1Map photo type+ID pairs
+        // URL path uses drANumber because the photo server caches photos by the original DR's directory.
+        // The photos physically belong to DR A's prop record on 1Map, so the proxy must route there.
         const newPhotos = wrongRecordPhotos.map(({ type, id }) => ({
-          filename: `${drBNumber}_${type}_${id}.jpg`,
-          url: `/api/activate/photo/${drBNumber}/${drBNumber}_${type}_${id}.jpg`,
+          filename: `${drANumber}_${type}_${id}.jpg`,
+          url: `/api/activate/photo/${drANumber}/${drANumber}_${type}_${id}.jpg`,
           original_type: type,
           step: null,
           source: `cross_dr_copy_prop${wrongPropId}`,
+          source_dr: drANumber,
         }));
 
         // Get DR B's existing photos to merge (avoid duplicates)
