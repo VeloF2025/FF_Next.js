@@ -63,7 +63,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     let paramIndex = 1;
 
     if (projectId) {
-      conditions.push(`v.project_id = $${paramIndex}::uuid`);
+      // Filter by qfield_project_id (validations store QFieldCloud IDs, not FibreFlow IDs)
+      // First look up the qfield_project_id from the FibreFlow id
+      conditions.push(`v.project_id::text = (SELECT qfield_project_id FROM qfield_projects WHERE id = $${paramIndex}::uuid)`);
       params.push(projectId as string);
       paramIndex++;
     }
