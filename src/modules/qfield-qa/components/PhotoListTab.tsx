@@ -74,20 +74,26 @@ export function PhotoListTab({
   const [assignNotes, setAssignNotes] = useState('');
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
 
-  // Fetch available users for assignment
+  // Fetch staff members for assignment
   useEffect(() => {
-    async function fetchUsers() {
+    async function fetchStaff() {
       try {
-        const res = await fetch('/api/users?limit=100&active=true');
+        const res = await fetch('/api/staff?status=active');
         if (res.ok) {
           const data = await res.json();
-          setAvailableUsers(data.data || []);
+          // Map staff data to expected format
+          const staffList = (data.data || []).map((s: any) => ({
+            id: s.id,
+            name: s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+            email: s.email,
+          }));
+          setAvailableUsers(staffList);
         }
       } catch {
-        // Fallback to empty - assignment will still work with email input
+        // Fallback to empty - will show loading or empty state
       }
     }
-    fetchUsers();
+    fetchStaff();
   }, []);
 
   // Handle select all
@@ -407,27 +413,26 @@ export function PhotoListTab({
               <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                 Assign To *
               </label>
-              {availableUsers.length > 0 ? (
-                <select
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                >
-                  <option value="">Select reviewer...</option>
-                  {availableUsers.map((user) => (
+              <select
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              >
+                <option value="">Select staff member...</option>
+                {availableUsers.length > 0 ? (
+                  availableUsers.map((user) => (
                     <option key={user.id} value={user.email || user.name}>
                       {user.name} {user.email ? `(${user.email})` : ''}
                     </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="email"
-                  placeholder="Enter reviewer email..."
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  className="w-full p-2.5 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
+                  ))
+                ) : (
+                  <option value="" disabled>Loading staff...</option>
+                )}
+              </select>
+              {availableUsers.length === 0 && (
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                  Loading staff members...
+                </p>
               )}
             </div>
 
