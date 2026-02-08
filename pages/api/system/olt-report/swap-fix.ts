@@ -88,16 +88,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       : null;
     const wrongPropId = wrongSerialRecord?.prop_id || null;
 
-    // Extract 1Map photo IDs from the wrong-serial record's photo fields
-    const wrongRecordPhotoIds = new Set<string>();
+    // Extract 1Map photo type+ID pairs from the wrong-serial record's photo fields
+    const wrongRecordPhotos: Array<{ type: string; id: string }> = [];
     if (wrongSerialRecord) {
       for (const [key, value] of Object.entries(wrongSerialRecord)) {
         if (key.startsWith('ph_') && key !== 'ph_ont' && value && typeof value === 'string' && /^\d+$/.test(value)) {
-          wrongRecordPhotoIds.add(value);
+          wrongRecordPhotos.push({ type: key, id: value });
         }
       }
       log.info('SwapFix', 'Identified wrong-serial prop record for photo copy', {
-        drA: drANumber, wrongPropId, photoIdCount: wrongRecordPhotoIds.size,
+        drA: drANumber, wrongPropId, photoCount: wrongRecordPhotos.length,
       });
     }
 
@@ -371,40 +371,57 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // Step 4: Copy photos from DR A's wrong-serial record to DR B
+    // Step 4: Copy photos from DR A's wrong-serial 1Map prop record to DR B
+    // Build photo entries directly from 1Map data (don't rely on FF having downloaded them)
     let photoCopyResult: { success: boolean; count?: number; propId?: string | null; error?: string } | null = null;
-    if (wrongRecordPhotoIds.size > 0) {
+    if (wrongRecordPhotos.length > 0) {
       try {
-        const drAPhotosRow = await client.query(
+        // Build photo metadata entries from 1Map photo type+ID pairs
+        const newPhotos = wrongRecordPhotos.map(({ type, id }) => ({
+          filename: `${drBNumber}_${type}_${id}.jpg`,
+          url: `/api/activate/photo/${drBNumber}/${drBNumber}_${type}_${id}.jpg`,
+          original_type: type,
+          step: null,
+          source: `cross_dr_copy_prop${wrongPropId}`,
+        }));
+
+        // Get DR B's existing photos to merge (avoid duplicates)
+        const drBPhotosRow = await client.query(
           'SELECT photos_metadata FROM dr_photo_unified_reviews WHERE drop_number = $1',
-          [drANumber]
+          [drBNumber]
         );
 
-        if (drAPhotosRow.rows.length > 0 && drAPhotosRow.rows[0].photos_metadata) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const allPhotos = drAPhotosRow.rows[0].photos_metadata as any[];
-          // Filter photos matching the wrong-serial record's 1Map photo IDs
-          const matchingPhotos = allPhotos.filter((p) => {
-            const filename = p.filename || (p.url && p.url.split('/').pop()) || '';
-            const idMatch = filename.match(/_(\d+)\.jpg$/);
-            return idMatch && wrongRecordPhotoIds.has(idMatch[1]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existingPhotos: any[] = drBPhotosRow.rows[0]?.photos_metadata || [];
+        const existingIds = new Set<string>();
+        for (const p of existingPhotos) {
+          const m = (p.filename || '').match(/_(\d+)\.jpg$/);
+          if (m) existingIds.add(m[1]);
+        }
+
+        const toAdd = newPhotos.filter(p => {
+          const m = p.filename.match(/_(\d+)\.jpg$/);
+          return m && !existingIds.has(m[1]);
+        });
+
+        if (toAdd.length > 0) {
+          const allPhotos = [...existingPhotos, ...toAdd];
+          await client.query(
+            `UPDATE dr_photo_unified_reviews
+             SET photos_metadata = $1::jsonb, photo_count = $2,
+                 photo_source = 'cross_dr_copy', updated_at = NOW()
+             WHERE drop_number = $3`,
+            [JSON.stringify(allPhotos), allPhotos.length, drBNumber]
+          );
+          photoCopyResult = { success: true, count: toAdd.length, propId: wrongPropId };
+
+          log.info('SwapFix', 'Photos built from 1Map and added to DR B', {
+            drA: drANumber, drB: drBNumber, propId: wrongPropId,
+            newPhotos: toAdd.length, existingPhotos: existingPhotos.length, totalPhotos: allPhotos.length,
           });
-
-          if (matchingPhotos.length > 0) {
-            await client.query(
-              `UPDATE dr_photo_unified_reviews
-               SET photos_metadata = $1::jsonb, photo_count = $2,
-                   photo_source = 'cross_dr_copy', updated_at = NOW()
-               WHERE drop_number = $3`,
-              [JSON.stringify(matchingPhotos), matchingPhotos.length, drBNumber]
-            );
-            photoCopyResult = { success: true, count: matchingPhotos.length, propId: wrongPropId };
-
-            log.info('SwapFix', 'Photos copied from DR A to DR B', {
-              drA: drANumber, drB: drBNumber, propId: wrongPropId,
-              photoCount: matchingPhotos.length, photoIds: [...wrongRecordPhotoIds],
-            });
-          }
+        } else {
+          photoCopyResult = { success: true, count: 0, propId: wrongPropId };
+          log.info('SwapFix', 'All photos already exist on DR B', { drB: drBNumber });
         }
       } catch (photoErr) {
         log.error('SwapFix', 'Photo copy failed (non-fatal)', { error: photoErr, drB: drBNumber });
