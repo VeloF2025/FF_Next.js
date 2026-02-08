@@ -540,7 +540,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     if (currentTab === 'pending') {
       fetchRecords('pending');
     } else if (currentTab === 'investigate') {
-      fetchRecords('needs_investigation', investigateSubFilter);
+      fetchRecords('needs_investigation');
     } else if (currentTab === 'escalations') {
       fetchRecords('escalated');
     } else if (currentTab === 'history') {
@@ -548,7 +548,16 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     } else if (currentTab === 'reporting') {
       fetchReportData();
     }
-  }, [currentTab, page, investigateSubFilter, fetchStats, fetchRecords, fetchImports, fetchReportData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTab, page, fetchStats, fetchRecords, fetchImports, fetchReportData]);
+
+  // Re-fetch investigate records when sub-filter changes
+  useEffect(() => {
+    if (currentTab === 'investigate' && investigateSubFilter !== 'all') {
+      fetchRecords('needs_investigation', investigateSubFilter);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [investigateSubFilter]);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
