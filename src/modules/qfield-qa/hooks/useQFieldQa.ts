@@ -2,7 +2,7 @@
  * QField QA Hooks
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import type {
   PhotoValidation,
@@ -36,15 +36,32 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     totalPages: 0,
   });
 
-  // Fetch validations
+  // Use refs to track current values without causing re-renders
+  const filtersRef = useRef(filters);
+  const paginationRef = useRef(pagination);
+
+  // Keep refs in sync
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  useEffect(() => {
+    paginationRef.current = pagination;
+  }, [pagination]);
+
+  // Stable fetch function using refs to access latest values
   const fetchValidations = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
 
       const [validationsRes, statsRes, projectsRes] = await Promise.all([
-        qfieldQaApiService.getValidations({ ...filters, page: pagination.page, pageSize: pagination.pageSize }),
-        qfieldQaApiService.getStats(filters.projectId),
+        qfieldQaApiService.getValidations({
+          ...filtersRef.current,
+          page: paginationRef.current.page,
+          pageSize: paginationRef.current.pageSize
+        }),
+        qfieldQaApiService.getStats(filtersRef.current.projectId),
         qfieldQaApiService.getProjects(),
       ]);
 
@@ -58,14 +75,15 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.pageSize]);
+  }, []); // No dependencies - stable reference
 
-  // Initial fetch
+  // Fetch when filters or pagination change
   useEffect(() => {
     fetchValidations();
-  }, [fetchValidations]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, pagination.page, pagination.pageSize]);
 
-  // Auto-refresh
+  // Auto-refresh with stable interval
   useEffect(() => {
     if (!autoRefresh) return;
 

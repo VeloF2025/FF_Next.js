@@ -265,9 +265,10 @@ export function ActivateDataProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.dateFrom, filters.dateTo, filters.projectFilter, filters.statusFilter, filters.qaStatusFilter, filters.serialStatusFilter, filters.resubmissionsOnly, filters.searchTerm]);
 
-  // Fetch when page changes
+  // Fetch when page changes (but skip if this is due to filter change resetting to page 1)
   useEffect(() => {
-    if (!isInitialLoad) {
+    // Skip page fetch if still on initial load or if we just reset to page 1 (handled by filter useEffect)
+    if (!isInitialLoad && currentPage !== 1) {
       fetchData(true, currentPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
