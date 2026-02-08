@@ -874,3 +874,99 @@ WHERE attachment_id = 'UUID';
 DELETE FROM qfield_photo_validations
 WHERE project_id = 'UUID';
 ```
+
+---
+
+## QField QA Dashboard (Feb 2026)
+
+### Overview
+Web-based dashboard for viewing QField photos, AI validation results, and performing manual QA review with approve/reject/escalate workflow.
+
+**Page:** `/qfield/qa`
+**Module:** `src/modules/qfield-qa/`
+
+### Photo Proxy API
+
+**Endpoint:** `GET /api/qfield/photo-proxy?key={photo_key}`
+
+**CRITICAL:** MinIO uses erasure-coded storage - files are sharded across `/data1`, `/data2`, etc. You CANNOT use direct `cat` to read files.
+
+**Solution:** Use `mc cat` (MinIO Client) inside the Docker container:
+```typescript
+const command = `docker exec qfieldcloud-minio-1 mc cat 'local/${MINIO_BUCKET}/${objectPath}' 2>&1`;
+```
+
+The `local` alias is pre-configured in the MinIO container to connect to `localhost:9000`.
+
+### MinIO Photo Path Format
+
+**IMPORTANT:** The photo version ID format in MinIO is:
+```
+v{YYYYMMDDHHMMSS}-{first 8 chars of UUID}
+```
+
+**Example:**
+- QFieldCloud `filestorage_fileversion.id`: `6abcf9f1-93fd-404d-9276-b733610d1e3c`
+- QFieldCloud `filestorage_fileversion.created_at`: `2026-02-06 13:47:22`
+- **MinIO path:** `projects/{project_id}/files/DCIM/{filename}/v20260206134722-6abcf9f1`
+
+**Query to get correct paths:**
+```sql
+SELECT
+  f.project_id,
+  'projects/' || f.project_id || '/files/' || f.name || '/v' ||
+  to_char(fv.created_at, 'YYYYMMDDHH24MISS') || '-' ||
+  substring(fv.id::text, 1, 8) as photo_key
+FROM filestorage_file f
+JOIN filestorage_fileversion fv ON fv.file_id = f.id
+WHERE f.name LIKE 'DCIM/%';
+```
+
+### Import Script
+
+**Script:** `scripts/import_qfield_photos.js`
+
+Imports photos from QFieldCloud into `qfield_photo_validations` table:
+1. Exports photo records from QFieldCloud PostgreSQL
+2. Converts version UUID to MinIO path format
+3. Inserts into FibreFlow with `workflow_status: 'pending'`
+
+**Usage:**
+```bash
+# 1. Export from QFieldCloud (on Velocity server)
+docker exec qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db -t -A -F'|' -c "
+SELECT f.project_id, p.name,
+  'projects/' || f.project_id || '/files/' || f.name || '/v' ||
+  to_char(fv.created_at, 'YYYYMMDDHH24MISS') || '-' ||
+  substring(fv.id::text, 1, 8) as photo_key,
+  f.name, fv.created_at
+FROM filestorage_file f
+JOIN core_project p ON p.id = f.project_id
+JOIN filestorage_fileversion fv ON fv.file_id = f.id
+WHERE f.name LIKE 'DCIM/%'
+  AND (f.name LIKE '%.jpg' OR f.name LIKE '%.JPG')
+ORDER BY fv.created_at DESC;
+" > /tmp/qfield_photos.csv
+
+# 2. Copy to local
+scp velo@100.96.203.105:/tmp/qfield_photos.csv /tmp/
+
+# 3. Run import
+npx tsx scripts/import_qfield_photos.js
+```
+
+### Database Schema
+
+**Key columns in `qfield_photo_validations`:**
+- `project_id` - UUID of QFieldCloud project
+- `photo_key` - Full MinIO path (e.g., `projects/{uuid}/files/DCIM/photo.jpg/v20260206-abc123`)
+- `work_type` - `pole_installation`, `cable_stringing`, `dome_joint`, `activation`
+- `workflow_status` - `pending`, `in_review`, `approved`, `rejected`, `escalated`
+- `vlm_confidence` - 0.00 to 1.00
+- `vlm_feedback` - Human-readable AI feedback
+
+### Stats (Feb 2026)
+
+After initial import:
+- **Total photos:** 5,965
+- **Projects:** LAW_Pole_Audit (3,364), MOA_Pole_Audit (2,292), MOA_Site_Audit (595), etc.
