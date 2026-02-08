@@ -247,6 +247,15 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
   // Displaced ONT tracking state
   const [displacedInfo, setDisplacedInfo] = useState<Record<string, { activated: boolean; ownerDr?: string; ownerTeam?: string; ownerStatus?: string }>>({});
 
+  // Displaced ONT reporting state
+  const [displacedReport, setDisplacedReport] = useState<{
+    total: number;
+    unactivated: number;
+    activated: number;
+    records: Array<{ drop_number: string; old_value: string; new_value: string; displaced_serial: string; displaced_activated: boolean; displaced_owner_dr: string | null; displaced_owner_team: string | null; created_at: string }>;
+  } | null>(null);
+  const [displacedReportLoading, setDisplacedReportLoading] = useState(false);
+
   // Projects state
   const [projects, setProjects] = useState<
     Array<{ id: string; project_name: string; project_code: string }>
@@ -453,6 +462,22 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
     }
   }, [reportPeriod]);
 
+  // Fetch displaced ONT report
+  const fetchDisplacedReport = useCallback(async (filter = 'all') => {
+    setDisplacedReportLoading(true);
+    try {
+      const res = await fetch(`/api/system/olt-report/displaced-report?filter=${filter}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDisplacedReport(data.data || data);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setDisplacedReportLoading(false);
+    }
+  }, []);
+
   // Export CSV
   const handleExportCSV = async () => {
     setExporting(true);
@@ -551,9 +576,10 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
       fetchImports();
     } else if (currentTab === 'reporting') {
       fetchReportData();
+      fetchDisplacedReport();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTab, page, fetchStats, fetchRecords, fetchImports, fetchReportData]);
+  }, [currentTab, page, fetchStats, fetchRecords, fetchImports, fetchReportData, fetchDisplacedReport]);
 
   // Re-fetch investigate records when sub-filter changes
   useEffect(() => {
@@ -1676,9 +1702,18 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                             );
                           }
                           if (!info.activated) {
+                            const ws = record.wrong_onemap_serial!.toUpperCase();
+                            const isOntSerial = /^ALCL|^HWTC/.test(ws);
+                            const isUpsSerial = ws.startsWith('GU18');
+                            const label = isOntSerial ? 'Unactivated ONT' : isUpsSerial ? 'UPS Serial' : 'Invalid Serial';
+                            const tooltip = isOntSerial
+                              ? 'Displaced ONT is not activated in OES — untracked physical ONT'
+                              : isUpsSerial
+                              ? 'Wrong serial is a UPS, not an ONT'
+                              : 'Wrong serial does not match any known ONT or UPS pattern';
                             return (
-                              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 inline-flex items-center gap-0.5" title="Displaced ONT is not activated in OES — untracked physical ONT">
-                                <Info className="w-3 h-3" /> Unactivated ONT
+                              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 inline-flex items-center gap-0.5" title={tooltip}>
+                                <Info className="w-3 h-3" /> {label}
                               </span>
                             );
                           }
@@ -2337,6 +2372,88 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                   </div>
                 </div>
               )}
+
+              {/* Displaced ONTs Section */}
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+                <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-[var(--ff-text-primary)]">Displaced ONTs</h3>
+                    <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">ONT serials overwritten during 1Map fixes — tracked for procurement stock reconciliation</p>
+                  </div>
+                  {displacedReport && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="text-amber-400 font-medium">{displacedReport.unactivated} unactivated</span>
+                      <span className="text-[var(--ff-text-tertiary)]">/</span>
+                      <span className="text-blue-400 font-medium">{displacedReport.activated} activated</span>
+                      <span className="text-[var(--ff-text-tertiary)]">/</span>
+                      <span className="text-[var(--ff-text-secondary)]">{displacedReport.total} total</span>
+                    </div>
+                  )}
+                </div>
+                {displacedReportLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-accent)]" />
+                  </div>
+                ) : displacedReport && displacedReport.records.length > 0 ? (
+                  <div className="overflow-x-auto max-h-96">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
+                        <tr className="border-b border-[var(--ff-border-light)]">
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Displaced Serial</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Type</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OES Status</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Owner</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Replaced With</th>
+                          <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Fixed On</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displacedReport.records.map((rec, idx) => {
+                          const ds = (rec.displaced_serial || '').toUpperCase();
+                          const isOnt = /^ALCL|^HWTC/.test(ds);
+                          const isUps = ds.startsWith('GU18');
+                          const typeLabel = isOnt ? 'ONT' : isUps ? 'UPS' : 'Invalid';
+                          const typeColor = isOnt ? 'text-blue-400' : isUps ? 'text-orange-400' : 'text-gray-400';
+                          return (
+                            <tr key={`${rec.drop_number}-${idx}`} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                              <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{rec.drop_number}</td>
+                              <td className="py-3 px-4 font-mono text-red-400">{rec.displaced_serial}</td>
+                              <td className="py-3 px-4">
+                                <span className={`px-2 py-0.5 rounded text-xs ${typeColor} ${isOnt ? 'bg-blue-500/10' : isUps ? 'bg-orange-500/10' : 'bg-gray-500/10'}`}>
+                                  {typeLabel}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                {rec.displaced_activated ? (
+                                  <span className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400">Activated</span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400">Unactivated</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-[var(--ff-text-secondary)] font-mono">
+                                {rec.displaced_owner_dr ? (
+                                  <span>{rec.displaced_owner_dr} <span className="text-[var(--ff-text-tertiary)]">({rec.displaced_owner_team || '-'})</span></span>
+                                ) : (
+                                  <span className="text-[var(--ff-text-tertiary)]">-</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-mono text-green-400">{rec.new_value}</td>
+                              <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
+                                {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-[var(--ff-text-tertiary)]">
+                    No displaced ONT records found
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="text-center py-12 text-[var(--ff-text-tertiary)]">
