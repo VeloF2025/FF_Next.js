@@ -208,22 +208,28 @@ async function processOneQueueItem(client: any, item: any, importId: string | un
   else if (wrongCount > 0) { mismatchType = 'note4_wrong_serial'; }
   else if (emptyCount > 0 && correctCount === 0) { mismatchType = 'note4_empty_barcode'; }
 
-  // Status mismatch check: serial is correct but status is wrong
+  // Status mismatch check: serial is correct but NO prop_id has "Installed" status
+  // A DR can have multiple prop_ids for different processes (sign-up, installation, etc.)
+  // Only flag if none of the correct-serial records have the installed status
   const INSTALLED_STATUS = 'Home Installation: Installed';
   let statusMismatchContext: string | null = null;
   if (mismatchType === 'match' && correctCount > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const wrongStatusRecord = records.find((r: any) =>
-      r.ph_ont?.trim().toUpperCase() === oesSerial && r.status !== INSTALLED_STATUS
+    const correctSerialRecords = records.filter((r: any) =>
+      r.ph_ont?.trim().toUpperCase() === oesSerial
     );
-    if (wrongStatusRecord) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hasInstalledRecord = correctSerialRecords.some((r: any) => r.status === INSTALLED_STATUS);
+    if (!hasInstalledRecord) {
+      // No prop_id with this serial has "Installed" status — flag the one closest to installed
+      const wrongStatusRecord = correctSerialRecords[0];
       mismatchType = 'status_mismatch';
       statusMismatchContext = JSON.stringify({
         reason: 'status_mismatch',
         propId: wrongStatusRecord.prop_id,
         currentStatus: wrongStatusRecord.status || 'unknown',
         expectedStatus: INSTALLED_STATUS,
-        message: `Status is "${wrongStatusRecord.status || 'unknown'}" but should be "${INSTALLED_STATUS}"`,
+        message: `No prop record with correct serial has "${INSTALLED_STATUS}" status. Best match: "${wrongStatusRecord.status || 'unknown'}"`,
       });
     }
   }
