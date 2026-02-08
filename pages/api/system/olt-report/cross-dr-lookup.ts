@@ -121,8 +121,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ? { propId: drBInstalledRecord.prop_id, status: drBInstalledRecord.status, needsFix: drBInstalledRecord.status !== INSTALLED_STATUS }
       : null;
 
-    // Detect UPS transfer: DR A has a UPS serial that likely belongs to DR B (DR B's UPS is empty)
-    const upsTransferNeeded = !!(drAOneMapUps && drBFoundOn1Map && !drBOneMapUps);
+    // Detect UPS action needed:
+    // Case 1: DR A has UPS, DR B has none → transfer (set on B, clear from A)
+    // Case 2: DR A has UPS, DR B has same UPS → just clear from A (de-duplicate)
+    const drAUpsMatchesDrB = !!(drAOneMapUps && drBOneMapUps && drAOneMapUps.toUpperCase() === drBOneMapUps.toUpperCase());
+    const upsTransferNeeded = !!(drAOneMapUps && drBFoundOn1Map && (!drBOneMapUps || drAUpsMatchesDrB));
 
     // Classify scenario
     let scenario: SwapScenario;
