@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Search,
   CheckCircle,
@@ -19,6 +19,8 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  Zap,
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import type { PhotoValidation, QAProject, QAFilters, Priority, WorkflowStatus } from '../types';
@@ -57,6 +59,9 @@ export function PhotoListTab({
   onRevalidate,
 }: PhotoListTabProps) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState<'approve' | 'reject' | null>(null);
+  const [bulkNotes, setBulkNotes] = useState('');
 
   // Handle select all
   const handleSelectAll = (checked: boolean) => {
@@ -81,20 +86,40 @@ export function PhotoListTab({
     onFilterChange({ search: searchTerm });
   };
 
-  // Handle bulk actions
-  const handleBulkAction = async (action: 'approve' | 'reject' | 'revalidate') => {
+  // Handle bulk actions with loading state
+  const handleBulkAction = useCallback(async (action: 'approve' | 'reject' | 'revalidate', notes?: string) => {
     if (selectedIds.length === 0) return;
 
-    switch (action) {
-      case 'approve':
-        await onApprove(selectedIds);
-        break;
-      case 'reject':
-        await onReject(selectedIds);
-        break;
-      case 'revalidate':
-        await onRevalidate(selectedIds);
-        break;
+    setBulkActionLoading(action);
+    try {
+      switch (action) {
+        case 'approve':
+          await onApprove(selectedIds, notes);
+          break;
+        case 'reject':
+          await onReject(selectedIds, notes);
+          break;
+        case 'revalidate':
+          await onRevalidate(selectedIds);
+          break;
+      }
+      setShowBulkModal(null);
+      setBulkNotes('');
+    } finally {
+      setBulkActionLoading(null);
+    }
+  }, [selectedIds, onApprove, onReject, onRevalidate]);
+
+  // Open confirmation modal for approve/reject
+  const openBulkModal = (action: 'approve' | 'reject') => {
+    setShowBulkModal(action);
+    setBulkNotes('');
+  };
+
+  // Confirm bulk action from modal
+  const confirmBulkAction = () => {
+    if (showBulkModal) {
+      handleBulkAction(showBulkModal, bulkNotes || undefined);
     }
   };
 
@@ -198,32 +223,105 @@ export function PhotoListTab({
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => handleBulkAction('approve')}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              onClick={() => openBulkModal('approve')}
+              disabled={bulkActionLoading !== null}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <CheckCircle className="w-4 h-4" />
-              Approve
+              {bulkActionLoading === 'approve' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Approve All
             </button>
             <button
-              onClick={() => handleBulkAction('reject')}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              onClick={() => openBulkModal('reject')}
+              disabled={bulkActionLoading !== null}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <XCircle className="w-4 h-4" />
-              Reject
+              {bulkActionLoading === 'reject' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              Reject All
             </button>
             <button
               onClick={() => handleBulkAction('revalidate')}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              disabled={bulkActionLoading !== null}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RotateCw className="w-4 h-4" />
-              Re-validate
+              {bulkActionLoading === 'revalidate' ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Zap className="w-4 h-4" />
+              )}
+              Run AI
             </button>
             <button
               onClick={() => onSelectionChange([])}
-              className="px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              disabled={bulkActionLoading !== null}
+              className="px-3 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
             >
               Clear
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Action Confirmation Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-2">
+              {showBulkModal === 'approve' ? 'Approve' : 'Reject'} {selectedIds.length} Photos
+            </h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              {showBulkModal === 'approve'
+                ? 'This will mark all selected photos as approved and complete their QA review.'
+                : 'This will mark all selected photos as rejected. Technicians will need to retake these photos.'}
+            </p>
+            <textarea
+              placeholder="Add notes (optional)..."
+              value={bulkNotes}
+              onChange={(e) => setBulkNotes(e.target.value)}
+              rows={3}
+              className="w-full p-3 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowBulkModal(null)}
+                disabled={bulkActionLoading !== null}
+                className="px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkAction}
+                disabled={bulkActionLoading !== null}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 ${
+                  showBulkModal === 'approve'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {bulkActionLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    {showBulkModal === 'approve' ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                    {showBulkModal === 'approve' ? 'Approve All' : 'Reject All'}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
