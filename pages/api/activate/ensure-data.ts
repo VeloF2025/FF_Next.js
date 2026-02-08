@@ -13,18 +13,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
 import { logPhotosSynced } from '@/modules/activate/services/activityLogService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 // BOSS API - Docker container on Velocity that caches 1Map photo data
 // LEGITIMATE USE: This endpoint is called once when opening QA Wizard

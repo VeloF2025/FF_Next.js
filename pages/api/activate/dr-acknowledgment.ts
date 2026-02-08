@@ -11,10 +11,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 // Webhook auth: verified via shared bridge secret (not withAuth - called by Go WhatsApp Bridge)
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
@@ -23,11 +23,6 @@ import { extractWaPhotoSerials, waitForWaPhotos } from '@/modules/activate/servi
 
 // Vercel: Allow up to 30s for delayed VLM serial extraction
 export const config = { maxDuration: 30 };
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 // BOSS API - Docker container on Velocity that caches 1Map photo data
 // LEGITIMATE USE: This endpoint is called once per DR submission to check

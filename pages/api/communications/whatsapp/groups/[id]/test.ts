@@ -6,16 +6,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import type { WaAdminApiResponse, WaTestMessageResult } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-  ssl: { rejectUnauthorized: false },
-});
 
 // Unified bridge URL (port 8083)
 const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';

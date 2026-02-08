@@ -7,14 +7,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import type { DropRecord, Photo } from '@/modules/photo-review/types';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-
-// Create database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.NEON_DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
 
 // BOSS VPS API base URL (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';

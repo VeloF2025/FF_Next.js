@@ -12,16 +12,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 interface StaffOption {
   id: string;

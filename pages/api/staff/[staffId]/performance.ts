@@ -14,14 +14,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 export interface StaffPerformanceMetrics {
   staffId: string;

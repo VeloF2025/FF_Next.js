@@ -8,11 +8,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import pool from '@/lib/db';
 import {
   evaluateAutoFail,
   getFailReasonDescription,
@@ -24,11 +24,6 @@ import {
   isSharePointDrSyncEnabled,
   fullDrSync,
 } from '@/lib/sharepointDrSyncService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 type QaDecision = 'PASS' | 'FAIL' | 'REWORK_NEEDED';
 

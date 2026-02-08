@@ -1,14 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
-import { Client } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-
-const connectionString = process.env.DATABASE_URL || 'process.env.DATABASE_URL';
 
 /**
  * Global Search API Route
  * GET /api/search?q={query}&type={type}&limit={limit}
- * 
+ *
  * Uses the PostgreSQL full-text search infrastructure we created
  */
 async function handler(
@@ -19,7 +17,7 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const client = new Client({ connectionString });
+  const client = await pool.connect();
 
   try {
     const { q, type = 'all', limit = 20 } = req.query;
@@ -27,8 +25,6 @@ async function handler(
     if (!q || typeof q !== 'string') {
       return res.status(400).json({ error: 'Search query is required' });
     }
-
-    await client.connect();
 
     // Use the global_search function we created
     const searchResults = await client.query(
@@ -103,7 +99,7 @@ async function handler(
       error: error instanceof Error ? error.message : 'Search failed'
     });
   } finally {
-    await client.end();
+    client.release();
   }
 }
 

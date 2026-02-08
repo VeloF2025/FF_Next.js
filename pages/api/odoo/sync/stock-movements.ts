@@ -9,19 +9,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { createOdooClient } from '@/services/odoo/odooClient';
 import { createStockMovementSyncService } from '@/services/odoo/entities/stockMovementSync';
-
-// Use direct pool for Odoo sync (long-running operation)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 5,
-});
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // GET - Return sync status

@@ -14,19 +14,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
-import ws from 'ws';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
-
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
-
-const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'process.env.DATABASE_URL',
-});
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 

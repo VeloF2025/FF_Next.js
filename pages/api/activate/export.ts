@@ -14,16 +14,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import * as XLSX from 'xlsx';
-import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+import pool from '@/lib/db';
+import { log } from '@/lib/logger';
 
 interface ExportRow {
   drop_number: string;

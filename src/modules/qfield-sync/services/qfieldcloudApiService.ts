@@ -15,6 +15,7 @@ if (!QFIELD_API_TOKEN) {
 }
 
 // QFieldCloud Database Direct Access (for faster queries)
+// NOTE: This is a separate database from FibreFlow's main DB, so it uses its own Pool
 const qfieldPool = new Pool({
   host: process.env.QFIELD_DB_HOST || '100.96.203.105',
   port: parseInt(process.env.QFIELD_DB_PORT || '5433'),

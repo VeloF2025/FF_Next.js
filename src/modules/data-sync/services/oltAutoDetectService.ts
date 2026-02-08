@@ -9,14 +9,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { logActivity } from '@/modules/activate/services/activityLogService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 function isUpsSerial(serial: string | null): boolean {
   return !!serial && serial.toUpperCase().startsWith('GU18');

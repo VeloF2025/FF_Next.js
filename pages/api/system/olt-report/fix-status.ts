@@ -14,17 +14,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole, getAuthUser } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
 import { logActivity } from '@/modules/activate/services/activityLogService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 const INSTALLED_STATUS = 'Home Installation: Installed';
 

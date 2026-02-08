@@ -3,22 +3,7 @@
  * Uses pg Pool for complex parameterized queries
  */
 
-import { Pool } from 'pg';
-
-// Create a singleton pool instance
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: false }
-        : false,
-    });
-  }
-  return pool;
-}
+import pool from '@/lib/db';
 
 /**
  * Execute a parameterized query
@@ -28,7 +13,7 @@ export async function query<T = Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<T[]> {
-  const client = await getPool().connect();
+  const client = await pool.connect();
   try {
     const result = await client.query(text, params);
     return result.rows as T[];

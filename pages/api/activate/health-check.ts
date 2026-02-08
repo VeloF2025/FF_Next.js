@@ -14,20 +14,15 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse } from '@/lib/apiResponse';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import {
   getSharePointDrConfig,
   isSharePointDrSyncEnabled,
   getAccessToken,
 } from '@/lib/sharepointDrSyncService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 // Service endpoints
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';

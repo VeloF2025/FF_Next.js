@@ -7,16 +7,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { WaMonitoredGroup, WaMonitoredGroupInput } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { log } from '@/lib/logger';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-  ssl: { rejectUnauthorized: false }
-});
 
 async function handler(
   req: NextApiRequest,

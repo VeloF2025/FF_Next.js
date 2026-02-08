@@ -7,7 +7,6 @@
  * - FibreFlow-created movements (GRNs, issues, returns)
  */
 
-import { Pool } from 'pg';
 import { createLogger } from '@/lib/logger';
 import {
   OdooClient,
@@ -15,6 +14,7 @@ import {
   OdooStockMove,
   OdooStockLocation,
 } from '../odooClient';
+import type { Pool } from 'pg';
 
 const logger = createLogger({ module: 'odoo:stockMovementSync' });
 

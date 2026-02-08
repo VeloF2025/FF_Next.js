@@ -5,16 +5,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
+import type { Pool } from 'pg';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 2; // Reduced from 3 - fewer concurrent 1Map calls = faster individual responses

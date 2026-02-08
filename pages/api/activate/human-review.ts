@@ -12,10 +12,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import {
   logHumanReviewStarted,
@@ -24,11 +24,6 @@ import {
   logStepRejection,
 } from '@/modules/activate/services/activityLogService';
 import { STEP_LABELS } from '@/modules/activate/utils/stepMapper';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 // ============================================================================
 // TYPES

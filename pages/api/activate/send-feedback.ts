@@ -12,18 +12,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 interface SendFeedbackRequest {
   dropNumber: string;

@@ -8,11 +8,9 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as NetServer } from 'http';
 import { Socket } from 'net';
 import { neon } from '@neondatabase/serverless';
-import pg from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
-
-const { Pool } = pg;
 
 interface ExtendedSocket extends Socket {
   server: NetServer & {
@@ -23,12 +21,6 @@ interface ExtendedSocket extends Socket {
 interface ExtendedNextApiResponse {
   socket: ExtendedSocket;
 }
-
-// Database connection for LISTEN/NOTIFY
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
 
 // Neon client for queries
 const sql = neon(process.env.DATABASE_URL || '');

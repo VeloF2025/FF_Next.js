@@ -16,10 +16,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 // Webhook auth: verified via shared bridge secret (not withAuth - called by Go WhatsApp Bridge)
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
@@ -41,11 +41,6 @@ import type { DrFolderInfo } from '@/modules/activate/types/sharepoint.types';
 
 // BOSS API (1Map data cached on dr-photo-api service)
 const BOSS_API_HOST = 'http://100.96.203.105:8003';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 interface ProcessNewDrRequest {
   dropNumber: string;

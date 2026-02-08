@@ -8,14 +8,9 @@
  * NLNH Confidence: HIGH
  */
 
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { oneMapApi } from '@/modules/system/services/oneMapApiService';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 const BATCH_SIZE = 50;
 const CONCURRENCY = 3;

@@ -14,7 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import {
   categorizePhotos,
@@ -28,12 +28,6 @@ import {
   validateSerialCrossReference,
   type DrValidationData,
 } from '@/modules/activate/services/qaAutoFailService';
-
-const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'process.env.DATABASE_URL',
-});
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 

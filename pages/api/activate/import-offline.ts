@@ -15,18 +15,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { IncomingForm, Fields, Files } from 'formidable';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+import pool from '@/lib/db';
 
 // Disable body parser for file uploads
 export const config = {

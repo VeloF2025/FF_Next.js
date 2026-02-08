@@ -11,18 +11,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import type { UnifiedReview } from '@/modules/activate/types/unified.types';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 interface FetchPhotosRequest {
   dropNumber: string;
