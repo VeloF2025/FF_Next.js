@@ -56,12 +56,10 @@ async function handler(
     return res.status(200).json(data);
   } catch (error) {
     log.error('DiscrepancyAPI', 'Failed to fetch discrepancy report', { error });
-    const errMsg = error instanceof Error ? error.message : String(error);
-    const errStack = error instanceof Error ? error.stack : undefined;
-    log.error('DiscrepancyAPI', `Error details: ${errMsg}`, { stack: errStack, errorType: typeof error });
+    const errMsg = error instanceof Error ? error.message : JSON.stringify(error);
+    log.error('DiscrepancyAPI', `Error details: ${errMsg}`);
     return res.status(500).json({
       error: errMsg,
-      detail: errStack?.split('\n').slice(0, 3).join(' | '),
     });
   }
 }
