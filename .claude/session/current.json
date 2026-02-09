@@ -1,148 +1,73 @@
 {
-  "session_id": "2026-02-07-technician-stats",
-  "started_at": "2026-02-07T06:00:00Z",
-  "last_updated": "2026-02-07T17:08:08.816Z",
+  "session_id": "2026-02-09-qfield-qa-fixes",
+  "started_at": "2026-02-09T04:00:00Z",
+  "last_updated": "2026-02-09T07:21:56.207Z",
   "working_on": {
-    "task": "Technician Stats & Recent DRs Feature",
+    "task": "QField QA - AI Validation Fix + Badge Visibility",
     "status": "completed",
     "progress": [
-      "Fixed installer performance API step column names (10 steps, not 12)",
-      "Fixed navigation tab highlighting for nested routes",
-      "Added dB signal quality metrics for installers",
-      "Added time range filters (7D, 30D, 90D, All, Custom)",
-      "Added Recent DRs list with links to QA Centre",
-      "Verified all stats against database for both installers and activators",
-      "Deployed to dev, staging, and production",
-      "Updated activate.md KB with technician documentation"
+      "Investigated AI validation not completing - discovered logger format was wrong",
+      "Fixed all log calls in qa-validate.ts to use pino format: log.info({data}, 'message')",
+      "Tested full validation pipeline: MinIO fetch -> VLM -> DB update (working)",
+      "Fixed badge visibility on photo cards - solid backgrounds instead of semi-transparent",
+      "Deployed fixes to dev.fibreflow.app",
+      "Created .claude.md for qfield-qa module"
     ],
-    "last_action": "Updated KB and session learnings"
+    "last_action": "KB update via /kb"
   },
   "learnings": {
-    "installer_vs_activator_data_sources": {
-      "problem": "Installers and activators have different data sources and metrics",
-      "solution": "Activators: qa_photo_reviews (submissions), Installers: drops (installations)",
-      "pattern": "Use role-based conditional queries: if (tech.type === 'installer') return getInstallerPerformance(...)"
+    "pino_logger_format": {
+      "problem": "Log calls using wrong argument order caused errors to log without details",
+      "wrong": "log.info('module-name', { data }, 'message')",
+      "correct": "log.info({ module: 'module-name', ...data }, 'message')",
+      "note": "Pino signature is log.level(object, message) - object comes FIRST"
     },
-    "step_column_names": {
-      "problem": "Migration file had 12 steps but actual table only has 10",
-      "solution": "Actual columns: step_01_house_photo through step_10_signature",
-      "pattern": "Always check qa-review-history.ts or DB schema for actual column names before using"
+    "minio_versioned_paths": {
+      "description": "QField photos in MinIO are stored with version suffixes",
+      "format": "projects/{id}/files/DCIM/{filename}.jpg/{version-id}",
+      "example": "JPEG_20251016130535337.jpg/v20251107044855-6296d2d1",
+      "note": "The version ID is part of the path, not a query parameter"
     },
-    "navigation_tab_highlighting": {
-      "problem": "Dashboard tab highlighted instead of Technicians when on detail page",
-      "root_cause": "Tab matching iterated in order, /activate matched before /activate/technicians",
-      "solution": "Sort tabs by path length (longest first) before matching",
-      "pattern": "const sortedTabs = [...tabs].sort((a, b) => b.path.length - a.path.length)"
-    },
-    "signal_quality_valid_range": {
-      "problem": "Need to show what percentage of dB readings are in valid range",
-      "solution": "Valid dBm range is -18 to -24 dBm",
-      "pattern": "COUNT(*) FILTER (WHERE vlm_power_meter_dbm BETWEEN -24 AND -18)"
-    },
-    "recent_drs_by_role": {
-      "problem": "Activators and installers need different DR queries",
-      "solution": "Activators: JOIN qa_photo_reviews, Installers: JOIN drops",
-      "pattern": "Activators show submission_count column, installers show qa_decision"
-    },
-    "stats_verification_process": {
-      "problem": "Need to verify UI stats match database",
-      "solution": "Use browser screenshot + DB query comparison",
-      "pattern": "Screenshot browser → Query same data from DB → Compare each metric"
-    },
-    "ten_step_checklist": {
-      "columns": [
-        "step_01_house_photo",
-        "step_02_cable_from_pole",
-        "step_03_entry_outside",
-        "step_04_entry_inside",
-        "step_05_wall",
-        "step_06_ont_back",
-        "step_07_power_meter",
-        "step_08_final_installation",
-        "step_09_green_lights",
-        "step_10_signature"
-      ],
-      "formula": "AVG(steps_passed) / 10.0 * 100 = avg_steps_compliance %"
+    "badge_visibility_on_images": {
+      "problem": "Semi-transparent badges invisible on matching photo backgrounds",
+      "bad": "bg-yellow-500/20 text-yellow-400",
+      "good": "bg-yellow-500 text-white shadow-lg",
+      "note": "Use solid colors + white text + shadow for badges overlaid on photos"
     }
   },
-  "features_added": [
-    {
-      "feature": "Recent DRs List",
-      "files": [
-        "pages/api/technicians/[id]/performance.ts - Added recentDRs query for both types",
-        "pages/activate/technicians/[id].tsx - Added RecentDRsList component"
-      ],
-      "description": "Shows up to 50 DRs worked on with View DR links to /activate/qa-centre/[dropNumber]"
-    },
-    {
-      "feature": "Signal Quality Metrics",
-      "files": [
-        "pages/api/technicians/[id]/performance.ts - Added dB metrics query",
-        "pages/activate/technicians/[id].tsx - Added Signal Quality stat card",
-        "src/types/technician.types.ts - Added avgDbReading, dbInRangeCount, dbInRangeRate"
-      ],
-      "description": "Shows avg dBm and % in valid range (-18 to -24) for installers"
-    },
-    {
-      "feature": "Time Range Filters",
-      "files": [
-        "pages/activate/technicians/[id].tsx - Added TimeRangeSelector component"
-      ],
-      "description": "7D, 30D, 90D, All presets plus Custom date picker with from/to inputs"
-    }
-  ],
   "bugs_fixed": [
     {
-      "file": "pages/api/technicians/[id]/performance.ts",
-      "issue": "Step columns step_08_ont_barcode, step_11, step_12 don't exist",
-      "fix": "Changed to correct 10-step columns ending with step_08_final_installation, step_09_green_lights, step_10_signature"
+      "file": "pages/api/qfield/qa-validate.ts",
+      "issue": "Logger calls using wrong argument order - errors logged without details",
+      "fix": "Changed all log.info/error calls to use pino format: log.info({data}, 'msg')"
     },
     {
-      "file": "src/modules/navigation/config/registry.ts",
-      "issue": "Wrong tab highlighted on technician detail page (/activate instead of /activate/technicians)",
-      "fix": "Sort tabs by path length descending before matching to find most specific match first"
+      "file": "src/modules/qfield-qa/components/PhotoListTab.tsx",
+      "issue": "StatusBadge, PriorityBadge, confidence badges invisible on some photo backgrounds",
+      "fix": "Changed from semi-transparent (bg-color/20) to solid backgrounds with shadow-lg"
     }
   ],
   "files_changed": [
-    "pages/api/technicians/[id]/performance.ts - Fixed step columns, added dB metrics, added recentDRs queries",
-    "pages/activate/technicians/[id].tsx - Added TimeRangeSelector, Signal Quality card, RecentDRsList component",
-    "src/modules/navigation/config/registry.ts - Fixed tab matching by sorting by path length",
-    "src/types/technician.types.ts - Added dB metrics and recentDRs to InstallerPerformance and ActivatorPerformance"
+    "pages/api/qfield/qa-validate.ts - Fixed 15+ log calls to use correct pino format",
+    "src/modules/qfield-qa/components/PhotoListTab.tsx - Solid badge backgrounds + shadows",
+    "src/modules/qfield-qa/.claude.md - Created module documentation"
   ],
-  "verification": {
-    "installer_bella": {
-      "id": "47be3fa5-581a-4bf5-834b-8edd879909d6",
-      "name": "Bella",
-      "metrics_verified": {
-        "total_installations": "79 ✅",
-        "qa_pass_rate": "3% (2/79) ✅",
-        "rework_rate": "0% ✅",
-        "steps_compliance": "44% ✅",
-        "signal_quality": "-18 dBm, 90% in range ✅",
-        "active_days": "2 ✅"
-      }
-    },
-    "activator_katkoopedi": {
-      "id": "c716537c-b752-4973-b64e-7b4a49ec1529",
-      "name": "katkoopedi",
-      "metrics_verified": {
-        "total_submissions": "175 ✅",
-        "first_pass_rate": "100% ✅",
-        "serial_compliance": "96% (ONT: 168, UPS: 168) ✅",
-        "resubmission_rate": "0% ✅",
-        "active_days": "18 ✅"
-      }
-    }
-  },
   "deployments": {
-    "dev": "https://dev.fibreflow.app - deployed 2026-02-07",
-    "staging": "https://vf.fibreflow.app - deployed 2026-02-07",
-    "production": "https://app.fibreflow.app - deployed 2026-02-07"
+    "dev": "https://dev.fibreflow.app - deployed 2026-02-09 05:49 SAST"
+  },
+  "kb_scan_results": {
+    "timestamp": "2026-02-09T04:35:00Z",
+    "total_modules": 47,
+    "modules_with_claude_md": 44,
+    "modules_missing": [
+      "data-sync",
+      "navigation",
+      "navigation.disabled"
+    ]
   },
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "activate/technicians"
-  },
-  "next_steps": []
+    "module": "qfield-qa"
+  }
 }

@@ -638,7 +638,7 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
         {confidence !== null && (
           <div className="absolute bottom-2 right-2">
             <span
-              className="px-2 py-0.5 text-xs font-bold text-white rounded"
+              className="px-2.5 py-1 text-xs font-bold text-white rounded shadow-lg"
               style={{ backgroundColor: getConfidenceColor(photo.vlm_confidence || 0) }}
             >
               {confidence}%
@@ -676,15 +676,15 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
 
 function StatusBadge({ status }: { status: WorkflowStatus }) {
   const config = {
-    pending: { label: 'Pending', classes: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    in_review: { label: 'In Review', classes: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    approved: { label: 'Approved', classes: 'bg-green-500/20 text-green-400 border-green-500/30' },
-    rejected: { label: 'Rejected', classes: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    escalated: { label: 'Escalated', classes: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
-  }[status] || { label: status, classes: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+    pending: { label: 'Pending', classes: 'bg-yellow-500 text-white' },
+    in_review: { label: 'In Review', classes: 'bg-blue-500 text-white' },
+    approved: { label: 'Approved', classes: 'bg-green-500 text-white' },
+    rejected: { label: 'Rejected', classes: 'bg-red-500 text-white' },
+    escalated: { label: 'Escalated', classes: 'bg-orange-500 text-white' },
+  }[status] || { label: status, classes: 'bg-gray-500 text-white' };
 
   return (
-    <span className={`px-2 py-0.5 text-xs font-medium rounded border ${config.classes}`}>
+    <span className={`px-2 py-1 text-xs font-semibold rounded shadow-lg ${config.classes}`}>
       {config.label}
     </span>
   );
@@ -692,15 +692,15 @@ function StatusBadge({ status }: { status: WorkflowStatus }) {
 
 function PriorityBadge({ priority }: { priority: Priority }) {
   const config = {
-    urgent: { label: 'Urgent', classes: 'bg-red-500/20 text-red-400' },
-    high: { label: 'High', classes: 'bg-orange-500/20 text-orange-400' },
-    low: { label: 'Low', classes: 'bg-gray-500/20 text-gray-400' },
+    urgent: { label: 'Urgent', classes: 'bg-red-600 text-white' },
+    high: { label: 'High', classes: 'bg-orange-500 text-white' },
+    low: { label: 'Low', classes: 'bg-gray-500 text-white' },
   }[priority];
 
   if (!config) return null;
 
   return (
-    <span className={`px-2 py-0.5 text-xs font-medium rounded ${config.classes}`}>
+    <span className={`px-2 py-0.5 text-xs font-semibold rounded ${config.classes}`}>
       {config.label}
     </span>
   );

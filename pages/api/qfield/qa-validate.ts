@@ -76,7 +76,8 @@ async function handler(
   try {
     const { validationIds, photoKeys, workType } = req.body as ValidationRequest;
 
-    log.info('qfield-qa-validate', {
+    log.info({
+      module: 'qfield-qa-validate',
       validationIdCount: validationIds?.length || 0,
       photoKeyCount: photoKeys?.length || 0,
       workType
@@ -136,7 +137,7 @@ async function handler(
 
     // For bulk validation, process in background and return immediately
     if (validations.length > BATCH_THRESHOLD) {
-      log.info('qfield-qa-validate', { count: validations.length }, 'Starting background validation');
+      log.info({ module: 'qfield-qa-validate', count: validations.length }, 'Starting background validation');
 
       // Mark all as "validating" in DB
       const ids = validations.map(v => v.id);
@@ -148,7 +149,7 @@ async function handler(
 
       // Process in background (fire-and-forget)
       processValidationsInBackground(validations, workType).catch(err => {
-        log.error('qfield-qa-validate', { error: err }, 'Background validation failed');
+        log.error({ module: 'qfield-qa-validate', error: err instanceof Error ? err.message : String(err) }, 'Background validation failed');
       });
 
       return apiResponse.success(res, {
@@ -172,7 +173,7 @@ async function handler(
       results: processedResults,
     }, `Validated ${successCount}/${processedResults.length} photos`);
   } catch (error) {
-    log.error('qfield-qa-validate', error instanceof Error ? { message: error.message } : { error }, 'Handler error');
+    log.error({ module: 'qfield-qa-validate', ...(error instanceof Error ? { message: error.message } : { error }) }, 'Handler error');
     return apiResponse.internalError(res, error);
   }
 }
@@ -189,7 +190,7 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     // The 'local' alias is pre-configured in the container
     const command = `docker exec qfieldcloud-minio-1 mc cat 'local/${MINIO_BUCKET}/${objectPath}' 2>/dev/null | base64 -w 0`;
 
-    log.info('qfield-qa-validate', { photoKey: photoKey.substring(0, 80) }, 'Fetching photo via Docker mc');
+    log.info({ module: 'qfield-qa-validate', photoKey: photoKey.substring(0, 80) }, 'Fetching photo via Docker mc');
 
     const base64Data = execSync(command, {
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer
@@ -198,21 +199,21 @@ async function fetchPhotoAsBase64(photoKey: string): Promise<string> {
     }).trim();
 
     if (!base64Data || base64Data.length < 100) {
-      log.error('qfield-qa-validate', { photoKey, dataLen: base64Data?.length || 0 }, 'Empty or invalid image data');
+      log.error({ module: 'qfield-qa-validate', photoKey, dataLen: base64Data?.length || 0 }, 'Empty or invalid image data');
       throw new Error('Empty or invalid image data returned');
     }
 
     // Check for mc error messages in output
     if (base64Data.startsWith('mc:') || base64Data.includes('ERROR') || base64Data.includes('does not exist')) {
-      log.error('qfield-qa-validate', { photoKey, error: base64Data.substring(0, 200) }, 'mc command returned error');
+      log.error({ module: 'qfield-qa-validate', photoKey, error: base64Data.substring(0, 200) }, 'mc command returned error');
       throw new Error(`MinIO error: ${base64Data.substring(0, 200)}`);
     }
 
-    log.info('qfield-qa-validate', { size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched successfully');
+    log.info({ module: 'qfield-qa-validate', size: Math.round(base64Data.length / 1024) + 'KB' }, 'Photo fetched successfully');
     return base64Data;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('qfield-qa-validate', { photoKey: photoKey.substring(0, 80), error: message.substring(0, 200) }, 'Failed to fetch photo');
+    log.error({ module: 'qfield-qa-validate', photoKey: photoKey.substring(0, 80), error: message.substring(0, 200) }, 'Failed to fetch photo');
     throw new Error(`Failed to fetch photo: ${message}`);
   }
 }
@@ -307,7 +308,8 @@ async function processOneValidation(
   error?: string;
 }> {
   const effectiveWorkType = validation.work_type || workType || 'pole_installation';
-  log.info('qfield-qa-validate', {
+  log.info({
+    module: 'qfield-qa-validate',
     id: validation.id,
     photoKey: validation.photo_key?.substring(0, 60),
     workType: effectiveWorkType
@@ -333,7 +335,8 @@ async function processOneValidation(
       WHERE id = ${validation.id}::uuid
     `;
 
-    log.debug('qfield-qa-validate', {
+    log.debug({
+      module: 'qfield-qa-validate',
       id: validation.id,
       confidence: vlmResult.confidence,
       needsRetake,
@@ -358,7 +361,7 @@ async function processOneValidation(
       WHERE id = ${validation.id}::uuid
     `.catch(() => {}); // Ignore DB errors here
 
-    log.error('qfield-qa-validate', { id: validation.id, error: errorMessage }, 'Validation failed');
+    log.error({ module: 'qfield-qa-validate', id: validation.id, error: errorMessage }, 'Validation failed');
 
     return {
       id: validation.id,
@@ -416,7 +419,7 @@ async function processValidationsInBackground(
   let successCount = 0;
   let failCount = 0;
 
-  log.info('qfield-qa-validate', { total: validations.length }, 'Background validation started');
+  log.info({ module: 'qfield-qa-validate', total: validations.length }, 'Background validation started');
 
   // Process with concurrency
   for (let i = 0; i < validations.length; i += CONCURRENT_VALIDATIONS) {
@@ -432,7 +435,8 @@ async function processValidationsInBackground(
 
     // Log progress every 10 photos
     if ((i + chunk.length) % 10 === 0 || i + chunk.length === validations.length) {
-      log.info('qfield-qa-validate', {
+      log.info({
+        module: 'qfield-qa-validate',
         processed: i + chunk.length,
         total: validations.length,
         success: successCount,
@@ -442,7 +446,8 @@ async function processValidationsInBackground(
   }
 
   const duration = Math.round((Date.now() - startTime) / 1000);
-  log.info('qfield-qa-validate', {
+  log.info({
+    module: 'qfield-qa-validate',
     total: validations.length,
     success: successCount,
     failed: failCount,
