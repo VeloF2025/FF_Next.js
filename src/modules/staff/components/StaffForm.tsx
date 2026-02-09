@@ -40,15 +40,15 @@ export function StaffForm() {
     name: '',
     email: '',
     phone: '',
-    employeeId: '',
+    employeeId: '', // Auto-generated server-side for new staff
     position: '',
-    department: 'field_operations',
+    department: 'General',
     status: StaffStatus.ACTIVE,
     skills: [],
     experienceYears: 0,
     address: '',
-    city: 'Johannesburg',
-    province: 'Gauteng',
+    city: '',
+    province: '',
     postalCode: '',
     startDate: new Date(),
     contractType: ContractType.PERMANENT,
@@ -113,10 +113,12 @@ export function StaffForm() {
     try {
       if (isEditing) {
         await updateMutation.mutateAsync({ id: id!, data: formData });
+        router.push('/staff');
       } else {
-        await createMutation.mutateAsync(formData);
+        const newStaff = await createMutation.mutateAsync(formData);
+        // Redirect to the new staff member's detail page so admin can continue adding info
+        router.push(`/staff/${newStaff.id}`);
       }
-      router.push('/staff');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to save staff member';
       setError(errorMessage);
@@ -222,33 +224,43 @@ export function StaffForm() {
               <p className="mt-1 ml-7">{error}</p>
             </div>
           )}
-          <PersonalInfoSection 
-            formData={formData} 
-            handleInputChange={handleInputChange} 
-          />
-          
-          <EmploymentSection 
-            formData={formData} 
-            handleInputChange={handleInputChange}
-          />
-          
-          {/* Address section removed - handled in PersonalInfoSection */}
-          
-          <EmergencyContactSection 
-            formData={formData} 
-            handleInputChange={handleInputChange}
-          />
-          
-          <AvailabilitySection 
-            formData={formData} 
-            handleInputChange={handleInputChange}
-          />
-          
-          <SkillsSection 
+
+          {!isEditing && (
+            <p className="text-sm text-[var(--ff-text-secondary)]">
+              Enter the basic details to add this person to the staff directory. An employee ID will be assigned automatically. You can add more information later from their profile.
+            </p>
+          )}
+
+          <PersonalInfoSection
             formData={formData}
             handleInputChange={handleInputChange}
-            toggleSkill={toggleSkill}
+            isCreating={!isEditing}
           />
+
+          {isEditing && (
+            <>
+              <EmploymentSection
+                formData={formData}
+                handleInputChange={handleInputChange}
+              />
+
+              <EmergencyContactSection
+                formData={formData}
+                handleInputChange={handleInputChange}
+              />
+
+              <AvailabilitySection
+                formData={formData}
+                handleInputChange={handleInputChange}
+              />
+
+              <SkillsSection
+                formData={formData}
+                handleInputChange={handleInputChange}
+                toggleSkill={toggleSkill}
+              />
+            </>
+          )}
 
           {/* Form Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-[var(--ff-border-light)]">
@@ -272,7 +284,7 @@ export function StaffForm() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  {isEditing ? 'Update Staff Member' : 'Create Staff Member'}
+                  {isEditing ? 'Update Staff Member' : 'Add to Directory'}
                 </>
               )}
             </button>

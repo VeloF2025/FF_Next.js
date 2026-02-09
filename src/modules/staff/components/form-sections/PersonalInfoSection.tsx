@@ -3,12 +3,13 @@ import { StaffFormData } from '@/types/staff.types';
 interface PersonalInfoSectionProps {
   formData: StaffFormData;
   handleInputChange: (field: keyof StaffFormData, value: any) => void;
+  isCreating?: boolean;
 }
 
 const inputClasses = "w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-[var(--ff-text-secondary)]";
 const labelClasses = "block text-sm font-medium text-[var(--ff-text-secondary)] mb-1";
 
-export function PersonalInfoSection({ formData, handleInputChange }: PersonalInfoSectionProps) {
+export function PersonalInfoSection({ formData, handleInputChange, isCreating }: PersonalInfoSectionProps) {
   return (
     <div>
       <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Personal Information</h2>
@@ -23,21 +24,23 @@ export function PersonalInfoSection({ formData, handleInputChange }: PersonalInf
             value={formData.name}
             onChange={(e) => handleInputChange('name', e.target.value)}
             className={inputClasses}
+            placeholder="First and last name"
           />
         </div>
 
-        <div>
-          <label className={labelClasses}>
-            Employee ID *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.employeeId}
-            onChange={(e) => handleInputChange('employeeId', e.target.value)}
-            className={inputClasses}
-          />
-        </div>
+        {!isCreating && (
+          <div>
+            <label className={labelClasses}>
+              Employee ID
+            </label>
+            <input
+              type="text"
+              value={formData.employeeId}
+              disabled
+              className={`${inputClasses} opacity-60 cursor-not-allowed`}
+            />
+          </div>
+        )}
 
         <div>
           <label className={labelClasses}>
@@ -49,6 +52,7 @@ export function PersonalInfoSection({ formData, handleInputChange }: PersonalInf
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
             className={inputClasses}
+            placeholder="email@example.com"
           />
         </div>
 
@@ -62,20 +66,23 @@ export function PersonalInfoSection({ formData, handleInputChange }: PersonalInf
             value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
             className={inputClasses}
+            placeholder="+27..."
           />
         </div>
 
-        <div>
-          <label className={labelClasses}>
-            Alternative Phone
-          </label>
-          <input
-            type="tel"
-            value={formData.alternativePhone || ''}
-            onChange={(e) => handleInputChange('alternativePhone', e.target.value)}
-            className={inputClasses}
-          />
-        </div>
+        {!isCreating && (
+          <div>
+            <label className={labelClasses}>
+              Alternative Phone
+            </label>
+            <input
+              type="tel"
+              value={formData.alternativePhone || ''}
+              onChange={(e) => handleInputChange('alternativePhone', e.target.value)}
+              className={inputClasses}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

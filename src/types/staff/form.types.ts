@@ -15,7 +15,7 @@ export interface StaffFormData {
   phone: string;
   alternativePhone?: string;
   whatsappId?: string; // WhatsApp JID for direct messaging (e.g., 27831234567@s.whatsapp.net)
-  employeeId: string;
+  employeeId?: string; // Auto-generated server-side (VFxxx pattern)
   position: Position | string;
   department: Department | string; // Allow string for new departments
   level?: StaffLevel;

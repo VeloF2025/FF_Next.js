@@ -331,7 +331,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       }
 
       case 'POST': {
-        // Create new staff member
+        // Create new staff member - only name, email, phone required
         const staffData = req.body;
 
         try {
@@ -340,19 +340,37 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           const firstName = staffData.first_name || staffData.firstName || name.split(' ')[0] || '';
           const lastName = staffData.last_name || staffData.lastName || name.split(' ').slice(1).join(' ') || '';
 
+          // Auto-generate employee ID: find max VFxxx and increment
+          let employeeId = staffData.employee_id || staffData.employeeId;
+          if (!employeeId) {
+            const maxResult = await sql`
+              SELECT employee_id FROM staff
+              WHERE employee_id ~ '^VF[0-9]+$'
+              ORDER BY CAST(SUBSTRING(employee_id FROM 3) AS INTEGER) DESC
+              LIMIT 1
+            `;
+            const maxRows = maxResult as any[];
+            if (maxRows.length > 0) {
+              const currentMax = parseInt(maxRows[0].employee_id.substring(2), 10);
+              employeeId = `VF${String(currentMax + 1).padStart(3, '0')}`;
+            } else {
+              employeeId = 'VF001';
+            }
+          }
+
           const newStaff = await sql`
             INSERT INTO staff (
               employee_id, first_name, last_name, email, phone,
               department, position, join_date, status, whatsapp_id
             )
             VALUES (
-              ${staffData.employee_id || staffData.employeeId || `EMP-${Date.now()}`},
+              ${employeeId},
               ${firstName},
               ${lastName},
               ${staffData.email},
               ${staffData.phone || null},
               ${staffData.department || 'General'},
-              ${staffData.position || 'Staff'},
+              ${staffData.position || null},
               ${staffData.join_date || staffData.startDate || new Date().toISOString()},
               ${staffData.status || 'ACTIVE'},
               ${staffData.whatsappId || staffData.whatsapp_id || null}
