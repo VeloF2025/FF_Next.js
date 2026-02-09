@@ -340,7 +340,7 @@ async function handler(
       totalCount,
     });
 
-    return apiResponse.success(res, response);
+    return res.status(200).json(response);
   } catch (error) {
     log.error('SerialMismatchReport', 'Failed to fetch serial mismatch report', { error });
     return apiResponse.internalError(res, error);
