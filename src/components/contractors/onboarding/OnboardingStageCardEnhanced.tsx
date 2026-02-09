@@ -1,12 +1,13 @@
 /**
  * Enhanced Onboarding Stage Card with Document Integration
  * Shows required documents with upload status and inline upload
+ * Uses FF design system CSS variables for dark theme consistency
  */
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle2, XCircle, FileText, Plus } from 'lucide-react';
+import { Upload, CheckCircle2, XCircle } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, DocumentType } from '@/types/contractor-document.types';
 import { DocumentUploadForm } from '../DocumentUploadForm';
@@ -36,6 +37,33 @@ interface OnboardingStageCardEnhancedProps {
     notes?: string;
   }) => Promise<void>;
 }
+
+const STATUS_CONFIG = {
+  completed: {
+    accent: 'border-t-green-500',
+    badgeColor: 'bg-green-500/20 text-green-400',
+    icon: '✓',
+    label: 'Completed',
+  },
+  in_progress: {
+    accent: 'border-t-blue-500',
+    badgeColor: 'bg-blue-500/20 text-blue-400',
+    icon: '↻',
+    label: 'In Progress',
+  },
+  skipped: {
+    accent: 'border-t-gray-500',
+    badgeColor: 'bg-gray-500/20 text-gray-400',
+    icon: '⤳',
+    label: 'Skipped',
+  },
+  pending: {
+    accent: 'border-t-amber-500',
+    badgeColor: 'bg-amber-500/20 text-amber-400',
+    icon: '○',
+    label: 'Pending',
+  },
+} as const;
 
 export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: OnboardingStageCardEnhancedProps) {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -68,49 +96,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
     }
   };
 
-  const getStatusConfig = () => {
-    switch (stage.status) {
-      case 'completed':
-        return {
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-          textColor: 'text-green-800',
-          badgeColor: 'bg-green-100 text-green-800',
-          icon: '✓',
-          label: 'Completed',
-        };
-      case 'in_progress':
-        return {
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-blue-200',
-          textColor: 'text-blue-800',
-          badgeColor: 'bg-blue-100 text-blue-800',
-          icon: '↻',
-          label: 'In Progress',
-        };
-      case 'skipped':
-        return {
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
-          textColor: 'text-gray-600',
-          badgeColor: 'bg-gray-100 text-gray-600',
-          icon: '⤳',
-          label: 'Skipped',
-        };
-      default:
-        return {
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
-          textColor: 'text-yellow-800',
-          badgeColor: 'bg-yellow-100 text-yellow-800',
-          icon: '○',
-          label: 'Pending',
-        };
-    }
-  };
-
   const handleStatusChange = async (newStatus: OnboardingStage['status']) => {
-    // Validate completion requirements
     if (newStatus === 'completed') {
       if (isVerificationStage && !verificationPassed) {
         notificationService.warning('Cannot complete stage. Run company verification first.');
@@ -154,7 +140,6 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
     fetchDocuments();
   };
 
-  // Check which required documents are uploaded
   const getDocumentStatus = (docType: string) => {
     return documents.find(d => d.documentType === docType && d.status === 'approved');
   };
@@ -163,7 +148,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
     return stage.requiredDocuments.filter(docType => !getDocumentStatus(docType));
   };
 
-  const config = getStatusConfig();
+  const config = STATUS_CONFIG[stage.status] || STATUS_CONFIG.pending;
   const completedDocsCount = stage.requiredDocuments.filter(docType => getDocumentStatus(docType)).length;
   const documentProgress = stage.requiredDocuments.length > 0
     ? Math.round((completedDocsCount / stage.requiredDocuments.length) * 100)
@@ -173,13 +158,12 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
     : (stage.requiredDocuments.length > 0 && getMissingDocuments().length === 0);
 
   return (
-    <div className={`rounded-lg border ${config.borderColor} ${config.bgColor} p-4 transition-all`}>
+    <div className={`rounded-lg border border-[var(--ff-border-light)] border-t-4 ${config.accent} bg-[var(--ff-bg-card)] p-4 transition-all`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-2xl ${config.textColor}`}>{config.icon}</span>
-            <h4 className="text-lg font-semibold text-gray-900">
+            <h4 className="text-lg font-semibold text-[var(--ff-text-primary)]">
               {stage.stageOrder}. {stage.stageName}
             </h4>
           </div>
@@ -193,14 +177,14 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
       {stage.requiredDocuments.length > 0 && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Documents</span>
-            <span className="text-sm font-bold text-gray-900">
+            <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Documents</span>
+            <span className="text-sm font-bold text-[var(--ff-text-primary)]">
               {completedDocsCount} / {stage.requiredDocuments.length}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2.5">
             <div
-              className={`h-2.5 rounded-full transition-all duration-300 ${allDocsComplete ? 'bg-green-600' : 'bg-blue-600'}`}
+              className={`h-2.5 rounded-full transition-all duration-300 ${allDocsComplete ? 'bg-green-500' : 'bg-blue-500'}`}
               style={{ width: `${documentProgress}%` }}
             />
           </div>
@@ -219,8 +203,8 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
 
       {/* Required Documents List */}
       {!isVerificationStage && stage.requiredDocuments.length > 0 && !isLoadingDocs && (
-        <div className="space-y-2 mb-4 bg-white rounded p-3 border border-gray-200">
-          <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Required Documents</h5>
+        <div className="space-y-2 mb-4 bg-[var(--ff-bg-secondary)] rounded-lg p-3 border border-[var(--ff-border-light)]">
+          <h5 className="text-xs font-semibold text-[var(--ff-text-tertiary)] uppercase mb-2">Required Documents</h5>
           {stage.requiredDocuments.map((docType) => {
             const doc = getDocumentStatus(docType);
             const isUploaded = !!doc;
@@ -228,20 +212,20 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
             return (
               <div
                 key={docType}
-                className="flex items-center justify-between py-2 px-2 rounded hover:bg-gray-50"
+                className="flex items-center justify-between py-2 px-2 rounded hover:bg-[var(--ff-bg-tertiary)]"
               >
                 <div className="flex items-center gap-2 flex-1">
                   {isUploaded ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0" />
                   ) : (
-                    <XCircle className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <XCircle className="h-4 w-4 text-[var(--ff-text-tertiary)] flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${isUploaded ? 'text-gray-900 font-medium' : 'text-gray-600'}`}>
+                    <p className={`text-sm ${isUploaded ? 'text-[var(--ff-text-primary)] font-medium' : 'text-[var(--ff-text-secondary)]'}`}>
                       {DOCUMENT_TYPE_LABELS[docType as DocumentType]}
                     </p>
                     {isUploaded && doc && (
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--ff-text-tertiary)]">
                         Uploaded {new Date(doc.createdAt).toISOString().split('T')[0]}
                       </p>
                     )}
@@ -263,7 +247,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
       )}
 
       {/* Timestamps */}
-      <div className="text-xs text-gray-600 space-y-1 mb-3">
+      <div className="text-xs text-[var(--ff-text-tertiary)] space-y-1 mb-3">
         {stage.startedAt && (
           <div>Started: {new Date(stage.startedAt).toISOString().split('T')[0]}</div>
         )}
@@ -281,7 +265,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded text-sm"
+            className="w-full p-2 bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded text-sm placeholder:text-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             rows={3}
             placeholder="Add notes..."
           />
@@ -289,13 +273,13 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
             <button
               onClick={handleSaveNotes}
               disabled={isUpdating}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               Save
             </button>
             <button
               onClick={() => setShowNotes(false)}
-              className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+              className="px-3 py-1 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] text-sm rounded hover:bg-[var(--ff-bg-hover)] transition-colors"
             >
               Cancel
             </button>
@@ -303,7 +287,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
         </div>
       ) : (
         stage.notes && (
-          <div className="mb-3 p-2 bg-white rounded text-sm text-gray-700 border border-gray-200">
+          <div className="mb-3 p-2 bg-[var(--ff-bg-secondary)] rounded text-sm text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)]">
             {stage.notes}
           </div>
         )
@@ -315,7 +299,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
           <button
             onClick={() => handleStatusChange('in_progress')}
             disabled={isUpdating}
-            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             Start Stage
           </button>
@@ -325,7 +309,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
             <button
               onClick={() => handleStatusChange('completed')}
               disabled={isUpdating || !allDocsComplete}
-              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title={!allDocsComplete
                 ? (isVerificationStage ? 'Complete verification first' : 'Upload all required documents first')
                 : 'Mark stage as complete'}
@@ -333,8 +317,8 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
               Mark Complete
             </button>
             {!allDocsComplete && (
-              <span className="text-xs text-amber-600 self-center italic">
-                {isVerificationStage ? '⚠ Complete verification to proceed' : '⚠ Upload all documents to complete'}
+              <span className="text-xs text-amber-400 self-center italic">
+                {isVerificationStage ? 'Complete verification to proceed' : 'Upload all documents to complete'}
               </span>
             )}
           </>
@@ -343,7 +327,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
           <button
             onClick={() => handleStatusChange('skipped')}
             disabled={isUpdating}
-            className="px-3 py-1.5 bg-gray-400 text-white text-sm rounded hover:bg-gray-500 disabled:opacity-50"
+            className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] text-sm rounded hover:bg-[var(--ff-bg-hover)] disabled:opacity-50 transition-colors"
           >
             Skip
           </button>
@@ -351,7 +335,7 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
         {!showNotes && (
           <button
             onClick={() => setShowNotes(true)}
-            className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+            className="px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] text-sm rounded hover:bg-[var(--ff-bg-hover)] transition-colors"
           >
             {stage.notes ? 'Edit Notes' : 'Add Notes'}
           </button>
@@ -360,8 +344,8 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
 
       {/* Upload Modal */}
       {showUpload && uploadDocType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <DocumentUploadForm
               contractorId={String(stage.contractorId)}
               onSuccess={handleUploadSuccess}
