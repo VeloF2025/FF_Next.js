@@ -183,9 +183,9 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
     fetchTTA();
   }, [filters, refreshKey]);
 
-  const TrendIcon = trendData?.velocity.installed_trend === 'up'
+  const TrendIcon = trendData?.velocity?.installed_trend === 'up'
     ? TrendingUp
-    : trendData?.velocity.installed_trend === 'down'
+    : trendData?.velocity?.installed_trend === 'down'
       ? TrendingDown
       : Minus;
 
@@ -319,12 +319,12 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       <ReportCardGrid columns={dailyTarget > 0 ? 5 : 4}>
         <ReportCard
           title="Avg Installs"
-          value={trendData?.velocity.avg_installed.toFixed(1) || '-'}
+          value={trendData?.velocity?.avg_installed?.toFixed(1) || '-'}
           subtitle={`per ${groupBy}`}
           color="blue"
-          trend={trendData?.velocity.installed_trend}
+          trend={trendData?.velocity?.installed_trend}
           trendValue={
-            trendData?.velocity.installed_wow_change
+            trendData?.velocity?.installed_wow_change
               ? `${trendData.velocity.installed_wow_change > 0 ? '+' : ''}${trendData.velocity.installed_wow_change.toFixed(0)}%`
               : undefined
           }
@@ -332,12 +332,12 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         />
         <ReportCard
           title="Avg Activations"
-          value={trendData?.velocity.avg_activated.toFixed(1) || '-'}
+          value={trendData?.velocity?.avg_activated?.toFixed(1) || '-'}
           subtitle={`per ${groupBy}`}
           color="purple"
-          trend={trendData?.velocity.activated_trend}
+          trend={trendData?.velocity?.activated_trend}
           trendValue={
-            trendData?.velocity.activated_wow_change
+            trendData?.velocity?.activated_wow_change
               ? `${trendData.velocity.activated_wow_change > 0 ? '+' : ''}${trendData.velocity.activated_wow_change.toFixed(0)}%`
               : undefined
           }
@@ -345,14 +345,14 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         />
         <ReportCard
           title="Total Period"
-          value={trendData?.data.reduce((sum, d) => sum + d.installed, 0) || 0}
+          value={trendData?.data?.reduce((sum, d) => sum + d.installed, 0) || 0}
           subtitle="Installed in period"
           color="green"
           isLoading={isLoading}
         />
         <ReportCard
           title="Data Points"
-          value={trendData?.data.length || 0}
+          value={trendData?.data?.length || 0}
           subtitle={`${groupBy}s in range`}
           color="gray"
           icon={<BarChart3 className="h-4 w-4" />}
@@ -363,15 +363,15 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           <ReportCard
             title="vs Target"
             value={
-              trendData?.velocity.avg_installed
+              trendData?.velocity?.avg_installed
                 ? `${((trendData.velocity.avg_installed / dailyTarget) * 100).toFixed(0)}%`
                 : '-'
             }
             subtitle={`of ${dailyTarget}/day target`}
             color={
-              trendData?.velocity.avg_installed && trendData.velocity.avg_installed >= dailyTarget
+              trendData?.velocity?.avg_installed && trendData.velocity.avg_installed >= dailyTarget
                 ? 'green'
-                : trendData?.velocity.avg_installed && trendData.velocity.avg_installed >= dailyTarget * 0.8
+                : trendData?.velocity?.avg_installed && trendData.velocity.avg_installed >= dailyTarget * 0.8
                   ? 'yellow'
                   : 'red'
             }
@@ -386,7 +386,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         <TrendChart
           title="Installation & Activation Trends"
           subtitle={`${filters.dateFrom} to ${filters.dateTo}${dailyTarget > 0 ? ` • Target: ${dailyTarget}/day` : ''}`}
-          data={trendData?.data.map((d) => {
+          data={trendData?.data?.map((d) => {
             // If we have per-project data and some projects are toggled off, compute filtered totals
             if (d.by_project && availableProjects.length > 1) {
               let installed = 0, activated = 0, reviewed = 0, notReviewed = 0;
@@ -436,7 +436,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         <TrendChart
           title="Daily Volume Distribution by Project"
           subtitle={`Showing: ${seriesVisibility.installed ? 'Installed' : seriesVisibility.activated ? 'Activated' : seriesVisibility.reviewed ? 'Reviewed' : 'Not Reviewed'}`}
-          data={trendData?.data.map((d) => {
+          data={trendData?.data?.map((d) => {
             // Build data point with each project as a separate key
             const dataPoint: Record<string, unknown> = { date: d.label };
 
@@ -588,26 +588,26 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             <ReportCardGrid columns={4}>
               <ReportCard
                 title="Avg Time"
-                value={formatDuration(timeToActivation.summary.avg_hours)}
+                value={formatDuration(timeToActivation.summary?.avg_hours ?? 0)}
                 subtitle="WA → OES"
                 color="purple"
                 icon={<Clock className="h-4 w-4" />}
               />
               <ReportCard
                 title="Median Time"
-                value={formatDuration(timeToActivation.summary.median_hours)}
+                value={formatDuration(timeToActivation.summary?.median_hours ?? 0)}
                 subtitle="50th percentile"
                 color="blue"
               />
               <ReportCard
                 title="Same Day"
-                value={`${timeToActivation.summary.same_day_percent.toFixed(0)}%`}
-                subtitle={`${timeToActivation.summary.total_matched} total`}
+                value={`${(timeToActivation.summary?.same_day_percent ?? 0).toFixed(0)}%`}
+                subtitle={`${timeToActivation.summary?.total_matched ?? 0} total`}
                 color="green"
               />
               <ReportCard
                 title="Within 24h"
-                value={`${timeToActivation.summary.within_24h_percent.toFixed(0)}%`}
+                value={`${(timeToActivation.summary?.within_24h_percent ?? 0).toFixed(0)}%`}
                 subtitle="Including same day"
                 color="cyan"
               />

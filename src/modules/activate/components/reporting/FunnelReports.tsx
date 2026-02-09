@@ -115,18 +115,18 @@ export function FunnelReports({ filters, refreshKey }: FunnelReportsProps) {
       <ReportCardGrid columns={4}>
         <ReportCard
           title="Total Submitted"
-          value={data?.summary.total_submitted || 0}
+          value={data?.summary?.total_submitted || 0}
           color="blue"
           isLoading={isLoading}
         />
         <ReportCard
           title="Conversion Rate"
-          value={`${data?.summary.conversion_rate.toFixed(1) || 0}%`}
+          value={`${(data?.summary?.conversion_rate ?? 0).toFixed(1)}%`}
           subtitle="Submitted → Feedback Sent"
           color={
-            (data?.summary.conversion_rate || 0) >= 80
+            (data?.summary?.conversion_rate || 0) >= 80
               ? 'green'
-              : (data?.summary.conversion_rate || 0) >= 50
+              : (data?.summary?.conversion_rate || 0) >= 50
                 ? 'yellow'
                 : 'red'
           }
@@ -134,19 +134,19 @@ export function FunnelReports({ filters, refreshKey }: FunnelReportsProps) {
         />
         <ReportCard
           title="Avg Cycle Time"
-          value={formatTime(data?.summary.avg_cycle_time || 0)}
+          value={formatTime(data?.summary?.avg_cycle_time || 0)}
           subtitle="End-to-end"
           color="purple"
           isLoading={isLoading}
         />
         <ReportCard
           title="Photo Completion"
-          value={`${data?.summary.photo_completion_rate.toFixed(1) || 0}%`}
+          value={`${(data?.summary?.photo_completion_rate ?? 0).toFixed(1)}%`}
           subtitle="All 10 steps"
           color={
-            (data?.summary.photo_completion_rate || 0) >= 80
+            (data?.summary?.photo_completion_rate || 0) >= 80
               ? 'green'
-              : (data?.summary.photo_completion_rate || 0) >= 50
+              : (data?.summary?.photo_completion_rate || 0) >= 50
                 ? 'yellow'
                 : 'red'
           }
@@ -234,7 +234,7 @@ function FunnelSection({
                         : 'text-red-600 dark:text-red-400'
                   }`}
                 >
-                  -{stage.drop_off_percent.toFixed(1)}%
+                  -{(stage.drop_off_percent ?? 0).toFixed(1)}%
                 </span>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
                   drop-off
@@ -326,7 +326,7 @@ function PhotoStepsSection({
                     Completion rate:
                   </span>
                   <span className="font-medium text-red-600 dark:text-red-400">
-                    {step.completion_rate.toFixed(1)}%
+                    {(step.completion_rate ?? 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className="mt-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">

@@ -101,24 +101,24 @@ export function TeamReports({ filters, refreshKey }: TeamReportsProps) {
       <ReportCardGrid columns={4}>
         <ReportCard
           title="Total Technicians"
-          value={data?.summary.total_technicians || 0}
+          value={data?.summary?.total_technicians || 0}
           color="blue"
           icon={<Users className="h-4 w-4" />}
           isLoading={isLoading}
         />
         <ReportCard
           title="Total Teams"
-          value={data?.summary.total_teams || 0}
+          value={data?.summary?.total_teams || 0}
           color="purple"
           isLoading={isLoading}
         />
         <ReportCard
           title="Avg First-Pass Rate"
-          value={`${data?.summary.avg_first_pass_rate.toFixed(1) || 0}%`}
+          value={`${(data?.summary?.avg_first_pass_rate ?? 0).toFixed(1)}%`}
           color={
-            (data?.summary.avg_first_pass_rate || 0) >= 80
+            (data?.summary?.avg_first_pass_rate || 0) >= 80
               ? 'green'
-              : (data?.summary.avg_first_pass_rate || 0) >= 60
+              : (data?.summary?.avg_first_pass_rate || 0) >= 60
                 ? 'yellow'
                 : 'red'
           }
@@ -126,7 +126,7 @@ export function TeamReports({ filters, refreshKey }: TeamReportsProps) {
         />
         <ReportCard
           title="Top Performer"
-          value={data?.summary.top_performer || '-'}
+          value={data?.summary?.top_performer || '-'}
           color="cyan"
           icon={<Trophy className="h-4 w-4" />}
           isLoading={isLoading}

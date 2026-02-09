@@ -70,7 +70,8 @@ export function ProcurementDashboard() {
 
         if (rfqsRes.ok) {
           const rfqsData = await rfqsRes.json();
-          (rfqsData.rfqs || []).slice(0, 2).forEach((rfq: any) => {
+          const rfqsList = rfqsData.data?.rfqs || rfqsData.rfqs || [];
+          rfqsList.slice(0, 2).forEach((rfq: any) => {
             activities.push({
               id: `rfq-${rfq.id}`,
               type: 'RFQ',
