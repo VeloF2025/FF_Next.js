@@ -14,7 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import type {
@@ -28,11 +28,6 @@ import type {
   VelocityMetrics,
   ProjectionData,
 } from '@/modules/activate/types/reporting.types';
-
-// Use neon() HTTP instead of Pool WebSocket to avoid socket hang up errors
-const sql = neon(process.env.DATABASE_URL!);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pool = { async query(text: string, params?: any[]) { const rows = await sql.query(text, params); return { rows }; } };
 
 // Milestone percentages to track
 const MILESTONES = [25, 50, 75, 90];

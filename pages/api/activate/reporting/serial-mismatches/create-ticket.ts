@@ -13,15 +13,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-// Use neon() HTTP instead of Pool WebSocket to avoid socket hang up errors
-const sqlFn = neon(process.env.DATABASE_URL!);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pool = { async query(text: string, params?: any[]) { const rows = await sqlFn.query(text, params); return { rows }; } };
 
 interface CreateTicketBody {
   id: string;

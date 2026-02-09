@@ -17,14 +17,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
-
-// Use neon() HTTP instead of Pool WebSocket to avoid socket hang up errors
-const sql = neon(process.env.DATABASE_URL!);
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pool = { async query(text: string, params?: any[]) { const rows = await sql.query(text, params); return { rows }; } };
 
 interface InstallationGapItem {
   drop_number: string;
