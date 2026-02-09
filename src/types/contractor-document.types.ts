@@ -103,7 +103,7 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   technical_certification: 'Technical Certification',
   key_staff_credentials: 'Key Staff Credentials',
   signed_contract: 'Signed Contract',
-  msa: 'Master Service Agreement',
+  msa: 'Master Build Agreement',
   ncnda: 'NCNDA',
   other: 'Other Document',
 };
