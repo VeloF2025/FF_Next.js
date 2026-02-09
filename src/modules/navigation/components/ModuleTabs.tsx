@@ -56,7 +56,7 @@ export function ModuleTabs({
 }: ModuleTabsProps) {
   return (
     <nav
-      className="flex w-full -mb-px"
+      className="flex w-full -mb-px overflow-x-auto scrollbar-hide"
       aria-label="Module tabs"
     >
       {tabs.map((tab) => {
@@ -67,7 +67,7 @@ export function ModuleTabs({
 
         // Tab styles - flex-1 for equal width distribution
         const baseStyles =
-          'flex-1 flex items-center justify-center gap-2 py-3 px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap';
+          'sm:flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 border-b-2 font-medium text-sm transition-colors whitespace-nowrap';
         const activeStyles =
           'border-[var(--ff-primary-500)] text-[var(--ff-primary-400)] bg-[var(--ff-primary-500)]/10';
         const inactiveStyles =

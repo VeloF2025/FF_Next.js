@@ -237,6 +237,15 @@
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-500 dark:bg-gray-500;
   }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 
