@@ -113,7 +113,9 @@ export function usePortalSession(): UsePortalSessionReturn {
 
           return result;
         } else {
-          const errorMsg = result?.error || data.error || 'Authentication failed';
+          // Extract error message string - data.error may be an object {code, message} from apiResponse
+          const rawError = result?.error || data.error || 'Authentication failed';
+          const errorMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : String(rawError);
           setError(errorMsg);
           return {
             success: false,
