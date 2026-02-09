@@ -344,7 +344,7 @@ export function StaffDetail() {
 
   if (error || !staff) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="p-6">
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
           <p className="text-red-400">Staff member not found</p>
         </div>
@@ -353,8 +353,8 @@ export function StaffDetail() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6">
+    <div className="p-6">
+      <div className="mb-4">
         <button
           onClick={() => router.push('/staff')}
           className="inline-flex items-center text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
