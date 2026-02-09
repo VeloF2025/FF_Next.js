@@ -48,6 +48,12 @@ export interface Contractor {
   specializations?: string[];
   certifications?: string[];
 
+  // Verification (4 fields)
+  cipcVerified?: boolean;
+  cipcVerifiedAt?: Date;
+  cipcCompanyStatus?: string;
+  verificationBundle?: string;
+
   // Metadata (4 fields)
   notes?: string;
   tags?: string[];

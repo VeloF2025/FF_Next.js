@@ -10,6 +10,7 @@ import { Upload, CheckCircle2, XCircle, FileText, Plus } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, DocumentType } from '@/types/contractor-document.types';
 import { DocumentUploadForm } from '../DocumentUploadForm';
+import { VerificationPanel } from './VerificationPanel';
 import { log } from '@/lib/logger';
 
 export interface OnboardingStage {
@@ -44,6 +45,9 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
   const [uploadDocType, setUploadDocType] = useState<DocumentType | null>(null);
   const [documents, setDocuments] = useState<ContractorDocument[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [verificationPassed, setVerificationPassed] = useState(false);
+
+  const isVerificationStage = stage.stageName === 'Company Verification';
 
   // Fetch contractor documents
   useEffect(() => {
@@ -106,12 +110,18 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
   };
 
   const handleStatusChange = async (newStatus: OnboardingStage['status']) => {
-    // Validate document completion before allowing 'completed' status
-    if (newStatus === 'completed' && stage.requiredDocuments.length > 0) {
-      const missingDocs = getMissingDocuments();
-      if (missingDocs.length > 0) {
-        notificationService.warning(`Cannot complete stage. Missing documents: ${missingDocs.map(d => DOCUMENT_TYPE_LABELS[d as DocumentType]).join(', ')}`);
+    // Validate completion requirements
+    if (newStatus === 'completed') {
+      if (isVerificationStage && !verificationPassed) {
+        notificationService.warning('Cannot complete stage. Run company verification first.');
         return;
+      }
+      if (!isVerificationStage && stage.requiredDocuments.length > 0) {
+        const missingDocs = getMissingDocuments();
+        if (missingDocs.length > 0) {
+          notificationService.warning(`Cannot complete stage. Missing documents: ${missingDocs.map(d => DOCUMENT_TYPE_LABELS[d as DocumentType]).join(', ')}`);
+          return;
+        }
       }
     }
 
@@ -158,7 +168,9 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
   const documentProgress = stage.requiredDocuments.length > 0
     ? Math.round((completedDocsCount / stage.requiredDocuments.length) * 100)
     : 100;
-  const allDocsComplete = stage.requiredDocuments.length > 0 && getMissingDocuments().length === 0;
+  const allDocsComplete = isVerificationStage
+    ? verificationPassed
+    : (stage.requiredDocuments.length > 0 && getMissingDocuments().length === 0);
 
   return (
     <div className={`rounded-lg border ${config.borderColor} ${config.bgColor} p-4 transition-all`}>
@@ -195,8 +207,18 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
         </div>
       )}
 
+      {/* Verification Panel for Company Verification stage */}
+      {isVerificationStage && (
+        <div className="mb-4">
+          <VerificationPanel
+            contractorId={String(stage.contractorId)}
+            onVerificationComplete={(passed) => setVerificationPassed(passed)}
+          />
+        </div>
+      )}
+
       {/* Required Documents List */}
-      {stage.requiredDocuments.length > 0 && !isLoadingDocs && (
+      {!isVerificationStage && stage.requiredDocuments.length > 0 && !isLoadingDocs && (
         <div className="space-y-2 mb-4 bg-white rounded p-3 border border-gray-200">
           <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Required Documents</h5>
           {stage.requiredDocuments.map((docType) => {
@@ -304,13 +326,15 @@ export function OnboardingStageCardEnhanced({ stage, onUpdateStage }: Onboarding
               onClick={() => handleStatusChange('completed')}
               disabled={isUpdating || !allDocsComplete}
               className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!allDocsComplete ? 'Upload all required documents first' : 'Mark stage as complete'}
+              title={!allDocsComplete
+                ? (isVerificationStage ? 'Complete verification first' : 'Upload all required documents first')
+                : 'Mark stage as complete'}
             >
               Mark Complete
             </button>
             {!allDocsComplete && (
               <span className="text-xs text-amber-600 self-center italic">
-                ⚠ Upload all documents to complete
+                {isVerificationStage ? '⚠ Complete verification to proceed' : '⚠ Upload all documents to complete'}
               </span>
             )}
           </>

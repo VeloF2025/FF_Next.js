@@ -52,23 +52,28 @@ const DEFAULT_STAGES = [
     requiredDocuments: ['cipc_registration', 'company_registration', 'tax_clearance'],
   },
   {
-    stageName: 'Financial Documentation',
+    stageName: 'Company Verification',
     stageOrder: 2,
+    requiredDocuments: [],
+  },
+  {
+    stageName: 'Financial Documentation',
+    stageOrder: 3,
     requiredDocuments: ['bank_confirmation', 'vat_certificate'],
   },
   {
     stageName: 'Insurance & Compliance',
-    stageOrder: 3,
+    stageOrder: 4,
     requiredDocuments: ['insurance_liability', 'insurance_workers_comp', 'safety_certificate'],
   },
   {
     stageName: 'Technical Qualifications',
-    stageOrder: 4,
+    stageOrder: 5,
     requiredDocuments: ['technical_certification', 'key_staff_credentials'],
   },
   {
     stageName: 'Final Review',
-    stageOrder: 5,
+    stageOrder: 6,
     requiredDocuments: [],
   },
 ];
