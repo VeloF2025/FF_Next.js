@@ -252,7 +252,7 @@ export function DrSummaryPage({
           </div>
 
           {/* Equipment Serials */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <span className="text-xs text-gray-500 dark:text-gray-400">ONT Serial</span>
               <p className="text-sm font-mono text-gray-900 dark:text-white truncate">

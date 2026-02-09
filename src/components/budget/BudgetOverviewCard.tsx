@@ -135,7 +135,7 @@ export function BudgetOverviewCard({
         </div>
 
         {/* Budget Breakdown */}
-        <div className="grid grid-cols-3 gap-4 pt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div className="space-y-1">
             <p className="text-xs text-gray-500 dark:text-gray-400">Committed</p>
             <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(committedAmount, currency)}</p>

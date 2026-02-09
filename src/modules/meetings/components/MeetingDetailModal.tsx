@@ -25,7 +25,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
         
         <div className="p-6">
           {/* Meeting Details */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Details</h3>
               <div className="space-y-2 text-sm text-[var(--ff-text-secondary)]">

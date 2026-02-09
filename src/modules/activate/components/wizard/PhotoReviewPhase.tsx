@@ -630,7 +630,7 @@ export function PhotoReviewPhase({
         </div>
 
         {/* Step coverage summary */}
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => {
             const count = stepCounts.get(step) || 0;
             const isMissing = count === 0;

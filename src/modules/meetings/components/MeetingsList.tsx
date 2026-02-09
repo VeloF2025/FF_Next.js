@@ -41,7 +41,7 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm text-[var(--ff-text-secondary)] mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-[var(--ff-text-secondary)] mb-3">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     <span>{meeting.date.toISOString().split('T')[0]}</span>

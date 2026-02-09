@@ -33,7 +33,7 @@ export default function BOQVersionComparison({
 
         <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="bg-green-50 p-4 rounded-lg">
               <div className="flex items-center">
                 <Plus className="h-5 w-5 text-green-600 mr-2" />

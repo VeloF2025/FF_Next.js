@@ -37,7 +37,7 @@ export const TransfersTab: React.FC<TransfersTabProps> = ({ transfers, onCreateT
                       </span>
                     </div>
                     <p className="text-gray-700 mb-2">{transfer.itemDescription}</p>
-                    <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-600">
                       <div>
                         <p className="text-xs text-gray-500">Quantity</p>
                         <p className="font-medium">{transfer.quantity.toLocaleString()} {transfer.unit}</p>

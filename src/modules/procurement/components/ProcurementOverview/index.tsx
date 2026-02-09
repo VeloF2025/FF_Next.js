@@ -51,7 +51,7 @@ export function ProcurementOverview({
       </div>
 
       {/* Stats Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard
           label="Active RFQs"
           value={aggregateMetrics?.totalActiveRFQs ?? 0}

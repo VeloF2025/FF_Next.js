@@ -54,7 +54,7 @@ export function BreadcrumbNavigation({ breadcrumbs, title, onMenuClick }: Breadc
       <div className="flex flex-col min-w-0">
         {/* Breadcrumbs */}
         {breadcrumbs && breadcrumbs.length > 1 && (
-          <nav className="flex items-center space-x-1 text-sm text-[var(--ff-text-tertiary)] mb-1">
+          <nav className="hidden sm:flex items-center space-x-1 text-sm text-[var(--ff-text-tertiary)] mb-1">
             {breadcrumbs.map((crumb, index) => {
               const isLast = index === breadcrumbs.length - 1;
               

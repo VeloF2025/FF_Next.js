@@ -609,7 +609,7 @@ export default function StockManagement({ projectId, projectName }: StockManagem
                       </div>
 
                       {/* Quantities */}
-                      <div className="grid grid-cols-3 gap-4 text-right">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-right">
                         <div>
                           <p className="text-xs text-[var(--ff-text-tertiary)]">Current</p>
                           <p className={`font-semibold ${

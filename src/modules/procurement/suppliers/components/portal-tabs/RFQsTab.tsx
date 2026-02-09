@@ -53,7 +53,7 @@ export const RFQsTab: React.FC<RFQsTabProps> = ({ rfqInvitations, onOpenQuoteMod
                   </span>
                 </div>
                 <p className="text-gray-600 mb-2">{rfq.description}</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">RFQ Number:</span>
                     <p className="font-medium">{rfq.rfqNumber}</p>

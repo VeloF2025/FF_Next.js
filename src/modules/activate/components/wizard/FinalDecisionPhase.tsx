@@ -451,7 +451,7 @@ export function FinalDecisionPhase({
                     </span>
                   </div>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{swapCheck.details}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
                       <span className="text-gray-500">ONT field:</span>
                       <code className="ml-1 font-mono">{wizardState.prerequisites.ontSerial || 'N/A'}</code>
@@ -492,7 +492,7 @@ export function FinalDecisionPhase({
 
         <div className="space-y-4">
           {/* Passing checks - compact */}
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Prerequisites:</span>
               <span>{getStatusIcon(wizardState.prerequisites.passed)}</span>
@@ -533,7 +533,7 @@ export function FinalDecisionPhase({
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                   This data is for internal QA/VLM improvement only. NOT sent to technicians.
                 </p>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* OneMap Serial */}
                   <div className="text-center">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">OneMap Synced</div>

@@ -72,7 +72,7 @@ export function Header({
           )}
 
           {/* Right side - Search + Theme + Notifications + User */}
-          <div className="flex items-center space-x-2 lg:space-x-3">
+          <div className="flex items-center gap-1 sm:gap-2 lg:space-x-3">
             {showSearch && (
               <SearchBar 
                 searchQuery={searchQuery}

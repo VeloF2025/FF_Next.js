@@ -58,7 +58,7 @@ const StandardDataTableComponent = <T,>({
         {columns.map((column) => (
           <td
             key={column.key}
-            className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]"
+            className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-[var(--ff-text-primary)]"
           >
             {renderCell(item, column)}
           </td>
@@ -76,7 +76,7 @@ const StandardDataTableComponent = <T,>({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide ${
+                  className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide ${
                     column.className || ''
                   }`}
                 >
@@ -159,7 +159,7 @@ export function Pagination({
         <button
           key={1}
           onClick={() => onPageChange(1)}
-          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
+          className="px-2 sm:px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
         >
           1
         </button>
@@ -174,7 +174,7 @@ export function Pagination({
         <button
           key={i}
           onClick={() => onPageChange(i)}
-          className={`px-3 py-1 text-sm border rounded ${
+          className={`px-2 sm:px-3 py-1 text-sm border rounded ${
             i === currentPage
               ? 'bg-blue-600 text-white border-blue-600'
               : 'border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]'
@@ -193,7 +193,7 @@ export function Pagination({
         <button
           key={totalPages}
           onClick={() => onPageChange(totalPages)}
-          className="px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
+          className="px-2 sm:px-3 py-1 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-primary)]"
         >
           {totalPages}
         </button>
@@ -204,8 +204,8 @@ export function Pagination({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)]">
-      <div className="text-sm text-[var(--ff-text-secondary)]">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 sm:px-4 py-3 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)]">
+      <div className="hidden sm:block text-sm text-[var(--ff-text-secondary)]">
         Showing <span className="font-medium text-[var(--ff-text-primary)]">{startItem}</span> to{' '}
         <span className="font-medium text-[var(--ff-text-primary)]">{endItem}</span> of{' '}
         <span className="font-medium text-[var(--ff-text-primary)]">{totalItems}</span> results

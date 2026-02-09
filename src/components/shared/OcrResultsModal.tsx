@@ -201,7 +201,7 @@ export function OcrResultsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden m-4 flex flex-col">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden mx-4 sm:mx-auto flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--ff-border-light)] flex-shrink-0">
           <div className="flex items-center gap-3">

@@ -106,7 +106,7 @@ const QuoteEvaluationPage: React.FC = () => {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
             <div className="text-sm text-gray-500">Total</div>

@@ -190,7 +190,7 @@ export default function VehicleCheckInHistoryPage() {
     <>
       <Head>
         <title>Check-In History | FibreFlow</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">

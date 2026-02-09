@@ -204,7 +204,7 @@ export function BundleItemsModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-[var(--ff-border-default)]">
+      <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-[var(--ff-border-default)] mx-4 sm:mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-default)]">
           <div className="flex items-center gap-3">

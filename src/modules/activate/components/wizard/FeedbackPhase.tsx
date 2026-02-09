@@ -397,7 +397,7 @@ export function FeedbackPhase({
           return null;
         })()}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {/* Prerequisites */}
           <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
             <div className="text-2xl mb-1">

@@ -222,7 +222,7 @@ export function BudgetDashboardWidget({
         </div>
 
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
           <div className="text-center">
             <p className="text-xs text-gray-500">Committed</p>
             <p className="text-sm font-semibold text-gray-900">{formatCompact(committedAmount, currency)}</p>

@@ -166,7 +166,7 @@ export function ConvertToPOModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+      <div className="relative bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden mx-4 sm:mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
           <div>

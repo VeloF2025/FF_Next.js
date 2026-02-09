@@ -418,7 +418,7 @@ export function UserPermissionsModal({
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="bg-[var(--ff-bg-primary)] w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl flex flex-col">
+        <div className="bg-[var(--ff-bg-primary)] w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl flex flex-col mx-4 sm:mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ff-border-light)]">
             <div className="flex items-center gap-3">
