@@ -167,11 +167,167 @@ function validateDataSample(rows: OESRow[]): string[] {
   return warnings;
 }
 
+// PP DATA types and project mapping
+interface PPRow {
+  project: string;
+  serial_number: string;
+  date_registered: string | null;
+}
+
+const PP_PROJECT_CODE_MAP: Record<string, string> = {
+  'LAW': 'Lawley',
+  'MOA': 'Mohadin',
+  'MAM': 'Mamelodi',
+};
+
+/**
+ * Parse PP DATA sheet from an already-loaded workbook
+ * Returns null if no PP sheet found (non-fatal)
+ */
+function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
+  const ppSheetName = workbook.SheetNames.find(name =>
+    name.toUpperCase().includes('PP')
+  );
+
+  if (!ppSheetName) return null;
+
+  const sheet = workbook.Sheets[ppSheetName];
+  if (!sheet) return null;
+
+  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+  if (data.length < 2) return null;
+
+  const rows: PPRow[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row || !row[0] || !row[1]) continue;
+
+    const rawProject = String(row[0]).trim().toUpperCase();
+    const serialNumber = String(row[1]).trim();
+    if (!serialNumber) continue;
+
+    let dateRegistered: string | null = null;
+    if (row[2] !== undefined && row[2] !== null && row[2] !== '') {
+      if (typeof row[2] === 'number') {
+        dateRegistered = excelDateToISO(row[2]);
+      } else {
+        dateRegistered = String(row[2]).trim();
+      }
+    }
+
+    rows.push({
+      project: PP_PROJECT_CODE_MAP[rawProject] || rawProject,
+      serial_number: serialNumber,
+      date_registered: dateRegistered,
+    });
+  }
+
+  return rows.length > 0 ? rows : null;
+}
+
+/**
+ * Import PP DATA rows into oes_pp_data with local resolution
+ */
+async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
+  try {
+    log.info('OESImport', 'Importing PP DATA sheet', { rows: ppRows.length });
+
+    // Create import batch
+    const batchResult = await pool.query(
+      `INSERT INTO oes_pp_import_batches (filename, total_rows, imported_by)
+       VALUES ($1, $2, $3) RETURNING id`,
+      [filename, ppRows.length, 'oes_import_auto']
+    );
+    const batchId = batchResult.rows[0].id;
+
+    // Batch upsert in chunks of 500
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < ppRows.length; i += BATCH_SIZE) {
+      const chunk = ppRows.slice(i, i + BATCH_SIZE);
+      const values: (string | number | null)[] = [];
+      const placeholders: string[] = [];
+
+      chunk.forEach((row, idx) => {
+        const offset = idx * 4;
+        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::date, $${offset + 4})`);
+        values.push(row.serial_number, row.project, row.date_registered, batchId);
+      });
+
+      await pool.query(
+        `INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
+         VALUES ${placeholders.join(', ')}
+         ON CONFLICT (serial_number, project) DO UPDATE SET
+           date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
+           import_batch_id = EXCLUDED.import_batch_id,
+           updated_at = NOW()
+         WHERE oes_pp_data.resolution_status = 'unresolved'`,
+        values
+      );
+    }
+
+    // Run local resolution (3 sequential UPDATE queries)
+    const oesMatch = await pool.query(`
+      UPDATE oes_pp_data pp SET resolution_status = 'matched_oes',
+        resolved_drop_number = oa.drop_number, resolved_source = 'oes_activations',
+        resolved_details = jsonb_build_object('activation_date', oa.activation_date::text, 'status', oa.status, 'team', oa.team),
+        resolved_at = NOW(), updated_at = NOW()
+      FROM oes_activations oa WHERE pp.serial_number = oa.serial_number AND pp.resolution_status = 'unresolved'
+    `);
+
+    const unifiedMatch = await pool.query(`
+      UPDATE oes_pp_data pp SET resolution_status = 'matched_unified',
+        resolved_drop_number = ur.drop_number, resolved_source = 'dr_photo_unified_reviews',
+        resolved_details = jsonb_build_object('matched_field',
+          CASE WHEN ur.oes_serial = pp.serial_number THEN 'oes_serial' ELSE 'ont_serial_scanned' END, 'project', ur.project),
+        resolved_at = NOW(), updated_at = NOW()
+      FROM dr_photo_unified_reviews ur
+      WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number) AND pp.resolution_status = 'unresolved'
+    `);
+
+    let onemapMatches = 0;
+    try {
+      const onemapMatch = await pool.query(`
+        UPDATE oes_pp_data pp SET resolution_status = 'matched_onemap',
+          resolved_drop_number = op.drop_number, resolved_source = 'onemap_properties',
+          resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
+          resolved_at = NOW(), updated_at = NOW()
+        FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'unresolved'
+      `);
+      onemapMatches = onemapMatch.rowCount || 0;
+    } catch { /* onemap_properties may not have ont_barcode */ }
+
+    const totalResolved = (oesMatch.rowCount || 0) + (unifiedMatch.rowCount || 0) + onemapMatches;
+
+    // Update batch stats
+    await pool.query(
+      `UPDATE oes_pp_import_batches SET resolved_count = $1, unresolved_count = $2 WHERE id = $3`,
+      [totalResolved, ppRows.length - totalResolved, batchId]
+    );
+
+    log.info('OESImport', 'PP DATA import complete', {
+      total: ppRows.length,
+      resolved: totalResolved,
+      oes: oesMatch.rowCount || 0,
+      unified: unifiedMatch.rowCount || 0,
+      onemap: onemapMatches,
+    });
+  } catch (err) {
+    log.error('OESImport', 'PP DATA import failed (non-blocking)', err);
+  }
+}
+
 /**
  * Parse Excel file and extract OES data with validation
  */
-function parseOESExcel(filePath: string): ParseResult {
+function parseOESExcel(filePath: string): ParseResult & { ppRows: PPRow[] | null } {
   const workbook = XLSX.readFile(filePath);
+
+  // Also parse PP DATA sheet if present
+  const ppRows = parsePPDataSheet(workbook);
+  if (ppRows) {
+    log.info('OESImport', `Found PP DATA sheet with ${ppRows.length} rows`);
+  }
+
   const sheetName = workbook.SheetNames[0]; // Use first sheet (OLT DATA)
   const sheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
@@ -238,7 +394,7 @@ function parseOESExcel(filePath: string): ParseResult {
     warnings.push(...dataWarnings);
   }
 
-  return { rows, warnings, headerMismatch };
+  return { rows, warnings, headerMismatch, ppRows };
 }
 
 /**
@@ -283,7 +439,7 @@ async function handler(
     // Parse the Excel file with validation
     log.info('OESImport', `Parsing file: ${uploadedFile.originalFilename}`);
     const parseResult = parseOESExcel(filePath);
-    const { rows: oesRows, warnings, headerMismatch } = parseResult;
+    const { rows: oesRows, warnings, headerMismatch, ppRows } = parseResult;
 
     // Log warnings if any
     if (warnings.length > 0) {
@@ -844,6 +1000,16 @@ async function handler(
         });
       }
 
+      // === PP DATA IMPORT (Fire-and-forget) ===
+      // Automatically import pre-provision data from the PP DATA sheet
+      let ppDataStatus: { total: number; message: string } | null = null;
+      if (ppRows && ppRows.length > 0) {
+        ppDataStatus = { total: ppRows.length, message: 'Importing in background...' };
+        importPPData(ppRows, uploadedFile.originalFilename || 'unknown').catch(err => {
+          log.error('OESImport', 'PP DATA import failed', err);
+        });
+      }
+
       return res.status(200).json({
         success: true,
         totalRows: oesRows.length,
@@ -863,6 +1029,7 @@ async function handler(
             : 'QField sync not triggered',
         },
         oltAutoDetectTriggered,
+        ppDataImport: ppDataStatus,
       });
     }
 
