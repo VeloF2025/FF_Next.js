@@ -57,11 +57,7 @@ export function VerificationPanel({ contractorId, onVerificationComplete }: Veri
   const [showCostConfirm, setShowCostConfirm] = useState(false);
   const [runningCheck, setRunningCheck] = useState<string | null>(null);
 
-  // Load existing data on mount
-  useEffect(() => {
-    loadData();
-  }, [contractorId, loadData]);
-
+  // Load existing data
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -87,6 +83,11 @@ export function VerificationPanel({ contractorId, onVerificationComplete }: Veri
       setIsLoading(false);
     }
   }, [contractorId, onVerificationComplete]);
+
+  // Load on mount
+  useEffect(() => {
+    loadData();
+  }, [contractorId, loadData]);
 
   // Inline SA ID validation
   const handleIdChange = (value: string) => {
