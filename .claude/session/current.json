@@ -1,73 +1,111 @@
 {
-  "session_id": "2026-02-09-qfield-qa-fixes",
-  "started_at": "2026-02-09T04:00:00Z",
-  "last_updated": "2026-02-09T08:20:34.452Z",
+  "session_id": "2026-02-09-reporting-audit",
+  "started_at": "2026-02-09T07:30:00Z",
+  "last_updated": "2026-02-09T10:22:53.683Z",
   "working_on": {
-    "task": "QField QA - AI Validation Fix + Badge Visibility",
+    "task": "Reporting Codebase Audit - Optional Chaining, API Wrappers, Icon Props",
     "status": "completed",
     "progress": [
-      "Investigated AI validation not completing - discovered logger format was wrong",
-      "Fixed all log calls in qa-validate.ts to use pino format: log.info({data}, 'message')",
-      "Tested full validation pipeline: MinIO fetch -> VLM -> DB update (working)",
-      "Fixed badge visibility on photo cards - solid backgrounds instead of semi-transparent",
-      "Deployed fixes to dev.fibreflow.app",
-      "Created .claude.md for qfield-qa module"
+      "Continued from previous session - verified all 10 reporting tabs on staging",
+      "Found and fixed Serial Swaps crash: apiResponse.success() wrapper + icon props",
+      "Launched 3-agent audit team: wrapper-auditor, icon-auditor, chaining-auditor",
+      "wrapper-auditor: Found 2 bugs (ProcurementDashboard RFQ, serial APIs already fixed)",
+      "icon-auditor: 111 occurrences checked - all correct except already-fixed SerialSwapReports",
+      "chaining-auditor: Found ~22 instances across 4 reporting files",
+      "Fixed all optional chaining in TeamReports, FunnelReports, TrendReports",
+      "Fixed ProcurementDashboard RFQ data unwrapping",
+      "Deployed to staging, dev, and production - all verified working",
+      "Updated KB with learnings for activate and procurement modules"
     ],
     "last_action": "KB update via /kb"
   },
   "learnings": {
-    "pino_logger_format": {
-      "problem": "Log calls using wrong argument order caused errors to log without details",
-      "wrong": "log.info('module-name', { data }, 'message')",
-      "correct": "log.info({ module: 'module-name', ...data }, 'message')",
-      "note": "Pino signature is log.level(object, message) - object comes FIRST"
+    "apiResponse_wrapper_pattern": {
+      "problem": "apiResponse.success() wraps data in {success:true, data:{...}} but some frontends expect unwrapped",
+      "rule": "Reporting APIs should use res.status(200).json() directly, not apiResponse.success()",
+      "affected": "serial-swaps, serial-mismatches APIs + ProcurementDashboard RFQ fetch"
     },
-    "minio_versioned_paths": {
-      "description": "QField photos in MinIO are stored with version suffixes",
-      "format": "projects/{id}/files/DCIM/{filename}.jpg/{version-id}",
-      "example": "JPEG_20251016130535337.jpg/v20251107044855-6296d2d1",
-      "note": "The version ID is part of the path, not a query parameter"
+    "icon_reactnode_vs_lucideicon": {
+      "problem": "Passing component refs to ReactNode props causes React error #31",
+      "rule": "icon={<Icon className='h-4 w-4' />} for ReactNode, icon={Icon} for LucideIcon type",
+      "note": "111 icon usages audited - only ReportCard uses ReactNode pattern"
     },
-    "badge_visibility_on_images": {
-      "problem": "Semi-transparent badges invisible on matching photo backgrounds",
-      "bad": "bg-yellow-500/20 text-yellow-400",
-      "good": "bg-yellow-500 text-white shadow-lg",
-      "note": "Use solid colors + white text + shadow for badges overlaid on photos"
+    "optional_chaining_pattern": {
+      "problem": "data?.summary.x only guards data, not summary",
+      "rule": "Always use full chain: data?.summary?.x and (value ?? 0).toFixed(N)",
+      "affected": "TeamReports, FunnelReports, TrendReports, SerialSwapReports"
+    },
+    "db_singleton_pool": {
+      "problem": "@neondatabase/serverless Pool silently fails in Node.js server environments",
+      "rule": "Always use import pool from '@/lib/db' (pg TCP Pool singleton)",
+      "affected": "9 of 11 reporting API endpoints were broken"
     }
   },
   "bugs_fixed": [
     {
-      "file": "pages/api/qfield/qa-validate.ts",
-      "issue": "Logger calls using wrong argument order - errors logged without details",
-      "fix": "Changed all log.info/error calls to use pino format: log.info({data}, 'msg')"
+      "file": "pages/api/activate/reporting/serial-swaps/index.ts",
+      "issue": "apiResponse.success() wrapper caused frontend crash",
+      "fix": "Changed to res.status(200).json(response)"
     },
     {
-      "file": "src/modules/qfield-qa/components/PhotoListTab.tsx",
-      "issue": "StatusBadge, PriorityBadge, confidence badges invisible on some photo backgrounds",
-      "fix": "Changed from semi-transparent (bg-color/20) to solid backgrounds with shadow-lg"
+      "file": "pages/api/activate/reporting/serial-mismatches/index.ts",
+      "issue": "Same apiResponse.success() wrapper issue",
+      "fix": "Changed to res.status(200).json(response)"
+    },
+    {
+      "file": "src/modules/activate/components/reporting/SerialSwapReports.tsx",
+      "issue": "Icon props as component refs + missing optional chaining",
+      "fix": "JSX elements for icons, data?.summary?.x pattern"
+    },
+    {
+      "file": "src/modules/activate/components/reporting/TeamReports.tsx",
+      "issue": "4x incomplete optional chaining on data?.summary.x",
+      "fix": "Full chain: data?.summary?.x"
+    },
+    {
+      "file": "src/modules/activate/components/reporting/FunnelReports.tsx",
+      "issue": "6x incomplete optional chaining + unguarded .toFixed()",
+      "fix": "Full chain + (value ?? 0).toFixed(1)"
+    },
+    {
+      "file": "src/modules/activate/components/reporting/TrendReports.tsx",
+      "issue": "12x incomplete optional chaining on velocity, data, summary",
+      "fix": "Full chain throughout"
+    },
+    {
+      "file": "src/modules/procurement/components/ProcurementDashboard/ProcurementDashboard.tsx",
+      "issue": "rfqsData.rfqs undefined - needs unwrapping from apiResponse.success()",
+      "fix": "rfqsData.data?.rfqs || rfqsData.rfqs || []"
     }
   ],
-  "files_changed": [
-    "pages/api/qfield/qa-validate.ts - Fixed 15+ log calls to use correct pino format",
-    "src/modules/qfield-qa/components/PhotoListTab.tsx - Solid badge backgrounds + shadows",
-    "src/modules/qfield-qa/.claude.md - Created module documentation"
+  "commits": [
+    "3d160d25 - fix(reporting): use direct res.json() for serial-swaps and serial-mismatches APIs",
+    "0a747e4b - fix(reporting): fix SerialSwapReports icon props and optional chaining",
+    "8777d762 - fix(reporting): add missing optional chaining across reporting components",
+    "0a7515fc - docs: update module docs, knowledge base, and deployment info"
   ],
   "deployments": {
-    "dev": "https://dev.fibreflow.app - deployed 2026-02-09 05:49 SAST"
+    "staging": "https://vf.fibreflow.app - deployed 2026-02-09 ~09:50 SAST",
+    "dev": "https://dev.fibreflow.app - deployed 2026-02-09 ~10:10 SAST",
+    "production": "https://app.fibreflow.app - deployed 2026-02-09 ~10:10 SAST"
   },
   "kb_scan_results": {
-    "timestamp": "2026-02-09T04:35:00Z",
+    "timestamp": "2026-02-09T10:15:00Z",
     "total_modules": 47,
     "modules_with_claude_md": 44,
     "modules_missing": [
       "data-sync",
       "navigation",
       "navigation.disabled"
-    ]
+    ],
+    "learnings_consolidated": 2
   },
   "context": {
     "project": "FibreFlow",
     "branch": "master",
-    "module": "qfield-qa"
+    "modules": [
+      "activate",
+      "procurement"
+    ]
   }
 }
