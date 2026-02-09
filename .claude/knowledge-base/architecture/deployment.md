@@ -66,8 +66,10 @@ graph TB
 | VF Storage | 8091 | `vf-storage.service` | File proxy |
 
 **Access:**
-- `ssh velo@100.96.203.105` (password: velo2026) — sudo/root, service restarts
-- `ssh hein@100.96.203.105` (password: 0203) — git ops, builds
+- `ssh velo@100.96.203.105` (password: velo2026) — sudo/root, service restarts, ALL deploys
+- `ssh hein@100.96.203.105` (password: 0203) — git ops only (no sudo)
+
+**IMPORTANT**: Always use `velo` user for all deploys (dev, staging, prod). The dev repo at `/home/hein/apps/fibreflow-dev` was re-owned to `velo:velo` on 2026-02-09 to fix git permission errors when deploying as `velo`.
 
 ### VPS Server (72.61.197.178)
 
@@ -86,16 +88,14 @@ graph TB
 
 ```
 /home/velo/
-└── fibreflow-production/     # Production app
-    ├── .next/                # Built Next.js
-    ├── node_modules/
-    └── ...
+├── fibreflow-production/     # Production app (app.fibreflow.app)
+│   ├── .next/                # Built Next.js
+│   ├── node_modules/
+│   └── ...
+└── fibreflow-staging/        # Staging app (vf.fibreflow.app)
 
 /home/hein/apps/
-└── fibreflow-dev/            # Dev app
-
-/home/louis/apps/
-└── fibreflow/                # Staging app (vf.fibreflow.app)
+└── fibreflow-dev/            # Dev app (dev.fibreflow.app) — owned by velo:velo
 ```
 
 ### VPS Server
@@ -109,19 +109,26 @@ graph TB
 
 ### Quick Deploy
 
+All deploys use the `velo` user (sudo access, owns all repo directories).
+
 ```bash
-# Development
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
-  "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-dev.service"
-
-# Staging (vf.fibreflow.app) — dir owned by louis, use sudo
+# Development (dev.fibreflow.app)
 sshpass -p 'velo2026' ssh velo@100.96.203.105 \
-  "cd /home/louis/apps/fibreflow && echo 'velo2026' | sudo -S git pull origin master && echo 'velo2026' | sudo -S npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+  "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 
-# Production
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-production && git pull && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow-production.service"
+# Staging (vf.fibreflow.app)
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+
+# Production (app.fibreflow.app)
+sshpass -p 'velo2026' ssh velo@100.96.203.105 \
+  "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 ```
+
+**Common Deploy Pitfalls:**
+- Never use `hein` user for deploys — no sudo access, service restart will fail
+- Dev repo lives under `/home/hein/apps/` but is owned by `velo:velo`
+- All three can be deployed in parallel (separate directories, separate services)
 
 ### Deploy Flow
 

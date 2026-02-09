@@ -101,9 +101,10 @@ Run `ls .claude/modules/` for full list (40+ modules).
 
 **Server Access:**
 ```bash
-ssh velo@100.96.203.105  # Velocity - Password: velo2026 (sudo/root, service restarts)
-ssh hein@100.96.203.105  # Velocity - Password: 0203 (git ops, builds)
+ssh velo@100.96.203.105  # Velocity - Password: velo2026 (sudo/root, ALL deploys)
+ssh hein@100.96.203.105  # Velocity - Password: 0203 (git ops only, no sudo)
 ssh root@72.61.197.178   # VPS (WhatsApp services)
+# ALWAYS use velo for deploys - hein has no sudo for service restarts
 ```
 
 **Deploy Commands:**

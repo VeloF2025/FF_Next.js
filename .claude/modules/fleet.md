@@ -277,6 +277,22 @@ fleet_photo_vlm_results → fleet_check_photos → fleet_check_responses
 - **Exterior** (9): Tyres⚠️, Lights & Indicators⚠️, Mirrors, Windscreen, Wipers, License Disk, Number Plate, Under Vehicle, Exterior Damage
 - **Interior** (4): Seat Position, Mirrors Position, Door Closure, Seatbelts⚠️
 
+## Camera Permission Handling
+
+The `VehicleCalibrationModal` and `OdometerOverrideModal` use `navigator.mediaDevices.getUserMedia()` for camera access. Error handling distinguishes:
+
+| Error | Message | User Action |
+|-------|---------|-------------|
+| `NotAllowedError` | Step-by-step permission fix instructions | Tap lock icon → Camera → Allow → Refresh |
+| `NotFoundError` | "No camera found on this device" | Use a device with a camera |
+| `NotReadableError` | "Camera is being used by another app" | Close other camera apps |
+| Generic | "Check your browser settings" | General troubleshooting |
+
+**IMPORTANT**: No file upload fallback — drivers must take photos with the camera. The error messages include a "Refresh Page" button because browser permission changes require a page reload to take effect.
+
+## Recent Changes (Feb 2026)
+- **Camera Permission UX**: Improved error messages with step-by-step fix instructions instead of generic "allow camera permissions" message (Johann Lubbe report, 2026-02-09)
+
 ## Recent Changes (Jan 2026)
 - Added `VehicleCalibrationModal` for first-time setup
 - Added calibration API with grandfathering logic
