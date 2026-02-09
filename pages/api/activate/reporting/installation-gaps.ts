@@ -17,28 +17,14 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 
-// Configure Neon transport
-const useHttpTransport = process.env.NEON_USE_HTTP === 'true';
-
-if (!useHttpTransport) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const ws = require('ws');
-    neonConfig.webSocketConstructor = ws;
-  } catch {
-    // ws not available, will use HTTP
-  }
-}
-
-const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'process.env.DATABASE_URL',
-});
+// Use neon() HTTP instead of Pool WebSocket to avoid socket hang up errors
+const sql = neon(process.env.DATABASE_URL!);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pool = { async query(text: string, params?: any[]) { const rows = await sql.query(text, params); return { rows }; } };
 
 interface InstallationGapItem {
   drop_number: string;

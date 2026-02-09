@@ -1,25 +1,29 @@
 /**
- * Shared pool setup for reporting services
- * Private - not re-exported from barrel
+ * Shared query interface for reporting services
+ * Uses neon() HTTP instead of Pool WebSocket to avoid socket hang up errors
+ * on staging/production servers where WebSocket connections time out.
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+import { neon } from '@neondatabase/serverless';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
-
-// CRITICAL: Use correct Neon endpoint (ep-dry-night-a9qyh4sj)
-const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    'process.env.DATABASE_URL',
-});
+const sql = neon(process.env.DATABASE_URL!);
 
 /**
- * Get pool instance for external use
+ * Pool-compatible query wrapper using neon() HTTP
+ * Returns { rows } to match pg Pool.query() interface used by all reporting services
  */
-export function getPool(): Pool {
+const pool = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async query(text: string, params?: any[]) {
+    const rows = await sql.query(text, params);
+    return { rows };
+  },
+};
+
+/**
+ * Get pool-compatible instance for external use
+ */
+export function getPool() {
   return pool;
 }
 
