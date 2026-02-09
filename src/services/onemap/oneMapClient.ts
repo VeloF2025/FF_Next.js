@@ -249,7 +249,7 @@ export class OneMapClient {
     logger.info('Fetching all drops from 1Map', { site });
 
     while (true) {
-      const result = await this.searchInstallations(site, { page, limit: 50 });
+      const result = await this.searchInstallations(site, { page, limit: 500 });
 
       if (!result.success || !result.result) {
         break;

@@ -289,8 +289,16 @@ async function handler(
     }
 
     if (action === '1map-lookup') {
-      const result = await run1MapLookup();
-      return res.status(200).json({ success: true, data: result });
+      // Fire-and-forget: return immediately, run in background
+      run1MapLookup().catch(err => {
+        logger.error('Background 1Map lookup failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+      return res.status(200).json({
+        success: true,
+        data: { message: 'Lookup started in background. Refresh in a few minutes to see results.' },
+      });
     }
 
     return res.status(400).json({ error: 'Invalid action. Use "local-scan" or "1map-lookup".' });

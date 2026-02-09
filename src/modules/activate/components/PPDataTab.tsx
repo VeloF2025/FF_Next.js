@@ -114,7 +114,7 @@ export function PPDataTab() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || '1Map lookup failed');
-      toast.success(`1Map lookup: ${result.data.total_resolved} matches found`);
+      toast.success(result.data.message || `1Map lookup: ${result.data.total_resolved} matches found`);
       fetchStats();
       fetchRecords();
     } catch (err) {
