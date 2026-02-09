@@ -7,7 +7,7 @@
 import React from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Clock, AlertOctagon } from 'lucide-react';
 import type { VerificationStatus } from '@/types/contractor-verification.types';
-import { formatCostRands } from '@/types/contractor-verification.types';
+import { formatCostRands } from '@/lib/verificationCosts';
 
 interface VerificationCheckRowProps {
   label: string;

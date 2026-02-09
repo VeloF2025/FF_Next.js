@@ -22,7 +22,7 @@ import {
   estimateBundleCost,
   formatCostRands,
   VERIFICATION_COSTS,
-} from '@/types/contractor-verification.types';
+} from '@/lib/verificationCosts';
 
 interface VerificationPanelProps {
   contractorId: string;

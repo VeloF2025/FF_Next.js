@@ -10,7 +10,13 @@
  * - Z: Luhn checksum digit
  */
 
-import type { SaIdValidationResult } from '@/types/contractor-verification.types';
+export interface SaIdValidationResult {
+  isValid: boolean;
+  dateOfBirth: string | null;
+  gender: 'male' | 'female' | null;
+  citizenship: 'sa_citizen' | 'permanent_resident' | null;
+  errors: string[];
+}
 
 export function validateSaId(idNumber: string): SaIdValidationResult {
   const errors: string[] = [];
