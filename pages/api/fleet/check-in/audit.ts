@@ -33,7 +33,7 @@ async function handler(
   try {
     // Get current user from auth context
     const user = (req as unknown as { user?: { id?: string; role?: string } }).user;
-    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'manager';
 
     const {
       vehicleId,
