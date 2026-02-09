@@ -181,31 +181,31 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       <ReportCardGrid>
         <ReportCard
           title="Total Detected"
-          value={data?.summary.total_detected ?? 0}
-          icon={Repeat}
+          value={data?.summary?.total_detected ?? 0}
+          icon={<Repeat className="h-4 w-4" />}
           color="blue"
           isLoading={isLoading}
         />
         <ReportCard
           title="Pending Correction"
-          value={data?.summary.pending_correction ?? 0}
-          icon={Clock}
+          value={data?.summary?.pending_correction ?? 0}
+          icon={<Clock className="h-4 w-4" />}
           color="yellow"
           isLoading={isLoading}
           onClick={() => setSelectedStatus('pending_correction')}
         />
         <ReportCard
           title="Corrected"
-          value={data?.summary.corrected ?? 0}
-          icon={CheckCircle}
+          value={data?.summary?.corrected ?? 0}
+          icon={<CheckCircle className="h-4 w-4" />}
           color="green"
           isLoading={isLoading}
           onClick={() => setSelectedStatus('corrected_in_1map')}
         />
         <ReportCard
           title="Backlog > 7 Days"
-          value={data?.summary.backlog_over_7_days ?? 0}
-          icon={AlertTriangle}
+          value={data?.summary?.backlog_over_7_days ?? 0}
+          icon={<AlertTriangle className="h-4 w-4" />}
           color="red"
           isLoading={isLoading}
         />
