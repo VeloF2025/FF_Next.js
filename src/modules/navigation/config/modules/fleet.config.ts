@@ -99,7 +99,7 @@ export const fleetConfig: ModuleNavigationConfig = {
       shortLabel: 'Check-Ins',
       icon: ClipboardList,
       path: '/fleet/check-in/history',
-      rbacKey: 'fleet.check-in-history',
+      rbacKey: 'fleet.check-in-audit',
     },
   ],
 };
