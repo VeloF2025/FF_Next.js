@@ -102,27 +102,27 @@ export function BudgetAdjustmentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div
-        className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4"
+        className="relative bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl w-full max-w-md mx-4"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Adjust Budget</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Adjust Budget</h2>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">
               Make a budget adjustment. All adjustments are logged for audit purposes.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+            className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)] rounded"
           >
             <X className="h-5 w-5" />
           </button>
@@ -132,14 +132,14 @@ export function BudgetAdjustmentModal({
         <form onSubmit={handleSubmit}>
           <div className="p-4 space-y-4">
             {/* Current Budget Display */}
-            <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Current Budget</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{formatCurrency(currentBudget, currency)}</p>
+            <div className="p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
+              <p className="text-sm text-[var(--ff-text-tertiary)]">Current Budget</p>
+              <p className="text-lg font-semibold text-[var(--ff-text-primary)]">{formatCurrency(currentBudget, currency)}</p>
             </div>
 
             {/* Adjustment Type */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)]">
                 Adjustment Type
               </label>
               <div className="flex gap-4">
@@ -151,9 +151,9 @@ export function BudgetAdjustmentModal({
                       value={type}
                       checked={adjustmentType === type}
                       onChange={(e) => setAdjustmentType(e.target.value as AdjustmentType)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 border-[var(--ff-border-light)] focus:ring-blue-500"
                     />
-                    <span className="text-sm capitalize text-gray-700 dark:text-gray-300">{type}</span>
+                    <span className="text-sm capitalize text-[var(--ff-text-secondary)]">{type}</span>
                   </label>
                 ))}
               </div>
@@ -161,7 +161,7 @@ export function BudgetAdjustmentModal({
 
             {/* Amount */}
             <div className="space-y-2">
-              <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="amount" className="block text-sm font-medium text-[var(--ff-text-secondary)]">
                 Amount ({currency})
               </label>
               <input
@@ -174,15 +174,15 @@ export function BudgetAdjustmentModal({
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="Enter amount"
                 required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
             {/* New Budget Preview */}
             {amount && parseFloat(amount) > 0 && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                <p className="text-sm text-gray-600 dark:text-gray-400">New Budget (after adjustment)</p>
-                <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-sm text-[var(--ff-text-tertiary)]">New Budget (after adjustment)</p>
+                <p className="text-lg font-semibold text-blue-400">
                   {formatCurrency(newBudget, currency)}
                 </p>
               </div>
@@ -190,7 +190,7 @@ export function BudgetAdjustmentModal({
 
             {/* Reason */}
             <div className="space-y-2">
-              <label htmlFor="reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="reason" className="block text-sm font-medium text-[var(--ff-text-secondary)]">
                 Reason (required)
               </label>
               <textarea
@@ -201,29 +201,29 @@ export function BudgetAdjustmentModal({
                 placeholder="Provide a detailed reason for this adjustment..."
                 rows={3}
                 required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-[var(--ff-text-tertiary)]">
                 Minimum 10 characters. This will be logged for audit purposes.
               </p>
             </div>
 
             {/* Error Display */}
             {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">{error}</p>
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-lg">
+          <div className="flex justify-end gap-2 p-4 border-t border-[var(--ff-border-light)] rounded-b-lg">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-md hover:bg-[var(--ff-bg-hover)] disabled:opacity-50"
             >
               Cancel
             </button>
