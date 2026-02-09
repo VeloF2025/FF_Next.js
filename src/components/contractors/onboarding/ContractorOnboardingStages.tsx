@@ -136,20 +136,20 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
   if (isLoading) {
     return (
       <div className="p-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p className="mt-2 text-gray-600">Loading onboarding stages...</p>
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+        <p className="mt-2 text-[var(--ff-text-tertiary)]">Loading onboarding stages...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-800 font-medium">Error loading onboarding stages</p>
-        <p className="text-red-600 text-sm mt-1">{error}</p>
+      <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-lg">
+        <p className="text-red-400 font-medium">Error loading onboarding stages</p>
+        <p className="text-red-400/80 text-sm mt-1">{error}</p>
         <button
           onClick={fetchStages}
-          className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
         >
           Retry
         </button>
@@ -168,7 +168,7 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
           <button
             onClick={handleCompleteOnboarding}
             disabled={isCompleting}
-            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isCompleting ? 'Completing...' : 'Complete Onboarding'}
           </button>
@@ -177,9 +177,9 @@ export function ContractorOnboardingStages({ contractorId }: ContractorOnboardin
 
       {/* Stages List */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Onboarding Stages</h3>
+        <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Onboarding Stages</h3>
         {stages.length === 0 ? (
-          <p className="text-gray-600">No onboarding stages found.</p>
+          <p className="text-[var(--ff-text-tertiary)]">No onboarding stages found.</p>
         ) : (
           stages.map((stage) => (
             <OnboardingStageCardEnhanced
