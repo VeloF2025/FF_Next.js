@@ -97,7 +97,21 @@ export function VehicleCalibrationModal({
         await videoRef.current.play();
       }
     } catch (err) {
-      setCameraError('Could not access camera. Please allow camera permissions.');
+      const error = err as DOMException;
+      if (error.name === 'NotAllowedError') {
+        setCameraError(
+          'Camera permission was denied. To fix this:\n' +
+          '1. Tap the lock/settings icon in your browser address bar\n' +
+          '2. Find "Camera" and set it to "Allow"\n' +
+          '3. Refresh the page and try again'
+        );
+      } else if (error.name === 'NotFoundError') {
+        setCameraError('No camera found on this device.');
+      } else if (error.name === 'NotReadableError') {
+        setCameraError('Camera is being used by another app. Close other apps using the camera and try again.');
+      } else {
+        setCameraError('Could not access camera. Please check your browser settings and try again.');
+      }
       setIsCapturing(false);
     }
   }, []);
@@ -329,14 +343,25 @@ export function VehicleCalibrationModal({
                   {cameraError ? (
                     <div className="text-center p-4">
                       <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                      <p className="text-red-400 text-sm">{cameraError}</p>
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm"
-                      >
-                        Try Again
-                      </button>
+                      <div className="text-red-400 text-sm whitespace-pre-line text-left mb-3">
+                        {cameraError}
+                      </div>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm"
+                        >
+                          Try Again
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.location.reload()}
+                          className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm"
+                        >
+                          Refresh Page
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <button

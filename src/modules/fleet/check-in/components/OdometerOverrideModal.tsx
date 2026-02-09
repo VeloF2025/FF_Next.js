@@ -78,7 +78,19 @@ export function OdometerOverrideModal({
       }
     } catch (err) {
       log.error('Failed to access camera', { error: err }, 'OdometerOverrideModal');
-      setCameraError('Could not access camera. Please allow camera permissions.');
+      const error = err as DOMException;
+      if (error.name === 'NotAllowedError') {
+        setCameraError(
+          'Camera permission was denied. To fix this:\n' +
+          '1. Tap the lock/settings icon in your browser address bar\n' +
+          '2. Find "Camera" and set it to "Allow"\n' +
+          '3. Refresh the page and try again'
+        );
+      } else if (error.name === 'NotReadableError') {
+        setCameraError('Camera is being used by another app. Close other apps using the camera and try again.');
+      } else {
+        setCameraError('Could not access camera. Please check your browser settings and try again.');
+      }
       setIsCapturing(false);
     }
   }, []);
