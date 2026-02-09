@@ -65,7 +65,7 @@ export type MaintenanceTabId =
   | 'wa-tracking';
 
 // Activate tab IDs
-export type ActivateTabId = 'oes' | 'arch' | 'manual';
+export type ActivateTabId = 'oes' | 'arch' | 'manual' | 'pp-data';
 
 // OLT Report tab IDs
 export type OltTabId =

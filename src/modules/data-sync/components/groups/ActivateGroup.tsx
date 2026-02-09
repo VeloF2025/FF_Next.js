@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useEffect, useMemo } from 'react';
-import { FileSpreadsheet, WifiOff, PlusCircle, Loader2, Lock } from 'lucide-react';
+import { FileSpreadsheet, WifiOff, PlusCircle, FileSearch, Loader2, Lock } from 'lucide-react';
 import type { ActivateTabId } from '../../types';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -14,12 +14,14 @@ import { usePermission } from '@/hooks/usePermission';
 import { OESImportTab } from '@/modules/activate/components/OESImportTab';
 import { OfflineImportTab } from '@/modules/activate/components/OfflineImportTab';
 import { ManualDREntry } from '@/modules/activate/components/ManualDREntry';
+import { PPDataTab } from '@/modules/activate/components/PPDataTab';
 
 // Tab configuration with permission keys
 const TABS: { id: ActivateTabId; label: string; icon: React.ElementType; permissionKey: string }[] = [
   { id: 'oes', label: 'OES Import', icon: FileSpreadsheet, permissionKey: 'system.data-sync.activate.oes' },
   { id: 'arch', label: 'ARCH Import', icon: WifiOff, permissionKey: 'system.data-sync.activate.arch' },
   { id: 'manual', label: 'Manual Entry', icon: PlusCircle, permissionKey: 'system.data-sync.activate.manual' },
+  { id: 'pp-data', label: 'PP Data', icon: FileSearch, permissionKey: 'system.data-sync.activate.pp-data' },
 ];
 
 interface ActivateGroupProps {
@@ -150,6 +152,20 @@ export function ActivateGroup({ activeTab, onTabChange }: ActivateGroupProps) {
             </p>
           </div>
           <ManualDREntry />
+        </div>
+      )}
+
+      {currentTab === 'pp-data' && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-md p-6 border border-[var(--ff-border-light)]">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+              PP Data (Pre-Provision)
+            </h2>
+            <p className="text-sm text-[var(--ff-text-secondary)]">
+              Import and resolve pre-provisioned ONT serial numbers from OES PP DATA tab
+            </p>
+          </div>
+          <PPDataTab />
         </div>
       )}
     </div>
