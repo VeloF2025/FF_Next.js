@@ -65,41 +65,61 @@ export class OneMapClient {
   }
 
   /**
-   * Authenticate with 1Map using session-based login
+   * Authenticate with 1Map using session-based login (CSRF + cookie flow)
    */
   async authenticate(): Promise<boolean> {
     logger.info('Authenticating with 1Map', { email: this.email });
 
     try {
+      // Step 1: GET login page to extract CSRF token and initial session cookie
+      const loginPage = await fetch(`${this.baseUrl}/login`);
+      const html = await loginPage.text();
+
+      const csrfMatch = html.match(/name="_csrf".*?value="([^"]+)"/);
+      const csrfValue = csrfMatch ? csrfMatch[1] : '';
+
+      // Extract initial cookies from login page
+      const pageCookies = loginPage.headers.get('set-cookie') || '';
+      const initialSidMatch = pageCookies.match(/connect\.sid=([^;]+)/);
+      const initialCsrfMatch = pageCookies.match(/csrfToken=([^;]+)/);
+
+      const initialCookies: string[] = [];
+      if (initialSidMatch) initialCookies.push(`connect.sid=${initialSidMatch[1]}`);
+      if (initialCsrfMatch) initialCookies.push(`csrfToken=${initialCsrfMatch[1]}`);
+
+      // Step 2: POST login with CSRF token and cookies
       const response = await fetch(`${this.baseUrl}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Cookie': initialCookies.join('; '),
         },
         body: new URLSearchParams({
+          _csrf: csrfValue,
           email: this.email,
           password: this.password,
         }).toString(),
         redirect: 'manual',
       });
 
-      // Extract cookies from response
-      const setCookieHeader = response.headers.get('set-cookie');
-      if (setCookieHeader) {
-        // Parse connect.sid cookie
-        const sidMatch = setCookieHeader.match(/connect\.sid=([^;]+)/);
-        if (sidMatch) {
-          this.sessionCookie = sidMatch[1];
-        }
+      // Extract cookies from login response
+      const setCookieHeader = response.headers.get('set-cookie') || '';
 
-        // Parse csrfToken if present
-        const csrfMatch = setCookieHeader.match(/csrfToken=([^;]+)/);
-        if (csrfMatch) {
-          this.csrfToken = csrfMatch[1];
-        }
+      const sidMatch = setCookieHeader.match(/connect\.sid=([^;]+)/);
+      if (sidMatch) {
+        this.sessionCookie = sidMatch[1];
+      }
+
+      const tokenMatch = setCookieHeader.match(/csrfToken=([^;]+)/);
+      if (tokenMatch) {
+        this.csrfToken = tokenMatch[1];
       }
 
       if (this.sessionCookie) {
+        // Step 3: Initialize layer access
+        await fetch(`${this.baseUrl}/app?layer=5121`, {
+          headers: { 'Cookie': this.getCookies() },
+        });
         logger.info('1Map authentication successful');
         return true;
       }
