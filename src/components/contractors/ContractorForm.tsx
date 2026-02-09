@@ -98,26 +98,26 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {error && (
-        <div className="sticky top-0 z-50 p-4 bg-red-100 border-2 border-red-400 rounded-lg shadow-lg">
+        <div className="sticky top-0 z-50 p-4 bg-red-500/10 border-2 border-red-500/30 rounded-lg shadow-lg">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-bold text-red-900 mb-1">Cannot Save Contractor</h3>
-              <p className="text-sm text-red-800">{error}</p>
+              <h3 className="text-sm font-bold text-red-400 mb-1">Cannot Save Contractor</h3>
+              <p className="text-sm text-red-400/80">{error}</p>
               {error.includes('already exists') && (
-                <p className="text-xs text-red-700 mt-2">
-                  💡 Tip: Use a different email address or registration number
+                <p className="text-xs text-red-400/60 mt-2">
+                  Tip: Use a different email address or registration number
                 </p>
               )}
             </div>
             <button
               type="button"
               onClick={() => setError(null)}
-              className="flex-shrink-0 text-red-600 hover:text-red-800"
+              className="flex-shrink-0 text-red-400 hover:text-red-300"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -148,7 +148,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
             <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Registration Number *
               {error?.includes('already exists') && (
-                <span className="ml-2 text-xs text-red-600">⚠️ May be duplicate</span>
+                <span className="ml-2 text-xs text-red-400">May be duplicate</span>
               )}
             </label>
             <input
@@ -158,8 +158,8 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               onChange={(e) => setFormData({ ...formData, registrationNumber: e.target.value })}
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                 error?.includes('already exists')
-                  ? 'border-red-400 bg-red-50 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-blue-500'
+                  ? 'border-red-500/50 bg-red-500/10 focus:ring-red-500'
+                  : 'border-[var(--ff-border-light)] focus:ring-blue-500'
               }`}
             />
           </div>
@@ -230,7 +230,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
             <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
               Email *
               {error?.includes('already exists') && (
-                <span className="ml-2 text-xs text-red-600">⚠️ May be duplicate</span>
+                <span className="ml-2 text-xs text-red-400">May be duplicate</span>
               )}
             </label>
             <input
@@ -240,8 +240,8 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
                 error?.includes('already exists')
-                  ? 'border-red-400 bg-red-50 focus:ring-red-500'
-                  : 'border-gray-300 focus:ring-blue-500'
+                  ? 'border-red-500/50 bg-red-500/10 focus:ring-red-500'
+                  : 'border-[var(--ff-border-light)] focus:ring-blue-500'
               }`}
             />
           </div>
@@ -419,9 +419,9 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
                 type="checkbox"
                 checked={formData.isActive}
                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-[var(--ff-border-light)] text-blue-600 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
               />
-              <span className="text-sm font-medium text-gray-700">Active</span>
+              <span className="text-sm font-medium text-[var(--ff-text-primary)]">Active</span>
             </label>
           </div>
         </div>
@@ -449,7 +449,7 @@ export function ContractorForm({ contractor, onSuccess }: ContractorFormProps) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="px-4 py-2 text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
         >
           Cancel
         </button>

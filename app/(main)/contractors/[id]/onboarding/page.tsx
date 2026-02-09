@@ -40,42 +40,38 @@ export default async function ContractorOnboardingPage({
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <Link
-            href={`/contractors/${id}`}
-            className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-tertiary)] hover:text-blue-400 mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Contractor Details
-          </Link>
+    <div className="p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <Link
+          href={`/contractors/${id}`}
+          className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-4 hover:text-blue-400"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Contractor Details
+        </Link>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[var(--ff-text-primary)]">
-                Contractor Onboarding
-              </h1>
-              <p className="text-lg text-[var(--ff-text-secondary)] mt-1">
-                {contractor.companyName}
-              </p>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">
+              Contractor Onboarding
+            </h1>
+            <p className="text-[var(--ff-text-secondary)] mt-1">
+              {contractor.companyName}
+            </p>
+          </div>
 
-            <div className="text-right">
-              <div className="text-sm text-[var(--ff-text-tertiary)]">Overall Progress</div>
-              <div className="text-3xl font-bold text-blue-400">
-                {contractor.onboardingProgress}%
-              </div>
+          <div className="text-right">
+            <div className="text-sm text-[var(--ff-text-tertiary)]">Overall Progress</div>
+            <div className="text-3xl font-bold text-blue-400">
+              {contractor.onboardingProgress}%
             </div>
           </div>
         </div>
-
-        {/* Onboarding Stages */}
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6">
-          <ContractorOnboardingStages contractorId={contractor.id} />
-        </div>
       </div>
+
+      {/* Onboarding Stages */}
+      <ContractorOnboardingStages contractorId={contractor.id} />
     </div>
   );
 }

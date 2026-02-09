@@ -64,16 +64,16 @@ export default async function EditContractorPage({
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-          <Link href={`/contractors/${contractor.id}`} className="hover:text-blue-600">
+        <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-2">
+          <Link href={`/contractors/${contractor.id}`} className="hover:text-blue-400">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <span>Back to Contractor</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Edit Contractor</h1>
-        <p className="text-gray-600">{contractor.companyName}</p>
+        <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Edit Contractor</h1>
+        <p className="text-[var(--ff-text-secondary)]">{contractor.companyName}</p>
       </div>
 
       <ContractorForm contractor={contractor} />
