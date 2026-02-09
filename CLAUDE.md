@@ -101,7 +101,8 @@ Run `ls .claude/modules/` for full list (40+ modules).
 
 **Server Access:**
 ```bash
-ssh velo@100.96.203.105  # Velocity - Password: velo2026
+ssh velo@100.96.203.105  # Velocity - Password: velo2026 (sudo/root, service restarts)
+ssh hein@100.96.203.105  # Velocity - Password: 0203 (git ops, builds)
 ssh root@72.61.197.178   # VPS (WhatsApp services)
 ```
 
@@ -109,6 +110,9 @@ ssh root@72.61.197.178   # VPS (WhatsApp services)
 ```bash
 # Dev
 sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+
+# Staging
+sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 
 # Production
 sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"

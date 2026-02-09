@@ -68,6 +68,35 @@ src/modules/fleet/
 | `/api/fleet/fuel/anomalies` | GET | Fuel anomaly detection |
 | `/api/fleet/fuel/summary` | GET | Fuel usage summary |
 
+## VLM Processing Modes
+
+**CRITICAL**: The `process-vlm` endpoint runs in three modes:
+
+| Mode | Condition | Fuel/Odometer Recording | VLM Results Saved |
+|------|-----------|------------------------|-------------------|
+| **Preview** | `recordId === 'pending'` or `photoId.startsWith('temp-')` | No | No |
+| **Persist-only** | `persistResultsOnly === true` | No | Yes |
+| **Full** | Neither of the above | Yes | Yes |
+
+### Check-In Submission Flow
+```
+1. Photo capture → VLM preview (no DB writes)
+2. User reviews/corrects values in form
+3. Submit → createCheckRecord() saves user's final fuel/odometer to history
+4. Post-submit → VLM re-processes with persistResultsOnly=true (saves VLM results only, no history)
+```
+
+**Why `persistResultsOnly` exists**: Without it, step 4 would create duplicate `fleet_fuel_history` entries that overwrite the user's manual corrections from step 3. The re-processing in step 4 is only to persist VLM extraction results to `fleet_photo_vlm_results` with real photo/record IDs.
+
+### Fuel Source Values
+| Source | Meaning |
+|--------|---------|
+| `vlm` | VLM auto-filled, user accepted as-is |
+| `manual_override` | VLM extracted a value, user corrected it (HITL) |
+| `check_in` | User entered manually (no VLM extraction) |
+| `fuel_transaction` | From fuel purchase recording |
+| `calibration` | From first-time vehicle calibration |
+
 ## Calibration Flow
 
 ```
@@ -125,6 +154,8 @@ Dashboard → Vehicles → Drivers → GPS Investigation → Locations → Fuel 
 | `/api/fleet/vehicles/extract-license-disk` | POST | VLM extraction from photo |
 
 ## Recent Changes (Feb 2026)
+- **VLM Fuel Override Fix**: Post-submission VLM re-processing was overwriting user's manual fuel corrections with duplicate `fleet_fuel_history` entries. Fixed with `persistResultsOnly` flag on `process-vlm` endpoint
+- **Fuel Source Tracking**: Added `fuelWasOverridden` state in `useCheckIn` hook - manual fuel corrections now tracked as `manual_override` source (matching odometer behavior)
 - **Photos Tab**: Added to vehicle detail page showing all photos from check-ins
 - **Photo Storage Fix**: Photos now use `/storage/` prefix for nginx proxy
 - **Two Photo Tables**: `fleet_check_photos` (check-in photos) + `fleet_vehicle_photos` (general vehicle photos)

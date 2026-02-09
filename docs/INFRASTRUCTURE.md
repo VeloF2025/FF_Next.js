@@ -17,8 +17,8 @@ All three environments share the **same production database** (Neon PostgreSQL).
 | Environment | Port | Directory | URL | Service |
 |-------------|------|-----------|-----|---------|
 | **Production** | 3008* | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
-| **Staging** | 3006 | `/home/louis/apps/fibreflow` | vf.fibreflow.app | `fibreflow.service` |
-| **Dev** | 3004 | `/home/velo/fibreflow` | dev.fibreflow.app | `fibreflow-dev.service` |
+| **Staging** | 3006 | `/home/velo/fibreflow-staging` | vf.fibreflow.app | `fibreflow.service` |
+| **Dev** | 3004 | `/home/hein/apps/fibreflow-dev` | dev.fibreflow.app | `fibreflow-dev.service` |
 
 *Note: Production currently runs on port 3008, should be migrated to 3000.
 
@@ -42,7 +42,7 @@ Password: <set in .env - never commit credentials>
 
 **Deploy to Staging (vf.fibreflow.app):**
 ```bash
-ssh velo@100.96.203.105 "sudo bash -c 'cd /home/louis/apps/fibreflow && chown -R louis:louis .git && su louis -c \"git pull origin master && npm run build\"' && sudo systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && sudo systemctl restart fibreflow.service"
 ```
 
 **Deploy to Production (app.fibreflow.app):**

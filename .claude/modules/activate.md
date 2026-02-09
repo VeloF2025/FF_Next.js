@@ -235,7 +235,47 @@ pages/api/technicians/[id]/performance.ts # Performance metrics API
 src/types/technician.types.ts           # TypeScript types
 ```
 
+## UPS Serial Data Gap Analysis (Feb 2026)
+
+### Data Flow
+UPS serials (`GU18W*` Gizzu) exist in multiple locations:
+| Location | Column | Source |
+|----------|--------|--------|
+| `dr_photo_unified_reviews` | `ups_serial_scanned` | Activation wizard scan |
+| `onemap_properties` | `ups_serial` | Local cache (stale!) |
+| 1Map API | `br_ser` | Live GIS system |
+| `wa_photos` | `vlm_ups_serial` | VLM extraction from WA photos |
+| `drops` | `mini_ups_serial` | SOW stock tracking |
+
+### Key Finding: `onemap_properties` is NOT reliable
+The local `onemap_properties` table is a **stale cache** (last synced ~Jan 2026). It does NOT reflect live 1Map data. Always query the 1Map API directly via `oneMapApiService.searchDR()` to check `br_ser` values.
+
+### Coverage (30-day snapshot, Feb 2026)
+| System | Coverage | Notes |
+|--------|----------|-------|
+| **FibreFlow** (`ups_serial_scanned`) | ~88% | From activation wizard |
+| **1Map** (`br_ser`) | ~88% | Populated during activation |
+| **WA Photos** (`vlm_ups_serial`) | ~2% | Technicians rarely send step 9 |
+
+### Gap Sources
+- **Truly missing**: Technicians not scanning UPS during activation (~265 DRs/month)
+- **Step 9 never submitted**: 0 of 283 missing DRs had WA UPS photo
+- **VLM fallback**: Only 11 DRs recoverable from WA photo VLM extraction
+
+### Backfill Procedure
+```bash
+# 1. Pull from 1Map live API (oneMapApiService.searchDR → br_ser)
+# 2. Pull from wa_photos VLM (vlm_ups_serial where confidence > 0.65)
+# 3. Update dr_photo_unified_reviews.ups_serial_scanned
+```
+
+### Multi-Property DRs
+Some DRs have multiple `prop_id` entries in 1Map. When checking `br_ser`:
+- Query ALL properties for the DR: `records.find(r => r.br_ser && r.br_ser.trim() !== '')`
+- One prop may have `br_ser` while others are empty — this is normal
+
 ## Recent Changes (Feb 2026)
+- **UPS Backfill from 1Map** (2026-02-08) - Systematic check of 283 DRs missing UPS. Filled 7 from 1Map API + 11 from WA photo VLM data. 265 truly missing (never captured).
 - **Technician Recent DRs** (2026-02-07) - Added Recent DRs list to activator/installer detail pages with "View DR" links to QA Centre. Activators show submission count column, installers show QA decision status.
 - **Installer Signal Quality** (2026-02-07) - Added dB signal quality metrics (avg dBm, % in valid range -18 to -24) for installers using `vlm_power_meter_dbm` from unified reviews.
 - **Time Range Filters** (2026-02-07) - Added 7D/30D/90D/All/Custom date range filters to technician detail pages.

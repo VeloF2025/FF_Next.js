@@ -91,24 +91,56 @@ npm run build
 
 ---
 
-## API Route Import Resolution
+## API Route Import Resolution — Webpack Neon vs pg Bundling
 
-**Problem:** Default exports from `@/lib/*` may not resolve correctly in minified production builds.
+**Severity:** CRITICAL - endpoint returns 500 with `n.default.connect is not a function`
 
-**Bad Pattern:**
-```typescript
-import db from '@/lib/db';
-await db.connect();  // TypeError: s.default.connect is not a function
+**Problem:** `@/lib/*` path alias resolves to TWO directories in tsconfig.json:
+```json
+"@/lib/*": ["./lib/*", "./src/lib/*"]
 ```
 
-**Good Pattern:**
-```typescript
-import { Pool } from 'pg';
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-await pool.connect();
+`src/lib/db.ts` exports a `pg` Pool (has `.connect()`, `.query()` returns `{ rows }`).
+But webpack may non-deterministically bundle `@neondatabase/serverless` instead via
+chunk 50697. The Neon `sql` function has no `.connect()` method and `.query()` returns
+rows directly (no `.rows` wrapper).
+
+**Diagnosis:**
+```bash
+# Check if built file has pg or Neon
+head -c 500 .next/server/pages/api/your-route.js | grep 'import("pg")'
+# If missing pg but has @neondatabase/serverless → this bug
+
+# Server logs show:
+TypeError: n.default.connect is not a function
+# or after switching to pool.query():
+TypeError: Cannot read properties of undefined (reading 'length')
 ```
 
-**See Also:** `learnings.md` - "Database Connection Pattern - Use Inline pg Pool"
+**Why It's Non-Deterministic:**
+Only some API files get the wrong module. Files built in the same batch with identical
+imports may get different resolutions. Clean builds (`rm -rf .next`) don't fix it.
+
+**Fix:** Use `pool.query()` instead of `pool.connect()` for non-transactional queries.
+This works with both pg Pool and is more resilient to module resolution issues.
+
+```typescript
+// ❌ BAD - breaks if Neon module gets bundled
+const client = await pool.connect();
+try {
+  const result = await client.query('SELECT ...');
+} finally {
+  client.release();
+}
+
+// ✅ GOOD - works with both pg Pool and Neon
+const result = await pool.query('SELECT ...');
+const records = result.rows;
+```
+
+For transactions that truly need `.connect()`, keep using it but be aware of this risk.
+
+**Reference:** 2026-02-08 — reporting.ts and displaced-report.ts both got Neon instead of pg
 
 ---
 
