@@ -217,9 +217,9 @@ export function DataSyncPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           {activeGroup && (
             <button
@@ -260,7 +260,7 @@ export function DataSyncPage() {
 
       {/* Group Navigation Pills (when viewing a group) */}
       {activeGroup && (
-        <div className="flex gap-2 pb-4 border-b border-[var(--ff-border-light)]">
+        <div className="flex gap-2 pb-4 border-b border-[var(--ff-border-light)] overflow-x-auto scrollbar-hide">
           {accessibleGroups.map((group) => {
             const Icon = group.icon;
             const isActive = activeGroup === group.id;
@@ -268,7 +268,7 @@ export function DataSyncPage() {
               <button
                 key={group.id}
                 onClick={() => handleGroupChange(group.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                   isActive
                     ? 'bg-[var(--ff-accent)] text-white'
                     : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]'

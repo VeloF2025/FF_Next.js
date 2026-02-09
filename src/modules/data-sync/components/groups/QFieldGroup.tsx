@@ -73,7 +73,7 @@ export function QFieldGroup({ activeTab, onTabChange }: QFieldGroupProps) {
     <div className="space-y-4">
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="flex gap-1" aria-label="QField Tabs">
+        <nav className="flex gap-1 overflow-x-auto scrollbar-hide" aria-label="QField Tabs">
           {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
@@ -81,7 +81,7 @@ export function QFieldGroup({ activeTab, onTabChange }: QFieldGroupProps) {
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   isActive
                     ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-medium)]'

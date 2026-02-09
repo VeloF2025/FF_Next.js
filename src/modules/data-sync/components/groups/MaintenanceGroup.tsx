@@ -99,7 +99,7 @@ export function MaintenanceGroup({ activeTab, onTabChange }: MaintenanceGroupPro
     <div className="space-y-6">
       {/* Tab Navigation */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="flex gap-1" aria-label="Maintenance Tabs">
+        <nav className="flex gap-1 overflow-x-auto scrollbar-hide" aria-label="Maintenance Tabs">
           {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
@@ -108,7 +108,7 @@ export function MaintenanceGroup({ activeTab, onTabChange }: MaintenanceGroupPro
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
                 className={`
-                  flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                  flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
                   ${
                     isActive
                       ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'

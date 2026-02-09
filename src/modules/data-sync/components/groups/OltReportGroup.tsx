@@ -1168,7 +1168,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
 
       {/* Tab Navigation - Only show tabs user has permission for */}
       <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="flex gap-1" aria-label="OLT Report Tabs">
+        <nav className="flex gap-1 overflow-x-auto scrollbar-hide" aria-label="OLT Report Tabs">
           {accessibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
@@ -1180,7 +1180,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                   onTabChange(tab.id);
                 }}
                 className={`
-                  flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                  flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
                   ${
                     isActive
                       ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'
