@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle,
+  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -245,6 +245,21 @@ export function PPDataTab() {
               <option value="matched_onemap">OneMap Match</option>
               <option value="matched_1map">1Map Match</option>
             </select>
+            <div className="ml-auto">
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams({ action: 'export' });
+                  if (filterProject) params.set('project', filterProject);
+                  if (filterStatus) params.set('status', filterStatus);
+                  window.open(`/api/activate/import-pp-data?${params}`, '_blank');
+                }}
+                className="px-3 py-1.5 text-sm rounded border border-[var(--ff-border-light)]
+                           text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]
+                           flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Excel
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

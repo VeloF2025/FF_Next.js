@@ -7,10 +7,12 @@
  * Methods:
  * - GET ?action=stats: Summary statistics
  * - GET ?action=list: Paginated list of PP data records
+ * - GET ?action=export: Excel export (respects project/status filters)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 
@@ -107,7 +109,85 @@ async function handler(
     });
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use "stats" or "list".' });
+  if (action === 'export') {
+    const project = req.query.project as string;
+    const status = req.query.status as string;
+
+    let whereClause = '';
+    const params: string[] = [];
+    let paramIndex = 1;
+
+    if (project) {
+      whereClause += ` AND project = $${paramIndex++}`;
+      params.push(project);
+    }
+    if (status) {
+      whereClause += ` AND resolution_status = $${paramIndex++}`;
+      params.push(status);
+    }
+
+    const dataResult = await pool.query(
+      `SELECT serial_number, project, date_registered, resolution_status,
+              resolved_drop_number, resolved_source, resolved_at
+       FROM oes_pp_data
+       WHERE 1=1${whereClause}
+       ORDER BY project, resolution_status, serial_number`,
+      params
+    );
+
+    const STATUS_LABELS: Record<string, string> = {
+      unresolved: 'Unresolved',
+      matched_oes: 'OES Match',
+      matched_unified: 'Unified Match',
+      matched_onemap: 'OneMap Match',
+      matched_1map: '1Map Match',
+    };
+
+    const rows = dataResult.rows.map(r => ({
+      'Serial Number': r.serial_number,
+      'Project': r.project,
+      'Date Registered': r.date_registered ? new Date(r.date_registered).toLocaleDateString() : '',
+      'Status': STATUS_LABELS[r.resolution_status] || r.resolution_status,
+      'Resolved DR': r.resolved_drop_number || '',
+      'Source': r.resolved_source || '',
+      'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 20 }, // Serial Number
+      { wch: 12 }, // Project
+      { wch: 14 }, // Date Registered
+      { wch: 14 }, // Status
+      { wch: 14 }, // Resolved DR
+      { wch: 22 }, // Source
+      { wch: 20 }, // Resolved At
+    ];
+
+    const sheetName = status
+      ? `PP Data - ${STATUS_LABELS[status] || status}`
+      : project
+        ? `PP Data - ${project}`
+        : 'PP Data';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const fileParts = ['PP_Data'];
+    if (project) fileParts.push(project);
+    if (status) fileParts.push(status);
+    fileParts.push(new Date().toISOString().substring(0, 10));
+    const filename = `${fileParts.join('_')}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buf);
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use "stats", "list", or "export".' });
 }
 
 export default withAuth(withRole('manager')(handler));
