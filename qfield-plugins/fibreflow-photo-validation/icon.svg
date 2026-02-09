@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Camera body -->
+  <rect x="4" y="12" width="40" height="28" rx="4" fill="#2563eb"/>
+
+  <!-- Camera lens mount -->
+  <circle cx="24" cy="26" r="10" fill="#1e40af"/>
+
+  <!-- Camera lens -->
+  <circle cx="24" cy="26" r="7" fill="#3b82f6"/>
+  <circle cx="24" cy="26" r="3" fill="#1e40af"/>
+
+  <!-- Flash -->
+  <rect x="32" y="16" width="8" height="4" rx="1" fill="#fbbf24"/>
+
+  <!-- Viewfinder -->
+  <rect x="8" y="16" width="6" height="4" rx="1" fill="#1e40af"/>
+
+  <!-- Validation checkmark badge -->
+  <circle cx="38" cy="38" r="8" fill="#10b981"/>
+  <path d="M34 38 L37 41 L42 35" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

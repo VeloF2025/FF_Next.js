@@ -1,0 +1,7 @@
+[general]
+name=FibreFlow Photo Validation
+description=Real-time AI validation for fiber installation photos. Validates pole installations, cable stringing, dome joints, and drop activations before saving.
+author=VelocityFibre
+icon=icon.svg
+version=1.0.0
+qfield_minimum_version=3.3.0
