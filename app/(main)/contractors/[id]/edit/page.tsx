@@ -66,12 +66,10 @@ export default async function EditContractorPage({
   return (
     <div className="p-6">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-2">
-          <Link href={`/contractors/${contractor.id}`} className="hover:text-blue-400">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-          <span>Back to Contractor</span>
-        </div>
+        <Link href={`/contractors/${contractor.id}`} className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] px-3 py-1.5 -ml-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors mb-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Contractor
+        </Link>
         <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Edit Contractor</h1>
         <p className="text-[var(--ff-text-secondary)]">{contractor.companyName}</p>
       </div>

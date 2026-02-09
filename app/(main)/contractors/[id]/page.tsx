@@ -69,12 +69,10 @@ export default async function ContractorDetailPage({
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] mb-2">
-            <Link href="/contractors" className="hover:text-blue-400">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <span>Back to Contractors</span>
-          </div>
+          <Link href="/contractors" className="inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] px-3 py-1.5 -ml-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors mb-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Contractors
+          </Link>
           <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">{contractor.companyName}</h1>
           <p className="text-[var(--ff-text-secondary)]">{contractor.registrationNumber}</p>
         </div>
