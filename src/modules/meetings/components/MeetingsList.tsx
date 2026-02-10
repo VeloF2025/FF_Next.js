@@ -21,11 +21,11 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
   }
 
   return (
-    <div className="space-y-4">
+    <div className="divide-y divide-[var(--ff-border-light)]">
       {meetings.map((meeting) => (
         <div
           key={meeting.id}
-          className="ff-card hover:shadow-md transition-shadow cursor-pointer"
+          className="hover:bg-[var(--ff-bg-hover)] transition-colors cursor-pointer"
           onClick={() => onEditMeeting(meeting)}
         >
           <div className="p-6">
