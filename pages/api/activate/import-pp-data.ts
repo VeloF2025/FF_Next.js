@@ -190,7 +190,30 @@ async function handler(
     return res.send(buf);
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use "stats", "list", or "export".' });
+  if (action === 'lookup-status') {
+    const result = await pool.query(`
+      SELECT id, status, started_at, completed_at, details
+      FROM data_sync_operations
+      WHERE operation_type = 'pp_data_1map_lookup'
+      ORDER BY started_at DESC
+      LIMIT 1
+    `);
+
+    const row = result.rows[0] || null;
+    return res.status(200).json({
+      success: true,
+      data: row
+        ? {
+            status: row.status,
+            startedAt: row.started_at,
+            completedAt: row.completed_at,
+            ...(typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {}),
+          }
+        : null,
+    });
+  }
+
+  return res.status(400).json({ error: 'Invalid action. Use "stats", "list", "export", or "lookup-status".' });
 }
 
 export default withAuth(withRole('manager')(handler));

@@ -127,12 +127,45 @@ async function run1MapLookup(): Promise<{
     return results;
   }
 
-  logger.info('Starting per-serial 1Map lookup', {
-    totalSerials: unresolvedResult.rows.length,
-  });
+  const totalSerials = unresolvedResult.rows.length;
+
+  // Insert a "running" tracker row so the UI can poll progress
+  let trackerId: number | null = null;
+  try {
+    const trackerResult = await pool.query(
+      `INSERT INTO data_sync_operations (operation_type, status, started_at, details, triggered_by)
+       VALUES ('pp_data_1map_lookup', 'running', NOW(), $1, 'pp_data_resolve')
+       RETURNING id`,
+      [JSON.stringify({ total: totalSerials, searched: 0, resolved: 0, not_found: 0, errors: 0, method: 'per_serial_search' })]
+    );
+    trackerId = trackerResult.rows[0]?.id || null;
+  } catch (trackerErr) {
+    logger.warn('Failed to create tracker row', { error: String(trackerErr) });
+  }
+
+  logger.info('Starting per-serial 1Map lookup', { totalSerials, trackerId });
 
   const client = createOneMapClient();
   await client.authenticate();
+
+  // Helper to update progress in DB
+  const updateProgress = async () => {
+    if (!trackerId) return;
+    try {
+      await pool.query(
+        `UPDATE data_sync_operations SET details = $1 WHERE id = $2`,
+        [JSON.stringify({
+          total: totalSerials,
+          searched: results.total_searched,
+          resolved: results.total_resolved,
+          not_found: results.total_not_found,
+          errors: results.total_errors,
+          elapsed_seconds: Math.round((Date.now() - startTime) / 1000),
+          method: 'per_serial_search',
+        }), trackerId]
+      );
+    } catch { /* non-fatal */ }
+  };
 
   // Process serials sequentially with rate limiting
   for (const row of unresolvedResult.rows) {
@@ -145,8 +178,7 @@ async function run1MapLookup(): Promise<{
       const searchResult = await client.searchInstallations(serial, { limit: 10 });
 
       if (searchResult.success && searchResult.result && searchResult.result.length > 0) {
-        // Find best match: check if serial appears in any field of any result
-        const match = searchResult.result[0]; // Top result from 1Map search
+        const match = searchResult.result[0];
 
         // Verify the serial actually appears in this record's data
         const recordStr = JSON.stringify(match).toUpperCase();
@@ -180,7 +212,6 @@ async function run1MapLookup(): Promise<{
             serial, project, dr: match.drp, pole: match.pole,
           });
         } else {
-          // Results returned but serial not actually in the data (false positive)
           results.total_not_found++;
         }
       } else {
@@ -194,14 +225,15 @@ async function run1MapLookup(): Promise<{
       });
     }
 
-    // Rate limit: 200ms between requests to avoid overwhelming 1Map
+    // Rate limit: 200ms between requests
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // Log progress every 50 serials
-    if (results.total_searched % 50 === 0) {
+    // Update progress every 25 serials
+    if (results.total_searched % 25 === 0) {
+      await updateProgress();
       logger.info('1Map lookup progress', {
         searched: results.total_searched,
-        total: unresolvedResult.rows.length,
+        total: totalSerials,
         resolved: results.total_resolved,
         elapsed: `${Math.round((Date.now() - startTime) / 1000)}s`,
       });
@@ -210,21 +242,21 @@ async function run1MapLookup(): Promise<{
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-  // Log to data_sync_operations
-  try {
-    await pool.query(
-      `INSERT INTO data_sync_operations (operation_type, status, started_at, completed_at, details, triggered_by)
-       VALUES ('pp_data_1map_lookup', 'success', NOW(), NOW(), $1, 'pp_data_resolve')`,
-      [JSON.stringify({
-        ...results,
-        elapsed_seconds: elapsed,
-        method: 'per_serial_search',
-      })]
-    );
-  } catch (logErr) {
-    logger.warn('Failed to log to data_sync_operations', {
-      error: logErr instanceof Error ? logErr.message : String(logErr),
-    });
+  // Mark tracker as complete
+  if (trackerId) {
+    try {
+      await pool.query(
+        `UPDATE data_sync_operations SET status = 'success', completed_at = NOW(), details = $1 WHERE id = $2`,
+        [JSON.stringify({
+          total: totalSerials,
+          ...results,
+          elapsed_seconds: elapsed,
+          method: 'per_serial_search',
+        }), trackerId]
+      );
+    } catch (logErr) {
+      logger.warn('Failed to update tracker row', { error: String(logErr) });
+    }
   }
 
   logger.info('1Map per-serial lookup complete', { ...results, elapsed_seconds: elapsed });

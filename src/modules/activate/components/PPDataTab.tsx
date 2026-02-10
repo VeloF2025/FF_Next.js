@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download,
+  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download, CheckCircle2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,18 @@ interface PPStats {
   } | null;
 }
 
+interface LookupStatus {
+  status: 'running' | 'success' | 'failed';
+  startedAt: string;
+  completedAt: string | null;
+  total: number;
+  searched: number;
+  resolved: number;
+  not_found: number;
+  errors: number;
+  elapsed_seconds?: number;
+}
+
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   not_found: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', label: 'Not Found' },
   located_oes: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'Found (OES)' },
@@ -41,7 +53,6 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
 
 export function PPDataTab() {
   const [isScanning, setIsScanning] = useState(false);
-  const [isLooking1Map, setIsLooking1Map] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<PPStats | null>(null);
   const [records, setRecords] = useState<PPRecord[]>([]);
@@ -49,6 +60,8 @@ export function PPDataTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -81,8 +94,39 @@ export function PPDataTab() {
     }
   }, [page, filterProject, filterStatus]);
 
+  const fetchLookupStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/activate/import-pp-data?action=lookup-status');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setLookupStatus(data.data);
+        // Stop polling if complete
+        if (data.data.status !== 'running') {
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          // Refresh stats + records when done
+          if (data.data.status === 'success') {
+            fetchStats();
+            fetchRecords();
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
+  }, [fetchStats, fetchRecords]);
+
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    fetchLookupStatus();
+    pollRef.current = setInterval(fetchLookupStatus, 3000);
+  }, [fetchLookupStatus]);
+
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (stats && stats.total > 0) fetchRecords(); }, [stats, fetchRecords]);
+
+  // Check if a lookup is already running on mount
+  useEffect(() => {
+    fetchLookupStatus();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchLookupStatus]);
 
   const handleLocalScan = async () => {
     setIsScanning(true);
@@ -106,7 +150,6 @@ export function PPDataTab() {
   };
 
   const handle1MapLookup = async () => {
-    setIsLooking1Map(true);
     setError(null);
     try {
       const res = await fetch('/api/activate/pp-data-resolve', {
@@ -116,15 +159,14 @@ export function PPDataTab() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || '1Map lookup failed');
-      toast.success(result.data.message || `1Map lookup: ${result.data.total_resolved} matches found`);
-      fetchStats();
-      fetchRecords();
+      toast.success('1Map per-serial search started');
+      startPolling();
     } catch (err) {
       setError(err instanceof Error ? err.message : '1Map lookup failed');
-    } finally {
-      setIsLooking1Map(false);
     }
   };
+
+  const is1MapRunning = lookupStatus?.status === 'running';
 
   return (
     <div className="space-y-6">
@@ -186,6 +228,54 @@ export function PPDataTab() {
         </div>
       )}
 
+      {/* 1Map Lookup Progress */}
+      {lookupStatus && lookupStatus.status === 'running' && lookupStatus.total > 0 && (
+        <div className="bg-purple-900/20 border border-purple-800 rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+            <span className="text-sm font-medium text-purple-300">
+              1Map Serial Search in Progress
+            </span>
+            <span className="text-xs text-purple-400 ml-auto">
+              {lookupStatus.elapsed_seconds ? `${lookupStatus.elapsed_seconds}s elapsed` : ''}
+            </span>
+          </div>
+          <div className="w-full bg-purple-900/40 rounded-full h-2">
+            <div
+              className="bg-purple-500 h-2 rounded-full transition-all duration-500"
+              style={{ width: `${Math.round((lookupStatus.searched / lookupStatus.total) * 100)}%` }}
+            />
+          </div>
+          <div className="flex gap-6 text-xs text-purple-300">
+            <span>Searched: <strong>{lookupStatus.searched}</strong> / {lookupStatus.total}</span>
+            <span className="text-teal-400">Found: <strong>{lookupStatus.resolved}</strong></span>
+            <span className="text-amber-400">Not Found: <strong>{lookupStatus.not_found}</strong></span>
+            {lookupStatus.errors > 0 && (
+              <span className="text-red-400">Errors: <strong>{lookupStatus.errors}</strong></span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 1Map Lookup Complete Banner */}
+      {lookupStatus && lookupStatus.status === 'success' && lookupStatus.total > 0 && (
+        <div className="bg-green-900/20 border border-green-800 rounded-lg p-4 flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="text-sm text-green-300">
+            <strong>1Map search complete.</strong>{' '}
+            Searched {lookupStatus.total} serials — found <strong>{lookupStatus.resolved}</strong>,
+            not found {lookupStatus.not_found}
+            {lookupStatus.elapsed_seconds ? ` in ${lookupStatus.elapsed_seconds}s` : ''}.
+          </div>
+          <button
+            onClick={() => setLookupStatus(null)}
+            className="ml-auto text-green-500 hover:text-green-300"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Action Buttons */}
       {stats && stats.total > 0 && (
         <div className="flex flex-wrap gap-3">
@@ -203,14 +293,14 @@ export function PPDataTab() {
           </button>
           <button
             onClick={handle1MapLookup}
-            disabled={isLooking1Map}
+            disabled={is1MapRunning}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700
                        disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isLooking1Map ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Looking up...</>
+            {is1MapRunning ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Searching...</>
             ) : (
-              <><Map className="w-4 h-4" /> 1Map Bulk Lookup</>
+              <><Map className="w-4 h-4" /> 1Map Serial Search</>
             )}
           </button>
           <button
