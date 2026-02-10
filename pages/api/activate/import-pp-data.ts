@@ -200,6 +200,25 @@ async function handler(
     `);
 
     const row = result.rows[0] || null;
+
+    // Detect stale "running" jobs (no completion after 5 minutes = server restart killed it)
+    if (row && row.status === 'running') {
+      const details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {};
+      const startedAt = new Date(row.started_at).getTime();
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const expectedDuration = (details.total || 500) * 0.25; // ~250ms per serial
+      if (elapsed > expectedDuration + 120) {
+        // Mark as stale — process likely died
+        await pool.query(
+          `UPDATE data_sync_operations SET status = 'failed', completed_at = NOW(),
+           details = details || '{"stale": true}'::jsonb WHERE id = $1`,
+          [row.id]
+        );
+        row.status = 'failed';
+        row.completed_at = new Date();
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: row
