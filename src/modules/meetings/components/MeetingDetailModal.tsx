@@ -1,4 +1,4 @@
-import { X, Calendar, Clock, Video, MapPin, User } from 'lucide-react';
+import { X, Calendar, Clock, Video, MapPin, User, Users } from 'lucide-react';
 import type { Meeting } from '../types/meeting.types';
 
 interface MeetingDetailModalProps {
@@ -60,12 +60,28 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
             </div>
 
             <div>
-              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Participants ({meeting.participants.length})</h3>
-              <div className="flex flex-wrap gap-2">
-                {meeting.participants.map((participant, index) => (
-                  <span key={index} className="px-2 py-1 bg-[var(--ff-bg-tertiary)] rounded text-sm text-[var(--ff-text-primary)]">
-                    {participant}
-                  </span>
+              <h3 className="font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
+                <Users className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                Attendees ({meeting.rawParticipants?.length || meeting.participants.length})
+              </h3>
+              <div className="space-y-2">
+                {(meeting.rawParticipants && meeting.rawParticipants.length > 0
+                  ? meeting.rawParticipants
+                  : meeting.participants.map(name => ({ name, email: '', displayName: '' }))
+                ).map((attendee, index) => (
+                  <div key={index} className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-tertiary)] rounded">
+                    <div className="w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center text-xs font-medium text-blue-400">
+                      {(attendee.displayName || attendee.name || attendee.email || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
+                        {attendee.displayName || attendee.name || attendee.email || 'Unknown'}
+                      </p>
+                      {attendee.email && (
+                        <p className="text-xs text-[var(--ff-text-tertiary)] truncate">{attendee.email}</p>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

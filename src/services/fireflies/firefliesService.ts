@@ -93,7 +93,11 @@ export async function syncFirefliesToNeon(apiKey: string, sql: any) {
       ON CONFLICT (fireflies_id)
       DO UPDATE SET
         title = ${transcript.title},
+        meeting_date = TO_TIMESTAMP(${transcript.date} / 1000.0),
+        duration = ${Math.floor(transcript.duration || 0)},
+        transcript_url = ${transcript.transcript_url},
         summary = ${JSON.stringify(transcript.summary)},
+        participants = ${JSON.stringify(transcript.meeting_attendees)},
         updated_at = NOW()
     `;
   }

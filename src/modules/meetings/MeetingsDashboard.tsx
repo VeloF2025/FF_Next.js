@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
-import type { Meeting, UpcomingMeeting } from './types/meeting.types';
+import type { Meeting, MeetingAttendee, UpcomingMeeting } from './types/meeting.types';
 import { MeetingStatsCards } from './components/MeetingStatsCards';
 import { MeetingsList } from './components/MeetingsList';
 import { MeetingsSidebar } from './components/MeetingsSidebar';
@@ -27,7 +27,13 @@ export function MeetingsDashboard() {
 
   useEffect(() => {
     loadMeetings();
+    // Auto-sync from Fireflies in background on page load
+    syncFromFireflies();
   }, []);
+
+  const getAttendeeDisplayName = (p: MeetingAttendee): string => {
+    return p.displayName || p.name || p.email || 'Unknown';
+  };
 
   const loadMeetings = async () => {
     try {
@@ -35,36 +41,57 @@ export function MeetingsDashboard() {
       const data = await response.json();
 
       if (data.meetings) {
-        // Transform Neon data to Meeting format
-        const transformedMeetings = data.meetings.map((m: any) => ({
-          id: m.id,
-          title: m.title,
-          type: 'team' as const,
-          date: new Date(m.date),
-          time: new Date(m.date).toLocaleTimeString(),
-          duration: `${m.duration} min`,
-          location: 'Virtual',
-          isVirtual: true,
-          meetingLink: m.transcript_url,
-          organizer: 'Fireflies',
-          participants: m.participants ? m.participants.map((p: any) => p.name || p.email) : [],
-          agenda: m.summary?.outline || m.summary?.keywords || [],
-          status: 'completed' as const,
-          notes: m.summary?.action_items || '',
-          actionItems: [],
-          // Store full summary for detail view
-          summary: m.summary,
-          firefliesId: m.fireflies_id
-        }));
+        const transformedMeetings = data.meetings.map((m: any) => {
+          const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
+            ? m.participants.map((p: any) => ({
+                name: p.name || '',
+                email: p.email || '',
+                displayName: p.displayName || '',
+              }))
+            : [];
+
+          return {
+            id: m.id,
+            title: m.title,
+            type: 'team' as const,
+            date: new Date(m.date),
+            time: new Date(m.date).toLocaleTimeString(),
+            duration: `${m.duration} min`,
+            location: 'Virtual',
+            isVirtual: true,
+            meetingLink: m.transcript_url,
+            organizer: 'Fireflies',
+            participants: rawParticipants.map(getAttendeeDisplayName),
+            rawParticipants,
+            agenda: m.summary?.outline || m.summary?.keywords || [],
+            status: 'completed' as const,
+            notes: m.summary?.action_items || '',
+            actionItems: [],
+            summary: m.summary,
+            firefliesId: m.fireflies_id,
+          };
+        });
 
         setMeetings(transformedMeetings);
         setUpcomingMeetings([]);
       }
     } catch (error) {
       log.error('Failed to load meetings', { error }, 'MeetingsDashboard');
-      // Fallback to empty arrays
       setMeetings([]);
       setUpcomingMeetings([]);
+    }
+  };
+
+  const syncFromFireflies = async () => {
+    try {
+      const response = await fetch('/api/meetings?action=sync', { method: 'POST' });
+      const data = await response.json();
+      if (data.success && data.synced > 0) {
+        await loadMeetings();
+      }
+    } catch (error) {
+      // Silent fail - background sync shouldn't disrupt UX
+      log.error('Background Fireflies sync failed', { error }, 'MeetingsDashboard');
     }
   };
 

@@ -64,8 +64,16 @@ export function MeetingsList({ meetings, onEditMeeting, onDeleteMeeting }: Meeti
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span>{meeting.participants.length} participants</span>
+                    <Users className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      {meeting.participants.length} attendee{meeting.participants.length !== 1 ? 's' : ''}
+                      {meeting.participants.length > 0 && (
+                        <span className="text-[var(--ff-text-tertiary)]">
+                          {' '}&middot; {meeting.participants.slice(0, 3).join(', ')}
+                          {meeting.participants.length > 3 && ` +${meeting.participants.length - 3}`}
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </div>
 

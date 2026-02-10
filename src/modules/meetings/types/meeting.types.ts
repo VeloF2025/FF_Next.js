@@ -1,3 +1,9 @@
+export interface MeetingAttendee {
+  name: string;
+  email: string;
+  displayName?: string;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -10,10 +16,18 @@ export interface Meeting {
   meetingLink?: string;
   organizer: string;
   participants: string[];
+  rawParticipants: MeetingAttendee[];
   agenda: string[];
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   notes?: string;
   actionItems: ActionItem[];
+  summary?: {
+    keywords?: string[];
+    action_items?: string[];
+    outline?: string[];
+    overview?: string;
+  };
+  firefliesId?: string;
 }
 
 export interface ActionItem {

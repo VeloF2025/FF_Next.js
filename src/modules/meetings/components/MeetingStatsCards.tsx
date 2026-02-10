@@ -8,27 +8,27 @@ interface MeetingStatsCardsProps {
 
 export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
   const stats = {
-    todayMeetings: meetings.filter(m => m.status === 'scheduled').length,
-    weekMeetings: meetings.filter(m => m.status === 'scheduled').length * 3,
+    totalMeetings: meetings.length,
+    totalAttendees: meetings.reduce((sum, m) => sum + (m.participants?.length || 0), 0),
     actionItems: meetings.reduce((sum, m) => sum + m.actionItems.filter(a => !a.completed).length, 0),
-    totalHours: meetings.reduce((sum, m) => {
-      const hours = parseInt(m.duration) || 0;
-      return sum + hours;
+    totalMinutes: meetings.reduce((sum, m) => {
+      const mins = parseInt(m.duration) || 0;
+      return sum + mins;
     }, 0)
   };
 
   return (
     <StatCardGrid columns={4} className="mb-6">
       <StatCard
-        label="Today's Meetings"
-        value={stats.todayMeetings}
+        label="Total Meetings"
+        value={stats.totalMeetings}
         icon={Calendar}
         colorType="total"
       />
       <StatCard
-        label="This Week"
-        value={stats.weekMeetings}
-        icon={Clock}
+        label="Total Attendees"
+        value={stats.totalAttendees}
+        icon={Users}
         colorType="active"
       />
       <StatCard
@@ -39,8 +39,8 @@ export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
       />
       <StatCard
         label="Total Hours"
-        value={`${stats.totalHours}h`}
-        icon={Users}
+        value={`${Math.round(stats.totalMinutes / 60)}h`}
+        icon={Clock}
         colorType="financial"
       />
     </StatCardGrid>
