@@ -5,9 +5,9 @@
  * Links located PP records to maintenance tickets for investigation/verification.
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 
-import { withAuth, withRole } from '@/lib/auth';
+import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createTicket } from '@/modules/maintenance/services/ticketService';
 import { TicketSource, TicketType, TicketPriority } from '@/modules/maintenance/types/ticket';
@@ -23,7 +23,7 @@ const VALID_TICKET_TYPES: string[] = [
 ];
 
 async function handler(
-  req: NextApiRequest,
+  req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
@@ -87,6 +87,7 @@ async function handler(
         description: notes || `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${record.project})`,
         dr_number: dr,
         ont_serial: serial,
+        created_by: req.user.id,
       });
 
       // Link ticket back to PP data record
