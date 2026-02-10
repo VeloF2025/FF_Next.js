@@ -57,6 +57,7 @@ export class OneMapClient {
   private password: string;
   private sessionCookie: string | null = null;
   private csrfToken: string | null = null;
+  private requestCount = 0;
 
   constructor(config: OneMapClientConfig) {
     this.email = config.email;
@@ -149,22 +150,14 @@ export class OneMapClient {
   }
 
   /**
-   * Search for drops
+   * Execute a search request (internal, no retry)
    */
-  async searchInstallations(
+  private async executeSearch(
     query: string,
-    options: {
-      layerId?: string;
-      page?: number;
-      limit?: number;
-    } = {}
-  ): Promise<OneMapSearchResult> {
-    const { layerId = '5121', page = 1, limit = 50 } = options;
-
-    if (!this.sessionCookie) {
-      await this.authenticate();
-    }
-
+    layerId: string,
+    page: number,
+    limit: number,
+  ): Promise<{ response: Response; isSessionExpired: boolean }> {
     const start = (page - 1) * limit;
 
     const formData = new URLSearchParams({
@@ -185,30 +178,95 @@ export class OneMapClient {
       limit: String(limit),
     });
 
+    const response = await fetch(`${this.baseUrl}/api/apps/app/getattributes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Cookie': this.getCookies(),
+      },
+      body: formData.toString(),
+      redirect: 'manual',
+    });
+
+    // Detect session expiry: redirect (302), unauthorized, or HTML response
+    const isSessionExpired =
+      response.status === 302 ||
+      response.status === 301 ||
+      response.status === 401 ||
+      response.status === 403 ||
+      (response.headers.get('content-type')?.includes('text/html') ?? false);
+
+    return { response, isSessionExpired };
+  }
+
+  /**
+   * Search for drops (auto-retries once on session expiry)
+   */
+  async searchInstallations(
+    query: string,
+    options: {
+      layerId?: string;
+      page?: number;
+      limit?: number;
+    } = {}
+  ): Promise<OneMapSearchResult> {
+    const { layerId = '5121', page = 1, limit = 50 } = options;
+
+    if (!this.sessionCookie) {
+      await this.authenticate();
+    }
+
+    // Proactively re-authenticate every 200 requests to avoid session expiry
+    this.requestCount++;
+    if (this.requestCount % 200 === 0) {
+      logger.info('Proactive re-authentication', { requestCount: this.requestCount });
+      await this.authenticate();
+    }
+
     try {
-      const response = await fetch(`${this.baseUrl}/api/apps/app/getattributes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'Cookie': this.getCookies(),
-        },
-        body: formData.toString(),
-      });
+      const { response, isSessionExpired } = await this.executeSearch(query, layerId, page, limit);
+
+      // Session expired — re-authenticate and retry once
+      if (isSessionExpired) {
+        logger.warn('1Map session expired, re-authenticating', {
+          status: response.status,
+          requestCount: this.requestCount,
+        });
+        await this.authenticate();
+        const retry = await this.executeSearch(query, layerId, page, limit);
+        if (retry.isSessionExpired) {
+          throw new Error(`1Map session expired after re-auth (status: ${retry.response.status})`);
+        }
+        if (!retry.response.ok) {
+          throw new Error(`1Map API error after re-auth: ${retry.response.status}`);
+        }
+        return await retry.response.json() as OneMapSearchResult;
+      }
 
       if (!response.ok) {
         throw new Error(`1Map API error: ${response.status} ${response.statusText}`);
       }
 
-      const result = await response.json() as OneMapSearchResult;
-
-      logger.debug('1Map search completed', {
-        query,
-        page,
-        results: result.result?.length || 0,
-        totalPages: result.total_pages,
-      });
-
-      return result;
+      const text = await response.text();
+      // Guard against non-JSON responses (e.g. HTML error pages)
+      try {
+        const result = JSON.parse(text) as OneMapSearchResult;
+        logger.debug('1Map search completed', {
+          query, page, results: result.result?.length || 0,
+        });
+        return result;
+      } catch {
+        // Got non-JSON — session likely expired, re-auth and retry
+        logger.warn('1Map returned non-JSON, re-authenticating', {
+          bodyPreview: text.substring(0, 100),
+        });
+        await this.authenticate();
+        const retry = await this.executeSearch(query, layerId, page, limit);
+        if (!retry.response.ok) {
+          throw new Error(`1Map API error after re-auth: ${retry.response.status}`);
+        }
+        return await retry.response.json() as OneMapSearchResult;
+      }
     } catch (error) {
       logger.error('1Map search failed', { error, query });
       throw error;
