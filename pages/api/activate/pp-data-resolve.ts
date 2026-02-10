@@ -43,7 +43,7 @@ async function runLocalResolution(): Promise<{
   // 1. Match against oes_activations.serial_number
   const oesResult = await pool.query(`
     UPDATE oes_pp_data pp
-    SET resolution_status = 'matched_oes',
+    SET resolution_status = 'located_oes',
         resolved_drop_number = oa.drop_number,
         resolved_source = 'oes_activations',
         resolved_details = jsonb_build_object(
@@ -55,14 +55,14 @@ async function runLocalResolution(): Promise<{
         updated_at = NOW()
     FROM oes_activations oa
     WHERE pp.serial_number = oa.serial_number
-      AND pp.resolution_status = 'unresolved'
+      AND pp.resolution_status = 'not_found'
   `);
   results.matched_oes = oesResult.rowCount || 0;
 
   // 2. Match against dr_photo_unified_reviews (oes_serial or ont_serial_scanned)
   const unifiedResult = await pool.query(`
     UPDATE oes_pp_data pp
-    SET resolution_status = 'matched_unified',
+    SET resolution_status = 'located_unified',
         resolved_drop_number = ur.drop_number,
         resolved_source = 'dr_photo_unified_reviews',
         resolved_details = jsonb_build_object(
@@ -76,7 +76,7 @@ async function runLocalResolution(): Promise<{
         updated_at = NOW()
     FROM dr_photo_unified_reviews ur
     WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number)
-      AND pp.resolution_status = 'unresolved'
+      AND pp.resolution_status = 'not_found'
   `);
   results.matched_unified = unifiedResult.rowCount || 0;
 
@@ -84,7 +84,7 @@ async function runLocalResolution(): Promise<{
   try {
     const onemapResult = await pool.query(`
       UPDATE oes_pp_data pp
-      SET resolution_status = 'matched_onemap',
+      SET resolution_status = 'located_onemap',
           resolved_drop_number = op.drop_number,
           resolved_source = 'onemap_properties',
           resolved_details = jsonb_build_object(
@@ -95,7 +95,7 @@ async function runLocalResolution(): Promise<{
           updated_at = NOW()
       FROM onemap_properties op
       WHERE op.ont_barcode = pp.serial_number
-        AND pp.resolution_status = 'unresolved'
+        AND pp.resolution_status = 'not_found'
     `);
     results.matched_onemap = onemapResult.rowCount || 0;
   } catch (err) {
@@ -126,7 +126,7 @@ async function run1MapLookup(): Promise<{
   const unresolvedResult = await pool.query(`
     SELECT serial_number, project
     FROM oes_pp_data
-    WHERE resolution_status = 'unresolved'
+    WHERE resolution_status = 'not_found'
     ORDER BY project
   `);
 
@@ -213,7 +213,7 @@ async function run1MapLookup(): Promise<{
 
           await pool.query(`
             UPDATE oes_pp_data pp
-            SET resolution_status = 'matched_1map',
+            SET resolution_status = 'located_1map',
                 resolved_drop_number = data.drp,
                 resolved_source = '1map_api',
                 resolved_details = data.details,
@@ -227,7 +227,7 @@ async function run1MapLookup(): Promise<{
             ) data
             WHERE pp.serial_number = data.serial
               AND pp.project = $4
-              AND pp.resolution_status = 'unresolved'
+              AND pp.resolution_status = 'not_found'
           `, [
             chunk.map(m => m.serial),
             chunk.map(m => m.drp),

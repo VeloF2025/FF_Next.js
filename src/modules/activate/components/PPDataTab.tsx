@@ -19,8 +19,9 @@ interface PPRecord {
 
 interface PPStats {
   total: number;
-  resolved: number;
-  unresolved: number;
+  activated: number;
+  located: number;
+  notFound: number;
   projects: number;
   lastImport: {
     date: string;
@@ -30,11 +31,12 @@ interface PPStats {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  unresolved: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', label: 'Unresolved' },
-  matched_oes: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'OES Match' },
-  matched_unified: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'Unified Match' },
-  matched_onemap: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', label: 'OneMap Match' },
-  matched_1map: { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-800 dark:text-teal-300', label: '1Map Match' },
+  not_found: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', label: 'Not Found' },
+  located_oes: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'Found (OES)' },
+  located_unified: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-800 dark:text-indigo-300', label: 'Found (Unified)' },
+  located_onemap: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', label: 'Found (OneMap)' },
+  located_1map: { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-800 dark:text-teal-300', label: 'Found (1Map)' },
+  activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
 
 export function PPDataTab() {
@@ -131,24 +133,28 @@ export function PPDataTab() {
         <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-blue-300">
           PP Data is automatically imported from the <strong>PP DATA</strong> sheet when you import an OES Excel file via the OES tab.
-          Use the actions below to resolve imported serials against local data or 1Map.
+          Use the actions below to locate imported serials against local data or 1Map. Serials are marked <strong>Activated</strong> when they appear in OES activations.
         </p>
       </div>
 
       {/* Summary Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.total}</p>
             <p className="text-sm text-[var(--ff-text-secondary)]">Total Imported</p>
           </div>
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-            <p className="text-2xl font-bold text-green-500">{stats.resolved}</p>
-            <p className="text-sm text-[var(--ff-text-secondary)]">Resolved</p>
+            <p className="text-2xl font-bold text-green-500">{stats.activated}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Activated</p>
           </div>
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
-            <p className="text-2xl font-bold text-amber-500">{stats.unresolved}</p>
-            <p className="text-sm text-[var(--ff-text-secondary)]">Unresolved</p>
+            <p className="text-2xl font-bold text-blue-500">{stats.located}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Located</p>
+          </div>
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+            <p className="text-2xl font-bold text-amber-500">{stats.notFound}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Not Found</p>
           </div>
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <p className="text-sm text-[var(--ff-text-secondary)]">Last Import</p>
@@ -239,11 +245,12 @@ export function PPDataTab() {
                          text-[var(--ff-text-primary)] text-sm"
             >
               <option value="">All Statuses</option>
-              <option value="unresolved">Unresolved</option>
-              <option value="matched_oes">OES Match</option>
-              <option value="matched_unified">Unified Match</option>
-              <option value="matched_onemap">OneMap Match</option>
-              <option value="matched_1map">1Map Match</option>
+              <option value="not_found">Not Found</option>
+              <option value="located_oes">Found (OES)</option>
+              <option value="located_unified">Found (Unified)</option>
+              <option value="located_onemap">Found (OneMap)</option>
+              <option value="located_1map">Found (1Map)</option>
+              <option value="activated">Activated</option>
             </select>
             <div className="ml-auto">
               <button
@@ -269,9 +276,9 @@ export function PPDataTab() {
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Project</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Registered</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Status</th>
-                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Resolved DR</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">DR</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Source</th>
-                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Resolved At</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Found At</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">

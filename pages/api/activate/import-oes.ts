@@ -260,38 +260,38 @@ async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
            date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
            import_batch_id = EXCLUDED.import_batch_id,
            updated_at = NOW()
-         WHERE oes_pp_data.resolution_status = 'unresolved'`,
+         WHERE oes_pp_data.resolution_status = 'not_found'`,
         values
       );
     }
 
     // Run local resolution (3 sequential UPDATE queries)
     const oesMatch = await pool.query(`
-      UPDATE oes_pp_data pp SET resolution_status = 'matched_oes',
+      UPDATE oes_pp_data pp SET resolution_status = 'located_oes',
         resolved_drop_number = oa.drop_number, resolved_source = 'oes_activations',
         resolved_details = jsonb_build_object('activation_date', oa.activation_date::text, 'status', oa.status, 'team', oa.team),
         resolved_at = NOW(), updated_at = NOW()
-      FROM oes_activations oa WHERE pp.serial_number = oa.serial_number AND pp.resolution_status = 'unresolved'
+      FROM oes_activations oa WHERE pp.serial_number = oa.serial_number AND pp.resolution_status = 'not_found'
     `);
 
     const unifiedMatch = await pool.query(`
-      UPDATE oes_pp_data pp SET resolution_status = 'matched_unified',
+      UPDATE oes_pp_data pp SET resolution_status = 'located_unified',
         resolved_drop_number = ur.drop_number, resolved_source = 'dr_photo_unified_reviews',
         resolved_details = jsonb_build_object('matched_field',
           CASE WHEN ur.oes_serial = pp.serial_number THEN 'oes_serial' ELSE 'ont_serial_scanned' END, 'project', ur.project),
         resolved_at = NOW(), updated_at = NOW()
       FROM dr_photo_unified_reviews ur
-      WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number) AND pp.resolution_status = 'unresolved'
+      WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number) AND pp.resolution_status = 'not_found'
     `);
 
     let onemapMatches = 0;
     try {
       const onemapMatch = await pool.query(`
-        UPDATE oes_pp_data pp SET resolution_status = 'matched_onemap',
+        UPDATE oes_pp_data pp SET resolution_status = 'located_onemap',
           resolved_drop_number = op.drop_number, resolved_source = 'onemap_properties',
           resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
           resolved_at = NOW(), updated_at = NOW()
-        FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'unresolved'
+        FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'not_found'
       `);
       onemapMatches = onemapMatch.rowCount || 0;
     } catch { /* onemap_properties may not have ont_barcode */ }
@@ -300,7 +300,7 @@ async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
 
     // Update batch stats
     await pool.query(
-      `UPDATE oes_pp_import_batches SET resolved_count = $1, unresolved_count = $2 WHERE id = $3`,
+      `UPDATE oes_pp_import_batches SET located_count = $1, unlocated_count = $2 WHERE id = $3`,
       [totalResolved, ppRows.length - totalResolved, batchId]
     );
 
@@ -1009,6 +1009,34 @@ async function handler(
           log.error('OESImport', 'PP DATA import failed', err);
         });
       }
+
+      // === PP ACTIVATION CHECK (Fire-and-forget) ===
+      // When OES data is imported, check if any PP serials now appear in OES activations
+      // and mark them as 'activated' (truly resolved)
+      (async () => {
+        try {
+          const activatedResult = await pool.query(`
+            UPDATE oes_pp_data pp
+            SET resolution_status = 'activated',
+                resolved_drop_number = COALESCE(pp.resolved_drop_number, oa.drop_number),
+                resolved_source = COALESCE(pp.resolved_source, 'oes_activations'),
+                resolved_details = COALESCE(pp.resolved_details, '{}'::jsonb) || jsonb_build_object(
+                  'activated_date', oa.activation_date::text,
+                  'activated_status', oa.status
+                ),
+                resolved_at = COALESCE(pp.resolved_at, NOW()),
+                updated_at = NOW()
+            FROM oes_activations oa
+            WHERE pp.serial_number = oa.serial_number
+              AND pp.resolution_status != 'activated'
+          `);
+          if ((activatedResult.rowCount || 0) > 0) {
+            log.info('OESImport', `PP activation check: ${activatedResult.rowCount} serials now activated`);
+          }
+        } catch (err) {
+          log.error('OESImport', 'PP activation check failed', err);
+        }
+      })();
 
       return res.status(200).json({
         success: true,

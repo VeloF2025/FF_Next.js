@@ -30,8 +30,9 @@ async function handler(
     const statsResult = await pool.query(`
       SELECT
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE resolution_status != 'unresolved') as resolved,
-        COUNT(*) FILTER (WHERE resolution_status = 'unresolved') as unresolved,
+        COUNT(*) FILTER (WHERE resolution_status = 'activated') as activated,
+        COUNT(*) FILTER (WHERE resolution_status LIKE 'located_%') as located,
+        COUNT(*) FILTER (WHERE resolution_status = 'not_found') as not_found,
         COUNT(DISTINCT project) as projects
       FROM oes_pp_data
     `);
@@ -50,8 +51,9 @@ async function handler(
       success: true,
       data: {
         total: parseInt(stats.total, 10),
-        resolved: parseInt(stats.resolved, 10),
-        unresolved: parseInt(stats.unresolved, 10),
+        activated: parseInt(stats.activated, 10),
+        located: parseInt(stats.located, 10),
+        notFound: parseInt(stats.not_found, 10),
         projects: parseInt(stats.projects, 10),
         lastImport: lastImport
           ? {
@@ -136,11 +138,12 @@ async function handler(
     );
 
     const STATUS_LABELS: Record<string, string> = {
-      unresolved: 'Unresolved',
-      matched_oes: 'OES Match',
-      matched_unified: 'Unified Match',
-      matched_onemap: 'OneMap Match',
-      matched_1map: '1Map Match',
+      not_found: 'Not Found',
+      located_oes: 'Found (OES)',
+      located_unified: 'Found (Unified)',
+      located_onemap: 'Found (OneMap)',
+      located_1map: 'Found (1Map)',
+      activated: 'Activated',
     };
 
     const rows = dataResult.rows.map(r => ({
