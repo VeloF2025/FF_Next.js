@@ -37,6 +37,16 @@ interface ExistingSubmission {
   qa_decision: string | null;
 }
 
+interface DuplicateSerialHit {
+  drop_number: string;
+  type: 'ont' | 'ups' | 'oes';
+}
+
+interface DuplicateSerialResult {
+  ontDuplicates: DuplicateSerialHit[];
+  upsDuplicates: DuplicateSerialHit[];
+}
+
 interface WAPhotoCheck {
   hasPhoto: boolean;
   photoCount: number;
@@ -142,6 +152,127 @@ async function checkDropsTable(dropNumber: string): Promise<DropsTableRecord | n
     log.warn('DrAcknowledgment', `Failed to check drops table for ${dropNumber}`, { error });
     return null;
   }
+}
+
+/**
+ * Check for duplicate serials across other DRs
+ * Non-critical: returns empty on failure so ack message still sends
+ */
+async function checkDuplicateSerials(
+  dropNumber: string,
+  ontSerial: string | null,
+  upsSerial: string | null
+): Promise<DuplicateSerialResult> {
+  const empty: DuplicateSerialResult = { ontDuplicates: [], upsDuplicates: [] };
+  try {
+    const queries: Promise<DuplicateSerialHit[]>[] = [];
+
+    // ONT duplicate check (match ont_serial_scanned OR oes_serial)
+    if (ontSerial) {
+      queries.push(
+        pool.query(
+          `SELECT drop_number, 'ont' as type FROM dr_photo_unified_reviews
+           WHERE UPPER(ont_serial_scanned) = UPPER($1) AND drop_number != $2
+           UNION
+           SELECT drop_number, 'oes' as type FROM dr_photo_unified_reviews
+           WHERE UPPER(oes_serial) = UPPER($1) AND drop_number != $2
+           LIMIT 5`,
+          [ontSerial, dropNumber]
+        ).then(r => r.rows as DuplicateSerialHit[])
+      );
+    } else {
+      queries.push(Promise.resolve([]));
+    }
+
+    // UPS duplicate check
+    if (upsSerial) {
+      queries.push(
+        pool.query(
+          `SELECT drop_number, 'ups' as type FROM dr_photo_unified_reviews
+           WHERE UPPER(ups_serial_scanned) = UPPER($1) AND drop_number != $2
+           LIMIT 5`,
+          [upsSerial, dropNumber]
+        ).then(r => r.rows as DuplicateSerialHit[])
+      );
+    } else {
+      queries.push(Promise.resolve([]));
+    }
+
+    const results = await Promise.all(queries);
+    return { ontDuplicates: results[0] || [], upsDuplicates: results[1] || [] };
+  } catch (error) {
+    log.warn('DrAcknowledgment', `Duplicate serial check failed for ${dropNumber}`, { error });
+    return empty;
+  }
+}
+
+/**
+ * Build serial warning lines for ack messages
+ * Shared by generateAckMessage() and generateResubmissionAckMessage()
+ */
+function buildSerialWarningLines(
+  ontSerial: string | null,
+  upsSerial: string | null,
+  vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number } | undefined,
+  duplicates: DuplicateSerialResult
+): string[] {
+  const lines: string[] = [];
+
+  // --- ONT Serial ---
+  if (ontSerial) {
+    if (vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
+      lines.push(`🔴 *ONT Serial MISMATCH:*`);
+      lines.push(`   1Map: ${ontSerial}`);
+      lines.push(`   Sticker: ${vlmResult.ontSerial}`);
+      lines.push(`   ⚠️ *Please correct in 1Map!*`);
+    } else if (vlmResult?.ontSerial) {
+      lines.push(`🔌 ONT Serial: ${ontSerial} ✅`);
+    } else {
+      lines.push(`🔌 ONT Serial: ${ontSerial}`);
+    }
+  } else {
+    lines.push(`🔴 *ONT Serial: NOT SCANNED*`);
+    lines.push(`   ⚠️ *Please scan ONT barcode in 1Map!*`);
+    if (vlmResult?.ontSerial) {
+      lines.push(`   📷 Photo shows: ${vlmResult.ontSerial}`);
+    }
+  }
+
+  // ONT duplicate warning
+  if (duplicates.ontDuplicates.length > 0) {
+    const drList = duplicates.ontDuplicates.map(d => d.drop_number).join(', ');
+    lines.push(`🔴 *ONT Serial ${ontSerial} already used on ${drList}!*`);
+    lines.push(`   ⚠️ *Please verify this is the correct serial*`);
+  }
+
+  // --- UPS Serial ---
+  if (upsSerial) {
+    if (vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
+      lines.push(`🔴 *UPS Serial MISMATCH:*`);
+      lines.push(`   1Map: ${upsSerial}`);
+      lines.push(`   Sticker: ${vlmResult.upsSerial}`);
+      lines.push(`   ⚠️ *Please correct in 1Map!*`);
+    } else if (vlmResult?.upsSerial) {
+      lines.push(`🔋 UPS Serial: ${upsSerial} ✅`);
+    } else {
+      lines.push(`🔋 UPS Serial: ${upsSerial}`);
+    }
+  } else {
+    lines.push(`🔴 *UPS Serial: NOT SCANNED*`);
+    lines.push(`   ⚠️ *Please scan UPS barcode in 1Map!*`);
+    if (vlmResult?.upsSerial) {
+      lines.push(`   📷 Photo shows: ${vlmResult.upsSerial}`);
+    }
+  }
+
+  // UPS duplicate warning
+  if (duplicates.upsDuplicates.length > 0) {
+    const drList = duplicates.upsDuplicates.map(d => d.drop_number).join(', ');
+    lines.push(`🔴 *UPS Serial ${upsSerial} already used on ${drList}!*`);
+    lines.push(`   ⚠️ *Please verify this is the correct serial*`);
+  }
+
+  return lines;
 }
 
 /**
@@ -317,7 +448,9 @@ function generateResubmissionAckMessage(
   previousPhotoCount: number,
   submissionNumber: number,
   ontSerial: string | null,
-  upsSerial: string | null
+  upsSerial: string | null,
+  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number },
+  duplicates: DuplicateSerialResult = { ontDuplicates: [], upsDuplicates: [] }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   const swapCheck = detectSwappedSerials(ontSerial, upsSerial);
   const lines: string[] = [];
@@ -348,9 +481,17 @@ function generateResubmissionAckMessage(
   // Photo count comparison
   lines.push(`📸 Photos: ${newPhotoCount} (was ${previousPhotoCount})`);
 
-  // Serial status
-  lines.push(`🔌 ONT: ${ontSerial || 'Not scanned'}`);
-  lines.push(`🔋 UPS: ${upsSerial || 'Not scanned'}`);
+  // Serial warnings using shared helper
+  if (swapCheck.swapped) {
+    lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
+    lines.push(`⚠️ UPS field: ${upsSerial || 'Not scanned'}`);
+    if (vlmResult?.ontSerial || vlmResult?.upsSerial) {
+      lines.push('');
+      lines.push(`📷 Photo serials: ONT=${vlmResult.ontSerial || '?'} UPS=${vlmResult.upsSerial || '?'}`);
+    }
+  } else {
+    lines.push(...buildSerialWarningLines(ontSerial, upsSerial, vlmResult, duplicates));
+  }
   lines.push('');
 
   // Footer - emphasize rework
@@ -385,7 +526,8 @@ function generateAckMessage(
   ontSerial: string | null,
   upsSerial: string | null,
   waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 },
-  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number }
+  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number },
+  duplicates: DuplicateSerialResult = { ontDuplicates: [], upsDuplicates: [] }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   // If DR not found in 1Map, return empty string
   // Go bridge checks for empty message and won't send anything
@@ -434,7 +576,7 @@ function generateAckMessage(
     lines.push('Please send ONT & UPS sticker photo with DR');
   }
 
-  // Serial status (with swap consideration and VLM photo comparison)
+  // Serial status (with swap consideration, VLM comparison, and duplicate detection)
   if (swapCheck.swapped) {
     // Already warned above, just show the raw values
     lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
@@ -445,39 +587,7 @@ function generateAckMessage(
       lines.push(`📷 Photo serials: ONT=${vlmResult.ontSerial || '?'} UPS=${vlmResult.upsSerial || '?'}`);
     }
   } else {
-    // ONT Serial with VLM sticker comparison
-    if (ontSerial) {
-      lines.push(`🔌 ONT Serial: ${ontSerial}`);
-      if (vlmResult?.ontSerial) {
-        if (normalizeForCompare(ontSerial) === normalizeForCompare(vlmResult.ontSerial)) {
-          lines.push(`   📷 Sticker: ✅ Match`);
-        } else {
-          lines.push(`   📷 Sticker: ⚠️ ${vlmResult.ontSerial}`);
-        }
-      }
-    } else {
-      lines.push(`⚠️ ONT Serial: Not scanned - please upload to 1Map`);
-      if (vlmResult?.ontSerial) {
-        lines.push(`   📷 Photo shows: ${vlmResult.ontSerial}`);
-      }
-    }
-
-    // UPS Serial with VLM sticker comparison
-    if (upsSerial) {
-      lines.push(`🔋 UPS Serial: ${upsSerial}`);
-      if (vlmResult?.upsSerial) {
-        if (normalizeForCompare(upsSerial) === normalizeForCompare(vlmResult.upsSerial)) {
-          lines.push(`   📷 Sticker: ✅ Match`);
-        } else {
-          lines.push(`   📷 Sticker: ⚠️ ${vlmResult.upsSerial}`);
-        }
-      }
-    } else {
-      lines.push(`⚠️ UPS Serial: Not scanned - please upload to 1Map`);
-      if (vlmResult?.upsSerial) {
-        lines.push(`   📷 Photo shows: ${vlmResult.upsSerial}`);
-      }
-    }
+    lines.push(...buildSerialWarningLines(ontSerial, upsSerial, vlmResult, duplicates));
   }
 
   lines.push('');
@@ -580,6 +690,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Continue with found=false - don't fail the request
     }
 
+    // Start duplicate serial check in parallel with WA photo polling (adds 0ms wall-clock time)
+    const duplicateCheckPromise = (ontSerial || upsSerial)
+      ? checkDuplicateSerials(dropNumber, ontSerial, upsSerial)
+      : Promise.resolve({ ontDuplicates: [], upsDuplicates: [] } as DuplicateSerialResult);
+
     // Poll for WhatsApp serial photos and run VLM serial extraction
     // Race condition: Go Bridge creates wa_photos records asynchronously
     let waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 };
@@ -632,6 +747,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       waPhotoCheck = await checkWAPhotos(dropNumber);
     }
 
+    // Await duplicate check (was running in parallel with WA photo polling)
+    const duplicates = await duplicateCheckPromise;
+    if (duplicates.ontDuplicates.length > 0 || duplicates.upsDuplicates.length > 0) {
+      log.warn('DrAcknowledgment', `Duplicate serials found for ${dropNumber}`, {
+        ontDuplicates: duplicates.ontDuplicates.map(d => d.drop_number),
+        upsDuplicates: duplicates.upsDuplicates.map(d => d.drop_number),
+      });
+    }
+
     // Generate appropriate message based on whether this is a resubmission
     let ackResult: { message: string; swapped: boolean; swapDetails: string | null };
     let notOnOneMap = false;
@@ -644,7 +768,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         previousPhotoCount,
         submissionNumber,
         ontSerial,
-        upsSerial
+        upsSerial,
+        vlmResult,
+        duplicates
       );
       // Mark for QA re-review and reset workflow
       await markForRework(dropNumber, photoCount);
@@ -667,12 +793,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         await updateOneMapStatus(dropNumber, 'not_found');
       } else {
         // DR not in 1Map AND not in drops - truly unknown
-        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult);
+        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult, duplicates);
         log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - no ack`);
       }
     } else {
       // Normal first submission found in 1Map
-      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult);
+      ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult, duplicates);
       // Track 1Map status
       await updateOneMapStatus(dropNumber, 'found');
     }
@@ -732,6 +858,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         upsMatch: upsSerial && vlmResult.upsSerial
           ? normalizeForCompare(upsSerial) === normalizeForCompare(vlmResult.upsSerial)
           : null,
+      } : null,
+      // Duplicate serial detection (Go Bridge ignores unknown fields)
+      duplicateSerials: (duplicates.ontDuplicates.length > 0 || duplicates.upsDuplicates.length > 0) ? {
+        ont: duplicates.ontDuplicates.map(d => d.drop_number),
+        ups: duplicates.upsDuplicates.map(d => d.drop_number),
       } : null,
     });
   } catch (error) {
