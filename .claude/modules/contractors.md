@@ -106,5 +106,58 @@ export const revalidate = 0;
 - Business type: `'pty_ltd'`
 - Compliance status: `'pending'`
 
+## Onboarding Stages (Updated 2026-02-09)
+
+6-stage workflow defined in `src/services/contractor/contractorOnboardingService.ts`:
+
+| Stage | Name | Required Documents |
+|-------|------|--------------------|
+| 1 | Company Registration | `cipc_registration`, `directors_ids`, `tax_clearance` |
+| 2 | Company Verification | (no docs - VerificationPanel) |
+| 3 | Financial Documentation | `bank_confirmation`, `vat_certificate` |
+| 4 | Insurance & Compliance | `insurance_liability`, `insurance_workers_comp`, `coid_registration`, `safety_certificate` |
+| 5 | Technical Qualifications | `technical_certification`, `key_staff_credentials` |
+| 6 | Final Review | `msa` (Master Build Agreement) |
+
+**DB storage**: `contractor_onboarding_stages.required_documents` is **jsonb** array.
+
+**Key rules**:
+- `cipc_registration` IS the company registration (don't duplicate with `company_registration`)
+- COID Registration (`coid_registration`) belongs in Insurance stage
+- Master Build Agreement (`msa`) required at Final Review
+- Directors' IDs tracked in Stage 1 (contractors upload multiple)
+- Stage 2 uses `VerificationPanel` component (SearchWorks/CIPC checks), not documents
+
+**Updating stages for existing contractors**: Use jsonb operators:
+```sql
+-- Add a doc: SET required_documents = required_documents || '"doc_type"'::jsonb
+-- Remove a doc: SET required_documents = required_documents - 'doc_type'
+-- Check contains: WHERE required_documents @> '"doc_type"'::jsonb
+```
+
+## Document Types
+
+Defined in `src/types/contractor-document.types.ts`. Key labels:
+- `msa` = "Master Build Agreement" (renamed from "Master Service Agreement" on 2026-02-09)
+- `cipc_registration` = "CIPC Registration" (same as company registration)
+- `coid_registration` = "COID Registration"
+- `directors_ids` = "Directors' IDs"
+
+Categories in `DOCUMENT_TYPE_CATEGORIES` for dropdown grouping.
+
+## UI/UX (Updated 2026-02-09)
+
+### Dark Theme
+All contractor modals/forms use FF design system CSS variables:
+- Modal overlay: `bg-black/60`
+- Modal container: `bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]`
+- Inputs: `bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)]`
+- Error banners: `bg-red-500/10 border border-red-500/30 text-red-400`
+- Cancel buttons: `bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]`
+
+### Layout
+- Detail/Edit pages: Full width with `p-6` (no `max-w-4xl`)
+- Back buttons: `inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] px-3 py-1.5 -ml-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors`
+
 ## Related Modules
 - `contractor-documents-report.md` - Document compliance reporting
