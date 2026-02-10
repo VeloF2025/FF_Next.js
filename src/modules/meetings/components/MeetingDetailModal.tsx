@@ -41,7 +41,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                   {meeting.isVirtual ? (
                     <>
                       <Video className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      <a href={meeting.meetingLink} className="text-blue-500 hover:underline">
+                      <a href={meeting.meetingLink} className="text-blue-400 hover:text-blue-300 hover:underline">
                         Join Meeting
                       </a>
                     </>
@@ -128,22 +128,22 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           )}
 
           {/* Fireflies Summary */}
-          {(meeting as any).summary && (
+          {meeting.summary && (
             <div className="mt-6 space-y-6">
               {/* Overview */}
-              {(meeting as any).summary.overview && (
+              {meeting.summary.overview && (
                 <div>
                   <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Summary</h3>
-                  <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{(meeting as any).summary.overview}</p>
+                  <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{meeting.summary.overview}</p>
                 </div>
               )}
 
               {/* Keywords */}
-              {(meeting as any).summary.keywords && Array.isArray((meeting as any).summary.keywords) && (meeting as any).summary.keywords.length > 0 && (
+              {meeting.summary.keywords && Array.isArray(meeting.summary.keywords) && meeting.summary.keywords.length > 0 && (
                 <div>
                   <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Keywords</h3>
                   <div className="flex flex-wrap gap-2">
-                    {(meeting as any).summary.keywords.map((keyword: string, index: number) => (
+                    {meeting.summary.keywords.map((keyword: string, index: number) => (
                       <span key={index} className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">
                         {keyword}
                       </span>
@@ -153,11 +153,11 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               )}
 
               {/* Outline */}
-              {(meeting as any).summary.outline && Array.isArray((meeting as any).summary.outline) && (meeting as any).summary.outline.length > 0 && (
+              {meeting.summary.outline && Array.isArray(meeting.summary.outline) && meeting.summary.outline.length > 0 && (
                 <div>
                   <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Detailed Outline</h3>
                   <ol className="space-y-2">
-                    {(meeting as any).summary.outline.map((item: string, index: number) => (
+                    {meeting.summary.outline.map((item: string, index: number) => (
                       <li key={index} className="flex gap-2 text-sm text-[var(--ff-text-secondary)]">
                         <span className="font-medium text-[var(--ff-text-tertiary)]">{index + 1}.</span>
                         <span>{item}</span>
@@ -168,32 +168,28 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
               )}
 
               {/* Action Items from Fireflies */}
-              {(meeting as any).summary.action_items && (
+              {meeting.summary.action_items && (
                 <div>
                   <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">AI-Detected Action Items</h3>
-                  <div className="p-4 bg-amber-500/10 rounded-lg border-l-4 border-amber-400">
-                    <div className="text-sm text-[var(--ff-text-primary)] leading-relaxed space-y-2">
+                  <div className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg border-l-4 border-blue-500">
+                    <div className="text-sm text-[var(--ff-text-secondary)] leading-relaxed space-y-2">
                       {(() => {
-                        const rawText = Array.isArray((meeting as any).summary.action_items)
-                          ? (meeting as any).summary.action_items.join(' ')
-                          : String((meeting as any).summary.action_items);
+                        const rawText = Array.isArray(meeting.summary.action_items)
+                          ? meeting.summary.action_items.join(' ')
+                          : String(meeting.summary.action_items);
 
-                        // Format the text to be more readable:
-                        // 1. Add line breaks before person names (**Name**)
-                        // 2. Add bullet points for each action item
                         const formatted = rawText
-                          .replace(/\*\*([^*]+)\*\*/g, '\n\n**$1**\n')  // Line breaks around names
-                          .replace(/(\([0-9:]+\))\s+([A-Z])/g, '$1\n• $2')  // Bullet before new actions
+                          .replace(/\*\*([^*]+)\*\*/g, '\n\n**$1**\n')
+                          .replace(/(\([0-9:]+\))\s+([A-Z])/g, '$1\n• $2')
                           .trim();
 
                         return formatted.split('\n').map((line, idx) => {
                           const trimmed = line.trim();
                           if (!trimmed) return null;
 
-                          // Bold person names
                           if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
                             return (
-                              <div key={idx} className="font-semibold text-amber-900 mt-3 first:mt-0">
+                              <div key={idx} className="font-semibold text-blue-400 mt-3 first:mt-0">
                                 {trimmed.replace(/\*\*/g, '')}
                               </div>
                             );
@@ -214,7 +210,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                     href={meeting.meetingLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+                    className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-2"
                   >
                     <Video className="w-4 h-4" />
                     View Full Transcript on Fireflies →
@@ -225,7 +221,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           )}
 
           {/* Fallback Notes */}
-          {!((meeting as any).summary) && meeting.notes && (
+          {!(meeting.summary) && meeting.notes && (
             <div className="mt-6">
               <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Notes</h3>
               <p className="text-sm text-[var(--ff-text-secondary)]">{meeting.notes}</p>
