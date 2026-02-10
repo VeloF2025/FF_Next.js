@@ -255,7 +255,10 @@ async function run1MapLookup(): Promise<{
         `UPDATE data_sync_operations SET status = 'success', completed_at = NOW(), details = $1 WHERE id = $2`,
         [JSON.stringify({
           total: totalSerials,
-          ...results,
+          searched: results.total_searched,
+          resolved: results.total_resolved,
+          not_found: results.total_not_found,
+          errors: results.total_errors,
           elapsed_seconds: elapsed,
           method: 'per_serial_search',
         }), trackerId]
