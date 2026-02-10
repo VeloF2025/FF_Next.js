@@ -53,9 +53,20 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [dataAccess, setDataAccess] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Check if user has data lookup permission
+  useEffect(() => {
+    if (userId) {
+      fetch(`/api/chat/access?userId=${userId}`)
+        .then(r => r.json())
+        .then(d => setDataAccess(!!d.dataAccess))
+        .catch(() => {});
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -92,7 +103,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
         body: JSON.stringify({
           message: trimmed, userName, userRole, userId,
           topic: selectedTopic?.id,
-          history,
+          history, dataAccess,
         }),
       });
       const data = await res.json();
