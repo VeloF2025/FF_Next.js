@@ -1126,19 +1126,34 @@ docker-compose restart worker_wrapper
 
 ### CSRF Configuration
 
-The override must include trusted origins:
+**Two parts required** - passing the env var is NOT enough:
+
+**Part 1: `.env` + override (already done):**
+```bash
+# .env
+CSRF_TRUSTED_ORIGINS="https://srv1083126.hstgr.cloud https://qfield.fibreflow.app"
+```
 ```yaml
+# docker-compose.override.yml
 app:
   environment:
     CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
 ```
 
-And in `.env`:
+**Part 2: In-container settings patch (REQUIRED - QFieldCloud doesn't read this env var):**
 ```bash
-CSRF_TRUSTED_ORIGINS=https://qfield.fibreflow.app
+docker exec qfieldcloud-app-1 sed -i '61a\
+\
+_csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")\
+CSRF_TRUSTED_ORIGINS = [o for o in _csrf_origins.split(" ") if o]' /usr/src/app/qfieldcloud/settings.py
+docker-compose restart app
 ```
 
-Without this, admin logout and form submissions fail with "Origin checking failed".
+**IMPORTANT:** Part 2 is an in-container edit. It persists across `restart` but is **lost on `up -d app`** (recreate). Must re-apply after any container recreate.
+
+**Verify:** `docker exec qfieldcloud-app-1 python manage.py shell -c "from django.conf import settings; print(settings.CSRF_TRUSTED_ORIGINS)"`
+
+Without this, admin login/logout and all POST forms fail with 403 "Origin checking failed".
 
 ### Restart Commands
 

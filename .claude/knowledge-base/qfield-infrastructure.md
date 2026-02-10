@@ -35,6 +35,17 @@ Project THM_3_Site_Audit_2026 stuck in `failed` / `failed_process_projectfile` s
 - **Fix:** Added `static_volume:/var/www/html/staticfiles:ro` to nginx in `docker-compose.override.yml`
 - **Gotcha:** Cloudflare cached old 503 responses. Need hard refresh (Ctrl+Shift+R) or cache purge after fix.
 
+#### 6. CSRF Trusted Origins Not Configured in Django
+- **Problem:** `.env` had `CSRF_TRUSTED_ORIGINS="https://srv1083126.hstgr.cloud https://qfield.fibreflow.app"` and the override passed it to the container, but Django `settings.py` never read the env var
+- **Effect:** 403 Forbidden on all POST requests (login, logout, admin forms) with "Origin checking failed - https://qfield.fibreflow.app does not match any trusted origins"
+- **Error:** `CSRF verification failed. Request aborted.`
+- **Fix:** Added to `/usr/src/app/qfieldcloud/settings.py` (in-container edit after line 61):
+  ```python
+  _csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
+  CSRF_TRUSTED_ORIGINS = [o for o in _csrf_origins.split(" ") if o]
+  ```
+- **IMPORTANT:** This is an in-container edit. Lost on `docker-compose up -d app` (recreate). Must re-apply after recreate. See re-apply command below.
+
 ### Key Learnings
 
 1. **Gunicorn workers >= worker_wrappers** - Always match or exceed the worker count
@@ -43,6 +54,7 @@ Project THM_3_Site_Audit_2026 stuck in `failed` / `failed_process_projectfile` s
 4. **Dequeue logic is strict** - Only picks up `PENDING` jobs for projects with NO `QUEUED`/`STARTED` jobs
 5. **Static files need nginx volume** - Without it, Django admin is completely broken (no WhiteNoise middleware)
 6. **Cloudflare caches errors** - After fixing 503s, old responses may be cached. Always test with cache bust.
+7. **CSRF env var not auto-read** - QFieldCloud's `settings.py` does NOT read `CSRF_TRUSTED_ORIGINS` from env. Must be patched in-container. Passing env var via docker-compose alone is NOT enough.
 
 ### Changes Made (Feb 10, 2026)
 
@@ -52,6 +64,7 @@ Project THM_3_Site_Audit_2026 stuck in `failed` / `failed_process_projectfile` s
 | Gunicorn max-requests | `.env` | `GUNICORN_MAX_REQUESTS=1000` | `GUNICORN_MAX_REQUESTS=5000` |
 | Nginx static volume | `docker-compose.override.yml` | Not mounted | `static_volume:/var/www/html/staticfiles:ro` |
 | Zombie jobs | Database | 16 stuck jobs | All given `finished_at` |
+| CSRF trusted origins | `settings.py` (in-container) | Not set (empty list) | `['https://srv1083126.hstgr.cloud', 'https://qfield.fibreflow.app']` |
 
 ### Diagnostic Commands Quick Reference
 
@@ -89,4 +102,17 @@ print(f'Job: {job.pk}')
 
 # Test static files
 curl -s -o /dev/null -w '%{http_code}' -H 'Host: qfield.fibreflow.app' http://localhost:8082/staticfiles/admin/css/base.css
+
+# Check CSRF trusted origins
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from django.conf import settings
+print(f'CSRF_TRUSTED_ORIGINS: {settings.CSRF_TRUSTED_ORIGINS}')
+"
+
+# Re-apply CSRF fix after container recreate
+docker exec qfieldcloud-app-1 sed -i '61a\
+\
+_csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")\
+CSRF_TRUSTED_ORIGINS = [o for o in _csrf_origins.split(" ") if o]' /usr/src/app/qfieldcloud/settings.py
+docker-compose restart app
 ```
