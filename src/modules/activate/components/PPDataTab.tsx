@@ -100,24 +100,32 @@ export function PPDataTab() {
       const data = await res.json();
       if (data.success && data.data) {
         setLookupStatus(data.data);
-        // Stop polling if complete
-        if (data.data.status !== 'running') {
-          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-          // Refresh stats + records when done
-          if (data.data.status === 'success') {
-            fetchStats();
-            fetchRecords();
+        if (data.data.status === 'running') {
+          // Auto-start polling if not already polling
+          if (!pollRef.current) {
+            pollRef.current = setInterval(() => {
+              fetch('/api/activate/import-pp-data?action=lookup-status')
+                .then(r => r.json())
+                .then(d => {
+                  if (d.success && d.data) {
+                    setLookupStatus(d.data);
+                    if (d.data.status !== 'running' && pollRef.current) {
+                      clearInterval(pollRef.current);
+                      pollRef.current = null;
+                    }
+                  }
+                })
+                .catch(() => { /* non-fatal */ });
+            }, 3000);
           }
+        } else {
+          // Not running — stop polling, refresh data if just completed
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          if (data.data.status === 'success') { fetchStats(); fetchRecords(); }
         }
       }
     } catch { /* non-fatal */ }
   }, [fetchStats, fetchRecords]);
-
-  const startPolling = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    fetchLookupStatus();
-    pollRef.current = setInterval(fetchLookupStatus, 3000);
-  }, [fetchLookupStatus]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (stats && stats.total > 0) fetchRecords(); }, [stats, fetchRecords]);
@@ -160,7 +168,8 @@ export function PPDataTab() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || '1Map lookup failed');
       toast.success('1Map per-serial search started');
-      startPolling();
+      // Delay slightly so the DB tracker row exists, then start polling
+      setTimeout(() => fetchLookupStatus(), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : '1Map lookup failed');
     }
