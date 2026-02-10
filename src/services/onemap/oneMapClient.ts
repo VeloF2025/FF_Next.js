@@ -73,7 +73,9 @@ export class OneMapClient {
 
     try {
       // Step 1: GET login page to extract CSRF token and initial session cookie
-      const loginPage = await fetch(`${this.baseUrl}/login`);
+      const loginPage = await fetch(`${this.baseUrl}/login`, {
+        signal: AbortSignal.timeout(30_000),
+      });
       const html = await loginPage.text();
 
       const csrfMatch = html.match(/name="_csrf".*?value="([^"]+)"/);
@@ -101,6 +103,7 @@ export class OneMapClient {
           password: this.password,
         }).toString(),
         redirect: 'manual',
+        signal: AbortSignal.timeout(30_000),
       });
 
       // Extract cookies from login response
@@ -120,6 +123,7 @@ export class OneMapClient {
         // Step 3: Initialize layer access
         await fetch(`${this.baseUrl}/app?layer=5121`, {
           headers: { 'Cookie': this.getCookies() },
+          signal: AbortSignal.timeout(30_000),
         });
         logger.info('1Map authentication successful');
         return true;
@@ -186,6 +190,7 @@ export class OneMapClient {
       },
       body: formData.toString(),
       redirect: 'manual',
+      signal: AbortSignal.timeout(30_000),
     });
 
     // Detect session expiry: redirect (302), unauthorized, or HTML response
