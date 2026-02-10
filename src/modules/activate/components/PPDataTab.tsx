@@ -48,6 +48,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   located_unified: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-800 dark:text-indigo-300', label: 'Found (Unified)' },
   located_onemap: { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', label: 'Found (OneMap)' },
   located_1map: { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-800 dark:text-teal-300', label: 'Found (1Map)' },
+  located_local: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-800 dark:text-cyan-300', label: 'Found (Local)' },
   activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
 
@@ -349,6 +350,7 @@ export function PPDataTab() {
               <option value="located_unified">Found (Unified)</option>
               <option value="located_onemap">Found (OneMap)</option>
               <option value="located_1map">Found (1Map)</option>
+              <option value="located_local">Found (Local)</option>
               <option value="activated">Activated</option>
             </select>
             <div className="ml-auto">

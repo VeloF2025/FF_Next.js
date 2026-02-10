@@ -143,6 +143,7 @@ async function handler(
       located_unified: 'Found (Unified)',
       located_onemap: 'Found (OneMap)',
       located_1map: 'Found (1Map)',
+      located_local: 'Found (Local)',
       activated: 'Activated',
     };
 

@@ -23,18 +23,44 @@ export const config = {
 };
 
 /**
- * Run local resolution against existing DB tables
+ * Run local resolution against ALL DB tables that might contain ONT serial data.
+ * Each source is wrapped in try/catch so missing tables don't break the scan.
  */
 async function runLocalResolution(): Promise<{
   matched_oes: number;
   matched_unified: number;
   matched_onemap: number;
+  matched_local: number;
   total_resolved: number;
+  sources: Record<string, number>;
 }> {
-  const results = { matched_oes: 0, matched_unified: 0, matched_onemap: 0, total_resolved: 0 };
+  const sources: Record<string, number> = {};
+  let matchedLocal = 0;
 
-  // 1. Match against oes_activations.serial_number
-  const oesResult = await pool.query(`
+  // Helper: run a single source match, return count
+  const matchSource = async (
+    name: string,
+    status: string,
+    query: string,
+  ): Promise<number> => {
+    try {
+      const result = await pool.query(query);
+      const count = result.rowCount || 0;
+      if (count > 0) {
+        sources[name] = count;
+        logger.info(`PP local match: ${name}`, { count });
+      }
+      return count;
+    } catch (err) {
+      logger.warn(`PP local match skipped: ${name}`, { error: String(err) });
+      return 0;
+    }
+  };
+
+  // === PRIMARY SOURCES ===
+
+  // 1. oes_activations.serial_number
+  const matchedOes = await matchSource('oes_activations', 'located_oes', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_oes',
         resolved_drop_number = oa.drop_number,
@@ -44,16 +70,14 @@ async function runLocalResolution(): Promise<{
           'status', oa.status,
           'team', oa.team
         ),
-        resolved_at = NOW(),
-        updated_at = NOW()
+        resolved_at = NOW(), updated_at = NOW()
     FROM oes_activations oa
     WHERE pp.serial_number = oa.serial_number
       AND pp.resolution_status = 'not_found'
   `);
-  results.matched_oes = oesResult.rowCount || 0;
 
-  // 2. Match against dr_photo_unified_reviews (oes_serial or ont_serial_scanned)
-  const unifiedResult = await pool.query(`
+  // 2. dr_photo_unified_reviews (oes_serial or ont_serial_scanned)
+  const matchedUnified = await matchSource('dr_photo_unified_reviews', 'located_unified', `
     UPDATE oes_pp_data pp
     SET resolution_status = 'located_unified',
         resolved_drop_number = ur.drop_number,
@@ -65,37 +89,200 @@ async function runLocalResolution(): Promise<{
           END,
           'project', ur.project
         ),
-        resolved_at = NOW(),
-        updated_at = NOW()
+        resolved_at = NOW(), updated_at = NOW()
     FROM dr_photo_unified_reviews ur
     WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number)
       AND pp.resolution_status = 'not_found'
   `);
-  results.matched_unified = unifiedResult.rowCount || 0;
 
-  // 3. Match against onemap_properties.ont_barcode
-  try {
-    const onemapResult = await pool.query(`
-      UPDATE oes_pp_data pp
-      SET resolution_status = 'located_onemap',
-          resolved_drop_number = op.drop_number,
-          resolved_source = 'onemap_properties',
-          resolved_details = jsonb_build_object(
-            'site', op.site,
-            'pole', op.pole
-          ),
-          resolved_at = NOW(),
-          updated_at = NOW()
-      FROM onemap_properties op
-      WHERE op.ont_barcode = pp.serial_number
-        AND pp.resolution_status = 'not_found'
-    `);
-    results.matched_onemap = onemapResult.rowCount || 0;
-  } catch (err) {
-    logger.warn('onemap_properties lookup skipped', { error: String(err) });
-  }
+  // 3. onemap_properties.ont_barcode
+  const matchedOnemap = await matchSource('onemap_properties', 'located_onemap', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_onemap',
+        resolved_drop_number = op.drop_number,
+        resolved_source = 'onemap_properties',
+        resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM onemap_properties op
+    WHERE op.ont_barcode = pp.serial_number
+      AND pp.resolution_status = 'not_found'
+  `);
 
-  results.total_resolved = results.matched_oes + results.matched_unified + results.matched_onemap;
+  // === ADDITIONAL SOURCES (all use 'located_local' status) ===
+
+  // 4. drops.ont_serial — SOW field installation data
+  matchedLocal += await matchSource('drops', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = d.drop_number,
+        resolved_source = 'drops',
+        resolved_details = jsonb_build_object(
+          'project_id', d.project_id::text,
+          'status', d.status
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM drops d
+    WHERE d.ont_serial = pp.serial_number
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 5. stock_serials — Stock tracking system (serial → installed DR)
+  matchedLocal += await matchSource('stock_serials', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = ss.installed_at_drop_number,
+        resolved_source = 'stock_serials',
+        resolved_details = jsonb_build_object(
+          'status', ss.status,
+          'installed_date', ss.installed_date::text
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM stock_serials ss
+    WHERE ss.serial_number = pp.serial_number
+      AND ss.installed_at_drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 6. foto_ai_reviews — VLM-extracted serials from QA photos (step6 + step9)
+  matchedLocal += await matchSource('foto_ai_reviews', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = fr.drop_number,
+        resolved_source = 'foto_ai_reviews',
+        resolved_details = jsonb_build_object(
+          'matched_field', CASE
+            WHEN fr.vlm_ont_serial_step6 = pp.serial_number THEN 'vlm_ont_serial_step6'
+            ELSE 'vlm_ont_serial_step9'
+          END
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM foto_ai_reviews fr
+    WHERE (fr.vlm_ont_serial_step6 = pp.serial_number OR fr.vlm_ont_serial_step9 = pp.serial_number)
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 7. wa_photos — WhatsApp photo VLM-extracted ONT serials
+  matchedLocal += await matchSource('wa_photos', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = wp.drop_number,
+        resolved_source = 'wa_photos',
+        resolved_details = jsonb_build_object(
+          'vlm_confidence', wp.vlm_confidence::text,
+          'purpose', wp.purpose
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM wa_photos wp
+    WHERE wp.vlm_ont_serial = pp.serial_number
+      AND wp.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 8. serial_change_history — Audit trail (old/new serial values linked to DRs)
+  matchedLocal += await matchSource('serial_change_history', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = sch.drop_number,
+        resolved_source = 'serial_change_history',
+        resolved_details = jsonb_build_object(
+          'matched_field', CASE
+            WHEN sch.new_value = pp.serial_number THEN 'new_value'
+            ELSE 'old_value'
+          END,
+          'change_type', sch.change_type,
+          'change_source', sch.change_source
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM serial_change_history sch
+    WHERE (sch.new_value = pp.serial_number OR sch.old_value = pp.serial_number)
+      AND sch.change_type = 'ont_serial'
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 9. offline_devices — serial, expected_serial, or olt_serial
+  matchedLocal += await matchSource('offline_devices', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = od.drop_number,
+        resolved_source = 'offline_devices',
+        resolved_details = jsonb_build_object(
+          'matched_field', CASE
+            WHEN od.serial_number = pp.serial_number THEN 'serial_number'
+            WHEN od.expected_serial = pp.serial_number THEN 'expected_serial'
+            ELSE 'olt_serial'
+          END,
+          'serial_mismatch', od.serial_mismatch
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM offline_devices od
+    WHERE (od.serial_number = pp.serial_number
+        OR od.expected_serial = pp.serial_number
+        OR od.olt_serial = pp.serial_number)
+      AND od.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 10. olt_mismatch_records — OLT serial correction records
+  matchedLocal += await matchSource('olt_mismatch_records', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = om.drop_number,
+        resolved_source = 'olt_mismatch_records',
+        resolved_details = jsonb_build_object(
+          'matched_field', CASE
+            WHEN om.olt_serial = pp.serial_number THEN 'olt_serial'
+            ELSE 'wrong_onemap_serial'
+          END,
+          'fix_status', om.fix_status
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM olt_mismatch_records om
+    WHERE (om.olt_serial = pp.serial_number OR om.wrong_onemap_serial = pp.serial_number)
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 11. arch_offline_devices — Historical OLT network snapshots
+  matchedLocal += await matchSource('arch_offline_devices', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = aod.drop_number,
+        resolved_source = 'arch_offline_devices',
+        resolved_details = jsonb_build_object(
+          'oes_status', aod.oes_status,
+          'last_down_reason', aod.last_down_reason
+        ),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM arch_offline_devices aod
+    WHERE aod.serial_number = pp.serial_number
+      AND aod.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  // 12. onemap_installations — Separate from onemap_properties
+  matchedLocal += await matchSource('onemap_installations', 'located_local', `
+    UPDATE oes_pp_data pp
+    SET resolution_status = 'located_local',
+        resolved_drop_number = op.drop_number,
+        resolved_source = 'onemap_installations',
+        resolved_details = jsonb_build_object('property_id', oi.property_id::text),
+        resolved_at = NOW(), updated_at = NOW()
+    FROM onemap_installations oi
+    JOIN onemap_properties op ON op.id = oi.property_id
+    WHERE oi.ont_barcode = pp.serial_number
+      AND op.drop_number IS NOT NULL
+      AND pp.resolution_status = 'not_found'
+  `);
+
+  const totalResolved = matchedOes + matchedUnified + matchedOnemap + matchedLocal;
+  const results = {
+    matched_oes: matchedOes,
+    matched_unified: matchedUnified,
+    matched_onemap: matchedOnemap,
+    matched_local: matchedLocal,
+    total_resolved: totalResolved,
+    sources,
+  };
+
   logger.info('Local resolution complete', results);
   return results;
 }
