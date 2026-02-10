@@ -1248,7 +1248,9 @@
       "WebFetch(domain:corporateandinvestment.standardbank.com)",
       "WebFetch(domain:www.searchworks.co.za)",
       "WebFetch(domain:www.voca.co.za)",
-      "WebFetch(domain:www.opengis.ch)"
+      "WebFetch(domain:www.opengis.ch)",
+      "Bash(PGPASSWORD='npg_MIUZXrg1tEY0' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -f /home/hein/Workspace/FF_Next.js/scripts/migrations/173_pp_data_maintenance_link.sql)",
+      "Bash(PGPASSWORD=npg_MIUZXrg1tEY0 /usr/bin/psql:*)"
     ],
     "deny": [],
     "ask": [],

@@ -1,96 +1,64 @@
 {
-  "session_id": "2026-02-09-reporting-audit",
-  "started_at": "2026-02-09T07:30:00Z",
-  "last_updated": "2026-02-09T10:22:53.683Z",
+  "session_id": "2026-02-09-ui-ux-alignment",
+  "started_at": "2026-02-09T12:00:00Z",
+  "last_updated": "2026-02-10T13:48:06.875Z",
   "working_on": {
-    "task": "Reporting Codebase Audit - Optional Chaining, API Wrappers, Icon Props",
+    "task": "UI/UX Dark Theme Alignment & Onboarding Workflow Fix",
     "status": "completed",
     "progress": [
-      "Continued from previous session - verified all 10 reporting tabs on staging",
-      "Found and fixed Serial Swaps crash: apiResponse.success() wrapper + icon props",
-      "Launched 3-agent audit team: wrapper-auditor, icon-auditor, chaining-auditor",
-      "wrapper-auditor: Found 2 bugs (ProcurementDashboard RFQ, serial APIs already fixed)",
-      "icon-auditor: 111 occurrences checked - all correct except already-fixed SerialSwapReports",
-      "chaining-auditor: Found ~22 instances across 4 reporting files",
-      "Fixed all optional chaining in TeamReports, FunnelReports, TrendReports",
-      "Fixed ProcurementDashboard RFQ data unwrapping",
-      "Deployed to staging, dev, and production - all verified working",
-      "Updated KB with learnings for activate and procurement modules"
+      "Fixed onboarding page wrapper from light to dark theme",
+      "Made contractor detail/edit pages full width (removed max-w-4xl)",
+      "Standardized back buttons across 17 files in 7 modules",
+      "Converted 4 modal/upload components to FF dark theme",
+      "Renamed Master Service Agreement to Master Build Agreement",
+      "Fixed onboarding stages: removed duplicate company_registration",
+      "Added directors_ids to Stage 1, coid_registration to Stage 4, msa to Stage 6",
+      "DB migration applied to all 9 existing contractors",
+      "Updated KB with contractors module docs and consolidated staff learnings"
     ],
     "last_action": "KB update via /kb"
   },
   "learnings": {
-    "apiResponse_wrapper_pattern": {
-      "problem": "apiResponse.success() wraps data in {success:true, data:{...}} but some frontends expect unwrapped",
-      "rule": "Reporting APIs should use res.status(200).json() directly, not apiResponse.success()",
-      "affected": "serial-swaps, serial-mismatches APIs + ProcurementDashboard RFQ fetch"
+    "dark_theme_patterns": {
+      "modal_overlay": "bg-black/60",
+      "modal_container": "bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]",
+      "inputs": "bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)]",
+      "error_banners": "bg-red-500/10 border border-red-500/30 text-red-400",
+      "status_badges": "bg-{color}-500/20 text-{color}-400",
+      "cancel_buttons": "bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]",
+      "rule": "Never use bg-white, text-gray-*, border-gray-* or dark: prefix pattern"
     },
-    "icon_reactnode_vs_lucideicon": {
-      "problem": "Passing component refs to ReactNode props causes React error #31",
-      "rule": "icon={<Icon className='h-4 w-4' />} for ReactNode, icon={Icon} for LucideIcon type",
-      "note": "111 icon usages audited - only ReportCard uses ReactNode pattern"
+    "back_button_pattern": {
+      "classes": "inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] px-3 py-1.5 -ml-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors",
+      "rule": "Full element clickable, hover background, -ml-3 for text alignment"
     },
-    "optional_chaining_pattern": {
-      "problem": "data?.summary.x only guards data, not summary",
-      "rule": "Always use full chain: data?.summary?.x and (value ?? 0).toFixed(N)",
-      "affected": "TeamReports, FunnelReports, TrendReports, SerialSwapReports"
+    "layout_pattern": {
+      "rule": "Detail/edit pages use p-6 (no max-w-4xl/6xl constraints)",
+      "reference": "Staff module pattern"
     },
-    "db_singleton_pool": {
-      "problem": "@neondatabase/serverless Pool silently fails in Node.js server environments",
-      "rule": "Always use import pool from '@/lib/db' (pg TCP Pool singleton)",
-      "affected": "9 of 11 reporting API endpoints were broken"
+    "onboarding_stages": {
+      "cipc_equals_company_reg": "cipc_registration IS the company registration - never duplicate",
+      "required_documents_column": "jsonb type in contractor_onboarding_stages table",
+      "jsonb_operations": "Add: || '\"type\"'::jsonb, Remove: - 'type', Check: @> '\"type\"'::jsonb"
+    },
+    "dev_deploy_ownership": {
+      "build_as": "hein (owns /home/hein/apps/fibreflow-dev)",
+      "chown_next": "sudo chown -R velo:velo .next (service runs as velo)",
+      "restart_as": "velo (has sudo for systemctl)"
     }
   },
-  "bugs_fixed": [
-    {
-      "file": "pages/api/activate/reporting/serial-swaps/index.ts",
-      "issue": "apiResponse.success() wrapper caused frontend crash",
-      "fix": "Changed to res.status(200).json(response)"
-    },
-    {
-      "file": "pages/api/activate/reporting/serial-mismatches/index.ts",
-      "issue": "Same apiResponse.success() wrapper issue",
-      "fix": "Changed to res.status(200).json(response)"
-    },
-    {
-      "file": "src/modules/activate/components/reporting/SerialSwapReports.tsx",
-      "issue": "Icon props as component refs + missing optional chaining",
-      "fix": "JSX elements for icons, data?.summary?.x pattern"
-    },
-    {
-      "file": "src/modules/activate/components/reporting/TeamReports.tsx",
-      "issue": "4x incomplete optional chaining on data?.summary.x",
-      "fix": "Full chain: data?.summary?.x"
-    },
-    {
-      "file": "src/modules/activate/components/reporting/FunnelReports.tsx",
-      "issue": "6x incomplete optional chaining + unguarded .toFixed()",
-      "fix": "Full chain + (value ?? 0).toFixed(1)"
-    },
-    {
-      "file": "src/modules/activate/components/reporting/TrendReports.tsx",
-      "issue": "12x incomplete optional chaining on velocity, data, summary",
-      "fix": "Full chain throughout"
-    },
-    {
-      "file": "src/modules/procurement/components/ProcurementDashboard/ProcurementDashboard.tsx",
-      "issue": "rfqsData.rfqs undefined - needs unwrapping from apiResponse.success()",
-      "fix": "rfqsData.data?.rfqs || rfqsData.rfqs || []"
-    }
-  ],
   "commits": [
-    "3d160d25 - fix(reporting): use direct res.json() for serial-swaps and serial-mismatches APIs",
-    "0a747e4b - fix(reporting): fix SerialSwapReports icon props and optional chaining",
-    "8777d762 - fix(reporting): add missing optional chaining across reporting components",
-    "0a7515fc - docs: update module docs, knowledge base, and deployment info"
+    "b7c3b9ab - fix(contractors): use full page width and dark theme for detail/edit pages",
+    "a5a1ed81 - fix(ui): standardize back buttons across all modules with larger click target",
+    "9c39f367 - fix(ui): convert modals and upload forms to FF dark theme",
+    "58492a93 - fix: rename Master Service Agreement to Master Build Agreement",
+    "6005cc44 - fix(onboarding): align stage documents with actual contractor workflow"
   ],
   "deployments": {
-    "staging": "https://vf.fibreflow.app - deployed 2026-02-09 ~09:50 SAST",
-    "dev": "https://dev.fibreflow.app - deployed 2026-02-09 ~10:10 SAST",
-    "production": "https://app.fibreflow.app - deployed 2026-02-09 ~10:10 SAST"
+    "dev": "https://dev.fibreflow.app - deployed and verified"
   },
   "kb_scan_results": {
-    "timestamp": "2026-02-09T10:15:00Z",
+    "timestamp": "2026-02-09T14:45:00Z",
     "total_modules": 47,
     "modules_with_claude_md": 44,
     "modules_missing": [
@@ -98,14 +66,16 @@
       "navigation",
       "navigation.disabled"
     ],
-    "learnings_consolidated": 2
+    "learnings_consolidated": 3
   },
   "context": {
     "project": "FibreFlow",
     "branch": "master",
     "modules": [
-      "activate",
-      "procurement"
+      "contractors",
+      "staff",
+      "sow",
+      "budget"
     ]
   }
 }
