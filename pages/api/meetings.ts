@@ -13,6 +13,7 @@ async function handler(
   // Get user info for access control
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
+  const userName = authReq.user?.name?.toLowerCase() || '';
   const userRole = authReq.user?.role;
   const isSuperAdmin = userRole === 'super_admin';
 
@@ -44,6 +45,8 @@ async function handler(
               AND EXISTS (
                 SELECT 1 FROM jsonb_array_elements(participants) AS p
                 WHERE LOWER(p->>'email') = ${userEmail}
+                   OR LOWER(p->>'name') = ${userName}
+                   OR LOWER(p->>'displayName') = ${userName}
               )
             `;
 
@@ -72,6 +75,8 @@ async function handler(
             WHERE EXISTS (
               SELECT 1 FROM jsonb_array_elements(participants) AS p
               WHERE LOWER(p->>'email') = ${userEmail}
+                 OR LOWER(p->>'name') = ${userName}
+                 OR LOWER(p->>'displayName') = ${userName}
             )
             ORDER BY meeting_date DESC
             LIMIT 50
