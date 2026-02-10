@@ -50,6 +50,7 @@ export enum TicketSource {
   QA_REVIEW = 'qa_review', // From QA Centre review process
   HSE_REPORT = 'hse_report', // From Health & Safety module
   WA_MAINTENANCE = 'wa_maintenance', // From WhatsApp maintenance tracking group
+  PP_DATA = 'pp_data', // From PP Data investigation
 }
 
 /**
@@ -221,6 +222,7 @@ export interface CreateTicketPayload {
   assigned_contractor_id?: string;
   assigned_team?: string;
   created_by?: string;
+  ont_serial?: string;
 }
 
 /**

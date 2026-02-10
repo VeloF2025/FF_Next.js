@@ -33,7 +33,8 @@ async function handler(
         COUNT(*) FILTER (WHERE resolution_status = 'activated') as activated,
         COUNT(*) FILTER (WHERE resolution_status LIKE 'located_%') as located,
         COUNT(*) FILTER (WHERE resolution_status = 'not_found') as not_found,
-        COUNT(DISTINCT project) as projects
+        COUNT(DISTINCT project) as projects,
+        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL) as ticketed
       FROM oes_pp_data
     `);
 
@@ -55,6 +56,7 @@ async function handler(
         located: parseInt(stats.located, 10),
         notFound: parseInt(stats.not_found, 10),
         projects: parseInt(stats.projects, 10),
+        ticketed: parseInt(stats.ticketed, 10),
         lastImport: lastImport
           ? {
               date: lastImport.created_at,
@@ -78,23 +80,25 @@ async function handler(
     let paramIndex = 1;
 
     if (project) {
-      whereClause += ` AND project = $${paramIndex++}`;
+      whereClause += ` AND pp.project = $${paramIndex++}`;
       params.push(project);
     }
     if (status) {
-      whereClause += ` AND resolution_status = $${paramIndex++}`;
+      whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM oes_pp_data WHERE 1=1${whereClause}`,
+      `SELECT COUNT(*) as total FROM oes_pp_data pp WHERE 1=1${whereClause}`,
       params
     );
 
     const dataResult = await pool.query(
-      `SELECT * FROM oes_pp_data
+      `SELECT pp.*, mt.ticket_uid
+       FROM oes_pp_data pp
+       LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        WHERE 1=1${whereClause}
-       ORDER BY created_at DESC
+       ORDER BY pp.created_at DESC
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
       [...params, limit, offset]
     );

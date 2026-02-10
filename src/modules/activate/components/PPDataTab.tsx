@@ -2,9 +2,10 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download, CheckCircle2,
+  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download, CheckCircle2, Wrench,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CreatePPTicketsModal } from './CreatePPTicketsModal';
 
 interface PPRecord {
   id: number;
@@ -15,6 +16,8 @@ interface PPRecord {
   resolved_drop_number: string | null;
   resolved_source: string | null;
   resolved_at: string | null;
+  maintenance_ticket_id: string | null;
+  ticket_uid: string | null;
 }
 
 interface PPStats {
@@ -23,6 +26,7 @@ interface PPStats {
   located: number;
   notFound: number;
   projects: number;
+  ticketed: number;
   lastImport: {
     date: string;
     filename: string;
@@ -52,6 +56,11 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
 
+/** Check if a record is eligible for ticket selection (located, no existing ticket) */
+function isSelectable(r: PPRecord): boolean {
+  return r.resolved_drop_number !== null && r.maintenance_ticket_id === null;
+}
+
 export function PPDataTab() {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +72,14 @@ export function PPDataTab() {
   const [filterStatus, setFilterStatus] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Selection & ticket modal state
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [creatingTickets, setCreatingTickets] = useState(false);
+
+  // Clear selection when filters or page change
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -102,7 +119,6 @@ export function PPDataTab() {
       if (data.success && data.data) {
         setLookupStatus(data.data);
         if (data.data.status === 'running') {
-          // Auto-start polling if not already polling
           if (!pollRef.current) {
             pollRef.current = setInterval(() => {
               fetch('/api/activate/import-pp-data?action=lookup-status')
@@ -120,7 +136,6 @@ export function PPDataTab() {
             }, 3000);
           }
         } else {
-          // Not running — stop polling, refresh data if just completed
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
           if (data.data.status === 'success') { fetchStats(); fetchRecords(); }
         }
@@ -131,7 +146,6 @@ export function PPDataTab() {
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => { if (stats && stats.total > 0) fetchRecords(); }, [stats, fetchRecords]);
 
-  // Check if a lookup is already running on mount
   useEffect(() => {
     fetchLookupStatus();
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -169,11 +183,53 @@ export function PPDataTab() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || '1Map lookup failed');
       toast.success('1Map per-serial search started');
-      // Delay slightly so the DB tracker row exists, then start polling
       setTimeout(() => fetchLookupStatus(), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : '1Map lookup failed');
     }
+  };
+
+  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string }) => {
+    setCreatingTickets(true);
+    try {
+      const res = await fetch('/api/activate/pp-data-tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pp_data_ids: selectedIds, ...params }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to create tickets');
+      const { created, skipped } = result.data;
+      toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+      setShowTicketModal(false);
+      setSelectedIds([]);
+      fetchStats();
+      fetchRecords();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
+    } finally {
+      setCreatingTickets(false);
+    }
+  };
+
+  // Selection helpers
+  const selectableOnPage = records.filter(isSelectable);
+  const allSelectableChecked = selectableOnPage.length > 0 && selectableOnPage.every(r => selectedIds.includes(r.id));
+
+  const toggleSelectAll = () => {
+    if (allSelectableChecked) {
+      setSelectedIds(prev => prev.filter(id => !selectableOnPage.some(r => r.id === id)));
+    } else {
+      setSelectedIds(prev => {
+        const newIds = new Set(prev);
+        selectableOnPage.forEach(r => newIds.add(r.id));
+        return Array.from(newIds);
+      });
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const is1MapRunning = lookupStatus?.status === 'running';
@@ -191,7 +247,7 @@ export function PPDataTab() {
 
       {/* Summary Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{stats.total}</p>
             <p className="text-sm text-[var(--ff-text-secondary)]">Total Imported</p>
@@ -207,6 +263,10 @@ export function PPDataTab() {
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <p className="text-2xl font-bold text-amber-500">{stats.notFound}</p>
             <p className="text-sm text-[var(--ff-text-secondary)]">Not Found</p>
+          </div>
+          <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
+            <p className="text-2xl font-bold text-orange-500">{stats.ticketed}</p>
+            <p className="text-sm text-[var(--ff-text-secondary)]">Ticketed</p>
           </div>
           <div className="bg-[var(--ff-bg-primary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <p className="text-sm text-[var(--ff-text-secondary)]">Last Import</p>
@@ -323,6 +383,30 @@ export function PPDataTab() {
         </div>
       )}
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-900/30 border border-blue-700 rounded-lg px-4 py-3 flex items-center justify-between">
+          <span className="text-sm text-blue-300">
+            <strong>{selectedIds.length}</strong> record{selectedIds.length !== 1 ? 's' : ''} selected
+          </span>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-sm rounded border border-blue-700 text-blue-300 hover:text-blue-100"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setShowTicketModal(true)}
+              className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700
+                         flex items-center gap-1.5"
+            >
+              <Wrench className="w-3.5 h-3.5" /> Create Maintenance Tickets
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filters & Records Table */}
       {stats && stats.total > 0 && (
         <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
@@ -373,20 +457,41 @@ export function PPDataTab() {
             <table className="w-full text-sm">
               <thead className="bg-[var(--ff-bg-tertiary)]">
                 <tr>
+                  <th className="px-3 py-2 w-10">
+                    {selectableOnPage.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={allSelectableChecked}
+                        onChange={toggleSelectAll}
+                        className="rounded border-gray-600"
+                      />
+                    )}
+                  </th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Serial</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Project</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Registered</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Status</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">DR</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Source</th>
-                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Found At</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Ticket</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
                 {records.map((record) => {
                   const statusStyle = STATUS_COLORS[record.resolution_status] || { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-800 dark:text-gray-300', label: record.resolution_status };
+                  const selectable = isSelectable(record);
                   return (
-                    <tr key={record.id} className="bg-[var(--ff-bg-secondary)]">
+                    <tr key={record.id} className={`bg-[var(--ff-bg-secondary)] ${selectedIds.includes(record.id) ? 'bg-blue-900/10' : ''}`}>
+                      <td className="px-3 py-2">
+                        {selectable ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(record.id)}
+                            onChange={() => toggleSelect(record.id)}
+                            className="rounded border-gray-600"
+                          />
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">{record.serial_number}</td>
                       <td className="px-3 py-2 text-[var(--ff-text-secondary)]">{record.project}</td>
                       <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
@@ -403,15 +508,24 @@ export function PPDataTab() {
                       <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
                         {record.resolved_source || '-'}
                       </td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
-                        {record.resolved_at ? new Date(record.resolved_at).toLocaleString() : '-'}
+                      <td className="px-3 py-2">
+                        {record.ticket_uid ? (
+                          <a
+                            href={`/maintenance/tickets/${record.maintenance_ticket_id}`}
+                            className="text-blue-400 hover:text-blue-300 text-xs font-mono"
+                          >
+                            {record.ticket_uid}
+                          </a>
+                        ) : (
+                          <span className="text-[var(--ff-text-tertiary)]">-</span>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
+                    <td colSpan={8} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
                       No records found
                     </td>
                   </tr>
@@ -444,6 +558,16 @@ export function PPDataTab() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Create Tickets Modal */}
+      {showTicketModal && (
+        <CreatePPTicketsModal
+          selectedCount={selectedIds.length}
+          onConfirm={handleCreateTickets}
+          onClose={() => setShowTicketModal(false)}
+          loading={creatingTickets}
+        />
       )}
     </div>
   );

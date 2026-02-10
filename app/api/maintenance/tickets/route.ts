@@ -42,6 +42,7 @@ const VALID_SOURCES: TicketSource[] = [
   TicketSource.REVENUE,
   TicketSource.ONT_SWAP,
   TicketSource.MANUAL,
+  TicketSource.PP_DATA,
 ];
 
 const VALID_TYPES: TicketType[] = [
