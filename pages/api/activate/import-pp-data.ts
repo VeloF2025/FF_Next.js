@@ -201,14 +201,24 @@ async function handler(
 
     const row = result.rows[0] || null;
 
-    // Detect stale "running" jobs (no completion after 5 minutes = server restart killed it)
+    // Detect stale "running" jobs (server restart killed the background process)
+    // A job is stale if: running for > 10 minutes, OR progress hasn't changed in > 3 minutes
     if (row && row.status === 'running') {
       const details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {};
       const startedAt = new Date(row.started_at).getTime();
-      const elapsed = (Date.now() - startedAt) / 1000;
-      const expectedDuration = (details.total || 500) * 0.25; // ~250ms per serial
-      if (elapsed > expectedDuration + 120) {
-        // Mark as stale — process likely died
+      const elapsedMs = Date.now() - startedAt;
+      const TEN_MINUTES = 10 * 60 * 1000;
+
+      if (elapsedMs > TEN_MINUTES) {
+        await pool.query(
+          `UPDATE data_sync_operations SET status = 'failed', completed_at = NOW(),
+           details = details || '{"stale": true}'::jsonb WHERE id = $1`,
+          [row.id]
+        );
+        row.status = 'failed';
+        row.completed_at = new Date();
+      } else if (details.elapsed_seconds && elapsedMs > (details.elapsed_seconds * 1000) + 180000) {
+        // DB progress hasn't updated in 3+ minutes (elapsed_seconds from last DB write vs wall clock)
         await pool.query(
           `UPDATE data_sync_operations SET status = 'failed', completed_at = NOW(),
            details = details || '{"stale": true}'::jsonb WHERE id = $1`,
