@@ -970,3 +970,190 @@ npx tsx scripts/import_qfield_photos.js
 After initial import:
 - **Total photos:** 5,965
 - **Projects:** LAW_Pole_Audit (3,364), MOA_Pole_Audit (2,292), MOA_Site_Audit (595), etc.
+
+---
+
+## QFieldCloud Infrastructure (Feb 2026)
+
+### Docker Architecture
+
+| Container | Purpose | Port |
+|-----------|---------|------|
+| `qfieldcloud-app-1` | Django/Gunicorn app server | 8000 (internal) |
+| `qfieldcloud-nginx-1` | Reverse proxy | 8082→80 |
+| `qfieldcloud-worker_wrapper-{1-8}` | Job processing workers (8 instances) | - |
+| `qfieldcloud-db-1` | PostgreSQL + PostGIS | 5433→5432 |
+| `qfieldcloud-minio-1` | Object storage (S3-compatible) | 8009→9000, 8010→9001 |
+| `qfieldcloud-memcached-1` | Cache | - |
+| `qfieldcloud-ofelia-1` | Cron scheduler | - |
+| `qfieldcloud-certbot-1` | TLS certificates | - |
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `/opt/qfieldcloud/docker-compose.yml` | Main compose (DO NOT EDIT) |
+| `/opt/qfieldcloud/docker-compose.override.yml` | Local overrides (EDIT THIS) |
+| `/opt/qfieldcloud/.env` | Environment variables |
+
+### Gunicorn Config (in `.env`)
+
+```bash
+GUNICORN_TIMEOUT_S=600
+GUNICORN_MAX_REQUESTS=5000   # Was 1000, increased Feb 10 2026
+GUNICORN_WORKERS=8           # Was 4, increased to match 8 worker_wrappers
+GUNICORN_THREADS=4
+```
+
+**CRITICAL:** Gunicorn workers MUST be >= worker_wrapper count. Workers download project files from the app via HTTP. If gunicorn workers < worker_wrappers, connection saturation causes `ConnectionResetError(104)`.
+
+### Static Files
+
+Static files are served by nginx from a shared Docker volume:
+- App collects to: `/usr/src/app/staticfiles` (via `collectstatic`)
+- Nginx serves from: `/var/www/html/staticfiles` (read-only mount)
+- `STATIC_URL = /staticfiles/`
+- **No WhiteNoise** - nginx serves directly, NOT through Django/gunicorn
+
+If static files return 404/503:
+1. Check volume is mounted in nginx override: `static_volume:/var/www/html/staticfiles:ro`
+2. Run `collectstatic`: `docker exec qfieldcloud-app-1 python manage.py collectstatic --noinput`
+3. Restart nginx: `docker-compose restart nginx`
+4. **Cloudflare cache**: Old 503s may be cached. Hard refresh (Ctrl+Shift+R) or purge cache.
+
+### Job Processing System
+
+**Job lifecycle:** `pending` → `queued` → `started` → `finished`/`failed`
+
+**Dequeue logic** (`qfieldcloud/core/management/commands/dequeue.py`):
+1. Each worker_wrapper runs a dequeue loop every 5 seconds
+2. Finds `PENDING` jobs where the project has NO `QUEUED` or `STARTED` jobs
+3. Also skips projects with `locked_at IS NOT NULL`
+4. Sets job to `QUEUED` and runs it
+
+**CRITICAL - Multi-table inheritance:**
+- `Job` is the base model in `core_job` table
+- `ProcessProjectfileJob`, `PackageJob`, `ApplyDeltaJob` are child models with their own tables
+- **NEVER create jobs via `Job.objects.create()`** - use the specific child model
+- Example: `ProcessProjectfileJob.objects.create(project=p, created_by=p.owner)`
+- Using base `Job.objects.create()` causes `AttributeError: 'ProcessProjectfileJobRun' object has no attribute 'job'`
+
+### Common Issues & Fixes
+
+#### `failed_process_projectfile`
+
+**Symptoms:** Project status = `failed`, status_code = `failed_process_projectfile`, jobs show "UNKNOWN" error type.
+
+**Diagnosis steps:**
+```bash
+# 1. Check all containers running
+docker ps -a --filter "name=qfield"
+
+# 2. Check worker logs for errors
+for i in 1 2 3 4 5 6 7 8; do
+  echo "=== wrapper-$i ==="
+  docker logs --since 30m qfieldcloud-worker_wrapper-$i 2>&1 | grep -E 'Error|error|failed|Finished' | tail -5
+done
+
+# 3. Check for stuck jobs (started but never finished)
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from qfieldcloud.core.models import Job
+stuck = Job.objects.filter(status='failed', started_at__isnull=False, finished_at__isnull=True)
+print(f'Stuck jobs: {stuck.count()}')
+for j in stuck:
+    print(f'  {j.pk} | {j.type} | started:{j.started_at}')
+"
+```
+
+**Fix stuck/zombie jobs:**
+```bash
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from django.utils import timezone
+from qfieldcloud.core.models import Job
+stuck = Job.objects.filter(status='failed', started_at__isnull=False, finished_at__isnull=True)
+for j in stuck:
+    j.finished_at = timezone.now()
+    j.save(update_fields=['finished_at'])
+    print(f'Fixed: {j.pk}')
+"
+```
+
+**Fix orphaned `queued` jobs** (worker died before processing):
+```bash
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from qfieldcloud.core.models import Job
+orphans = Job.objects.filter(status='queued', started_at__isnull=True)
+for j in orphans:
+    j.status = Job.Status.PENDING
+    j.save(update_fields=['status'])
+    print(f'Reset: {j.pk}')
+"
+```
+
+**Trigger reprocess for a failed project:**
+```bash
+docker exec qfieldcloud-app-1 python manage.py shell -c "
+from qfieldcloud.core.models import ProcessProjectfileJob, Project
+p = Project.objects.get(pk='PROJECT_UUID_HERE')
+job = ProcessProjectfileJob.objects.create(project=p, created_by=p.owner)
+print(f'Created job: {job.pk}')
+"
+```
+
+#### `ConnectionResetError(104)` during downloads
+
+**Cause:** Gunicorn worker saturation - too many worker_wrappers overwhelming too few gunicorn workers. Workers hit `--max-requests` and restart mid-connection.
+
+**Fix:** Increase gunicorn workers in `/opt/qfieldcloud/.env`:
+```bash
+GUNICORN_WORKERS=8           # Match worker_wrapper count
+GUNICORN_MAX_REQUESTS=5000   # Reduce restart frequency
+```
+Then: `docker-compose up -d app`
+
+#### Workers not picking up jobs
+
+**Symptoms:** Jobs stuck as `pending` or `queued`, all workers silent.
+
+**Fix:**
+```bash
+# Restart all workers
+docker-compose restart worker_wrapper
+
+# If still stuck, check for zombie queued jobs blocking the project
+# (see "Fix orphaned queued jobs" above)
+```
+
+### CSRF Configuration
+
+The override must include trusted origins:
+```yaml
+app:
+  environment:
+    CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+```
+
+And in `.env`:
+```bash
+CSRF_TRUSTED_ORIGINS=https://qfield.fibreflow.app
+```
+
+Without this, admin logout and form submissions fail with "Origin checking failed".
+
+### Restart Commands
+
+```bash
+cd /opt/qfieldcloud
+
+# Restart app (picks up .env changes)
+docker-compose up -d app
+
+# Restart workers
+docker-compose restart worker_wrapper
+
+# Restart nginx (picks up override volume changes)
+docker-compose up -d nginx
+
+# Full restart (all services)
+docker-compose down && docker-compose up -d
+```
