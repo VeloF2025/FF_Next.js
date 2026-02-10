@@ -2,7 +2,7 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText } from 'lucide-react';
+import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText, BookOpen } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -14,6 +14,14 @@ export const communicationsSection: NavSection = {
   sectionId: 'communications',
   isCollapsible: true,
   items: [
+    {
+      to: '/communications/help-center',
+      icon: BookOpen,
+      label: 'Help Center',
+      shortLabel: 'Help',
+      permissions: [],
+      rbacKey: 'communications',
+    },
     {
       to: '/communications',
       icon: MessageSquare,

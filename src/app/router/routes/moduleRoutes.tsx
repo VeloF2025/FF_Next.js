@@ -17,6 +17,7 @@ import {
   ContractorEditPage,
   ContractorDetailPage,
   CommunicationsDashboard,
+  HelpCenterPage,
   AnalyticsDashboard,
   FieldAppPortal,
   MeetingsDashboard,
@@ -152,10 +153,26 @@ export const moduleRoutes = [
     ),
   },
   {
+    path: 'communications/help-center',
+    element: (
+      <Suspense fallback={<Loading />}>
+        <HelpCenterPage />
+      </Suspense>
+    ),
+  },
+  {
     path: 'communications',
     element: (
       <Suspense fallback={<Loading />}>
         <CommunicationsDashboard />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'communications/help-center',
+    element: (
+      <Suspense fallback={<Loading />}>
+        <HelpCenterPage />
       </Suspense>
     ),
   },

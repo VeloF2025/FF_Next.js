@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 const Sidebar = dynamic(() => import('./Sidebar').then(mod => ({ default: mod.Sidebar })), { ssr: false });
 const Header = dynamic(() => import('./Header').then(mod => ({ default: mod.Header })), { ssr: false });
 const Footer = dynamic(() => import('./Footer').then(mod => ({ default: mod.Footer })), { ssr: false });
+const ChatWidget = dynamic(() => import('@/modules/help-center/components/ChatWidget').then(mod => ({ default: mod.ChatWidget })), { ssr: false });
 
 interface PageMeta {
   title: string;
@@ -301,6 +302,13 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
         <Footer />
       </div>
       
+      {/* Chat Widget - Available on all pages */}
+      <ChatWidget
+        userName={currentUser?.displayName || currentUser?.email?.split('@')[0]}
+        userRole={currentUser?.role}
+        userId={currentUser?.id}
+      />
+
       {/* WebSocket Connection Status - Disabled */}
       {/* <ConnectionStatus
         mode="auto"

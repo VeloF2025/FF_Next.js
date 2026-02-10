@@ -119,6 +119,8 @@ export const ContractorEditPage = lazy(() => import('@/modules/contractors/compo
 export const ContractorDetailPage = lazy(() => import('@/modules/contractors/components/ContractorView').then(m => ({ default: m.ContractorView })));
 export const AnalyticsDashboard = lazy(() => import('@/components/analytics/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 export const CommunicationsDashboard = lazy(() => import('@/modules/communications/CommunicationsDashboard').then(m => ({ default: m.default })));
+export const HelpCenterPage = lazy(() => import('@/modules/help-center/HelpCenterPage').then(m => ({ default: m.HelpCenterPage })));
+export const HelpCenterPage = lazy(() => import('@/modules/help-center/HelpCenterPage').then(m => ({ default: m.HelpCenterPage })));
 export const HomeInstallationsDashboard = lazy(() => import('@/modules/installations/HomeInstallationsDashboard').then(m => ({ default: m.default })));
 export const FieldAppPortal = lazy(() => import('@/modules/field-app/FieldAppPortal').then(m => ({ default: m.default })));
 export const FiberStringingDashboard = lazy(() => import('@/modules/projects/fiber-stringing/FiberStringingDashboard').then(m => ({ default: m.FiberStringingDashboard })));
