@@ -221,9 +221,10 @@ export class OneMapClient {
       await this.authenticate();
     }
 
-    // Proactively re-authenticate every 200 requests to avoid session expiry
+    // Proactively re-authenticate every 100 requests to avoid session expiry
+    // (1Map sessions expire after ~125-250 requests)
     this.requestCount++;
-    if (this.requestCount % 200 === 0) {
+    if (this.requestCount % 100 === 0) {
       logger.info('Proactive re-authentication', { requestCount: this.requestCount });
       await this.authenticate();
     }

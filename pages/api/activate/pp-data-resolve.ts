@@ -175,7 +175,13 @@ async function run1MapLookup(): Promise<{
     results.total_searched++;
 
     try {
-      const searchResult = await client.searchInstallations(serial, { limit: 10 });
+      // Wrap in a 45s timeout to prevent any single serial from hanging the entire loop
+      const searchResult = await Promise.race([
+        client.searchInstallations(serial, { limit: 10 }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Serial search timeout (45s)')), 45_000)
+        ),
+      ]);
 
       if (searchResult.success && searchResult.result && searchResult.result.length > 0) {
         const match = searchResult.result[0];
