@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { log } from '@/lib/logger';
-import type { Meeting } from '@/modules/meetings/types/meeting.types';
+import type { Meeting, MeetingAttendee } from '@/modules/meetings/types/meeting.types';
 import {
   ActionItem,
   Notification,
   CommunicationsStats,
   CommunicationsData
 } from '@/types/communications.types';
+
+function getAttendeeDisplayName(p: MeetingAttendee): string {
+  return p.displayName || p.name || p.email || 'Unknown';
+}
 
 export function useCommunications() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -17,43 +21,48 @@ export function useCommunications() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch real meeting data from the meetings API
       const response = await fetch('/api/meetings');
       const data = await response.json();
 
       if (data.meetings) {
-        // Transform Neon data to Meeting format (same as MeetingsDashboard)
-        const transformedMeetings: Meeting[] = data.meetings.map((m: Record<string, unknown>) => ({
-          id: m.id as string,
-          title: m.title as string,
-          type: 'team' as const,
-          date: new Date(m.date as string),
-          time: new Date(m.date as string).toLocaleTimeString(),
-          duration: `${m.duration} min`,
-          location: 'Virtual',
-          isVirtual: true,
-          meetingLink: m.transcript_url as string | undefined,
-          organizer: 'Fireflies',
-          participants: m.participants
-            ? (m.participants as Array<{ name?: string; email?: string }>).map(p => p.name || p.email || 'Unknown')
-            : [],
-          agenda: (m.summary as Record<string, unknown>)?.outline as string[]
-            || (m.summary as Record<string, unknown>)?.keywords as string[]
-            || [],
-          status: 'completed' as const,
-          notes: (m.summary as Record<string, unknown>)?.action_items as string || '',
-          actionItems: [],
-          // Store full summary for detail view
-          summary: m.summary,
-          firefliesId: m.fireflies_id
-        }));
+        const transformedMeetings: Meeting[] = data.meetings.map((m: Record<string, unknown>) => {
+          const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
+            ? (m.participants as Array<Record<string, unknown>>).map(p => ({
+                name: (p.name as string) || '',
+                email: (p.email as string) || '',
+                displayName: (p.displayName as string) || '',
+              }))
+            : [];
+
+          return {
+            id: m.id as string,
+            title: m.title as string,
+            type: 'team' as const,
+            date: new Date(m.date as string),
+            time: new Date(m.date as string).toLocaleTimeString(),
+            duration: `${m.duration} min`,
+            location: 'Virtual',
+            isVirtual: true,
+            meetingLink: m.transcript_url as string | undefined,
+            organizer: 'Fireflies',
+            participants: rawParticipants.map(getAttendeeDisplayName),
+            rawParticipants,
+            agenda: (m.summary as Record<string, unknown>)?.outline as string[]
+              || (m.summary as Record<string, unknown>)?.keywords as string[]
+              || [],
+            status: 'completed' as const,
+            notes: (m.summary as Record<string, unknown>)?.action_items as string || '',
+            actionItems: [],
+            summary: m.summary as Meeting['summary'],
+            firefliesId: m.fireflies_id as string,
+          };
+        });
 
         setMeetings(transformedMeetings);
       } else {
         setMeetings([]);
       }
 
-      // Action items and notifications remain empty until integrated
       setActionItems([]);
       setNotifications([]);
     } catch (error) {
