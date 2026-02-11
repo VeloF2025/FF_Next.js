@@ -12,15 +12,13 @@ import {
   Filter,
   AlertTriangle,
   CheckCircle,
-  Clock,
   FileText,
-  TrendingUp,
-  Building2,
   RefreshCw,
   LayoutGrid,
   List,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import { PipelineKanban } from './PipelineKanban';
 import type {
   PipelineDashboardStats,
@@ -204,74 +202,40 @@ export function PipelineDashboard() {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Total Pipeline</p>
-                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                    {stats.total_projects}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <FolderKanban className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-              <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
-                {formatCurrency(stats.total_estimated_value)} total value
-              </p>
-            </div>
-
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Ready to Plan</p>
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {stats.projects_ready_to_plan}
-                  </p>
-                </div>
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
-              </div>
-              <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
-                All approvals complete + PO received
-              </p>
-            </div>
-
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Awaiting PO</p>
-                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                    {stats.projects_awaiting_po}
-                  </p>
-                </div>
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                  <FileText className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-              <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
-                Approvals complete, waiting for PO
-              </p>
-            </div>
-
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border-light)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">Expiring Soon</p>
-                  <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    {stats.approvals_expiring_soon}
-                  </p>
-                </div>
-                <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-              </div>
-              <p className="text-xs text-[var(--ff-text-secondary)] mt-2">
-                Approvals expiring within 30 days
-              </p>
-            </div>
+          <div className="mb-8">
+            <StatsGrid
+              columns={4}
+              cards={[
+                {
+                  title: 'Total Pipeline',
+                  value: stats.total_projects,
+                  icon: FolderKanban,
+                  color: '#3B82F6',
+                  subtitle: `${formatCurrency(stats.total_estimated_value)} total value`,
+                },
+                {
+                  title: 'Ready to Plan',
+                  value: stats.projects_ready_to_plan,
+                  icon: CheckCircle,
+                  color: '#10B981',
+                  subtitle: 'All approvals complete + PO received',
+                },
+                {
+                  title: 'Awaiting PO',
+                  value: stats.projects_awaiting_po,
+                  icon: FileText,
+                  color: '#F59E0B',
+                  subtitle: 'Approvals complete, waiting for PO',
+                },
+                {
+                  title: 'Expiring Soon',
+                  value: stats.approvals_expiring_soon,
+                  icon: AlertTriangle,
+                  color: '#EF4444',
+                  subtitle: 'Approvals expiring within 30 days',
+                },
+              ]}
+            />
           </div>
         )}
 

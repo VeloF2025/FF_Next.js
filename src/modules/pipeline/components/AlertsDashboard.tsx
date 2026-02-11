@@ -174,28 +174,28 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
     return (
       <div className={`space-y-4 ${className}`}>
         {/* Summary Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-4">
             <p className="text-2xl font-bold text-red-600">
               {(expiring?.by_urgency.expired.length || 0) +
                 (followups?.by_status.overdue.length || 0)}
             </p>
             <p className="text-xs text-red-600">Critical/Overdue</p>
           </div>
-          <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
+          <div className="bg-orange-50 dark:bg-orange-900/30 rounded-lg p-4">
             <p className="text-2xl font-bold text-orange-600">
               {(expiring?.by_urgency.critical.length || 0) +
                 (followups?.by_status.today.length || 0)}
             </p>
             <p className="text-xs text-orange-600">Urgent Today</p>
           </div>
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+          <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-4">
             <p className="text-2xl font-bold text-amber-600">
               {expiring?.by_urgency.warning.length || 0}
             </p>
             <p className="text-xs text-amber-600">Expiring Soon</p>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+          <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
             <p className="text-2xl font-bold text-blue-600">
               {followups?.by_status.upcoming.length || 0}
             </p>
@@ -205,7 +205,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
 
         {/* Critical Items Preview */}
         {criticalCount > 0 && (
-          <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 border border-[var(--ff-border-light)]">
             <h4 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
               <Bell className="w-4 h-4 text-red-500" />
               Requires Immediate Attention
@@ -276,7 +276,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <XCircle className="w-5 h-5 text-red-500" />
             <span className="text-sm font-medium text-red-600">Expired</span>
@@ -285,7 +285,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
             {expiring?.by_urgency.expired.length || 0}
           </p>
         </div>
-        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+        <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
             <span className="text-sm font-medium text-orange-600">Critical</span>
@@ -295,7 +295,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
           </p>
           <p className="text-xs text-orange-500 mt-1">Expiring in 7 days</p>
         </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-5 h-5 text-amber-500" />
             <span className="text-sm font-medium text-amber-600">Warning</span>
@@ -305,7 +305,7 @@ export function AlertsDashboard({ className = '', compact = false }: AlertsDashb
           </p>
           <p className="text-xs text-amber-500 mt-1">Expiring in 30 days</p>
         </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <Calendar className="w-5 h-5 text-blue-500" />
             <span className="text-sm font-medium text-blue-600">Follow-ups</span>
