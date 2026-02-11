@@ -850,10 +850,10 @@ export class FiberTimeQContactClient {
         }
       }
 
-      // Handle 403 - fall back to c__update field
+      // Handle 403 - fall back to description field
       if (response.status === 403) {
-        logger.info('Note creation denied (403), falling back to c__update field', { caseId });
-        return this.addNoteViaField(caseId, content);
+        logger.info('Note creation denied (403), falling back to description field', { caseId });
+        return this.addNoteViaDescription(caseId, content);
       }
 
       if (!response.ok) {
@@ -864,8 +864,8 @@ export class FiberTimeQContactClient {
           error: errorText.substring(0, 200),
         });
         // Also try fallback for other errors
-        logger.info('Trying c__update field fallback', { caseId });
-        return this.addNoteViaField(caseId, content);
+        logger.info('Trying description field fallback', { caseId });
+        return this.addNoteViaDescription(caseId, content);
       }
 
       const data = await response.json();
@@ -880,7 +880,7 @@ export class FiberTimeQContactClient {
       logger.error('Error adding note to QContact', { caseId, error: errorMsg });
       // Try fallback on any error
       try {
-        return await this.addNoteViaField(caseId, content);
+        return await this.addNoteViaDescription(caseId, content);
       } catch (fallbackError) {
         return { success: false, error: errorMsg };
       }
@@ -888,29 +888,42 @@ export class FiberTimeQContactClient {
   }
 
   /**
-   * Fallback: push note content into the c__update custom field via PATCH
-   * This uses the same updateCase mechanism that works for status changes.
+   * Fallback: append note content to the case description field via PATCH.
+   * The description field accepts free text (verified working).
    */
-  private async addNoteViaField(
+  private async addNoteViaDescription(
     caseId: string | number,
     content: string
   ): Promise<{ success: boolean; noteId?: string; error?: string }> {
     try {
       const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      const updateText = `[${timestamp}] ${content}`;
+      const noteEntry = `[${timestamp}] ${content}`;
 
-      const result = await this.updateCase(caseId, { c__update: updateText });
-
-      if (result.success) {
-        logger.info('Note pushed via c__update field', { caseId });
-        return { success: true, noteId: `field-update-${Date.now()}` };
+      // Fetch current description to append (not overwrite)
+      let existing = '';
+      try {
+        const caseData = await this.request('GET', `/api/v2/entities/Case/${caseId}`);
+        existing = caseData?.fields?.description || '';
+      } catch {
+        // If we can't fetch, just set directly
       }
 
-      logger.error('c__update field fallback also failed', { caseId, error: result.error });
-      return { success: false, error: `Note creation and c__update fallback both failed: ${result.error}` };
+      const newDescription = existing
+        ? `${existing}\n\n---\n${noteEntry}`
+        : noteEntry;
+
+      const result = await this.updateCase(caseId, { description: newDescription });
+
+      if (result.success) {
+        logger.info('Note appended to description field', { caseId });
+        return { success: true, noteId: `desc-update-${Date.now()}` };
+      }
+
+      logger.error('Description field fallback also failed', { caseId, error: result.error });
+      return { success: false, error: `Note creation and description fallback both failed: ${result.error}` };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('c__update field fallback error', { caseId, error: errorMsg });
+      logger.error('Description field fallback error', { caseId, error: errorMsg });
       return { success: false, error: errorMsg };
     }
   }
