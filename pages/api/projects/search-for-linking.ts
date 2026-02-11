@@ -58,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
-        WHERE p.id NOT IN ${sql(linkedProjectIds)}
+        WHERE NOT (p.id = ANY(${linkedProjectIds}::uuid[]))
           AND (
             p.project_name ILIKE ${'%' + searchQuery + '%'}
             OR p.project_code ILIKE ${'%' + searchQuery + '%'}
@@ -97,7 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           p.pipeline_project_id as existing_pipeline_id
         FROM projects p
         LEFT JOIN clients c ON c.id = p.client_id
-        WHERE p.id NOT IN ${sql(linkedProjectIds)}
+        WHERE NOT (p.id = ANY(${linkedProjectIds}::uuid[]))
         ORDER BY p.project_name ASC
         LIMIT ${limitNum}
       `;
