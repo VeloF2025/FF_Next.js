@@ -348,9 +348,12 @@ export async function syncSingleInboundTicket(
     const existingTicketId = await checkDuplicate(qcontactTicket.id);
 
     if (existingTicketId) {
-      // UPDATE existing ticket's status, type, and category instead of skipping
+      // UPDATE existing ticket's status, type, category, and backfill timestamps
       const mappedStatus = mapQContactStatusToFibreFlow(qcontactTicket.status);
       const mappedType = mapTicketType(qcontactTicket.category, qcontactTicket.subcategory);
+      const qcCreatedAt = qcontactTicket.created_at ? new Date(qcontactTicket.created_at) : null;
+      const qcUpdatedAt = qcontactTicket.updated_at ? new Date(qcontactTicket.updated_at) : null;
+      const qcLoggedDate = qcCreatedAt ? qcCreatedAt.toISOString().split('T')[0] : null;
 
       const updateSql = `
         UPDATE maintenance_tickets
@@ -358,14 +361,23 @@ export async function syncSingleInboundTicket(
             type = $2,
             category = $3,
             subcategory = $4,
-            updated_at = NOW()
+            updated_at = COALESCE($6, NOW()),
+            created_at = COALESCE($7, created_at),
+            original_logged_date = COALESCE(original_logged_date, $8)
         WHERE id = $5
         RETURNING id, status
       `;
 
       const updateResult = await queryOne<{ id: string; status: string }>(
         updateSql,
-        [mappedStatus, mappedType, qcontactTicket.category || null, qcontactTicket.subcategory || null, existingTicketId]
+        [
+          mappedStatus, mappedType,
+          qcontactTicket.category || null, qcontactTicket.subcategory || null,
+          existingTicketId,
+          qcUpdatedAt?.toISOString() || null,
+          qcCreatedAt?.toISOString() || null,
+          qcLoggedDate,
+        ]
       );
 
       logger.info('Updated existing ticket status and category', {
@@ -407,6 +419,11 @@ export async function syncSingleInboundTicket(
 
     // Create ticket in FibreFlow with all available fields
     // Note: Database uses 'type' not 'ticket_type', 'zone' not 'zone_id', 'pon' not 'pon_number'
+    // Preserve QContact timestamps for SLA tracking
+    const qcCreatedAt = qcontactTicket.created_at ? new Date(qcontactTicket.created_at) : new Date();
+    const qcUpdatedAt = qcontactTicket.updated_at ? new Date(qcontactTicket.updated_at) : qcCreatedAt;
+    const qcLoggedDate = qcCreatedAt.toISOString().split('T')[0]; // YYYY-MM-DD for original_logged_date
+
     const sql = `
       INSERT INTO maintenance_tickets (
         ticket_uid,
@@ -429,10 +446,14 @@ export async function syncSingleInboundTicket(
         ont_serial,
         category,
         subcategory,
-        created_by
+        created_by,
+        created_at,
+        updated_at,
+        original_logged_date
       ) VALUES (
         'FF' || LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23
       )
       RETURNING *
     `;
@@ -458,6 +479,9 @@ export async function syncSingleInboundTicket(
       ticketPayload.category || null,
       ticketPayload.subcategory || null,
       QCONTACT_SYSTEM_USER_ID,
+      qcCreatedAt.toISOString(),
+      qcUpdatedAt.toISOString(),
+      qcLoggedDate,
     ];
 
     const createdTicket = await queryOne<{ id: string; ticket_uid: string }>(sql, values);
