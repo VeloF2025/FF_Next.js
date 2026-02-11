@@ -187,12 +187,16 @@ export async function PUT(
       return notFoundError('Ticket', ticketId);
     }
 
-    // Sync status changes to QContact (async, non-blocking)
-    if (body.status) {
-      syncOutboundUpdate(ticketId, { status: body.status as TicketStatus })
+    // Sync changes to QContact in real-time (async, non-blocking)
+    const outboundChanges: { status?: TicketStatus; assigned_to?: string | null } = {};
+    if (body.status) outboundChanges.status = body.status as TicketStatus;
+    if (body.assigned_to !== undefined) outboundChanges.assigned_to = body.assigned_to ?? null;
+
+    if (Object.keys(outboundChanges).length > 0) {
+      syncOutboundUpdate(ticketId, outboundChanges)
         .then(result => {
           if (result.success) {
-            logger.info('QContact outbound sync successful', { ticketId, status: body.status });
+            logger.info('QContact outbound sync successful', { ticketId, changes: Object.keys(outboundChanges) });
           } else {
             logger.warn('QContact outbound sync failed', { ticketId, error: result.error_message });
           }
@@ -240,6 +244,12 @@ export async function DELETE(
     if (!deletedTicket) {
       return notFoundError('Ticket', ticketId);
     }
+
+    // Sync cancellation to QContact (async, non-blocking)
+    syncOutboundUpdate(ticketId, { status: TicketStatus.CANCELLED })
+      .catch(err => {
+        logger.error('QContact outbound sync error on delete', { ticketId, error: err.message });
+      });
 
     return NextResponse.json({
       success: true,
