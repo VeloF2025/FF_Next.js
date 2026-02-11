@@ -9,7 +9,7 @@ import { Wrench } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const maintenanceSection: NavSection = {
-  section: 'Maintenance',
+  section: 'NOC',
   sectionId: 'maintenance',
   sectionLink: '/maintenance',
   isCollapsible: false,
@@ -17,8 +17,8 @@ export const maintenanceSection: NavSection = {
     {
       to: '/maintenance',
       icon: Wrench,
-      label: 'Maintenance',
-      shortLabel: 'Maint',
+      label: 'NOC',
+      shortLabel: 'NOC',
       permissions: [],
       rbacKey: 'maintenance.main',
     },

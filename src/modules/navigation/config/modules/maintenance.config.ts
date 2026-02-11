@@ -18,8 +18,8 @@ import type { ModuleNavigationConfig } from '../../types';
 
 export const maintenanceConfig: ModuleNavigationConfig = {
   moduleId: 'maintenance',
-  moduleName: 'Maintenance',
-  description: 'Ticket management, teams, and fault tracking',
+  moduleName: 'NOC',
+  description: 'Network Operations Centre - Ticket management, teams, and fault tracking',
   basePath: '/maintenance',
   icon: Wrench,
   tabs: [
