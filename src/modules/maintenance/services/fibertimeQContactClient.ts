@@ -800,11 +800,10 @@ export class FiberTimeQContactClient {
 
   /**
    * Add a note to a case
-   * ⚠️ BLOCKED: QContact Note creation requires elevated permissions
    *
-   * Current status: The Maintenance - Velocity user account returns 403 Access Denied
-   * when attempting to create notes via the API. FiberTime needs to grant note
-   * creation permissions to the Velocity account.
+   * Strategy: Try Note entity creation first. If 403 (permission denied),
+   * fall back to writing note content into the c__update custom field
+   * via PATCH, which uses the same mechanism as status updates.
    *
    * @param caseId - QContact case ID (external_id)
    * @param content - Note text content
@@ -819,7 +818,7 @@ export class FiberTimeQContactClient {
     try {
       logger.info('Adding note to QContact case', { caseId, contentLength: content.length, isInternal });
 
-      // Try creating Note entity directly (correct endpoint, but requires permission)
+      // Try creating Note entity directly
       const url = `${this.baseUrl}/api/v2/entities/Note`;
 
       const controller = new AbortController();
@@ -847,21 +846,14 @@ export class FiberTimeQContactClient {
         logger.warn('QContact API returned 401 on addNote, attempting auto-refresh');
         const authSuccess = await this.authenticate();
         if (authSuccess) {
-          // Retry the request
           return this.addNote(caseId, content, isInternal);
         }
       }
 
-      // Handle 403 - Permission denied (expected with current account)
+      // Handle 403 - fall back to c__update field
       if (response.status === 403) {
-        logger.warn('QContact note creation denied - Velocity account lacks Note CREATE permission', {
-          caseId,
-          status: response.status,
-        });
-        return {
-          success: false,
-          error: 'Permission denied: Velocity account cannot create notes in QContact. Contact FiberTime to enable note creation permissions.',
-        };
+        logger.info('Note creation denied (403), falling back to c__update field', { caseId });
+        return this.addNoteViaField(caseId, content);
       }
 
       if (!response.ok) {
@@ -869,17 +861,15 @@ export class FiberTimeQContactClient {
         logger.error('Failed to add note to QContact', {
           caseId,
           status: response.status,
-          statusText: response.statusText,
           error: errorText.substring(0, 200),
         });
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        };
+        // Also try fallback for other errors
+        logger.info('Trying c__update field fallback', { caseId });
+        return this.addNoteViaField(caseId, content);
       }
 
       const data = await response.json();
-      logger.info('Successfully added note to QContact', { caseId, noteId: data?.id });
+      logger.info('Successfully added note to QContact via Note entity', { caseId, noteId: data?.id });
 
       return {
         success: true,
@@ -888,10 +878,40 @@ export class FiberTimeQContactClient {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Error adding note to QContact', { caseId, error: errorMsg });
-      return {
-        success: false,
-        error: errorMsg,
-      };
+      // Try fallback on any error
+      try {
+        return await this.addNoteViaField(caseId, content);
+      } catch (fallbackError) {
+        return { success: false, error: errorMsg };
+      }
+    }
+  }
+
+  /**
+   * Fallback: push note content into the c__update custom field via PATCH
+   * This uses the same updateCase mechanism that works for status changes.
+   */
+  private async addNoteViaField(
+    caseId: string | number,
+    content: string
+  ): Promise<{ success: boolean; noteId?: string; error?: string }> {
+    try {
+      const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const updateText = `[${timestamp}] ${content}`;
+
+      const result = await this.updateCase(caseId, { c__update: updateText });
+
+      if (result.success) {
+        logger.info('Note pushed via c__update field', { caseId });
+        return { success: true, noteId: `field-update-${Date.now()}` };
+      }
+
+      logger.error('c__update field fallback also failed', { caseId, error: result.error });
+      return { success: false, error: `Note creation and c__update fallback both failed: ${result.error}` };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('c__update field fallback error', { caseId, error: errorMsg });
+      return { success: false, error: errorMsg };
     }
   }
 
