@@ -73,9 +73,10 @@ async function sendResetEmail(
   }
 
   try {
-    // Dynamic require to avoid issues if nodemailer not installed
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-    const nodemailer = require('nodemailer');
+    // Dynamic import hidden from webpack static analysis
+    // nodemailer is only needed when SMTP is configured
+    // eslint-disable-next-line no-eval
+    const nodemailer = eval('require')('nodemailer');
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
