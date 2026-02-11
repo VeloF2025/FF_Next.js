@@ -3,21 +3,22 @@
  * 🟢 WORKING: Production-ready service for orchestrating QContact sync
  *
  * Features:
- * - Inbound sync (QContact -> FibreFlow)
+ * - Bidirectional sync (QContact <-> FibreFlow)
+ * - Inbound: QContact -> FibreFlow (with status precedence protection)
+ * - Outbound: FibreFlow -> QContact (status updates via PATCH)
  * - Progress tracking
  * - Success rate calculation
  * - Comprehensive error handling
  * - Sync report generation
- *
- * NOTE: Outbound sync is DISABLED. The Velocity user account does not have
- * permissions to change status/close tickets in QContact. Only note-adding
- * would be possible, which will be handled separately if needed.
  *
  * @module maintenance/services/qcontactSyncOrchestrator
  */
 
 import { query, queryOne } from '../utils/db';
 import { syncFiberTimeInboundTickets } from './qcontactSyncInbound';
+import { pushStatusUpdate } from './qcontactSyncOutbound';
+import { TicketStatus } from '../types/ticket';
+import { mapFibreFlowStatusToQContact } from '../constants/qcontactStatusMapping';
 import type {
   FullSyncRequest,
   FullSyncResult,
@@ -223,9 +224,9 @@ async function fetchTicketsForOutboundSync(
 
 /**
  * Process outbound sync for tickets
- * 🟢 WORKING: Syncs ticket updates to QContact
+ * 🟢 WORKING: Pushes FibreFlow status updates to QContact
  *
- * @param tickets - Tickets to sync
+ * @param tickets - Tickets to sync outbound
  * @returns Sync stats and errors
  */
 async function processOutboundSync(
@@ -238,10 +239,43 @@ async function processOutboundSync(
     ticketCount: tickets.length,
   });
 
-  // For now, we'll just count the tickets as processed
-  // In a real implementation, we would call syncOutboundUpdate for each ticket
-  stats.total_processed = tickets.length;
-  stats.successful = tickets.length;
+  for (const ticket of tickets) {
+    stats.total_processed++;
+
+    try {
+      const result = await pushStatusUpdate(
+        ticket.id,
+        ticket.status as TicketStatus
+      );
+
+      if (result.success) {
+        stats.successful++;
+        stats.updated++;
+      } else {
+        stats.failed++;
+        errors.push({
+          ticket_id: ticket.id,
+          qcontact_ticket_id: ticket.external_id,
+          sync_type: SyncType.STATUS_UPDATE,
+          error_message: result.error_message || 'Unknown error',
+          error_code: null,
+          timestamp: new Date(),
+          recoverable: true,
+        });
+      }
+    } catch (error) {
+      stats.failed++;
+      errors.push({
+        ticket_id: ticket.id,
+        qcontact_ticket_id: ticket.external_id,
+        sync_type: SyncType.STATUS_UPDATE,
+        error_message: error instanceof Error ? error.message : String(error),
+        error_code: null,
+        timestamp: new Date(),
+        recoverable: true,
+      });
+    }
+  }
 
   logger.info('Outbound sync completed', {
     processed: stats.total_processed,
@@ -257,16 +291,14 @@ async function processOutboundSync(
 // ============================================================================
 
 /**
- * Run full sync (inbound only - outbound is disabled)
- * 🟢 WORKING: Orchestrates inbound sync from QContact to FibreFlow
- *
- * NOTE: Outbound sync is DISABLED because the Velocity user account
- * has limited permissions in QContact (cannot change status/close tickets).
+ * Run full bidirectional sync
+ * 🟢 WORKING: Orchestrates sync between QContact and FibreFlow
  *
  * Process:
- * 1. Run inbound sync (QContact -> FibreFlow)
- * 2. Generate comprehensive report
- * 3. Calculate success rate
+ * 1. Run inbound sync (QContact -> FibreFlow) with status precedence
+ * 2. Run outbound sync (FibreFlow -> QContact) pushing status updates
+ * 3. Generate comprehensive report
+ * 4. Calculate success rate
  *
  * @param request - Sync request options
  * @returns Full sync result with stats and errors
@@ -276,7 +308,7 @@ export async function runFullSync(
 ): Promise<FullSyncResult> {
   const started_at = new Date();
 
-  logger.info('Starting sync (inbound only - outbound disabled)', request);
+  logger.info('Starting bidirectional sync', request);
 
   try {
     // Run inbound sync (FiberTime QContact -> FibreFlow)
@@ -291,17 +323,24 @@ export async function runFullSync(
       failed: inboundResult.failed,
     });
 
-    // Outbound sync is DISABLED - just log and skip
-    logger.info('Outbound sync is DISABLED (Velocity user has limited QContact permissions)');
+    // Run outbound sync (FibreFlow -> QContact)
+    logger.info('Running outbound sync to QContact');
+    const outboundTickets = await fetchTicketsForOutboundSync(request);
+    const { stats: outboundStats, errors: outboundErrors } = await processOutboundSync(outboundTickets);
+
+    logger.info('Outbound sync completed', {
+      processed: outboundStats.total_processed,
+      successful: outboundStats.successful,
+      failed: outboundStats.failed,
+    });
 
     const completed_at = new Date();
     const duration_seconds =
       (completed_at.getTime() - started_at.getTime()) / 1000;
 
-    const success_rate = calculateSyncSuccessRate(
-      inboundResult.successful,
-      inboundResult.failed
-    );
+    const totalSuccess = inboundResult.successful + outboundStats.successful;
+    const totalFailed = inboundResult.failed + outboundStats.failed;
+    const success_rate = calculateSyncSuccessRate(totalSuccess, totalFailed);
 
     const result: FullSyncResult = {
       started_at,
@@ -316,11 +355,11 @@ export async function runFullSync(
         created: inboundResult.created,
         updated: inboundResult.updated,
       },
-      outbound_stats: createEmptyStats(), // Outbound disabled
-      total_success: inboundResult.successful,
-      total_failed: inboundResult.failed,
+      outbound_stats: outboundStats,
+      total_success: totalSuccess,
+      total_failed: totalFailed,
       success_rate,
-      errors: inboundResult.errors,
+      errors: [...inboundResult.errors, ...outboundErrors],
     };
 
     logger.info('Sync completed successfully', {
@@ -425,41 +464,66 @@ export async function runInboundOnlySync(
 
 /**
  * Run outbound-only sync
- * ⚠️ DISABLED: Outbound sync is not available
+ * 🟢 WORKING: Pushes FibreFlow status updates to QContact
  *
- * The Velocity user account does not have permissions to modify cases in QContact.
- * This function returns empty results immediately.
- *
- * @param request - Sync request options (ignored)
- * @returns Empty sync result
+ * @param request - Sync request options
+ * @returns Sync result with outbound stats
  */
 export async function runOutboundOnlySync(
   request: FullSyncRequest
 ): Promise<FullSyncResult> {
   const started_at = new Date();
 
-  logger.warn('Outbound sync is DISABLED - Velocity user has limited QContact permissions', request);
+  logger.info('Starting outbound-only sync', request);
 
-  // Return empty result immediately - outbound is disabled
-  const completed_at = new Date();
+  try {
+    const outboundTickets = await fetchTicketsForOutboundSync(request);
+    const { stats: outboundStats, errors: outboundErrors } = await processOutboundSync(outboundTickets);
 
-  return {
-    started_at,
-    completed_at,
-    duration_seconds: 0,
-    inbound_stats: createEmptyStats(),
-    outbound_stats: createEmptyStats(),
-    total_success: 0,
-    total_failed: 0,
-    success_rate: 0,
-    errors: [{
-      ticket_id: null,
-      error_type: 'disabled',
-      message: 'Outbound sync is disabled. The Velocity user account does not have permissions to modify cases in QContact.',
-      timestamp: new Date(),
-      recoverable: false,
-    }],
-  };
+    const completed_at = new Date();
+    const duration_seconds =
+      (completed_at.getTime() - started_at.getTime()) / 1000;
+
+    const success_rate = calculateSyncSuccessRate(
+      outboundStats.successful,
+      outboundStats.failed
+    );
+
+    const result: FullSyncResult = {
+      started_at,
+      completed_at,
+      duration_seconds,
+      inbound_stats: createEmptyStats(),
+      outbound_stats: outboundStats,
+      total_success: outboundStats.successful,
+      total_failed: outboundStats.failed,
+      success_rate,
+      errors: outboundErrors,
+    };
+
+    logger.info('Outbound-only sync completed', {
+      duration_seconds: result.duration_seconds,
+      total_success: result.total_success,
+      total_failed: result.total_failed,
+      success_rate: result.success_rate,
+    });
+
+    // Log sync summary
+    const syncStatus = result.total_failed > 0
+      ? (result.total_success > 0 ? SyncStatus.PARTIAL : SyncStatus.FAILED)
+      : SyncStatus.SUCCESS;
+    await logSyncSummary(SyncDirection.OUTBOUND, syncStatus, result);
+
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    logger.error('Outbound-only sync failed', {
+      error: errorMessage,
+    });
+
+    throw error;
+  }
 }
 
 /**

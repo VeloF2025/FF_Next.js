@@ -1,6 +1,94 @@
 # WA Monitor: ACK Message Troubleshooting
 
+## Bridge Reliability Fixes (2026-02-10)
+
+### Investigation: DR474666 Missing Acknowledgment
+
+**Root Cause:** Google Sheets write error (Mamelodi project had no tab configured) cascaded into 500 error on `/api/activate/dr-acknowledgment`, causing bridge to exit without sending ack.
+
+**Secondary Issue:** Dedup TTL (10 min) blocked legitimate resubmission acks (e.g., DR1730948 blocked after 2m20s).
+
+### Three Fixes Deployed
+
+**1. Ack Retry Logic** (`main.go` - `sendDRAcknowledgment()`)
+```go
+// Previously: single attempt, exit on any error
+// Now: 3 attempts with exponential backoff (2s, 4s, 8s)
+```
+- Logs `[ACK RETRY X/3]` on failed attempts
+- Logs `[ACK FAILED]` after all retries exhausted
+- Handles transient errors: Cloudflare 530/520, temporary 500s, Neon timeouts
+
+**2. Google Sheets Removal** (`main.go`)
+- Removed all 3 Sheets call sites:
+  - `writeToGoogleSheets()` after new DR processing
+  - `updateSheetsForResubmission()` on resubmissions
+  - `checkRecentCompletions()` in receipt handler
+- Root cause of DR474666: Sheets error → API 500 → no ack
+- Functions still exist as dead code, just not called
+
+**3. Dedup TTL Reduction** (`sender_proxy.go`)
+```go
+// Changed from: msgCacheTTL = 10 * time.Minute
+// Changed to:   msgCacheTTL = 90 * time.Second
+```
+- Prevents infinite loops while allowing genuine resubmissions
+- Fixes: DR1730948 blocked after only 2m20s with 10min TTL
+
+### Weekly Stats (Feb 3-10, 2026)
+- **13 real DRs** missed acks (excluding DR474666 now fixed)
+- **Causes:** Cloudflare 530/520 (5), Server 500 (2), No ack/not on 1Map (6)
+- **Projects:** Mamelodi (5), Lawley (6), Mohadin (2)
+- **44 additional failures** were invalid DR numbers (WhatsApp typos)
+
+### Bridge Deployment Notes
+1. **ALWAYS stop service before copying binary** (Text file busy error)
+2. **Bridge log has no date stamps** - cross-reference with `qa_photo_reviews.created_at`
+3. **Manual ack endpoint:** POST to bridge `/send-message` with `group_jid` and `message`
+
+---
+
+## Serial Number Warning Format (2026-02-10)
+
+### Improved Visibility in ACK Messages
+
+**Changes in commit cb8d64c3:**
+- **Mismatch warnings:** Changed from subtle `⚠️` to bold `🔴 *MISMATCH:*` with 1Map vs Sticker comparison
+- **Missing serials:** Now show `🔴 *NOT SCANNED*` instead of subtle warning emoji
+- **Duplicate detection:** Checks if same ONT/UPS serial used on multiple DRs (parallel with photo polling, 0ms latency)
+
+### Warning Format Examples
+```
+🔴 *MISMATCH: ONT*
+1Map: ZTEM12345678
+Sticker: ZTEM87654321
+
+🔴 *NOT SCANNED: UPS*
+Serial sticker not visible
+
+🔴 *DUPLICATE SERIAL: ONT*
+ZTEM12345678 also on DR123456, DR234567
+```
+
+### Implementation Notes
+- `checkDuplicateSerials()` queries `dr_photo_unified_reviews` with case-insensitive UPPER() lookups
+- `buildSerialWarningLines()` shared helper for both new DRs and resubmissions
+- Migration 174: Added 3 indexes on `UPPER(ont_serial_scanned)`, `UPPER(ups_serial_scanned)`, `UPPER(oes_serial)` for performance
+- Duplicate info included in JSON response (`duplicateSerials` field) - Go Bridge ignores unknown fields
+
+### Database Indexes
+```sql
+-- Migration 174
+CREATE INDEX idx_dr_unified_ont_upper ON dr_photo_unified_reviews (UPPER(ont_serial_scanned));
+CREATE INDEX idx_dr_unified_ups_upper ON dr_photo_unified_reviews (UPPER(ups_serial_scanned));
+CREATE INDEX idx_dr_unified_oes_upper ON dr_photo_unified_reviews (UPPER(oes_serial));
+```
+
+---
+
 ## Error Code 1033 - Neon Database Timeout
+
+**Update (Feb 2026):** Bridge now auto-retries with exponential backoff. If all 3 retries fail, follow manual steps below.
 
 ### Symptoms
 - Bridge logs show: `[ACK WARN] Acknowledgment API returned 530 for DR123456: error code: 1033`

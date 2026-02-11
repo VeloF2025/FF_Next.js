@@ -15,7 +15,7 @@ pdf_options:
     <section>
       <div class="header-line">
         <span style="color: #023047; font-weight: 600;">VELOCITY FIBRE</span>
-        <span>FibreFlow — Complete User Manual v1.2</span>
+        <span>FibreFlow — Complete User Manual v1.3</span>
       </div>
     </section>
   footerTemplate: |-
@@ -166,8 +166,8 @@ css: |-
 <hr class="cover-divider" />
 
 <div class="cover-meta">
-<strong>Version:</strong> 1.2<br/>
-<strong>Last Updated:</strong> 10 February 2026<br/>
+<strong>Version:</strong> 1.3<br/>
+<strong>Last Updated:</strong> 11 February 2026<br/>
 <strong>Application:</strong> FibreFlow (fibreflow.app)<br/>
 <strong>Scope:</strong> All Modules<br/>
 <strong>Classification:</strong> Internal Use
@@ -394,6 +394,25 @@ The Meetings module integrates with Fireflies.ai to automatically sync meeting t
   - Participants list
   - Duration and date
 
+#### Enhanced Participant Tracking **(NEW)**
+
+FibreFlow now uses improved participant matching for better accuracy:
+
+- **Fireflies Speakers Data** — Uses speakers data from Fireflies for more accurate participant tracking
+  - Identifies participants by their actual speaking contributions
+  - Reduces false positives from attendees who didn't participate
+  - Better handles multi-organization meetings
+
+- **Enhanced Attendee Display** — Improved attendee list in Communications portal:
+  - Clear distinction between active speakers and passive attendees
+  - Accurate participant counts
+  - Better handling of external attendees
+
+- **Non-Admin User Matching** — Improved participant matching for non-admin users:
+  - Uses name matching when email matching fails
+  - Handles variations in name format (First Last, Last First, etc.)
+  - More reliable access control for regular users
+
 #### Meeting Detail Modal
 
 | Section | Content |
@@ -402,7 +421,9 @@ The Meetings module integrates with Fireflies.ai to automatically sync meeting t
 | **Keywords** | Key topics discussed |
 | **Action Items** | Tasks identified from the conversation |
 | **Outline** | Structured breakdown of the meeting |
-| **Participants** | List of attendees |
+| **Participants** | List of attendees with speaker identification |
+
+> **Tip:** If you attended a meeting but it's not showing up, check that your name or email in FibreFlow matches what was recorded in Fireflies. Contact your administrator to update your profile if needed.
 
 ### 2.3 Action Items
 
@@ -748,12 +769,39 @@ For each step:
 - Approve or flag issues
 - Re-assign photos to different steps if AI categorization was incorrect
 
-#### Phase 3: Data Validation
+#### Phase 3: Data Validation **(ENHANCED)**
 
-Validates extracted data:
+Validates extracted data with enhanced duplicate detection:
+
 - **Power meter reading** — Must be between -18 and -24 dBm
 - **ONT serial** — Extracted serial matches expected format (ALCL prefix)
 - **DR number** — Matches the submission
+
+**Duplicate Serial Detection (NEW):**
+
+The system now performs comprehensive serial validation during DR acknowledgment:
+
+- **Duplicate Detection** — Automatically detects when an ONT or UPS serial is already used on another DR
+  - Displays bold warning with 🔴 formatting
+  - Names the conflicting DR number (e.g., "Already used on DR1234567")
+  - Prevents accidental duplicate activations
+
+- **Serial Mismatch Warnings** — Compares 1Map data to sticker photo readings:
+  - 🔴 **Bold red warnings** when serials don't match between sources
+  - Helps identify data entry errors or incorrect equipment
+  - Flags discrepancies for immediate resolution
+
+- **Missing Serial Prompts** — Clear indicators for incomplete data:
+  - **"NOT SCANNED"** labels shown when serial is missing from photos
+  - Prompts technician to capture required serial photos
+  - Prevents QA approval until all serials are validated
+
+- **Real-Time Validation** — All checks run automatically during DR acknowledgment workflow
+  - No manual checking required
+  - Immediate feedback to QA reviewer
+  - Reduces activation errors and rework
+
+> **Tip:** When you see a duplicate serial warning, investigate immediately. The serial may have been entered incorrectly, or equipment may have been swapped between installations.
 
 #### Phase 4: Final Decision
 
@@ -780,7 +828,7 @@ Generate and send feedback to the field installer:
 - Includes specific issues to address
 - Tracks acknowledgment status
 
-### 4.4 PP Data Management **(NEW)**
+### 4.4 PP Data Management **(ENHANCED)**
 
 PP Data (Pre-Provisioned ONT Data) manages ONTs that are pre-registered in the system before activation.
 
@@ -789,9 +837,27 @@ PP Data (Pre-Provisioned ONT Data) manages ONTs that are pre-registered in the s
 #### Features
 
 - **Auto-Import** — PP Data is automatically extracted from OES Excel file imports (PP DATA sheet)
-- **Resolution** — Match pre-provisioned ONT serials to actual installations via:
-  - **Local Scan** — Search against FibreFlow's local activation data
+- **Enhanced Resolution** — Match pre-provisioned ONT serials to actual installations via:
+  - **Local Scan (12 Sources)** — Expanded from 3 to **12 local data sources** for comprehensive serial matching:
+    - OES activation records
+    - DR submissions
+    - Photo review data
+    - 1Map sync records
+    - QField captures
+    - Maintenance tickets
+    - PP Data imports
+    - OLT reports
+    - Historical activations
+    - Cross-project matches
+    - UPS serial tracking
+    - Serial correction logs
   - **1Map Lookup** — Bulk lookup against 1Map API for drop assignments
+  - **Live Progress Tracking** — Real-time progress indicators during 1Map serial lookups:
+    - Progress bar showing current/total lookups
+    - Percentage completion
+    - Estimated time remaining
+    - Success/failure counts during processing
+
 - **Status Tracking** — Track resolution status:
   - **Unresolved** — Serial not yet matched to a drop
   - **OES Match** — Matched via OES activation data
@@ -813,6 +879,23 @@ Export PP Data with project and status filters:
 - Apply project and status filters
 - Click **Export Excel** to download filtered data
 - Includes all resolution details and timestamps
+
+#### Create Maintenance Tickets **(NEW)**
+
+Unresolved PP Data records can now be converted directly into maintenance tickets:
+
+1. Navigate to the **PP Data** tab
+2. Filter to show **Unresolved** records
+3. Select records that require investigation
+4. Click **Create Maintenance Ticket**
+5. The system creates a ticket with:
+   - Serial number details
+   - Project context
+   - PP Data import information
+   - Priority level based on age of record
+6. Technicians can investigate and resolve the discrepancy
+
+> **Tip:** Use the expanded local data sources to resolve more PP Data records without relying on 1Map lookups. The system now checks 12 different sources automatically before marking a record as unresolved.
 
 ### 4.5 VLM AI Integration
 
@@ -904,7 +987,7 @@ The dashboard provides comprehensive statistics:
 4. **Escalation** — Complex cases can be escalated to supervisors
 5. **WhatsApp Notifications** — Automatic notifications sent to field teams about rejections
 
-#### My Queue Tab
+#### My Queue Tab **(ENHANCED)**
 
 Personalized queue for assigned reviewers:
 - **Assigned Photos** — Photos specifically assigned to the current user
@@ -912,13 +995,21 @@ Personalized queue for assigned reviewers:
 - **Due Date Tracking** — Visual indicators for approaching deadlines
 - **Quick Actions** — Approve, reject, or request more info with one click
 
-#### All Photos Tab
+#### All Photos Tab **(ENHANCED)**
 
 System-wide photo management:
 - **Comprehensive Search** — Search by project, pole number, work type, or status
 - **Advanced Filters** — Filter by validation status, confidence score, date range
-- **Bulk Assignment** — Assign multiple photos to reviewers
-- **Pole Number Mapping** — Photos linked to specific pole locations for geographic context
+- **Enhanced Bulk Assignment** — Assign multiple photos to reviewers with:
+  - **Due Date Selection** — Set due dates for assigned photos
+  - **Priority Levels** — Choose priority (Low, Medium, High, Urgent) for assignments
+  - **Batch Processing** — Assign multiple photos simultaneously with same criteria
+  - **Assignment Preview** — Review assignments before confirming
+- **Pole Number Mapping** — Photos linked to specific pole locations for geographic context:
+  - **Enhanced Pole Display** — Improved pole number visibility on photo cards
+  - **Photo-to-Pole Association** — Automatic mapping of photos to pole numbers from QField data
+  - **Geographic Context** — View pole locations on project maps
+  - **Pole-Based Filtering** — Filter photos by specific pole numbers for targeted review
 
 #### Photo Detail Modal
 
@@ -1480,6 +1571,13 @@ The daily/weekly vehicle inspection system with VLM-powered features and manager
 
 #### New Features
 
+- **Fuel Gauge Photo Scanning (NEW)** — VLM-powered automatic fuel level detection:
+  - **Dashboard Photo Capture** — Upload a photo of the vehicle dashboard during fuel fill-up
+  - **AI Fuel Extraction** — VLM automatically reads fuel gauge percentage from the dashboard photo
+  - **Visual Verification** — Review extracted fuel level before confirming
+  - **Manual Override** — Adjust AI reading if needed for accuracy
+  - **Integrated Workflow** — Fuel gauge reading captured alongside odometer during fill-up
+
 - **Odometer Photo Capture** — VLM extraction of odometer readings from photos during fuel fill-up
 - **Admin Delete** — Administrators can delete fuel transactions
 - **Recalculated L/100km** — Fuel efficiency automatically recalculated after transaction changes
@@ -1490,8 +1588,32 @@ The daily/weekly vehicle inspection system with VLM-powered features and manager
 
 - **Fuel Transactions** — Record fuel purchases with receipt scanning
 - **Fuel Summary** — Total fuel spend by vehicle, driver, and period
-- **Anomaly Detection** — System flags unusual fuel consumption patterns
-- **Fuel Level Tracking** — Historical fuel levels from check-in data
+- **Anomaly Detection** — System flags unusual fuel consumption patterns based on:
+  - Fuel gauge readings vs. liters filled
+  - Expected vs. actual consumption rates
+  - Unusual fill-up patterns
+- **Fuel Level Tracking** — Historical fuel levels from:
+  - Check-in data
+  - Fuel gauge photo scans
+  - Manual entries
+
+#### Fuel Fill-Up Process with Gauge Scanning
+
+1. Navigate to **Fleet Portal** or **Fuel** tab
+2. Click **Record Fuel Fill-Up**
+3. Upload **Dashboard Photo** (showing fuel gauge and odometer)
+4. VLM automatically extracts:
+   - **Fuel Gauge Level** — Current tank level percentage (0-100%)
+   - **Odometer Reading** — Current vehicle mileage
+5. Review and adjust extracted values if needed
+6. Upload **Receipt Photo** for cost scanning
+7. Enter or verify:
+   - Liters filled
+   - Cost per liter
+   - Total cost
+8. Submit transaction
+
+> **Tip:** Take dashboard photos from directly in front of the gauge for best AI accuracy. Ensure the fuel gauge needle and odometer numbers are clearly visible and well-lit.
 
 ### 9.6 Fleet Maintenance
 
@@ -1786,6 +1908,67 @@ A collection of PDF manipulation tools:
 - Rotate pages
 - Add watermarks
 
+### 12.4 Help Center & AI Chat Assistant **(NEW)**
+
+FibreFlow includes a comprehensive Help Center with an AI-powered chat assistant to provide instant support and documentation access.
+
+**Navigation:** Sidebar → **Communications** → **Help Center**
+
+![Help Center](../screenshots/complete/36-help-center.png)
+*Figure 12.3: Help Center showing searchable documentation with AI Chat Widget*
+
+#### Features
+
+**Searchable Documentation:**
+- **Table of Contents Sidebar** — Navigate documentation sections easily with an organized sidebar
+- **Full-Text Search** — Find answers quickly by searching across all help articles
+- **Module-Specific Guides** — Detailed documentation organized by FibreFlow module
+- **Step-by-Step Tutorials** — Visual walkthroughs with screenshots for common tasks
+- **FAQ Section** — Frequently asked questions with quick answers
+
+**AI Chat Widget:**
+The floating chat button is available on every page in FibreFlow, providing instant AI assistance:
+
+- **Always Available** — Accessible from any page via the floating chat icon
+- **Topic-Scoped Conversations** — Choose from 13 specialized topics:
+  - Dashboard
+  - Projects
+  - Activate
+  - Fleet
+  - Maintenance
+  - Procurement
+  - Assets
+  - HR
+  - Analytics
+  - Communications
+  - QField QA
+  - System Administration
+  - General Help
+
+- **Quick Question Suggestions** — Each topic includes pre-configured quick questions relevant to that area
+- **Multi-Turn Conversations** — Ask follow-up questions to dive deeper into topics
+- **Conversation History** — Review previous questions and answers within the current session
+- **Context-Aware Responses** — AI understands FibreFlow terminology and workflows
+
+#### Using the AI Chat Assistant
+
+1. **Access the Chat** — Click the floating chat icon (visible on all pages)
+2. **Select Topic** — Choose the relevant topic from the dropdown (e.g., "Activate" for QA questions)
+3. **Ask Your Question** — Type your question or click a suggested quick question
+4. **Review Response** — The AI provides detailed answers with references to documentation
+5. **Follow Up** — Ask clarifying questions to get more specific information
+6. **Switch Topics** — Change topics anytime to get help with different modules
+
+> **Tip:** The AI Chat Assistant is trained on FibreFlow documentation and can help with navigation, feature explanations, troubleshooting, and best practices.
+
+#### Access Control
+
+- **Available to All Roles** — The Help Center and AI Chat are accessible to all users regardless of role
+- **Role-Appropriate Answers** — The AI tailors responses based on your role and permissions
+- **No Sensitive Data** — The chat assistant focuses on help documentation and does not access your project data
+
+> **Important:** While the AI Chat Assistant is very helpful, it provides guidance based on documentation. For system-specific issues or data problems, contact your system administrator.
+
 ---
 
 ## 13. System Administration
@@ -1835,25 +2018,77 @@ Data Sync now uses **granular tab-level permissions**:
 
 #### OLT Report (Enhanced Feature)
 
-The OLT Report tool manages ONT serial number corrections with improved functionality:
+The OLT Report tool manages ONT serial number corrections with comprehensive enhancements:
 
 1. **Import OLT mismatch report** (Excel)
 2. **View mismatched records** (wrong serial in 1Map)
 3. **Auto-fix** — System corrects serials in 1Map via API with:
-   - Cross-DR conflict detection
-   - UPS transfer capabilities
-   - Photo synchronization after fixes
-   - Investigation context cards
+   - **Cross-DR Conflict Detection** — Identifies when fixing one DR would create conflicts with other DRs
+   - **Swap Feature UI** — Visual interface for swapping serials between conflicting DRs:
+     - Shows both DRs involved in the conflict
+     - Preview of proposed swap
+     - One-click swap execution
+     - Automatic validation after swap
+   - **UPS Transfer Capabilities** — Transfer UPS equipment between DRs:
+     - Identify UPS misplacements
+     - Transfer UPS to correct DR
+     - Automatic photo re-sync after UPS transfer
+     - Validation of UPS serial uniqueness
+   - **Photo Synchronization** — Photos automatically re-synced after serial fixes:
+     - ONT photos transferred to correct DR
+     - UPS photos moved with UPS transfers
+     - Photo metadata updated
+     - Maintains photo audit trail
+   - **Investigation Context Cards** — Rich contextual information for troubleshooting
+
 4. **Enhanced Investigation** — Detailed investigation workflow with:
-   - Collapsible context cards
-   - Status mismatch detection
-   - Photo copying between DRs
-   - Live match/mismatch counts
-5. **Reporting** — Comprehensive reporting with:
-   - CSV export for all sub-tabs
-   - Date filters for statistics
-   - Clickable status filters
-   - Displaced ONT tracking
+   - **Collapsible Context Cards** — Expandable information panels for:
+     - DR details
+     - Serial history
+     - Photo timeline
+     - Related conflicts
+   - **Status Mismatch Detection** — Identifies discrepancies between:
+     - OLT report status
+     - 1Map activation status
+     - FibreFlow DR status
+   - **Photo Copying Between DRs** — Transfer photos when equipment is reassigned:
+     - Smart photo selection
+     - Metadata preservation
+     - Audit trail maintained
+   - **Live Match/Mismatch Counts** — Real-time statistics during investigation:
+     - Total records processed
+     - Matches found
+     - Mismatches identified
+     - Conflicts detected
+
+5. **Comprehensive Reporting** — Enhanced reporting capabilities:
+   - **CSV Export for All Sub-Tabs**:
+     - Mismatches tab export
+     - Conflicts tab export
+     - Displaced ONTs export
+     - Investigation history export
+     - Custom field selection
+   - **Date Filters for Statistics Cards**:
+     - Filter stats by date range
+     - Compare periods
+     - Trend analysis
+   - **Clickable Status Filters on Stats Cards**:
+     - Click any stat card to filter the list
+     - Quick filtering by status
+     - Combined filter support
+   - **Sub-Status Filter on Investigate Tab**:
+     - Filter by specific sub-status (e.g., "Pending Swap", "Photo Sync Required")
+     - Advanced filtering for complex investigations
+   - **Smart Displaced Badges**:
+     - Visual indicators for displaced ONTs
+     - Color-coded by displacement severity
+     - Quick identification of problematic records
+   - **Displaced ONT Tracking**:
+     - Dedicated tracking for ONTs found in wrong locations
+     - History of displacement events
+     - Resolution workflow
+
+> **Important:** When swapping serials between DRs, always verify the photos are transferred correctly. The system automatically handles photo re-sync, but visual confirmation is recommended for critical installations.
 
 ### 13.3 VLM Learning **(NEW)**
 
@@ -1925,11 +2160,57 @@ Users can customize their sidebar by:
 
 ## 14. Appendices
 
-### Appendix A: What's New in Version 1.2
+### Appendix A: What's New in Version 1.3
 
-This section summarizes the major changes and new features since version 1.1 (February 2, 2026).
+This section summarizes the major changes and new features since version 1.2 (February 10, 2026).
 
-#### New Features
+#### New Features (Version 1.3)
+
+| Feature | Module | Description |
+|---------|--------|-------------|
+| **Help Center & AI Chat** | Communications | Searchable documentation with AI chat assistant, 13 topic categories, multi-turn conversations |
+| **Duplicate Serial Detection** | Activate | Auto-detect duplicate ONT/UPS serials, bold mismatch warnings, missing serial prompts |
+| **Fireflies Speakers Integration** | Communications | Enhanced participant tracking using Fireflies speakers data |
+| **PP Data Enhancements** | Activate | 12 local data sources (up from 3), maintenance ticket creation, live progress tracking |
+| **QField Bulk Assignment** | Field Operations | Due dates and priority levels for bulk photo assignments |
+| **Fuel Gauge Scanning** | Fleet | VLM extraction of fuel percentage from dashboard photos |
+| **OLT Report Enhancements** | System | Cross-DR swap UI, UPS transfers, CSV exports, clickable filters, displaced badges |
+
+#### Enhanced Features (Version 1.3)
+
+- **Meetings Participant Matching** — Improved name-based matching for non-admin users
+- **Enhanced Attendee Display** — Better participant lists in Communications portal
+- **Pole Number Display** — Improved pole number visibility on QField QA photo cards
+- **Photo-to-Pole Mapping** — Automatic geographic context for field photos
+- **Tank Level Field** — Added to portal fuel fill-up form with gauge integration
+- **Sub-Status Filters** — Investigation tab filtering by sub-status
+- **Live Progress Tracking** — Real-time progress bars during 1Map serial lookups
+
+#### User Interface Improvements (Version 1.3)
+
+- **AI Chat Widget** — Floating chat button available on all pages
+- **Help Center Sidebar** — Table of contents navigation for documentation
+- **Enhanced Warning Display** — Bold 🔴 formatting for critical serial mismatches
+- **Collapsible Context Cards** — Expandable panels in OLT investigation
+- **Smart Displaced Badges** — Color-coded severity indicators for displaced ONTs
+- **Clickable Status Cards** — Click statistics cards to filter lists
+
+#### System Enhancements (Version 1.3)
+
+- **12 PP Data Sources** — Expanded from 3 to 12 local serial matching sources
+- **Photo Re-Sync** — Automatic photo synchronization after OLT fixes and UPS transfers
+- **Cross-DR Conflict Detection** — Identifies serial swap conflicts before execution
+- **CSV Export for All OLT Tabs** — Comprehensive export capabilities
+- **Date-Filtered Statistics** — OLT report stats with date range filtering
+- **Real-Time Validation** — Duplicate detection during DR acknowledgment workflow
+
+---
+
+### Appendix A.1: What's New in Version 1.2
+
+Version 1.2 changes (February 10, 2026):
+
+#### New Features (Version 1.2)
 
 | Feature | Module | Description |
 |---------|--------|-------------|
@@ -1943,7 +2224,7 @@ This section summarizes the major changes and new features since version 1.1 (Fe
 | **Meetings Integration** | Communications | Meetings merged into Communications Portal |
 | **Fleet Enhancements** | Fleet | Manager visibility for check-ins, enhanced OCR |
 
-#### User Interface Improvements
+#### User Interface Improvements (Version 1.2)
 
 - **Mobile Responsive Design** — 28 files updated for mobile readiness
 - **Dark Theme Conversions** — Multiple modules converted to dark theme
@@ -1951,7 +2232,7 @@ This section summarizes the major changes and new features since version 1.1 (Fe
 - **Enhanced Navigation** — Field Operations section added
 - **Simplified Staff Creation** — Name, email, phone only with auto-generated IDs
 
-#### System Enhancements
+#### System Enhancements (Version 1.2)
 
 - **Master Build Agreement** — Renamed from Master Service Agreement
 - **Excel Export Filters** — PP Data export with project/status filters
@@ -2078,10 +2359,12 @@ This section summarizes the major changes and new features since version 1.1 (Fe
 | **HR** | Import errors | Check CSV formatting. Required fields: first_name, last_name, email. |
 | **HR** | Missing staff tabs | Check granular permissions. User may not have access to specific tabs. |
 | **Communications** | Meetings not showing | Check participant access. Users only see meetings they attended. |
+| **Communications** | AI Chat not responding | Refresh page. Check internet connection. AI Chat requires active connection. |
+| **Communications** | Help Center search not working | Try different keywords. Use topic filter. Some content may be recently added. |
 | **System** | Data Sync tabs missing | Check granular permissions. Loading spinner indicates permission check. |
 
 ---
 
 *This manual is maintained by the Velocity Fibre development team. For questions, corrections, or feature requests, contact the system administrator.*
 
-*Document generated: 10 February 2026*
+*Document generated: 11 February 2026*

@@ -249,19 +249,25 @@ ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 # Bridge on VPS (72.61.197.178)
 ssh root@72.61.197.178
 systemctl status whatsapp-bridge
-systemctl restart whatsapp-bridge
 tail -f /opt/whatsapp-bridge/bridge.log
+
+# CRITICAL: Stop service BEFORE copying binary (Text file busy error if running)
+systemctl stop whatsapp-bridge
+# ... copy new binary ...
+systemctl start whatsapp-bridge
 
 # Bridge source on Velocity (100.96.203.105)
 sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
 cd /home/louis/whatsapp-bridge-go
-# Edit main.go, then compile:
-go build -o whatsapp-bridge .
+# Edit main.go or sender_proxy.go, then compile:
+go build -o whatsapp-bridge-new .
 
 # Deploy binary (relay via local machine — servers can't SSH to each other)
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/
-scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/
-ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
+scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
+
+# Deploy on VPS (MUST stop service first)
+ssh root@72.61.197.178 "systemctl stop whatsapp-bridge && mv /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup && mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge && chmod +x /opt/whatsapp-bridge/whatsapp-bridge && systemctl start whatsapp-bridge"
 ```
 
 ### Delete Sent Messages
@@ -428,6 +434,34 @@ All components use semi-transparent dark-compatible colors:
 - Error boxes: `bg-red-500/10 border border-red-500/30 text-red-400`
 - Phone badges: CSS variables (`--ff-bg-tertiary`, `--ff-text-secondary`)
 
+## Bridge Reliability Enhancements (2026-02-10)
+
+### Three Fixes Deployed
+
+**1. Ack Retry Logic** (`main.go` - `sendDRAcknowledgment()`)
+- 3 retry attempts with exponential backoff (2s, 4s, 8s)
+- Logs `[ACK RETRY X/3]` on failed attempts, `[ACK FAILED]` after exhaustion
+- Fixes: Transient API errors (Cloudflare 530/520, temporary 500s)
+
+**2. Google Sheets Removal** (`main.go`)
+- Removed all 3 Sheets call sites (new DR, resubmission, receipt handler)
+- Root cause of DR474666: Sheets error (no tab configured) → API 500 → no ack
+- Functions still exist as dead code, just not called
+
+**3. Dedup TTL Reduction** (`sender_proxy.go`)
+- Changed `msgCacheTTL` from 10 minutes → 90 seconds
+- Fixes: Legitimate resubmission acks blocked (e.g., DR1730948 blocked after 2m20s)
+- Still prevents infinite loops while allowing genuine resubmissions
+
+### Bridge Log Notes
+- **No date stamps** - cross-reference with `qa_photo_reviews.created_at` for date ranges
+- Logs at `/opt/whatsapp-bridge/bridge.log` on VPS
+
+### Key Bridge Files
+- Source: `/home/louis/whatsapp-bridge-go/main.go` (Velocity)
+- Sender proxy: `/home/louis/whatsapp-bridge-go/sender_proxy.go` (Velocity)
+- Binary: `/opt/whatsapp-bridge/whatsapp-bridge` (VPS)
+
 ## Troubleshooting Quick Reference
 
 ### Error Code 1033 (Neon Timeout)
@@ -435,6 +469,7 @@ When logs show `[ACK WARN] Acknowledgment API returned 530: error code: 1033`:
 1. **Cause**: Transient Neon PostgreSQL timeout
 2. **Fix**: Restart services: `ssh root@72.61.197.178 "systemctl restart whatsapp-sender whatsapp-bridge"`
 3. **Manual acks**: See `.claude/knowledge-base/wa-monitor/troubleshooting-acks.md`
+4. **Now auto-retries**: Bridge now retries 3 times with exponential backoff (Feb 2026)
 
 ### WA Sender Endpoint (Port 8081)
 ```bash

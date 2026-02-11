@@ -731,6 +731,70 @@ export class FiberTimeQContactClient {
   }
 
   /**
+   * Update a case in QContact (status, fields, etc.)
+   * 🟢 WORKING: PATCH on /api/v2/entities/Case/{id}
+   *
+   * @param caseId - QContact case ID (external_id)
+   * @param fields - Fields to update (e.g. { status: 'Solved' })
+   * @returns Updated case data or error
+   */
+  async updateCase(
+    caseId: string | number,
+    fields: Record<string, unknown>
+  ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+    try {
+      logger.info('Updating QContact case', { caseId, fields: Object.keys(fields) });
+
+      const url = `${this.baseUrl}/api/v2/entities/Case/${caseId}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fields),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle 401 - try to re-authenticate
+      if (response.status === 401 && this.password) {
+        logger.warn('QContact API returned 401 on updateCase, attempting auto-refresh');
+        const authSuccess = await this.authenticate();
+        if (authSuccess) {
+          return this.updateCase(caseId, fields);
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('Failed to update QContact case', {
+          caseId,
+          status: response.status,
+          error: errorText.substring(0, 200),
+        });
+        return {
+          success: false,
+          error: `QContact API error ${response.status}: ${errorText.substring(0, 200)}`,
+        };
+      }
+
+      const data = await response.json();
+      logger.info('QContact case updated successfully', { caseId });
+      return { success: true, data };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Error updating QContact case', { caseId, error: errorMessage });
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
    * Add a note to a case
    * ⚠️ BLOCKED: QContact Note creation requires elevated permissions
    *

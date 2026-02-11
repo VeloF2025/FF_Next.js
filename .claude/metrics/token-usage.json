@@ -761,69 +761,128 @@
     "b928a98f-ba69-4618-bc8e-50672cd48491": {
       "session_id": "b928a98f-ba69-4618-bc8e-50672cd48491",
       "started_at": "2026-02-10T09:44:59.355Z",
-      "total_input_tokens": 16057,
+      "total_input_tokens": 22992,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.048171,
-      "tool_calls": 132,
+      "total_cost_usd": 0.068976,
+      "tool_calls": 194,
       "tools_used": {
-        "Read": 13,
-        "Glob": 2,
-        "Grep": 6,
+        "Read": 31,
+        "Glob": 10,
+        "Grep": 23,
         "TaskCreate": 1,
         "TaskUpdate": 2,
         "Write": 4,
-        "Edit": 13,
-        "Bash": 26,
+        "Edit": 15,
+        "Bash": 39,
         "mcp__claude-in-chrome__tabs_context_mcp": 1,
         "mcp__claude-in-chrome__navigate": 3,
         "mcp__claude-in-chrome__computer": 48,
         "mcp__claude-in-chrome__find": 3,
         "mcp__claude-in-chrome__read_console_messages": 1,
         "mcp__claude-in-chrome__read_network_requests": 3,
-        "mcp__claude-in-chrome__javascript_tool": 6
+        "mcp__claude-in-chrome__javascript_tool": 6,
+        "Task": 1,
+        "TaskOutput": 3
       }
     },
     "7a602475-1541-4999-8765-3d9a382376cf": {
       "session_id": "7a602475-1541-4999-8765-3d9a382376cf",
       "started_at": "2026-02-10T12:06:59.192Z",
-      "total_input_tokens": 4584,
+      "total_input_tokens": 16754,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.013752,
-      "tool_calls": 60,
+      "total_cost_usd": 0.05026200000000005,
+      "tool_calls": 251,
       "tools_used": {
         "Glob": 3,
-        "Grep": 3,
-        "Read": 34,
-        "Bash": 8,
+        "Grep": 12,
+        "Read": 46,
+        "Bash": 72,
         "Task": 1,
-        "Edit": 11
+        "Edit": 20,
+        "mcp__claude-in-chrome__tabs_context_mcp": 3,
+        "mcp__claude-in-chrome__tabs_create_mcp": 2,
+        "mcp__claude-in-chrome__navigate": 7,
+        "mcp__claude-in-chrome__computer": 64,
+        "mcp__claude-in-chrome__find": 6,
+        "mcp__claude-in-chrome__javascript_tool": 5,
+        "mcp__claude-in-chrome__read_console_messages": 4,
+        "Write": 2,
+        "TaskOutput": 3,
+        "Skill": 1
       }
     },
     "ca9e087d-f54e-4c11-8c35-6eadda788bb0": {
       "session_id": "ca9e087d-f54e-4c11-8c35-6eadda788bb0",
       "started_at": "2026-02-10T13:38:32.770Z",
-      "total_input_tokens": 10175,
+      "total_input_tokens": 18682,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.030525,
-      "tool_calls": 97,
+      "total_cost_usd": 0.056046000000000006,
+      "tool_calls": 198,
       "tools_used": {
-        "Read": 7,
-        "Bash": 82,
-        "Glob": 3,
-        "Grep": 1,
-        "Task": 3,
-        "AskUserQuestion": 1
+        "Read": 45,
+        "Bash": 111,
+        "Glob": 8,
+        "Grep": 19,
+        "Task": 7,
+        "AskUserQuestion": 1,
+        "Edit": 4,
+        "Write": 2,
+        "EnterPlanMode": 1
       }
     },
     "3d7110ef-853d-4e2a-b81e-0a7b2c34b55a": {
       "session_id": "3d7110ef-853d-4e2a-b81e-0a7b2c34b55a",
       "started_at": "2026-02-10T14:44:25.312Z",
-      "total_input_tokens": 640,
+      "total_input_tokens": 7643,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.0019199999999999998,
-      "tool_calls": 12,
+      "total_cost_usd": 0.022929000000000005,
+      "tool_calls": 56,
       "tools_used": {
-        "Bash": 12
+        "Bash": 45,
+        "TaskOutput": 3,
+        "AskUserQuestion": 1,
+        "Read": 4,
+        "Write": 3
+      }
+    },
+    "8dca6701-bfee-4fba-9f63-febc45b49fda": {
+      "session_id": "8dca6701-bfee-4fba-9f63-febc45b49fda",
+      "started_at": "2026-02-10T16:10:42.705Z",
+      "total_input_tokens": 38393,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.11517899999999993,
+      "tool_calls": 245,
+      "tools_used": {
+        "Glob": 22,
+        "Read": 69,
+        "Grep": 10,
+        "Write": 11,
+        "Edit": 34,
+        "Bash": 77,
+        "TaskOutput": 10,
+        "Task": 9,
+        "Skill": 1,
+        "AskUserQuestion": 2
+      }
+    },
+    "25fd3c2a-c33f-427d-bc2b-c606df37f4c1": {
+      "session_id": "25fd3c2a-c33f-427d-bc2b-c606df37f4c1",
+      "started_at": "2026-02-11T01:55:32.120Z",
+      "total_input_tokens": 3143,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.009428999999999998,
+      "tool_calls": 37,
+      "tools_used": {
+        "Read": 6,
+        "Bash": 11,
+        "TaskOutput": 2,
+        "TaskStop": 1,
+        "WebFetch": 6,
+        "WebSearch": 4,
+        "Task": 2,
+        "Glob": 2,
+        "Edit": 2,
+        "Skill": 1
       }
     }
   }

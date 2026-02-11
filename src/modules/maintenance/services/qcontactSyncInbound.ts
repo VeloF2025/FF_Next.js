@@ -47,6 +47,45 @@ const logger = createLogger('qcontactSyncInbound');
 // System user ID for automated QContact imports
 const QCONTACT_SYSTEM_USER_ID = 'decb8382-94ed-4e07-94f7-74ad269a5985'; // Admin User
 
+/**
+ * Status precedence for inbound sync - higher number = more advanced
+ * Inbound sync will NOT regress a ticket past resolved/closed
+ * but CAN regress between work-phase statuses (open ↔ assigned ↔ in_progress)
+ */
+const STATUS_PRECEDENCE: Record<string, number> = {
+  open: 0,
+  assigned: 1,
+  in_progress: 2,
+  pending_qa: 3,
+  qa_in_progress: 3,
+  qa_rejected: 2,
+  qa_approved: 4,
+  pending_handover: 5,
+  handed_to_ops: 6,
+  resolved: 7,
+  closed: 8,
+  cancelled: 8,
+};
+
+/**
+ * Check if inbound status should override current FF status
+ * Rules:
+ * - Never regress from resolved/closed/cancelled (precedence >= 7)
+ * - Allow progression to closed from any state
+ * - Allow any changes within work phase (precedence 0-2)
+ */
+function shouldUpdateStatus(currentFFStatus: string, incomingStatus: string): boolean {
+  const currentPrec = STATUS_PRECEDENCE[currentFFStatus] ?? 0;
+  const incomingPrec = STATUS_PRECEDENCE[incomingStatus] ?? 0;
+
+  // Never regress from resolved/closed/cancelled
+  if (currentPrec >= 7 && incomingPrec < currentPrec) {
+    return false;
+  }
+
+  return true;
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -355,6 +394,23 @@ export async function syncSingleInboundTicket(
       const qcUpdatedAt = qcontactTicket.updated_at ? new Date(qcontactTicket.updated_at) : null;
       const qcLoggedDate = qcCreatedAt ? qcCreatedAt.toISOString().split('T')[0] : null;
 
+      // Check current FF status to apply precedence rules
+      const currentTicket = await queryOne<{ status: string }>(
+        'SELECT status FROM maintenance_tickets WHERE id = $1',
+        [existingTicketId]
+      );
+      const currentStatus = currentTicket?.status || 'open';
+      const statusToSet = shouldUpdateStatus(currentStatus, mappedStatus) ? mappedStatus : currentStatus;
+
+      if (statusToSet !== mappedStatus) {
+        logger.info('Status precedence prevented regression', {
+          qcontactTicketId: qcontactTicket.id,
+          currentStatus,
+          incomingStatus: mappedStatus,
+          kept: statusToSet,
+        });
+      }
+
       const updateSql = `
         UPDATE maintenance_tickets
         SET status = $1,
@@ -371,7 +427,7 @@ export async function syncSingleInboundTicket(
       const updateResult = await queryOne<{ id: string; status: string }>(
         updateSql,
         [
-          mappedStatus, mappedType,
+          statusToSet, mappedType,
           qcontactTicket.category || null, qcontactTicket.subcategory || null,
           existingTicketId,
           qcUpdatedAt?.toISOString() || null,
@@ -380,11 +436,12 @@ export async function syncSingleInboundTicket(
         ]
       );
 
-      logger.info('Updated existing ticket status and category', {
+      logger.info('Updated existing ticket', {
         qcontactTicketId: qcontactTicket.id,
         existingTicketId,
         qcontactStatus: qcontactTicket.status,
-        newStatus: mappedStatus,
+        ffStatus: statusToSet,
+        statusProtected: statusToSet !== mappedStatus,
         category: qcontactTicket.category,
         type: mappedType,
       });

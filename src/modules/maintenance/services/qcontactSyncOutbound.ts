@@ -15,7 +15,6 @@
  */
 
 import { queryOne } from '../utils/db';
-import { getDefaultQContactClient } from './qcontactClient';
 import { getDefaultFiberTimeQContactClient } from './fibertimeQContactClient';
 import { TicketStatus } from '../types/ticket';
 import {
@@ -229,9 +228,13 @@ export async function pushStatusUpdate(
     const qcontactStatus = mapStatusToQContact(newStatus);
     const requestPayload = { status: qcontactStatus };
 
-    // Push update to QContact
-    const qcontactClient = getDefaultQContactClient();
-    const response = await qcontactClient.updateTicket(ticket.external_id, requestPayload);
+    // Push update to QContact via FiberTime client
+    const fibertimeClient = getDefaultFiberTimeQContactClient();
+    const response = await fibertimeClient.updateCase(ticket.external_id, requestPayload);
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update QContact case');
+    }
 
     // Log successful sync
     const syncLogId = await createSyncLog(
@@ -240,7 +243,7 @@ export async function pushStatusUpdate(
       SyncType.STATUS_UPDATE,
       SyncStatus.SUCCESS,
       requestPayload,
-      response,
+      response.data || null,
       null
     );
 
@@ -356,9 +359,13 @@ export async function pushAssignment(
 
     const requestPayload = { assigned_to: userName || null };
 
-    // Push update to QContact
-    const qcontactClient = getDefaultQContactClient();
-    const response = await qcontactClient.updateTicket(ticket.external_id, requestPayload);
+    // Push update to QContact via FiberTime client
+    const fibertimeClient = getDefaultFiberTimeQContactClient();
+    const response = await fibertimeClient.updateCase(ticket.external_id, requestPayload);
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to update QContact assignment');
+    }
 
     // Log successful sync
     const syncLogId = await createSyncLog(
@@ -367,7 +374,7 @@ export async function pushAssignment(
       SyncType.ASSIGNMENT,
       SyncStatus.SUCCESS,
       requestPayload,
-      response,
+      response.data || null,
       null
     );
 
@@ -618,18 +625,19 @@ export async function pushTicketClosure(
       };
     }
 
-    const requestPayload = { status: 'closed' };
+    const requestPayload = { status: 'Solved' };
 
-    // Push closure status to QContact
-    const qcontactClient = getDefaultQContactClient();
-    const response = await qcontactClient.updateTicket(ticket.external_id, requestPayload);
+    // Push closure status to QContact via FiberTime client
+    const fibertimeClient = getDefaultFiberTimeQContactClient();
+    const response = await fibertimeClient.updateCase(ticket.external_id, requestPayload);
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to close QContact case');
+    }
 
     // Add closure note if provided
     if (closureNote && closureNote.trim().length > 0) {
-      await qcontactClient.addNote(ticket.external_id, {
-        content: closureNote,
-        is_internal: false,
-      });
+      await fibertimeClient.addNote(ticket.external_id, closureNote, false);
     }
 
     // Log successful sync
@@ -639,7 +647,7 @@ export async function pushTicketClosure(
       SyncType.STATUS_UPDATE,
       SyncStatus.SUCCESS,
       { ...requestPayload, closure_note: closureNote || null },
-      response,
+      response.data || null,
       null
     );
 
@@ -743,8 +751,12 @@ export async function syncOutboundUpdate(
 
     // Push update to QContact if there are changes
     if (Object.keys(qcontactPayload).length > 0) {
-      const qcontactClient = getDefaultQContactClient();
-      const response = await qcontactClient.updateTicket(ticket.external_id, qcontactPayload);
+      const fibertimeClient = getDefaultFiberTimeQContactClient();
+      const response = await fibertimeClient.updateCase(ticket.external_id, qcontactPayload);
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update QContact case');
+      }
 
       // Log successful sync
       const syncLogId = await createSyncLog(
@@ -753,7 +765,7 @@ export async function syncOutboundUpdate(
         SyncType.STATUS_UPDATE,
         SyncStatus.SUCCESS,
         qcontactPayload,
-        response,
+        response.data || null,
         null
       );
 
