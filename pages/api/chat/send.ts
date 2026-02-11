@@ -1,10 +1,11 @@
 /**
  * Chat API - FibreFlow Help Assistant
- * 
+ *
  * POST /api/chat/send
  * Body: { message, userName?, userRole?, topic?, history? }
- * 
+ *
  * Topic-scoped context with GPT-4o-mini for fast responses.
+ * Rate limited to 10 requests per minute per user.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -12,6 +13,8 @@ import fs from 'fs';
 import path from 'path';
 import { withOptionalAuth } from '@/lib/auth/middleware';
 import { createLogger } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import rateLimiter, { RateLimits } from '@/lib/rateLimiter';
 
 const logger = createLogger('api:chat:send');
 
@@ -104,16 +107,62 @@ Rules:
 - If unsure, say so honestly`;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!OPENAI_API_KEY) return res.status(500).json({ error: 'AI service not configured' });
+  // ── Method Check ──
+  if (req.method !== 'POST') {
+    return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Only POST requests allowed');
+  }
 
+  // ── Service Configuration Check ──
+  if (!OPENAI_API_KEY) {
+    logger.error('OpenAI API key not configured');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'AI service not configured');
+  }
+
+  // ── Input Validation ──
   const { message, userName, userRole, topic, history } = req.body;
-  if (!message) return res.status(400).json({ error: 'message is required' });
+  if (!message) {
+    return apiResponse.error(res, ErrorCode.VALIDATION_ERROR, 'message is required');
+  }
 
-  // Track user info from auth middleware or request body
+  // ── User Context ──
   const authenticatedUser = (req as any).user;
   const trackingName = authenticatedUser?.name || userName || 'Anonymous';
   const trackingRole = authenticatedUser?.role || userRole || 'Guest';
+  const userId = authenticatedUser?.id || req.socket.remoteAddress || 'anonymous';
+
+  // ── Rate Limiting ──
+  const rateLimitKey = `chat:${userId}`;
+  const { success, remaining, resetAt } = rateLimiter.check(
+    rateLimitKey,
+    RateLimits.CHAT_API.limit,
+    RateLimits.CHAT_API.windowMs
+  );
+
+  if (!success) {
+    const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
+    logger.warn('Rate limit exceeded', {
+      userId,
+      userName: trackingName,
+      ip: req.socket.remoteAddress,
+      resetAt: new Date(resetAt).toISOString()
+    });
+
+    res.setHeader('Retry-After', retryAfter);
+    res.setHeader('X-RateLimit-Limit', RateLimits.CHAT_API.limit);
+    res.setHeader('X-RateLimit-Remaining', 0);
+    res.setHeader('X-RateLimit-Reset', resetAt);
+
+    return apiResponse.error(
+      res,
+      ErrorCode.RATE_LIMIT,
+      `Too many requests. Please wait ${retryAfter} seconds before trying again.`
+    );
+  }
+
+  // Set rate limit headers for successful requests
+  res.setHeader('X-RateLimit-Limit', RateLimits.CHAT_API.limit);
+  res.setHeader('X-RateLimit-Remaining', remaining);
+  res.setHeader('X-RateLimit-Reset', resetAt);
 
   // Build context based on topic
   const topicContext = topic && SECTION_RANGES[topic]
@@ -136,7 +185,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userContext = `[${trackingName}${trackingRole ? ` — ${trackingRole}` : ''}] `;
   messages.push({ role: 'user', content: `${userContext}${message}` });
 
+  // ── Execute OpenAI Request ──
   try {
+    logger.info('Sending chat request', {
+      userId,
+      userName: trackingName,
+      userRole: trackingRole,
+      topic: topic || 'general',
+      messageLength: message.length,
+      historyCount: Array.isArray(history) ? history.length : 0
+    });
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -148,18 +207,54 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error('OpenAI API error', { status: response.status, error: errorText });
-      return res.status(502).json({ error: 'AI service error' });
+      logger.error('OpenAI API error', {
+        status: response.status,
+        error: errorText,
+        userId,
+        topic
+      });
+      return apiResponse.error(
+        res,
+        ErrorCode.SERVICE_UNAVAILABLE,
+        'AI service temporarily unavailable. Please try again.'
+      );
     }
 
     const data = await response.json();
-    return res.status(200).json({
-      response: data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.',
+    const assistantResponse = data.choices?.[0]?.message?.content;
+
+    if (!assistantResponse) {
+      logger.error('Empty response from OpenAI', { data, userId });
+      return apiResponse.error(
+        res,
+        ErrorCode.INTERNAL_ERROR,
+        'Failed to generate response. Please try again.'
+      );
+    }
+
+    logger.info('Chat request successful', {
+      userId,
+      topic: topic || 'general',
+      responseLength: assistantResponse.length,
+      tokensUsed: data.usage
+    });
+
+    return apiResponse.success(res, {
+      response: assistantResponse,
       model: MODEL,
     });
   } catch (err: any) {
-    logger.error('Chat API error', { error: err.message, stack: err.stack });
-    return res.status(500).json({ error: 'Internal server error' });
+    logger.error('Chat API error', {
+      error: err.message,
+      stack: err.stack,
+      userId,
+      userName: trackingName
+    });
+    return apiResponse.error(
+      res,
+      ErrorCode.INTERNAL_ERROR,
+      'An unexpected error occurred. Please try again.'
+    );
   }
 }
 

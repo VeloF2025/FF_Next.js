@@ -1,15 +1,20 @@
 /**
  * Chat Data Query API
- * 
+ *
  * POST /api/chat/query
  * Body: { queryId: string, params?: Record<string, any> }
- * 
+ *
  * Executes pre-defined read-only queries. No arbitrary SQL.
  * Access controlled via system_feature_settings + RBAC.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { userHasPermission } from '@/lib/permissions';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('api:chat:query');
 
 // ── Pre-defined queries ──────────────────────────────────────────
 
@@ -176,17 +181,65 @@ const QUERIES: QueryDef[] = [
 // ── Handler ──────────────────────────────────────────────────────
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Only POST requests allowed');
+  }
 
+  // ── Authentication Check ──
+  const user = (req as any).user;
+  if (!user || !user.id) {
+    logger.warn('Unauthorized query attempt', { ip: req.socket.remoteAddress });
+    return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Authentication required');
+  }
+
+  // ── RBAC Permission Check ──
+  try {
+    const hasAccess = await userHasPermission(
+      user.id,
+      'communications.chat-data-lookups',
+      'view'
+    );
+
+    if (!hasAccess) {
+      logger.warn('Unauthorized data query attempt', {
+        userId: user.id,
+        userName: user.name,
+        role: user.role
+      });
+      return apiResponse.error(
+        res,
+        ErrorCode.FORBIDDEN,
+        'You do not have permission to access data queries. Contact your administrator.'
+      );
+    }
+  } catch (permErr: any) {
+    logger.error('Permission check failed', { error: permErr.message, userId: user.id });
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Permission check failed');
+  }
+
+  // ── Validate Query ID ──
   const { queryId } = req.body;
-  if (!queryId) return res.status(400).json({ error: 'queryId is required' });
+  if (!queryId) {
+    return apiResponse.error(res, ErrorCode.VALIDATION_ERROR, 'queryId is required');
+  }
 
   const queryDef = QUERIES.find(q => q.id === queryId);
-  if (!queryDef) return res.status(400).json({ error: `Unknown query: ${queryId}` });
+  if (!queryDef) {
+    logger.warn('Unknown query requested', { queryId, userId: user.id });
+    return apiResponse.error(res, ErrorCode.VALIDATION_ERROR, `Unknown query: ${queryId}`);
+  }
 
+  // ── Execute Query ──
   try {
+    logger.info('Executing data query', {
+      queryId,
+      queryName: queryDef.name,
+      userId: user.id,
+      userName: user.name
+    });
+
     const result = await pool.query(queryDef.sql);
-    
+
     let formatted: string;
     if (queryDef.format === 'count') {
       formatted = `${queryDef.name}: ${result.rows[0]?.count ?? 0}`;
@@ -196,22 +249,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         formatted = `${queryDef.name}: No data found.`;
       } else {
         const cols = Object.keys(result.rows[0]);
-        const lines = result.rows.map(row => 
+        const lines = result.rows.map(row =>
           cols.map(c => `${c}: ${row[c] ?? 'N/A'}`).join(' | ')
         );
         formatted = `${queryDef.name}:\n${lines.join('\n')}`;
       }
     }
 
-    return res.status(200).json({ 
+    logger.info('Query executed successfully', {
+      queryId,
+      rowCount: result.rows.length,
+      userId: user.id
+    });
+
+    return apiResponse.success(res, {
       data: result.rows,
       formatted,
       queryId,
       queryName: queryDef.name,
     });
   } catch (err: any) {
-    console.error('Query error:', queryId, err.message);
-    return res.status(500).json({ error: 'Query failed' });
+    logger.error('Query execution failed', {
+      queryId,
+      error: err.message,
+      stack: err.stack,
+      userId: user.id
+    });
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Query execution failed');
   }
 }
 

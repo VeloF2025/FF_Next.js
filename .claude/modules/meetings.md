@@ -86,3 +86,29 @@ syncFirefliesToNeon()  // Fetch and UPSERT
 - **Participants Array**: Array of {name, email, displayName} objects
 - **Auto Timestamps**: created_at/updated_at managed by database (NOW())
 - **Data Transform**: Manual mapping of db fields to Meeting interface in dashboard
+- **Fireflies meeting_attendees EMPTY**: Most meetings return empty meeting_attendees — speakers field (voice recognition) is the real participant source
+- **Two Data Pipelines**: MeetingsDashboard.tsx serves /meetings, useCommunications.ts serves /communications?tab=meetings — changes must be applied to BOTH
+- **Name-Based Matching**: Non-admin users are matched by email OR name OR displayName — email-only matching misses all speaker-sourced participants
+- **UPSERT Must Update All Fields**: ON CONFLICT clause must include participants, duration, transcript_url — not just title/summary
+- **Dark Theme**: Modal uses var(--ff-bg-tertiary), blue-400/blue-500 for action items — NOT amber/yellow
+
+## Learnings (Feb 2026)
+
+### Fireflies Speakers Data Integration (2026-02-10)
+**Problem**: Meetings showed 0 attendees because `meeting_attendees` returns empty arrays.
+**Root Cause**: Fireflies voice recognition populates `speakers` field, not `meeting_attendees`.
+**Fix**: Created `mergeParticipants()` in firefliesService.ts that combines all 3 sources (speakers, meeting_attendees, participants) with deduplication.
+
+### Non-Admin Participant Matching (2026-02-10)
+**Problem**: Jacques Langenhoven (PROJECT MANAGER) couldn't see today's meetings despite being a participant.
+**Root Cause**: API filtered by `LOWER(p->>'email') = userEmail` only, but speaker-sourced participants have names, no emails.
+**Fix**: Added `OR LOWER(p->>'name') = userName OR LOWER(p->>'displayName') = userName` to both list and single-meeting queries.
+
+### Communications Portal Data Pipeline (2026-02-10)
+**Problem**: Fixed attendees on /meetings but /communications?tab=meetings still showed 0.
+**Root Cause**: useCommunications.ts hook has its own data transformation, separate from MeetingsDashboard.
+**Fix**: Added rawParticipants mapping and getAttendeeDisplayName() helper to useCommunications.ts.
+
+### Dark Theme Alignment (2026-02-10)
+**Problem**: Modal action items used amber/yellow styling that clashed with dark theme.
+**Fix**: Changed to bg-[var(--ff-bg-tertiary)], border-blue-500, text-blue-400 for person names, text-blue-400 hover:text-blue-300 for links.
