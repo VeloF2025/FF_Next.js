@@ -141,7 +141,6 @@ export function PipelineDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -454,7 +453,6 @@ export function PipelineDashboard() {
         </div>
           </>
         )}
-      </div>
     </div>
   );
 }
