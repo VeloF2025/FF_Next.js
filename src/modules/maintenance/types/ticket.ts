@@ -91,6 +91,7 @@ export enum TicketStatus {
   QA_APPROVED = 'qa_approved',
   PENDING_HANDOVER = 'pending_handover',
   HANDED_TO_OPS = 'handed_to_ops', // Renamed from HANDED_TO_MAINTENANCE
+  RESOLVED = 'resolved', // Work completed, pending formal closure
   CLOSED = 'closed',
   CANCELLED = 'cancelled',
 }

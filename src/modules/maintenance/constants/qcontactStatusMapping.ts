@@ -40,7 +40,7 @@ export const QCONTACT_TO_FIBREFLOW_STATUS: Record<string, TicketStatus> = {
   'Reviewed': TicketStatus.QA_APPROVED,
 
   // Terminal states
-  'Solved': TicketStatus.CLOSED,
+  'Solved': TicketStatus.RESOLVED,
   'Unsolved - No Response': TicketStatus.CANCELLED,
 
   // Legacy/fallback mappings (for historical data)
@@ -72,6 +72,7 @@ export const FIBREFLOW_TO_QCONTACT_STATUS: Partial<Record<TicketStatus, string>>
   [TicketStatus.HANDED_TO_OPS]: 'Solved',
 
   // Terminal states
+  [TicketStatus.RESOLVED]: 'Solved',
   [TicketStatus.CLOSED]: 'Solved',
   [TicketStatus.CANCELLED]: 'Unsolved - No Response',
 };
@@ -123,7 +124,7 @@ export function mapFibreFlowStatusToQContact(fibreflowStatus: TicketStatus): str
  */
 export function isQContactStatusTerminal(qcontactStatus: string): boolean {
   const mapped = mapQContactStatusToFibreFlow(qcontactStatus);
-  return mapped === TicketStatus.CLOSED || mapped === TicketStatus.CANCELLED;
+  return mapped === TicketStatus.RESOLVED || mapped === TicketStatus.CLOSED || mapped === TicketStatus.CANCELLED;
 }
 
 /**
@@ -157,7 +158,7 @@ export function getStatusAlignment(
   // Determine suggested action based on status transition
   const isQContactTerminal = isQContactStatusTerminal(qcontactStatus);
   const isFibreFlowTerminal =
-    fibreflowStatus === TicketStatus.CLOSED || fibreflowStatus === TicketStatus.CANCELLED;
+    fibreflowStatus === TicketStatus.RESOLVED || fibreflowStatus === TicketStatus.CLOSED || fibreflowStatus === TicketStatus.CANCELLED;
 
   if (isQContactTerminal && !isFibreFlowTerminal) {
     // QContact closed but FibreFlow still open - should close
