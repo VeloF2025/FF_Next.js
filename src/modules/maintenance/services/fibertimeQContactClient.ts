@@ -750,13 +750,17 @@ export class FiberTimeQContactClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
+      // QContact API requires fields to be wrapped in { fields: { ... } }
+      // Sending at top level returns 200 but silently ignores the update
+      const body = fields.fields ? fields : { fields };
+
       const response = await fetch(url, {
         method: 'PATCH',
         headers: {
           ...this.getHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(fields),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 

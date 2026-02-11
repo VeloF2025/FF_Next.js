@@ -55,16 +55,24 @@ export const QCONTACT_TO_FIBREFLOW_STATUS: Record<string, TicketStatus> = {
  * Reverse mapping: FibreFlow status to QContact status
  * Used for OUTBOUND sync when pushing FibreFlow changes to QContact
  */
+/**
+ * Valid QContact API status values (verified 2026-02-11 via PATCH tests):
+ * Open, Assigned, InProgress, Escalated, InReview, Reviewed,
+ * Pending Company Response, Solved
+ *
+ * NOTE: QC API is case-sensitive and uses PascalCase without spaces
+ * e.g. "InProgress" NOT "In Progress", "InReview" NOT "In Review"
+ */
 export const FIBREFLOW_TO_QCONTACT_STATUS: Partial<Record<TicketStatus, string>> = {
   // Work phase
-  [TicketStatus.OPEN]: 'New',
+  [TicketStatus.OPEN]: 'Open',
   [TicketStatus.ASSIGNED]: 'Assigned',
-  [TicketStatus.IN_PROGRESS]: 'In Progress',
+  [TicketStatus.IN_PROGRESS]: 'InProgress',
 
   // QA phase
-  [TicketStatus.PENDING_QA]: 'In Review',
-  [TicketStatus.QA_IN_PROGRESS]: 'In Review',
-  [TicketStatus.QA_REJECTED]: 'In Progress', // Rejected = back to work
+  [TicketStatus.PENDING_QA]: 'InReview',
+  [TicketStatus.QA_IN_PROGRESS]: 'InReview',
+  [TicketStatus.QA_REJECTED]: 'InProgress', // Rejected = back to work
   [TicketStatus.QA_APPROVED]: 'Reviewed',
 
   // Handover phase
@@ -74,7 +82,7 @@ export const FIBREFLOW_TO_QCONTACT_STATUS: Partial<Record<TicketStatus, string>>
   // Terminal states
   [TicketStatus.RESOLVED]: 'Solved',
   [TicketStatus.CLOSED]: 'Solved',
-  [TicketStatus.CANCELLED]: 'Unsolved - No Response',
+  [TicketStatus.CANCELLED]: 'Solved', // QC has no "Unsolved" via API
 };
 
 /**
@@ -113,7 +121,7 @@ export function mapQContactStatusToFibreFlow(qcontactStatus: string | null | und
  * @returns QContact status string (defaults to 'Open' for unmapped statuses)
  */
 export function mapFibreFlowStatusToQContact(fibreflowStatus: TicketStatus): string {
-  return FIBREFLOW_TO_QCONTACT_STATUS[fibreflowStatus] ?? 'Open';
+  return FIBREFLOW_TO_QCONTACT_STATUS[fibreflowStatus] ?? 'Assigned';
 }
 
 /**
