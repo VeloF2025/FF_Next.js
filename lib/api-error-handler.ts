@@ -91,7 +91,7 @@ export function withErrorHandler<T = any, R extends NextApiRequest = NextApiRequ
 
       // Check if headers were already sent
       if (res.headersSent) {
-        console.error('Headers were already sent, cannot send error response');
+        apiLogger.warn({ method: req.method, url: req.url }, 'Headers already sent, cannot send error response');
         return;
       }
 

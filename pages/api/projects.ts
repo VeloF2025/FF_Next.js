@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
-import { apiLogger } from '@/lib/logger';
+import { log } from '@/lib/logger';
 
 // Create a new connection for each request to avoid connection pooling issues
 const getSql = () => createLoggedSql(process.env.DATABASE_URL!);
@@ -137,7 +137,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     
     return res.status(200).json({ success: true, data: projects || [] });
   } catch (error) {
-    apiLogger.error({ error, method: 'GET', path: '/api/projects' }, 'Failed to fetch projects');
+    log.error('Failed to fetch projects', { error, method: 'GET', path: '/api/projects' }, 'ProjectsAPI');
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -213,7 +213,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     
     return res.status(201).json({ success: true, data: newProject[0] });
   } catch (error) {
-    apiLogger.error({ error, method: 'POST', path: '/api/projects' }, 'Failed to create project');
+    log.error('Failed to create project', { error, method: 'POST', path: '/api/projects' }, 'ProjectsAPI');
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -260,7 +260,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
     
     return res.status(200).json({ success: true, data: updatedProject[0] });
   } catch (error) {
-    apiLogger.error({ error, method: 'PUT', path: '/api/projects', projectId: id }, 'Failed to update project');
+    log.error('Failed to update project', { error, method: 'PUT', path: '/api/projects', projectId: id }, 'ProjectsAPI');
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -287,7 +287,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     
     return res.status(200).json({ success: true, message: 'Project deleted successfully' });
   } catch (error) {
-    apiLogger.error({ error, method: 'DELETE', path: '/api/projects', projectId: id }, 'Failed to delete project');
+    log.error('Failed to delete project', { error, method: 'DELETE', path: '/api/projects', projectId: id }, 'ProjectsAPI');
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -226,3 +226,14 @@ export function createLogger(component: string) {
     error: (message: string, data?: LogData) => log.error(message, data, component),
   };
 }
+
+/**
+ * Pino-style API logger for use in API routes
+ * Accepts (data, message?) format used by api-error-handler and API routes
+ */
+export const apiLogger = {
+  debug: (data: LogData, message?: string) => log.debug(message || 'debug', data, 'API'),
+  info: (data: LogData, message?: string) => log.info(message || 'info', data, 'API'),
+  warn: (data: LogData, message?: string) => log.warn(message || 'warning', data, 'API'),
+  error: (data: LogData, message?: string) => log.error(message || 'error', data, 'API'),
+};

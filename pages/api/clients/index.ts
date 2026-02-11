@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '../../../lib/db.mjs';
 import { safeArrayQuery } from '../../../lib/safe-query';
-import { apiLogger } from '@/lib/logger';
+import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '../../../lib/api-error-handler';
 
@@ -245,7 +245,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (error) {
-    apiLogger.error({ error, method: req.method, path: '/api/clients' }, 'Client API request failed');
+    log.error('Client API request failed', { error, method: req.method, path: '/api/clients' }, 'ClientsAPI');
     res.status(500).json({ success: false, error: (error as Error).message });
   }
 }))
