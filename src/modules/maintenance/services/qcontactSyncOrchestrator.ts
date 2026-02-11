@@ -239,8 +239,18 @@ async function processOutboundSync(
     ticketCount: tickets.length,
   });
 
+  // Terminal statuses that QC won't allow changes on (already Closed)
+  const TERMINAL_FF_STATUSES = ['resolved', 'closed', 'cancelled'];
+
   for (const ticket of tickets) {
     stats.total_processed++;
+
+    // Skip tickets in terminal status - QC already has them as Closed
+    // and returns 422 "can't re-open a Closed case"
+    if (TERMINAL_FF_STATUSES.includes(ticket.status)) {
+      stats.skipped++;
+      continue;
+    }
 
     try {
       const result = await pushStatusUpdate(
