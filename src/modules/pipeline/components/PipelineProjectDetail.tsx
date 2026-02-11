@@ -3,7 +3,7 @@
  * Shows project details and approval gates
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
@@ -157,6 +157,9 @@ export function PipelineProjectDetail() {
     cession_date: '',
     cession_document_url: '',
   });
+  const [uploadingField, setUploadingField] = useState<'lease' | 'cession' | null>(null);
+  const leaseFileRef = useRef<HTMLInputElement>(null);
+  const cessionFileRef = useRef<HTMLInputElement>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
   const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
@@ -318,6 +321,32 @@ export function PipelineProjectDetail() {
       log.error('Failed to save legal docs', { error: err, projectId: id, legalDocs }, 'PipelineProjectDetail');
     } finally {
       setSavingLegalDocs(false);
+    }
+  };
+
+  const handleFileUpload = async (field: 'lease' | 'cession', file: File) => {
+    setUploadingField(field);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'pipeline');
+      formData.append('category', 'legal-documents');
+
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Upload failed');
+
+      const data = await response.json();
+      const urlKey = field === 'lease' ? 'lease_agreement_document_url' : 'cession_document_url';
+      handleLegalDocChange(urlKey, data.url);
+    } catch (err) {
+      log.error('Failed to upload legal document', { error: err, field }, 'PipelineProjectDetail');
+    } finally {
+      setUploadingField(null);
     }
   };
 
@@ -820,6 +849,30 @@ export function PipelineProjectDetail() {
                     />
                     <div className="flex gap-2">
                       <input
+                        type="file"
+                        ref={leaseFileRef}
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('lease', file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => leaseFileRef.current?.click()}
+                        disabled={uploadingField === 'lease'}
+                        className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)] disabled:opacity-50"
+                        title="Upload file"
+                      >
+                        {uploadingField === 'lease' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                      </button>
+                      <input
                         type="url"
                         value={legalDocs.lease_agreement_document_url}
                         onChange={(e) =>
@@ -867,6 +920,30 @@ export function PipelineProjectDetail() {
                       placeholder="Date"
                     />
                     <div className="flex gap-2">
+                      <input
+                        type="file"
+                        ref={cessionFileRef}
+                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileUpload('cession', file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => cessionFileRef.current?.click()}
+                        disabled={uploadingField === 'cession'}
+                        className="px-2 py-1.5 border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-tertiary)] disabled:opacity-50"
+                        title="Upload file"
+                      >
+                        {uploadingField === 'cession' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                      </button>
                       <input
                         type="url"
                         value={legalDocs.cession_document_url}
