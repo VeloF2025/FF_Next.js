@@ -3,7 +3,7 @@
  * Manages document uploads and displays for pipeline approvals
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileText,
   Upload,
@@ -95,6 +95,35 @@ export function DocumentManager({
     reference_number: '',
     issuing_authority: '',
   });
+
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileSelect(file: File) {
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'pipeline');
+      formData.append('category', 'approval-documents');
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      const data = await response.json();
+      setUploadData((prev) => ({
+        ...prev,
+        file_url: data.url,
+        file_name: prev.file_name || file.name,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'File upload failed');
+    } finally {
+      setUploadingFile(false);
+    }
+  }
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -383,19 +412,42 @@ export function DocumentManager({
 
             <div className="col-span-2">
               <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                File URL (Optional)
+                File URL
               </label>
               <input
-                type="url"
-                value={uploadData.file_url}
-                onChange={(e) =>
-                  setUploadData({ ...uploadData, file_url: e.target.value })
-                }
-                placeholder="https://..."
-                className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] bg-[var(--ff-bg-primary)]"
+                type="file"
+                ref={fileInputRef}
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                  e.target.value = '';
+                }}
               />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingFile}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-primary)] disabled:opacity-50 text-sm whitespace-nowrap"
+                  title="Upload file"
+                >
+                  {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {uploadingFile ? 'Uploading...' : 'Upload'}
+                </button>
+                <input
+                  type="url"
+                  value={uploadData.file_url}
+                  onChange={(e) =>
+                    setUploadData({ ...uploadData, file_url: e.target.value })
+                  }
+                  placeholder="https://... or upload a file"
+                  className="flex-1 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] bg-[var(--ff-bg-primary)]"
+                />
+              </div>
               <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                Link to document in SharePoint, Google Drive, etc.
+                Upload a file or paste a URL
               </p>
             </div>
 
