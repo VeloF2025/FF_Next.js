@@ -107,9 +107,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
         }),
       });
       const data = await res.json();
+      const responseText = data.data?.response || data.response || data.error?.message || data.error || 'Sorry, something went wrong.';
       setMessages(prev => [...prev, {
         id: `assistant-${Date.now()}`, role: 'assistant',
-        content: data.response || data.error || 'Sorry, something went wrong.',
+        content: responseText,
         timestamp: new Date(),
       }]);
     } catch {
@@ -183,7 +184,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
             ? 'w-12 h-12 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
             : 'w-14 h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400'
         )}
-        title={isOpen ? 'Close chat' : 'Ask FibreFlow Assistant'}
+        title={isOpen ? 'Close chat' : 'Ask Velo'}
       >
         {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-6 h-6" />}
         {!isOpen && messages.length === 0 && (
@@ -210,7 +211,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-white text-sm">FibreFlow Assistant</h3>
+                <h3 className="font-semibold text-white text-sm">Velo - Your Digital Assistant</h3>
                 <p className="text-xs text-white/70">
                   {selectedTopic ? selectedTopic.label : 'Choose a topic to get started'}
                 </p>

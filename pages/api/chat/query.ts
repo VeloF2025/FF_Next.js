@@ -30,7 +30,55 @@ interface QueryDef {
 const QUERIES: QueryDef[] = [
   // Activate / QA
   {
-    id: 'qa_summary',
+    id: 'activations_yesterday',
+    name: 'OES Activations Yesterday',
+    description: 'Number of homes/drops activated in OES yesterday',
+    sql: `SELECT COUNT(*) as count FROM oes_activations WHERE activation_date = CURRENT_DATE - 1`,
+    format: 'count',
+  },
+  {
+    id: 'activations_today',
+    name: 'OES Activations Today',
+    description: 'Number of homes/drops activated in OES today so far',
+    sql: `SELECT COUNT(*) as count FROM oes_activations WHERE activation_date = CURRENT_DATE`,
+    format: 'count',
+  },
+  {
+    id: 'activations_this_week',
+    name: 'OES Activations This Week',
+    description: 'Number of homes/drops activated in OES in the last 7 days',
+    sql: `SELECT activation_date, COUNT(*) as count FROM oes_activations WHERE activation_date >= CURRENT_DATE - 7 GROUP BY activation_date ORDER BY activation_date DESC`,
+    format: 'table',
+  },
+  {
+    id: 'activations_this_month',
+    name: 'OES Activations This Month',
+    description: 'Number of homes/drops activated in OES in the last 30 days',
+    sql: `SELECT COUNT(*) as count FROM oes_activations WHERE activation_date >= CURRENT_DATE - 30`,
+    format: 'count',
+  },
+  {
+    id: 'activations_by_team',
+    name: 'Activations by Team',
+    description: 'Activation counts per team in the last 7 days',
+    sql: `SELECT COALESCE(team, 'Unknown') as team, COUNT(*) as count FROM oes_activations WHERE activation_date >= CURRENT_DATE - 7 GROUP BY team ORDER BY count DESC`,
+    format: 'table',
+  },
+  {
+    id: 'qa_yesterday',
+    name: 'QA Yesterday',
+    description: 'QA photo review decisions made yesterday (pass/fail/rework)',
+    sql: `SELECT qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews WHERE qa_decision IS NOT NULL AND qa_decision_at::date = CURRENT_DATE - 1 GROUP BY qa_decision ORDER BY count DESC`,
+    format: 'table',
+  },
+  {
+    id: 'qa_today',
+    name: 'QA Today',
+    description: 'QA photo review decisions made today so far',
+    sql: `SELECT qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews WHERE qa_decision IS NOT NULL AND qa_decision_at::date = CURRENT_DATE GROUP BY qa_decision ORDER BY count DESC`,
+    format: 'table',
+  },
+  {
     name: 'QA Summary',
     description: 'Get QA decision counts (total PASS/FAIL/REWORK)',
     sql: `SELECT qa_decision, COUNT(*) as count FROM dr_photo_unified_reviews WHERE qa_decision IS NOT NULL GROUP BY qa_decision ORDER BY count DESC`,
