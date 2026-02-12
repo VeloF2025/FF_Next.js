@@ -2,7 +2,7 @@
  * Pipeline Project Detail API
  * GET /api/pipeline/projects/[id] - Get project details
  * PUT /api/pipeline/projects/[id] - Update project
- * DELETE /api/pipeline/projects/[id] - Delete project (soft)
+ * DELETE /api/pipeline/projects/[id] - Hard delete project with cascade
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -11,6 +11,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
 import type { UpdatePipelineProjectInput } from '@/modules/pipeline/types';
 import { withAuth } from '@/lib/auth';
+import sql from '@/lib/db';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -82,22 +83,55 @@ async function handlePut(
 
 /**
  * DELETE /api/pipeline/projects/[id]
- * Soft delete project
+ * Hard delete project with cascade
  */
 async function handleDelete(
   req: NextApiRequest,
   res: NextApiResponse,
   id: string
 ) {
-  const { deleted_by } = req.body || {};
-
-  const success = await pipelineProjectService.deleteProject(id, deleted_by);
-
-  if (!success) {
+  // Verify project exists
+  const existing = await pipelineProjectService.getProjectById(id);
+  if (!existing) {
     return apiResponse.notFound(res, 'Pipeline project', id);
   }
 
-  return apiResponse.success(res, { message: 'Project deleted successfully' });
+  // Cascade delete in FK-safe order
+  const unlinkResult = await sql`
+    UPDATE projects SET pipeline_project_id = NULL
+    WHERE pipeline_project_id = ${id}
+  `;
+
+  const linksResult = await sql`
+    DELETE FROM project_pipeline_links
+    WHERE pipeline_project_id = ${id}
+  `;
+
+  const docsResult = await sql`
+    DELETE FROM pipeline_approval_documents
+    WHERE pipeline_project_id = ${id}
+  `;
+
+  const approvalsResult = await sql`
+    DELETE FROM pipeline_project_approvals
+    WHERE pipeline_project_id = ${id}
+  `;
+
+  const projectResult = await sql`
+    DELETE FROM pipeline_projects
+    WHERE id = ${id}
+  `;
+
+  return apiResponse.success(res, {
+    message: 'Project deleted successfully',
+    deleted: {
+      projects_unlinked: unlinkResult.count ?? 0,
+      pipeline_links: linksResult.count ?? 0,
+      approval_documents: docsResult.count ?? 0,
+      approvals: approvalsResult.count ?? 0,
+      project: projectResult.count ?? 0,
+    },
+  });
 }
 
 export default withAuth(withErrorHandler(handler));

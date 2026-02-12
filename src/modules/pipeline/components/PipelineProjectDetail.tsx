@@ -163,6 +163,7 @@ export function PipelineProjectDetail() {
   const [transitioning, setTransitioning] = useState(false);
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
   const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Map auth role to drawer role
   const drawerUserRole = useMemo((): 'pm' | 'ops' | 'admin' | 'viewer' => {
@@ -265,6 +266,37 @@ export function PipelineProjectDetail() {
       alert('Failed to transition project. Please try again.');
     } finally {
       setTransitioning(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!id || !project || deleting) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${project.project_name}"? This will remove all approvals, documents, and links. This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/pipeline/projects/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete project');
+        return;
+      }
+
+      router.push('/projects/pipeline');
+    } catch (err) {
+      log.error('Failed to delete project', { error: err, projectId: id }, 'PipelineProjectDetail');
+      alert('Failed to delete project. Please try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -1074,6 +1106,18 @@ export function PipelineProjectDetail() {
                     {transitioning ? 'Transitioning...' : 'Transition to Planned'}
                   </button>
                 )}
+                <button
+                  onClick={handleDeleteProject}
+                  disabled={deleting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  {deleting ? 'Deleting...' : 'Delete Project'}
+                </button>
               </div>
             </div>
           </div>
