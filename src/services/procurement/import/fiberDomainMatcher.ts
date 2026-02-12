@@ -19,89 +19,114 @@ export interface FiberMatchResult {
 
 /** Maps BOQ categories to stock item code prefix patterns */
 const CATEGORY_PREFIX_MAP: Record<string, string[]> = {
-  // Cables
-  'Drop Cable (Connectorised)': ['CAB-LCAPC-SCAPC-', 'CAB-LEAD-'],
+  // Cables — Drop
+  'Drop Cable (Connectorised)': ['DROP-APC-'],
+
+  // Cables — Aerial
   'Aerial Cable (ADSS)': ['CAB-AER-SM-'],
   'Aerial Cable (ADSS Slimline)': ['CAB-AER-SM-'],
   'Aerial Cable (Mini-ADSS)': ['CAB-AER-SM-'],
-  'Underground Cable (Micro-Blown)': ['CAB-TRENCH-MB-SM-'],
-  'Pigtail (Connectorised)': ['CAB-PIGTAIL-'],
+
+  // Cables — Underground/Micro-Blown
+  'Underground Cable (Micro-Blown)': ['CAB-MB-SM-'],
+
+  // Cables — Patch Leads & Pigtails
+  'Pigtail (Connectorised)': ['LEAD-'],
 
   // Tangents & Dead-Ends
-  'Tangent (ADSS)': ['CAB-TANGENT-'],
-  'Tangent (Mini-ADSS)': ['CAB-TANGENT-'],
-  'Dead-End(ADSS)': ['CAB-DEADEND-'],
-  'Dead-End(Drop)': ['CAB-DEADEND-DROP', 'CAB-DEADEND-RAPIDHOLD'],
-  'Dead-End(Mini-ADSS)': ['CAB-DEADEND-'],
+  'Tangent (ADSS)': ['TANGENT-'],
+  'Tangent (Mini-ADSS)': ['TANGENT-'],
+  'Dead-End(ADSS)': ['DEADEND-'],
+  'Dead-End (ADSS)': ['DEADEND-'],
+  'Dead-End(Drop)': ['DEADEND-RAPIDHOLD'],
+  'Dead-End(Mini-ADSS)': ['DEADEND-'],
+  'Dead-End (Mini-ADSS)': ['DEADEND-'],
 
-  // Enclosures
-  'Enclosure (Connectorised)': ['ENCL-CONN-'],
-  'Enclosure  (Splice)': ['ENCL-SPLICE-'],
-  'Enclosure (Splice)': ['ENCL-SPLICE-'],
-  'Access Chamber (Manhole)': ['ENCL-MANHOLE-RN'],
-  'Access Chamber (Manhole Key)': ['ENCL-MANHOLE-KEY-'],
+  // Enclosures — Connectorised (SJC closures)
+  'Enclosure (Connectorised)': ['SJC-'],
 
-  // Infrastructure
-  'Trunking (PVC)': ['TRUNK-PVC-'],
+  // Enclosures — Splice (Dome joints)
+  'Enclosure  (Splice)': ['DOME-'],
+  'Enclosure (Splice)': ['DOME-'],
+
+  // Access Chambers (Manholes)
+  'Access Chamber (Manhole)': ['MANHOLE-'],
+  'Access Chamber (Manhole Key)': ['MANHOLE-K-'],
+
+  // Infrastructure — Conduit & Pipe
   'Conduit (Galv)': ['CONDUIT-GLV-'],
-  'Conduit (Galv, Bend)': ['CONDUIT-GLV-BEND-'],
-  'Conduit (PVC)': ['CONDUIT-PVC-'],
-  'Conduit (PVC,Bend)': ['CONDUIT-PVC-BEND-'],
+  'Conduit (Galv, Bend)': ['CONDUIT-GLV-'],
+  'Conduit (PVC)': ['PIPE-HDPE-'],
+  'Conduit (PVC,Bend)': ['PIPE-HDPE-'],
   'Conduit (Corr)': ['PIPE-CORR-'],
-  'Conduit (HDPE)': ['PIPE-HDPE-'],
-  'Micro Duct (HDPE, Polyethylene)': ['PIPE-MD-HDPE-'],
-  'Micro Duct (HDPE, Polyethylene, Combi)': ['PIPE-MD-HDPE-COMBO'],
-  'Micro Duct (HDPE, Polyethylene, Sub)': ['PIPE-MD-HDPE-SUB-'],
-  'Micro Duct': ['CAB-MICRODUCT-'],
+  'Conduit (HDPE)': ['PIPE-HDPE-', 'HDPE-SUBD-'],
 
-  // Optical
-  'Splitter (Bare)': ['CAB-SPLITTER-BF-'],
-  'Splitter (Connectorised)': ['CAB-SPLITTER-CON-'],
-  'Midcoupler (Flanged)': ['CONS-MIDCOUPLER-F-SM-'],
-  'Midcoupler (Flangeless)': ['CONS-MIDCOUPLER-FL-SM-'],
-  'Splice Protector': ['CONS-SPLICEPROT-'],
+  // Micro Duct
+  'Micro Duct (HDPE, Polyethylene)': ['HDPE-'],
+  'Micro Duct (HDPE, Polyethylene, Combi)': ['HDPE-'],
+  'Micro Duct (HDPE, Polyethylene, Sub)': ['HDPE-SUBD-'],
+  'Micro Duct': ['HDPE-'],
+
+  // Optical — Splitters
+  'Splitter (Bare)': ['SPLIT-BF-'],
+  'Splitter (Connectorised)': ['SPLIT-CON-'],
+
+  // Optical — Midcouplers
+  'Midcoupler (Flanged)': ['MIDCOUP-'],
+  'Midcoupler (Flangeless)': ['MIDCOUP-'],
+
+  // Optical — Splice Protectors
+  'Splice Protector': ['SPLICEPROTECTOR-'],
 
   // Poles & Dressing
   'Poles (Creosote)': ['POLE-'],
-  'Hook (Monopole Bracket Offset)': ['DRESS-HOOK-'],
-  'Slack Bracket (Bracket)': ['DRESS-SLACKBRKT-'],
-  // Slack Storage Box — no stock items exist, left for manual matching
-  'Slack Bracket (Branded Box)': ['DRESS-SLACKBRKT-BRANDEDBOX'],
-  'Buckle (Steel)': ['DRESS-BANDIT-BUCKLE'],
-  'Strapping (Steel)': ['DRESS-BANDITSTRAP-'],
-  'Label (Chromadek)': ['DRESS-POLE-TAG'],
+  'Hook (Monopole Bracket Offset)': ['HOOK-'],
+  'Slack Bracket (Bracket)': ['SLACK-'],
+  'Slack Bracket (Branded Box)': ['SLACK-'],
+  'Buckle (Steel)': ['BANDIT-BUCKLE'],
+  'Strapping (Steel)': ['BANDIT-STRAP'],
+  'Label (Chromadek)': ['POLE-TAG'],
 
   // Consumables
-  'Cable Tie': ['CONS-CT-'],
-  'Label (Brady)': ['CONS-BRADYLABEL'],
-  'Label': ['CONS-LABEL-'],
-  'Coupling (Micro Duct)': ['CONS-MD-COUPLING-'],
-  'End Cap (Micro Duct)': ['CONS-MD-ENDCAP-'],
-  'Alcohol (Aerosol)': ['CONS-ALCOHOL-'],
-  'Kim Wipes': ['CONS-KIM-WIPES'],
-  'Bituman (SC60)': ['CONS-BITUMAN'],
-  'Caution Tape (Trench)': ['CONS-CAUTIONTAPE-'],
-  'Coach Screws': ['CONS-COACH-'],
-  'Screw': ['CONS-SCREW'],
-  'Screws': ['CONS-SCREW-MIDCOUP-'],
-  'SC/APC Connector for drop cable': ['CONNECTOR-SC-APC'],
+  'Cable Tie': ['CABLETIE-'],
+  'Label (Brady)': ['BRADYLABEL'],
+  'Label': ['BRADYLABEL', 'CARRIERTAG'],
+  'Coupling (Micro Duct)': ['COUPLING-'],
+  'End Cap (Micro Duct)': ['ENDCAP-'],
+  'Alcohol (Aerosol)': ['ALCOHOL-'],
+  'Kim Wipes': ['KIM-WIPES'],
+  'Bituman (SC60)': ['BITUMANTAPE'],
+  'Caution Tape (Trench)': ['CAUTIONTAPE'],
+  'Coach Screws': ['SCREW-COACH'],
+  'Screw': ['SCREW-'],
+  'Screws': ['SCREW-MIDCOUP'],
 
   // Wall Attachments
-  'Wall Attachment': ['CONS-WA-'],
-  'Wall Attchment': ['CONS-WA-'],
-  'Hook (Pigtail)': ['CONS-WA-PIGTAIL-SCREW'],
-
-  // Electrical
-  'Electrical': ['CONS-ELEC-'],
-  'Power Cable Kit': ['CONS-PCK', 'CONS-CAB-CLIP'],
-
-  // Stay Sets
-  'Stay Set': ['STAY-'],
-  'Lock Nut (Galv)': ['STAY-NUT-'],
+  'Wall Attachment': ['WALLPLUG', 'SCREW-NAIL-IN', 'SCREW-PIGTAIL'],
+  'Wall Attchment': ['WALLPLUG', 'SCREW-NAIL-IN', 'SCREW-PIGTAIL'],
+  'Wall Attachment (Insp Box GALV)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Insp Box Galv)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Insp Box Lid Galv)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Insp Box Lid PVC)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Insp Box PVC)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Saddle Galv)': ['WALLPLUG', 'SCREW-'],
+  'Wall Attachment (Saddle PVC)': ['WALLPLUG', 'SCREW-'],
+  'Hook (Pigtail)': ['SCREW-PIGTAIL'],
 
   // Cement & Tar
-  'Cement Bag': ['CONS-CEM'],
-  'Tar Bag': ['CONS-TAR'],
+  'Cement Bag': ['CEMENT'],
+  'Tar Bag': ['TAR'],
+
+  // Electrical
+  'Electrical': ['GLAND', 'PLUG-'],
+  'Power Cable Kit': ['CABLECLIP'],
+
+  // Stay Sets
+  'Stay Set': ['BANDIT-'],
+  'Lock Nut (Galv)': ['NUT-'],
+
+  // Slack storage variants
+  'Slack Bracket (Slack Storage Box)': ['SLACK-'],
 };
 
 interface ParsedParams {
@@ -225,9 +250,14 @@ function parseBOQDescription(description: string): ParsedParams {
     if (p === 'rapid stor' || p === 'rapid') params.variant = 'RAPID';
     if (p === 'extreme slack') params.variant = 'X';
 
-    // Duplex/Simplex
+    // Duplex/Simplex/Quad
     if (p === 'duplex') params.variant = (params.variant || '') + 'DUP';
     if (p === 'simplex') params.variant = (params.variant || '') + 'SIM';
+    if (p === 'quad') params.variant = (params.variant || '') + 'QUAD';
+
+    // Flanged/Flangeless
+    if (p === 'flangeless' || p === 'flangelss') params.variant = (params.variant || '') + 'FL';
+    if (p === 'flanged') params.variant = (params.variant || '') + 'F';
 
     // Duct sizes: "8/5", "14/10", "40/34", "14/10 YELLOW", "8/5 WHITE"
     const ductMatch = part.match(/^(\d+)\/(\d+)/);
@@ -358,13 +388,20 @@ function parseStockCode(code: string): ParsedParams {
   const params: ParsedParams = {};
   const parts = code.split('-');
 
-  // Connectors in stock codes: LCAPC, SCAPC (paired or single)
+  // Connectors in stock codes: LCAPC, SCAPC, LAPC (paired or single)
   if (code.includes('LCAPC') && code.includes('SCAPC')) {
     params.connectors = 'lcapc-scapc';
-  } else if (code.includes('LCAPC')) {
+  } else if (code.includes('LCAPC') || code.includes('LAPC')) {
     params.connectors = 'lcapc';
   } else if (code.includes('SCAPC')) {
     params.connectors = 'scapc';
+  } else if (code.includes('SCUPC')) {
+    params.connectors = 'scupc';
+  }
+
+  // DROP-APC cables imply LC/APC-SC/APC connectors
+  if (code.startsWith('DROP-APC-')) {
+    params.connectors = 'lcapc-scapc';
   }
 
   // Look for numeric parts
@@ -381,7 +418,6 @@ function parseStockCode(code: string): ParsedParams {
     // Size range: two consecutive numeric parts like "9.2" and "9.5"
     if (i < parts.length - 1 && /^\d+\.?\d*$/.test(part) && /^\d+\.?\d*$/.test(parts[i + 1])) {
       const next = parts[i + 1];
-      // Check if this looks like a range (both are similar magnitudes)
       const v1 = parseFloat(part);
       const v2 = parseFloat(next);
       if (v2 > v1 && v2 < v1 * 3) {
@@ -398,8 +434,8 @@ function parseStockCode(code: string): ParsedParams {
       continue;
     }
 
-    // Model identifiers: RN300, ODCFD0, UMJ, CMJ, SPRAY, 1L, EXT
-    if (/^(RN\d+|ODCFD\w*|UMJ|CMJ|MMJ|DROP|RAPIDHOLD|SPRAY|1L|EXT)$/i.test(part)) {
+    // Model identifiers: ODCFD0, ODCFD08L, ODCFD1, UMJ, CMJ, MMJ, LMJ, RAPIDHOLD
+    if (/^(RN\d+|ODCFD\w*|UMJ|CMJ|MMJ|LMJ|DROP|RAPIDHOLD|SPRAY|1L|EXT)$/i.test(part)) {
       params.model = part.toUpperCase();
       continue;
     }
@@ -410,26 +446,32 @@ function parseStockCode(code: string): ParsedParams {
       continue;
     }
 
-    // Enclosure Microloop models: M8, M16 (followed by MICROLOOP in next part)
+    // Enclosure Microloop models: SJC-MICROLOOP-M8, SJC-MICROLOOP-M16
     if (/^M\d+$/i.test(part)) {
-      // Check if next part is MICROLOOP
-      if (i < parts.length - 1 && parts[i + 1].toUpperCase() === 'MICROLOOP') {
+      if (code.includes('MICROLOOP')) {
         params.model = part.toUpperCase() + '-MICROLOOP';
-        i++; // skip MICROLOOP
         continue;
       }
+    }
+    if (part === 'MICROLOOP') continue; // Skip, already handled
+
+    // Midcoupler: D=Duplex, S=Simplex, Q=Quad, FL=Flangeless
+    if (code.startsWith('MIDCOUP-')) {
+      if (part === 'D') params.variant = (params.variant || '') + 'DUP';
+      else if (part === 'S') params.variant = (params.variant || '') + 'SIM';
+      else if (part === 'Q') params.variant = (params.variant || '') + 'QUAD';
+      else if (part === 'FL') params.variant = (params.variant || '') + 'FL';
     }
 
     // Splitter/pigtail specific: DUP, SIM
     if (part === 'DUP') params.variant = (params.variant || '') + 'DUP';
     if (part === 'SIM') params.variant = (params.variant || '') + 'SIM';
-    // LPAPC for splitters (LP = LC Port APC)
-    if (part === 'LPAPC') params.connectors = 'lcapc';
+    // LPAPC/LCAPC for splitters
+    if (part === 'LPAPC' || part === 'LCAPC') params.connectors = 'lcapc';
 
-    // Hook ways: 1WAY, 2WAY, 3WAY, UNI
-    const waysStockMatch = part.match(/^(\d+)WAY$/i);
-    if (waysStockMatch) {
-      params.ways = parseInt(waysStockMatch[1], 10);
+    // Hook ways: 1, 2, 3 (for HOOK-1, HOOK-2, HOOK-3)
+    if (code.startsWith('HOOK-') && /^\d+$/.test(part)) {
+      params.ways = parseInt(part, 10);
       continue;
     }
     if (part === 'UNI') {
@@ -437,83 +479,50 @@ function parseStockCode(code: string): ParsedParams {
       continue;
     }
 
-    // Slack bracket variants: X (extreme), RAPID, BRANDEDBOX, 600
-    if (part === 'X') params.variant = 'X';
-    if (part === 'RAPID') params.variant = 'RAPID';
-    if (part === 'BRANDEDBOX') params.variant = 'BRANDEDBOX';
-    if (part === '600') params.length = 600;
+    // Slack bracket variants: V, X (extreme), RAPID, 600
+    if (code.startsWith('SLACK-')) {
+      if (part === 'X') params.variant = 'X';
+      if (part === 'V') params.variant = 'V';
+      if (part === 'RAPID') params.variant = 'RAPID';
+      if (part === '600') params.length = 600;
+    }
 
     // Thread/bolt sizes in stock codes: M12, M14
     if (/^M\d+$/.test(part) && !params.model) {
       params.model = part;
     }
-
-    // Cable tie size variants: L (Large), S (Small)
-    if ((part === 'L' || part === 'S') && code.startsWith('CONS-CT-')) {
-      params.variant = part;
-    }
   }
 
-  // Splitter ratio from stock codes: CAB-SPLITTER-BF-1-8, CAB-SPLITTER-CON-1-16-LPAPC
-  const splitterRatioMatch = code.match(/CAB-SPLITTER-(?:BF|CON)-(\d+)-(\d+)/);
+  // Splitter ratio: SPLIT-BF-1-8, SPLIT-CON-1-16-LCAPC
+  const splitterRatioMatch = code.match(/SPLIT-(?:BF|CON)-(\d+)-(\d+)/);
   if (splitterRatioMatch) {
     params.model = splitterRatioMatch[1] + '-' + splitterRatioMatch[2];
   }
 
-  // Stay Set component models from stock codes (with bolt size for precise matching)
-  if (code.startsWith('STAY-')) {
-    let stayComp = '';
-    if (code.includes('BOTTOM-MAKEOFF')) stayComp = 'BOTTOM-MAKEOFF';
-    else if (code.includes('GUYGRIP')) stayComp = 'GUYGRIP';
-    else if (code.includes('WIRE')) stayComp = 'WIRE';
-    else if (code.includes('CW-BASE')) stayComp = 'CW-BASE+ROD';
-    else if (code.includes('THREADEDROD')) stayComp = 'THREADEDROD';
-    else if (code.includes('NBW')) stayComp = 'NBW';
-    else if (code.includes('NUT')) stayComp = 'NUT';
-    else if (code.includes('WASHER') && !code.includes('NBW')) stayComp = 'WASHER';
-
-    // Append bolt size (M12, M14) to component for precise matching
-    const stayBoltMatch = code.match(/M(\d{2})(?:-|$)/);
-    if (stayBoltMatch && stayComp) {
-      params.model = stayComp + '-M' + stayBoltMatch[1];
-    } else if (stayComp) {
-      params.model = stayComp;
-    }
-
-    // Wire gauge from stock: "7-2" in STAY-BOTTOM-MAKEOFF-7-2
-    const gaugeStockMatch = code.match(/(\d+)-(\d+)$/);
-    if (gaugeStockMatch && parseInt(gaugeStockMatch[1]) <= 10) {
-      params.dimensions = gaugeStockMatch[1] + '-' + gaugeStockMatch[2];
-    }
+  // Screw variants
+  if (code.startsWith('SCREW-')) {
+    if (code.includes('MIDCOUP')) params.variant = 'MIDCOUP';
+    if (code.includes('COACH')) params.variant = 'COACH';
   }
 
-  // Screw variants from stock codes
-  if (code.startsWith('CONS-SCREW')) {
-    if (code.includes('FH')) params.variant = 'FH';
-    else if (code.includes('MIDCOUP')) params.variant = 'MIDCOUP';
-  }
-
-  // Brady label variants from stock codes
-  if (code.startsWith('CONS-BRADYLABEL')) {
+  // Brady label variants
+  if (code.startsWith('BRADYLABEL')) {
     if (code.includes('CARRIER')) params.variant = 'CARRIER-Y';
   }
 
-  // Access chamber variants from stock codes
+  // Access chamber (manhole) variants
   if (code.includes('-EXT')) params.variant = 'EXT';
 
-  // Micro Duct dimensions from stock: PIPE-MD-HDPE-2WAY-14-10
-  if (code.startsWith('PIPE-MD-HDPE-') && !code.includes('COMBO') && !code.includes('SUB')) {
-    const mdMatch = code.match(/PIPE-MD-HDPE-\d+WAY-(\d+)-(\d+)/);
+  // Micro Duct dimensions: HDPE-2-1410 → ways=2, dimensions=14-10
+  if (code.startsWith('HDPE-') && !code.includes('SUBD')) {
+    const mdMatch = code.match(/HDPE-(\d+)-(\d+)(\d{2})$/);
     if (mdMatch) {
-      params.dimensions = mdMatch[1] + '-' + mdMatch[2];
+      params.ways = parseInt(mdMatch[1], 10);
+      params.dimensions = mdMatch[2] + '-' + mdMatch[3];
     }
   }
 
-  // Extract trailing numeric parameters (length, diameter)
-  // For CAB-LCAPC-SCAPC-10-3: after prefix removal, get [10, 3] → length=10, diameter=3
-  // For CAB-AER-SM-9.6-24F: after prefix, get [9.6] + fiber from above
-  // For POLE-5.4-100-120: get [5.4, 100-120]
-  // For CONDUIT-GLV-20-4: get [20, 4] → diameter=20, length=4
+  // Extract trailing numeric parameters
   const numericTail = extractNumericTail(code, params);
   if (numericTail.length) params.length = numericTail.length;
   if (numericTail.diameter) params.diameter = numericTail.diameter;
@@ -540,45 +549,39 @@ function extractNumericTail(
   }
 
   // Heuristic interpretation based on code prefix
-  const prefix = code.split('-').slice(0, 2).join('-');
-
-  if (code.startsWith('CAB-LCAPC-SCAPC-') && numericParts.length >= 2) {
-    // CAB-LCAPC-SCAPC-10-3 → length=10, diameter=3
+  if (code.startsWith('DROP-APC-') && numericParts.length >= 2) {
+    // DROP-APC-10-3 → length=10, diameter=3
     result.length = numericParts[0];
     result.diameter = numericParts[1];
+  } else if (code.startsWith('DROP-APC-') && numericParts.length === 1) {
+    result.length = numericParts[0];
   } else if (code.startsWith('CAB-AER-SM-') && numericParts.length >= 1) {
     // CAB-AER-SM-9.6-24F → diameter=9.6 (fiber already parsed)
     result.diameter = numericParts[0];
-  } else if (code.startsWith('CAB-TRENCH-MB-SM-') && numericParts.length >= 1) {
+  } else if (code.startsWith('CAB-MB-SM-') && numericParts.length >= 1) {
+    // CAB-MB-SM-5.6-12F → diameter=5.6
     result.diameter = numericParts[0];
   } else if (code.startsWith('POLE-') && numericParts.length >= 1) {
     result.length = numericParts[0]; // pole height
-  } else if ((prefix === 'CONDUIT-GLV' || prefix === 'CONDUIT-PVC') && numericParts.length >= 1) {
+  } else if (code.startsWith('CONDUIT-GLV-') && numericParts.length >= 1) {
     result.diameter = numericParts[0];
     if (numericParts.length >= 2) result.length = numericParts[1];
   } else if (code.startsWith('PIPE-HDPE-') || code.startsWith('PIPE-CORR-')) {
     if (numericParts.length >= 1) result.diameter = numericParts[0];
-  } else if (code.startsWith('TRUNK-PVC-') && numericParts.length >= 1) {
-    // TRUNK-PVC-16X16-2 → dimensions already parsed, length from numeric
-    result.length = numericParts[numericParts.length - 1];
-  } else if (code.startsWith('CONS-SPLICEPROT-') && numericParts.length >= 2) {
-    result.length = numericParts[0]; // splice protector length
-    result.diameter = numericParts[1]; // splice protector width
-  } else if (code.startsWith('CAB-PIGTAIL-') && numericParts.length >= 1) {
-    result.length = numericParts[numericParts.length - 1];
-  } else if (code.startsWith('PIPE-MD-HDPE-')) {
-    // Micro Duct OD/ID handled as dimensions, not diameter/length
-    // Skip numeric extraction here — dimensions parsed separately
-  } else if (code.startsWith('CONS-MD-') && numericParts.length >= 1) {
+  } else if (code.startsWith('SPLICEPROTECTOR-') && numericParts.length >= 1) {
+    // SPLICEPROTECTOR-2.2 → diameter=2.2
     result.diameter = numericParts[0];
-  } else if (code.startsWith('STAY-') || code.startsWith('DRESS-BANDITSTRAP-')) {
-    if (numericParts.length >= 1) result.length = numericParts[0];
-  } else if (code.startsWith('CONS-COACH-') && numericParts.length >= 2) {
-    result.diameter = numericParts[0];
-    result.length = numericParts[1];
-  } else if (code.startsWith('CAB-SPLITTER-') && numericParts.length >= 2) {
-    // CAB-SPLITTER-BF-1-8 → model = "1-8"
-    // Already handled in model extraction
+    if (numericParts.length >= 2) result.length = numericParts[1];
+  } else if (code.startsWith('LEAD-') && numericParts.length >= 1) {
+    // LEAD-LCAPC-SCAPC-3 → length=3
+    result.length = numericParts[numericParts.length - 1];
+  } else if (code.startsWith('MANHOLE-') && numericParts.length >= 1) {
+    // MANHOLE-300 → dimensions (size)
+    result.length = numericParts[0];
+  } else if (code.startsWith('COUPLING-') || code.startsWith('ENDCAP-')) {
+    if (numericParts.length >= 1) result.diameter = numericParts[0];
+  } else if (code.startsWith('SPLIT-') && numericParts.length >= 2) {
+    // SPLIT-BF-1-8 → model handled above
   } else if (numericParts.length === 1) {
     result.length = numericParts[0];
   }
@@ -682,14 +685,24 @@ function scoreParamMatch(boq: ParsedParams, stock: ParsedParams): { score: numbe
     }
   }
 
-  // Variant match (MINI, DUP, SIM, etc.)
+  // Variant match (MINI, DUP, SIM, FL, etc.)
+  // Normalize: sort variant substrings so "FLDUP" matches "DUPFL"
+  const normalizeVariant = (v: string) => {
+    const parts: string[] = [];
+    const tokens = ['QUAD', 'DUP', 'SIM', 'MINI', 'SLIMLINE', 'RAPID', 'FL', 'F', 'X', 'V'];
+    let remaining = v;
+    for (const t of tokens) {
+      if (remaining.includes(t)) { parts.push(t); remaining = remaining.replace(t, ''); }
+    }
+    if (remaining) parts.push(remaining);
+    return parts.sort().join('+');
+  };
   if (boq.variant && stock.variant) {
-    if (boq.variant === stock.variant) {
+    if (normalizeVariant(boq.variant) === normalizeVariant(stock.variant)) {
       score += 0.15;
       matched.push('variant');
     }
   } else if (boq.variant && !stock.variant) {
-    // BOQ says MINI but stock doesn't have MINI tag → penalty
     score -= 0.15;
   } else if (!boq.variant && stock.variant) {
     score -= 0.15;
