@@ -159,6 +159,9 @@ function parseBOQDescription(description: string): ParsedParams {
 
   let text = description.replace(/\(.*?\)/g, '').trim(); // Remove parenthetical notes
 
+  // Separate text labels from numbers: "ADSS10.80" → "ADSS.10.80"
+  text = text.replace(/([A-Za-z])(\d+[.,]\d+)/g, '$1.$2');
+
   // Protect decimal dots inside standalone numbers BEFORE splitting by '.'
   // "9.20-9.50mm" → "9,20-9,50mm" but NOT "G657A1.8mm" (letter before digit)
   text = text.replace(/(?<![A-Za-z])(\d)\.(\d)/g, '$1,$2');
@@ -208,9 +211,11 @@ function parseBOQDescription(description: string): ParsedParams {
     }
 
     // Model numbers: RN300, RN400, "RN400 Extension", ODCFD0, UMJ, CMJ
-    const rnMatch = part.match(/^(RN\d+)/i);
+    const rnMatch = part.match(/^RN(\d+)/i);
     if (rnMatch) {
-      params.model = rnMatch[1].toUpperCase();
+      params.model = 'RN' + rnMatch[1];
+      // Also store the numeric part as length for matching MANHOLE-300 etc.
+      params.length = parseInt(rnMatch[1], 10);
     } else if (/^(ODCFD\w*|UMJ|CMJ|MMJ)$/i.test(part)) {
       params.model = part.toUpperCase();
     }
@@ -617,9 +622,9 @@ function scoreParamMatch(boq: ParsedParams, stock: ParsedParams): { score: numbe
     }
   }
 
-  // Diameter match (with tolerance for rounding)
+  // Diameter match (with tolerance for rounding and cable spec differences)
   if (boq.diameter != null && stock.diameter != null) {
-    if (Math.abs(boq.diameter - stock.diameter) < 0.2) {
+    if (Math.abs(boq.diameter - stock.diameter) < 0.6) {
       score += 0.20;
       matched.push('diameter');
     }
