@@ -152,6 +152,30 @@ export class StockMatcher {
           matchConfidence: SUPPLIER_CODE_CONFIDENCE,
         };
       }
+
+      // Stage 1c: Prefix code match — BOQ codes often have variant suffixes
+      // e.g. BOQ "DP-A-1-LB-86/73-2-10" matches stock "DP-A-1-LB-86/73-2"
+      const prefixMatches = stockItems
+        .filter(s => {
+          const stockCode = s.itemCode.toLowerCase();
+          // BOQ code starts with stock code and next char is a separator
+          if (stockCode.length >= 4 && normalizedCode.startsWith(stockCode)) {
+            const remainder = normalizedCode.slice(stockCode.length);
+            return remainder === '' || /^[-_./]/.test(remainder);
+          }
+          return false;
+        })
+        .sort((a, b) => b.itemCode.length - a.itemCode.length); // Longest match wins
+
+      if (prefixMatches.length > 0) {
+        return {
+          ...baseResult,
+          stockItem: prefixMatches[0],
+          matchMethod: 'exact_code',
+          matchConfidence: 0.95,
+          alternatives: prefixMatches.slice(1, 4).map(s => ({ stockItem: s, score: 0.90 })),
+        };
+      }
     }
 
     // Stage 2: Fiber domain match (category + parameter matching)
