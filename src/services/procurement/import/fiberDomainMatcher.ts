@@ -160,7 +160,8 @@ function parseBOQDescription(description: string): ParsedParams {
   let text = description.replace(/\(.*?\)/g, '').trim(); // Remove parenthetical notes
 
   // Separate text labels from numbers: "ADSS10.80" → "ADSS.10.80"
-  text = text.replace(/([A-Za-z])(\d+[.,]\d+)/g, '$1.$2');
+  // Only match when number has 2+ digits before decimal to avoid corrupting "A1.1:16"
+  text = text.replace(/([A-Za-z])(\d{2,}[.,]\d+)/g, '$1.$2');
 
   // Protect decimal dots inside standalone numbers BEFORE splitting by '.'
   // "9.20-9.50mm" → "9,20-9,50mm" but NOT "G657A1.8mm" (letter before digit)
@@ -624,7 +625,11 @@ function scoreParamMatch(boq: ParsedParams, stock: ParsedParams): { score: numbe
 
   // Diameter match (with tolerance for rounding and cable spec differences)
   if (boq.diameter != null && stock.diameter != null) {
-    if (Math.abs(boq.diameter - stock.diameter) < 0.6) {
+    if (Math.abs(boq.diameter - stock.diameter) < 0.1) {
+      // Near-exact diameter match — higher score
+      score += 0.25;
+      matched.push('diameter');
+    } else if (Math.abs(boq.diameter - stock.diameter) < 0.6) {
       score += 0.20;
       matched.push('diameter');
     }
@@ -708,7 +713,10 @@ function scoreParamMatch(boq: ParsedParams, stock: ParsedParams): { score: numbe
       matched.push('variant');
     }
   } else if (boq.variant && !stock.variant) {
-    score -= 0.15;
+    // Only penalize for meaningful variant mismatches, not labels like SLIMLINE
+    if (boq.variant !== 'SLIMLINE') {
+      score -= 0.15;
+    }
   } else if (!boq.variant && stock.variant) {
     score -= 0.15;
   }
