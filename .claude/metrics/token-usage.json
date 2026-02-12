@@ -213,13 +213,13 @@
     "0616ef2f-2180-4c44-8553-949c54ab0deb": {
       "session_id": "0616ef2f-2180-4c44-8553-949c54ab0deb",
       "started_at": "2026-02-12T13:30:55.689Z",
-      "total_input_tokens": 45679,
+      "total_input_tokens": 46069,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.13703699999999994,
-      "tool_calls": 395,
+      "total_cost_usd": 0.1382069999999999,
+      "tool_calls": 398,
       "tools_used": {
         "Read": 60,
-        "Bash": 261,
+        "Bash": 264,
         "Grep": 23,
         "Task": 11,
         "Write": 5,
@@ -230,13 +230,13 @@
     "6b2b851e-2992-4c1e-b16d-b89477f56707": {
       "session_id": "6b2b851e-2992-4c1e-b16d-b89477f56707",
       "started_at": "2026-02-12T13:48:50.710Z",
-      "total_input_tokens": 52083,
+      "total_input_tokens": 52152,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.1562490000000002,
-      "tool_calls": 470,
+      "total_cost_usd": 0.1564560000000002,
+      "tool_calls": 475,
       "tools_used": {
         "Glob": 25,
-        "Bash": 163,
+        "Bash": 164,
         "Grep": 10,
         "Read": 103,
         "Task": 5,
@@ -261,7 +261,7 @@
         "Write": 9,
         "mcp__claude-in-chrome__tabs_context_mcp": 2,
         "mcp__claude-in-chrome__navigate": 3,
-        "mcp__claude-in-chrome__computer": 39,
+        "mcp__claude-in-chrome__computer": 43,
         "mcp__claude-in-chrome__find": 1,
         "mcp__claude-in-chrome__javascript_tool": 3,
         "mcp__claude-in-chrome__read_console_messages": 2,
@@ -271,18 +271,18 @@
     "d08f1430-53dc-42c0-9528-afba8cd85202": {
       "session_id": "d08f1430-53dc-42c0-9528-afba8cd85202",
       "started_at": "2026-02-12T17:13:57.410Z",
-      "total_input_tokens": 10594,
+      "total_input_tokens": 13786,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.03178199999999999,
-      "tool_calls": 89,
+      "total_cost_usd": 0.041357999999999985,
+      "tool_calls": 102,
       "tools_used": {
         "Grep": 11,
         "Glob": 5,
-        "Read": 17,
-        "Bash": 48,
+        "Read": 18,
+        "Bash": 55,
         "AskUserQuestion": 3,
-        "Edit": 1,
-        "Write": 4
+        "Edit": 2,
+        "Write": 8
       }
     }
   }
