@@ -1124,36 +1124,46 @@ docker-compose restart worker_wrapper
 # (see "Fix orphaned queued jobs" above)
 ```
 
-### CSRF Configuration
+### CSRF Configuration (Permanent - Feb 2026)
 
-**Two parts required** - passing the env var is NOT enough:
+**Now automatic** - CSRF patch is applied on every container start via entrypoint wrapper. No manual intervention needed.
 
-**Part 1: `.env` + override (already done):**
-```bash
-# .env
-CSRF_TRUSTED_ORIGINS="https://srv1083126.hstgr.cloud https://qfield.fibreflow.app"
-```
-```yaml
-# docker-compose.override.yml
-app:
-  environment:
-    CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
-```
+**How it works:**
+1. `.env` has `CSRF_TRUSTED_ORIGINS="https://srv1083126.hstgr.cloud https://qfield.fibreflow.app"`
+2. `docker-compose.override.yml` passes it as env var AND mounts the patch files
+3. `/opt/qfieldcloud/entrypoint-wrapper.sh` runs before gunicorn, appends CSRF code to settings.py
+4. `/opt/qfieldcloud/settings_csrf_patch.py` contains the actual Python CSRF code
 
-**Part 2: In-container settings patch (REQUIRED - QFieldCloud doesn't read this env var):**
-```bash
-docker exec qfieldcloud-app-1 sed -i '61a\
-\
-_csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")\
-CSRF_TRUSTED_ORIGINS = [o for o in _csrf_origins.split(" ") if o]' /usr/src/app/qfieldcloud/settings.py
-docker-compose restart app
-```
-
-**IMPORTANT:** Part 2 is an in-container edit. It persists across `restart` but is **lost on `up -d app`** (recreate). Must re-apply after any container recreate.
+**Files on Velocity host:**
+| File | Purpose |
+|------|---------|
+| `/opt/qfieldcloud/entrypoint-wrapper.sh` | Wrapper entrypoint (mounted read-only) |
+| `/opt/qfieldcloud/settings_csrf_patch.py` | CSRF Python code (mounted read-only) |
 
 **Verify:** `docker exec qfieldcloud-app-1 python manage.py shell -c "from django.conf import settings; print(settings.CSRF_TRUSTED_ORIGINS)"`
 
-Without this, admin login/logout and all POST forms fail with 403 "Origin checking failed".
+**History:** Previously used manual `sed` patch that was lost on container recreate and once broke with a SyntaxError (joining two lines). The entrypoint wrapper approach is permanent.
+
+Without CSRF config, admin login/logout and all POST forms fail with 403 "Origin checking failed".
+
+### STORAGES endpoint_url (Feb 2026 Fix)
+
+**CRITICAL:** The `.env` has TWO MinIO endpoint configs:
+1. `STORAGE_ENDPOINT_URL=http://minio:9000` - Used by some code paths
+2. `STORAGES` JSON → `endpoint_url` - Used by Django file storage backend (file downloads)
+
+**Both MUST use `http://minio:9000`** (internal Docker DNS). Never use `http://172.17.0.1:8009` (Docker bridge IP) - it becomes unreachable when Docker networking changes.
+
+**Symptom:** QField app shows HTTP-524 timeout when syncing. App logs show `Connect timeout on endpoint URL: "http://172.17.0.1:8009/..."`.
+
+**Fix:**
+```bash
+cd /opt/qfieldcloud
+# Update endpoint in .env STORAGES JSON
+sed -i 's|"endpoint_url": "http://172.17.0.1:8009"|"endpoint_url": "http://minio:9000"|' .env
+# CRITICAL: Restart BOTH app AND workers (they have separate STORAGES copies)
+docker-compose up -d app worker_wrapper
+```
 
 ### Restart Commands
 

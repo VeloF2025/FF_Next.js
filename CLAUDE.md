@@ -101,22 +101,28 @@ Run `ls .claude/modules/` for full list (40+ modules).
 
 **Server Access:**
 ```bash
-ssh velo@100.96.203.105  # Velocity - Password: velo2026 (sudo/root, ALL deploys)
-ssh hein@100.96.203.105  # Velocity - Password: 0203 (git ops only, no sudo)
-ssh root@72.61.197.178   # VPS (WhatsApp services)
-# ALWAYS use velo for deploys - hein has no sudo for service restarts
+ssh velo@100.96.203.105    # Velocity - SSH key auth (sudo/root, ALL deploys)
+ssh zander@100.96.203.105  # Velocity - Password: zander2026 (sudo, full deploy access)
+ssh root@72.61.197.178     # VPS (WhatsApp services)
 ```
 
-**Deploy Commands:**
+**All deploy dirs under /home/velo/:**
+```
+/home/velo/fibreflow-dev/         # Dev (dev.fibreflow.app)
+/home/velo/fibreflow-staging/     # Staging (vf.fibreflow.app)
+/home/velo/fibreflow-production/  # Production (app.fibreflow.app)
+```
+
+**Deploy Commands (SSH key auth — no passwords needed):**
 ```bash
 # Dev
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Staging
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 
 # Production
-sshpass -p 'velo2026' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 **Full details:** `docs/INFRASTRUCTURE.md` | Credentials: `.claude/credentials.local.md`
