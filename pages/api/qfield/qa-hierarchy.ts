@@ -37,23 +37,28 @@ async function handler(
     }
 
     // Get hierarchy grouped by zone, PON, and work type
-    // Join to poles for zone_no/pon_no
+    // Join to drops for zone_no/pon_no (drops table has the zone/PON data, poles table doesn't)
+    // Use a subquery to get one zone/pon per pole_number to avoid inflated counts from multiple drops
     const rows: HierarchyRow[] = await sql`
       SELECT
-        p.zone_no,
-        p.pon_no,
+        dz.zone_no,
+        dz.pon_no,
         v.work_type,
         COUNT(*)::int as photo_count,
         COUNT(*) FILTER (WHERE v.workflow_status = 'pending')::int as pending,
         COUNT(*) FILTER (WHERE v.workflow_status = 'approved')::int as approved,
         COUNT(*) FILTER (WHERE v.workflow_status = 'rejected')::int as rejected
       FROM qfield_photo_validations v
-      LEFT JOIN poles p ON v.feature_id = p.pole_number
+      LEFT JOIN (
+        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
+        FROM drops
+        ORDER BY pole_number, zone_no, pon_no
+      ) dz ON v.feature_id = dz.pole_number
       WHERE v.project_id = (
         SELECT id FROM qfield_projects WHERE id = ${projectId}::uuid
       )
-      GROUP BY p.zone_no, p.pon_no, v.work_type
-      ORDER BY p.zone_no NULLS LAST, p.pon_no NULLS LAST, v.work_type
+      GROUP BY dz.zone_no, dz.pon_no, v.work_type
+      ORDER BY dz.zone_no NULLS LAST, dz.pon_no NULLS LAST, v.work_type
     `;
 
     // Build the hierarchical structure

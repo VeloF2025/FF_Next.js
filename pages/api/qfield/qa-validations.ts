@@ -112,26 +112,27 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
-    // Zone/PON filters require poles join — tracked via needsPolesJoin flag
-    let needsPolesJoin = false;
+    // Zone/PON filters use drops table (which has zone/pon data, unlike poles)
+    // Use a subquery to get one zone/pon per pole_number to avoid duplicate rows
+    let needsDropsJoin = false;
 
     if (zoneNo) {
-      needsPolesJoin = true;
+      needsDropsJoin = true;
       if (zoneNo === 'null' || zoneNo === '-1') {
-        conditions.push('poles_filter.zone_no IS NULL');
+        conditions.push('drops_filter.zone_no IS NULL');
       } else {
-        conditions.push(`poles_filter.zone_no = $${paramIndex}`);
+        conditions.push(`drops_filter.zone_no = $${paramIndex}`);
         params.push(parseInt(zoneNo as string, 10));
         paramIndex++;
       }
     }
 
     if (ponNo) {
-      needsPolesJoin = true;
+      needsDropsJoin = true;
       if (ponNo === 'null' || ponNo === '-1') {
-        conditions.push('poles_filter.pon_no IS NULL');
+        conditions.push('drops_filter.pon_no IS NULL');
       } else {
-        conditions.push(`poles_filter.pon_no = $${paramIndex}`);
+        conditions.push(`drops_filter.pon_no = $${paramIndex}`);
         params.push(parseInt(ponNo as string, 10));
         paramIndex++;
       }
@@ -143,8 +144,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
-    const polesFilterJoin = needsPolesJoin
-      ? 'LEFT JOIN poles poles_filter ON v.feature_id = poles_filter.pole_number'
+    const dropsFilterJoin = needsDropsJoin
+      ? `LEFT JOIN (
+          SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
+          FROM drops ORDER BY pole_number, zone_no, pon_no
+        ) drops_filter ON v.feature_id = drops_filter.pole_number`
       : '';
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -153,7 +157,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM qfield_photo_validations v
-      ${polesFilterJoin}
+      ${dropsFilterJoin}
       ${whereClause}
     `;
     const countResult = await sql.query(countQuery, params);
@@ -198,8 +202,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         p.latitude AS pole_latitude,
         p.longitude AS pole_longitude,
         p.address AS pole_address,
-        p.zone_no AS pole_zone_no,
-        p.pon_no AS pole_pon_no,
+        -- Zone/PON from drops (drops table has zone/pon data)
+        dz.zone_no AS pole_zone_no,
+        dz.pon_no AS pole_pon_no,
         -- Drop context
         d.drop_number,
         d.pole_number AS drop_pole_number,
@@ -212,8 +217,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       FROM qfield_photo_validations v
       LEFT JOIN poles p ON v.feature_type = 'pole' AND v.feature_id = p.pole_number
       LEFT JOIN drops d ON v.feature_type = 'drop' AND v.feature_id = d.drop_number
+      LEFT JOIN (
+        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
+        FROM drops ORDER BY pole_number, zone_no, pon_no
+      ) dz ON v.feature_id = dz.pole_number
       LEFT JOIN qfield_projects qp ON v.project_id = qp.id
-      ${polesFilterJoin}
+      ${dropsFilterJoin}
       ${whereClause}
       ORDER BY
         CASE v.priority
