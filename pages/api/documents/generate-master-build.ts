@@ -2,7 +2,7 @@
  * API: Generate Master Build Agreement
  *
  * POST /api/documents/generate-master-build
- * Body: { contractorId: string }
+ * Body: { contractorId: string, agreementDate?: string, effectiveDate?: string }
  *
  * Returns: DOCX file download
  */
@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { contractorId } = req.body;
+  const { contractorId, agreementDate, effectiveDate } = req.body;
 
   if (!contractorId) {
     return res.status(400).json({ error: 'contractorId is required' });
@@ -64,6 +64,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const fullAddress = addressParts.join(', ');
 
+    // Format custom dates if provided (YYYY-MM-DD → human-readable)
+    const formatDate = (dateStr: string | undefined): string | undefined => {
+      if (!dateStr) return undefined;
+      try {
+        return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-ZA', {
+          day: 'numeric', month: 'long', year: 'numeric',
+        });
+      } catch {
+        return undefined;
+      }
+    };
+
     // Prepare data for document generation
     const docData: ContractorDocData = {
       contractor_name: (contractor.company_name as string) || '',
@@ -72,6 +84,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       contractor_physical_address: fullAddress,
       contractor_email: (contractor.email as string) || '',
       contractor_phone: (contractor.phone as string) || '',
+      agreement_date: formatDate(agreementDate as string),
+      effective_date: formatDate(effectiveDate as string),
     };
 
     log.info('Generating Master Build Agreement', {
