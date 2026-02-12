@@ -2,28 +2,16 @@
  * WhatsApp Inbound Message API
  * POST /api/communications/whatsapp/inbound - Receive messages from Bridge
  *
- * Called by whatsapp-bridge-2 when a message is received from WhatsApp groups
+ * Called by whatsapp-bridge when a message is received from WhatsApp groups.
+ * Auth: bridge secret (NOT withAuth - called by Go WhatsApp Bridge)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-});
-
-// Shared secret for Bridge authentication - must be set in env, no fallback
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
-if (!BRIDGE_SECRET) {
-  log.error('WA_BRIDGE_SECRET environment variable is required but not set');
-}
 
 interface InboundMessageRequest {
   secret: string;
@@ -46,13 +34,19 @@ async function handler(
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  const body = req.body as InboundMessageRequest;
+  // Verify bridge secret
+  if (!BRIDGE_SECRET) {
+    log.error('[wa-inbound] WA_BRIDGE_SECRET env var not set');
+    return res.status(500).json({ success: false, error: 'Server configuration error' });
+  }
 
-  // Validate secret
-  if (body.secret !== BRIDGE_SECRET) {
+  const body = req.body as InboundMessageRequest;
+  const secret = body.secret || req.headers['x-bridge-secret'];
+
+  if (secret !== BRIDGE_SECRET) {
     return res.status(401).json({
       success: false,
-      error: 'Unauthorized',
+      error: 'Unauthorized: invalid bridge secret',
     });
   }
 
@@ -122,4 +116,5 @@ async function handler(
   }
 }
 
-export default withAuth(handler);
+// No withAuth — called by Go WhatsApp Bridge with bridge secret
+export default handler;
