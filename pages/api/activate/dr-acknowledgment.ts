@@ -218,14 +218,19 @@ function buildSerialWarningLines(
 ): string[] {
   const lines: string[] = [];
 
+  // Only trust VLM serial comparison if confidence >= 95%
+  // Blurry photos produce low-confidence misreads that mislead techs
+  const MIN_VLM_CONFIDENCE = 0.95;
+  const trustVlm = vlmResult && vlmResult.confidence >= MIN_VLM_CONFIDENCE;
+
   // --- ONT Serial ---
   if (ontSerial) {
-    if (vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
+    if (trustVlm && vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
       lines.push(`🔴 *ONT Serial MISMATCH:*`);
       lines.push(`   1Map: ${ontSerial}`);
       lines.push(`   Sticker: ${vlmResult.ontSerial}`);
       lines.push(`   ⚠️ *Please correct in 1Map!*`);
-    } else if (vlmResult?.ontSerial) {
+    } else if (trustVlm && vlmResult?.ontSerial) {
       lines.push(`🔌 ONT Serial: ${ontSerial} ✅`);
     } else {
       lines.push(`🔌 ONT Serial: ${ontSerial}`);
@@ -233,7 +238,7 @@ function buildSerialWarningLines(
   } else {
     lines.push(`🔴 *ONT Serial: NOT SCANNED*`);
     lines.push(`   ⚠️ *Please scan ONT barcode in 1Map!*`);
-    if (vlmResult?.ontSerial) {
+    if (trustVlm && vlmResult?.ontSerial) {
       lines.push(`   📷 Photo shows: ${vlmResult.ontSerial}`);
     }
   }
@@ -247,12 +252,12 @@ function buildSerialWarningLines(
 
   // --- UPS Serial ---
   if (upsSerial) {
-    if (vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
+    if (trustVlm && vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
       lines.push(`🔴 *UPS Serial MISMATCH:*`);
       lines.push(`   1Map: ${upsSerial}`);
       lines.push(`   Sticker: ${vlmResult.upsSerial}`);
       lines.push(`   ⚠️ *Please correct in 1Map!*`);
-    } else if (vlmResult?.upsSerial) {
+    } else if (trustVlm && vlmResult?.upsSerial) {
       lines.push(`🔋 UPS Serial: ${upsSerial} ✅`);
     } else {
       lines.push(`🔋 UPS Serial: ${upsSerial}`);
@@ -260,7 +265,7 @@ function buildSerialWarningLines(
   } else {
     lines.push(`🔴 *UPS Serial: NOT SCANNED*`);
     lines.push(`   ⚠️ *Please scan UPS barcode in 1Map!*`);
-    if (vlmResult?.upsSerial) {
+    if (trustVlm && vlmResult?.upsSerial) {
       lines.push(`   📷 Photo shows: ${vlmResult.upsSerial}`);
     }
   }
@@ -485,7 +490,8 @@ function generateResubmissionAckMessage(
   if (swapCheck.swapped) {
     lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
     lines.push(`⚠️ UPS field: ${upsSerial || 'Not scanned'}`);
-    if (vlmResult?.ontSerial || vlmResult?.upsSerial) {
+    // Show VLM serials for reference only if high confidence
+    if (vlmResult && vlmResult.confidence >= 0.95 && (vlmResult.ontSerial || vlmResult.upsSerial)) {
       lines.push('');
       lines.push(`📷 Photo serials: ONT=${vlmResult.ontSerial || '?'} UPS=${vlmResult.upsSerial || '?'}`);
     }
@@ -581,8 +587,8 @@ function generateAckMessage(
     // Already warned above, just show the raw values
     lines.push(`⚠️ ONT field: ${ontSerial || 'Not scanned'}`);
     lines.push(`⚠️ UPS field: ${upsSerial || 'Not scanned'}`);
-    // Show VLM serials for reference even when swapped
-    if (vlmResult?.ontSerial || vlmResult?.upsSerial) {
+    // Show VLM serials for reference even when swapped (only if high confidence)
+    if (vlmResult && vlmResult.confidence >= 0.95 && (vlmResult.ontSerial || vlmResult.upsSerial)) {
       lines.push('');
       lines.push(`📷 Photo serials: ONT=${vlmResult.ontSerial || '?'} UPS=${vlmResult.upsSerial || '?'}`);
     }
