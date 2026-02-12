@@ -9,6 +9,7 @@ import type {
   QAStats,
   QAProject,
   QAFilters,
+  QAHierarchy,
   ActionRequest,
   ActionType,
   Priority,
@@ -25,6 +26,8 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
   const [validations, setValidations] = useState<PhotoValidation[]>([]);
   const [stats, setStats] = useState<QAStats | null>(null);
   const [projects, setProjects] = useState<QAProject[]>([]);
+  const [hierarchy, setHierarchy] = useState<QAHierarchy | null>(null);
+  const [hierarchyLoading, setHierarchyLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -35,6 +38,11 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     total: 0,
     totalPages: 0,
   });
+
+  // Hierarchy navigation state
+  const [selectedZone, setSelectedZone] = useState<number | null | undefined>(undefined);
+  const [selectedPon, setSelectedPon] = useState<number | null | undefined>(undefined);
+  const [selectedFeatureType, setSelectedFeatureType] = useState<string | undefined>(undefined);
 
   // Use refs to track current values without causing re-renders
   const filtersRef = useRef(filters);
@@ -77,6 +85,19 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     }
   }, []); // No dependencies - stable reference
 
+  // Fetch hierarchy when project changes
+  const fetchHierarchy = useCallback(async (projectId: string) => {
+    try {
+      setHierarchyLoading(true);
+      const result = await qfieldQaApiService.getHierarchy(projectId);
+      setHierarchy(result.data);
+    } catch (err) {
+      setHierarchy(null);
+    } finally {
+      setHierarchyLoading(false);
+    }
+  }, []);
+
   // Fetch when filters or pagination change
   useEffect(() => {
     fetchValidations();
@@ -114,12 +135,16 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
       };
       const result = await qfieldQaApiService.executeAction(request);
       await fetchValidations(false);
+      // Refresh hierarchy if we have a project selected
+      if (filtersRef.current.projectId) {
+        fetchHierarchy(filtersRef.current.projectId);
+      }
       return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
       throw err;
     }
-  }, [fetchValidations]);
+  }, [fetchValidations, fetchHierarchy]);
 
   // Trigger validation
   const triggerValidation = useCallback(async (validationIds: string[]): Promise<{
@@ -132,10 +157,8 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
   }> => {
     try {
       const result = await qfieldQaApiService.triggerValidation({ validationIds });
-      // Refresh data after a short delay for background mode
       const data = result.data as { mode?: string; queued?: number; success?: number; failed?: number; total?: number; message?: string };
       if (data.mode === 'background') {
-        // For background processing, refresh after a delay to show "validating" status
         setTimeout(() => fetchValidations(false), 1000);
       } else {
         await fetchValidations(false);
@@ -174,6 +197,61 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     }
   }, [fetchValidations]);
 
+  // Select a hierarchy node — update filters to match
+  const selectNode = useCallback((
+    zoneNo?: number | null,
+    ponNo?: number | null,
+    featureType?: string,
+  ) => {
+    setSelectedZone(zoneNo);
+    setSelectedPon(ponNo);
+    setSelectedFeatureType(featureType);
+
+    const newFilters: Partial<QAFilters> = {};
+
+    // Zone filter (undefined = not set, null = "Unassigned" zone)
+    if (zoneNo !== undefined) {
+      newFilters.zoneNo = zoneNo === null ? undefined : zoneNo;
+      // For null zones, pass special string marker via the filter
+      if (zoneNo === null) {
+        // Signal "null zone" — handled by sending zoneNo=null as query param
+        newFilters.zoneNo = -1; // sentinel: API handles -1 as NULL filter
+      }
+    }
+
+    if (ponNo !== undefined) {
+      newFilters.ponNo = ponNo === null ? undefined : ponNo;
+      if (ponNo === null) {
+        newFilters.ponNo = -1;
+      }
+    }
+
+    if (featureType !== undefined) {
+      newFilters.featureType = featureType;
+    }
+
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters,
+      // Clear deeper levels when selecting a higher level
+      ...(zoneNo !== undefined && ponNo === undefined ? { ponNo: undefined, featureType: undefined } : {}),
+      ...(ponNo !== undefined && featureType === undefined ? { featureType: undefined } : {}),
+    }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, []);
+
+  // Clear hierarchy selection
+  const clearSelection = useCallback(() => {
+    setSelectedZone(undefined);
+    setSelectedPon(undefined);
+    setSelectedFeatureType(undefined);
+    setFilters(prev => {
+      const { zoneNo, ponNo, featureType, ...rest } = prev;
+      return rest;
+    });
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, []);
+
   // Update filters
   const updateFilters = useCallback((newFilters: Partial<QAFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
@@ -183,6 +261,9 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
   // Clear filters
   const clearFilters = useCallback(() => {
     setFilters({});
+    setSelectedZone(undefined);
+    setSelectedPon(undefined);
+    setSelectedFeatureType(undefined);
     setPagination(prev => ({ ...prev, page: 1 }));
   }, []);
 
@@ -196,14 +277,24 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     validations,
     stats,
     projects,
+    hierarchy,
+    hierarchyLoading,
     pagination,
     filters,
     loading,
     error,
     lastRefresh,
 
+    // Hierarchy navigation
+    selectedZone,
+    selectedPon,
+    selectedFeatureType,
+
     // Actions
     refresh: fetchValidations,
+    fetchHierarchy,
+    selectNode,
+    clearSelection,
     executeAction,
     triggerValidation,
     assignPhotos,

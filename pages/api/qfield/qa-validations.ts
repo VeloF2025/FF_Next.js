@@ -22,6 +22,9 @@ interface ValidationFilters {
   priority?: string;
   needsRetake?: boolean;
   search?: string;
+  zoneNo?: string;
+  ponNo?: string;
+  featureType?: string;
   page?: number;
   pageSize?: number;
 }
@@ -49,6 +52,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       priority,
       needsRetake,
       search,
+      zoneNo,
+      ponNo,
+      featureType,
       page = '1',
       pageSize = '50',
     } = req.query;
@@ -106,12 +112,48 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
+    // Zone/PON filters require poles join — tracked via needsPolesJoin flag
+    let needsPolesJoin = false;
+
+    if (zoneNo) {
+      needsPolesJoin = true;
+      if (zoneNo === 'null' || zoneNo === '-1') {
+        conditions.push('poles_filter.zone_no IS NULL');
+      } else {
+        conditions.push(`poles_filter.zone_no = $${paramIndex}`);
+        params.push(parseInt(zoneNo as string, 10));
+        paramIndex++;
+      }
+    }
+
+    if (ponNo) {
+      needsPolesJoin = true;
+      if (ponNo === 'null' || ponNo === '-1') {
+        conditions.push('poles_filter.pon_no IS NULL');
+      } else {
+        conditions.push(`poles_filter.pon_no = $${paramIndex}`);
+        params.push(parseInt(ponNo as string, 10));
+        paramIndex++;
+      }
+    }
+
+    if (featureType) {
+      conditions.push(`v.work_type = $${paramIndex}`);
+      params.push(featureType as string);
+      paramIndex++;
+    }
+
+    const polesFilterJoin = needsPolesJoin
+      ? 'LEFT JOIN poles poles_filter ON v.feature_id = poles_filter.pole_number'
+      : '';
+
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
       FROM qfield_photo_validations v
+      ${polesFilterJoin}
       ${whereClause}
     `;
     const countResult = await sql.query(countQuery, params);
@@ -156,6 +198,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         p.latitude AS pole_latitude,
         p.longitude AS pole_longitude,
         p.address AS pole_address,
+        p.zone_no AS pole_zone_no,
+        p.pon_no AS pole_pon_no,
         -- Drop context
         d.drop_number,
         d.pole_number AS drop_pole_number,
@@ -169,6 +213,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN poles p ON v.feature_type = 'pole' AND v.feature_id = p.pole_number
       LEFT JOIN drops d ON v.feature_type = 'drop' AND v.feature_id = d.drop_number
       LEFT JOIN qfield_projects qp ON v.project_id = qp.id
+      ${polesFilterJoin}
       ${whereClause}
       ORDER BY
         CASE v.priority

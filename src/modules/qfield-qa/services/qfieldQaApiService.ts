@@ -8,6 +8,7 @@ import type {
   QAProject,
   QAAssignment,
   QAFilters,
+  QAHierarchy,
   ActionRequest,
 } from '../types';
 
@@ -52,6 +53,9 @@ export const qfieldQaApiService = {
     if (filters.priority) params.set('priority', filters.priority);
     if (filters.needsRetake !== undefined) params.set('needsRetake', String(filters.needsRetake));
     if (filters.search) params.set('search', filters.search);
+    if (filters.zoneNo !== undefined) params.set('zoneNo', filters.zoneNo === -1 ? 'null' : String(filters.zoneNo));
+    if (filters.ponNo !== undefined) params.set('ponNo', filters.ponNo === -1 ? 'null' : String(filters.ponNo));
+    if (filters.featureType) params.set('featureType', filters.featureType);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
 
@@ -153,6 +157,15 @@ export const qfieldQaApiService = {
       body: JSON.stringify(params),
     });
     if (!response.ok) throw new Error('Failed to assign photos');
+    return response.json();
+  },
+
+  /**
+   * Get hierarchy (zone -> PON -> feature type tree) for a project
+   */
+  async getHierarchy(projectId: string): Promise<ApiResponse<QAHierarchy>> {
+    const response = await fetch(`${BASE_URL}/qa-hierarchy?projectId=${projectId}`);
+    if (!response.ok) throw new Error('Failed to fetch hierarchy');
     return response.json();
   },
 

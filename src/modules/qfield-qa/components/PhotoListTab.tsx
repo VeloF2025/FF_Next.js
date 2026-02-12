@@ -43,6 +43,8 @@ interface PhotoListTabProps {
   onEscalate: (ids: string[], reason: string) => Promise<void>;
   onRevalidate: (ids: string[]) => Promise<void>;
   onAssign: (ids: string[], assignee: string, options?: { dueDate?: string; priority?: string }) => Promise<void>;
+  /** When true, hides the built-in filter bar (used when dashboard provides its own filters) */
+  hideFilters?: boolean;
 }
 
 export function PhotoListTab({
@@ -60,6 +62,7 @@ export function PhotoListTab({
   onReject,
   onRevalidate,
   onAssign,
+  hideFilters,
 }: PhotoListTabProps) {
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
@@ -187,92 +190,94 @@ export function PhotoListTab({
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
-            <input
-              type="text"
-              placeholder="Search photos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-            />
+      {/* Filters — hidden when parent provides its own filter bar */}
+      {!hideFilters && (
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <div className="flex flex-wrap gap-3 items-center">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                placeholder="Search photos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Project Filter */}
+            <select
+              value={filters.projectId || ''}
+              onChange={(e) => onFilterChange({ projectId: e.target.value || undefined })}
+              className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Projects</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            {/* Work Type Filter */}
+            <select
+              value={filters.workType || ''}
+              onChange={(e) => onFilterChange({ workType: e.target.value as any || undefined })}
+              className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Types</option>
+              <option value="pole_installation">Pole Installation</option>
+              <option value="cable_stringing">Cable Stringing</option>
+              <option value="dome_joint">Dome Joint</option>
+              <option value="activation">Activation</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={filters.workflowStatus || ''}
+              onChange={(e) => onFilterChange({ workflowStatus: e.target.value as WorkflowStatus || undefined })}
+              className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_review">In Review</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="escalated">Escalated</option>
+            </select>
+
+            {/* Priority Filter */}
+            <select
+              value={filters.priority || ''}
+              onChange={(e) => onFilterChange({ priority: e.target.value as Priority || undefined })}
+              className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value="">All Priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </select>
+
+            {/* Clear Button */}
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                onFilterChange({
+                  projectId: undefined,
+                  workType: undefined,
+                  workflowStatus: undefined,
+                  priority: undefined,
+                  search: undefined,
+                });
+              }}
+              className="px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+            >
+              Clear
+            </button>
           </div>
-
-          {/* Project Filter */}
-          <select
-            value={filters.projectId || ''}
-            onChange={(e) => onFilterChange({ projectId: e.target.value || undefined })}
-            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="">All Projects</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-
-          {/* Work Type Filter */}
-          <select
-            value={filters.workType || ''}
-            onChange={(e) => onFilterChange({ workType: e.target.value as any || undefined })}
-            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="">All Types</option>
-            <option value="pole_installation">Pole Installation</option>
-            <option value="cable_stringing">Cable Stringing</option>
-            <option value="dome_joint">Dome Joint</option>
-            <option value="activation">Activation</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={filters.workflowStatus || ''}
-            onChange={(e) => onFilterChange({ workflowStatus: e.target.value as WorkflowStatus || undefined })}
-            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="in_review">In Review</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="escalated">Escalated</option>
-          </select>
-
-          {/* Priority Filter */}
-          <select
-            value={filters.priority || ''}
-            onChange={(e) => onFilterChange({ priority: e.target.value as Priority || undefined })}
-            className="px-3 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-          >
-            <option value="">All Priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option>
-          </select>
-
-          {/* Clear Button */}
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              onFilterChange({
-                projectId: undefined,
-                workType: undefined,
-                workflowStatus: undefined,
-                priority: undefined,
-                search: undefined,
-              });
-            }}
-            className="px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-          >
-            Clear
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
@@ -650,10 +655,20 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
         <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate" title={displayTitle}>
           {displayTitle}
         </p>
-        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           <span className="px-2 py-0.5 text-xs text-[var(--ff-text-secondary)] bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded capitalize">
             {photo.feature_type || formatWorkType(photo.work_type)}
           </span>
+          {photo.pole_zone_no != null && (
+            <span className="px-1.5 py-0.5 text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded">
+              Z{photo.pole_zone_no}
+            </span>
+          )}
+          {photo.pole_pon_no != null && (
+            <span className="px-1.5 py-0.5 text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded">
+              P{photo.pole_pon_no}
+            </span>
+          )}
           {photo.priority && photo.priority !== 'normal' && (
             <PriorityBadge priority={photo.priority} />
           )}

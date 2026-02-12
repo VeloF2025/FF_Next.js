@@ -62,6 +62,8 @@ export interface PhotoValidation {
   pole_longitude?: number | null;
   pole_address?: string | null;
   pole_images?: string[] | null;
+  pole_zone_no?: number | null;
+  pole_pon_no?: number | null;
 
   // Joined drop context
   drop_number?: string | null;
@@ -156,8 +158,47 @@ export interface QAFilters {
   priority?: Priority;
   needsRetake?: boolean;
   search?: string;
+  zoneNo?: number;
+  ponNo?: number;
+  featureType?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface QAHierarchyFeatureType {
+  work_type: string;
+  photo_count: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface QAHierarchyPon {
+  pon_no: number | null;
+  photo_count: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  feature_types: QAHierarchyFeatureType[];
+}
+
+export interface QAHierarchyZone {
+  zone_no: number | null;
+  photo_count: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  pons: QAHierarchyPon[];
+}
+
+export interface QAHierarchy {
+  zones: QAHierarchyZone[];
+  totals: {
+    photo_count: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
 }
 
 export interface ActionRequest {

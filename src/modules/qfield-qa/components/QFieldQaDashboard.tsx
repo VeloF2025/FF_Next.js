@@ -1,61 +1,63 @@
 /**
  * QField QA Dashboard
- * Main dashboard for QField photo validation and QA workflow
+ * Hybrid layout: sidebar (project + hierarchy tree) + content (photo grid)
  *
  * Follows FibreFlow UI patterns:
  * - EnhancedStatCard + StatsGrid for summary cards
  * - CSS variables for dark mode compatibility
- * - Tab navigation via URL params
+ * - Activate-style hierarchy navigation
  */
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useMemo, useCallback } from 'react';
 import {
   RefreshCw,
   CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
-  User,
   Camera,
   Layers,
   Calendar,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
 import { useQFieldQa } from '../hooks/useQFieldQa';
-import { OverviewTab } from './OverviewTab';
+import { ProjectSelector } from './ProjectSelector';
+import { HierarchyTree } from './HierarchyTree';
+import { SearchFilterBar } from './SearchFilterBar';
 import { PhotoListTab } from './PhotoListTab';
 import { PhotoDetailModal } from './PhotoDetailModal';
 import type { PhotoValidation } from '../types';
 import { log } from '@/lib/logger';
 
-type TabType = 'overview' | 'queue' | 'photos';
-
 export function QFieldQaDashboard() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // Read tab from URL, default to 'overview'
-  const tabFromUrl = (searchParams.get('tab') as TabType) || 'overview';
-  const [activeTab, setActiveTab] = useState<TabType>(tabFromUrl);
-
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoValidation | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [currentUser, setCurrentUser] = useState<string>('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   const {
     validations,
     stats,
     projects,
+    hierarchy,
+    hierarchyLoading,
     pagination,
     filters,
     loading,
     error,
     lastRefresh,
+    selectedZone,
+    selectedPon,
+    selectedFeatureType,
     refresh,
+    fetchHierarchy,
+    selectNode,
+    clearSelection,
     executeAction,
     triggerValidation,
     assignPhotos,
@@ -64,40 +66,27 @@ export function QFieldQaDashboard() {
     setPage,
   } = useQFieldQa({ autoRefresh: true, refreshInterval: 30000 });
 
-  // Get current user from auth context or session
-  useEffect(() => {
-    setCurrentUser(localStorage.getItem('userEmail') || '');
-  }, []);
+  // Load hierarchy when project is selected
+  const handleProjectSelect = useCallback((projectId: string) => {
+    updateFilters({ projectId });
+    fetchHierarchy(projectId);
+    clearSelection();
+  }, [updateFilters, fetchHierarchy, clearSelection]);
 
-  // Sync tab with URL
-  useEffect(() => {
-    if (tabFromUrl !== activeTab) {
-      setActiveTab(tabFromUrl);
+  // Build breadcrumb from hierarchy selection
+  const breadcrumb = useMemo(() => {
+    const parts: string[] = [];
+    if (selectedZone !== undefined) {
+      parts.push(selectedZone !== null ? `Zone ${selectedZone}` : 'Unassigned');
     }
-  }, [tabFromUrl]);
-
-  // My queue count
-  const myQueueCount = useMemo(() => {
-    if (!currentUser || !validations) return 0;
-    return validations.filter(v => v.assigned_to === currentUser).length;
-  }, [currentUser, validations]);
-
-  // Handle tab change - update URL
-  const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tab);
-    router.push(`?${params.toString()}`, { scroll: false });
-
-    // Update filters based on tab
-    if (tab === 'queue') {
-      updateFilters({ assignedTo: currentUser, workflowStatus: 'in_review' });
-    } else if (tab === 'photos') {
-      clearFilters();
-    } else {
-      clearFilters();
+    if (selectedPon !== undefined) {
+      parts.push(selectedPon !== null ? `PON ${selectedPon}` : 'Unassigned');
     }
-  }, [router, searchParams, currentUser, updateFilters, clearFilters]);
+    if (selectedFeatureType) {
+      parts.push(formatWorkType(selectedFeatureType));
+    }
+    return parts.length > 0 ? parts.join(' > ') : undefined;
+  }, [selectedZone, selectedPon, selectedFeatureType]);
 
   // Handle photo click
   const handlePhotoClick = (photo: PhotoValidation) => {
@@ -142,19 +131,14 @@ export function QFieldQaDashboard() {
     }
   };
 
-  // State for validation feedback
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
-
   // Handle re-validate
   const handleRevalidate = async (ids: string[]) => {
     try {
       const result = await triggerValidation(ids);
       setSelectedIds([]);
 
-      // Show feedback based on processing mode
       if (result.mode === 'background') {
         setValidationMessage(`Queued ${result.total} photos for AI validation. Results will appear as they complete.`);
-        // Auto-clear message after 10 seconds
         setTimeout(() => setValidationMessage(null), 10000);
       } else if (result.success !== undefined) {
         setValidationMessage(`Validated ${result.success}/${result.total} photos`);
@@ -266,10 +250,17 @@ export function QFieldQaDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg transition-colors"
+            title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+          >
+            {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
+          </button>
           <button
             onClick={() => refresh()}
             disabled={loading}
@@ -304,7 +295,7 @@ export function QFieldQaDashboard() {
             onClick={() => setValidationMessage(null)}
             className="ml-auto text-blue-400 hover:text-blue-300"
           >
-            ✕
+            <XCircle className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -312,95 +303,60 @@ export function QFieldQaDashboard() {
       {/* Stats Cards */}
       <StatsGrid cards={statsCards} columns={6} />
 
-      {/* Tabs */}
-      <div className="border-b border-[var(--ff-border-light)]">
-        <nav className="flex gap-6" aria-label="Tabs">
-          <button
-            onClick={() => handleTabChange('overview')}
-            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'overview'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-medium)]'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => handleTabChange('queue')}
-            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
-              activeTab === 'queue'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-medium)]'
-            }`}
-          >
-            My Queue
-            {myQueueCount > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-400 rounded-full">
-                {myQueueCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleTabChange('photos')}
-            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'photos'
-                ? 'border-blue-500 text-blue-500'
-                : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-medium)]'
-            }`}
-          >
-            All Photos
-          </button>
-        </nav>
+      {/* Main Layout: Sidebar + Content */}
+      <div className="flex gap-4">
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <div className="w-[280px] flex-shrink-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden self-start sticky top-4">
+            <ProjectSelector
+              projects={projects}
+              selectedProjectId={filters.projectId}
+              onSelect={handleProjectSelect}
+              loading={loading}
+            />
+            <HierarchyTree
+              hierarchy={hierarchy}
+              loading={hierarchyLoading}
+              selectedZone={selectedZone}
+              selectedPon={selectedPon}
+              selectedFeatureType={selectedFeatureType}
+              onSelectNode={selectNode}
+              onClearSelection={clearSelection}
+            />
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* Search & Filter Bar */}
+          <SearchFilterBar
+            filters={filters}
+            onFilterChange={updateFilters}
+            onClearFilters={clearFilters}
+            breadcrumb={breadcrumb}
+          />
+
+          {/* Photo Grid */}
+          <PhotoListTab
+            validations={validations}
+            projects={projects}
+            filters={filters}
+            pagination={pagination}
+            loading={loading}
+            selectedIds={selectedIds}
+            onFilterChange={updateFilters}
+            onPageChange={setPage}
+            onPhotoClick={handlePhotoClick}
+            onSelectionChange={handleSelectionChange}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onEscalate={handleEscalate}
+            onRevalidate={handleRevalidate}
+            onAssign={handleAssign}
+            hideFilters
+          />
+        </div>
       </div>
-
-      {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <OverviewTab
-          stats={stats}
-          recentActivity={stats?.recent_activity || []}
-          onViewAll={() => handleTabChange('photos')}
-        />
-      )}
-
-      {activeTab === 'queue' && (
-        <PhotoListTab
-          validations={validations.filter(v => v.assigned_to === currentUser)}
-          projects={projects}
-          filters={filters}
-          pagination={pagination}
-          loading={loading}
-          selectedIds={selectedIds}
-          onFilterChange={updateFilters}
-          onPageChange={setPage}
-          onPhotoClick={handlePhotoClick}
-          onSelectionChange={handleSelectionChange}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onEscalate={handleEscalate}
-          onRevalidate={handleRevalidate}
-          onAssign={handleAssign}
-        />
-      )}
-
-      {activeTab === 'photos' && (
-        <PhotoListTab
-          validations={validations}
-          projects={projects}
-          filters={filters}
-          pagination={pagination}
-          loading={loading}
-          selectedIds={selectedIds}
-          onFilterChange={updateFilters}
-          onPageChange={setPage}
-          onPhotoClick={handlePhotoClick}
-          onSelectionChange={handleSelectionChange}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onEscalate={handleEscalate}
-          onRevalidate={handleRevalidate}
-          onAssign={handleAssign}
-        />
-      )}
 
       {/* Photo Detail Modal */}
       {selectedPhoto && (
@@ -416,6 +372,16 @@ export function QFieldQaDashboard() {
       )}
     </div>
   );
+}
+
+function formatWorkType(workType: string): string {
+  switch (workType) {
+    case 'pole_installation': return 'Poles';
+    case 'cable_stringing': return 'Cables';
+    case 'dome_joint': return 'Dome Joints';
+    case 'activation': return 'Activation';
+    default: return workType.charAt(0).toUpperCase() + workType.slice(1).replace(/_/g, ' ');
+  }
 }
 
 export default QFieldQaDashboard;
