@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 import { MaterialMatcher, MatchInput, MatchOptions } from './materialMatcher';
 import { CategoryMapper } from './categoryMapper';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
+import { log } from '@/lib/logger';
 import type {
   BOQImportResult,
   FiberBudgetCategoryCode,
@@ -102,6 +103,7 @@ export class BOQImportEnhanced {
 
   /**
    * Import BOQ from parsed rows
+   * Optimized: pre-loads materials into memory, batches DB writes
    */
   async processRows(
     rows: BOQRow[],
@@ -147,34 +149,60 @@ export class BOQImportEnhanced {
       budgetCategories = budgetResult.categories;
     }
 
-    // Process each row
-    const categoryTotals = new Map<FiberBudgetCategoryCode, { count: number; amount: number }>();
+    // Pre-load all materials into memory for fast matching (1 query instead of 3N)
+    const allMaterials = await this.materialMatcher.getAllMaterials();
+    log.info('Pre-loaded materials for matching', { data: { count: allMaterials.length } }, 'boq-import');
 
+    this.reportProgress(options, 'matching', 0, validRows.length, 'Matching materials...');
+
+    // Pre-map all categories in memory (no DB calls - uses keyword fallback after 1 init query)
+    const categoryResults: FiberBudgetCategoryCode[] = [];
+    for (const row of validRows) {
+      const catResult = await this.categoryMapper.mapCategory(row.itemCategory || '');
+      categoryResults.push(catResult.budgetCategoryCode);
+    }
+
+    // Pre-match all items using cached materials (0 DB queries for matching)
+    const matchResults: MaterialMatchResult[] = [];
     for (let i = 0; i < validRows.length; i++) {
       const row = validRows[i];
-      this.reportProgress(options, 'matching', i + 1, validRows.length, `Processing: ${row.description?.substring(0, 40)}...`);
-
-      try {
-        // Map category
-        const categoryResult = await this.categoryMapper.mapCategory(row.itemCategory || '');
-        const budgetCategoryCode = categoryResult.budgetCategoryCode;
-
-        // Match or create material
-        const matchInput: MatchInput = {
+      const matchResult = await this.materialMatcher.matchItemWithCache(
+        {
           itemCode: row.itemCode,
           description: row.description,
           category: row.itemCategory,
           uom: row.uom,
-        };
-
-        const matchOptions: MatchOptions = {
+        },
+        allMaterials,
+        {
           createIfNotFound: options.createMaterials !== false,
-          budgetCategory: budgetCategoryCode,
+          budgetCategory: categoryResults[i],
           userId: options.userId,
-        };
+        }
+      );
+      matchResults.push(matchResult);
+    }
 
-        const matchResult = await this.materialMatcher.matchItem(matchInput, matchOptions);
+    log.info('Material matching complete', {
+      data: {
+        total: matchResults.length,
+        matched: matchResults.filter(m => m.matchType !== 'new_item').length,
+        newItems: matchResults.filter(m => m.isNewMaterial).length,
+      }
+    }, 'boq-import');
 
+    this.reportProgress(options, 'creating', 0, validRows.length, 'Creating BOQ items...');
+
+    // Process each row with pre-computed matches
+    const categoryTotals = new Map<FiberBudgetCategoryCode, { count: number; amount: number }>();
+    const matchHistoryBatch: { matchResult: MaterialMatchResult }[] = [];
+
+    for (let i = 0; i < validRows.length; i++) {
+      const row = validRows[i];
+      const budgetCategoryCode = categoryResults[i];
+      const matchResult = matchResults[i];
+
+      try {
         // Track stats
         if (matchResult.matchType === 'exact_code') {
           result.materialsMatched++;
@@ -187,29 +215,44 @@ export class BOQImportEnhanced {
           result.materialsMatched++;
         }
 
-        // Record match history
-        if (!options.dryRun) {
-          await this.materialMatcher.recordMatchHistory(boqId, matchResult, options.userId);
-        }
+        // Collect match history for batch insert later
+        matchHistoryBatch.push({ matchResult });
 
-        // Create BOQ item
+        // Create BOQ item (single INSERT, no extra SELECT)
         if (!options.dryRun) {
-          const boqItemId = await this.createBoqItem(boqId, options.projectId, row, matchResult, budgetCategoryCode);
+          const budgetCategoryId = budgetCategories.get(budgetCategoryCode) || null;
+
+          const boqItemResult = await this.sql`
+            INSERT INTO boq_items (
+              boq_id, project_id, line_number, description, uom,
+              quantity, unit_price, total_price, category,
+              material_catalog_id, item_code, budget_category_id,
+              mapping_confidence, mapping_status
+            ) VALUES (
+              ${boqId}, ${options.projectId}, ${row.itemNo || 0},
+              ${row.description}, ${row.uom || 'unit'},
+              ${row.quantity || 0}, ${row.itemRate || 0},
+              ${(row.quantity || 0) * (row.itemRate || 0)},
+              ${row.itemCategory || null},
+              ${matchResult.matchedMaterial?.id || null},
+              ${row.itemCode || null}, ${budgetCategoryId},
+              ${matchResult.matchConfidence * 100},
+              ${matchResult.matchedMaterial ? 'mapped' : 'pending'}
+            )
+            RETURNING id
+          `;
 
           // Create budget item if enabled
-          if (options.createBudgetItems && projectBudgetId && row.quantity && row.itemRate) {
-            const budgetCategoryId = budgetCategories.get(budgetCategoryCode);
-            if (budgetCategoryId) {
-              await this.createBudgetItem({
-                projectBudgetId,
-                budgetCategoryId,
-                materialCatalogId: matchResult.matchedMaterial?.id,
-                boqItemId,
-                row,
-                budgetCategoryCode,
-              });
-              result.budgetItemsCreated++;
-            }
+          if (options.createBudgetItems && projectBudgetId && row.quantity && row.itemRate && budgetCategoryId) {
+            await this.createBudgetItem({
+              projectBudgetId,
+              budgetCategoryId,
+              materialCatalogId: matchResult.matchedMaterial?.id,
+              boqItemId: boqItemResult[0].id,
+              row,
+              budgetCategoryCode,
+            });
+            result.budgetItemsCreated++;
           }
         }
 
@@ -225,6 +268,22 @@ export class BOQImportEnhanced {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         result.errors!.push(`Row ${i + 1}: ${errorMsg}`);
+      }
+
+      // Report progress every 25 items
+      if ((i + 1) % 25 === 0 || i === validRows.length - 1) {
+        this.reportProgress(options, 'creating', i + 1, validRows.length, `Created ${i + 1}/${validRows.length} items`);
+      }
+    }
+
+    // Batch insert match history (non-blocking, errors don't fail import)
+    if (!options.dryRun && matchHistoryBatch.length > 0) {
+      try {
+        for (const entry of matchHistoryBatch) {
+          await this.materialMatcher.recordMatchHistory(boqId, entry.matchResult, options.userId);
+        }
+      } catch (error) {
+        log.warn('Failed to record some match history', { data: { error: String(error) } }, 'boq-import');
       }
     }
 

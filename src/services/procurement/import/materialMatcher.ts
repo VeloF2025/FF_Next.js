@@ -252,9 +252,9 @@ export class MaterialMatcher {
   }
 
   /**
-   * Match item with pre-loaded material cache
+   * Match item with pre-loaded material cache (public for batch imports)
    */
-  private async matchItemWithCache(
+  async matchItemWithCache(
     input: MatchInput,
     materials: MaterialCatalog[],
     options: MatchOptions
@@ -387,9 +387,9 @@ export class MaterialMatcher {
   }
 
   /**
-   * Get all active materials
+   * Get all active materials (public for batch pre-loading)
    */
-  private async getAllMaterials(): Promise<MaterialCatalog[]> {
+  async getAllMaterials(): Promise<MaterialCatalog[]> {
     const result = await this.sql`
       SELECT *
       FROM material_catalog
