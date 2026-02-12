@@ -22,6 +22,8 @@ const ALLOWED_TYPES: Record<string, number[][]> = {
   'image/webp': [[0x52, 0x49, 0x46, 0x46]], // RIFF header
   'application/pdf': [[0x25, 0x50, 0x44, 0x46]], // %PDF
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [[0x50, 0x4B, 0x03, 0x04]], // ZIP (xlsx)
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [[0x50, 0x4B, 0x03, 0x04]], // ZIP (docx)
+  'application/msword': [[0xD0, 0xCF, 0x11, 0xE0]], // OLE2 (doc)
   'text/csv': [], // No magic bytes for CSV
 };
 

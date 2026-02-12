@@ -188,7 +188,10 @@ export function ProjectDocumentManager({
         credentials: 'include',
         body: formData,
       });
-      if (!response.ok) throw new Error('Upload failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Upload failed');
+      }
       const data = await response.json();
       setUploadData((prev) => ({
         ...prev,
