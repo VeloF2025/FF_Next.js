@@ -71,71 +71,101 @@ export function usePortalSession(): UsePortalSessionReturn {
     checkExistingSession();
   }, []);
 
-  // Authenticate with plate photo
+  // Authenticate with plate photo (with retry for network failures)
   const authenticateWithPlate = useCallback(
     async (platePhotoBase64: string): Promise<PlateAuthResult> => {
       setIsLoading(true);
       setError(null);
 
-      try {
-        const response = await fetch('/api/fleet/portal/plate-auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platePhotoBase64 }),
-        });
+      const MAX_RETRIES = 2;
+      const requestBody = JSON.stringify({ platePhotoBase64 });
 
-        const data = await response.json();
-        const result = data.data as PlateAuthResult;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const response = await fetch('/api/fleet/portal/plate-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: requestBody,
+          });
 
-        if (response.ok && result?.success) {
-          // Session cookie is set automatically by the API
-          // Update local state with the returned data
-          if (result.session) {
-            setSession({
-              sessionId: result.session.sessionId,
-              vehicleId: result.vehicle?.id || '',
-              vehicleRegistration: result.vehicle?.registration || '',
-              driverId: result.driver?.id || null,
-              driverName: result.driver?.name || null,
-              driverPhone: result.driver?.phone || null,
-              createdAt: new Date().toISOString(),
-              expiresAt: result.session.expiresAt,
-            });
+          const data = await response.json();
+          const result = data.data as PlateAuthResult;
+
+          if (response.ok && result?.success) {
+            // Session cookie is set automatically by the API
+            // Update local state with the returned data
+            if (result.session) {
+              setSession({
+                sessionId: result.session.sessionId,
+                vehicleId: result.vehicle?.id || '',
+                vehicleRegistration: result.vehicle?.registration || '',
+                driverId: result.driver?.id || null,
+                driverName: result.driver?.name || null,
+                driverPhone: result.driver?.phone || null,
+                createdAt: new Date().toISOString(),
+                expiresAt: result.session.expiresAt,
+              });
+            }
+
+            if (result.vehicle) {
+              setVehicle(result.vehicle);
+            }
+
+            if (result.driver) {
+              setDriver(result.driver);
+            }
+
+            return result;
+          } else {
+            // Server returned an error - don't retry these
+            const rawError = result?.error || data.error || 'Authentication failed';
+            const errorMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : String(rawError);
+            setError(errorMsg);
+            setIsLoading(false);
+            return {
+              success: false,
+              extractedPlate: result?.extractedPlate || '',
+              confidence: result?.confidence || 0,
+              error: errorMsg,
+            };
+          }
+        } catch (err) {
+          const isNetworkError = err instanceof TypeError && (
+            err.message === 'Failed to fetch' ||
+            err.message === 'NetworkError when attempting to fetch resource.' ||
+            err.message === 'Network request failed' ||
+            err.message.includes('network')
+          );
+
+          // Retry on network errors, but not on other errors
+          if (isNetworkError && attempt < MAX_RETRIES) {
+            // Wait before retry: 2s, then 4s
+            await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 2000));
+            continue;
           }
 
-          if (result.vehicle) {
-            setVehicle(result.vehicle);
-          }
-
-          if (result.driver) {
-            setDriver(result.driver);
-          }
-
-          return result;
-        } else {
-          // Extract error message string - data.error may be an object {code, message} from apiResponse
-          const rawError = result?.error || data.error || 'Authentication failed';
-          const errorMsg = typeof rawError === 'object' ? (rawError.message || JSON.stringify(rawError)) : String(rawError);
+          const errorMsg = isNetworkError
+            ? 'NETWORK_ERROR'
+            : (err instanceof Error ? err.message : 'Unknown error');
           setError(errorMsg);
+          setIsLoading(false);
           return {
             success: false,
-            extractedPlate: result?.extractedPlate || '',
-            confidence: result?.confidence || 0,
+            extractedPlate: '',
+            confidence: 0,
             error: errorMsg,
           };
         }
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Network error';
-        setError(errorMsg);
-        return {
-          success: false,
-          extractedPlate: '',
-          confidence: 0,
-          error: errorMsg,
-        };
-      } finally {
-        setIsLoading(false);
       }
+
+      // Should not reach here, but just in case
+      setIsLoading(false);
+      return {
+        success: false,
+        extractedPlate: '',
+        confidence: 0,
+        error: 'NETWORK_ERROR',
+      };
     },
     []
   );

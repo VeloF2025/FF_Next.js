@@ -254,73 +254,87 @@ export default function VehiclePortalPage() {
     }
   };
 
+  // Last captured base64 for retry
+  const [lastPlateBase64, setLastPlateBase64] = useState<string | null>(null);
+
+  // Process plate verification from base64
+  const processPlateVerification = useCallback(async (base64: string) => {
+    setLastPlateBase64(base64);
+    setVerifying(true);
+    setVerificationResult(null);
+
+    const result = await authenticateWithPlate(base64);
+
+    setVerificationResult({
+      success: result.success,
+      extractedPlate: result.extractedPlate,
+      confidence: result.confidence,
+      vehicle: result.vehicle ? {
+        id: result.vehicle.id,
+        registration: result.vehicle.registration,
+        make: result.vehicle.make,
+        model: result.vehicle.model,
+        year: result.vehicle.year,
+        vehicleType: result.vehicle.vehicleType,
+        color: result.vehicle.color,
+        assignedStaffName: result.vehicle.assignedDriver?.name || null,
+        assignedDriver: result.vehicle.assignedDriver,
+        lastOdometer: result.vehicle.lastOdometer,
+        lastFuel: result.vehicle.lastFuel,
+        lastCheckIn: result.vehicle.lastCheckIn,
+      } : null,
+      error: result.error,
+    });
+
+    if (result.success && result.vehicle) {
+      setVerifiedVehicle({
+        id: result.vehicle.id,
+        registration: result.vehicle.registration,
+        make: result.vehicle.make,
+        model: result.vehicle.model,
+        year: result.vehicle.year,
+        vehicleType: result.vehicle.vehicleType,
+        color: result.vehicle.color,
+        assignedStaffName: result.vehicle.assignedDriver?.name || null,
+        assignedDriver: result.vehicle.assignedDriver,
+        lastOdometer: result.vehicle.lastOdometer,
+        lastFuel: result.vehicle.lastFuel,
+        lastCheckIn: result.vehicle.lastCheckIn,
+      });
+      setStep('verified');
+      toast.success(`Logged in: ${result.vehicle.registration}`);
+    } else if (result.error !== 'NETWORK_ERROR') {
+      toast.error(result.error || 'Could not verify plate');
+    }
+
+    setVerifying(false);
+  }, [authenticateWithPlate]);
+
+  // Retry last plate verification
+  const handleRetryVerification = useCallback(() => {
+    if (lastPlateBase64) {
+      processPlateVerification(lastPlateBase64);
+    }
+  }, [lastPlateBase64, processPlateVerification]);
+
   // Handle plate photo capture - this IS the login
   const handlePlateCapture = useCallback(async (file: File) => {
     setPlatePhotoFile(file);
     const previewUrl = URL.createObjectURL(file);
     setPlatePhotoUrl(previewUrl);
 
-    // Start verification/authentication
-    setVerifying(true);
     try {
-      // Convert to base64
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = (reader.result as string).split(',')[1] || '';
-
-        // Call plate-auth API - this creates a session (no password needed!)
-        const result = await authenticateWithPlate(base64);
-
-        setVerificationResult({
-          success: result.success,
-          extractedPlate: result.extractedPlate,
-          confidence: result.confidence,
-          vehicle: result.vehicle ? {
-            id: result.vehicle.id,
-            registration: result.vehicle.registration,
-            make: result.vehicle.make,
-            model: result.vehicle.model,
-            year: result.vehicle.year,
-            vehicleType: result.vehicle.vehicleType,
-            color: result.vehicle.color,
-            assignedStaffName: result.vehicle.assignedDriver?.name || null,
-            assignedDriver: result.vehicle.assignedDriver,
-            lastOdometer: result.vehicle.lastOdometer,
-            lastFuel: result.vehicle.lastFuel,
-            lastCheckIn: result.vehicle.lastCheckIn,
-          } : null,
-          error: result.error,
-        });
-
-        if (result.success && result.vehicle) {
-          setVerifiedVehicle({
-            id: result.vehicle.id,
-            registration: result.vehicle.registration,
-            make: result.vehicle.make,
-            model: result.vehicle.model,
-            year: result.vehicle.year,
-            vehicleType: result.vehicle.vehicleType,
-            color: result.vehicle.color,
-            assignedStaffName: result.vehicle.assignedDriver?.name || null,
-            assignedDriver: result.vehicle.assignedDriver,
-            lastOdometer: result.vehicle.lastOdometer,
-            lastFuel: result.vehicle.lastFuel,
-            lastCheckIn: result.vehicle.lastCheckIn,
-          });
-          setStep('verified');
-          toast.success(`Logged in: ${result.vehicle.registration}`);
-        } else {
-          toast.error(result.error || 'Could not verify plate');
-        }
-
-        setVerifying(false);
+        await processPlateVerification(base64);
       };
       reader.readAsDataURL(file);
     } catch (err) {
-      toast.error('Failed to verify plate');
+      toast.error('Failed to read photo');
       setVerifying(false);
     }
-  }, [authenticateWithPlate]);
+  }, [processPlateVerification]);
 
   // Reset and try again (logout)
   const handleReset = () => {
@@ -864,24 +878,57 @@ export default function VehiclePortalPage() {
 
               {/* Verification error */}
               {verificationResult && !verificationResult.success && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <XCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-red-800 dark:text-red-200">
-                        Verification Failed
-                      </p>
-                      <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                        {verificationResult.error || 'Could not identify vehicle'}
-                      </p>
-                      {verificationResult.extractedPlate && (
-                        <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                          Detected: {verificationResult.extractedPlate}
+                verificationResult.error === 'NETWORK_ERROR' ? (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                          Connection Problem
                         </p>
-                      )}
+                        <p className="text-sm text-amber-600 dark:text-amber-300 mt-1">
+                          Could not reach the server. Please check your mobile data or WiFi connection and try again.
+                        </p>
+                        <button
+                          onClick={handleRetryVerification}
+                          disabled={verifying}
+                          className="mt-3 w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                        >
+                          {verifying ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Retrying...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              Retry Verification
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <XCircle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-red-800 dark:text-red-200">
+                          Verification Failed
+                        </p>
+                        <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                          {verificationResult.error || 'Could not identify vehicle'}
+                        </p>
+                        {verificationResult.extractedPlate && (
+                          <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                            Detected: {verificationResult.extractedPlate}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
 
               {/* Capture buttons */}
