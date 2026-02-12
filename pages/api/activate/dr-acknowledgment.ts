@@ -222,7 +222,6 @@ function buildSerialWarningLines(
   // Below that, prompt the tech to double-check rather than showing a wrong mismatch
   const MIN_VLM_CONFIDENCE = 0.95;
   const trustVlm = vlmResult && vlmResult.confidence >= MIN_VLM_CONFIDENCE;
-  const hasLowConfidenceVlm = vlmResult && vlmResult.confidence > 0 && vlmResult.confidence < MIN_VLM_CONFIDENCE;
 
   // --- ONT Serial ---
   if (ontSerial) {
@@ -233,11 +232,9 @@ function buildSerialWarningLines(
       lines.push(`   ⚠️ *Please correct in 1Map!*`);
     } else if (trustVlm && vlmResult?.ontSerial) {
       lines.push(`🔌 ONT Serial: ${ontSerial} ✅`);
-    } else if (hasLowConfidenceVlm && vlmResult?.ontSerial) {
-      lines.push(`🔌 ONT Serial: ${ontSerial}`);
-      lines.push(`   📷 Photo unclear - please double-check ONT serial`);
     } else {
       lines.push(`🔌 ONT Serial: ${ontSerial}`);
+      lines.push(`   📷 Please double-check ONT serial`);
     }
   } else {
     lines.push(`🔴 *ONT Serial: NOT SCANNED*`);
@@ -263,11 +260,9 @@ function buildSerialWarningLines(
       lines.push(`   ⚠️ *Please correct in 1Map!*`);
     } else if (trustVlm && vlmResult?.upsSerial) {
       lines.push(`🔋 UPS Serial: ${upsSerial} ✅`);
-    } else if (hasLowConfidenceVlm && vlmResult?.upsSerial) {
-      lines.push(`🔋 UPS Serial: ${upsSerial}`);
-      lines.push(`   📷 Photo unclear - please double-check UPS serial`);
     } else {
       lines.push(`🔋 UPS Serial: ${upsSerial}`);
+      lines.push(`   📷 Please double-check UPS serial`);
     }
   } else {
     lines.push(`🔴 *UPS Serial: NOT SCANNED*`);
