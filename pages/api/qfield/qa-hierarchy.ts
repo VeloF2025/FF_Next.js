@@ -21,6 +21,17 @@ interface HierarchyRow {
   rejected: string;
 }
 
+interface FeatureRow {
+  zone_no: number | null;
+  pon_no: number | null;
+  feature_id: string;
+  work_type: string | null;
+  photo_count: string;
+  pending: string;
+  approved: string;
+  rejected: string;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -61,6 +72,56 @@ async function handler(
       ORDER BY dz.zone_no NULLS LAST, dz.pon_no NULLS LAST, v.work_type
     `;
 
+    // Get individual features (poles/joints) per zone/PON
+    const featureRows: FeatureRow[] = await sql`
+      SELECT
+        dz.zone_no,
+        dz.pon_no,
+        v.feature_id,
+        v.work_type,
+        COUNT(*)::int as photo_count,
+        COUNT(*) FILTER (WHERE v.workflow_status = 'pending')::int as pending,
+        COUNT(*) FILTER (WHERE v.workflow_status = 'approved')::int as approved,
+        COUNT(*) FILTER (WHERE v.workflow_status = 'rejected')::int as rejected
+      FROM qfield_photo_validations v
+      LEFT JOIN (
+        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
+        FROM drops
+        ORDER BY pole_number, zone_no, pon_no
+      ) dz ON v.feature_id = dz.pole_number
+      WHERE v.project_id = (
+        SELECT id FROM qfield_projects WHERE id = ${projectId}::uuid
+      )
+      AND v.feature_id IS NOT NULL
+      GROUP BY dz.zone_no, dz.pon_no, v.feature_id, v.work_type
+      ORDER BY dz.zone_no NULLS LAST, dz.pon_no NULLS LAST, v.feature_id
+    `;
+
+    // Index features by zone_no + pon_no key
+    const featuresByPon = new Map<string, Array<{
+      feature_id: string;
+      work_type: string;
+      photo_count: number;
+      pending: number;
+      approved: number;
+      rejected: number;
+    }>>();
+
+    for (const fr of featureRows) {
+      const key = `${fr.zone_no}_${fr.pon_no}`;
+      if (!featuresByPon.has(key)) {
+        featuresByPon.set(key, []);
+      }
+      featuresByPon.get(key)!.push({
+        feature_id: fr.feature_id,
+        work_type: fr.work_type || 'unknown',
+        photo_count: Number(fr.photo_count),
+        pending: Number(fr.pending),
+        approved: Number(fr.approved),
+        rejected: Number(fr.rejected),
+      });
+    }
+
     // Build the hierarchical structure
     const zoneMap = new Map<number | null, {
       zone_no: number | null;
@@ -75,6 +136,14 @@ async function handler(
         approved: number;
         rejected: number;
         feature_types: Array<{
+          work_type: string;
+          photo_count: number;
+          pending: number;
+          approved: number;
+          rejected: number;
+        }>;
+        features: Array<{
+          feature_id: string;
           work_type: string;
           photo_count: number;
           pending: number;
@@ -126,6 +195,7 @@ async function handler(
           approved: 0,
           rejected: 0,
           feature_types: [],
+          features: [],
         });
       }
       const pon = zone.ponMap.get(row.pon_no)!;
@@ -151,14 +221,18 @@ async function handler(
       pending: zone.pending,
       approved: zone.approved,
       rejected: zone.rejected,
-      pons: Array.from(zone.ponMap.values()).map(pon => ({
-        pon_no: pon.pon_no,
-        photo_count: pon.photo_count,
-        pending: pon.pending,
-        approved: pon.approved,
-        rejected: pon.rejected,
-        feature_types: pon.feature_types,
-      })),
+      pons: Array.from(zone.ponMap.values()).map(pon => {
+        const ponKey = `${zone.zone_no}_${pon.pon_no}`;
+        return {
+          pon_no: pon.pon_no,
+          photo_count: pon.photo_count,
+          pending: pon.pending,
+          approved: pon.approved,
+          rejected: pon.rejected,
+          feature_types: pon.feature_types,
+          features: featuresByPon.get(ponKey) || [],
+        };
+      }),
     }));
 
     return apiResponse.success(res, {

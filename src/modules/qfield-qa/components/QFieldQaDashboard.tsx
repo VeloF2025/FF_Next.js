@@ -54,6 +54,7 @@ export function QFieldQaDashboard() {
     selectedZone,
     selectedPon,
     selectedFeatureType,
+    selectedFeatureId,
     refresh,
     fetchHierarchy,
     selectNode,
@@ -82,11 +83,13 @@ export function QFieldQaDashboard() {
     if (selectedPon !== undefined) {
       parts.push(selectedPon !== null ? `PON ${selectedPon}` : 'Unassigned');
     }
-    if (selectedFeatureType) {
+    if (selectedFeatureId) {
+      parts.push(selectedFeatureId);
+    } else if (selectedFeatureType) {
       parts.push(formatWorkType(selectedFeatureType));
     }
     return parts.length > 0 ? parts.join(' > ') : undefined;
-  }, [selectedZone, selectedPon, selectedFeatureType]);
+  }, [selectedZone, selectedPon, selectedFeatureType, selectedFeatureId]);
 
   // Handle photo click
   const handlePhotoClick = (photo: PhotoValidation) => {
@@ -320,6 +323,7 @@ export function QFieldQaDashboard() {
               selectedZone={selectedZone}
               selectedPon={selectedPon}
               selectedFeatureType={selectedFeatureType}
+              selectedFeatureId={selectedFeatureId}
               onSelectNode={selectNode}
               onClearSelection={clearSelection}
             />

@@ -144,6 +144,13 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       paramIndex++;
     }
 
+    const { featureId } = req.query;
+    if (featureId && typeof featureId === 'string') {
+      conditions.push(`v.feature_id = $${paramIndex}`);
+      params.push(featureId);
+      paramIndex++;
+    }
+
     const dropsFilterJoin = needsDropsJoin
       ? `LEFT JOIN (
           SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no

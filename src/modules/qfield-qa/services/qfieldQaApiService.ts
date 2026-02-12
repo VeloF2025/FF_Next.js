@@ -56,6 +56,7 @@ export const qfieldQaApiService = {
     if (filters.zoneNo !== undefined) params.set('zoneNo', filters.zoneNo === -1 ? 'null' : String(filters.zoneNo));
     if (filters.ponNo !== undefined) params.set('ponNo', filters.ponNo === -1 ? 'null' : String(filters.ponNo));
     if (filters.featureType) params.set('featureType', filters.featureType);
+    if (filters.featureId) params.set('featureId', filters.featureId);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
 

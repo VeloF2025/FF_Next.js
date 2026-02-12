@@ -161,8 +161,18 @@ export interface QAFilters {
   zoneNo?: number;
   ponNo?: number;
   featureType?: string;
+  featureId?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface QAHierarchyFeature {
+  feature_id: string;
+  work_type: string;
+  photo_count: number;
+  pending: number;
+  approved: number;
+  rejected: number;
 }
 
 export interface QAHierarchyFeatureType {
@@ -180,6 +190,7 @@ export interface QAHierarchyPon {
   approved: number;
   rejected: number;
   feature_types: QAHierarchyFeatureType[];
+  features: QAHierarchyFeature[];
 }
 
 export interface QAHierarchyZone {

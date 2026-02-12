@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Loader2, MapPin, Cable, Zap } from 'lucide-react';
-import type { QAHierarchy, QAHierarchyZone, QAHierarchyPon, QAHierarchyFeatureType } from '../types';
+import type { QAHierarchy, QAHierarchyZone, QAHierarchyPon, QAHierarchyFeature } from '../types';
 
 interface HierarchyTreeProps {
   hierarchy: QAHierarchy | null;
@@ -15,7 +15,8 @@ interface HierarchyTreeProps {
   selectedZone?: number | null;
   selectedPon?: number | null;
   selectedFeatureType?: string;
-  onSelectNode: (zoneNo?: number | null, ponNo?: number | null, featureType?: string) => void;
+  selectedFeatureId?: string;
+  onSelectNode: (zoneNo?: number | null, ponNo?: number | null, featureType?: string, featureId?: string) => void;
   onClearSelection: () => void;
 }
 
@@ -25,6 +26,7 @@ export function HierarchyTree({
   selectedZone,
   selectedPon,
   selectedFeatureType,
+  selectedFeatureId,
   onSelectNode,
   onClearSelection,
 }: HierarchyTreeProps) {
@@ -88,6 +90,7 @@ export function HierarchyTree({
           selectedZone={selectedZone}
           selectedPon={selectedPon}
           selectedFeatureType={selectedFeatureType}
+          selectedFeatureId={selectedFeatureId}
           onToggle={toggleExpand}
           onSelect={onSelectNode}
         />
@@ -102,11 +105,12 @@ interface ZoneRowProps {
   selectedZone?: number | null;
   selectedPon?: number | null;
   selectedFeatureType?: string;
+  selectedFeatureId?: string;
   onToggle: (key: string, e: React.MouseEvent) => void;
-  onSelect: (zoneNo?: number | null, ponNo?: number | null, featureType?: string) => void;
+  onSelect: (zoneNo?: number | null, ponNo?: number | null, featureType?: string, featureId?: string) => void;
 }
 
-function ZoneRow({ zone, expanded, selectedZone, selectedPon, selectedFeatureType, onToggle, onSelect }: ZoneRowProps) {
+function ZoneRow({ zone, expanded, selectedZone, selectedPon, selectedFeatureType, selectedFeatureId, onToggle, onSelect }: ZoneRowProps) {
   const zoneKey = `zone_${zone.zone_no}`;
   const isExpanded = expanded.has(zoneKey);
   const isSelected = selectedZone === zone.zone_no && selectedPon === undefined;
@@ -151,6 +155,7 @@ function ZoneRow({ zone, expanded, selectedZone, selectedPon, selectedFeatureTyp
               selectedZone={selectedZone}
               selectedPon={selectedPon}
               selectedFeatureType={selectedFeatureType}
+              selectedFeatureId={selectedFeatureId}
               onToggle={onToggle}
               onSelect={onSelect}
             />
@@ -173,16 +178,18 @@ interface PonRowProps {
   selectedZone?: number | null;
   selectedPon?: number | null;
   selectedFeatureType?: string;
+  selectedFeatureId?: string;
   onToggle: (key: string, e: React.MouseEvent) => void;
-  onSelect: (zoneNo?: number | null, ponNo?: number | null, featureType?: string) => void;
+  onSelect: (zoneNo?: number | null, ponNo?: number | null, featureType?: string, featureId?: string) => void;
 }
 
-function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeatureType, onToggle, onSelect }: PonRowProps) {
+function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeatureType, selectedFeatureId, onToggle, onSelect }: PonRowProps) {
   const ponKey = `pon_${zoneNo}_${pon.pon_no}`;
   const isExpanded = expanded.has(ponKey);
-  const isSelected = selectedZone === zoneNo && selectedPon === pon.pon_no && selectedFeatureType === undefined;
+  const isSelected = selectedZone === zoneNo && selectedPon === pon.pon_no && selectedFeatureId === undefined;
   const isActive = selectedZone === zoneNo && selectedPon === pon.pon_no;
   const label = pon.pon_no !== null ? `PON ${pon.pon_no}` : 'Unassigned';
+  const hasFeatures = pon.features && pon.features.length > 0;
 
   return (
     <div>
@@ -196,35 +203,37 @@ function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeat
             : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
         }`}
       >
-        <span
-          onClick={(e) => toggleExpand(e)}
-          className="flex-shrink-0 p-0.5 hover:bg-[var(--ff-bg-tertiary)] rounded cursor-pointer"
-        >
-          {isExpanded ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <ChevronRight className="w-3 h-3" />
-          )}
-        </span>
+        {hasFeatures ? (
+          <span
+            onClick={(e) => toggleExpand(e)}
+            className="flex-shrink-0 p-0.5 hover:bg-[var(--ff-bg-tertiary)] rounded cursor-pointer"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </span>
+        ) : (
+          <span className="w-4 flex-shrink-0" />
+        )}
         <span className="flex-1 text-left truncate">{label}</span>
         <StatusDots pending={pon.pending} approved={pon.approved} rejected={pon.rejected} />
         <CountBadge count={pon.photo_count} small />
       </button>
 
-      {isExpanded && (
+      {isExpanded && hasFeatures && (
         <div className="ml-5">
-          {pon.feature_types.map(ft => (
-            <FeatureTypeRow
-              key={`ft_${zoneNo}_${pon.pon_no}_${ft.work_type}`}
-              featureType={ft}
-              zoneNo={zoneNo}
-              ponNo={pon.pon_no}
+          {pon.features.map(feat => (
+            <FeatureRow
+              key={`feat_${zoneNo}_${pon.pon_no}_${feat.feature_id}`}
+              feature={feat}
               isSelected={
                 selectedZone === zoneNo &&
                 selectedPon === pon.pon_no &&
-                selectedFeatureType === ft.work_type
+                selectedFeatureId === feat.feature_id
               }
-              onSelect={() => onSelect(zoneNo, pon.pon_no, ft.work_type)}
+              onSelect={() => onSelect(zoneNo, pon.pon_no, undefined, feat.feature_id)}
             />
           ))}
         </div>
@@ -238,15 +247,13 @@ function PonRow({ pon, zoneNo, expanded, selectedZone, selectedPon, selectedFeat
   }
 }
 
-interface FeatureTypeRowProps {
-  featureType: QAHierarchyFeatureType;
-  zoneNo: number | null;
-  ponNo: number | null;
+interface FeatureRowProps {
+  feature: QAHierarchyFeature;
   isSelected: boolean;
   onSelect: () => void;
 }
 
-function FeatureTypeRow({ featureType, isSelected, onSelect }: FeatureTypeRowProps) {
+function FeatureRow({ feature, isSelected, onSelect }: FeatureRowProps) {
   return (
     <button
       onClick={onSelect}
@@ -256,9 +263,10 @@ function FeatureTypeRow({ featureType, isSelected, onSelect }: FeatureTypeRowPro
           : 'text-[var(--ff-text-tertiary)] hover:bg-[var(--ff-bg-tertiary)] hover:text-[var(--ff-text-secondary)]'
       }`}
     >
-      <FeatureTypeIcon workType={featureType.work_type} />
-      <span className="flex-1 text-left truncate">{formatWorkType(featureType.work_type)}</span>
-      <CountBadge count={featureType.photo_count} small />
+      <FeatureTypeIcon workType={feature.work_type} />
+      <span className="flex-1 text-left truncate">{feature.feature_id}</span>
+      <StatusDots pending={feature.pending} approved={feature.approved} rejected={feature.rejected} />
+      <CountBadge count={feature.photo_count} small />
     </button>
   );
 }

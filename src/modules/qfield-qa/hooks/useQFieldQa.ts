@@ -43,6 +43,7 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
   const [selectedZone, setSelectedZone] = useState<number | null | undefined>(undefined);
   const [selectedPon, setSelectedPon] = useState<number | null | undefined>(undefined);
   const [selectedFeatureType, setSelectedFeatureType] = useState<string | undefined>(undefined);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | undefined>(undefined);
 
   // Use refs to track current values without causing re-renders
   const filtersRef = useRef(filters);
@@ -202,10 +203,12 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     zoneNo?: number | null,
     ponNo?: number | null,
     featureType?: string,
+    featureId?: string,
   ) => {
     setSelectedZone(zoneNo);
     setSelectedPon(ponNo);
     setSelectedFeatureType(featureType);
+    setSelectedFeatureId(featureId);
 
     const newFilters: Partial<QAFilters> = {};
 
@@ -230,12 +233,16 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
       newFilters.featureType = featureType;
     }
 
+    if (featureId !== undefined) {
+      newFilters.featureId = featureId;
+    }
+
     setFilters(prev => ({
       ...prev,
       ...newFilters,
       // Clear deeper levels when selecting a higher level
-      ...(zoneNo !== undefined && ponNo === undefined ? { ponNo: undefined, featureType: undefined } : {}),
-      ...(ponNo !== undefined && featureType === undefined ? { featureType: undefined } : {}),
+      ...(zoneNo !== undefined && ponNo === undefined ? { ponNo: undefined, featureType: undefined, featureId: undefined } : {}),
+      ...(ponNo !== undefined && featureId === undefined ? { featureId: undefined } : {}),
     }));
     setPagination(prev => ({ ...prev, page: 1 }));
   }, []);
@@ -245,8 +252,9 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     setSelectedZone(undefined);
     setSelectedPon(undefined);
     setSelectedFeatureType(undefined);
+    setSelectedFeatureId(undefined);
     setFilters(prev => {
-      const { zoneNo, ponNo, featureType, ...rest } = prev;
+      const { zoneNo, ponNo, featureType, featureId, ...rest } = prev;
       return rest;
     });
     setPagination(prev => ({ ...prev, page: 1 }));
@@ -264,6 +272,7 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     setSelectedZone(undefined);
     setSelectedPon(undefined);
     setSelectedFeatureType(undefined);
+    setSelectedFeatureId(undefined);
     setPagination(prev => ({ ...prev, page: 1 }));
   }, []);
 
@@ -289,6 +298,7 @@ export function useQFieldQa(options: UseQFieldQaOptions = {}) {
     selectedZone,
     selectedPon,
     selectedFeatureType,
+    selectedFeatureId,
 
     // Actions
     refresh: fetchValidations,
