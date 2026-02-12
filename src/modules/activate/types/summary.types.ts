@@ -74,6 +74,17 @@ export interface DRSummary {
     contactsDiffer: boolean;
   };
 
+  // ONT swap tracking (Feb 2026)
+  ontSwap: {
+    detected: boolean;
+    newSerial: string;
+    oldSerial: string | null;
+    swapType: string;
+    status: string; // pending_review, confirmed_oes, reviewed, rejected
+    reportedAt: string;
+    confirmedAt: string | null;
+  } | null;
+
   // Resubmission tracking (Jan 2026)
   submission_count: number;
   is_resubmission: boolean;

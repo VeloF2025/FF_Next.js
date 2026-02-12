@@ -279,6 +279,11 @@ export function DrSummaryPage({
             </div>
           </div>
 
+          {/* ONT Swap Banner */}
+          {summary.ontSwap && (
+            <OntSwapBanner swap={summary.ontSwap} />
+          )}
+
           {/* Decision */}
           {summary.qaStatus.decision && (
             <div className="flex items-center gap-2">
@@ -480,6 +485,72 @@ function ContactDetails({
           <span className="text-sm text-gray-600 dark:text-gray-300">{language}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * ONT Swap Banner
+ * Shows pending or confirmed ONT replacement info
+ */
+function OntSwapBanner({
+  swap,
+}: {
+  swap: NonNullable<DRSummary['ontSwap']>;
+}) {
+  const isConfirmed = swap.status === 'confirmed_oes';
+  const isPending = swap.status === 'pending_review';
+
+  return (
+    <div
+      className={`rounded-lg p-3 border ${
+        isConfirmed
+          ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
+          : isPending
+            ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
+            : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-sm">
+          {isConfirmed ? '✅' : isPending ? '🔄' : '📋'}
+        </span>
+        <span className={`text-xs font-semibold uppercase ${
+          isConfirmed
+            ? 'text-green-700 dark:text-green-300'
+            : isPending
+              ? 'text-orange-700 dark:text-orange-300'
+              : 'text-gray-700 dark:text-gray-300'
+        }`}>
+          ONT Swap {isConfirmed ? 'Confirmed' : isPending ? 'Pending OES' : swap.status.replace(/_/g, ' ')}
+        </span>
+      </div>
+      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+        <div className="flex gap-2">
+          <span className="text-gray-500 w-16">New:</span>
+          <span className="font-mono font-medium text-gray-900 dark:text-white">{swap.newSerial}</span>
+        </div>
+        {swap.oldSerial && (
+          <div className="flex gap-2">
+            <span className="text-gray-500 w-16">Old:</span>
+            <span className="font-mono line-through text-gray-500">{swap.oldSerial}</span>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <span className="text-gray-500 w-16">Type:</span>
+          <span>{swap.swapType === 'pre_provision' ? 'Pre-Provision' : 'Encrypted ONT'}</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="text-gray-500 w-16">Reported:</span>
+          <span>{formatDate(swap.reportedAt)}</span>
+        </div>
+        {swap.confirmedAt && (
+          <div className="flex gap-2">
+            <span className="text-gray-500 w-16">Live:</span>
+            <span>{formatDate(swap.confirmedAt)}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

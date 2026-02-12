@@ -137,7 +137,7 @@ async function handler(
     log.info('DRSummary', `Fetching summary for ${dropNumber}`);
 
     // UNIFIED ARCHITECTURE: All data from database tables only - NO live API calls
-    const [unifiedResult, oesResult, dropsResult, qaResult] = await Promise.all([
+    const [unifiedResult, oesResult, dropsResult, qaResult, swapResult] = await Promise.all([
       // Main unified review data (including contact info stored during processing)
       pool.query(
         `SELECT
@@ -219,12 +219,29 @@ async function handler(
          LIMIT 1`,
         [dropNumber]
       ),
+
+      // ONT swap records (Feb 2026)
+      pool.query(
+        `SELECT
+           new_serial,
+           old_serial,
+           swap_type,
+           status,
+           created_at,
+           updated_at
+         FROM ont_swap_records
+         WHERE drop_number = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [dropNumber]
+      ),
     ]);
 
     const unified = unifiedResult.rows[0];
     const oes = oesResult.rows[0];
     const drop = dropsResult.rows[0];
     const qa = qaResult.rows[0];
+    const swap = swapResult.rows[0];
 
     // If no data found anywhere
     if (!unified && !oes && !drop && !qa) {
@@ -314,6 +331,17 @@ async function handler(
 
       // UNIFIED: Subscriber contact info from unified table (stored during processing)
       subscriberContact: buildSubscriberContact(unified),
+
+      // ONT swap tracking (Feb 2026)
+      ontSwap: swap ? {
+        detected: true,
+        newSerial: swap.new_serial,
+        oldSerial: swap.old_serial || null,
+        swapType: swap.swap_type,
+        status: swap.status,
+        reportedAt: new Date(swap.created_at).toISOString(),
+        confirmedAt: swap.status === 'confirmed_oes' ? new Date(swap.updated_at).toISOString() : null,
+      } : null,
 
       // Resubmission tracking (Jan 2026)
       submission_count: unified?.submission_count || 1,

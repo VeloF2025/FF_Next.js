@@ -1039,7 +1039,8 @@ async function handler(
       })();
 
       // === ONT SWAP CONFIRMATION (Fire-and-forget) ===
-      // Auto-confirm swap records when OES shows the new serial as active
+      // Auto-confirm swap records when OES shows the new serial as active,
+      // and update the unified review's oes_serial to the new serial
       (async () => {
         try {
           const swapResult = await pool.query(`
@@ -1051,9 +1052,19 @@ async function handler(
             WHERE osr.new_serial = oa.serial_number
               AND osr.drop_number = oa.drop_number
               AND osr.status = 'pending_review'
+            RETURNING osr.drop_number, osr.new_serial
           `);
           if ((swapResult.rowCount || 0) > 0) {
             log.info('OESImport', `ONT swap confirmation: ${swapResult.rowCount} swaps confirmed via OES`);
+            // Update unified reviews with the new serial so it shows as current
+            for (const row of swapResult.rows) {
+              await pool.query(
+                `UPDATE dr_photo_unified_reviews
+                 SET oes_serial = $2, updated_at = NOW()
+                 WHERE drop_number = $1`,
+                [row.drop_number, row.new_serial]
+              );
+            }
           }
         } catch (err) {
           log.error('OESImport', 'ONT swap confirmation check failed', err);
