@@ -1038,6 +1038,28 @@ async function handler(
         }
       })();
 
+      // === ONT SWAP CONFIRMATION (Fire-and-forget) ===
+      // Auto-confirm swap records when OES shows the new serial as active
+      (async () => {
+        try {
+          const swapResult = await pool.query(`
+            UPDATE ont_swap_records osr
+            SET status = 'confirmed_oes',
+                oes_status = oa.status,
+                updated_at = NOW()
+            FROM oes_activations oa
+            WHERE osr.new_serial = oa.serial_number
+              AND osr.drop_number = oa.drop_number
+              AND osr.status = 'pending_review'
+          `);
+          if ((swapResult.rowCount || 0) > 0) {
+            log.info('OESImport', `ONT swap confirmation: ${swapResult.rowCount} swaps confirmed via OES`);
+          }
+        } catch (err) {
+          log.error('OESImport', 'ONT swap confirmation check failed', err);
+        }
+      })();
+
       return res.status(200).json({
         success: true,
         totalRows: oesRows.length,

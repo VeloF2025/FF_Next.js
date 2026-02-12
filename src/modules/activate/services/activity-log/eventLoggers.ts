@@ -204,3 +204,21 @@ export async function logFeedbackSent(drNumber: string, group: string, messageId
 export async function logError(drNumber: string, message: string, details?: unknown): Promise<string> {
   return logActivity(drNumber, 'error', { message, details }, 'error-handler');
 }
+
+/**
+ * Log ONT swap reported via WhatsApp pre-provision group
+ */
+export async function logOntSwapReported(
+  drNumber: string,
+  oldSerial: string | null,
+  newSerial: string,
+  swapType: string,
+  senderName: string
+): Promise<string> {
+  return logActivity(
+    drNumber,
+    'ONT_SWAP_REPORTED',
+    { oldSerial, newSerial, swapType, reportedBy: senderName },
+    'whatsapp-bridge'
+  );
+}

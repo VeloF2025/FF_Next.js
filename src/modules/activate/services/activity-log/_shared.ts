@@ -38,7 +38,8 @@ export type ActivityEventType =
   | 'INVESTIGATE'
   | 'MANUAL_SERIAL_EDIT'
   | 'SERIAL_VERIFICATION_COMPUTED'
-  | 'STATUS_UPDATE';
+  | 'STATUS_UPDATE'
+  | 'ONT_SWAP_REPORTED';
 
 /**
  * Serial change source types
@@ -245,6 +246,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: '1Map Status Updated',
     icon: '🔄',
     iconColor: 'text-blue-500',
+  },
+  ONT_SWAP_REPORTED: {
+    title: 'ONT Swap Reported',
+    icon: '🔄',
+    iconColor: 'text-orange-500',
   },
 };
 
