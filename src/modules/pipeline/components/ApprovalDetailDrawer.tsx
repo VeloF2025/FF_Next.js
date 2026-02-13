@@ -11,17 +11,15 @@ import {
   Clock,
   AlertTriangle,
   FileText,
-  Calendar,
   User,
   Building2,
   Phone,
   Mail,
   MapPin,
-  DollarSign,
   Send,
-  Upload,
   MessageSquare,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import type {
   PipelineProjectApprovalWithType,
@@ -71,8 +69,7 @@ const INTERNAL_STATUS_CONFIG: Record<
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
-  // Standard YYYY-MM-DD format
-  return new Date(date).toISOString().split('T')[0];
+  return new Date(date).toISOString().split('T')[0] ?? '-';
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -100,6 +97,7 @@ export function ApprovalDetailDrawer({
   const [showAuthorityPicker, setShowAuthorityPicker] = useState(false);
   const [savingAuthority, setSavingAuthority] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionsExpanded, setActionsExpanded] = useState(false);
 
   // Form state for submission
   const [submitData, setSubmitData] = useState({
@@ -148,6 +146,8 @@ export function ApprovalDetailDrawer({
   const canMarkRejected =
     (currentUserRole === 'admin' || currentUserRole === 'ops') &&
     ['submitted', 'in_review', 'additional_info_required'].includes(approval.status);
+
+  const hasActions = canPmApprove || canOpsApprove || canSubmit || canMarkApproved || canMarkRejected;
 
   async function handleInternalApprove(action: 'pm_approve' | 'ops_approve' | 'reject') {
     setLoading(true);
@@ -342,306 +342,19 @@ export function ApprovalDetailDrawer({
             </div>
           )}
 
-          {/* Internal Approval Workflow */}
-          {(canPmApprove || canOpsApprove) && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-blue-900 mb-3">
-                Internal Approval Required
-              </h3>
-              {canPmApprove && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleInternalApprove('pm_approve')}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    PM Approve
-                  </button>
-                  <button
-                    onClick={() => setShowRejectForm(true)}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject
-                  </button>
-                </div>
-              )}
-              {canOpsApprove && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleInternalApprove('ops_approve')}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Ops Approve
-                  </button>
-                  <button
-                    onClick={() => setShowRejectForm(true)}
-                    disabled={loading}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    Reject
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Submit to Authority Action */}
-          {canSubmit && !showSubmitForm && (
-            <button
-              onClick={() => setShowSubmitForm(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <Send className="w-4 h-4" />
-              Submit to Authority
-            </button>
-          )}
-
-          {/* Submit Form */}
-          {showSubmitForm && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
-              <h3 className="text-sm font-medium text-purple-900">
-                Submit Application
-              </h3>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Application Date *
-                </label>
-                <input
-                  type="date"
-                  value={submitData.application_date}
-                  onChange={(e) =>
-                    setSubmitData({ ...submitData, application_date: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Reference Number
-                </label>
-                <input
-                  type="text"
-                  value={submitData.application_reference}
-                  onChange={(e) =>
-                    setSubmitData({ ...submitData, application_reference: e.target.value })
-                  }
-                  placeholder="e.g., APP-2024-001"
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Application Fee
-                </label>
-                <input
-                  type="number"
-                  value={submitData.application_fee}
-                  onChange={(e) =>
-                    setSubmitData({ ...submitData, application_fee: e.target.value })
-                  }
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={submitData.notes}
-                  onChange={(e) =>
-                    setSubmitData({ ...submitData, notes: e.target.value })
-                  }
-                  rows={3}
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleSubmitApplication}
-                  disabled={loading || !submitData.application_date}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {loading ? 'Submitting...' : 'Submit'}
-                </button>
-                <button
-                  onClick={() => setShowSubmitForm(false)}
-                  disabled={loading}
-                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Mark Approved/Rejected Actions */}
-          {(canMarkApproved || canMarkRejected) && !showApproveForm && !showRejectForm && (
-            <div className="flex gap-2">
-              {canMarkApproved && (
-                <button
-                  onClick={() => setShowApproveForm(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Mark Approved
-                </button>
-              )}
-              {canMarkRejected && (
-                <button
-                  onClick={() => setShowRejectForm(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  <XCircle className="w-4 h-4" />
-                  Mark Rejected
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Approve Form */}
-          {showApproveForm && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-4">
-              <h3 className="text-sm font-medium text-green-900">
-                Record Approval
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                    Approval Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={approveData.approval_date}
-                    onChange={(e) =>
-                      setApproveData({ ...approveData, approval_date: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                    Reference *
-                  </label>
-                  <input
-                    type="text"
-                    value={approveData.approval_reference}
-                    onChange={(e) =>
-                      setApproveData({ ...approveData, approval_reference: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                    Issue Date
-                  </label>
-                  <input
-                    type="date"
-                    value={approveData.issue_date}
-                    onChange={(e) =>
-                      setApproveData({ ...approveData, issue_date: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                    Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    value={approveData.expiry_date}
-                    onChange={(e) =>
-                      setApproveData({ ...approveData, expiry_date: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Conditions
-                </label>
-                <textarea
-                  value={approveData.conditions}
-                  onChange={(e) =>
-                    setApproveData({ ...approveData, conditions: e.target.value })
-                  }
-                  rows={2}
-                  placeholder="Any conditions attached to the approval..."
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleMarkApproved}
-                  disabled={loading || !approveData.approval_date || !approveData.approval_reference}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Confirm Approval'}
-                </button>
-                <button
-                  onClick={() => setShowApproveForm(false)}
-                  disabled={loading}
-                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Reject Form */}
-          {showRejectForm && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-4">
-              <h3 className="text-sm font-medium text-red-900">
-                Record Rejection
-              </h3>
-              <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Rejection Reason *
-                </label>
-                <textarea
-                  value={rejectData.rejection_reason}
-                  onChange={(e) =>
-                    setRejectData({ ...rejectData, rejection_reason: e.target.value })
-                  }
-                  rows={3}
-                  placeholder="Reason for rejection..."
-                  className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-[var(--ff-bg-primary)]"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={
-                    canPmApprove || canOpsApprove
-                      ? () => handleInternalApprove('reject')
-                      : handleMarkRejected
-                  }
-                  disabled={loading || !rejectData.rejection_reason}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Confirm Rejection'}
-                </button>
-                <button
-                  onClick={() => setShowRejectForm(false)}
-                  disabled={loading}
-                  className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Documents Section — FIRST for visibility */}
+          <div>
+            <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Documents
+            </h3>
+            <DocumentManager
+              approvalId={approval.id}
+              currentUserId={currentUserId}
+              readonly={currentUserRole === 'viewer'}
+              onDocumentChange={onUpdate}
+            />
+          </div>
 
           {/* Authority Information */}
           <div>
@@ -848,19 +561,330 @@ export function ApprovalDetailDrawer({
             </div>
           )}
 
-          {/* Documents Section */}
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Documents
-            </h3>
-            <DocumentManager
-              approvalId={approval.id}
-              currentUserId={currentUserId}
-              readonly={currentUserRole === 'viewer'}
-              onDocumentChange={onUpdate}
-            />
-          </div>
+          {/* Workflow Actions — collapsible at bottom */}
+          {hasActions && (
+            <div className="border-t border-[var(--ff-border-light)] pt-4">
+              <button
+                onClick={() => setActionsExpanded(!actionsExpanded)}
+                className="w-full flex items-center justify-between text-sm font-medium text-[var(--ff-text-primary)] hover:text-[var(--ff-accent)] transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Workflow Actions
+                </span>
+                {actionsExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+
+              {actionsExpanded && (
+                <div className="mt-4 space-y-4">
+                  {/* Internal Approval Workflow */}
+                  {(canPmApprove || canOpsApprove) && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-3">
+                        Internal Approval Required
+                      </h3>
+                      {canPmApprove && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleInternalApprove('pm_approve')}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            PM Approve
+                          </button>
+                          <button
+                            onClick={() => setShowRejectForm(true)}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {canOpsApprove && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleInternalApprove('ops_approve')}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Ops Approve
+                          </button>
+                          <button
+                            onClick={() => setShowRejectForm(true)}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Submit to Authority Action */}
+                  {canSubmit && !showSubmitForm && (
+                    <button
+                      onClick={() => setShowSubmitForm(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    >
+                      <Send className="w-4 h-4" />
+                      Submit to Authority
+                    </button>
+                  )}
+
+                  {/* Submit Form */}
+                  {showSubmitForm && (
+                    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 space-y-4">
+                      <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300">
+                        Submit Application
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Application Date *
+                        </label>
+                        <input
+                          type="date"
+                          value={submitData.application_date}
+                          onChange={(e) =>
+                            setSubmitData({ ...submitData, application_date: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Reference Number
+                        </label>
+                        <input
+                          type="text"
+                          value={submitData.application_reference}
+                          onChange={(e) =>
+                            setSubmitData({ ...submitData, application_reference: e.target.value })
+                          }
+                          placeholder="e.g., APP-2024-001"
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Application Fee
+                        </label>
+                        <input
+                          type="number"
+                          value={submitData.application_fee}
+                          onChange={(e) =>
+                            setSubmitData({ ...submitData, application_fee: e.target.value })
+                          }
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Notes
+                        </label>
+                        <textarea
+                          value={submitData.notes}
+                          onChange={(e) =>
+                            setSubmitData({ ...submitData, notes: e.target.value })
+                          }
+                          rows={3}
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSubmitApplication}
+                          disabled={loading || !submitData.application_date}
+                          className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          {loading ? 'Submitting...' : 'Submit'}
+                        </button>
+                        <button
+                          onClick={() => setShowSubmitForm(false)}
+                          disabled={loading}
+                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mark Approved/Rejected Actions */}
+                  {(canMarkApproved || canMarkRejected) && !showApproveForm && !showRejectForm && (
+                    <div className="flex gap-2">
+                      {canMarkApproved && (
+                        <button
+                          onClick={() => setShowApproveForm(true)}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Mark Approved
+                        </button>
+                      )}
+                      {canMarkRejected && (
+                        <button
+                          onClick={() => setShowRejectForm(true)}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Mark Rejected
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Approve Form */}
+                  {showApproveForm && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-4">
+                      <h3 className="text-sm font-medium text-green-900 dark:text-green-300">
+                        Record Approval
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                            Approval Date *
+                          </label>
+                          <input
+                            type="date"
+                            value={approveData.approval_date}
+                            onChange={(e) =>
+                              setApproveData({ ...approveData, approval_date: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                            Reference *
+                          </label>
+                          <input
+                            type="text"
+                            value={approveData.approval_reference}
+                            onChange={(e) =>
+                              setApproveData({ ...approveData, approval_reference: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                            Issue Date
+                          </label>
+                          <input
+                            type="date"
+                            value={approveData.issue_date}
+                            onChange={(e) =>
+                              setApproveData({ ...approveData, issue_date: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                            Expiry Date
+                          </label>
+                          <input
+                            type="date"
+                            value={approveData.expiry_date}
+                            onChange={(e) =>
+                              setApproveData({ ...approveData, expiry_date: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Conditions
+                        </label>
+                        <textarea
+                          value={approveData.conditions}
+                          onChange={(e) =>
+                            setApproveData({ ...approveData, conditions: e.target.value })
+                          }
+                          rows={2}
+                          placeholder="Any conditions attached to the approval..."
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleMarkApproved}
+                          disabled={loading || !approveData.approval_date || !approveData.approval_reference}
+                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {loading ? 'Saving...' : 'Confirm Approval'}
+                        </button>
+                        <button
+                          onClick={() => setShowApproveForm(false)}
+                          disabled={loading}
+                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reject Form */}
+                  {showRejectForm && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-4">
+                      <h3 className="text-sm font-medium text-red-900 dark:text-red-300">
+                        Record Rejection
+                      </h3>
+                      <div>
+                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                          Rejection Reason *
+                        </label>
+                        <textarea
+                          value={rejectData.rejection_reason}
+                          onChange={(e) =>
+                            setRejectData({ ...rejectData, rejection_reason: e.target.value })
+                          }
+                          rows={3}
+                          placeholder="Reason for rejection..."
+                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-[var(--ff-bg-primary)]"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={
+                            canPmApprove || canOpsApprove
+                              ? () => handleInternalApprove('reject')
+                              : handleMarkRejected
+                          }
+                          disabled={loading || !rejectData.rejection_reason}
+                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                        >
+                          {loading ? 'Saving...' : 'Confirm Rejection'}
+                        </button>
+                        <button
+                          onClick={() => setShowRejectForm(false)}
+                          disabled={loading}
+                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

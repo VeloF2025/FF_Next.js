@@ -575,6 +575,7 @@ export function PipelineProjectDetail() {
                         const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
                         const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
                         const isRuralOnly = approval.approval_type_condition_type === 'rural_only';
+                        const docCount = Number(approval.document_count) || 0;
 
                         return (
                           <div
@@ -596,6 +597,12 @@ export function PipelineProjectDetail() {
                                       <span className="px-1.5 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded flex items-center gap-1">
                                         <Trees className="w-3 h-3" />
                                         Rural
+                                      </span>
+                                    )}
+                                    {docCount > 0 && (
+                                      <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded flex items-center gap-1">
+                                        <FileText className="w-3 h-3" />
+                                        {docCount}
                                       </span>
                                     )}
                                   </div>
@@ -685,6 +692,7 @@ export function PipelineProjectDetail() {
                         const isNotApplicable =
                           (approval.approval_type_condition_type === 'rural_only' && !isRural) ||
                           (approval.approval_type_condition_type === 'urban_only' && isRural);
+                        const docCount = Number(approval.document_count) || 0;
 
                         return (
                           <div
@@ -707,6 +715,12 @@ export function PipelineProjectDetail() {
                                     {isNotApplicable && (
                                       <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
                                         N/A
+                                      </span>
+                                    )}
+                                    {!isNotApplicable && docCount > 0 && (
+                                      <span className="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded flex items-center gap-1">
+                                        <FileText className="w-3 h-3" />
+                                        {docCount}
                                       </span>
                                     )}
                                   </div>

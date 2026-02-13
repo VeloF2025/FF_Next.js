@@ -81,7 +81,8 @@ export async function getProjectApprovals(
       t.name AS approval_type_name,
       t.category AS approval_type_category,
       COALESCE(t.is_compulsory, false) AS approval_type_is_compulsory,
-      t.condition_type AS approval_type_condition_type
+      t.condition_type AS approval_type_condition_type,
+      (SELECT COUNT(*)::int FROM pipeline_approval_documents d WHERE d.approval_id = a.id AND d.is_active = true) AS document_count
     FROM pipeline_project_approvals a
     JOIN pipeline_approval_types t ON a.approval_type_id = t.id
     WHERE a.pipeline_project_id = ${projectId}

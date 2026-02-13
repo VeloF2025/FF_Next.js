@@ -186,6 +186,7 @@ export interface PipelineProjectApprovalWithType extends PipelineProjectApproval
   approval_type_category: ApprovalCategory;
   approval_type_is_compulsory: boolean;
   approval_type_condition_type: ApprovalConditionType;
+  document_count?: number;
 }
 
 export interface ExpiringApproval extends PipelineProjectApprovalWithType {
