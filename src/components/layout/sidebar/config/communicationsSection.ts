@@ -2,7 +2,7 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText, BookOpen } from 'lucide-react';
+import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText, BookOpen, Satellite } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -21,6 +21,14 @@ export const communicationsSection: NavSection = {
       shortLabel: 'Help',
       permissions: [],
       rbacKey: 'communications',
+    },
+    {
+      to: '/communications/mission-control',
+      icon: Satellite,
+      label: 'Mission Control',
+      shortLabel: 'MC',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'communications.mission-control',
     },
     {
       to: '/communications',

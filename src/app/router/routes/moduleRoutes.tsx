@@ -16,6 +16,7 @@ import {
   ContractorCreatePage,
   ContractorEditPage,
   ContractorDetailPage,
+  MissionControlDashboard,
   CommunicationsDashboard,
   HelpCenterPage,
   AnalyticsDashboard,
@@ -149,6 +150,14 @@ export const moduleRoutes = [
     element: (
       <Suspense fallback={<Loading />}>
         <ContractorDetailPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: 'communications/mission-control',
+    element: (
+      <Suspense fallback={<Loading />}>
+        <MissionControlDashboard />
       </Suspense>
     ),
   },

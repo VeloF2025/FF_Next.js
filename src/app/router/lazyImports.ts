@@ -79,6 +79,9 @@ export const CostAnalysis = lazy(() => import('@/modules/procurement/reporting/c
 export const SupplierPerformance = lazy(() => import('@/modules/procurement/reporting/components').then(m => ({ default: m.SupplierPerformance })));
 export const ComplianceReports = lazy(() => import('@/modules/procurement/reporting/components').then(m => ({ default: m.ComplianceReports })));
 
+// Mission Control
+export const MissionControlDashboard = lazy(() => import('@/modules/mission-control/MissionControlDashboard'));
+
 // Communications Module
 export const MeetingsDashboard = lazy(() => import('@/modules/meetings/MeetingsDashboard').then(m => ({ default: m.MeetingsDashboard })));
 export const ActionItemsDashboard = lazy(() => import('@/modules/action-items/ActionItemsDashboard').then(m => ({ default: m.ActionItemsDashboard })));
