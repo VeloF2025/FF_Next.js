@@ -163,15 +163,16 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
     }
   }
 
-  // Format 2: "33.9221° S, 18.4231° E" or "33°55'28.3" S, 18°25'26.6" E"
-  const dmsPattern = /(\d+(?:\.\d+)?(?:°\d+(?:\.\d+)?['′]\d+(?:\.\d+)?["″]?|°)?)\s*([NSEW])\s*,?\s*(\d+(?:\.\d+)?(?:°\d+(?:\.\d+)?['′]\d+(?:\.\d+)?["″]?|°)?)\s*([NSEW])/i;
+  // Format 2: DMS with direction — "25°59'14.8" S, 28°14'07.9" E" or "-25.96743N, 28.20015E"
+  // Capture everything (including optional minus) up to a direction letter
+  const dmsPattern = /(-?[\d°'′"″.\s]+)\s*([NSEW])\s*[,;]?\s*(-?[\d°'′"″.\s]+)\s*([NSEW])/i;
   const dmsMatch = cleanInput.match(dmsPattern);
   if (dmsMatch) {
     const [, coord1, dir1, coord2, dir2] = dmsMatch;
-    
-    const lat = parseCoordinate(coord1, dir1);
-    const lng = parseCoordinate(coord2, dir2);
-    
+
+    const lat = parseCoordinate(coord1.trim(), dir1);
+    const lng = parseCoordinate(coord2.trim(), dir2);
+
     if (lat !== null && lng !== null) {
       return { lat, lng };
     }
@@ -187,12 +188,12 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
     }
   }
 
-  // Format 4: Try to extract two decimal numbers from anywhere in the string
-  const allDecimals = cleanInput.match(/-?\d+\.?\d*/g);
+  // Format 4: Try to extract two decimal numbers — only accept if they look like valid coordinates
+  const allDecimals = cleanInput.match(/-?\d+\.\d+/g);
   if (allDecimals && allDecimals.length >= 2) {
     const lat = parseFloat(allDecimals[0]);
     const lng = parseFloat(allDecimals[1]);
-    if (!isNaN(lat) && !isNaN(lng)) {
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
       return { lat, lng };
     }
   }
@@ -205,27 +206,43 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
  */
 function parseCoordinate(coord: string, direction: string): number | null {
   const dir = direction.toUpperCase();
-  
-  // If it's already decimal
-  const decimal = parseFloat(coord.replace(/[°'"″′]/g, ''));
-  if (!isNaN(decimal)) {
-    const multiplier = (dir === 'S' || dir === 'W') ? -1 : 1;
-    return decimal * multiplier;
-  }
+  const hasExplicitNegative = coord.trim().startsWith('-');
+  // If coord already has a negative sign, respect it; otherwise use direction
+  const multiplier = hasExplicitNegative ? -1 : (dir === 'S' || dir === 'W') ? -1 : 1;
+  // Work with absolute value of the coordinate string
+  const absCoord = coord.replace(/^-/, '').trim();
 
-  // Try to parse DMS format (degrees, minutes, seconds)
-  const dmsPattern = /(\d+)(?:°|d)?\s*(\d+(?:\.\d+)?)(?:['′]|m)?\s*(\d+(?:\.\d+)?)(?:["″]|s)?/i;
-  const dmsMatch = coord.match(dmsPattern);
-  
+  // Try DMS format FIRST (degrees, minutes, seconds) — must check before decimal
+  // Matches: 33°55'28.3", 25°59'14.8, 28d14m07.9s, etc.
+  const dmsPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]\s*(\d+(?:\.\d+)?)[″"s]?/i;
+  const dmsMatch = absCoord.match(dmsPattern);
+
   if (dmsMatch) {
     const degrees = parseInt(dmsMatch[1]);
     const minutes = parseFloat(dmsMatch[2]) || 0;
     const seconds = parseFloat(dmsMatch[3]) || 0;
-    
+
     const decimalDegrees = degrees + (minutes / 60) + (seconds / 3600);
-    const multiplier = (dir === 'S' || dir === 'W') ? -1 : 1;
-    
     return decimalDegrees * multiplier;
+  }
+
+  // Try degrees + decimal minutes: 33°55.472'
+  const dmPattern = /(\d+)[°d]\s*(\d+(?:\.\d+)?)[′'m]?/i;
+  const dmMatch = absCoord.match(dmPattern);
+
+  if (dmMatch) {
+    const degrees = parseInt(dmMatch[1]);
+    const minutes = parseFloat(dmMatch[2]) || 0;
+
+    const decimalDegrees = degrees + (minutes / 60);
+    return decimalDegrees * multiplier;
+  }
+
+  // Try decimal degrees: 33.9221° or just 33.9221
+  const decimalOnly = absCoord.replace(/[°]/g, '').trim();
+  const decimal = parseFloat(decimalOnly);
+  if (!isNaN(decimal) && decimal < 360) {
+    return decimal * multiplier;
   }
 
   return null;
