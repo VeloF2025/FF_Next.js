@@ -61,10 +61,15 @@ async function handler(
         COUNT(*) FILTER (WHERE v.workflow_status = 'rejected')::int as rejected
       FROM qfield_photo_validations v
       LEFT JOIN (
-        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
-        FROM drops
-        ORDER BY pole_number, zone_no, pon_no
-      ) dz ON v.feature_id = dz.pole_number
+        SELECT pole_number AS feature_label, zone_no, pon_no FROM poles
+        UNION ALL
+        SELECT joint_label AS feature_label, zone_no, pon_no FROM joints
+        UNION ALL
+        SELECT * FROM (
+          SELECT DISTINCT ON (pole_number) pole_number AS feature_label, zone_no, pon_no
+          FROM drops ORDER BY pole_number, zone_no, pon_no
+        ) d
+      ) dz ON v.feature_id = dz.feature_label
       WHERE v.project_id = (
         SELECT id FROM qfield_projects WHERE id = ${projectId}::uuid
       )
@@ -85,10 +90,15 @@ async function handler(
         COUNT(*) FILTER (WHERE v.workflow_status = 'rejected')::int as rejected
       FROM qfield_photo_validations v
       LEFT JOIN (
-        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
-        FROM drops
-        ORDER BY pole_number, zone_no, pon_no
-      ) dz ON v.feature_id = dz.pole_number
+        SELECT pole_number AS feature_label, zone_no, pon_no FROM poles
+        UNION ALL
+        SELECT joint_label AS feature_label, zone_no, pon_no FROM joints
+        UNION ALL
+        SELECT * FROM (
+          SELECT DISTINCT ON (pole_number) pole_number AS feature_label, zone_no, pon_no
+          FROM drops ORDER BY pole_number, zone_no, pon_no
+        ) d
+      ) dz ON v.feature_id = dz.feature_label
       WHERE v.project_id = (
         SELECT id FROM qfield_projects WHERE id = ${projectId}::uuid
       )

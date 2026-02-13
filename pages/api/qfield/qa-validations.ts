@@ -153,9 +153,15 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     const dropsFilterJoin = needsDropsJoin
       ? `LEFT JOIN (
-          SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
-          FROM drops ORDER BY pole_number, zone_no, pon_no
-        ) drops_filter ON v.feature_id = drops_filter.pole_number`
+          SELECT pole_number AS feature_label, zone_no, pon_no FROM poles
+          UNION ALL
+          SELECT joint_label AS feature_label, zone_no, pon_no FROM joints
+          UNION ALL
+          SELECT * FROM (
+            SELECT DISTINCT ON (pole_number) pole_number AS feature_label, zone_no, pon_no
+            FROM drops ORDER BY pole_number, zone_no, pon_no
+          ) d
+        ) drops_filter ON v.feature_id = drops_filter.feature_label`
       : '';
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -209,6 +215,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         p.latitude AS pole_latitude,
         p.longitude AS pole_longitude,
         p.address AS pole_address,
+        -- Joint context
+        j.joint_type,
+        j.cable_capacity AS joint_cable_capacity,
+        j.zone_no AS joint_zone_no,
+        j.pon_no AS joint_pon_no,
         -- Zone/PON from drops (drops table has zone/pon data)
         dz.zone_no AS pole_zone_no,
         dz.pon_no AS pole_pon_no,
@@ -223,11 +234,18 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         qp.name AS qfield_project_name
       FROM qfield_photo_validations v
       LEFT JOIN poles p ON v.feature_type = 'pole' AND v.feature_id = p.pole_number
+      LEFT JOIN joints j ON v.feature_type = 'splice' AND v.feature_id = j.joint_label
       LEFT JOIN drops d ON v.feature_type = 'drop' AND v.feature_id = d.drop_number
       LEFT JOIN (
-        SELECT DISTINCT ON (pole_number) pole_number, zone_no, pon_no
-        FROM drops ORDER BY pole_number, zone_no, pon_no
-      ) dz ON v.feature_id = dz.pole_number
+        SELECT pole_number AS feature_label, zone_no, pon_no FROM poles
+        UNION ALL
+        SELECT joint_label AS feature_label, zone_no, pon_no FROM joints
+        UNION ALL
+        SELECT * FROM (
+          SELECT DISTINCT ON (pole_number) pole_number AS feature_label, zone_no, pon_no
+          FROM drops ORDER BY pole_number, zone_no, pon_no
+        ) d
+      ) dz ON v.feature_id = dz.feature_label
       LEFT JOIN qfield_projects qp ON v.project_id = qp.id
       ${dropsFilterJoin}
       ${whereClause}

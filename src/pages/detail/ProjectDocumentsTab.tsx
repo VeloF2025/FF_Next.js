@@ -22,7 +22,9 @@ import {
   FileSpreadsheet,
   Trash2,
   Download,
+  Database,
 } from 'lucide-react';
+import { QFieldImportPanel } from '@/modules/qfield-import';
 import { useSOWUpload } from '@/modules/projects/components/SOWUploadSection/hooks/useSOWUpload';
 import { FILE_TYPE_CONFIGS } from '@/modules/projects/components/SOWUploadSection/types/sowUpload.types';
 import { useProjectSOW } from '@/hooks/useNeonSOW';
@@ -339,6 +341,19 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               onDownloadTemplate={() => downloadSOWTemplate(FILE_TYPE_CONFIGS.find(c => c.type === 'fibre')!)}
             />
           </div>
+        </div>
+      </section>
+
+      {/* QField GeoPackage Import Section */}
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
+        <div className="p-4 border-b border-[var(--ff-border-light)]">
+          <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">QField GeoPackage Import</h3>
+          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+            Import infrastructure data from QFieldCloud GeoPackage files (joints, cable spans, zone/PON boundaries)
+          </p>
+        </div>
+        <div className="p-4">
+          <QFieldImportPanel projectId={projectId} />
         </div>
       </section>
 

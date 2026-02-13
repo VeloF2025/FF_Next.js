@@ -65,6 +65,12 @@ export interface PhotoValidation {
   pole_zone_no?: number | null;
   pole_pon_no?: number | null;
 
+  // Joined joint context
+  joint_type?: string | null;
+  joint_cable_capacity?: string | null;
+  joint_zone_no?: number | null;
+  joint_pon_no?: number | null;
+
   // Joined drop context
   drop_number?: string | null;
   drop_pole_number?: string | null;

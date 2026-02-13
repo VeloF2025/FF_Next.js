@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
-import { CheckCircle, FileSpreadsheet, ArrowRight, Folder } from 'lucide-react';
+import { CheckCircle, FileSpreadsheet, ArrowRight, Folder, Database } from 'lucide-react';
 import { useActiveClients } from '@/hooks/useClients';
 import { useProjectManagers } from '@/hooks/useStaff';
 import { useCreateProject } from '@/hooks/useProjects';
@@ -191,6 +191,14 @@ export function ProjectCreationWizard() {
               Import SOW from Excel
             </Link>
             
+            <Link
+              href={`/projects/${createdProjectId}?tab=documents`}
+              className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-emerald-600 bg-[var(--ff-bg-secondary)] border border-emerald-600 rounded-md hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+            >
+              <Database className="h-5 w-5 mr-2" />
+              Import from QField GeoPackage
+            </Link>
+
             <Link
               href={`/projects/${createdProjectId}`}
               className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-blue-600 bg-[var(--ff-bg-secondary)] border border-blue-600 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
