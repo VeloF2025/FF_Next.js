@@ -23,7 +23,7 @@ graph TB
             VFStorage[VF Storage :8091]
         end
 
-        Nginx[Nginx Reverse Proxy]
+        Nginx[Nginx Reverse Proxy<br/>with Upstream Failover]
     end
 
     subgraph "VPS Server (72.61.197.178)"
@@ -36,7 +36,6 @@ graph TB
     subgraph "Cloud"
         Neon[(Neon PostgreSQL)]
         Firebase[(Firebase Storage)]
-        Vercel[Vercel CDN]
     end
 
     Browser --> Nginx
@@ -44,12 +43,54 @@ graph TB
     Nginx --> Prod
     Nginx --> Staging
     Nginx --> Dev
+    Nginx -.->|failover| Backup
     Prod --> Neon
     Staging --> Neon
     Dev --> Neon
+    Backup --> Neon
     Prod --> VLM
     Prod --> Firebase
 ```
+
+## Failover Architecture
+
+### Nginx Upstream Failover
+
+All environments have automatic failover to VPS backup (72.61.197.178:3005):
+
+```nginx
+upstream fibreflow_prod {
+    server localhost:3000;
+    server 72.61.197.178:3005 backup;
+}
+upstream fibreflow_staging {
+    server localhost:3006;
+    server 72.61.197.178:3005 backup;
+}
+upstream fibreflow_dev {
+    server localhost:3005;
+    server 72.61.197.178:3005 backup;
+}
+```
+
+**Triggers:** connection error, timeout, HTTP 502/503/504
+**Failover time:** ~0.3s
+**Scope:** Covers service-level failures. Full Velocity failure requires Cloudflare LB.
+
+### VPS Backup Auto-Sync
+
+Hourly cron (`/opt/fibreflow/auto-update.sh`) on VPS:
+- Fetches latest from GitHub master
+- If new commits: pull, build, restart `fibreflow-backup.service`
+- Log: `/var/log/fibreflow-autoupdate.log`
+
+### Health Check System
+
+Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
+- Monitors all services via HTTP health checks
+- Auto-restarts failed systemd services and Docker containers
+- Logs to `system_recovery_actions` table
+- WhatsApp alerts for critical failures
 
 ## Server Inventory
 
@@ -99,8 +140,8 @@ All three directories owned by `velo:velo`, same user, no permission issues.
 ### VPS Server
 
 ```
-/root/
-└── fibreflow-backup/         # Backup instance
+/opt/fibreflow/                # Backup instance (fibreflow-backup.service)
+/opt/fibreflow/auto-update.sh  # Hourly auto-sync cron script
 ```
 
 ## Deployment Commands
@@ -176,16 +217,18 @@ graph LR
 
 ## Nginx Configuration
 
-### Domain Routing
+### Domain Routing (with Upstream Failover)
 
 ```nginx
-# /etc/nginx/sites-available/fibreflow
+# /etc/nginx/sites-enabled/vf-fibreflow
+# All domains use upstream blocks with VPS backup failover
 
 # Production
 server {
     server_name app.fibreflow.app;
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://fibreflow_prod;  # localhost:3000 → VPS:3005 backup
+        proxy_next_upstream error timeout http_502 http_503 http_504;
     }
 }
 
@@ -193,7 +236,8 @@ server {
 server {
     server_name vf.fibreflow.app;
     location / {
-        proxy_pass http://localhost:3006;
+        proxy_pass http://fibreflow_staging;  # localhost:3006 → VPS:3005 backup
+        proxy_next_upstream error timeout http_502 http_503 http_504;
     }
 }
 
@@ -201,15 +245,13 @@ server {
 server {
     server_name dev.fibreflow.app;
     location / {
-        proxy_pass http://localhost:3005;
-    }
-
-    # Storage proxy for dev
-    location /storage/ {
-        proxy_pass http://localhost:8091/;
+        proxy_pass http://fibreflow_dev;  # localhost:3005 → VPS:3005 backup
+        proxy_next_upstream error timeout http_502 http_503 http_504;
     }
 }
 ```
+
+All domains also proxy `/storage/` to `localhost:8091` for fleet photos.
 
 ## Systemd Service Template
 

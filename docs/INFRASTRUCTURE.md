@@ -1,6 +1,6 @@
 # FibreFlow Infrastructure Documentation
 
-> Last updated: 21 Jan 2026
+> Last updated: 13 Feb 2026
 
 ## Velocity Server
 
@@ -16,11 +16,12 @@ All three environments share the **same production database** (Neon PostgreSQL).
 
 | Environment | Port | Directory | URL | Service |
 |-------------|------|-----------|-----|---------|
-| **Production** | 3008* | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
+| **Production** | 3000 | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
 | **Staging** | 3006 | `/home/velo/fibreflow-staging` | vf.fibreflow.app | `fibreflow.service` |
-| **Dev** | 3004 | `/home/hein/apps/fibreflow-dev` | dev.fibreflow.app | `fibreflow-dev.service` |
+| **Dev** | 3005 | `/home/velo/fibreflow-dev` | dev.fibreflow.app | `fibreflow-dev.service` |
+| **Backup (VPS)** | 3005 | `/opt/fibreflow` | backup.fibreflow.app | `fibreflow-backup.service` |
 
-*Note: Production currently runs on port 3008, should be migrated to 3000.
+All deploy directories on Velocity are under `/home/velo/`. Backup runs on VPS (72.61.197.178).
 
 ### Database (Shared)
 
@@ -52,16 +53,82 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin m
 
 ---
 
+## Nginx Upstream Failover
+
+All three environments have automatic failover to the VPS backup server. If a service on Velocity is down (crash, restart, deploy), nginx automatically routes to VPS backup within ~0.3s.
+
+```
+User → Cloudflare → cloudflared (Velocity) → nginx upstream → Primary (localhost) or Backup (VPS)
+```
+
+### Upstream Configuration
+
+```nginx
+# /etc/nginx/sites-enabled/vf-fibreflow
+
+upstream fibreflow_prod {
+    server localhost:3000;
+    server 72.61.197.178:3005 backup;
+}
+
+upstream fibreflow_staging {
+    server localhost:3006;
+    server 72.61.197.178:3005 backup;
+}
+
+upstream fibreflow_dev {
+    server localhost:3005;
+    server 72.61.197.178:3005 backup;
+}
+```
+
+**Failover triggers:** connection error, timeout, HTTP 502/503/504
+**Failover timeout:** 10s max, 2 tries
+**Limitation:** Only covers service-level failures on Velocity. If Velocity itself goes down (server/network/cloudflared), traffic won't reach nginx. That would require Cloudflare Load Balancing (paid plan).
+
+### VPS Backup Auto-Sync
+
+Hourly cron on VPS keeps backup in sync with master:
+
+```bash
+# /opt/fibreflow/auto-update.sh (runs every hour via root crontab)
+# Fetches latest from GitHub, builds and restarts if new commits detected
+```
+
+**Log:** `/var/log/fibreflow-autoupdate.log`
+
+---
+
 ## Cloudflare Configuration
 
 | Domain | Points To | Proxy |
 |--------|-----------|-------|
-| **app.fibreflow.app** | Cloudflare Tunnel → localhost:3000 | Yes |
-| **vf.fibreflow.app** | Cloudflare Tunnel → nginx:80 → localhost:3006 | Yes |
+| **app.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3000 / VPS backup) | Yes |
+| **vf.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3006 / VPS backup) | Yes |
+| **dev.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3005 / VPS backup) | Yes |
 
 **Cloudflare Tunnel Service:** `cloudflared-tunnel.service`
 - Tunnel name: `vf-downloads`
 - Config: `/home/louis/.cloudflared/config.yml`
+
+---
+
+## Health Check System
+
+Automated health monitoring runs every 5 minutes on Velocity:
+
+**Script:** `/home/velo/scripts/fibreflow-health-check-v2.sh`
+**Cron:** `*/5 * * * *`
+
+**Monitors:**
+- All FibreFlow services (prod, staging, dev)
+- Support services (VLM, QField, WA, PDFCraft, Storage)
+- Docker containers (QFieldCloud)
+
+**Actions on failure:**
+1. Auto-restarts failed systemd services and Docker containers
+2. Logs recovery actions to `system_recovery_actions` DB table
+3. Sends WhatsApp alerts for critical service failures (production)
 
 ---
 
@@ -71,8 +138,10 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin m
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `fibreflow-production.service` | 3008 (should be 3000) | Production FibreFlow |
+| `fibreflow-production.service` | 3000 | Production FibreFlow |
 | `fibreflow.service` | 3006 | Staging FibreFlow |
+| `fibreflow-dev.service` | 3005 | Dev FibreFlow |
+| `fibreflow-backup.service` | 3005 (VPS) | Backup FibreFlow |
 | `fibreflow-storage.service` | 8091 | Storage API (`/srv/data/fibreflow-storage`) |
 | `pdfcraft.service` | 3007 | PDFCraft (vf.fibreflow.app/pdf-tools/) |
 
@@ -183,12 +252,11 @@ QFIELD_API_KEY=your_api_key
 
 | Port | Service | Status |
 |------|---------|--------|
-| 3000 | Production FibreFlow | **SHOULD BE** (currently 3008) |
-| 3005 | Dev FibreFlow | Active |
+| 3000 | Production FibreFlow | Active |
+| 3005 | Dev FibreFlow / VPS Backup | Active |
 | 3006 | Staging FibreFlow | Active |
 | 3007 | PDFCraft | Active |
-| 3008 | Production FibreFlow | **WRONG PORT** |
-| 3010 | Unknown | Active |
+| 3007 | PDFCraft | Active |
 | 3030 | Grafana | Active |
 | 6333 | Qdrant HTTP | Active |
 | 6334 | Qdrant gRPC | Active |
@@ -205,14 +273,18 @@ QFIELD_API_KEY=your_api_key
 
 **Main config:** `/etc/nginx/sites-enabled/vf-fibreflow`
 
+### app.fibreflow.app (Production)
+- `/` → upstream `fibreflow_prod` (localhost:3000, VPS backup)
+- `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
+
 ### vf.fibreflow.app (Staging)
-- `/` → localhost:3006 (Staging FibreFlow)
+- `/` → upstream `fibreflow_staging` (localhost:3006, VPS backup)
 - `/pdf-tools/` → localhost:3007 (PDFCraft)
 - `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
 - `/wa-proxy/` → localhost:8092 (WhatsApp proxy)
 
 ### dev.fibreflow.app (Dev)
-- `/` → localhost:3005 (Dev FibreFlow)
+- `/` → upstream `fibreflow_dev` (localhost:3005, VPS backup)
 - `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
 
 ### Storage Proxy Configuration
@@ -260,6 +332,5 @@ ss -tlnp | grep -E ':300[0-9]'
 
 ## TODO
 
-- [ ] Migrate production from port 3008 to port 3000
-- [ ] Update `fibreflow-production.service` ExecStart to use `-p 3000`
-- [ ] Verify Cloudflare tunnel points to correct port after migration
+- [ ] Cloudflare Load Balancing for full Velocity server failure (requires paid plan)
+- [ ] Add VPS backup to health check WhatsApp alerts
