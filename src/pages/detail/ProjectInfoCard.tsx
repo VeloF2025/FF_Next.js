@@ -21,9 +21,11 @@ function formatLocation(location: unknown): string {
     if (parsed.region) parts.push(parsed.region);
     if (parsed.province) parts.push(parsed.province);
     if (parsed.country) parts.push(parsed.country);
-    if (parts.length > 0) return parts.filter(Boolean).join(', ');
-    // If JSON but no readable fields, return the raw city or a fallback
-    return parsed.address || loc;
+    if (parts.length > 0) return parts.join(', ');
+    // If JSON but no readable fields, check address
+    if (parsed.address) return parsed.address;
+    // All fields empty — show placeholder instead of raw JSON
+    return 'Not specified';
   } catch {
     // Not JSON — return as-is (plain text location)
     return loc;
