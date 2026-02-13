@@ -519,12 +519,18 @@ def fetch_gpkg_from_minio(
     """
     Find and copy GPKG files from QFieldCloud MinIO for a project.
 
-    Uses docker exec to list files in MinIO, then docker cp to retrieve.
+    QFieldCloud stores files as versioned objects in MinIO.  Each .gpkg
+    "file" is actually a directory of versions (e.g. LAWPoles.gpkg/v202...).
+    We list the project files dir, find .gpkg/ entries, then for each one
+    fetch the latest version and rename it to the .gpkg filename.
+
+    Uses docker exec to run mc commands inside the MinIO container, then
+    docker cp to pull files to the host.
     Returns list of local GPKG file paths.
     """
     container = "qfieldcloud-minio-1"
     minio_path = (
-        f"minio/qfieldcloud-local/projects/{project_id}/files/"
+        f"local/qfieldcloud-prod/projects/{project_id}/files/"
     )
 
     logger.info("Listing files in MinIO: %s", minio_path)
@@ -539,28 +545,69 @@ def fetch_gpkg_from_minio(
         logger.error("Failed to list MinIO files: %s", result.stderr.strip())
         return []
 
-    gpkg_files = []
+    # Collect .gpkg entries (shown as directories with trailing /)
+    gpkg_dirs = []
     for line in result.stdout.strip().splitlines():
-        # mc ls output format: "[DATE] [TIME] [SIZE] filename"
         parts = line.strip().split()
         if not parts:
             continue
-        filename = parts[-1]
+        filename = parts[-1].rstrip("/")
         if filename.lower().endswith(".gpkg"):
-            gpkg_files.append(filename)
+            gpkg_dirs.append(filename)
 
-    if not gpkg_files:
+    if not gpkg_dirs:
         logger.warning("No GPKG files found for project %s", project_id)
         return []
 
-    logger.info("Found %d GPKG file(s): %s", len(gpkg_files), gpkg_files)
+    logger.info("Found %d GPKG file(s): %s", len(gpkg_dirs), gpkg_dirs)
 
     local_paths = []
-    for filename in gpkg_files:
-        remote_src = f"{minio_path}{filename}"
-        container_tmp = f"/tmp/{filename}"
+    for gpkg_name in gpkg_dirs:
+        # List versions inside the .gpkg/ directory using --json
+        ver_path = f"{minio_path}{gpkg_name}/"
+        ver_result = subprocess.run(
+            [
+                "docker", "exec", container, "mc", "ls",
+                "--json", ver_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if ver_result.returncode != 0:
+            logger.error(
+                "Failed to list versions for %s: %s",
+                gpkg_name,
+                ver_result.stderr.strip(),
+            )
+            continue
 
-        # Copy inside container to /tmp
+        # Parse JSON lines, pick the latest version by lastModified
+        versions = []
+        for json_line in ver_result.stdout.strip().splitlines():
+            try:
+                obj = json.loads(json_line)
+                key = obj.get("key", "")
+                ts = obj.get("lastModified", "")
+                if key and ts:
+                    versions.append((ts, key))
+            except json.JSONDecodeError:
+                continue
+
+        if not versions:
+            logger.warning("No versions found for %s", gpkg_name)
+            continue
+
+        versions.sort(reverse=True)
+        latest_version = versions[0][1]
+        logger.info(
+            "%s: %d versions, using latest: %s",
+            gpkg_name, len(versions), latest_version,
+        )
+
+        # mc cp the latest version file to /tmp inside the container
+        remote_src = f"{ver_path}{latest_version}"
+        container_tmp = f"/tmp/{gpkg_name}"
+
         cp_result = subprocess.run(
             [
                 "docker", "exec", container, "mc", "cp",
@@ -572,13 +619,13 @@ def fetch_gpkg_from_minio(
         if cp_result.returncode != 0:
             logger.error(
                 "Failed to copy %s in container: %s",
-                filename,
+                gpkg_name,
                 cp_result.stderr.strip(),
             )
             continue
 
         # Docker cp from container to host
-        local_path = os.path.join(work_dir, filename)
+        local_path = os.path.join(work_dir, gpkg_name)
         dcp_result = subprocess.run(
             [
                 "docker", "cp",
@@ -591,12 +638,12 @@ def fetch_gpkg_from_minio(
         if dcp_result.returncode != 0:
             logger.error(
                 "Failed docker cp for %s: %s",
-                filename,
+                gpkg_name,
                 dcp_result.stderr.strip(),
             )
             continue
 
-        logger.info("Copied %s to %s", filename, local_path)
+        logger.info("Copied %s to %s", gpkg_name, local_path)
         local_paths.append(local_path)
 
     return local_paths

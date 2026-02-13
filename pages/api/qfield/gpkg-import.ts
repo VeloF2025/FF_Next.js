@@ -99,16 +99,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.internalError(res, new Error('Failed to create import job'), 'Failed to create import job record');
     }
 
-    // --- 2. SSH to Velocity, run read_gpkg.py ---
-    const scriptDir = '/home/velo/fibreflow-production/scripts/qfield-sync';
-    const sshCommand = [
-      'ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no velo@100.96.203.105',
-      `"cd ${scriptDir} && python3 read_gpkg.py --project-id ${qfieldProjectId}"`,
-    ].join(' ');
+    // --- 2. Run read_gpkg.py locally (server runs on Velocity) ---
+    const scriptDir = `${process.cwd()}/scripts/qfield-sync`;
+    const command = `cd ${scriptDir} && python3 read_gpkg.py --project-id ${qfieldProjectId}`;
 
-    log.info('gpkg-import: starting SSH', { jobId, qfieldProjectId }, 'GpkgImport');
+    log.info('gpkg-import: starting Python reader', { jobId, qfieldProjectId }, 'GpkgImport');
 
-    const { stdout, stderr } = await execAsync(sshCommand, {
+    const { stdout, stderr } = await execAsync(command, {
       timeout: 120000,
       maxBuffer: 50 * 1024 * 1024,
     });

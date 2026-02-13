@@ -42,13 +42,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const minioPath = `minio/qfieldcloud-local/projects/${qfieldProjectId}/files/`;
-    const sshCommand = [
-      'ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no velo@100.96.203.105',
-      `"docker exec qfieldcloud-minio-1 mc ls --json ${minioPath}"`,
-    ].join(' ');
+    const minioPath = `local/qfieldcloud-prod/projects/${qfieldProjectId}/files/`;
+    const command = `docker exec qfieldcloud-minio-1 mc ls --json ${minioPath}`;
 
-    const { stdout, stderr } = await execAsync(sshCommand, {
+    const { stdout, stderr } = await execAsync(command, {
       timeout: 30000,
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -63,7 +60,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     for (const line of lines) {
       try {
         const entry = JSON.parse(line);
-        const key: string = entry.key || '';
+        const key: string = (entry.key || '').replace(/\/$/, '');
         if (key.toLowerCase().endsWith('.gpkg')) {
           files.push({
             name: key,

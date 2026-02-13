@@ -46,13 +46,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const scriptDir = '/home/velo/fibreflow-production/scripts/qfield-sync';
-    const sshCommand = [
-      'ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no velo@100.96.203.105',
-      `"cd ${scriptDir} && python3 read_gpkg.py --project-id ${qfieldProjectId} --preview"`,
-    ].join(' ');
+    // Script runs on Velocity where the Next.js server also runs.
+    // Use process.cwd() to find the script relative to the deploy dir.
+    const scriptDir = `${process.cwd()}/scripts/qfield-sync`;
+    const command = `cd ${scriptDir} && python3 read_gpkg.py --project-id ${qfieldProjectId} --preview`;
 
-    const { stdout, stderr } = await execAsync(sshCommand, {
+    const { stdout, stderr } = await execAsync(command, {
       timeout: 60000,
       maxBuffer: 10 * 1024 * 1024,
     });
