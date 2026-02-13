@@ -388,8 +388,9 @@ async function calculateSummary(filters?: {
   dateTo?: string;
   project?: string;
   status?: string;
+  search?: string;
 }): Promise<Summary> {
-  const buildConditions = (dateCol: string, projectCol: string) => {
+  const buildConditions = (dateCol: string, projectCol: string, dropNumberCol = 'drop_number') => {
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
@@ -409,6 +410,11 @@ async function calculateSummary(filters?: {
       params.push(filters.project);
       paramIndex++;
     }
+    if (filters?.search) {
+      conditions.push(`(${dropNumberCol} ILIKE $${paramIndex} OR ${projectCol} ILIKE $${paramIndex})`);
+      params.push(`%${filters.search}%`);
+      paramIndex++;
+    }
     return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
   };
 
@@ -417,9 +423,22 @@ async function calculateSummary(filters?: {
     'project'
   );
 
-  const activatedParams = filters?.project && filters.project !== 'all'
-    ? [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01', filters.project]
-    : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
+  // Build activated query params dynamically for summary
+  const activatedParams: any[] = [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
+  let sumNextParam = 3;
+  let sumProjectCond = '';
+  let sumSearchCond = '';
+
+  if (filters?.project && filters.project !== 'all') {
+    sumProjectCond = `AND (upr.project = $${sumNextParam} OR p.project_name = $${sumNextParam})`;
+    activatedParams.push(filters.project);
+    sumNextParam++;
+  }
+  if (filters?.search) {
+    sumSearchCond = `AND (oes.drop_number ILIKE $${sumNextParam} OR COALESCE(upr.project, p.project_name) ILIKE $${sumNextParam})`;
+    activatedParams.push(`%${filters.search}%`);
+    sumNextParam++;
+  }
 
   const installedQuery = `
     SELECT
@@ -443,8 +462,12 @@ async function calculateSummary(filters?: {
     LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3)' : ''}
+      ${sumProjectCond}
+      ${sumSearchCond}
   `;
+
+  const sumOesProjectCond = filters?.project && filters.project !== 'all'
+    ? `AND upr.project = $${activatedParams.indexOf(filters.project) + 1}` : '';
 
   const oesOnlyQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as oes_only
@@ -458,9 +481,10 @@ async function calculateSummary(filters?: {
         WHERE upr.drop_number = oes.drop_number
           AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
           AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
-          ${filters?.project && filters.project !== 'all' ? 'AND upr.project = $3' : ''}
+          ${sumOesProjectCond}
       )
-      ${filters?.project && filters.project !== 'all' ? 'AND p.project_name = $3' : ''}
+      ${sumProjectCond}
+      ${sumSearchCond}
   `;
 
   const [installedResult, activatedResult, oesOnlyResult] = await Promise.all([
@@ -510,8 +534,9 @@ async function getProjectStats(filters?: {
   dateTo?: string;
   project?: string;
   status?: string;
+  search?: string;
 }): Promise<ProjectStats[]> {
-  const buildConditions = (dateCol: string, projectCol: string) => {
+  const buildConditions = (dateCol: string, projectCol: string, dropNumberCol = 'drop_number') => {
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
@@ -531,6 +556,11 @@ async function getProjectStats(filters?: {
       params.push(filters.project);
       paramIndex++;
     }
+    if (filters?.search) {
+      conditions.push(`(${dropNumberCol} ILIKE $${paramIndex} OR ${projectCol} ILIKE $${paramIndex})`);
+      params.push(`%${filters.search}%`);
+      paramIndex++;
+    }
     return { conditions, params, whereClause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '' };
   };
 
@@ -547,9 +577,22 @@ async function getProjectStats(filters?: {
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
-  const activatedParams = filters?.project && filters.project !== 'all'
-    ? [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01', filters.project]
-    : [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
+  // Build activated query params dynamically
+  const activatedParams: any[] = [filters?.dateFrom || '1900-01-01', filters?.dateTo || '2100-01-01'];
+  let activatedNextParam = 3;
+  let activatedProjectCond = '';
+  let activatedSearchCond = '';
+
+  if (filters?.project && filters.project !== 'all') {
+    activatedProjectCond = `AND (upr.project = $${activatedNextParam} OR p.project_name = $${activatedNextParam} OR (upr.project IS NULL AND p.project_name IS NULL))`;
+    activatedParams.push(filters.project);
+    activatedNextParam++;
+  }
+  if (filters?.search) {
+    activatedSearchCond = `AND (oes.drop_number ILIKE $${activatedNextParam} OR COALESCE(upr.project, p.project_name) ILIKE $${activatedNextParam})`;
+    activatedParams.push(`%${filters.search}%`);
+    activatedNextParam++;
+  }
 
   const activatedQuery = `
     SELECT
@@ -561,9 +604,14 @@ async function getProjectStats(filters?: {
     LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3 OR (upr.project IS NULL AND p.project_name IS NULL))' : ''}
+      ${activatedProjectCond}
+      ${activatedSearchCond}
     GROUP BY COALESCE(upr.project, p.project_name, 'Unknown')
   `;
+
+  // OES-only query uses same param positions
+  const oesOnlyProjectCond = filters?.project && filters.project !== 'all'
+    ? `AND upr2.project = $${activatedParams.indexOf(filters.project) + 1}` : '';
 
   const oesOnlyQuery = `
     SELECT
@@ -580,9 +628,10 @@ async function getProjectStats(filters?: {
         WHERE upr2.drop_number = oes.drop_number
           AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) >= $1::DATE
           AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) <= $2::DATE
-          ${filters?.project && filters.project !== 'all' ? 'AND upr2.project = $3' : ''}
+          ${oesOnlyProjectCond}
       )
-      ${filters?.project && filters.project !== 'all' ? 'AND (upr.project = $3 OR p.project_name = $3 OR (upr.project IS NULL AND p.project_name IS NULL))' : ''}
+      ${activatedProjectCond}
+      ${activatedSearchCond}
     GROUP BY COALESCE(upr.project, p.project_name, 'Unknown')
   `;
 
@@ -847,6 +896,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
+    const searchTerm = search && typeof search === 'string' ? search : undefined;
+
     const filters = {
       dateFrom: dateFrom && typeof dateFrom === 'string' ? dateFrom : undefined,
       dateTo: dateTo && typeof dateTo === 'string' ? dateTo : undefined,
@@ -855,9 +906,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       qaStatus: qaStatus && typeof qaStatus === 'string' ? qaStatus : undefined,
       serialStatus: serialStatus && typeof serialStatus === 'string' ? serialStatus : undefined,
       resubmissionsOnly: resubmissionsOnly === 'true',
+      search: searchTerm,
     };
-
-    const searchTerm = search && typeof search === 'string' ? search : undefined;
 
     // Throttled auto-sync (once per 5 minutes)
     await syncMissingFromQaPhotoReviews();
