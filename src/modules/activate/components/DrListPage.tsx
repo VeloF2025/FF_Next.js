@@ -9,7 +9,7 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, Layers, Wifi, Radio, Eye, CheckCircle } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
@@ -67,6 +67,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
   // Local UI state - tab is now controlled by parent via showTab prop
   const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
 
   // Expandable project rows state
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -125,18 +126,29 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
     return 'all';
   };
 
+  // Debounced search - update context filter after 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, searchTerm: searchInput }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, setFilters]);
+
   const hasActiveFilters = filters.dateFrom || filters.dateTo ||
-    filters.statusFilter !== 'all' || filters.projectFilter !== 'all';
+    filters.statusFilter !== 'all' || filters.projectFilter !== 'all' ||
+    filters.searchTerm.trim() !== '';
 
   // Clear all filters
   const handleClearFilters = useCallback(() => {
-    setFilters({
+    setSearchInput('');
+    setFilters(prev => ({
+      ...prev,
       searchTerm: '',
       dateFrom: getTodaySAST(),
       dateTo: getTodaySAST(),
       statusFilter: 'all',
       projectFilter: 'all',
-    });
+    }));
   }, [setFilters]);
 
   // Toggle project expansion and fetch zone data if needed
@@ -391,15 +403,15 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
             {/* Filter Panel */}
             <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
               <div className="flex items-center justify-between">
-                {/* Search placeholder for consistency with QA Centre */}
+                {/* Search input */}
                 <div className="flex-1 max-w-md">
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search drop number..."
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="Search drop number or project..."
                       className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-[var(--ff-primary-500)] focus:border-transparent"
-                      disabled
-                      title="Use QA Centre for search"
                     />
                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--ff-text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
