@@ -1,15 +1,30 @@
 import { GetServerSideProps } from 'next';
-import dynamic from 'next/dynamic';
 
-const SOWImportPage = dynamic(() => import('@/modules/sow/SOWImportPage').then(mod => mod.SOWImportPage || mod.default), {
-  ssr: false,
-  loading: () => <div>Loading SOW import...</div>
-});
-
-export default function SOWImportPageWrapper() {
-  return <SOWImportPage />;
+/**
+ * SOW Import page - redirects to project Documents tab where import is handled.
+ * If projectId is provided, goes directly to that project's documents tab.
+ * Otherwise, redirects to the projects list.
+ */
+export default function SOWImportRedirect() {
+  return null;
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  return { props: {} };
+  const projectId = ctx.query.projectId as string | undefined;
+
+  if (projectId) {
+    return {
+      redirect: {
+        destination: `/projects/${projectId}?tab=documents`,
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    redirect: {
+      destination: '/projects',
+      permanent: false,
+    },
+  };
 };

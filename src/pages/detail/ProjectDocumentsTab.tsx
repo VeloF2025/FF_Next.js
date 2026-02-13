@@ -352,10 +352,20 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
         </div>
         <div className="p-4">
           <div className="text-center py-8 bg-[var(--ff-bg-secondary)] rounded-lg border border-dashed border-[var(--ff-border-light)]">
-            <FileSpreadsheet className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
-            <p className="text-sm text-[var(--ff-text-secondary)]">BOQ import coming soon</p>
-            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-              Currently BOQs can be managed in the BOQ/Materials tab
+            <FileSpreadsheet className="w-12 h-12 mx-auto text-blue-400 mb-3" />
+            <p className="text-sm text-[var(--ff-text-primary)] mb-3">
+              Import BOQ data via the Procurement module
+            </p>
+            <a
+              href={`/procurement/boq/new?projectId=${projectId}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Import BOQ
+            </a>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-3">
+              Existing BOQs can be viewed in{' '}
+              <a href="/procurement/boq" className="text-blue-400 hover:underline">Procurement &rarr; BOQ</a>
             </p>
           </div>
         </div>
