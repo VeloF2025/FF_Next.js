@@ -110,11 +110,14 @@ export async function importZoneBoundaries(sql: SqlFn, features: any[], projectI
     await sql`DELETE FROM zone_boundaries WHERE project_id = ${projectId}::uuid`;
   }
 
+  // Filter out features with null zone_no (required field) and deduplicate
+  const validFeatures = dedup(features.filter(f => f.zone_no != null), 'zone_no');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds = batch.map(() => projectId);
     const zoneNos    = batch.map(f => safeInt(f.zone_no));
@@ -152,11 +155,14 @@ export async function importPonBoundaries(sql: SqlFn, features: any[], projectId
     await sql`DELETE FROM pon_boundaries WHERE project_id = ${projectId}::uuid`;
   }
 
+  // Filter out features with null pon_no (required field) and deduplicate
+  const validFeatures = dedup(features.filter(f => f.pon_no != null), 'pon_no');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds = batch.map(() => projectId);
     const ponNos     = batch.map(f => safeInt(f.pon_no));

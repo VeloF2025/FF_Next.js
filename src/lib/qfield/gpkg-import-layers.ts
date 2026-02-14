@@ -31,6 +31,13 @@ function safeInt(v: unknown): number | null {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
+/** Truncate string to max length for varchar columns */
+function trunc(v: unknown, max: number): string | null {
+  if (v == null) return null;
+  const s = String(v);
+  return s.length > max ? s.slice(0, max) : s;
+}
+
 export interface LayerResult {
   created: number;
   updated: number;
@@ -65,10 +72,10 @@ export async function importPoles(sql: SqlFn, features: any[], projectId: string
     const types          = batch.map(f => f.type || null);
     const latitudes      = batch.map(f => f.latitude != null ? Number(f.latitude) : null);
     const longitudes     = batch.map(f => f.longitude != null ? Number(f.longitude) : null);
-    const domeJoints     = batch.map(f => f.dome_joint || null);
-    const typeOfJoins    = batch.map(f => f.type_of_join || null);
-    const splitters      = batch.map(f => f.splitter || null);
-    const slacks         = batch.map(f => f.slack_on_pole || null);
+    const domeJoints     = batch.map(f => trunc(f.dome_joint, 50));
+    const typeOfJoins    = batch.map(f => trunc(f.type_of_join, 50));
+    const splitters      = batch.map(f => trunc(f.splitter, 50));
+    const slacks         = batch.map(f => trunc(f.slack_on_pole, 50));
     const fieldAgents    = batch.map(f => f.field_agent || null);
     const polePlanteds   = batch.map(f => f.pole_planted || null);
     const auditDates     = batch.map(f => f.audit_complete || null);

@@ -405,14 +405,16 @@ def map_feature_fields(
             feature["geojson"] = geom
 
     elif layer_type == "zone_boundaries":
-        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
+        feature["zone_no"] = _safe_int(
+            _get_field(row, "zone_no", "section_na", "zone", "Zone")
+        )
         if geom:
             feature["geojson"] = geom
 
     elif layer_type == "pon_boundaries":
         feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
-        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
-        feature["pon_label"] = _get_field(row, "pon_label", "label")
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no", "Zone"))
+        feature["pon_label"] = _get_field(row, "pon_label", "Label", "label")
         if geom:
             feature["geojson"] = geom
 
