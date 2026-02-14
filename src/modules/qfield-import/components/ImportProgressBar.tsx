@@ -6,7 +6,7 @@ interface ImportProgressBarProps {
   importing: boolean;
 }
 
-const LAYER_LABELS: Record<LayerType, string> = {
+const LAYER_LABELS: Record<string, string> = {
   poles: 'Poles',
   joints: 'Joints',
   cable_spans: 'Cable Spans',

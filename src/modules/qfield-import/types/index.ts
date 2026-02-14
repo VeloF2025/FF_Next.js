@@ -10,15 +10,7 @@ export interface LayerPreview {
 }
 
 export interface GpkgPreviewResult {
-  layers: {
-    poles?: LayerPreview;
-    joints?: LayerPreview;
-    cable_spans?: LayerPreview;
-    drops?: LayerPreview;
-    zone_boundaries?: LayerPreview;
-    pon_boundaries?: LayerPreview;
-    pops?: LayerPreview;
-  };
+  layers: Record<string, LayerPreview | undefined>;
 }
 
 export type ImportMode = 'merge' | 'replace';

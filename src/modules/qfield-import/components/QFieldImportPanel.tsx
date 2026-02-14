@@ -74,9 +74,14 @@ export function QFieldImportPanel({ projectId }: QFieldImportPanelProps) {
     await executeImport(selectedQFieldId);
   };
 
+  const KNOWN_LAYERS: Set<string> = new Set([
+    'poles', 'joints', 'cable_spans', 'drops',
+    'zone_boundaries', 'pon_boundaries', 'pops',
+  ]);
+
   const availableLayers = preview
     ? (Object.keys(preview.layers) as LayerType[]).filter(
-        (l) => preview.layers[l] && preview.layers[l]!.count > 0
+        (l) => KNOWN_LAYERS.has(l) && preview.layers[l] && preview.layers[l]!.count > 0
       )
     : [];
 

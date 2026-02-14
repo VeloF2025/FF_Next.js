@@ -1,4 +1,4 @@
-import { MapPin, GitMerge, Cable, Home, Hexagon, Box, Radio } from 'lucide-react';
+import { MapPin, GitMerge, Cable, Home, Hexagon, Box, Radio, HelpCircle } from 'lucide-react';
 import type { LayerType, LayerPreview } from '../types';
 
 interface LayerPreviewCardProps {
@@ -9,7 +9,7 @@ interface LayerPreviewCardProps {
 }
 
 const LAYER_CONFIG: Record<
-  LayerType,
+  string,
   { label: string; icon: React.ComponentType<{ className?: string }> }
 > = {
   poles: { label: 'Poles', icon: MapPin },
@@ -21,13 +21,15 @@ const LAYER_CONFIG: Record<
   pops: { label: 'POPs', icon: Radio },
 };
 
+const FALLBACK_CONFIG = { label: 'Unknown', icon: HelpCircle };
+
 export function LayerPreviewCard({
   layerType,
   preview,
   selected,
   onToggle,
 }: LayerPreviewCardProps) {
-  const config = LAYER_CONFIG[layerType];
+  const config = LAYER_CONFIG[layerType] || FALLBACK_CONFIG;
   const Icon = config.icon;
 
   return (

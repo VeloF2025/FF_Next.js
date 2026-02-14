@@ -235,15 +235,19 @@ def _decode_multi_polygon(
 
 
 def detect_layer_type(
-    columns: List[str], sample_geom_type: Optional[str]
+    columns: List[str],
+    sample_geom_type: Optional[str],
+    table_name: str = "",
 ) -> str:
     """
-    Auto-detect layer type using column name heuristics and geometry type.
+    Auto-detect layer type using column name heuristics, geometry type,
+    and table name as fallback.
 
     Returns one of: poles, joints, cable_spans, drops,
                     zone_boundaries, pon_boundaries, pops, unknown
     """
     col_set = {c.lower() for c in columns}
+    tname = table_name.lower()
 
     # Poles: has "pole type" or "photopole"
     if "pole type" in col_set or "poletype" in col_set or "photopole" in col_set:
@@ -253,13 +257,19 @@ def detect_layer_type(
     if "node" in col_set:
         return "pops"
 
-    # Cable spans: has "cable size" or "cable_size"
-    if "cable size" in col_set or "cable_size" in col_set:
+    # Cable spans: has "cable size", "cable_size", or "cablesize"
+    if "cable size" in col_set or "cable_size" in col_set or "cablesize" in col_set:
         return "cable_spans"
 
     # Drops: has "cblcpty" AND geometry is MultiLineString
     if "cblcpty" in col_set and sample_geom_type == "MultiLineString":
         return "drops"
+
+    # Drops: has "strtfeat" + "endfeat" AND MultiLineString (MAM-style drop cables)
+    if "strtfeat" in col_set and "endfeat" in col_set and sample_geom_type == "MultiLineString":
+        # Distinguish from cable spans: cable spans have cable size/type columns
+        if "cablesize" not in col_set and "cable size" not in col_set:
+            return "drops"
 
     # PON boundaries: MultiPolygon with pon_no
     if sample_geom_type == "MultiPolygon" and "pon_no" in col_set:
@@ -272,9 +282,28 @@ def detect_layer_type(
     # Joints: has "type" column with values like Enclosure/Splitter,
     # or has "cblcpty" with point geometry
     if "type" in col_set and sample_geom_type == "Point":
+        # Check table name to avoid misclassifying POPs as joints
+        if "pop" in tname:
+            return "pops"
         return "joints"
     if "cblcpty" in col_set and sample_geom_type == "Point":
         return "joints"
+
+    # --- Table name fallback when column heuristics fail ---
+    if "pop" in tname:
+        return "pops"
+    if "pole" in tname:
+        return "poles"
+    if "joint" in tname:
+        return "joints"
+    if "cablespan" in tname or "cable_span" in tname:
+        return "cable_spans"
+    if "drop" in tname:
+        return "drops"
+    if "pon" in tname and sample_geom_type == "MultiPolygon":
+        return "pon_boundaries"
+    if "zone" in tname and sample_geom_type == "MultiPolygon":
+        return "zone_boundaries"
 
     return "unknown"
 
@@ -453,7 +482,7 @@ def read_gpkg_layers(gpkg_path: str) -> Dict[str, Any]:
             sample_geom = decode_gpkg_geometry(sample[geom_col])
 
         sample_geom_type = sample_geom["type"] if sample_geom else None
-        layer_type = detect_layer_type(non_geom_columns, sample_geom_type)
+        layer_type = detect_layer_type(non_geom_columns, sample_geom_type, table_name)
 
         logger.info(
             "  Detected type: %s (geom: %s)", layer_type, sample_geom_type
