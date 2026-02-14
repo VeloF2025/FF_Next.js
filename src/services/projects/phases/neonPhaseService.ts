@@ -17,6 +17,7 @@ import {
   Priority
 } from '@/types/project/hierarchy.types';
 import { log } from '@/lib/logger';
+import { sanitizeText } from '@/lib/security/sanitization';
 
 // Get database connection
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -576,7 +577,7 @@ export const taskOperations = {
     try {
       await sql`
         INSERT INTO phase_task_comments (task_id, text, author_id, author_name)
-        VALUES (${taskId}::uuid, ${text}, ${authorId}, ${authorName})
+        VALUES (${taskId}::uuid, ${sanitizeText(text)}, ${authorId}, ${sanitizeText(authorName)})
       `;
     } catch (error) {
       log.error('Error adding task comment:', { data: error }, 'neonPhaseService');

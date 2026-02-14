@@ -43,6 +43,7 @@ import {
   VehicleThreshold,
   OdometerSource,
 } from '../types/check-in.types';
+import { sanitizeText } from '@/lib/security/sanitization';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -325,7 +326,7 @@ export async function createCheckRecord(input: CreateCheckRecordInput): Promise<
         ${response.itemId},
         ${response.isPassed},
         ${response.severity || null},
-        ${response.notes || null}
+        ${response.notes ? sanitizeText(response.notes) : null}
       )
     `;
   }

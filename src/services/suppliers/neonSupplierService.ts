@@ -13,6 +13,7 @@ import {
   SupplierRating
 } from '@/types/supplier/base.types';
 import { log } from '@/lib/logger';
+import { sanitizeSupplierData } from '@/lib/security/sanitization';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -144,7 +145,10 @@ export class NeonSupplierService {
    */
   static async create(data: SupplierFormData, userId: string): Promise<string> {
     try {
-      const code = data.code || `SUP-${Date.now()}`;
+      // Sanitize all text inputs to prevent XSS
+      const sanitized = sanitizeSupplierData(data);
+
+      const code = sanitized.code || `SUP-${Date.now()}`;
       
       const result = await sql`
         INSERT INTO suppliers (
@@ -169,22 +173,22 @@ export class NeonSupplierService {
           updated_by
         ) VALUES (
           ${code},
-          ${data.name},
-          ${data.companyName || data.name},
-          ${data.email},
-          ${data.phone || ''},
-          ${data.status || SupplierStatus.PENDING},
-          ${data.businessType || BusinessType.OTHER},
-          ${data.primaryContact?.name || data.name},
-          ${data.primaryContact?.email || data.email},
-          ${data.primaryContact?.phone || data.phone || ''},
-          ${data.addresses?.physical?.street1 || ''},
-          ${data.addresses?.physical?.city || ''},
-          ${data.addresses?.physical?.state || ''},
-          ${data.addresses?.physical?.postalCode || ''},
-          ${data.addresses?.physical?.country || 'South Africa'},
-          ${data.categories || []},
-          ${data.notes || ''},
+          ${sanitized.name},
+          ${sanitized.companyName || sanitized.name},
+          ${sanitized.email},
+          ${sanitized.phone || ''},
+          ${sanitized.status || SupplierStatus.PENDING},
+          ${sanitized.businessType || BusinessType.OTHER},
+          ${sanitized.primaryContact?.name || data.name},
+          ${sanitized.primaryContact?.email || data.email},
+          ${sanitized.primaryContact?.phone || data.phone || ''},
+          ${sanitized.addresses?.physical?.street1 || ''},
+          ${sanitized.addresses?.physical?.city || ''},
+          ${sanitized.addresses?.physical?.state || ''},
+          ${sanitized.addresses?.physical?.postalCode || ''},
+          ${sanitized.addresses?.physical?.country || 'South Africa'},
+          ${sanitized.categories || []},
+          ${sanitized.notes || ''},
           ${userId},
           ${userId}
         )
