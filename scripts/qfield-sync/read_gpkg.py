@@ -282,9 +282,11 @@ def detect_layer_type(
     # Joints: has "type" column with values like Enclosure/Splitter,
     # or has "cblcpty" with point geometry
     if "type" in col_set and sample_geom_type == "Point":
-        # Check table name to avoid misclassifying POPs as joints
+        # Check table name to avoid misclassifying non-joints
         if "pop" in tname:
             return "pops"
+        if "homeconnection" in tname.replace("_", "").replace(" ", ""):
+            return "unknown"
         return "joints"
     if "cblcpty" in col_set and sample_geom_type == "Point":
         return "joints"
