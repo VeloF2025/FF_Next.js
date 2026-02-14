@@ -96,7 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Alert stats
       sql`
         SELECT
-          (SELECT COUNT(*) FROM stock_items WHERE quantity <= min_stock_level AND min_stock_level > 0) as low_stock,
+          (SELECT COUNT(*) FROM stock_items WHERE qty_available <= min_stock_level AND min_stock_level > 0 AND is_active = true) as low_stock,
           (SELECT COUNT(*) FROM stock_returns WHERE status = 'pending') as pending_returns,
           (SELECT COUNT(*) FROM contractor_stock_accountability WHERE is_blocked = true) as blocked_contractors
       `,
@@ -146,7 +146,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         unverified: Number(consumptionStats[0]?.unverified || 0),
       },
       alerts: {
-        lowStock: 0, // TODO: Implement based on stock_quants vs min_stock_level
+        lowStock: Number(alertStats[0]?.low_stock || 0),
         pendingReturns: Number(alertStats[0]?.pending_returns || 0),
         blockedContractors: Number(alertStats[0]?.blocked_contractors || 0),
       },

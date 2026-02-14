@@ -239,9 +239,10 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
           <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Create Client PO</h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -277,6 +278,9 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
         {activeTab === 'import' && (
           <div className="p-6 bg-[var(--ff-bg-card)]">
             <div
+              role="button"
+              tabIndex={0}
+              aria-label="Upload PO PDF file. Drag and drop or click to browse."
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -288,7 +292,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
             >
               {extracting ? (
                 <div className="flex flex-col items-center">
-                  <svg className="w-12 h-12 animate-spin text-[var(--ff-accent)] mb-4" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 animate-spin text-[var(--ff-accent)] mb-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
@@ -297,7 +301,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                 </div>
               ) : (
                 <>
-                  <svg className="w-12 h-12 mx-auto text-[var(--ff-text-secondary)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 mx-auto text-[var(--ff-text-secondary)] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   <p className="text-[var(--ff-text-primary)] mb-2">
@@ -475,7 +479,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                 className="px-4 py-2 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] disabled:bg-[var(--ff-accent)]/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 {loading && (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
