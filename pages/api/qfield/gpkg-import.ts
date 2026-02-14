@@ -106,8 +106,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     log.info('gpkg-import: starting Python reader', { jobId, qfieldProjectId }, 'GpkgImport');
 
     const { stdout, stderr } = await execAsync(command, {
-      timeout: 120000,
-      maxBuffer: 50 * 1024 * 1024,
+      timeout: 300000,
+      maxBuffer: 200 * 1024 * 1024,
     });
 
     if (stderr) {
