@@ -255,7 +255,7 @@ export function PremiumLoginPage() {
           variant="neon-green"
           icon={<Mail className="w-5 h-5" />}
           iconPosition="left"
-          placeholder="you@company.com"
+          placeholder="Enter Your Email Address"
           autoComplete="username"
           disabled={loading}
           disableFloating
