@@ -1051,6 +1051,195 @@ QField QA integrates seamlessly with other FibreFlow modules:
 - **Analytics** — Quality metrics included in reporting dashboards
 
 ---
+### 5.4 Field App Portal
+
+The Field App Portal is a mobile-first interface designed specifically for field technicians to manage their daily tasks, track work progress, and maintain operational efficiency even in offline conditions.
+
+**Navigation:** Sidebar → **Field Operations** → **Field App Portal**
+
+#### Overview
+
+The Field App Portal provides field technicians with a streamlined, mobile-optimized interface for:
+- **Task Management** — View assigned tasks with priorities and deadlines
+- **Offline Operation** — Work without connectivity and sync when available
+- **Device Monitoring** — Track device health (battery, GPS, signal, storage)
+- **Team Coordination** — View technician locations and availability
+- **Work Documentation** — Capture and sync photos, forms, and completion data
+
+#### Task Dashboard
+
+The main dashboard displays all assigned field tasks with comprehensive information:
+
+| Field | Description |
+|-------|-------------|
+| **Task Type** | Installation, Maintenance, Inspection, or Repair |
+| **Priority** | Low, Medium, High, or Urgent designation |
+| **Status** | Pending, In Progress, Completed, or Failed |
+| **Sync Status** | Indicates if task data has synced to server |
+| **Customer Info** | Customer name and contact details |
+| **Location** | Physical address with GPS coordinates |
+| **Attachments** | Count of photos and documents |
+
+#### Task Types
+
+The portal supports four main task categories:
+
+**Installation Tasks:**
+- New fiber connections
+- Equipment installation
+- Customer premises setup
+- Testing and activation
+
+**Maintenance Tasks:**
+- Routine inspections
+- Preventive maintenance
+- Equipment upgrades
+- Network optimization
+
+**Inspection Tasks:**
+- Site surveys
+- Quality checks
+- Compliance verification
+- Documentation updates
+
+**Repair Tasks:**
+- Fault resolution
+- Emergency repairs
+- Service restoration
+- Damage assessment
+
+#### Offline Capabilities **(KEY FEATURE)**
+
+The Field App Portal is designed for reliable offline operation:
+
+**Offline Data Management:**
+- **Task Cache** — All assigned tasks downloaded for offline access
+- **Photo Storage** — Photos captured offline stored locally until sync
+- **Form Data** — Completion forms saved locally with automatic sync
+- **Data Size Tracking** — Monitor local storage usage
+- **Last Sync Indicator** — Shows when last sync occurred
+
+**Sync Behavior:**
+- **Automatic Sync** — When connection restored, data syncs automatically
+- **Manual Sync** — Technicians can trigger sync on demand
+- **Conflict Resolution** — Server-side conflict handling for concurrent edits
+- **Partial Sync** — Individual tasks can sync independently
+
+**Offline Status Indicator:**
+The top bar displays:
+- Number of tasks pending sync
+- Number of photos waiting to upload
+- Number of forms queued for submission
+- Last successful sync timestamp
+- Total data size waiting to sync
+
+#### Technician Management
+
+View and coordinate with other field technicians:
+
+**Technician Cards Display:**
+- **Current Status** — Available, Assigned, On Break, or Offline
+- **Current Task** — Active task title and location
+- **Location** — Real-time GPS coordinates (when online)
+- **Expertise** — Specialization areas (Installation, Fiber Splicing, etc.)
+- **Rating** — Performance rating (1-5 stars)
+
+**Team Overview:**
+- Task distribution across team members
+- Priority breakdown visualization
+- Workload balancing insights
+- Availability tracking
+
+#### Device Status Monitoring
+
+The portal continuously monitors device health:
+
+| Metric | Thresholds | Alert Conditions |
+|--------|-----------|------------------|
+| **Battery Level** | 0-100% | Warning below 20%, Critical below 10% |
+| **Signal Strength** | 0-5 bars | Warning below 2 bars |
+| **GPS Accuracy** | Meters | Warning above 50m accuracy |
+| **Storage Space** | GB available | Warning below 500MB |
+
+**Device Alerts:**
+- Low battery notifications
+- Poor signal warnings
+- GPS accuracy issues
+- Storage capacity warnings
+
+#### Task Workflow
+
+**1. View Assigned Tasks:**
+- Tasks appear in priority order
+- Filter by status, type, or priority
+- Search by customer name or location
+
+**2. Accept and Start Task:**
+- Tap task card to view details
+- Review customer info and location
+- Navigate using integrated maps
+- Mark task as "In Progress"
+
+**3. Complete Work:**
+- Capture required photos
+- Fill out completion forms
+- Document any issues or notes
+- Verify all requirements met
+
+**4. Submit Completion:**
+- Mark task as "Completed"
+- Data queues for sync (or syncs immediately if online)
+- Automatic notification sent to dispatch
+- Move to next task
+
+**5. Handle Failures:**
+- Mark task as "Failed" if unable to complete
+- Select failure reason from dropdown
+- Add detailed notes
+- Optionally escalate to supervisor
+
+#### Integration with Other Modules
+
+The Field App Portal integrates with:
+- **Projects** — Tasks linked to project milestones and phases
+- **Maintenance** — Maintenance tickets converted to field tasks
+- **QField QA** — Photos submitted for validation review
+- **Fleet** — Vehicle tracking and resource allocation
+- **Communications** — WhatsApp notifications for task assignments
+
+#### Mobile Optimization
+
+The portal is optimized for mobile devices:
+- **Responsive Design** — Adapts to all screen sizes
+- **Touch-Friendly** — Large tap targets and gestures
+- **Minimal Data Usage** — Efficient sync protocols
+- **Battery Optimization** — Background sync management
+- **Dark Mode Support** — Reduces eye strain in field conditions
+
+#### Current Limitations **(IMPORTANT)**
+
+> **Note:** The Field App Portal is currently in **mock/prototype phase**. Current limitations include:
+> - **No Backend Integration** — All data is mock/simulated
+> - **Simulated Sync** — Offline sync uses 2-second delay simulation
+> - **No Real Navigation** — Map coordinates present but not integrated
+> - **No Data Persistence** — Refreshing browser clears all data
+> - **Stub Functions** — Some features are placeholders for future development
+>
+> Full backend integration and real-time sync are planned for future releases.
+
+#### Future Enhancements
+
+Planned features for upcoming releases:
+- **Real-time GPS Tracking** — Live technician location updates
+- **Route Optimization** — Intelligent task routing based on location
+- **Voice Notes** — Audio note capture for hands-free operation
+- **Barcode Scanning** — Equipment and inventory scanning
+- **Time Tracking** — Automatic work duration logging
+- **Customer Signatures** — Digital signature capture for work completion
+- **Parts Inventory** — Track parts used per task
+- **API Integration** — Full backend connectivity for all features
+
+---
 
 ## 6. Maintenance
 
