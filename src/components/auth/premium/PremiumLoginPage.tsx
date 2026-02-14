@@ -315,7 +315,7 @@ export function PremiumLoginPage() {
           href={`/auth/forgot-password?email=${encodeURIComponent(email)}`}
           className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
         >
-          Forgot password?
+          Forgot Password?
         </Link>
       </div>
 
