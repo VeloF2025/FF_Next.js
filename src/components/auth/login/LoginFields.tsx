@@ -36,7 +36,7 @@ export function LoginFields({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="block w-full pl-10 pr-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter your email"
+            placeholder="Enter Your Email Address"
           />
         </div>
       </div>

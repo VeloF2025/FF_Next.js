@@ -69,7 +69,7 @@ export function LoginPage() {
                 autoComplete="email"
                 required
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-[var(--ff-border-light)] placeholder-[var(--ff-text-tertiary)] text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                placeholder="Enter Your Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
