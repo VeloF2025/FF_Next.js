@@ -8,6 +8,16 @@ import { log } from '@/lib/logger';
 
 const BATCH_SIZE = 1000;
 
+/** Deduplicate features by key field — keeps last occurrence (latest wins) */
+function dedup(features: any[], keyField: string): any[] {
+  const map = new Map<string, any>();
+  for (const f of features) {
+    const key = String(f[keyField]);
+    map.set(key, f);
+  }
+  return Array.from(map.values());
+}
+
 /** Safely parse a value to integer — handles comma-separated strings like "67,80,81" */
 function safeInt(v: unknown): number | null {
   if (v == null) return null;
@@ -36,11 +46,13 @@ export async function importCableSpans(sql: SqlFn, features: any[], projectId: s
     await sql`DELETE FROM cable_spans WHERE project_id = ${projectId}::uuid`;
   }
 
+  const validFeatures = dedup(features.filter(f => f.span_label), 'span_label');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds   = batch.map(() => projectId);
     const spanLabels   = batch.map(f => f.span_label);

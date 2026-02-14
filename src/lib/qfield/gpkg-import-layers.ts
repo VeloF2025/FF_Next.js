@@ -13,6 +13,16 @@ export { importCableSpans, importZoneBoundaries, importPonBoundaries, importPops
 
 const BATCH_SIZE = 1000;
 
+/** Deduplicate features by key field — keeps last occurrence (latest wins) */
+function dedup(features: any[], keyField: string): any[] {
+  const map = new Map<string, any>();
+  for (const f of features) {
+    const key = String(f[keyField]);
+    map.set(key, f);
+  }
+  return Array.from(map.values());
+}
+
 /** Safely parse a value to integer — handles comma-separated strings like "67,80,81" */
 function safeInt(v: unknown): number | null {
   if (v == null) return null;
@@ -41,11 +51,14 @@ export async function importPoles(sql: SqlFn, features: any[], projectId: string
     await sql`DELETE FROM poles WHERE project_id = ${projectId}::uuid AND source IN ('qfield', 'sow+qfield')`;
   }
 
+  // Filter out features with null/empty pole_number (required field)
+  const validFeatures = dedup(features.filter(f => f.pole_number), 'pole_number');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds     = batch.map(() => projectId);
     const poleNumbers    = batch.map(f => f.pole_number);
@@ -121,11 +134,13 @@ export async function importJoints(sql: SqlFn, features: any[], projectId: strin
     await sql`DELETE FROM joints WHERE project_id = ${projectId}::uuid`;
   }
 
+  const validFeatures = dedup(features.filter(f => f.joint_label), 'joint_label');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds      = batch.map(() => projectId);
     const jointLabels     = batch.map(f => f.joint_label);
@@ -183,11 +198,13 @@ export async function importDrops(sql: SqlFn, features: any[], projectId: string
     await sql`DELETE FROM drops WHERE project_id = ${projectId}::uuid AND source IN ('qfield', 'sow+qfield')`;
   }
 
+  const validFeatures = dedup(features.filter(f => f.drop_number), 'drop_number');
+
   let created = 0;
   let updated = 0;
 
-  for (let i = 0; i < features.length; i += BATCH_SIZE) {
-    const batch = features.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < validFeatures.length; i += BATCH_SIZE) {
+    const batch = validFeatures.slice(i, i + BATCH_SIZE);
 
     const projectIds      = batch.map(() => projectId);
     const dropNumbers     = batch.map(f => f.drop_number);
