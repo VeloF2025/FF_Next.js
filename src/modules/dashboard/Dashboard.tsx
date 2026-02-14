@@ -33,9 +33,9 @@ export function Dashboard() {
     const hour = new Date().getHours();
     const name = currentUser?.displayName?.split(' ')[0] || 'there';
 
-    if (hour < 12) return `Good morning, ${name}`;
-    if (hour < 17) return `Good afternoon, ${name}`;
-    return `Good evening, ${name}`;
+    if (hour < 12) return `Good Morning, ${name}`;
+    if (hour < 17) return `Good Afternoon, ${name}`;
+    return `Good Evening, ${name}`;
   };
 
   const getFormattedDate = () => {
