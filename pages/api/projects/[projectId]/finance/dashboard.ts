@@ -50,23 +50,40 @@ export default withAuth(withErrorHandler(async (
       WHERE d.project_id = ${projectId}
     `;
 
+    // Get total project drops count (for spare calculation)
+    const dropsCountResult = await sql`
+      SELECT COUNT(*) as total_project_drops
+      FROM drops
+      WHERE project_id = ${projectId}
+    `;
+
     const clientPOs = clientPOsResult[0];
     const totalDropsActivated = Number(activationsResult[0]?.total_drops_activated || 0);
+    const totalDropsContracted = Number(clientPOs?.total_drops_contracted || 0);
+    const totalProjectDrops = Number(dropsCountResult[0]?.total_project_drops || 0);
+    // Spares = total deployed drops minus PO contracted scope
+    const totalSpares = Math.max(0, totalProjectDrops - totalDropsContracted);
+
     const clientPOSummary = {
       totalContractValue: Number(clientPOs?.total_contract_value || 0),
-      totalDropsContracted: Number(clientPOs?.total_drops_contracted || 0),
+      totalDropsContracted,
       totalDropsActivated,
       totalInvoiced: Number(clientPOs?.total_invoiced || 0),
       totalPaid: Number(clientPOs?.total_paid || 0),
       totalOutstanding: Number(clientPOs?.total_invoiced || 0) - Number(clientPOs?.total_paid || 0),
-      activationProgress: Number(clientPOs?.total_drops_contracted) > 0
-        ? Math.round((totalDropsActivated / Number(clientPOs?.total_drops_contracted)) * 100 * 100) / 100
+      activationProgress: totalDropsContracted > 0
+        ? Math.round((totalDropsActivated / totalDropsContracted) * 100 * 100) / 100
         : 0,
       invoicingProgress: Number(clientPOs?.total_contract_value) > 0
         ? Math.round((Number(clientPOs?.total_invoiced) / Number(clientPOs?.total_contract_value)) * 100 * 100) / 100
         : 0,
       poCount: Number(clientPOs?.po_count || 0),
       activePoCount: Number(clientPOs?.active_po_count || 0),
+      // Spare tracking (derived: total deployed - PO contracted = spares)
+      totalProjectDrops,
+      totalSpares,
+      sparesUsed: 0, // Updated when spare_usage_log entries exist
+      sparesAvailable: totalSpares,
     };
 
     // Get Budget summary (expense control)

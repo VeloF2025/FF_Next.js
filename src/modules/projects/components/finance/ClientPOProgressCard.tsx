@@ -47,6 +47,11 @@ export function ClientPOProgressCard({ clientPOs, onViewDetails }: ClientPOProgr
           <p className="text-sm text-[var(--ff-text-secondary)]">
             {clientPOs.activePoCount} active PO{clientPOs.activePoCount !== 1 ? 's' : ''} of {clientPOs.poCount} total
           </p>
+          {clientPOs.totalSpares > 0 && (
+            <p className="text-xs text-amber-400 mt-0.5">
+              {clientPOs.totalDropsContracted.toLocaleString()} PO + {clientPOs.totalSpares.toLocaleString()} spares = {clientPOs.totalProjectDrops.toLocaleString()} total
+            </p>
+          )}
         </div>
         {onViewDetails && (
           <button
@@ -92,6 +97,16 @@ export function ClientPOProgressCard({ clientPOs, onViewDetails }: ClientPOProgr
               <div className="text-right mt-1">
                 <span className="text-xs text-[var(--ff-text-secondary)]">{bar.percent}%</span>
               </div>
+              {/* Spare info below Drops Activated bar */}
+              {index === 0 && clientPOs.totalSpares > 0 && (
+                <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-400 flex items-center gap-2">
+                  <span>{clientPOs.totalSpares.toLocaleString()} spares</span>
+                  <span className="text-amber-500/40">|</span>
+                  <span>{clientPOs.sparesUsed.toLocaleString()} used</span>
+                  <span className="text-amber-500/40">|</span>
+                  <span>{clientPOs.sparesAvailable.toLocaleString()} available</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

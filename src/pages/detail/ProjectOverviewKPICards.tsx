@@ -30,6 +30,7 @@ export function ProjectOverviewKPICards({
   const progress = Math.round(financeSummary?.activationProgress || project.actualProgress || 0);
   const dropsActivated = financeSummary?.totalDropsActivated || 0;
   const dropsContracted = financeSummary?.totalDropsContracted || 0;
+  const totalSpares = financeSummary?.totalSpares || 0;
 
   // Get expiring docs count (warning + critical + expired)
   const expiringCount = expiringDocs
@@ -65,7 +66,7 @@ export function ProjectOverviewKPICards({
         <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">Progress</h3>
         <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
           {dropsContracted > 0
-            ? `${dropsActivated.toLocaleString()} / ${dropsContracted.toLocaleString()} drops`
+            ? `${dropsActivated.toLocaleString()} / ${dropsContracted.toLocaleString()} PO drops${totalSpares > 0 ? ` (+${totalSpares.toLocaleString()} spares)` : ''}`
             : 'Overall completion'
           }
         </p>

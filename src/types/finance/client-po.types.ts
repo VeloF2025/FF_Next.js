@@ -23,6 +23,10 @@ export interface ClientPurchaseOrder {
   amountInvoiced: number;
   amountPaid: number;
 
+  // Spare tracking
+  sparesAllocated: number;
+  sparesUsed: number;
+
   // Status
   status: ClientPOStatus;
 
@@ -110,6 +114,11 @@ export interface ClientPOSummary {
   invoicingProgress: number;
   poCount: number;
   activePoCount: number;
+  // Spare tracking (derived: total deployed - PO contracted = spares)
+  totalProjectDrops: number;
+  totalSpares: number;
+  sparesUsed: number;
+  sparesAvailable: number;
 }
 
 export interface AssignDropsInput {
@@ -120,4 +129,29 @@ export interface AssignDropsResult {
   assigned: number;
   alreadyAssigned: number;
   errors: string[];
+}
+
+// Spare Drop Tracking
+export type SpareUsageReason =
+  | 'failed_drop'
+  | 'damaged_ont'
+  | 'customer_relocation'
+  | 'signal_quality'
+  | 'construction_issue'
+  | 'other';
+
+export interface SpareUsageLogEntry {
+  id: string;
+  spareDropNumber: string;
+  replacedDropNumber?: string;
+  reason: SpareUsageReason;
+  notes?: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+export interface SpareSummary {
+  sparesAllocated: number;
+  sparesUsed: number;
+  sparesAvailable: number;
 }

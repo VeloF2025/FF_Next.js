@@ -59,12 +59,11 @@ export function useSOWData() {
         const totalFibre = projectData.fibre.length;
         
         // Calculate houses vs spares from drops
-        const houses = projectData.drops.filter((d: any) => 
-          d.address && d.address.startsWith('LAW.ONT.DR')
+        // Prefer is_spare flag from DB; fall back to address heuristic for legacy data
+        const spares = projectData.drops.filter((d: any) =>
+          d.is_spare === true || (d.is_spare === undefined && d.address && (d.address === 'Spare' || d.address.toLowerCase().includes('spare')))
         ).length;
-        const spares = projectData.drops.filter((d: any) => 
-          d.address && (d.address === 'Spare' || d.address.toLowerCase().includes('spare'))
-        ).length;
+        const houses = projectData.drops.length - spares;
         
         // Calculate total fibre distance
         const totalFibreDistance = projectData.fibre.reduce((sum: number, segment: any) => 

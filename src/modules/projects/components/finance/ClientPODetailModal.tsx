@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { ClientPurchaseOrder, ClientPOProgress } from '@/types/finance';
+import type { ClientPurchaseOrder, ClientPOProgress, SpareSummary, SpareUsageLogEntry } from '@/types/finance';
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import { DOCUMENT_TYPE_LABELS } from '@/modules/projects/types/po-extraction.types';
 import { log } from '@/lib/logger';
@@ -23,15 +23,20 @@ export function ClientPODetailModal({ projectId, clientPO, onClose, onUpdated }:
   const [error, setError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [spareSummary, setSpareSummary] = useState<SpareSummary | null>(null);
+  const [spareUsageLog, setSpareUsageLog] = useState<SpareUsageLogEntry[]>([]);
 
   useEffect(() => {
     async function fetchDetails() {
       try {
-        // Fetch PO details
+        // Fetch PO details (includes spare summary and usage log)
         const response = await fetch(`/api/projects/${projectId}/client-pos/${clientPO.id}`);
         if (!response.ok) throw new Error('Failed to fetch details');
         const data = await response.json();
-        setProgress(data.progress);
+        const detail = data.data || data;
+        setProgress(detail.progress);
+        if (detail.spareSummary) setSpareSummary(detail.spareSummary);
+        if (detail.spareUsageLog) setSpareUsageLog(detail.spareUsageLog);
 
         // Fetch linked documents
         const docsResponse = await fetch(`/api/projects/${projectId}/documents?clientPoId=${clientPO.id}`);
@@ -274,6 +279,54 @@ export function ClientPODetailModal({ projectId, clientPO, onClose, onUpdated }:
                   R {progress.remainingValue.toLocaleString()}
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* Spare Drops Section */}
+          {spareSummary && spareSummary.sparesAllocated > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-[var(--ff-text-secondary)]">Spare Drops</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-amber-400">{spareSummary.sparesAllocated.toLocaleString()}</div>
+                  <div className="text-xs text-[var(--ff-text-secondary)]">Allocated</div>
+                </div>
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-green-400">{spareSummary.sparesAvailable.toLocaleString()}</div>
+                  <div className="text-xs text-[var(--ff-text-secondary)]">Available</div>
+                </div>
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
+                  <div className="text-2xl font-bold text-blue-400">{spareSummary.sparesUsed}</div>
+                  <div className="text-xs text-[var(--ff-text-secondary)]">Used</div>
+                </div>
+              </div>
+
+              {/* Recent Spare Usage Log */}
+              {spareUsageLog.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-[var(--ff-text-secondary)]">Recent Spare Usage</h4>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {spareUsageLog.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between p-2 bg-[var(--ff-bg-secondary)] rounded-lg text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[var(--ff-text-primary)] font-medium">{entry.spareDropNumber}</span>
+                          {entry.replacedDropNumber && (
+                            <span className="text-[var(--ff-text-secondary)]">→ {entry.replacedDropNumber}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded capitalize">
+                            {entry.reason.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-[var(--ff-text-secondary)]">
+                            {new Date(entry.recordedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

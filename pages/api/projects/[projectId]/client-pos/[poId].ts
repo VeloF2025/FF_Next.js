@@ -59,6 +59,29 @@ export default withAuth(withErrorHandler(async (
         WHERE d.client_po_id = ${poId}
       `;
 
+      // Spare summary: derived from total project drops - total PO contracted
+      const spareCalcResult = await sql`
+        SELECT
+          (SELECT COUNT(*) FROM drops WHERE project_id = ${projectId}) as total_project_drops,
+          (SELECT COALESCE(SUM(contracted_drops), 0) FROM client_purchase_orders
+           WHERE project_id = ${projectId} AND status != 'cancelled') as total_contracted
+      `;
+      const totalProjectDrops = Number(spareCalcResult[0]?.total_project_drops || 0);
+      const totalContracted = Number(spareCalcResult[0]?.total_contracted || 0);
+      const projectSpares = Math.max(0, totalProjectDrops - totalContracted);
+
+      // Get recent spare usage log for this PO (or project-level if no PO assignment)
+      const usageLog = await sql`
+        SELECT
+          id, spare_drop_number, replaced_drop_number,
+          reason, notes, recorded_by, recorded_at
+        FROM spare_usage_log
+        WHERE project_id = ${projectId}
+          AND (client_po_id = ${poId} OR client_po_id IS NULL)
+        ORDER BY recorded_at DESC
+        LIMIT 10
+      `;
+
       return apiResponse.success(res, {
         clientPO,
         progress,
@@ -67,6 +90,20 @@ export default withAuth(withErrorHandler(async (
           totalActivated: Number(dropsSummary[0]?.total_activated || 0),
           totalInvoiced: Number(dropsSummary[0]?.total_invoiced || 0),
         },
+        spareSummary: {
+          sparesAllocated: projectSpares,
+          sparesUsed: 0,
+          sparesAvailable: projectSpares,
+        },
+        spareUsageLog: usageLog.map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          spareDropNumber: row.spare_drop_number as string,
+          replacedDropNumber: row.replaced_drop_number as string | undefined,
+          reason: row.reason as string,
+          notes: row.notes as string | undefined,
+          recordedBy: row.recorded_by as string,
+          recordedAt: row.recorded_at as string,
+        })),
       });
     } catch (error) {
       log.error('Failed to fetch Client PO', { projectId, poId, error });
@@ -208,6 +245,8 @@ function transformClientPO(row: Record<string, unknown>): ClientPurchaseOrder {
     dropsActivated: Number(row.drops_activated || 0),
     amountInvoiced: Number(row.amount_invoiced || 0),
     amountPaid: Number(row.amount_paid || 0),
+    sparesAllocated: Number(row.spares_allocated || 0),
+    sparesUsed: Number(row.spares_used || 0),
     status: row.status as ClientPurchaseOrder['status'],
     poDate: row.po_date as string,
     validFrom: row.valid_from as string | undefined,

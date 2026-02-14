@@ -213,6 +213,8 @@ function transformClientPO(row: Record<string, unknown>): ClientPurchaseOrder {
     dropsActivated: Number(row.drops_activated || 0),
     amountInvoiced: Number(row.amount_invoiced || 0),
     amountPaid: Number(row.amount_paid || 0),
+    sparesAllocated: Number(row.spares_allocated || 0),
+    sparesUsed: Number(row.spares_used || 0),
     status: row.status as ClientPurchaseOrder['status'],
     poDate: row.po_date as string,
     validFrom: row.valid_from as string | undefined,

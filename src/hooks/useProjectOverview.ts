@@ -206,6 +206,11 @@ interface FinanceDashboardSummary {
   totalDropsContracted: number;
   totalContractValue: number;
   totalInvoiced: number;
+  // Spare tracking
+  totalProjectDrops: number;
+  totalSpares: number;
+  sparesUsed: number;
+  sparesAvailable: number;
 }
 
 /**
@@ -224,6 +229,10 @@ export function useProjectFinanceSummary(projectId: string | undefined) {
           totalDropsContracted: 0,
           totalContractValue: 0,
           totalInvoiced: 0,
+          totalProjectDrops: 0,
+          totalSpares: 0,
+          sparesUsed: 0,
+          sparesAvailable: 0,
         };
       }
       const json = await res.json();
@@ -235,6 +244,10 @@ export function useProjectFinanceSummary(projectId: string | undefined) {
         totalDropsContracted: clientPOs.totalDropsContracted || 0,
         totalContractValue: clientPOs.totalContractValue || 0,
         totalInvoiced: clientPOs.totalInvoiced || 0,
+        totalProjectDrops: clientPOs.totalProjectDrops || 0,
+        totalSpares: clientPOs.totalSpares || 0,
+        sparesUsed: clientPOs.sparesUsed || 0,
+        sparesAvailable: clientPOs.sparesAvailable || 0,
       };
     },
     enabled: !!projectId,

@@ -81,6 +81,11 @@ export function ClientPOList({ projectId, clientPOs, onRefresh }: ClientPOListPr
                     <div className="text-xs text-[var(--ff-text-secondary)]">
                       @ R{po.pricePerDrop.toLocaleString()} each
                     </div>
+                    {po.sparesAllocated > 0 && (
+                      <div className="text-xs text-amber-400 mt-0.5">
+                        + {po.sparesAllocated.toLocaleString()} spares ({po.sparesUsed} used)
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="w-32">
