@@ -30,10 +30,10 @@ export function PrerequisitesPhase({
         <span className={`text-xl ${passed ? 'text-green-500' : 'text-red-500'}`}>
           {passed ? '✅' : '❌'}
         </span>
-        <span className="text-gray-900 dark:text-white">{label}</span>
+        <span className="text-foreground">{label}</span>
       </div>
       {detail && (
-        <span className="text-sm text-gray-500 dark:text-gray-400">{detail}</span>
+        <span className="text-sm text-muted-foreground">{detail}</span>
       )}
     </div>
   );
@@ -58,7 +58,7 @@ export function PrerequisitesPhase({
       </div>
 
       {/* Prerequisites checklist */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         {renderCheckItem(
           'Photos Available',
           state.photosAvailable,
@@ -94,7 +94,7 @@ export function PrerequisitesPhase({
       <div className="flex justify-between pt-4">
         <button
           onClick={onRefresh}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          className="px-4 py-2 text-muted-foreground hover:text-foreground"
         >
           Refresh
         </button>
@@ -104,7 +104,7 @@ export function PrerequisitesPhase({
           className={`px-6 py-2 rounded-lg font-medium ${
             allPassed
               ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              : 'bg-muted text-muted-foreground cursor-not-allowed'
           }`}
         >
           Continue to Photo Review

@@ -179,27 +179,27 @@ export function WorkflowEditorForms() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Estimated Duration (days)
           </label>
           <input
             type="number"
             value={formData.estimatedDuration || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, estimatedDuration: parseInt(e.target.value) || undefined }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="1"
             placeholder="7"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Order Index
           </label>
           <input
             type="number"
             value={formData.orderIndex}
             onChange={(e) => setFormData(prev => ({ ...prev, orderIndex: parseInt(e.target.value) || 0 }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="0"
             required
           />
@@ -212,18 +212,18 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isOptional || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isOptional: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Optional Phase</span>
+          <span className="ml-2 text-sm text-muted-foreground">Optional Phase</span>
         </label>
         <label className="flex items-center">
           <input
             type="checkbox"
             checked={formData.isParallel || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isParallel: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Can run in parallel</span>
+          <span className="ml-2 text-sm text-muted-foreground">Can run in parallel</span>
         </label>
       </div>
     </>
@@ -233,26 +233,26 @@ export function WorkflowEditorForms() {
     <>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Step Name
           </label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             placeholder="e.g., Site Survey"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Step Type
           </label>
           <select
             value={formData.stepType || 'task'}
             onChange={(e) => setFormData(prev => ({ ...prev, stepType: e.target.value as StepType }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
           >
             <option value="task">Task</option>
             <option value="approval">Approval</option>
@@ -263,13 +263,13 @@ export function WorkflowEditorForms() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Description
         </label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+          className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
           rows={3}
           placeholder="Describe what needs to be done..."
         />
@@ -277,39 +277,39 @@ export function WorkflowEditorForms() {
 
       <div className="grid grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Duration (hours)
           </label>
           <input
             type="number"
             value={formData.estimatedDuration || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, estimatedDuration: parseInt(e.target.value) || undefined }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="1"
             placeholder="8"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Assignee Role
           </label>
           <input
             type="text"
             value={formData.assigneeRole || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, assigneeRole: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             placeholder="engineer"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Order Index
           </label>
           <input
             type="number"
             value={formData.orderIndex}
             onChange={(e) => setFormData(prev => ({ ...prev, orderIndex: parseInt(e.target.value) || 0 }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="0"
             required
           />
@@ -322,18 +322,18 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isRequired !== false}
             onChange={(e) => setFormData(prev => ({ ...prev, isRequired: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Required Step</span>
+          <span className="ml-2 text-sm text-muted-foreground">Required Step</span>
         </label>
         <label className="flex items-center">
           <input
             type="checkbox"
             checked={formData.isAutomated || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isAutomated: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Automated</span>
+          <span className="ml-2 text-sm text-muted-foreground">Automated</span>
         </label>
       </div>
     </>
@@ -343,26 +343,26 @@ export function WorkflowEditorForms() {
     <>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Task Name
           </label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             placeholder="e.g., Install equipment"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Priority
           </label>
           <select
             value={formData.priority || 'medium'}
             onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as TaskPriority }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -373,13 +373,13 @@ export function WorkflowEditorForms() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Description
         </label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+          className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
           rows={3}
           placeholder="Detailed task description..."
         />
@@ -387,28 +387,28 @@ export function WorkflowEditorForms() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Estimated Hours
           </label>
           <input
             type="number"
             value={formData.estimatedHours || ''}
             onChange={(e) => setFormData(prev => ({ ...prev, estimatedHours: parseInt(e.target.value) || undefined }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="0.5"
             step="0.5"
             placeholder="2"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Order Index
           </label>
           <input
             type="number"
             value={formData.orderIndex}
             onChange={(e) => setFormData(prev => ({ ...prev, orderIndex: parseInt(e.target.value) || 0 }))}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
+            className="w-full px-3 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
             min="0"
             required
           />
@@ -421,25 +421,25 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isOptional || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isOptional: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Optional Task</span>
+          <span className="ml-2 text-sm text-muted-foreground">Optional Task</span>
         </label>
         <label className="flex items-center">
           <input
             type="checkbox"
             checked={formData.canBeParallel || false}
             onChange={(e) => setFormData(prev => ({ ...prev, canBeParallel: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-border"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Can run in parallel</span>
+          <span className="ml-2 text-sm text-muted-foreground">Can run in parallel</span>
         </label>
       </div>
     </>
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="flex items-center justify-between">

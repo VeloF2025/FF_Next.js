@@ -117,18 +117,18 @@ const PhaseNode = memo(({ data, isSelected, isDragging }: {
           
           <div className="flex items-center space-x-1">
             {data.isOptional && (
-              <span className="px-1.5 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Optional</span>
+              <span className="px-1.5 py-0.5 bg-card/20 rounded text-xs">Optional</span>
             )}
             {data.isParallel && (
-              <span className="px-1.5 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Parallel</span>
+              <span className="px-1.5 py-0.5 bg-card/20 rounded text-xs">Parallel</span>
             )}
           </div>
         </div>
 
         {/* Progress Bar (placeholder) */}
         <div className="mt-2">
-          <div className="bg-white dark:bg-gray-800/20 rounded-full h-1.5">
-            <div className="bg-white dark:bg-gray-800 rounded-full h-1.5 w-0" />
+          <div className="bg-card/20 rounded-full h-1.5">
+            <div className="bg-card rounded-full h-1.5 w-0" />
           </div>
         </div>
       </div>
@@ -189,10 +189,10 @@ const StepNode = memo(({ data, isSelected, isDragging }: {
           
           <div className="flex items-center space-x-1">
             {!data.isRequired && (
-              <span className="px-1 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Optional</span>
+              <span className="px-1 py-0.5 bg-card/20 rounded text-xs">Optional</span>
             )}
             {data.isAutomated && (
-              <span className="px-1 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Auto</span>
+              <span className="px-1 py-0.5 bg-card/20 rounded text-xs">Auto</span>
             )}
           </div>
         </div>
@@ -250,10 +250,10 @@ const TaskNode = memo(({ data, isSelected, isDragging }: {
           
           <div className="flex items-center space-x-1">
             {data.isOptional && (
-              <span className="px-1 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Opt</span>
+              <span className="px-1 py-0.5 bg-card/20 rounded text-xs">Opt</span>
             )}
             {data.canBeParallel && (
-              <span className="px-1 py-0.5 bg-white dark:bg-gray-800/20 rounded text-xs">Par</span>
+              <span className="px-1 py-0.5 bg-card/20 rounded text-xs">Par</span>
             )}
           </div>
         </div>

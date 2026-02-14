@@ -448,7 +448,7 @@ export function QaWizardContainer({
                       ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 dark:ring-offset-gray-800'
                       : isComplete
                         ? 'bg-green-500 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                        : 'bg-secondary text-muted-foreground'
                   } ${isClickable ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-50'}`}
                 >
                   {isComplete ? '✓' : index + 1}
@@ -460,7 +460,7 @@ export function QaWizardContainer({
                       ? 'font-semibold text-blue-600 dark:text-blue-400'
                       : isComplete
                         ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'
+                        : 'text-gray-400 dark:text-muted-foreground'
                   }`}
                 >
                   {PHASE_SHORT_LABELS[phase]}
@@ -486,10 +486,10 @@ export function QaWizardContainer({
   // Render current phase label (simplified - just the full name on left)
   const renderPhaseHeader = () => (
     <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
-      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+      <h3 className="text-sm font-medium text-muted-foreground">
         {PHASE_LABELS[state.phase]}
       </h3>
-      <span className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400">
+      <span className="text-xs text-gray-400 dark:text-muted-foreground">
         {PHASE_ORDER.indexOf(state.phase) + 1}/{PHASE_ORDER.length}
       </span>
     </div>
@@ -500,7 +500,7 @@ export function QaWizardContainer({
     return (
       <div className="p-6 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           {dataStatus || 'Loading QA Wizard...'}
         </p>
       </div>
@@ -584,10 +584,10 @@ export function QaWizardContainer({
         return (
           <div className="p-6 text-center">
             <div className="text-green-500 text-5xl mb-4">✓</div>
-            <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            <h4 className="text-xl font-semibold text-foreground mb-2">
               Review Complete
             </h4>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               {dropNumber} has been reviewed and feedback sent.
             </p>
           </div>
@@ -639,7 +639,7 @@ export function QaWizardContainer({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+    <div className="bg-card rounded-lg shadow-sm">
       {/* 1Map Sync Progress Overlay */}
       <WizardProgressOverlay
         isVisible={syncPhase !== null}
@@ -653,7 +653,7 @@ export function QaWizardContainer({
       {renderResubmissionBanner()}
 
       {/* Compact phase indicator */}
-      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="px-3 py-2 border-b border-border">
         {renderPhaseIndicator()}
         {renderPhaseHeader()}
       </div>

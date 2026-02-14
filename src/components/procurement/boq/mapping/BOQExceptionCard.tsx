@@ -40,7 +40,7 @@ export default function BOQExceptionCard({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1">
@@ -48,7 +48,7 @@ export default function BOQExceptionCard({
               type="checkbox"
               checked={isSelected}
               onChange={onToggleSelect}
-              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-border rounded"
             />
             
             <div className="flex-1">
@@ -58,7 +58,7 @@ export default function BOQExceptionCard({
                   exception.severity === 'medium' ? 'text-yellow-500' :
                   'text-blue-500'
                 }`} />
-                <span className="font-medium text-gray-900 dark:text-gray-100">
+                <span className="font-medium text-foreground">
                   Line {exception.boqItem.lineNumber}: {exception.boqItem.description}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -66,12 +66,12 @@ export default function BOQExceptionCard({
                 }`}>
                   {exception.severity}
                 </span>
-                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium">
+                <span className="px-2 py-0.5 bg-secondary text-muted-foreground rounded-full text-xs font-medium">
                   {EXCEPTION_TYPE_LABELS[exception.exceptionType] || exception.exceptionType}
                 </span>
               </div>
 
-              <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                 <div>
                   <span className="font-medium">Item Code:</span> {exception.boqItem.itemCode || 'N/A'}
                 </div>
@@ -94,14 +94,14 @@ export default function BOQExceptionCard({
           <div className="flex items-center space-x-2 ml-4">
             <button
               onClick={() => setShowDismissDialog(true)}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-400"
+              className="p-2 text-gray-400 hover:text-muted-foreground"
               title="Dismiss exception"
             >
               <SkipForward className="h-5 w-5" />
             </button>
             <button
               onClick={onToggleExpand}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-400"
+              className="p-2 text-gray-400 hover:text-muted-foreground"
             >
               {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </button>
@@ -110,7 +110,7 @@ export default function BOQExceptionCard({
       </div>
 
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
+        <div className="border-t border-border">
           <BOQMappingSuggestions
             suggestions={exception.suggestions}
             onSelectSuggestion={onApproveMapping}
@@ -120,25 +120,25 @@ export default function BOQExceptionCard({
       )}
 
       {showDismissDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-foreground mb-4">
               Dismiss Exception
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Please provide a reason for dismissing this exception:
             </p>
             <textarea
               value={dismissReason}
               onChange={(e) => setDismissReason(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
               rows={3}
               placeholder="Enter reason..."
             />
             <div className="flex justify-end space-x-3 mt-4">
               <button
                 onClick={() => setShowDismissDialog(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 dark:bg-gray-900"
+                className="px-4 py-2 border border-border text-muted-foreground rounded-md text-sm font-medium hover:bg-background"
               >
                 Cancel
               </button>

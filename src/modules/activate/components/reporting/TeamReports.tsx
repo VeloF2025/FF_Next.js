@@ -70,7 +70,7 @@ export function TeamReports({ filters, refreshKey }: TeamReportsProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Sub-report tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-4">
         {subReports.map((sub) => {
           const Icon = sub.icon;
           return (
@@ -80,7 +80,7 @@ export function TeamReports({ filters, refreshKey }: TeamReportsProps) {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm font-medium transition-colors ${
                 activeSubReport === sub.id
                   ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-b-2 border-purple-500'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -169,30 +169,30 @@ function LeaderboardSection({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-900/50">
+        <thead className="bg-background/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Rank
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Technician
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Project(s)
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Total
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               First-Pass %
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Resubmit %
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Serial %
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               7-Day Trend
             </th>
           </tr>
@@ -207,14 +207,14 @@ function LeaderboardSection({
                 <RankBadge rank={entry.rank} />
               </td>
               <td className="px-4 py-3 text-sm">
-                <div className="font-medium text-gray-900 dark:text-white">
+                <div className="font-medium text-foreground">
                   {entry.user_name || 'Unknown'}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className="text-xs text-muted-foreground">
                   {entry.sender_phone ? entry.sender_phone.replace(/^27/, '0') : '-'}
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {entry.projects.join(', ') || '-'}
               </td>
               <td className="px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400">
@@ -269,7 +269,7 @@ function TeamComparisonSection({
   return (
     <div className="space-y-6">
       {/* Bar Chart */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         <TrendChart
           title="Team Activations Comparison"
           data={chartData}
@@ -286,24 +286,24 @@ function TeamComparisonSection({
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Team
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Project(s)
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Activations
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 WA Match %
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Avg Activation Time
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Avg ONT Signal
               </th>
             </tr>
@@ -311,10 +311,10 @@ function TeamComparisonSection({
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {data.map((team) => (
               <tr key={team.team}>
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {team.team}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {team.projects.join(', ') || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-purple-600 dark:text-purple-400">
@@ -323,7 +323,7 @@ function TeamComparisonSection({
                 <td className="px-4 py-3 text-sm">
                   <RateCell value={team.wa_match_rate} />
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {team.avg_activation_time
                     ? `${team.avg_activation_time.toFixed(1)}h`
                     : '-'}
@@ -396,15 +396,15 @@ function ComplianceSection({
       <div className="flex justify-center gap-8 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-green-500" />
-          <span className="text-gray-600 dark:text-gray-400">Above target</span>
+          <span className="text-muted-foreground">Above target</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
-          <span className="text-gray-600 dark:text-gray-400">Near target (80%+)</span>
+          <span className="text-muted-foreground">Near target (80%+)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-gray-600 dark:text-gray-400">Below target</span>
+          <span className="text-muted-foreground">Below target</span>
         </div>
       </div>
 
@@ -448,9 +448,9 @@ function ComplianceCard({
   const isNear = value >= target * 0.8;
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-      <h4 className="font-medium text-gray-900 dark:text-white">{title}</h4>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+    <div className="bg-background/50 rounded-lg p-4">
+      <h4 className="font-medium text-foreground">{title}</h4>
+      <p className="text-xs text-muted-foreground mt-1">{description}</p>
       <div className="mt-3 flex items-end justify-between">
         <span
           className={`text-3xl font-bold ${
@@ -463,11 +463,11 @@ function ComplianceCard({
         >
           {value.toFixed(1)}%
         </span>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm text-muted-foreground">
           Target: {target}%
         </span>
       </div>
-      <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="mt-2 h-2 bg-secondary rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${
             isGood ? 'bg-green-500' : isNear ? 'bg-yellow-500' : 'bg-red-500'
@@ -487,7 +487,7 @@ function RankBadge({ rank }: { rank: number }) {
   if (rank <= 3) {
     const colors = {
       1: 'bg-yellow-500 text-yellow-900',
-      2: 'bg-gray-300 text-gray-700 dark:text-gray-300',
+      2: 'bg-gray-300 text-muted-foreground',
       3: 'bg-orange-400 text-orange-900',
     };
     return (
@@ -499,7 +499,7 @@ function RankBadge({ rank }: { rank: number }) {
     );
   }
   return (
-    <span className="text-gray-600 dark:text-gray-400 font-medium">{rank}</span>
+    <span className="text-muted-foreground font-medium">{rank}</span>
   );
 }
 
@@ -568,14 +568,14 @@ function SignalStrength({ value }: { value: number }) {
 function LoadingSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-64 animate-pulse bg-secondary rounded" />
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+    <div className="text-center py-12 text-muted-foreground">
       <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
       <p>{message}</p>
     </div>

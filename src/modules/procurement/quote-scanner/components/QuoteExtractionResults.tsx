@@ -152,10 +152,10 @@ export function QuoteExtractionResults({
   return (
     <div className="space-y-6">
       {/* Supplier Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Building className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h3 className="font-semibold text-gray-900 dark:text-white">Supplier Information</h3>
+          <Building className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold text-foreground">Supplier Information</h3>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -211,10 +211,10 @@ export function QuoteExtractionResults({
       </div>
 
       {/* Quote Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-4">
-          <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h3 className="font-semibold text-gray-900 dark:text-white">Quote Details</h3>
+          <FileText className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold text-foreground">Quote Details</h3>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -297,10 +297,10 @@ export function QuoteExtractionResults({
       </div>
 
       {/* Line Items */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h3 className="font-semibold text-gray-900 dark:text-white">
+          <Package className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold text-foreground">
             Line Items ({extraction.lineItems?.length || 0})
           </h3>
         </div>
@@ -308,24 +308,24 @@ export function QuoteExtractionResults({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">#</th>
-                <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Code</th>
-                <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Description</th>
-                <th className="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Qty</th>
-                <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Unit</th>
-                <th className="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Unit Price</th>
-                <th className="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Total</th>
-                <th className="text-center py-2 px-2 text-gray-500 dark:text-gray-400 font-medium w-8"></th>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 px-2 text-muted-foreground font-medium">#</th>
+                <th className="text-left py-2 px-2 text-muted-foreground font-medium">Code</th>
+                <th className="text-left py-2 px-2 text-muted-foreground font-medium">Description</th>
+                <th className="text-right py-2 px-2 text-muted-foreground font-medium">Qty</th>
+                <th className="text-left py-2 px-2 text-muted-foreground font-medium">Unit</th>
+                <th className="text-right py-2 px-2 text-muted-foreground font-medium">Unit Price</th>
+                <th className="text-right py-2 px-2 text-muted-foreground font-medium">Total</th>
+                <th className="text-center py-2 px-2 text-muted-foreground font-medium w-8"></th>
               </tr>
             </thead>
             <tbody>
               {(extraction.lineItems || []).map((item, index) => (
                 <tr
                   key={index}
-                  className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                  className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-accent/30"
                 >
-                  <td className="py-2 px-2 text-gray-600 dark:text-gray-400">
+                  <td className="py-2 px-2 text-muted-foreground">
                     {item.lineNumber}
                   </td>
                   <td className="py-2 px-2">
@@ -392,7 +392,7 @@ export function QuoteExtractionResults({
                       format="currency"
                     />
                   </td>
-                  <td className="py-2 px-2 text-right font-medium text-gray-900 dark:text-white">
+                  <td className="py-2 px-2 text-right font-medium text-foreground">
                     R {(item.totalPrice || 0).toLocaleString()}
                   </td>
                   <td className="py-2 px-2 text-center">
@@ -406,30 +406,30 @@ export function QuoteExtractionResults({
       </div>
 
       {/* Totals */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <h3 className="font-semibold text-gray-900 dark:text-white">Totals</h3>
+          <DollarSign className="h-5 w-5 text-muted-foreground" />
+          <h3 className="font-semibold text-foreground">Totals</h3>
         </div>
 
         <div className="flex flex-col items-end space-y-2 text-sm">
           <div className="flex justify-between w-48">
-            <span className="text-gray-500 dark:text-gray-400">Subtotal:</span>
-            <span className="text-gray-900 dark:text-white">
+            <span className="text-muted-foreground">Subtotal:</span>
+            <span className="text-foreground">
               R {calculatedTotals.subtotal.toLocaleString()}
             </span>
           </div>
           <div className="flex justify-between w-48">
-            <span className="text-gray-500 dark:text-gray-400">
+            <span className="text-muted-foreground">
               VAT ({calculatedTotals.vatRate}%):
             </span>
-            <span className="text-gray-900 dark:text-white">
+            <span className="text-foreground">
               R {calculatedTotals.vatAmount.toLocaleString()}
             </span>
           </div>
-          <div className="flex justify-between w-48 pt-2 border-t border-gray-200 dark:border-gray-700">
-            <span className="font-semibold text-gray-900 dark:text-white">Total:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+          <div className="flex justify-between w-48 pt-2 border-t border-border">
+            <span className="font-semibold text-foreground">Total:</span>
+            <span className="font-semibold text-foreground">
               R {calculatedTotals.total.toLocaleString()}
             </span>
           </div>
@@ -488,7 +488,7 @@ function EditableField({
 }: EditableFieldProps) {
   return (
     <div>
-      <label className="text-xs text-gray-500 dark:text-gray-400">{label}</label>
+      <label className="text-xs text-muted-foreground">{label}</label>
       {isEditing ? (
         <div className="flex items-center gap-1 mt-1">
           <input
@@ -511,7 +511,7 @@ function EditableField({
         </div>
       ) : (
         <div className="flex items-center gap-1 mt-1 group">
-          <p className="text-sm font-medium text-gray-900 dark:text-white">
+          <p className="text-sm font-medium text-foreground">
             {value || <span className="text-gray-400 italic">Not extracted</span>}
           </p>
           {!readOnly && (
@@ -591,7 +591,7 @@ function EditableCell({
   return (
     <span
       className={`
-        text-gray-900 dark:text-white cursor-pointer hover:text-blue-600
+        text-foreground cursor-pointer hover:text-blue-600
         ${!readOnly ? 'hover:underline' : ''}
         ${className}
       `}

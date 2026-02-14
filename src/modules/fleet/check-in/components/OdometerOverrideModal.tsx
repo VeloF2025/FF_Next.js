@@ -145,7 +145,7 @@ export function OdometerOverrideModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-background rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-red-50 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 p-4">
           <div className="flex items-start gap-3">
@@ -160,7 +160,7 @@ export function OdometerOverrideModal({
             </div>
             <button
               onClick={handleClose}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              className="p-1 text-muted-foreground hover:text-gray-700 dark:hover:text-gray-300"
             >
               <X className="w-5 h-5" />
             </button>
@@ -169,18 +169,18 @@ export function OdometerOverrideModal({
 
         <div className="p-4 space-y-5">
           {/* Info about rejected value */}
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="p-3 bg-input rounded-lg">
+            <p className="text-sm text-muted-foreground">
               <span className="font-medium">Vehicle:</span> {vehicleRegistration}
             </p>
             {vlmExtractedValue && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 <span className="font-medium">VLM Read:</span>{' '}
                 <span className="line-through text-red-500">{vlmExtractedValue.toLocaleString()} km</span>
               </p>
             )}
             {previousReading && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 <span className="font-medium">Previous:</span> {previousReading.toLocaleString()} km
               </p>
             )}
@@ -190,11 +190,11 @@ export function OdometerOverrideModal({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                isValidReading ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                isValidReading ? 'bg-green-500 text-white' : 'bg-secondary text-muted-foreground'
               }`}>
                 {isValidReading ? <CheckCircle2 className="w-4 h-4" /> : '1'}
               </div>
-              <label className="font-medium text-gray-900 dark:text-white">
+              <label className="font-medium text-foreground">
                 Enter Correct Mileage
               </label>
             </div>
@@ -206,7 +206,7 @@ export function OdometerOverrideModal({
                   value={manualReading}
                   onChange={(e) => setManualReading(e.target.value)}
                   placeholder="Enter odometer reading"
-                  className="w-full pl-10 pr-12 py-3 border rounded-lg text-lg bg-white dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-12 py-3 border rounded-lg text-lg bg-card dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">km</span>
               </div>
@@ -222,11 +222,11 @@ export function OdometerOverrideModal({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                hasVerificationPhoto ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                hasVerificationPhoto ? 'bg-green-500 text-white' : 'bg-secondary text-muted-foreground'
               }`}>
                 {hasVerificationPhoto ? <CheckCircle2 className="w-4 h-4" /> : '2'}
               </div>
-              <label className="font-medium text-gray-900 dark:text-white">
+              <label className="font-medium text-foreground">
                 Take Verification Photo
               </label>
             </div>
@@ -257,7 +257,7 @@ export function OdometerOverrideModal({
                   />
                   <button
                     onClick={capturePhoto}
-                    className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 bg-white dark:bg-gray-800 rounded-full border-4 border-gray-300 dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-gray-100 dark:bg-gray-800"
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 bg-card rounded-full border-4 border-border shadow-lg flex items-center justify-center hover:bg-secondary"
                   >
                     <div className="w-10 h-10 bg-red-500 rounded-full" />
                   </button>
@@ -265,7 +265,7 @@ export function OdometerOverrideModal({
               ) : (
                 <button
                   onClick={startCamera}
-                  className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                  className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-blue-400 hover:text-blue-500 transition-colors"
                 >
                   {cameraError ? (
                     <>
@@ -280,7 +280,7 @@ export function OdometerOverrideModal({
                   )}
                 </button>
               )}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Photo will be saved for audit purposes
               </p>
             </div>
@@ -288,10 +288,10 @@ export function OdometerOverrideModal({
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-gray-900 border-t dark:border-gray-800 p-4 flex gap-3">
+        <div className="sticky bottom-0 bg-background border-t dark:border-gray-800 p-4 flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 py-3 px-4 border rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="flex-1 py-3 px-4 border rounded-lg font-medium text-muted-foreground hover:bg-accent"
           >
             Cancel
           </button>
@@ -301,7 +301,7 @@ export function OdometerOverrideModal({
             className={`flex-1 py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 ${
               canConfirm
                 ? 'bg-green-500 text-white hover:bg-green-600'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
+                : 'bg-secondary text-muted-foreground cursor-not-allowed dark:bg-gray-800 dark:text-muted-foreground'
             }`}
           >
             <CheckCircle2 className="w-5 h-5" />

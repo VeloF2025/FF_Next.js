@@ -33,7 +33,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
   const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow">
+    <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start space-x-3 flex-1">
           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -41,8 +41,8 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">{document.name}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{document.description}</p>
+            <h3 className="font-semibold text-foreground truncate">{document.name}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{document.description}</p>
 
             <div className="flex items-center flex-wrap gap-2 mt-2">
               <span className={cn("px-2 py-1 rounded-full text-xs font-medium", type.color)}>
@@ -62,7 +62,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
+      <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground mb-4">
         <div>
           <p className="font-medium">Uploaded</p>
           <p>{formatDate(document.uploadDate)}</p>
@@ -83,7 +83,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
-        <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
           <span>v{document.version}</span>
           <span>{formatFileSize(document.fileSize)}</span>
           <span>{document.fileType}</span>
@@ -114,7 +114,7 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({
         <div className="mt-3 pt-3 border-t">
           <div className="flex flex-wrap gap-1">
             {document.tags.map((tag, index) => (
-              <span key={index} className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded text-xs">
+              <span key={index} className="bg-secondary text-muted-foreground px-2 py-1 rounded text-xs">
                 #{tag}
               </span>
             ))}

@@ -113,9 +113,9 @@ export function ValidationPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
+    <div className="h-full flex flex-col bg-card">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             {validationSummary.isValid ? (
@@ -123,7 +123,7 @@ export function ValidationPanel() {
             ) : (
               <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
             )}
-            <h2 className="font-semibold text-gray-900 dark:text-gray-100">Validation</h2>
+            <h2 className="font-semibold text-foreground">Validation</h2>
           </div>
 
           <button
@@ -132,14 +132,14 @@ export function ValidationPanel() {
             className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
             title="Refresh Validation"
           >
-            <RefreshCw className={`w-4 h-4 text-gray-600 dark:text-gray-400 ${state.isValidating ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-muted-foreground ${state.isValidating ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
         {/* Validation Summary */}
         <div className="bg-gray-50 dark:bg-gray-750 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className="text-sm font-medium text-foreground">
               Overall Status
             </span>
             {validationSummary.isValid ? (
@@ -158,13 +158,13 @@ export function ValidationPanel() {
               <div className="text-lg font-bold text-red-600 dark:text-red-400">
                 {validationSummary.errors}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Errors</div>
+              <div className="text-xs text-muted-foreground">Errors</div>
             </div>
             <div>
               <div className="text-lg font-bold text-amber-600 dark:text-amber-400">
                 {validationSummary.warnings}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Warnings</div>
+              <div className="text-xs text-muted-foreground">Warnings</div>
             </div>
           </div>
         </div>
@@ -176,7 +176,7 @@ export function ValidationPanel() {
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center space-x-3">
               <RefreshCw className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-muted-foreground">
                 Validating workflow...
               </span>
             </div>
@@ -184,10 +184,10 @@ export function ValidationPanel() {
         ) : !state.validationResult ? (
           <div className="text-center py-8">
             <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               No Validation Results
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               Start building your workflow to see validation feedback.
             </p>
             {state.templateId && (
@@ -260,8 +260,8 @@ export function ValidationPanel() {
       </div>
 
       {/* Footer with Validation Info */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+      <div className="p-4 border-t border-border">
+        <div className="text-xs text-muted-foreground space-y-1">
           <div>• Validation runs automatically as you edit</div>
           <div>• Click "Jump to" to navigate to problematic items</div>
           <div>• Fix all errors before saving your workflow</div>

@@ -9,8 +9,8 @@ interface LoadingStateProps {}
 
 export const LoadingState: React.FC<LoadingStateProps> = () => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-8">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg p-8">
         <LoadingSpinner size="lg" />
       </div>
     </div>
@@ -29,8 +29,8 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
   onRetry
 }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg p-8 max-w-md">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-red-800 mb-2">Error</h3>

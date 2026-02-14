@@ -27,7 +27,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quote Line Items</h3>
+        <h3 className="text-lg font-semibold text-foreground">Quote Line Items</h3>
         <VelocityButton onClick={onAddItem} size="sm">
           <Plus className="h-4 w-4 mr-2" />
           Add Item
@@ -58,7 +58,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
       {/* Quote Total */}
       <GlassCard className="bg-blue-50 border-blue-200">
         <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quote Total:</span>
+          <span className="text-lg font-semibold text-foreground">Quote Total:</span>
           <span className="text-2xl font-bold text-blue-600">
             R{totalAmount.toLocaleString()}
           </span>

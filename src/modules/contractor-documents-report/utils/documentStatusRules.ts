@@ -138,9 +138,9 @@ export function getStatusBadgeProps(status: DocumentDisplayStatus) {
       icon: 'Square',
       color: 'gray',
       label: 'Missing',
-      bgColor: 'bg-gray-100 dark:bg-gray-800',
-      textColor: 'text-gray-800 dark:text-gray-200',
-      borderColor: 'border-gray-200 dark:border-gray-700',
+      bgColor: 'bg-secondary',
+      textColor: 'text-foreground',
+      borderColor: 'border-border',
     },
   };
 

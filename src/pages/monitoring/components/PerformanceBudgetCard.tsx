@@ -24,7 +24,7 @@ export function PerformanceBudgetCard({ items }: PerformanceBudgetCardProps) {
             >
               <div className="flex-1">
                 <div className="font-medium">{item.metric}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Budget: {item.budget}</div>
+                <div className="text-sm text-muted-foreground">Budget: {item.budget}</div>
               </div>
               <div className="flex items-center space-x-3">
                 <div className="text-right">

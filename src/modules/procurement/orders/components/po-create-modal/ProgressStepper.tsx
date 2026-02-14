@@ -18,13 +18,13 @@ export const ProgressStepper: React.FC<ProgressStepperProps> = ({
           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
             currentStep >= stepNum
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+              : 'bg-secondary text-muted-foreground'
           }`}>
             {stepNum}
           </div>
           {stepNum < totalSteps && (
             <div className={`w-12 h-0.5 ml-2 ${
-              currentStep > stepNum ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+              currentStep > stepNum ? 'bg-blue-600' : 'bg-secondary'
             }`} />
           )}
         </div>

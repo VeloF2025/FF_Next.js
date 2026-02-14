@@ -120,8 +120,8 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
           <Card key={i}>
             <CardContent className="p-6">
               <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
-                <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 bg-secondary rounded w-1/3 mb-4"></div>
+                <div className="h-64 bg-secondary rounded"></div>
               </div>
             </CardContent>
           </Card>
@@ -133,8 +133,8 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
   const CustomTooltip = ({ active, payload, label, labelKey: _labelKey = 'name' }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900 dark:text-gray-100">
+        <div className="bg-card p-3 border rounded-lg shadow-lg">
+          <p className="font-medium text-foreground">
             {payload[0].payload.fullName || label}
           </p>
           {payload.map((entry: any, index: number) => (
@@ -159,7 +159,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Projects</p>
+                <p className="text-sm text-muted-foreground">Total Projects</p>
                 <p className="text-2xl font-bold">{analytics.performanceMetrics.totalProjects}</p>
               </div>
               <div className="text-blue-600 dark:text-blue-400">
@@ -173,7 +173,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Average Duration</p>
+                <p className="text-sm text-muted-foreground">Average Duration</p>
                 <p className="text-2xl font-bold">
                   {Math.round(analytics.performanceMetrics.averageProjectDuration)} days
                 </p>
@@ -189,7 +189,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">On-Time Rate</p>
+                <p className="text-sm text-muted-foreground">On-Time Rate</p>
                 <p className="text-2xl font-bold">
                   {Math.round(analytics.performanceMetrics.onTimeCompletion)}%
                 </p>
@@ -219,7 +219,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
               <BarChart className="w-5 h-5" />
               Template Usage
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Project count by template ({dateRange.label})
             </p>
           </CardHeader>
@@ -249,7 +249,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
               <PieChart className="w-5 h-5" />
               Success Rate Distribution
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Template success rates comparison
             </p>
           </CardHeader>
@@ -275,8 +275,8 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                     if (payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-                          <p className="font-medium text-gray-900 dark:text-gray-100">
+                        <div className="bg-card p-3 border rounded-lg shadow-lg">
+                          <p className="font-medium text-foreground">
                             {data.fullName}
                           </p>
                           <p className="text-sm">Success Rate: {data.rate}%</p>
@@ -299,7 +299,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
               <AreaChart className="w-5 h-5" />
               Phase Duration Analysis
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Average duration by workflow phase
             </p>
           </CardHeader>
@@ -335,7 +335,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
               Bottleneck Analysis
             </CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Phases with completion rates below 90%
             </p>
           </CardHeader>
@@ -343,7 +343,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
             {chartData.bottlenecks.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-muted-foreground">
                   No significant bottlenecks detected
                 </p>
               </div>
@@ -352,7 +352,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                 {chartData.bottlenecks.map((phase, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <span className="text-sm font-medium text-foreground">
                         {phase.fullName}
                       </span>
                       <div className="flex items-center gap-2">
@@ -362,7 +362,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
                         >
                           {phase.completionRate}%
                         </Badge>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-muted-foreground">
                           {phase.duration}d avg
                         </span>
                       </div>
@@ -384,7 +384,7 @@ export function WorkflowCharts({ analytics, dateRange }: WorkflowChartsProps) {
         <Card>
           <CardHeader>
             <CardTitle>Common Bottlenecks</CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Most frequently reported workflow obstacles
             </p>
           </CardHeader>

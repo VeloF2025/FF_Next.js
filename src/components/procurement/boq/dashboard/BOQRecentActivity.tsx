@@ -33,18 +33,18 @@ export default function BOQRecentActivity({
       case 'export':
         return <Download className="h-5 w-5 text-purple-500" />;
       default:
-        return <Activity className="h-5 w-5 text-gray-500 dark:text-gray-400" />;
+        return <Activity className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Activity</h3>
+    <div className="bg-card rounded-lg border">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Recent Activity</h3>
       </div>
       <div className="divide-y divide-gray-200">
         {recentActivity.length === 0 ? (
-          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+          <div className="p-6 text-center text-muted-foreground">
             <Activity className="mx-auto h-8 w-8 text-gray-300 mb-2" />
             <p>No recent activity</p>
           </div>
@@ -56,12 +56,12 @@ export default function BOQRecentActivity({
                   {getActivityIcon(activity.type)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.description}</p>
+                  <p className="text-sm font-medium text-foreground">{activity.description}</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <Users className="h-3 w-3 text-gray-400" />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{activity.userId}</span>
+                    <span className="text-xs text-muted-foreground">{activity.userId}</span>
                     <Calendar className="h-3 w-3 text-gray-400" />
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(activity.timestamp)}</span>
+                    <span className="text-xs text-muted-foreground">{formatRelativeTime(activity.timestamp)}</span>
                   </div>
                 </div>
               </div>

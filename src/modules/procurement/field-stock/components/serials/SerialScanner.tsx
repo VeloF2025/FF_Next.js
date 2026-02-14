@@ -100,7 +100,7 @@ export function SerialScanner({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value.toUpperCase())}
             placeholder={placeholder}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 pl-11 pr-20 text-lg font-mono text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            className="w-full rounded-lg border border-border bg-card py-3 pl-11 pr-20 text-lg font-mono text-foreground placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             autoComplete="off"
             autoFocus
           />
@@ -109,7 +109,7 @@ export function SerialScanner({
               <button
                 type="button"
                 onClick={handleClear}
-                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-600"
+                className="rounded-lg p-2 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-600"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -117,7 +117,7 @@ export function SerialScanner({
             <button
               type="button"
               onClick={() => setShowCamera(!showCamera)}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-600"
+              className="rounded-lg p-2 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-600"
               title="Scan with camera"
             >
               <Camera className="h-5 w-5" />
@@ -144,12 +144,12 @@ export function SerialScanner({
 
       {/* Camera Placeholder */}
       {showCamera && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-8 text-center dark:border-gray-600 dark:bg-gray-800">
+        <div className="rounded-lg border-2 border-dashed border-border bg-background p-8 text-center dark:border-gray-600 dark:bg-gray-800">
           <Camera className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-2 text-sm text-muted-foreground">
             Camera barcode scanning coming soon
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-muted-foreground">
             For now, please enter the serial number manually
           </p>
           <button
@@ -224,7 +224,7 @@ export function SerialScanner({
             </button>
             <button
               onClick={handleClear}
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
               Cancel
             </button>

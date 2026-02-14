@@ -67,8 +67,8 @@ const APPROVAL_STATUS_COLORS: Record<
   { bg: string; text: string; icon: React.ReactNode }
 > = {
   not_started: {
-    bg: 'bg-gray-100 dark:bg-gray-700/30',
-    text: 'text-gray-600 dark:text-gray-400',
+    bg: 'bg-secondary/30',
+    text: 'text-muted-foreground',
     icon: <Clock className="w-5 h-5" />,
   },
   preparing: {
@@ -122,8 +122,8 @@ const APPROVAL_STATUS_COLORS: Record<
     icon: <RefreshCw className="w-5 h-5" />,
   },
   withdrawn: {
-    bg: 'bg-gray-100 dark:bg-gray-700/30',
-    text: 'text-gray-600 dark:text-gray-400',
+    bg: 'bg-secondary/30',
+    text: 'text-muted-foreground',
     icon: <XCircle className="w-5 h-5" />,
   },
 };
@@ -713,7 +713,7 @@ export function PipelineProjectDetail() {
                                       {approval.approval_type_name}
                                     </h3>
                                     {isNotApplicable && (
-                                      <span className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
+                                      <span className="px-1.5 py-0.5 text-xs bg-secondary text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
                                         N/A
                                       </span>
                                     )}

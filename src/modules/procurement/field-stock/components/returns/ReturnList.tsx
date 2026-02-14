@@ -71,7 +71,7 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
             placeholder="Search returns..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
@@ -80,7 +80,7 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as ReturnStatus | 'all')}
-            className="appearance-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="appearance-none rounded-lg border border-border bg-card py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending</option>
@@ -95,36 +95,36 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
 
       {/* Returns List */}
       {filteredReturns.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No returns found</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h3 className="mt-2 text-sm font-medium text-foreground">No returns found</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
             {searchTerm || statusFilter !== 'all'
               ? 'Try adjusting your filters'
               : 'Returns will appear here when created'}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-hidden rounded-lg border border-border">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
+            <thead className="bg-input">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Return #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Returned By
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Items
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Status
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Actions
                 </th>
               </tr>
@@ -136,17 +136,17 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
                 const lineCount = Array.isArray(ret.lines) ? ret.lines.length : 0;
 
                 return (
-                  <tr key={ret.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  <tr key={ret.id} className="hover:bg-accent">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-foreground">
                       {ret.returnNumber}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                       {ret.returnedByName || 'Unknown'}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                       {lineCount} item{lineCount !== 1 ? 's' : ''}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                    <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                       {ret.returnDate
                         ? new Date(ret.returnDate).toISOString().split('T')[0]
                         : '-'}
@@ -164,7 +164,7 @@ export function ReturnList({ returns, loading, onInspect, onAccept, onView }: Re
                         {onView && (
                           <button
                             onClick={() => onView(ret)}
-                            className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                            className="rounded p-1 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                             title="View details"
                           >
                             <Eye className="h-4 w-4" />

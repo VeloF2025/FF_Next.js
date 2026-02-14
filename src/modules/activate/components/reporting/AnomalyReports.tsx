@@ -130,7 +130,7 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Sub-report tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-4">
         {subReports.map((sub) => {
           const Icon = sub.icon;
           return (
@@ -140,7 +140,7 @@ export function AnomalyReports({ filters, refreshKey }: AnomalyReportsProps) {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm font-medium transition-colors ${
                 activeSubReport === sub.id
                   ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-b-2 border-orange-500'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -267,11 +267,11 @@ function DiscrepancySection({
 
       {/* Filter Buttons */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</span>
+        <span className="text-sm font-medium text-muted-foreground">Filter:</span>
         {filterButtons.map((btn) => {
           const isActive = activeFilter === btn.id;
           const colorStyles: Record<string, string> = {
-            gray: isActive ? 'bg-gray-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+            gray: isActive ? 'bg-gray-600 text-white' : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600',
             yellow: isActive ? 'bg-yellow-500 text-white' : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-100 dark:hover:bg-yellow-900/40',
             orange: isActive ? 'bg-orange-500 text-white' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40',
             green: isActive ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40',
@@ -303,7 +303,7 @@ function DiscrepancyTable({
 }) {
   if (records.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No anomalies found for the selected date
       </div>
     );
@@ -312,29 +312,29 @@ function DiscrepancyTable({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-900/50">
+        <thead className="bg-background/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               DR Number
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Project
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               WA Submitted By
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               OES Team
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Action
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
           {records.slice(0, 50).map((record) => (
             <tr
               key={record.drop_number}
@@ -346,19 +346,19 @@ function DiscrepancyTable({
                     : 'bg-orange-50 dark:bg-orange-900/10'
               }`}
             >
-              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+              <td className="px-4 py-3 text-sm font-medium text-foreground">
                 {record.drop_number}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {record.project || '-'}
               </td>
               <td className="px-4 py-3 text-sm">
                 <StatusBadge type={record.discrepancy_type} />
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {record.wa_submitted_by || record.wa_sender_phone || '-'}
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {record.oes_team || '-'}
               </td>
               <td className="px-4 py-3 text-sm">
@@ -374,7 +374,7 @@ function DiscrepancyTable({
         </tbody>
       </table>
       {records.length > 50 && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+        <p className="text-sm text-muted-foreground mt-2 text-center">
           Showing first 50 of {records.length} records
         </p>
       )}
@@ -450,8 +450,8 @@ function PendingAgingSection({
       </ReportCardGrid>
 
       {/* Aging Buckets Distribution */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+      <div className="bg-background/50 rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-foreground mb-3">
           Aging Distribution
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -475,7 +475,7 @@ function PendingAgingSection({
           {selectedBucket && (
             <button
               onClick={() => setSelectedBucket(null)}
-              className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
             >
               Clear filter
             </button>
@@ -486,32 +486,32 @@ function PendingAgingSection({
       {/* Records Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 WA Submitted
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Days Pending
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Submitted By
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Photos
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Action
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
             {filteredRecords.slice(0, 50).map((record) => (
               <tr
                 key={record.drop_number}
@@ -525,13 +525,13 @@ function PendingAgingSection({
                         : ''
                 }`}
               >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {record.drop_number}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.project}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {new Date(record.wa_submitted).toISOString().split('T')[0]}
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -549,10 +549,10 @@ function PendingAgingSection({
                     {record.days_pending} days
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.submitted_by || record.sender_phone || '-'}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.completed_photos}
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -568,12 +568,12 @@ function PendingAgingSection({
           </tbody>
         </table>
         {filteredRecords.length > 50 && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+          <p className="text-sm text-muted-foreground mt-2 text-center">
             Showing first 50 of {filteredRecords.length} records
           </p>
         )}
         {filteredRecords.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-muted-foreground">
             No pending activations in this category
           </div>
         )}
@@ -637,9 +637,9 @@ function SerialSection({
             type="checkbox"
             checked={showMismatchesOnly}
             onChange={(e) => setShowMismatchesOnly(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
+            className="rounded border-border text-red-600 focus:ring-red-500"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="text-sm text-muted-foreground">
             Show mismatches only ({data.mismatches_only.length})
           </span>
         </label>
@@ -657,7 +657,7 @@ function SerialTable({
 }) {
   if (records.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No serial validation issues found
       </div>
     );
@@ -666,21 +666,21 @@ function SerialTable({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-900/50">
+        <thead className="bg-background/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               DR Number
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               ONT (WA/Scanned)
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               ONT (OES)
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               UPS Scanned
             </th>
           </tr>
@@ -693,13 +693,13 @@ function SerialTable({
                 r.ont_match_status === 'mismatch' ? 'bg-red-50 dark:bg-red-900/10' : ''
               }
             >
-              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+              <td className="px-4 py-3 text-sm font-medium text-foreground">
                 {r.drop_number}
               </td>
-              <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
                 {r.ont_serial_wa || '-'}
               </td>
-              <td className="px-4 py-3 text-sm font-mono text-gray-600 dark:text-gray-400">
+              <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
                 {r.ont_serial_oes || '-'}
               </td>
               <td className="px-4 py-3 text-sm">
@@ -727,7 +727,7 @@ function SerialTable({
         </tbody>
       </table>
       {records.length > 50 && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+        <p className="text-sm text-muted-foreground mt-2 text-center">
           Showing first 50 of {records.length}
         </p>
       )}
@@ -787,26 +787,26 @@ function ResubmissionSection({
       {/* By Project */}
       {data.by_project.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             By Project
           </h4>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
+              <thead className="bg-background/50">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Project
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Total
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Resubmitted
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Rate
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Avg Submissions
                   </th>
                 </tr>
@@ -814,10 +814,10 @@ function ResubmissionSection({
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {data.by_project.map((p) => (
                   <tr key={p.group_name}>
-                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">
+                    <td className="px-4 py-2 font-medium text-foreground">
                       {p.group_name}
                     </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400">{p.total_drs}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{p.total_drs}</td>
                     <td className="px-4 py-2 text-orange-600 dark:text-orange-400">
                       {p.resubmitted_drs}
                     </td>
@@ -832,7 +832,7 @@ function ResubmissionSection({
                         {p.resubmission_rate.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-2 text-muted-foreground">
                       {p.avg_submissions.toFixed(1)}
                     </td>
                   </tr>
@@ -846,23 +846,23 @@ function ResubmissionSection({
       {/* Top Resubmitted */}
       {data.top_resubmitted.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             Top Resubmitted DRs (Quality Issues?)
           </h4>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
+              <thead className="bg-background/50">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     DR Number
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Project
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Submissions
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground uppercase text-xs">
                     Submitted By
                   </th>
                 </tr>
@@ -878,13 +878,13 @@ function ResubmissionSection({
                         {dr.drop_number}
                       </a>
                     </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-2 text-muted-foreground">
                       {dr.project || '-'}
                     </td>
                     <td className="px-4 py-2 font-medium text-orange-600 dark:text-orange-400">
                       {dr.submission_count}x
                     </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-2 text-muted-foreground">
                       {dr.submitted_by || '-'}
                     </td>
                   </tr>
@@ -927,17 +927,17 @@ function LoadingSkeleton({ cards }: { cards: number }) {
     <div className="space-y-6">
       <div className={`grid grid-cols-${Math.min(cards, 6)} gap-4`}>
         {Array.from({ length: cards }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          <div key={i} className="h-24 animate-pulse bg-secondary rounded-lg" />
         ))}
       </div>
-      <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-64 animate-pulse bg-secondary rounded" />
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+    <div className="text-center py-12 text-muted-foreground">
       <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
       <p>{message}</p>
     </div>

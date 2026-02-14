@@ -86,7 +86,7 @@ export function useCommunications() {
       case 'high': return 'bg-orange-100 text-orange-800';
       case 'medium': return 'bg-yellow-100 text-yellow-800';
       case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      default: return 'bg-secondary text-foreground';
     }
   };
 
@@ -94,11 +94,11 @@ export function useCommunications() {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'in_progress': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      case 'pending': return 'bg-secondary text-foreground';
       case 'overdue': return 'bg-red-100 text-red-800';
       case 'scheduled': return 'bg-purple-100 text-purple-800';
-      case 'cancelled': return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
-      default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      case 'cancelled': return 'bg-secondary text-foreground';
+      default: return 'bg-secondary text-foreground';
     }
   };
 

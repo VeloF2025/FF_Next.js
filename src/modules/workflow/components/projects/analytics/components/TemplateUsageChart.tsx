@@ -10,12 +10,12 @@ interface TemplateUsageChartProps {
 
 export function TemplateUsageChart({ templateUsage }: TemplateUsageChartProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+    <div className="bg-background rounded-lg p-6 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+        <h3 className="text-lg font-medium text-foreground">
           Most Used Templates
         </h3>
-        <span className="text-sm text-gray-600 dark:text-gray-400">
+        <span className="text-sm text-muted-foreground">
           Project count
         </span>
       </div>
@@ -30,24 +30,24 @@ export function TemplateUsageChart({ templateUsage }: TemplateUsageChartProps) {
                 index === 2 ? 'bg-purple-500' :
                 index === 3 ? 'bg-orange-500' : 'bg-gray-500'
               }`} />
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+              <span className="text-sm font-medium text-foreground truncate">
                 {template.templateName}
               </span>
             </div>
 
             <div className="flex items-center space-x-4 text-sm">
-              <span className="text-gray-600 dark:text-gray-400 min-w-16 text-right">
+              <span className="text-muted-foreground min-w-16 text-right">
                 {template.projectCount} projects
               </span>
-              <span className="text-gray-600 dark:text-gray-400 min-w-20 text-right">
+              <span className="text-muted-foreground min-w-20 text-right">
                 {Math.round(template.successRate)}% success
               </span>
-              <span className="text-gray-600 dark:text-gray-400 min-w-20 text-right">
+              <span className="text-muted-foreground min-w-20 text-right">
                 {Math.round(template.averageDuration)} days avg
               </span>
             </div>
 
-            <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-24 bg-secondary rounded-full h-2">
               <div
                 className={`h-2 rounded-full ${
                   index === 0 ? 'bg-blue-500' :

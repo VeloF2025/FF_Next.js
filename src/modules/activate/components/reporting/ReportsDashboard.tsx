@@ -304,7 +304,7 @@ export function ReportsDashboard() {
   return (
     <div className="space-y-6">
       {/* Category Navigation */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
         <div className="flex flex-wrap gap-2">
           {categories.map((cat) => {
             const Icon = cat.icon;
@@ -317,7 +317,7 @@ export function ReportsDashboard() {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
                 title={cat.description}
               >
@@ -329,13 +329,13 @@ export function ReportsDashboard() {
         </div>
 
         {/* Category description */}
-        <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-3 text-sm text-muted-foreground">
           {categories.find((c) => c.id === activeCategory)?.description}
         </p>
       </div>
 
       {/* Filters Bar - Sticky */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4 sticky top-0 z-10">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-4 sticky top-0 z-10">
         <div className="flex flex-wrap items-center gap-4">
           {/* Quick Filters */}
           <div className="flex flex-wrap gap-1.5">
@@ -357,7 +357,7 @@ export function ReportsDashboard() {
                 className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                   getActiveQuickFilter() === key
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {label}
@@ -372,14 +372,14 @@ export function ReportsDashboard() {
               type="date"
               value={filters.dateFrom}
               onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
-              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             />
-            <span className="text-gray-500 dark:text-gray-400">to</span>
+            <span className="text-muted-foreground">to</span>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
-              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             />
           </div>
 
@@ -392,7 +392,7 @@ export function ReportsDashboard() {
                 project: e.target.value || undefined,
               })
             }
-            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
           >
             <option value="">All Projects</option>
             {projects.map((p) => (
@@ -407,7 +407,7 @@ export function ReportsDashboard() {
             <button
               onClick={handleRefresh}
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-muted-foreground rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -424,7 +424,7 @@ export function ReportsDashboard() {
       </div>
 
       {/* Report Content */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50">
         {activeCategory === 'anomalies' && (
           <AnomalyReports filters={filters} refreshKey={refreshKey} />
         )}

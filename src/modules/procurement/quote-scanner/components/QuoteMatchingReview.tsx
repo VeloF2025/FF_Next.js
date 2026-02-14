@@ -138,26 +138,26 @@ export function QuoteMatchingReview({
   return (
     <div className="space-y-6">
       {/* Summary Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">
+            <h3 className="font-semibold text-foreground">
               Review Item Matching
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               {matching.rfqNumber} - {extraction.lineItems?.length || 0} extracted items
             </p>
           </div>
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-gray-600 dark:text-gray-300">
+              <span className="text-muted-foreground">
                 {matching.totalMatched} matched
               </span>
             </div>
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
-              <span className="text-gray-600 dark:text-gray-300">
+              <span className="text-muted-foreground">
                 {matching.totalUnmatched} unmatched
               </span>
             </div>
@@ -166,10 +166,10 @@ export function QuoteMatchingReview({
 
         {/* Overall Confidence */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="text-sm text-muted-foreground">
             Overall Confidence:
           </span>
-          <div className="flex-1 max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="flex-1 max-w-xs bg-secondary rounded-full h-2">
             <div
               className={`h-2 rounded-full transition-all ${
                 matching.overallConfidence >= 0.8
@@ -181,7 +181,7 @@ export function QuoteMatchingReview({
               style={{ width: `${matching.overallConfidence * 100}%` }}
             />
           </div>
-          <span className="text-sm font-medium text-gray-900 dark:text-white">
+          <span className="text-sm font-medium text-foreground">
             {Math.round(matching.overallConfidence * 100)}%
           </span>
         </div>
@@ -214,23 +214,23 @@ export function QuoteMatchingReview({
           return (
             <div
               key={index}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+              className="bg-card rounded-lg border border-border overflow-hidden"
             >
               {/* Item Header */}
               <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/30"
                 onClick={() => setExpandedItem(isExpanded ? null : index)}
               >
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-8">
+                  <span className="text-sm font-medium text-muted-foreground w-8">
                     #{item.lineNumber}
                   </span>
 
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {item.description}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       {item.quantity} {item.unit} × R {(item.unitPrice || 0).toLocaleString()}
                       {' = '}
                       <span className="font-medium">
@@ -252,37 +252,37 @@ export function QuoteMatchingReview({
 
               {/* Expanded Content */}
               {isExpanded && (
-                <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
+                <div className="border-t border-border p-4 bg-input/50">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Extracted Item Details */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         Extracted Item
                       </h4>
-                      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                      <div className="bg-card rounded-lg border border-border p-3 space-y-2">
                         {item.itemCode && (
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                            <span className="font-medium text-gray-900 dark:text-white">
+                            <span className="text-muted-foreground">Code:</span>
+                            <span className="font-medium text-foreground">
                               {item.itemCode}
                             </span>
                           </div>
                         )}
                         <div className="text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Description:</span>
-                          <p className="font-medium text-gray-900 dark:text-white mt-1">
+                          <span className="text-muted-foreground">Description:</span>
+                          <p className="font-medium text-foreground mt-1">
                             {item.description}
                           </p>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Quantity:</span>
-                          <span className="font-medium text-gray-900 dark:text-white">
+                          <span className="text-muted-foreground">Quantity:</span>
+                          <span className="font-medium text-foreground">
                             {item.quantity} {item.unit}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-500 dark:text-gray-400">Unit Price:</span>
-                          <span className="font-medium text-gray-900 dark:text-white">
+                          <span className="text-muted-foreground">Unit Price:</span>
+                          <span className="font-medium text-foreground">
                             R {(item.unitPrice || 0).toLocaleString()}
                           </span>
                         </div>
@@ -291,7 +291,7 @@ export function QuoteMatchingReview({
 
                     {/* RFQ Item Match */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         Matched RFQ Item
                       </h4>
 
@@ -305,7 +305,7 @@ export function QuoteMatchingReview({
                               e.target.value || null
                             )
                           }
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                          className="w-full px-3 py-2 text-sm border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                         >
                           <option value="">-- Select RFQ Item --</option>
                           {getAvailableRfqItems(item.lineNumber).map((rfqItem) => (
@@ -319,24 +319,24 @@ export function QuoteMatchingReview({
 
                         {/* Selected RFQ Item Details */}
                         {matchedRfqItem && (
-                          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                          <div className="bg-card rounded-lg border border-border p-3 space-y-2">
                             {matchedRfqItem.itemCode && (
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                <span className="font-medium text-gray-900 dark:text-white">
+                                <span className="text-muted-foreground">Code:</span>
+                                <span className="font-medium text-foreground">
                                   {matchedRfqItem.itemCode}
                                 </span>
                               </div>
                             )}
                             <div className="text-sm">
-                              <span className="text-gray-500 dark:text-gray-400">Description:</span>
-                              <p className="font-medium text-gray-900 dark:text-white mt-1">
+                              <span className="text-muted-foreground">Description:</span>
+                              <p className="font-medium text-foreground mt-1">
                                 {matchedRfqItem.description}
                               </p>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-500 dark:text-gray-400">Required Qty:</span>
-                              <span className="font-medium text-gray-900 dark:text-white">
+                              <span className="text-muted-foreground">Required Qty:</span>
+                              <span className="font-medium text-foreground">
                                 {matchedRfqItem.quantity} {matchedRfqItem.unit}
                               </span>
                             </div>
@@ -354,9 +354,9 @@ export function QuoteMatchingReview({
                         )}
 
                         {!matchedRfqItem && (
-                          <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-3 text-center">
+                          <div className="bg-secondary/50 rounded-lg p-3 text-center">
                             <Unlink className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-muted-foreground">
                               No RFQ item selected
                             </p>
                           </div>
@@ -373,8 +373,8 @@ export function QuoteMatchingReview({
 
       {/* Unmatched RFQ Items Warning */}
       {rfqItems.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             RFQ Items Not in Quote
           </h4>
           <div className="space-y-2">
@@ -383,7 +383,7 @@ export function QuoteMatchingReview({
               .map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
+                  className="flex items-center gap-2 text-sm text-muted-foreground"
                 >
                   <XCircle className="h-4 w-4 text-red-400" />
                   <span className="truncate">
@@ -406,7 +406,7 @@ export function QuoteMatchingReview({
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>

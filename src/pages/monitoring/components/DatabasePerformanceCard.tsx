@@ -35,7 +35,7 @@ export function DatabasePerformanceCard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {dbMetrics.map((metric) => (
             <div key={metric.label}>
-              <div className="text-sm text-gray-600 dark:text-gray-400">{metric.label}</div>
+              <div className="text-sm text-muted-foreground">{metric.label}</div>
               <div className="text-2xl font-bold">{metric.value}</div>
               <div className={`text-sm ${metric.statusColor}`}>{metric.status}</div>
             </div>

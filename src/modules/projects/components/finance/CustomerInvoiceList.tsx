@@ -35,7 +35,7 @@ export function CustomerInvoiceList({ projectId, invoices, summary, onRefresh }:
     paid: { bg: 'bg-green-500/20', text: 'text-green-400' },
     partially_paid: { bg: 'bg-teal-500/20', text: 'text-teal-400' },
     overdue: { bg: 'bg-red-500/20', text: 'text-red-400' },
-    cancelled: { bg: 'bg-gray-500/20', text: 'text-gray-500 dark:text-gray-400' },
+    cancelled: { bg: 'bg-gray-500/20', text: 'text-muted-foreground' },
   };
 
   const handleAction = async (invoiceId: string, action: string) => {

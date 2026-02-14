@@ -179,7 +179,7 @@ export function ClientDetail() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Delete Client?</h3>
             <p className="text-[var(--ff-text-secondary)] mb-6">

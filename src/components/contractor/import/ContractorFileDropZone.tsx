@@ -102,8 +102,8 @@ export function ContractorFileDropZone({
         onDrop={handleDrop}
         className={`
           relative border-2 border-dashed rounded-lg p-6 text-center transition-colors
-          ${isDragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 dark:border-gray-600'}
-          ${isProcessing ? 'pointer-events-none opacity-50' : 'hover:border-gray-400 hover:bg-gray-50 dark:bg-gray-900'}
+          ${isDragOver ? 'border-blue-400 bg-blue-50' : 'border-border'}
+          ${isProcessing ? 'pointer-events-none opacity-50' : 'hover:border-gray-400 hover:bg-background'}
           ${dragError ? 'border-red-300 bg-red-50' : ''}
         `}
       >
@@ -119,7 +119,7 @@ export function ContractorFileDropZone({
           {isProcessing ? (
             <>
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Processing file...</p>
+              <p className="text-sm text-muted-foreground">Processing file...</p>
             </>
           ) : dragError ? (
             <>
@@ -128,7 +128,7 @@ export function ContractorFileDropZone({
                 <p className="text-sm font-medium text-red-800">Upload Error</p>
                 <p className="text-sm text-red-600">{dragError}</p>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Try again with a valid file</p>
+              <p className="text-xs text-muted-foreground">Try again with a valid file</p>
             </>
           ) : (
             <>
@@ -138,10 +138,10 @@ export function ContractorFileDropZone({
                 <Upload className="w-8 h-8 text-gray-400" />
               )}
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p className="text-sm font-medium text-foreground">
                   {isDragOver ? 'Drop file here' : 'Drop files here or click to browse'}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   CSV, Excel (.xlsx, .xls) files up to 50MB
                 </p>
               </div>
@@ -151,7 +151,7 @@ export function ContractorFileDropZone({
       </div>
 
       {/* Supported formats info */}
-      <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mt-3 text-xs text-muted-foreground">
         <p className="font-medium">Supported formats:</p>
         <ul className="mt-1 space-y-1">
           <li>• CSV files (.csv)</li>

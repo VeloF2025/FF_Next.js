@@ -55,19 +55,19 @@ export function HealthTrendChart({ hours = 24, limit = 48 }: HealthTrendChartPro
 
   if (loading && !data) {
     return (
-      <div className="bg-white dark:bg-gray-800/5 rounded-xl border border-white/10 p-6">
+      <div className="bg-card/5 rounded-xl border border-white/10 p-6">
         <div className="flex items-center gap-2 mb-4">
           <RefreshCw className="w-5 h-5 text-velocity-accent animate-spin" />
           <span className="text-white/60">Loading health history...</span>
         </div>
-        <div className="h-32 bg-white dark:bg-gray-800/5 rounded animate-pulse" />
+        <div className="h-32 bg-card/5 rounded animate-pulse" />
       </div>
     );
   }
 
   if (error || !data || data.entries.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800/5 rounded-xl border border-white/10 p-6">
+      <div className="bg-card/5 rounded-xl border border-white/10 p-6">
         <h3 className="text-lg font-semibold text-white mb-2">Health Trend</h3>
         <p className="text-white/50 text-sm">
           {error || 'No historical data available yet. Data will appear after health checks run.'}
@@ -95,7 +95,7 @@ export function HealthTrendChart({ hours = 24, limit = 48 }: HealthTrendChartPro
   const chronologicalEntries = [...data.entries].reverse();
 
   return (
-    <div className="bg-white dark:bg-gray-800/5 rounded-xl border border-white/10 p-6">
+    <div className="bg-card/5 rounded-xl border border-white/10 p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-white">Health Trend (Last {hours}h)</h3>
         <div className={`flex items-center gap-1 ${trendColor}`}>

@@ -53,7 +53,7 @@ async function fetchSuppliers(): Promise<Supplier[]> {
 function getStatusBadge(status: Agreement['status']) {
   switch (status) {
     case 'draft':
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: 'Draft' };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: 'Draft' };
     case 'pending_review':
       return { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', label: 'Pending Review' };
     case 'approved':
@@ -63,7 +63,7 @@ function getStatusBadge(status: Agreement['status']) {
     case 'expired':
       return { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Expired' };
     default:
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: status };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: status };
   }
 }
 
@@ -421,10 +421,10 @@ export function ProjectAgreementsTab({ projectId }: ProjectAgreementsTabProps) {
   if (isLoading) {
     return (
       <div className="ff-card animate-pulse">
-        <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
+        <div className="h-8 w-48 bg-secondary rounded mb-4" />
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div key={i} className="h-16 bg-secondary rounded" />
           ))}
         </div>
       </div>

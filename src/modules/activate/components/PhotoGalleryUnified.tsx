@@ -37,12 +37,12 @@ export function PhotoGalleryUnified({
 
   if (photos.length === 0) {
     return (
-      <div className="text-center py-12 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+      <div className="text-center py-12 bg-background/50 rounded-lg border border-border">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary mb-4">
           <span className="text-3xl">📸</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Photos Available</h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h3 className="text-lg font-semibold text-foreground mb-2">No Photos Available</h3>
+        <p className="text-muted-foreground">
           Photos will appear here once they are fetched from the source
         </p>
       </div>
@@ -124,9 +124,9 @@ function StepGroupedGallery({ photos, source, onPhotoClick }: StepGroupedGallery
       {/* Photo Source Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Source:</span>
+          <span className="text-sm text-muted-foreground">Source:</span>
           <PhotoSourceBadge source={source} />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-muted-foreground">
             {photos.length} photo{photos.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -152,28 +152,28 @@ function StepGroupedGallery({ photos, source, onPhotoClick }: StepGroupedGallery
             return (
               <div
                 key={step}
-                className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden"
+                className="border border-border rounded-lg bg-card overflow-hidden"
               >
                 {/* Step Header */}
                 <button
                   onClick={() => toggleStep(step)}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 font-semibold text-sm">
                       {step}
                     </span>
                     <div className="text-left">
-                      <h4 className="font-medium text-gray-900 dark:text-white">
+                      <h4 className="font-medium text-foreground">
                         {STEP_LABELS[step] || `Step ${step}`}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {stepPhotos.length} photo{stepPhotos.length !== 1 ? 's' : ''}
                       </p>
                     </div>
                   </div>
                   <svg
-                    className={`w-5 h-5 text-gray-400 dark:text-gray-500 dark:text-gray-400 transition-transform ${
+                    className={`w-5 h-5 text-gray-400 dark:text-muted-foreground transition-transform ${
                       isExpanded ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -191,7 +191,7 @@ function StepGroupedGallery({ photos, source, onPhotoClick }: StepGroupedGallery
 
                 {/* Step Photos */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                  <div className="border-t border-border p-4">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {stepPhotos.map((photo, index) => (
                         <PhotoThumbnail
@@ -226,9 +226,9 @@ function SimpleGallery({ photos, source, onPhotoClick }: SimpleGalleryProps) {
     <div className="space-y-4">
       {/* Photo Source Header */}
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-600 dark:text-gray-400">Source:</span>
+        <span className="text-sm text-muted-foreground">Source:</span>
         <PhotoSourceBadge source={source} />
-        <span className="text-sm text-gray-600 dark:text-gray-400">
+        <span className="text-sm text-muted-foreground">
           {photos.length} photo{photos.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -262,7 +262,7 @@ function PhotoThumbnail({ photo, onClick }: PhotoThumbnailProps) {
   return (
     <div
       onClick={onClick}
-      className="group relative aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 dark:hover:ring-blue-400 transition-all"
+      className="group relative aspect-square bg-secondary rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 dark:hover:ring-blue-400 transition-all"
     >
       {!imageError ? (
         <Image
@@ -273,7 +273,7 @@ function PhotoThumbnail({ photo, onClick }: PhotoThumbnailProps) {
           onError={() => setImageError(true)}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 dark:text-gray-400">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-muted-foreground">
           <svg
             className="w-12 h-12 mb-2"
             fill="none"
@@ -357,7 +357,7 @@ function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="flex items-center justify-center min-h-[400px] text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
               <div className="text-center">
                 <svg
                   className="w-24 h-24 mx-auto mb-4"
@@ -415,10 +415,10 @@ function PhotoSourceBadge({ source }: PhotoSourceBadgeProps) {
   const sourceConfig: Record<PhotoSource, { label: string; color: string }> = {
     onemap: { label: 'OneMap GIS', color: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200' },
     boss: { label: 'BOSS API', color: 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200' },
-    local: { label: 'Local Cache', color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' },
+    local: { label: 'Local Cache', color: 'bg-secondary text-foreground' },
   };
 
-  const fallback = { label: source || 'Unknown', color: 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200' };
+  const fallback = { label: source || 'Unknown', color: 'bg-secondary text-foreground' };
   const config = (source && sourceConfig[source]) || fallback;
 
   return (

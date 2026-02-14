@@ -17,37 +17,37 @@ export function CommunicationsActionTab({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50 dark:bg-gray-900">
+        <thead className="bg-background">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Action Item
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Assignee
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Due Date
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Priority
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Status
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+        <tbody className="bg-card divide-y divide-gray-200">
           {actionItems.map((item) => (
             <tr key={item.id}>
               <td className="px-6 py-4">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <div className="text-sm font-medium text-foreground">
                   {item.description}
                 </div>
                 {item.meetingId && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-sm text-muted-foreground">
                     From: {meetings.find(m => m.id === item.meetingId)?.title}
                   </div>
                 )}
@@ -55,11 +55,11 @@ export function CommunicationsActionTab({
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <User className="w-4 h-4 mr-2 text-gray-400" />
-                  <span className="text-sm text-gray-900 dark:text-gray-100">{item.assignee}</span>
+                  <span className="text-sm text-foreground">{item.assignee}</span>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-gray-100">
+                <div className="text-sm text-foreground">
                   {item.dueDate.toISOString().split('T')[0]}
                 </div>
               </td>
@@ -74,7 +74,7 @@ export function CommunicationsActionTab({
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button className="text-gray-400 hover:text-gray-600 dark:text-gray-400">
+                <button className="text-gray-400 hover:text-muted-foreground">
                   <MoreVertical className="w-5 h-5" />
                 </button>
               </td>

@@ -208,7 +208,7 @@ export function ServiceTemplatesTab({
             {hasChildren ? (
               <button
                 onClick={() => toggleExpanded(template.id)}
-                className="p-1 hover:bg-gray-100 dark:bg-gray-800 rounded"
+                className="p-1 hover:bg-secondary rounded"
               >
                 {isExpanded ? (
                   <ChevronDown className="w-4 h-4" />
@@ -232,15 +232,15 @@ export function ServiceTemplatesTab({
             {/* Template info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2">
-                <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">{template.name}</h4>
+                <h4 className="font-medium text-foreground truncate">{template.name}</h4>
                 {template.code && (
-                  <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded">
+                  <span className="text-xs bg-secondary text-muted-foreground px-2 py-1 rounded">
                     {template.code}
                   </span>
                 )}
               </div>
               {template.description && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">{template.description}</p>
+                <p className="text-sm text-muted-foreground truncate mt-1">{template.description}</p>
               )}
               <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
                 {template.unit && <span>Unit: {template.unit}</span>}
@@ -308,7 +308,7 @@ export function ServiceTemplatesTab({
     return (
       <div className="flex items-center justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading service templates...</span>
+        <span className="ml-2 text-muted-foreground">Loading service templates...</span>
       </div>
     );
   }
@@ -368,7 +368,7 @@ export function ServiceTemplatesTab({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as any)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="">All Categories</option>
             <option value="deliverable">Deliverables</option>
@@ -383,20 +383,20 @@ export function ServiceTemplatesTab({
               onChange={(e) => setShowInactiveOnly(e.target.checked)}
               className="rounded"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Show inactive only</span>
+            <span className="text-sm text-muted-foreground">Show inactive only</span>
           </label>
 
           {/* Expand all / Collapse all */}
           <div className="flex space-x-2">
             <button
               onClick={() => setExpandedNodes(hierarchicalTemplates.map(t => t.id))}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
+              className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-background"
             >
               Expand All
             </button>
             <button
               onClick={() => setExpandedNodes([])}
-              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
+              className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-background"
             >
               Collapse All
             </button>
@@ -405,12 +405,12 @@ export function ServiceTemplatesTab({
       </div>
 
       {/* Templates tree */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-card rounded-lg shadow p-6">
         {hierarchicalTemplates.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No service templates found</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
+            <h3 className="text-lg font-medium text-foreground mb-2">No service templates found</h3>
+            <p className="text-muted-foreground mb-4">
               {searchTerm || selectedCategory || showInactiveOnly
                 ? 'Try adjusting your filters or search terms'
                 : 'Get started by creating your first service template'
@@ -440,16 +440,16 @@ export function ServiceTemplatesTab({
 
       {/* Create Modal - Placeholder */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Create Service Template</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               Service template creation form will be implemented here.
             </p>
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
+                className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background"
               >
                 Cancel
               </button>
@@ -466,13 +466,13 @@ export function ServiceTemplatesTab({
 
       {/* Edit Modal - Placeholder */}
       {showEditModal && selectedTemplate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full">
             <h3 className="text-lg font-semibold mb-4">Edit Service Template</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               Editing: {selectedTemplate.name}
             </p>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               Service template edit form will be implemented here.
             </p>
             <div className="flex justify-end space-x-3">
@@ -481,7 +481,7 @@ export function ServiceTemplatesTab({
                   setShowEditModal(false);
                   setSelectedTemplate(null);
                 }}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
+                className="px-4 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background"
               >
                 Cancel
               </button>

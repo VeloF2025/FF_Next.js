@@ -70,7 +70,7 @@ export function ExpiringDocsCard({ expiringDocs, isLoading = false }: ExpiringDo
   if (isLoading) {
     return (
       <div className="ff-card animate-pulse">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-32 bg-secondary rounded" />
       </div>
     );
   }

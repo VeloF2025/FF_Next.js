@@ -30,7 +30,7 @@ const STATE_LABELS: Record<DRState, { label: string; color: string; icon: string
   reviewed_pass: { label: 'Reviewed, Passed', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: '✅' },
   reviewed_fail: { label: 'Reviewed, Failed', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: '❌' },
   reviewed_rework: { label: 'Reviewed, Rework', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: '🔄' },
-  not_reviewed: { label: 'Not Reviewed', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '⏳' },
+  not_reviewed: { label: 'Not Reviewed', color: 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '⏳' },
 };
 
 function formatDate(dateStr: string | null): string {
@@ -105,7 +105,7 @@ export function DrSummaryPage({
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading DR Summary...</p>
+          <p className="text-muted-foreground">Loading DR Summary...</p>
         </div>
       </div>
     );
@@ -116,10 +116,10 @@ export function DrSummaryPage({
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-4">!</div>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{error || 'DR not found'}</p>
+          <p className="text-muted-foreground mb-4">{error || 'DR not found'}</p>
           <button
             onClick={onBackToList}
-            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
+            className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
           >
             Back to List
           </button>
@@ -136,9 +136,9 @@ export function DrSummaryPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{dropNumber}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{dropNumber}</h1>
           {summary.project && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
+            <span className="text-sm text-muted-foreground">
               Project: {summary.project}
             </span>
           )}
@@ -151,8 +151,8 @@ export function DrSummaryPage({
       {/* Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Timeline Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+        <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
             Timeline
           </h3>
           <div className="space-y-2">
@@ -184,8 +184,8 @@ export function DrSummaryPage({
         </div>
 
         {/* Team Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+        <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
+          <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
             Team
           </h3>
           <div className="space-y-2">
@@ -213,9 +213,9 @@ export function DrSummaryPage({
       )}
 
       {/* QA Status Card - Full Width */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+      <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
             QA Status
           </h3>
           {verification && verification.overallStatus !== 'none' && (
@@ -232,12 +232,12 @@ export function DrSummaryPage({
           {/* Photo Progress */}
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span className="text-gray-600 dark:text-gray-400">Photo Steps</span>
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-muted-foreground">Photo Steps</span>
+              <span className="font-medium text-foreground">
                 {summary.qaStatus.stepsComplete}/{summary.qaStatus.totalSteps}
               </span>
             </div>
-            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-secondary rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
                   progressPercent === 100
@@ -254,8 +254,8 @@ export function DrSummaryPage({
           {/* Equipment Serials */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">ONT Serial</span>
-              <p className="text-sm font-mono text-gray-900 dark:text-white truncate">
+              <span className="text-xs text-muted-foreground">ONT Serial</span>
+              <p className="text-sm font-mono text-foreground truncate">
                 {summary.equipment.ontSerial || '-'}
               </p>
               {verification && verification.ontVerification.sourcesWithData > 1 && (
@@ -266,8 +266,8 @@ export function DrSummaryPage({
               )}
             </div>
             <div>
-              <span className="text-xs text-gray-500 dark:text-gray-400">UPS Serial</span>
-              <p className="text-sm font-mono text-gray-900 dark:text-white truncate">
+              <span className="text-xs text-muted-foreground">UPS Serial</span>
+              <p className="text-sm font-mono text-foreground truncate">
                 {summary.equipment.upsSerial || '-'}
               </p>
               {verification && verification.upsVerification.sourcesWithData > 1 && (
@@ -287,7 +287,7 @@ export function DrSummaryPage({
           {/* Decision */}
           {summary.qaStatus.decision && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Decision:</span>
+              <span className="text-sm text-muted-foreground">Decision:</span>
               <span
                 className={`px-2 py-0.5 rounded text-sm font-medium ${
                   summary.qaStatus.decision === 'PASS'
@@ -308,11 +308,11 @@ export function DrSummaryPage({
 
           {/* Feedback Message */}
           {summary.qaStatus.feedbackMessage && (
-            <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+            <div className="bg-background rounded p-2">
+              <span className="text-xs text-muted-foreground block mb-1">
                 Feedback Message:
               </span>
-              <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+              <p className="text-sm text-muted-foreground italic">
                 &ldquo;{summary.qaStatus.feedbackMessage}&rdquo;
               </p>
             </div>
@@ -322,9 +322,9 @@ export function DrSummaryPage({
 
       {/* Photo Preview */}
       {summary.photoPreview.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               Photos
             </h3>
             <button
@@ -338,7 +338,7 @@ export function DrSummaryPage({
             {summary.photoPreview.map((photo, idx) => (
               <div
                 key={photo.filename}
-                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 relative"
+                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-secondary relative"
               >
                 <img
                   src={photo.url}
@@ -356,10 +356,10 @@ export function DrSummaryPage({
       )}
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex flex-wrap gap-3 justify-center pt-4 border-t border-border">
         <button
           onClick={onBackToList}
-          className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
         >
           ← Back to List
         </button>
@@ -397,8 +397,8 @@ function SubscriberContactCard({
   // If contacts don't differ, show a single unified view
   if (!contactsDiffer && hasOneMap) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+      <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
           📞 Subscriber Contact
         </h3>
         <ContactDetails contact={oneMap} language={oneMap.language} />
@@ -408,8 +408,8 @@ function SubscriberContactCard({
 
   // Show both contacts if they differ
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
-      <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+    <div className="bg-card rounded-lg shadow-sm p-4 border border-border">
+      <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
         📞 Contacts
         {contactsDiffer && (
           <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 text-xs rounded">
@@ -453,13 +453,13 @@ function ContactDetails({
     <div className="space-y-1.5">
       {contact.name && (
         <div className="flex items-center gap-2">
-          <span className="text-gray-500 dark:text-gray-400">👤</span>
-          <span className="text-sm text-gray-900 dark:text-white font-medium">{contact.name}</span>
+          <span className="text-muted-foreground">👤</span>
+          <span className="text-sm text-foreground font-medium">{contact.name}</span>
         </div>
       )}
       {contact.phone && (
         <div className="flex items-center gap-2">
-          <span className="text-gray-500 dark:text-gray-400">📱</span>
+          <span className="text-muted-foreground">📱</span>
           <a
             href={`tel:${contact.phone}`}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
@@ -470,7 +470,7 @@ function ContactDetails({
       )}
       {contact.email && (
         <div className="flex items-center gap-2">
-          <span className="text-gray-500 dark:text-gray-400">✉️</span>
+          <span className="text-muted-foreground">✉️</span>
           <a
             href={`mailto:${contact.email}`}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -481,8 +481,8 @@ function ContactDetails({
       )}
       {language && (
         <div className="flex items-center gap-2">
-          <span className="text-gray-500 dark:text-gray-400">🗣️</span>
-          <span className="text-sm text-gray-600 dark:text-gray-300">{language}</span>
+          <span className="text-muted-foreground">🗣️</span>
+          <span className="text-sm text-muted-foreground">{language}</span>
         </div>
       )}
     </div>
@@ -508,7 +508,7 @@ function OntSwapBanner({
           ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
           : isPending
             ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
-            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+            : 'bg-background border-gray-200 dark:bg-gray-800 dark:border-gray-700'
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -520,33 +520,33 @@ function OntSwapBanner({
             ? 'text-green-700 dark:text-green-300'
             : isPending
               ? 'text-orange-700 dark:text-orange-300'
-              : 'text-gray-700 dark:text-gray-300'
+              : 'text-muted-foreground'
         }`}>
           ONT Swap {isConfirmed ? 'Confirmed' : isPending ? 'Pending OES' : swap.status.replace(/_/g, ' ')}
         </span>
       </div>
-      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
+      <div className="text-xs text-muted-foreground space-y-0.5">
         <div className="flex gap-2">
-          <span className="text-gray-500 dark:text-gray-400 w-16">New:</span>
-          <span className="font-mono font-medium text-gray-900 dark:text-white">{swap.newSerial}</span>
+          <span className="text-muted-foreground w-16">New:</span>
+          <span className="font-mono font-medium text-foreground">{swap.newSerial}</span>
         </div>
         {swap.oldSerial && (
           <div className="flex gap-2">
-            <span className="text-gray-500 dark:text-gray-400 w-16">Old:</span>
-            <span className="font-mono line-through text-gray-500 dark:text-gray-400">{swap.oldSerial}</span>
+            <span className="text-muted-foreground w-16">Old:</span>
+            <span className="font-mono line-through text-muted-foreground">{swap.oldSerial}</span>
           </div>
         )}
         <div className="flex gap-2">
-          <span className="text-gray-500 dark:text-gray-400 w-16">Type:</span>
+          <span className="text-muted-foreground w-16">Type:</span>
           <span>{swap.swapType === 'pre_provision' ? 'Pre-Provision' : 'Encrypted ONT'}</span>
         </div>
         <div className="flex gap-2">
-          <span className="text-gray-500 dark:text-gray-400 w-16">Reported:</span>
+          <span className="text-muted-foreground w-16">Reported:</span>
           <span>{formatDate(swap.reportedAt)}</span>
         </div>
         {swap.confirmedAt && (
           <div className="flex gap-2">
-            <span className="text-gray-500 dark:text-gray-400 w-16">Live:</span>
+            <span className="text-muted-foreground w-16">Live:</span>
             <span>{formatDate(swap.confirmedAt)}</span>
           </div>
         )}
@@ -569,12 +569,12 @@ function TimelineItem({
   return (
     <div className="flex items-center gap-2">
       <span className="text-base">{icon}</span>
-      <span className="text-sm text-gray-600 dark:text-gray-400 w-20">{label}:</span>
+      <span className="text-sm text-muted-foreground w-20">{label}:</span>
       <span
         className={`text-sm ${
           highlight
-            ? 'text-gray-900 dark:text-white font-medium'
-            : 'text-gray-500 dark:text-gray-500 dark:text-gray-400'
+            ? 'text-foreground font-medium'
+            : 'text-muted-foreground dark:text-gray-400'
         }`}
       >
         {date}
@@ -597,11 +597,11 @@ function TeamItem({
   return (
     <div className="flex items-center gap-2">
       <span className="text-base">{icon}</span>
-      <span className="text-sm text-gray-600 dark:text-gray-400 w-20">{role}:</span>
-      <span className="text-sm text-gray-900 dark:text-white truncate">
+      <span className="text-sm text-muted-foreground w-20">{role}:</span>
+      <span className="text-sm text-foreground truncate">
         {name || '-'}
         {detail && name && (
-          <span className="text-gray-500 dark:text-gray-400 text-xs ml-1">({detail})</span>
+          <span className="text-muted-foreground text-xs ml-1">({detail})</span>
         )}
       </span>
     </div>
@@ -650,7 +650,7 @@ function SerialSourceIndicator({
                 ? verification.allAgree
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
                   : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
+                : 'bg-secondary text-gray-400 dark:bg-gray-800 dark:text-muted-foreground'
             }
           `}
           title={`${src.label}: ${src.value || 'No data'}`}
@@ -695,7 +695,7 @@ function SerialVerificationBadge({
     },
     silver: {
       bg: 'bg-gradient-to-r from-gray-300 to-gray-400',
-      text: 'text-gray-800 dark:text-gray-200',
+      text: 'text-foreground',
       border: 'border-gray-400',
       icon: '✓',
     },
@@ -712,9 +712,9 @@ function SerialVerificationBadge({
       icon: '⚠️',
     },
     none: {
-      bg: 'bg-gray-100 dark:bg-gray-700',
-      text: 'text-gray-600 dark:text-gray-400',
-      border: 'border-gray-300 dark:border-gray-600',
+      bg: 'bg-secondary',
+      text: 'text-muted-foreground',
+      border: 'border-border',
       icon: '',
     },
   };

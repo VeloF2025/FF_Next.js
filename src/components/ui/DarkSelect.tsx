@@ -164,7 +164,7 @@ const DarkSelect = forwardRef<HTMLSelectElement, DarkSelectProps>(
         </div>
 
         {(helperText || errorMessage) && (
-          <p className={`mt-1.5 text-sm ${error ? 'text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+          <p className={`mt-1.5 text-sm ${error ? 'text-red-400' : 'text-muted-foreground'}`}>
             {error ? errorMessage : helperText}
           </p>
         )}

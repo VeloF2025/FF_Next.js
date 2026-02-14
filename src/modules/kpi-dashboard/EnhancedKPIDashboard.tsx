@@ -343,7 +343,7 @@ export function EnhancedKPIDashboard() {
                   ? 'text-green-500'
                   : trendData.velocity.installed_trend === 'down'
                     ? 'text-red-500'
-                    : 'text-gray-500 dark:text-gray-400'
+                    : 'text-muted-foreground'
               }`}
             >
               {trendData.velocity.installed_trend === 'up' ? '↑' : trendData.velocity.installed_trend === 'down' ? '↓' : '→'}
@@ -367,7 +367,7 @@ export function EnhancedKPIDashboard() {
                   ? 'text-green-500'
                   : trendData.velocity.activated_trend === 'down'
                     ? 'text-red-500'
-                    : 'text-gray-500 dark:text-gray-400'
+                    : 'text-muted-foreground'
               }`}
             >
               {trendData.velocity.activated_trend === 'up' ? '↑' : trendData.velocity.activated_trend === 'down' ? '↓' : '→'}

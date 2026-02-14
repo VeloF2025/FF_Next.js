@@ -69,7 +69,7 @@ function getSeverityConfig(severity: string | null) {
     case 'minor':
       return { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', label: 'Minor' };
     default:
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: 'Unknown' };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: 'Unknown' };
   }
 }
 
@@ -96,9 +96,9 @@ function getStatusConfig(status: string) {
     case 'closed':
       return { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', label: 'Closed' };
     case 'cancelled':
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: 'Cancelled' };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: 'Cancelled' };
     default:
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: status };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: status };
   }
 }
 
@@ -133,10 +133,10 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-16 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="h-16 bg-secondary rounded-lg" />
         <div className="space-y-2">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            <div key={i} className="h-20 bg-secondary rounded-lg" />
           ))}
         </div>
       </div>
@@ -165,17 +165,17 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
     <div className="space-y-4">
       {/* Summary Stats */}
       {!compact && summary && (
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-input rounded-lg">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Total:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{summary.total}</span>
+            <span className="text-sm text-muted-foreground">Total:</span>
+            <span className="font-semibold text-foreground">{summary.total}</span>
           </div>
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-blue-500" />
             <span className="text-sm text-blue-700 dark:text-blue-300">{summary.open} Open</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">{summary.closed} Closed</span>
+            <span className="text-sm text-muted-foreground">{summary.closed} Closed</span>
           </div>
           {summary.dol_reportable > 0 && (
             <div className="flex items-center gap-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 rounded">
@@ -191,7 +191,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value as 'all' | 'open' | 'closed')}
-                className="bg-transparent border-none text-gray-700 dark:text-gray-300 focus:ring-0 text-sm"
+                className="bg-transparent border-none text-muted-foreground focus:ring-0 text-sm"
               >
                 <option value="all">All</option>
                 <option value="open">Open</option>
@@ -200,7 +200,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
             </div>
             <button
               onClick={() => mutate()}
-              className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+              className="p-1.5 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
@@ -211,10 +211,10 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
 
       {/* Incidents List */}
       {filteredIncidents.length === 0 ? (
-        <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+        <div className="p-6 bg-input rounded-lg border border-border text-center">
           <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-          <h4 className="font-medium text-gray-900 dark:text-white mb-1">No Incidents</h4>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <h4 className="font-medium text-foreground mb-1">No Incidents</h4>
+          <p className="text-sm text-muted-foreground">
             {filterStatus === 'all'
               ? 'No H&S incidents have been reported for this project or its contractors.'
               : filterStatus === 'open'
@@ -223,9 +223,9 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400">
+          <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-secondary/50 border-b border-border text-sm font-medium text-muted-foreground">
             <div className="col-span-1">Type</div>
             <div className="col-span-3">Description</div>
             <div className="col-span-2">Source</div>
@@ -244,7 +244,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
               return (
                 <div
                   key={incident.id}
-                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors items-center"
+                  className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-accent/50 cursor-pointer transition-colors items-center"
                   onClick={() => router.push(`/health-safety/incidents/${incident.id}`)}
                 >
                   {/* Type */}
@@ -256,10 +256,10 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
 
                   {/* Description */}
                   <div className="col-span-3">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {incident.title || getIncidentTypeLabel(incident.hs_incident_type)}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       {getIncidentTypeLabel(incident.hs_incident_type)}
                     </p>
                   </div>
@@ -272,7 +272,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
                       ) : (
                         <User className="w-4 h-4 text-gray-400" />
                       )}
-                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                      <span className="text-sm text-muted-foreground truncate">
                         {incident.source_name}
                       </span>
                     </div>
@@ -292,7 +292,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
 
                   {/* Date */}
                   <div className="col-span-2">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
                       <span>{formatDate(incident.incident_date || incident.created_at)}</span>
                     </div>
@@ -316,7 +316,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
 
           {/* View All Link */}
           {incidents.length > 5 && (
-            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-4 py-3 bg-secondary/50 border-t border-border">
               <a
                 href={`/health-safety/incidents?project_id=${projectId}`}
                 className="flex items-center justify-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"

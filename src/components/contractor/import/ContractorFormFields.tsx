@@ -33,7 +33,7 @@ export function BusinessTypeSelect({
 }: BusinessTypeSelectProps) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">
         Business Type*
       </label>
       <Select 
@@ -55,7 +55,7 @@ export function BusinessTypeSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+      <p className="text-muted-foreground text-xs mt-1">
         South African business entity type
       </p>
     </div>
@@ -81,7 +81,7 @@ export function ProvinceSelect({
 }: ProvinceSelectProps) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">
         {label}
       </label>
       <Select 
@@ -137,7 +137,7 @@ export function RegionSelect({
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">
         Region of Operations
       </label>
       <div className="relative">
@@ -147,12 +147,12 @@ export function RegionSelect({
           disabled={disabled}
           className={`
             flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm
-            ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}
+            ${error ? 'border-red-500' : 'border-border'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer hover:border-gray-400'}
-            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+            bg-card text-foreground
           `}
         >
-          <span className={value.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''}>
+          <span className={value.length === 0 ? 'text-muted-foreground' : ''}>
             {value.length === 0 
               ? 'Select provinces...' 
               : `${value.length} province${value.length > 1 ? 's' : ''} selected`
@@ -166,7 +166,7 @@ export function RegionSelect({
               className="fixed inset-0 z-40" 
               onClick={() => setIsOpen(false)} 
             />
-            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+            <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg">
               <div className="max-h-60 overflow-y-auto p-1">
                 {SA_PROVINCES.map((province) => (
                   <label
@@ -177,7 +177,7 @@ export function RegionSelect({
                       type="checkbox"
                       checked={value.includes(province)}
                       onChange={() => handleProvinceToggle(province)}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+                      className="mr-2 h-4 w-4 rounded border-border text-purple-600 focus:ring-purple-500"
                     />
                     <span className="text-sm">{province}</span>
                   </label>
@@ -214,7 +214,7 @@ export function RegionSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+      <p className="text-muted-foreground text-xs mt-1">
         Select all provinces where contractor operates
       </p>
     </div>
@@ -317,18 +317,18 @@ export function ServiceSelect({
   if (isLoading) {
     return (
       <div className={className}>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Services
         </label>
-        <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-md animate-pulse" />
-        <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">Loading services...</p>
+        <div className="h-10 bg-secondary rounded-md animate-pulse" />
+        <p className="text-muted-foreground text-xs mt-1">Loading services...</p>
       </div>
     );
   }
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">
         Services
       </label>
       <div className="relative">
@@ -338,12 +338,12 @@ export function ServiceSelect({
           disabled={disabled}
           className={`
             flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm
-            ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}
+            ${error ? 'border-red-500' : 'border-border'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer hover:border-gray-400'}
-            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+            bg-card text-foreground
           `}
         >
-          <span className={value.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''}>
+          <span className={value.length === 0 ? 'text-muted-foreground' : ''}>
             {value.length === 0 
               ? 'Select services...' 
               : `${value.length} service${value.length > 1 ? 's' : ''} selected`
@@ -357,7 +357,7 @@ export function ServiceSelect({
               className="fixed inset-0 z-40" 
               onClick={() => setIsOpen(false)} 
             />
-            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
+            <div className="absolute z-50 mt-1 w-full bg-card border border-border rounded-md shadow-lg">
               <div className="max-h-60 overflow-y-auto p-1">
                 {availableServices.map((service) => (
                   <label
@@ -368,13 +368,13 @@ export function ServiceSelect({
                       type="checkbox"
                       checked={value.includes(service)}
                       onChange={() => handleServiceToggle(service)}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+                      className="mr-2 h-4 w-4 rounded border-border text-purple-600 focus:ring-purple-500"
                     />
                     <span className="text-sm">{service}</span>
                   </label>
                 ))}
                 {availableServices.length === 0 && (
-                  <div className="px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="px-2 py-2 text-sm text-muted-foreground">
                     No services available
                   </div>
                 )}
@@ -410,7 +410,7 @@ export function ServiceSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
+      <p className="text-muted-foreground text-xs mt-1">
         Select services from your configured rate card templates
       </p>
     </div>

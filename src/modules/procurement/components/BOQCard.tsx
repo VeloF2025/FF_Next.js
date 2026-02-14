@@ -21,7 +21,7 @@ export function BOQCard({ boq }: BOQCardProps) {
       case BOQStatus.MAPPING_REVIEW:
         return <Clock className="h-4 w-4 text-yellow-500" />;
       case BOQStatus.ARCHIVED:
-        return <AlertCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
       default:
         return <FileText className="h-4 w-4 text-gray-400" />;
     }

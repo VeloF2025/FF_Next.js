@@ -90,7 +90,7 @@ function TabItem({
 
       {/* Active tab indicator */}
       {isActive && (
-        <div className="absolute inset-x-0 -bottom-px h-0.5 bg-white dark:bg-gray-800 rounded-full" />
+        <div className="absolute inset-x-0 -bottom-px h-0.5 bg-card rounded-full" />
       )}
 
       {/* Disabled overlay */}

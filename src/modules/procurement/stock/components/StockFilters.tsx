@@ -30,21 +30,21 @@ export const StockFilters: React.FC<StockFiltersProps> = ({
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+          <Search className="h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search items..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm w-64"
+            className="border border-border rounded-md px-3 py-1 text-sm w-64"
           />
         </div>
         <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+          <Filter className="h-4 w-4 text-muted-foreground" />
           <select
             value={filterStatus}
             onChange={(e) => onFilterChange(e.target.value as StockFilter)}
-            className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm"
+            className="border border-border rounded-md px-3 py-1 text-sm"
           >
             <option value="all">All Status</option>
             <option value="in-stock">In Stock</option>
@@ -53,11 +53,11 @@ export const StockFilters: React.FC<StockFiltersProps> = ({
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Sort by:</span>
+          <span className="text-sm text-muted-foreground">Sort by:</span>
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as StockSortBy)}
-            className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm"
+            className="border border-border rounded-md px-3 py-1 text-sm"
           >
             <option value="item-code">Item Code</option>
             <option value="description">Description</option>
@@ -70,7 +70,7 @@ export const StockFilters: React.FC<StockFiltersProps> = ({
 
       {selectedCount > 0 && (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">{selectedCount} selected</span>
+          <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
           {onBulkIssue && (
             <Button variant="outline" size="sm" onClick={onBulkIssue}>
               <ArrowRight className="h-4 w-4 mr-1" />

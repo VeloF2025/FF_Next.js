@@ -49,7 +49,7 @@ export function DashboardTab() {
   }, [viewMode, selectedProject, aggregateMetrics, projectSummaries, isLoading]);
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-900">
+    <div className="h-full bg-background">
       {dashboardContent}
     </div>
   );
@@ -66,28 +66,28 @@ function WelcomeState() {
           <BarChart3 className="h-12 w-12 text-primary-600" />
         </div>
         
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <h2 className="text-2xl font-bold text-foreground mb-4">
           Welcome to Procurement Portal
         </h2>
         
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Select a specific project to view its procurement dashboard, or choose "All Projects" 
           to see aggregated metrics across your entire portfolio.
         </p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card p-4 rounded-lg border border-border">
             <Building2 className="h-8 w-8 text-blue-600 mb-2 mx-auto" />
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Single Project</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <h3 className="font-semibold text-foreground mb-1">Single Project</h3>
+            <p className="text-sm text-muted-foreground">
               Detailed view of a specific project's procurement activities
             </p>
           </div>
           
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="bg-card p-4 rounded-lg border border-border">
             <Globe className="h-8 w-8 text-green-600 mb-2 mx-auto" />
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">All Projects</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <h3 className="font-semibold text-foreground mb-1">All Projects</h3>
+            <p className="text-sm text-muted-foreground">
               Aggregate metrics and overview across all active projects
             </p>
           </div>
@@ -185,7 +185,7 @@ function StatCard({ title, value, icon: Icon, color, trend }: StatCardProps) {
   const trendColor = trend?.startsWith('+') ? 'text-green-600' : 'text-red-600';
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="h-6 w-6" />
@@ -199,8 +199,8 @@ function StatCard({ title, value, icon: Icon, color, trend }: StatCardProps) {
       </div>
       
       <div>
-        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">{value}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
+        <p className="text-2xl font-bold text-foreground mb-1">{value}</p>
+        <p className="text-sm text-muted-foreground">{title}</p>
       </div>
     </div>
   );

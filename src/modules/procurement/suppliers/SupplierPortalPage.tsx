@@ -86,21 +86,21 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <GlassCard className="w-full max-w-md">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Supplier Portal</h1>
-            <p className="text-gray-600 dark:text-gray-400">Access your supplier dashboard</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Supplier Portal</h1>
+            <p className="text-muted-foreground">Access your supplier dashboard</p>
           </div>
 
           {authStep === 'email' ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Email Address
                 </label>
                 <input
                   type="email"
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter your registered email"
                 />
               </div>
@@ -111,21 +111,21 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
               >
                 {loading ? 'Sending...' : 'Send Magic Link'}
               </VelocityButton>
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+              <p className="text-sm text-muted-foreground text-center">
                 We'll send you a secure login link via email
               </p>
             </div>
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-muted-foreground mb-2">
                   Verification Code
                 </label>
                 <input
                   type="text"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter 6-digit code"
                 />
               </div>
@@ -146,7 +146,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
           )}
 
           {/* Demo Access Button */}
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="mt-6 pt-6 border-t border-border">
             <VelocityButton
               onClick={setDemoSession}
               variant="outline"
@@ -161,17 +161,17 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Supplier Portal</h1>
-              <p className="text-gray-600 dark:text-gray-400">Welcome, {supplierSession.supplierName}</p>
+              <h1 className="text-2xl font-bold text-foreground">Supplier Portal</h1>
+              <p className="text-muted-foreground">Welcome, {supplierSession.supplierName}</p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100">
+              <button className="relative p-2 text-muted-foreground hover:text-foreground">
                 <Bell className="h-5 w-5" />
                 {stats?.activeRFQs && stats.activeRFQs > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
@@ -181,7 +181,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
               </button>
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{supplierSession.supplierEmail}</span>
+                <span className="text-sm text-muted-foreground">{supplierSession.supplierEmail}</span>
               </div>
             </div>
           </div>
@@ -189,7 +189,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             {[
@@ -206,7 +206,7 @@ const SupplierPortalPage: React.FC<SupplierPortalProps> = () => {
                 className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
                   activeTab === key
                     ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
+                    : 'border-transparent text-muted-foreground hover:text-muted-foreground hover:border-border'
                 }`}
               >
                 <Icon className="h-4 w-4" />

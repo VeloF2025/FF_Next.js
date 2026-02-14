@@ -18,38 +18,38 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({
 }) => {
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Notes & Review</h3>
+      <h3 className="text-lg font-semibold text-foreground">Notes & Review</h3>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Notes (visible to supplier)
           </label>
           <textarea
             value={formData.notes || ''}
             onChange={(e) => updateFormData({ notes: e.target.value })}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter any notes for the supplier"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-muted-foreground mb-1">
             Internal Notes (not visible to supplier)
           </label>
           <textarea
             value={formData.internalNotes || ''}
             onChange={(e) => updateFormData({ internalNotes: e.target.value })}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter internal notes"
           />
         </div>
       </div>
 
       {/* Order Summary */}
-      <GlassCard className="p-6 bg-gray-50 dark:bg-gray-900">
+      <GlassCard className="p-6 bg-background">
         <h4 className="text-lg font-semibold mb-4">Order Summary</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>

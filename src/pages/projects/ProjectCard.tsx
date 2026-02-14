@@ -24,31 +24,31 @@ export function ProjectCard({
   formatCurrency 
 }: ProjectCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+    <div className="bg-card rounded-lg shadow-sm border border-border hover:shadow-md transition-shadow">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-foreground">
               {project.name}
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{project.code}</p>
+            <p className="text-sm text-muted-foreground">{project.code}</p>
           </div>
           <div className="relative group">
             <button className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
               <MoreVertical className="h-5 w-5 text-gray-400" />
             </button>
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+            <div className="absolute right-0 mt-2 w-48 bg-card rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
               <div className="py-1">
                 <button
                   onClick={() => onView(project.id)}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   View Details
                 </button>
                 <button
                   onClick={() => onEdit(project.id)}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+                  className="w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
@@ -67,18 +67,18 @@ export function ProjectCard({
 
         <div className="flex items-center gap-2 mb-4">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            statusColors[project.status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+            statusColors[project.status] || 'bg-secondary text-foreground'
           }`}>
             {project.status ? project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ') : 'Unknown'}
           </span>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            priorityColors[project.priority] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+            priorityColors[project.priority] || 'bg-secondary text-foreground'
           }`}>
             {project.priority ? project.priority.charAt(0).toUpperCase() + project.priority.slice(1) : 'Normal'}
           </span>
         </div>
 
-        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+        <div className="space-y-2 text-sm text-muted-foreground">
           {project.clientName && (
             <div className="flex items-center">
               <Building2 className="h-4 w-4 mr-2" />
@@ -99,11 +99,11 @@ export function ProjectCard({
 
         {project.actualProgress !== undefined && (
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
               <span>Progress</span>
               <span>{Math.round(project.actualProgress)}%</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-secondary rounded-full h-2">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${project.actualProgress}%` }}

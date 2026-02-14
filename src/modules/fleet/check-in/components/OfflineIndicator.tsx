@@ -54,7 +54,7 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
             ) : (
               <CloudOff className="w-4 h-4 text-gray-400" />
             )}
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm text-muted-foreground">
               {offlineRecordCount} pending
             </span>
             {isOnline && (
@@ -67,7 +67,7 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
                 {isSyncing ? (
                   <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                 ) : (
-                  <RefreshCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <RefreshCw className="w-4 h-4 text-muted-foreground" />
                 )}
               </button>
             )}
@@ -77,29 +77,29 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
 
       {/* Detailed status */}
       {showDetails && (
-        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+        <div className="mt-2 pt-2 border-t border-border">
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-lg font-semibold text-foreground">
                 {syncStatus.pending}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Pending</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
             </div>
             <div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-lg font-semibold text-foreground">
                 {syncStatus.syncing}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Syncing</p>
+              <p className="text-xs text-muted-foreground">Syncing</p>
             </div>
             <div>
               <p className="text-lg font-semibold text-red-600 dark:text-red-400">
                 {syncStatus.failed}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Failed</p>
+              <p className="text-xs text-muted-foreground">Failed</p>
             </div>
           </div>
           {syncStatus.lastSyncAt && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+            <p className="mt-2 text-xs text-muted-foreground text-center">
               Last sync: {new Date(syncStatus.lastSyncAt).toLocaleString()}
             </p>
           )}

@@ -30,9 +30,9 @@ export const RFQsTab: React.FC<RFQsTabProps> = ({ rfqInvitations, onOpenQuoteMod
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">RFQ Invitations</h2>
+        <h2 className="text-xl font-semibold text-foreground">RFQ Invitations</h2>
         <div className="flex space-x-2">
-          <select className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+          <select className="px-3 py-2 border border-border rounded-lg text-sm">
             <option>All Status</option>
             <option>Pending</option>
             <option>Submitted</option>
@@ -47,37 +47,37 @@ export const RFQsTab: React.FC<RFQsTabProps> = ({ rfqInvitations, onOpenQuoteMod
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfq.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{rfq.title}</h3>
                   <span className={`text-xs px-2 py-1 rounded-full ${getUrgencyColor(rfq.urgency)}`}>
                     {rfq.urgency}
                   </span>
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 mb-2">{rfq.description}</p>
+                <p className="text-muted-foreground mb-2">{rfq.description}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">RFQ Number:</span>
+                    <span className="text-muted-foreground">RFQ Number:</span>
                     <p className="font-medium">{rfq.rfqNumber}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Project:</span>
+                    <span className="text-muted-foreground">Project:</span>
                     <p className="font-medium">{rfq.projectName}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Due Date:</span>
+                    <span className="text-muted-foreground">Due Date:</span>
                     <p className="font-medium">{new Date(rfq.dueDate).toISOString().split('T')[0]}</p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Est. Value:</span>
+                    <span className="text-muted-foreground">Est. Value:</span>
                     <p className="font-medium">R{rfq.estimatedValue.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
               <div className="flex items-center space-x-3 ml-4">
                 {getStatusIcon(rfq.status)}
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{rfq.status}</span>
+                <span className="text-sm font-medium text-muted-foreground capitalize">{rfq.status}</span>
               </div>
             </div>
-            <div className="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex justify-between items-center pt-4 border-t border-border">
               <div className="flex space-x-2">
                 <VelocityButton size="sm" variant="outline">
                   <FileText className="h-4 w-4 mr-2" />
@@ -89,7 +89,7 @@ export const RFQsTab: React.FC<RFQsTabProps> = ({ rfqInvitations, onOpenQuoteMod
                   </VelocityButton>
                 )}
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-muted-foreground">
                 {rfq.status === 'pending'
                   ? `${Math.ceil((new Date(rfq.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left`
                   : 'Completed'

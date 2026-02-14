@@ -50,10 +50,10 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-6"></div>
+          <div className="h-32 bg-secondary rounded-lg mb-6"></div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            <div className="h-64 bg-secondary rounded-lg"></div>
+            <div className="h-64 bg-secondary rounded-lg"></div>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
     return (
       <div className="text-center py-12">
         <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500 dark:text-gray-400">No spending data available</p>
+        <p className="text-muted-foreground">No spending data available</p>
       </div>
     );
   }
@@ -77,8 +77,8 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Spend</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                <p className="text-sm font-medium text-muted-foreground">Total Spend</p>
+                <p className="text-3xl font-bold text-foreground">
                   {formatCurrency(data.totalSpend)}
                 </p>
               </div>
@@ -93,11 +93,11 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Categories</p>
+                <p className="text-sm font-medium text-muted-foreground">Categories</p>
                 <p className="text-3xl font-bold text-green-600">
                   {data.categoryBreakdown.length}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Active categories</p>
+                <p className="text-sm text-muted-foreground mt-1">Active categories</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg">
                 <Package className="w-6 h-6 text-green-600" />
@@ -110,11 +110,11 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Suppliers</p>
+                <p className="text-sm font-medium text-muted-foreground">Suppliers</p>
                 <p className="text-3xl font-bold text-purple-600">
                   {data.supplierBreakdown.length}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Active suppliers</p>
+                <p className="text-sm text-muted-foreground mt-1">Active suppliers</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg">
                 <Building2 className="w-6 h-6 text-purple-600" />
@@ -127,7 +127,7 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Order Value</p>
+                <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
                 <p className="text-3xl font-bold text-orange-600">
                   {data.monthlyTrends.length > 0 
                     ? formatCurrency(data.monthlyTrends.reduce((sum, month) => sum + month.averageOrderValue, 0) / data.monthlyTrends.length)
@@ -243,35 +243,35 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
         <CardContent>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Budgeted
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Actual Spend
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Variance
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     % of Total
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-gray-200">
                 {data.categoryBreakdown.map((category) => (
-                  <tr key={category.category} className="hover:bg-gray-50 dark:bg-gray-900">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <tr key={category.category} className="hover:bg-background">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                       {category.category}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {formatCurrency(category.budgeted)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {formatCurrency(category.actual)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -284,7 +284,7 @@ export function SpendAnalysisReport({ data, loading }: SpendAnalysisReportProps)
                         {category.variance > 0 ? ' over' : ' under'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                       {((category.actual / data.totalSpend) * 100).toFixed(1)}%
                     </td>
                   </tr>

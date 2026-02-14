@@ -102,14 +102,14 @@ export function WizardProgressOverlay({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+      <div className="bg-card rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
         {/* Header */}
         <div className="text-center mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-xl font-semibold text-foreground">
             {title}
           </h3>
           {dropNumber && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {dropNumber}
               {photoCount ? ` • ${photoCount} photos` : ''}
             </p>
@@ -173,7 +173,7 @@ function ProgressStep({ label, isActive, isComplete }: ProgressStepProps) {
         ? 'bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800'
         : isComplete
           ? 'bg-green-50 dark:bg-green-900/20'
-          : 'bg-gray-50 dark:bg-gray-700/30'
+          : 'bg-secondary/30'
     }`}>
       {/* Status indicator */}
       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
@@ -181,7 +181,7 @@ function ProgressStep({ label, isActive, isComplete }: ProgressStepProps) {
           ? 'bg-green-500 text-white'
           : isActive
             ? 'bg-purple-500 text-white'
-            : 'bg-gray-300 dark:bg-gray-600'
+            : 'bg-muted'
       }`}>
         {isComplete ? (
           <CheckCircle className="w-4 h-4" />
@@ -198,7 +198,7 @@ function ProgressStep({ label, isActive, isComplete }: ProgressStepProps) {
           ? 'text-green-700 dark:text-green-300'
           : isActive
             ? 'text-purple-700 dark:text-purple-300'
-            : 'text-gray-500 dark:text-gray-400'
+            : 'text-muted-foreground'
       }`}>
         {label}
       </span>

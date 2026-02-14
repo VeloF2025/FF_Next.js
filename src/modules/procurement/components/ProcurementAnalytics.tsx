@@ -77,8 +77,8 @@ export function ProcurementAnalytics() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Procurement Analytics</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Procurement Analytics</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Performance metrics and insights for procurement operations
         </p>
       </div>
@@ -88,7 +88,7 @@ export function ProcurementAnalytics() {
         {kpiCards.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.title} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div key={kpi.title} className="bg-card rounded-lg border border-border p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className={`p-2 rounded-lg ${kpi.bgColor}`}>
                   <Icon className={`h-6 w-6 ${kpi.color}`} />
@@ -101,10 +101,10 @@ export function ProcurementAnalytics() {
                   </span>
                 )}
               </div>
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">{kpi.title}</h3>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{kpi.value}</p>
+              <h3 className="text-sm font-medium text-muted-foreground">{kpi.title}</h3>
+              <p className="text-2xl font-bold text-foreground mt-1">{kpi.value}</p>
               {kpi.description && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{kpi.description}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kpi.description}</p>
               )}
             </div>
           );
@@ -114,74 +114,74 @@ export function ProcurementAnalytics() {
       {/* Status Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* BOQ Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">BOQ Status Distribution</h2>
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">BOQ Status Distribution</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Draft</span>
+              <span className="text-sm text-muted-foreground">Draft</span>
               <div className="flex items-center gap-2">
-                <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-32 bg-secondary rounded-full h-2">
                   <div
                     className="bg-yellow-500 h-2 rounded-full"
                     style={{ width: `${(metrics.boq.draft / metrics.boq.total) * 100}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{metrics.boq.draft}</span>
+                <span className="text-sm font-medium text-foreground">{metrics.boq.draft}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Approved</span>
+              <span className="text-sm text-muted-foreground">Approved</span>
               <div className="flex items-center gap-2">
-                <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-32 bg-secondary rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full"
                     style={{ width: `${(metrics.boq.approved / metrics.boq.total) * 100}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{metrics.boq.approved}</span>
+                <span className="text-sm font-medium text-foreground">{metrics.boq.approved}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* RFQ Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">RFQ Status Distribution</h2>
+        <div className="bg-card rounded-lg border border-border p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4">RFQ Status Distribution</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Sent</span>
+              <span className="text-sm text-muted-foreground">Sent</span>
               <div className="flex items-center gap-2">
-                <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-32 bg-secondary rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full"
                     style={{ width: `${(metrics.rfq.sent / metrics.rfq.total) * 100}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{metrics.rfq.sent}</span>
+                <span className="text-sm font-medium text-foreground">{metrics.rfq.sent}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Responses Received</span>
+              <span className="text-sm text-muted-foreground">Responses Received</span>
               <div className="flex items-center gap-2">
-                <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-32 bg-secondary rounded-full h-2">
                   <div
                     className="bg-yellow-500 h-2 rounded-full"
                     style={{ width: `${(metrics.rfq.responsesReceived / metrics.rfq.total) * 100}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{metrics.rfq.responsesReceived}</span>
+                <span className="text-sm font-medium text-foreground">{metrics.rfq.responsesReceived}</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Awarded</span>
+              <span className="text-sm text-muted-foreground">Awarded</span>
               <div className="flex items-center gap-2">
-                <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-32 bg-secondary rounded-full h-2">
                   <div
                     className="bg-green-500 h-2 rounded-full"
                     style={{ width: `${(metrics.rfq.awarded / metrics.rfq.total) * 100}%` }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{metrics.rfq.awarded}</span>
+                <span className="text-sm font-medium text-foreground">{metrics.rfq.awarded}</span>
               </div>
             </div>
           </div>
@@ -189,26 +189,26 @@ export function ProcurementAnalytics() {
       </div>
 
       {/* Summary Statistics */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Summary Statistics</h2>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Summary Statistics</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Average BOQ Value</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            <p className="text-sm text-muted-foreground">Average BOQ Value</p>
+            <p className="text-xl font-bold text-foreground">
               R {metrics.boq.averageValue.toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total BOQs</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{metrics.boq.total}</p>
+            <p className="text-sm text-muted-foreground">Total BOQs</p>
+            <p className="text-xl font-bold text-foreground">{metrics.boq.total}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total RFQs</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{metrics.rfq.total}</p>
+            <p className="text-sm text-muted-foreground">Total RFQs</p>
+            <p className="text-xl font-bold text-foreground">{metrics.rfq.total}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Award Rate</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            <p className="text-sm text-muted-foreground">Award Rate</p>
+            <p className="text-xl font-bold text-foreground">
               {metrics.efficiency.awardRate.toFixed(0)}%
             </p>
           </div>

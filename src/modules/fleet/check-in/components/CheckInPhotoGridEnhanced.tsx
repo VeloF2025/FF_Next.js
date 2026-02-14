@@ -189,7 +189,7 @@ export function CheckInPhotoGridEnhanced({
 
               {hasPhoto ? (
                 /* Photo preview */
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary">
                   <img
                     src={photo.dataUrl}
                     alt={label}
@@ -229,12 +229,12 @@ export function CheckInPhotoGridEnhanced({
                   onClick={() => handleCapture(type)}
                   className={`w-full aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors ${
                     required
-                      ? 'border-gray-300 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                      ? 'border-border hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                      : 'border-border hover:border-gray-400'
                   }`}
                 >
                   <Camera className={`w-8 h-8 ${required ? 'text-gray-400' : 'text-gray-300'}`} />
-                  <span className={`text-sm font-medium text-center px-2 ${required ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400'}`}>
+                  <span className={`text-sm font-medium text-center px-2 ${required ? 'text-muted-foreground' : 'text-gray-400'}`}>
                     {label}
                   </span>
                   {required && (

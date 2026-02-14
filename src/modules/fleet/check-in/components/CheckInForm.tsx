@@ -157,7 +157,7 @@ export function CheckInForm({
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading checklist...</span>
+        <span className="ml-3 text-muted-foreground">Loading checklist...</span>
       </div>
     );
   }
@@ -168,16 +168,16 @@ export function CheckInForm({
       <OfflineIndicator />
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b dark:border-gray-800 p-4 mb-4">
+      <div className="sticky top-0 z-10 bg-background border-b dark:border-gray-800 p-4 mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
             <Car className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1">
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h1 className="text-lg font-semibold text-foreground">
               Vehicle Check-In
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               {vehicleRegistration}
             </p>
           </div>
@@ -191,7 +191,7 @@ export function CheckInForm({
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'daily'
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                : 'bg-secondary text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             <Calendar className="w-4 h-4" />
@@ -203,7 +203,7 @@ export function CheckInForm({
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'weekly'
                 ? 'bg-purple-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                : 'bg-secondary text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             <CalendarDays className="w-4 h-4" />
@@ -212,7 +212,7 @@ export function CheckInForm({
         </div>
 
         {/* Check type description */}
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-muted-foreground">
           {checkType === 'daily'
             ? 'Quick check: Odometer + Fuel photos only'
             : 'Full inspection: Complete checklist + all photos'
@@ -229,7 +229,7 @@ export function CheckInForm({
 
       {/* Photo capture - shown first for both modes */}
       <div className="px-4 mb-6">
-        <h3 className="font-medium text-gray-900 dark:text-white mb-3">
+        <h3 className="font-medium text-foreground mb-3">
           {checkType === 'daily' ? 'Required Photos' : 'Vehicle Photos'}
         </h3>
         <CheckInPhotoGridEnhanced
@@ -395,7 +395,7 @@ export function CheckInForm({
       {/* Manual Odometer Entry (fallback) */}
       {!odometerVlm?.extractedNumeric && (
         <div className="px-4 mb-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             <Gauge className="w-4 h-4 inline mr-2" />
             Odometer Reading (km)
           </label>
@@ -404,9 +404,9 @@ export function CheckInForm({
             value={formState.odometerReading}
             onChange={(e) => setOdometerReading(e.target.value)}
             placeholder="Enter current odometer reading"
-            className="w-full px-4 py-3 border rounded-lg text-lg bg-white dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border rounded-lg text-lg bg-card dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-xs text-muted-foreground">
             {isProcessingVlm ? 'Processing photo...' : 'Or take a dashboard photo to auto-fill'}
           </p>
         </div>
@@ -415,14 +415,14 @@ export function CheckInForm({
       {/* Weekly Checklist items by category */}
       {checkType === 'weekly' && template?.items && template.items.length > 0 && (
         <div className="px-4 space-y-6 mt-6">
-          <h3 className="font-medium text-gray-900 dark:text-white">Inspection Checklist</h3>
+          <h3 className="font-medium text-foreground">Inspection Checklist</h3>
           {categoryOrder.map((category) => {
             const items = itemsByCategory[category];
             if (!items || items.length === 0) return null;
 
             return (
               <div key={category}>
-                <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 tracking-wide mb-3">
+                <h4 className="text-sm font-semibold text-muted-foreground tracking-wide mb-3">
                   {categoryLabels[category]}
                 </h4>
                 <div className="space-y-3">
@@ -480,8 +480,8 @@ export function CheckInForm({
       {/* Validation errors */}
       {validationErrors.length > 0 && (
         <div className="px-4 mt-4">
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="p-3 bg-input rounded-lg">
+            <p className="text-sm text-muted-foreground">
               {validationErrors.join(' • ')}
             </p>
           </div>
@@ -489,11 +489,11 @@ export function CheckInForm({
       )}
 
       {/* Submit buttons - fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t dark:border-gray-800 p-4 flex gap-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t dark:border-gray-800 p-4 flex gap-3">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-3 px-4 border rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          className="flex-1 py-3 px-4 border rounded-lg font-medium text-muted-foreground hover:bg-accent"
         >
           Cancel
         </button>
@@ -508,7 +508,7 @@ export function CheckInForm({
                 : checkType === 'daily'
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'bg-purple-500 text-white hover:bg-purple-600'
-              : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
+              : 'bg-secondary text-muted-foreground cursor-not-allowed dark:bg-gray-800 dark:text-muted-foreground'
           }`}
         >
           {isSubmitting ? (

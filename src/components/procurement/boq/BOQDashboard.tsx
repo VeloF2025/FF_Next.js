@@ -137,8 +137,8 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
         ) : (
           <div className="text-center py-12">
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No BOQ Selected</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Please select a BOQ to view.</p>
+            <h3 className="mt-4 text-lg font-medium text-foreground">No BOQ Selected</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Please select a BOQ to view.</p>
           </div>
         );
       
@@ -152,8 +152,8 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
         ) : (
           <div className="text-center py-12">
             <AlertTriangle className="mx-auto h-12 w-12 text-orange-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No BOQ Selected</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Please select a BOQ for mapping review.</p>
+            <h3 className="mt-4 text-lg font-medium text-foreground">No BOQ Selected</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Please select a BOQ for mapping review.</p>
           </div>
         );
       
@@ -169,8 +169,8 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
         ) : (
           <div className="text-center py-12">
             <Clock className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No BOQ Selected</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Please select a BOQ to view its history.</p>
+            <h3 className="mt-4 text-lg font-medium text-foreground">No BOQ Selected</h3>
+            <p className="mt-2 text-sm text-muted-foreground">Please select a BOQ to view its history.</p>
           </div>
         );
       
@@ -199,7 +199,7 @@ export default function BOQDashboard({ className }: BOQDashboardProps) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading dashboard...</span>
+        <span className="ml-2 text-muted-foreground">Loading dashboard...</span>
       </div>
     );
   }

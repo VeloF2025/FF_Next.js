@@ -30,7 +30,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
   resultCount
 }) => {
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="bg-card p-4 rounded-lg border border-border">
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {/* Search */}
         <div className="relative">
@@ -38,7 +38,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
           <input
             type="text"
             placeholder="Search documents..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -46,7 +46,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 
         {/* Type Filter */}
         <select
-          className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+          className="border border-border rounded-md px-3 py-2 text-sm"
           value={typeFilter}
           onChange={(e) => onTypeFilterChange(e.target.value)}
         >
@@ -58,7 +58,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 
         {/* Status Filter */}
         <select
-          className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+          className="border border-border rounded-md px-3 py-2 text-sm"
           value={statusFilter}
           onChange={(e) => onStatusFilterChange(e.target.value)}
         >
@@ -70,7 +70,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
 
         {/* Requirement Filter */}
         <select
-          className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+          className="border border-border rounded-md px-3 py-2 text-sm"
           value={requirementFilter}
           onChange={(e) => onRequirementFilterChange(e.target.value)}
         >
@@ -80,7 +80,7 @@ export const DocumentFilters: React.FC<DocumentFiltersProps> = ({
         </select>
 
         {/* Result Count */}
-        <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+        <div className="text-sm text-muted-foreground flex items-center">
           {resultCount} document{resultCount !== 1 ? 's' : ''}
         </div>
       </div>

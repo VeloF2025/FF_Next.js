@@ -29,7 +29,7 @@ export const MessageThreadItem: React.FC<MessageThreadItemProps> = ({
   return (
     <div
       className={cn(
-        "p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer transition-all hover:bg-gray-50 dark:bg-gray-900",
+        "p-4 border-b border-border cursor-pointer transition-all hover:bg-background",
         isSelected ? "bg-blue-50 border-blue-200" : ""
       )}
       onClick={onClick}
@@ -43,7 +43,7 @@ export const MessageThreadItem: React.FC<MessageThreadItemProps> = ({
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-1">
-                <h3 className={cn("font-medium text-sm truncate", !thread.lastMessage.isRead ? "text-gray-900 dark:text-gray-100" : "text-gray-700 dark:text-gray-300")}>
+                <h3 className={cn("font-medium text-sm truncate", !thread.lastMessage.isRead ? "text-foreground" : "text-muted-foreground")}>
                   {thread.supplierName}
                 </h3>
                 <div className={cn("w-2 h-2 rounded-full flex-shrink-0", priority.dot)} />
@@ -52,11 +52,11 @@ export const MessageThreadItem: React.FC<MessageThreadItemProps> = ({
                 )}
               </div>
 
-              <p className={cn("text-sm font-medium truncate", !thread.lastMessage.isRead ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400")}>
+              <p className={cn("text-sm font-medium truncate", !thread.lastMessage.isRead ? "text-foreground" : "text-muted-foreground")}>
                 {thread.subject}
               </p>
 
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+              <p className="text-sm text-muted-foreground truncate mt-1">
                 {thread.lastMessage.content}
               </p>
 
@@ -65,7 +65,7 @@ export const MessageThreadItem: React.FC<MessageThreadItemProps> = ({
                   {category.label}
                 </span>
                 {thread.lastMessage.attachments > 0 && (
-                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center text-xs text-muted-foreground">
                     <Paperclip className="w-3 h-3 mr-1" />
                     {thread.lastMessage.attachments}
                   </div>
@@ -74,7 +74,7 @@ export const MessageThreadItem: React.FC<MessageThreadItemProps> = ({
             </div>
 
             <div className="text-right flex-shrink-0 ml-2">
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <div className="text-xs text-muted-foreground mb-1">
                 {formatMessageTime(thread.lastMessage.timestamp)}
               </div>
 

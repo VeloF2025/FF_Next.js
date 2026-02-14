@@ -114,7 +114,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
 
   const getStatusBadgeClass = (status: PickingStatus) => {
     const colorMap = {
-      draft: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+      draft: 'bg-secondary text-gray-800 dark:bg-gray-800 dark:text-gray-200',
       confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
       processing: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
       done: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
@@ -173,7 +173,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as PickingType | 'all')}
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="rounded-lg border border-border bg-card py-1.5 px-3 text-sm text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="all">All Types</option>
               <option value="issue">Issue</option>
@@ -188,7 +188,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as PickingStatus | 'all')}
-            className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="rounded-lg border border-border bg-card py-1.5 px-3 text-sm text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All Status</option>
             <option value="draft">Draft</option>
@@ -203,7 +203,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-background disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -222,10 +222,10 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
 
       {/* Pickings List */}
       {filteredPickings.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No pickings found</h3>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <h3 className="mt-4 text-lg font-medium text-foreground">No pickings found</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
             {filterType !== 'all' || filterStatus !== 'all'
               ? 'Try adjusting your filters to see more results.'
               : 'Create a new picking to get started.'}
@@ -241,7 +241,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
           )}
         </div>
       ) : (
-        <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+        <div className="divide-y divide-gray-200 rounded-lg border border-border bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
           {filteredPickings.map((picking) => {
             const typeConfig = PICKING_TYPE_CONFIG[picking.pickingType];
             const statusConfig = STATUS_CONFIG[picking.status];
@@ -250,7 +250,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
               <div
                 key={picking.id}
                 onClick={() => handleSelectPicking(picking)}
-                className="flex cursor-pointer items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                className="flex cursor-pointer items-center justify-between p-4 hover:bg-accent/50"
               >
                 <div className="flex items-center gap-4">
                   <div className={`rounded-lg p-2 ${getTypeBadgeClass(picking.pickingType)}`}>
@@ -258,14 +258,14 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 dark:text-white">
+                      <span className="font-medium text-foreground">
                         {picking.pickingNumber}
                       </span>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${getTypeBadgeClass(picking.pickingType)}`}>
                         {typeConfig.label}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
                       {picking.contractorName && (
                         <span>Contractor: {picking.contractorName}</span>
                       )}

@@ -28,8 +28,8 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
     return (
       <div
         className={cn(
-          "bg-white dark:bg-gray-800 border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md",
-          isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200 dark:border-gray-700"
+          "bg-card border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md",
+          isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-border"
         )}
         onClick={onSelect}
       >
@@ -39,14 +39,14 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
               <Building2 className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">{supplier.name}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{supplier.code} • {supplier.category}</p>
+              <h3 className="font-semibold text-foreground">{supplier.name}</h3>
+              <p className="text-sm text-muted-foreground">{supplier.code} • {supplier.category}</p>
               <div className="flex items-center space-x-4 mt-1">
-                <span className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center text-sm text-muted-foreground">
                   <MapPin className="w-3 h-3 mr-1" />
                   {supplier.location}
                 </span>
-                <span className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                <span className="flex items-center text-sm text-muted-foreground">
                   <Mail className="w-3 h-3 mr-1" />
                   {supplier.contactPerson}
                 </span>
@@ -59,7 +59,7 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
                 <Star className="w-4 h-4 text-yellow-500 fill-current" />
                 <span className="font-medium">{supplier.rating}</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">{supplier.complianceScore}% compliance</p>
+              <p className="text-xs text-muted-foreground">{supplier.complianceScore}% compliance</p>
             </div>
             <div className={cn("px-2 py-1 rounded-full flex items-center space-x-1", status.bgColor)}>
               <StatusIcon className={cn("w-3 h-3", status.color)} />
@@ -75,8 +75,8 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
   return (
     <div
       className={cn(
-        "bg-white dark:bg-gray-800 border rounded-lg p-6 cursor-pointer transition-all hover:shadow-md",
-        isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200 dark:border-gray-700"
+        "bg-card border rounded-lg p-6 cursor-pointer transition-all hover:shadow-md",
+        isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-border"
       )}
       onClick={onSelect}
     >
@@ -91,21 +91,21 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
       </div>
 
       <div className="mb-4">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">{supplier.name}</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{supplier.code}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{supplier.description}</p>
+        <h3 className="font-semibold text-foreground mb-1">{supplier.name}</h3>
+        <p className="text-sm text-muted-foreground mb-2">{supplier.code}</p>
+        <p className="text-xs text-muted-foreground line-clamp-2">{supplier.description}</p>
       </div>
 
       <div className="space-y-2 mb-4">
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center text-sm text-muted-foreground">
           <MapPin className="w-3 h-3 mr-2 text-gray-400" />
           {supplier.location}
         </div>
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center text-sm text-muted-foreground">
           <Mail className="w-3 h-3 mr-2 text-gray-400" />
           {supplier.contactPerson}
         </div>
-        <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center text-sm text-muted-foreground">
           <Globe className="w-3 h-3 mr-2 text-gray-400" />
           {supplier.category}
         </div>
@@ -115,18 +115,18 @@ export const SupplierCard: React.FC<SupplierCardProps> = ({
         <div className="flex items-center space-x-1">
           <Star className="w-4 h-4 text-yellow-500 fill-current" />
           <span className="font-medium text-sm">{supplier.rating}</span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">({supplier.complianceScore}% compliance)</span>
+          <span className="text-xs text-muted-foreground">({supplier.complianceScore}% compliance)</span>
         </div>
         <div className="flex space-x-1">
           <button
             onClick={(e) => { e.stopPropagation(); }}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-400"
+            className="p-1 text-gray-400 hover:text-muted-foreground"
           >
             <Eye className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); }}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-400"
+            className="p-1 text-gray-400 hover:text-muted-foreground"
           >
             <Edit className="w-4 h-4" />
           </button>

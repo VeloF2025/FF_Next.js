@@ -48,8 +48,8 @@ export function ProjectHierarchyView({ hierarchy, isLoading }: ProjectHierarchyV
     return (
       <div className="text-center py-12">
         <div className="text-gray-400 text-5xl mb-4">📋</div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No project hierarchy defined</h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h3 className="text-lg font-medium text-foreground mb-2">No project hierarchy defined</h3>
+        <p className="text-muted-foreground">
           Break down your project into phases and tasks to track progress better.
         </p>
       </div>
@@ -59,20 +59,20 @@ export function ProjectHierarchyView({ hierarchy, isLoading }: ProjectHierarchyV
   return (
     <div className="space-y-4">
       {hierarchy.phases.map(phase => (
-        <div key={phase.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="p-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+        <div key={phase.id} className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+          <div className="p-4 bg-background border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 {getPhaseStatusIcon(phase.status)}
-                <h3 className="ml-3 text-lg font-medium text-gray-900 dark:text-gray-100">{phase.name}</h3>
+                <h3 className="ml-3 text-lg font-medium text-foreground">{phase.name}</h3>
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className="text-sm text-muted-foreground">
                 {toDate(phase.startDate)?.toISOString().split('T')[0]} -
                 {toDate(phase.endDate)?.toISOString().split('T')[0]}
               </span>
             </div>
             {phase.description && (
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{phase.description}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{phase.description}</p>
             )}
           </div>
           
@@ -80,12 +80,12 @@ export function ProjectHierarchyView({ hierarchy, isLoading }: ProjectHierarchyV
             <div className="p-4">
               <div className="space-y-2">
                 {phase.tasks.map(task => (
-                  <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <div key={task.id} className="flex items-center justify-between p-3 bg-background rounded-lg">
                     <div className="flex items-center">
                       <span className="mr-2">{getTaskStatusIcon(task.status)}</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{task.name}</span>
+                      <span className="text-sm font-medium text-foreground">{task.name}</span>
                       {task.assignedTo && (
-                        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">• {task.assignedTo}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">• {task.assignedTo}</span>
                       )}
                     </div>
                     <div className="flex items-center space-x-2">

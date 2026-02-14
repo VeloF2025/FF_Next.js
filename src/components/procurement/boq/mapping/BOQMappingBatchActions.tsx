@@ -23,14 +23,14 @@ export default function BOQMappingBatchActions({
 }: BOQMappingBatchActionsProps) {
   if (selectedCount === 0) {
     return (
-      <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center justify-between p-4 bg-background rounded-lg">
+        <p className="text-sm text-muted-foreground">
           Select exceptions to perform batch actions
         </p>
         <button
           onClick={onRefresh}
           disabled={isProcessing}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          className="px-3 py-1.5 text-sm font-medium text-muted-foreground bg-card border border-border rounded-md hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
@@ -57,7 +57,7 @@ export default function BOQMappingBatchActions({
         <button
           onClick={onBatchDismiss}
           disabled={isProcessing}
-          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          className="px-4 py-2 text-sm font-medium text-muted-foreground bg-card border border-border rounded-md hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
         >
           <X className="h-4 w-4 mr-2" />
           Dismiss Selected

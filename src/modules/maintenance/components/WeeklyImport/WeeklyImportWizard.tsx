@@ -306,7 +306,7 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
             <div
               className={`${
                 t.visible ? 'animate-enter' : 'animate-leave'
-              } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+              } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
             >
               <div className="flex-1 w-0 p-4">
                 <div className="flex items-start">
@@ -318,43 +318,43 @@ export function WeeklyImportWizard({ onComplete, onCancel }: WeeklyImportWizardP
                     )}
                   </div>
                   <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-sm font-medium text-foreground">
                       {hasErrors ? 'Import Complete with Warnings' : 'Weekly Import Complete'}
                     </p>
                     <div className="mt-2 space-y-1">
                       {finalResult.imported_count > 0 && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Database className="h-4 w-4 text-green-500" />
                           <span>{finalResult.imported_count} new tickets created</span>
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         </div>
                       )}
                       {duplicateCount > 0 && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <FileCheck className="h-4 w-4 text-blue-400" />
                           <span>{duplicateCount} duplicates updated</span>
                         </div>
                       )}
                       {allDuplicates && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <CheckCircle className="h-4 w-4 text-blue-500" />
                           <span>All tickets already exist</span>
                         </div>
                       )}
                       {finalResult.error_count > 0 && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <XCircle className="h-4 w-4 text-red-500" />
                           <span>{finalResult.error_count} errors</span>
                         </div>
                       )}
                     </div>
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       {finalResult.total_rows.toLocaleString()} total rows processed
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="flex border-l border-gray-200 dark:border-gray-700">
+              <div className="flex border-l border-border">
                 <button
                   onClick={() => toast.dismiss(t.id)}
                   className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"

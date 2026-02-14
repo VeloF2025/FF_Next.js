@@ -15,11 +15,11 @@ export function getStatusColor(status: BOQStatusType): string {
     case 'mapping_review':
       return 'text-yellow-600 bg-yellow-100';
     case 'draft':
-      return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800';
+      return 'text-muted-foreground bg-secondary';
     case 'archived':
       return 'text-purple-600 bg-purple-100';
     default:
-      return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800';
+      return 'text-muted-foreground bg-secondary';
   }
 }
 

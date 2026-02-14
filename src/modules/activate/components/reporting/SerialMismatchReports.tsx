@@ -236,7 +236,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
         );
       case 'false_positive':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300">
             <XCircle className="h-3 w-3" />
             False +
           </span>
@@ -339,13 +339,13 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-muted-foreground">
             Status:
           </label>
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
           >
             <option value="">All</option>
             <option value="pending_investigation">Pending Investigation</option>
@@ -357,13 +357,13 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
         {data?.available_teams && data.available_teams.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-muted-foreground">
               Team:
             </label>
             <select
               value={selectedTeam}
               onChange={(e) => setSelectedTeam(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Teams</option>
               {data.available_teams.map((t) => (
@@ -377,13 +377,13 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
         {data?.available_zones && data.available_zones.length > 0 && (
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-muted-foreground">
               Zone:
             </label>
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Zones</option>
               {data.available_zones.map((z) => (
@@ -408,47 +408,47 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       {/* Data Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
+          <thead className="bg-input">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Team
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Zone
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from OES activation">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase" title="Serial from OES activation">
                 OES
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from offline report">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase" title="Serial from offline report">
                 Offline
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from 1Map database">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase" title="Serial from 1Map database">
                 1Map
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase" title="Serial from WhatsApp photo VLM">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase" title="Serial from WhatsApp photo VLM">
                 WA Photo
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Status
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-700">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   Loading...
                 </td>
               </tr>
             ) : data?.records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   No serial mismatches found for the selected filters
                 </td>
               </tr>
@@ -463,14 +463,14 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
                 // Helper to get cell color based on agreement with OES (reference)
                 const getSerialColor = (serial: string | null | undefined, isReference = false) => {
-                  if (!serial) return 'text-gray-400 dark:text-gray-500 dark:text-gray-400';
+                  if (!serial) return 'text-gray-400 dark:text-muted-foreground';
                   if (isReference) return 'text-green-600 dark:text-green-400';
                   if (oesSerial && serial.toUpperCase() === oesSerial) return 'text-green-600 dark:text-green-400';
                   return 'text-red-600 dark:text-red-400';
                 };
 
                 return (
-                  <tr key={record.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <tr key={record.id} className="hover:bg-accent">
                     <td className="px-3 py-3">
                       <a
                         href={`/activate/${record.drop_number}`}
@@ -488,7 +488,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                         {record.installation_team || 'Unknown'}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 dark:text-gray-100">
+                    <td className="px-3 py-3 text-sm text-foreground">
                       {record.zone || '-'}
                     </td>
                     {/* 4-Way Serial Comparison */}
@@ -522,7 +522,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                     <td className="px-3 py-3">
                       {getStatusBadge(record.status)}
                       {record.ticket_id && (
-                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="ml-1 text-xs text-muted-foreground">
                           ({record.ticket_status})
                         </span>
                       )}
@@ -567,7 +567,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                         </button>
                       )}
                       {record.status === 'resolved' && record.resolved_at && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-muted-foreground">
                           {new Date(record.resolved_at).toISOString().split('T')[0]}
                         </span>
                       )}
@@ -582,8 +582,8 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
       {/* Pagination */}
       {data && data.total_count > pageSize && (
-        <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{' '}
             {Math.min(page * pageSize, data.total_count)} of {data.total_count} results
           </p>
@@ -591,14 +591,14 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page * pageSize >= data.total_count}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -609,34 +609,34 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
       {/* Resolution Modal */}
       {resolutionModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Resolve Mismatch: {resolutionModal.record.drop_number}
             </h3>
 
-            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm space-y-2">
+            <div className="mb-4 p-3 bg-secondary rounded text-sm space-y-2">
               <div><strong>Team:</strong> {resolutionModal.record.installation_team || 'Unknown'}</div>
               <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
                 <strong className="block mb-1">4-Way Serial Comparison:</strong>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">OES:</span>{' '}
+                    <span className="text-muted-foreground">OES:</span>{' '}
                     <span className="font-mono text-green-600">{resolutionModal.record.serial_comparison?.oes || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Offline:</span>{' '}
+                    <span className="text-muted-foreground">Offline:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.offline?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.offline || '-'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">1Map:</span>{' '}
+                    <span className="text-muted-foreground">1Map:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.onemap?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.onemap || '-'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">WA Photo:</span>{' '}
+                    <span className="text-muted-foreground">WA Photo:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.wa_photo?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.wa_photo || (resolutionModal.record.serial_comparison?.wa_photo_processed ? '-' : 'pending')}
                     </span>
@@ -647,7 +647,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Resolution Type
                 </label>
                 <select
@@ -658,7 +658,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                       resolution: e.target.value as MismatchResolution,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-border rounded bg-card text-foreground"
                 >
                   <option value="ont_replaced">ONT Replaced (legitimate - documented)</option>
                   <option value="data_corrected">Data Entry Corrected</option>
@@ -669,7 +669,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Investigation Notes
                 </label>
                 <textarea
@@ -682,7 +682,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                   }
                   rows={3}
                   placeholder="Where is the original ONT? What happened?"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-border rounded bg-card text-foreground"
                 />
               </div>
             </div>
@@ -690,7 +690,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setResolutionModal(null)}
-                className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="px-4 py-2 text-sm border border-border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>

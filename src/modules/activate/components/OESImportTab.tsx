@@ -206,7 +206,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
           <div
             className={`${
               t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+            } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
           >
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
@@ -220,7 +220,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                   )}
                 </div>
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-foreground">
                     {dbConfirmed && qfieldConfirmed
                       ? 'OES Import Complete'
                       : dbConfirmed
@@ -228,7 +228,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                       : 'OES Import Failed'}
                   </p>
                   <div className="mt-2 space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Database className="h-4 w-4 text-blue-500" />
                       <span>Uploaded to FibreFlow Database</span>
                       {dbConfirmed ? (
@@ -237,7 +237,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                         <XCircle className="h-4 w-4 text-red-500" />
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <CloudCog className="h-4 w-4 text-purple-500" />
                       <span>
                         {qfieldConfirmed
@@ -251,7 +251,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                       )}
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     {result.totalRows.toLocaleString()} records processed
                     {qfieldConfirmed && result.qfieldSyncStatus?.recordCount && (
                       <span> • {result.qfieldSyncStatus.recordCount.toLocaleString()} synced to QField</span>
@@ -260,7 +260,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 </div>
               </div>
             </div>
-            <div className="flex border-l border-gray-200 dark:border-gray-700">
+            <div className="flex border-l border-border">
               <button
                 onClick={() => toast.dismiss(t.id)}
                 className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
@@ -312,25 +312,25 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-lg font-semibold text-foreground">
           OES Report Import
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Import Nokia OES activation reports to reconcile drops with actual activations.
         </p>
       </div>
 
       {/* Date Picker */}
       <div className="max-w-xs">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Report Date
         </label>
         <input
           type="date"
           value={reportDate}
           onChange={(e) => setReportDate(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+          className="w-full px-3 py-2 border border-border rounded-md
+                     bg-card text-foreground
                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
@@ -340,7 +340,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8
+          className="border-2 border-dashed border-border rounded-lg p-8
                      text-center hover:border-blue-500 dark:hover:border-blue-400 transition-colors
                      cursor-pointer"
           onClick={() => document.getElementById('oes-file-input')?.click()}
@@ -353,10 +353,10 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
             className="hidden"
           />
           <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             Drag and drop OES Excel file here, or click to browse
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
+          <p className="text-sm text-muted-foreground dark:text-gray-400 mt-2">
             Supports .xlsx and .xls files
           </p>
         </div>
@@ -364,13 +364,13 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
       {/* File Selected */}
       {file && !importResult && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+        <div className="bg-input rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="w-8 h-8 text-green-600" />
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="font-medium text-foreground">{file.name}</p>
+                <p className="text-sm text-muted-foreground">
                   {(file.size / 1024).toFixed(1)} KB
                 </p>
               </div>
@@ -389,7 +389,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
       {isParsing && (
         <div className="flex items-center justify-center gap-2 py-4">
           <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-          <span className="text-gray-600 dark:text-gray-400">Parsing file...</span>
+          <span className="text-muted-foreground">Parsing file...</span>
         </div>
       )}
 
@@ -420,48 +420,48 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
 
       {/* Preview Table */}
       {previewData.length > 0 && !importResult && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="font-medium text-gray-900 dark:text-white">
+        <div className="border border-border rounded-lg overflow-hidden">
+          <div className="bg-input px-4 py-2 border-b border-border">
+            <h3 className="font-medium text-foreground">
               Preview (first 10 rows of {previewData.length} total)
             </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-100 dark:bg-gray-700">
+              <thead className="bg-secondary">
                 <tr>
-                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Drop Number</th>
-                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Serial</th>
-                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Date</th>
-                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Status</th>
-                  <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Team</th>
-                  <th className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">Link Budget</th>
+                  <th className="px-3 py-2 text-left text-muted-foreground">Drop Number</th>
+                  <th className="px-3 py-2 text-left text-muted-foreground">Serial</th>
+                  <th className="px-3 py-2 text-left text-muted-foreground">Date</th>
+                  <th className="px-3 py-2 text-left text-muted-foreground">Status</th>
+                  <th className="px-3 py-2 text-left text-muted-foreground">Team</th>
+                  <th className="px-3 py-2 text-right text-muted-foreground">Link Budget</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {previewData.slice(0, 10).map((row, i) => (
-                  <tr key={i} className="bg-white dark:bg-gray-800">
-                    <td className="px-3 py-2 font-mono text-gray-900 dark:text-white">
+                  <tr key={i} className="bg-card">
+                    <td className="px-3 py-2 font-mono text-foreground">
                       {row.drop_number}
                     </td>
-                    <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-400">
+                    <td className="px-3 py-2 font-mono text-muted-foreground">
                       {row.serial_number}
                     </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {row.activation_date}
                     </td>
                     <td className="px-3 py-2">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium
                         ${row.status === 'Active'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                          : 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                         {row.status}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {row.team}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-600 dark:text-gray-400">
+                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">
                       {row.link_budget_ont_olt_db?.toFixed(1) || '-'} dB
                     </td>
                   </tr>
@@ -489,7 +489,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
         <div className="flex justify-end gap-3">
           <button
             onClick={() => resetForm()}
-            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800
+            className="px-4 py-2 text-muted-foreground hover:text-gray-800
                        dark:hover:text-gray-200"
           >
             Cancel
@@ -526,35 +526,35 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 Import Complete
               </h3>
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-card rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">
                     {importResult.totalRows}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Rows</p>
+                  <p className="text-sm text-muted-foreground">Total Rows</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
                     {importResult.inserted}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">New Inserts</p>
+                  <p className="text-sm text-muted-foreground">New Inserts</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-blue-600">
                     {importResult.updated}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Updated</p>
+                  <p className="text-sm text-muted-foreground">Updated</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-600">
                     {importResult.matched}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched Drops</p>
+                  <p className="text-sm text-muted-foreground">Matched Drops</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-600">
                     {importResult.unmatched}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Not in Drops</p>
+                  <p className="text-sm text-muted-foreground">Not in Drops</p>
                 </div>
               </div>
               {importResult.errors.length > 0 && (
@@ -563,7 +563,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                     <AlertCircle className="w-4 h-4" />
                     <span className="font-medium">{importResult.errors.length} warnings</span>
                   </div>
-                  <ul className="mt-2 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
+                  <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">
                     {importResult.errors.slice(0, 5).map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}
@@ -618,11 +618,11 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                 {qfieldSyncResult.message}
               </p>
               {qfieldSyncResult.totalPoints && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {qfieldSyncResult.totalPoints} drop locations synced to QFieldCloud as "OES Report" layer with DR number labels
                 </p>
               )}
-              <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
+              <p className="text-sm text-muted-foreground dark:text-gray-400 mt-2">
                 ✓ Points display with drop numbers visible on map<br/>
                 ✓ Data available in QField mobile app after sync
               </p>

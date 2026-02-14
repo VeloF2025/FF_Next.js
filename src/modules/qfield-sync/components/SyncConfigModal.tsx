@@ -40,12 +40,12 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
 
   return (
     <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sync Configuration</h2>
+      <div className="bg-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-foreground">Sync Configuration</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 dark:text-gray-400"
+            className="text-gray-400 hover:text-muted-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -54,10 +54,10 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {/* QFieldCloud Settings */}
           <div>
-            <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">QFieldCloud Settings</h3>
+            <h3 className="text-md font-medium text-foreground mb-4">QFieldCloud Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   QFieldCloud URL
                 </label>
                 <input
@@ -69,13 +69,13 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       qfieldcloud: { ...formData.qfieldcloud, url: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Project ID
                 </label>
                 <input
@@ -87,14 +87,14 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       qfieldcloud: { ...formData.qfieldcloud, projectId: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter QFieldCloud project ID"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   API Key
                 </label>
                 <input
@@ -106,16 +106,16 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       qfieldcloud: { ...formData.qfieldcloud, apiKey: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Enter QFieldCloud API key"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   API key is securely stored and never displayed
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Polling Interval (seconds)
                 </label>
                 <input
@@ -130,7 +130,7 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   min="30"
                   max="3600"
                 />
@@ -140,10 +140,10 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
 
           {/* Sync Settings */}
           <div>
-            <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Sync Settings</h3>
+            <h3 className="text-md font-medium text-foreground mb-4">Sync Settings</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Sync Mode
                 </label>
                 <select
@@ -154,7 +154,7 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       syncMode: e.target.value as QFieldSyncConfig['syncMode'],
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="manual">Manual</option>
                   <option value="automatic">Automatic</option>
@@ -163,7 +163,7 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Sync Direction
                 </label>
                 <select
@@ -174,7 +174,7 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       syncDirection: e.target.value as QFieldSyncConfig['syncDirection'],
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="qfield_to_fibreflow">QField → FibreFlow</option>
                   <option value="fibreflow_to_qfield">FibreFlow → QField</option>
@@ -193,9 +193,9 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       autoResolveConflicts: e.target.checked,
                     })
                   }
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-border rounded"
                 />
-                <label htmlFor="autoResolve" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+                <label htmlFor="autoResolve" className="ml-2 block text-sm text-foreground">
                   Automatically resolve conflicts
                 </label>
               </div>
@@ -218,10 +218,10 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
 
           {/* FibreFlow Settings */}
           <div>
-            <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">FibreFlow Database</h3>
+            <h3 className="text-md font-medium text-foreground mb-4">FibreFlow Database</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Target Table
                 </label>
                 <input
@@ -233,7 +233,7 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
                       fibreflow: { ...formData.fibreflow, targetTable: e.target.value },
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
               </div>
@@ -241,11 +241,11 @@ export function SyncConfigModal({ config, onClose, onSave }: SyncConfigModalProp
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900"
+              className="px-4 py-2 border border-border rounded-md text-muted-foreground hover:bg-background"
             >
               Cancel
             </button>

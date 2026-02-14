@@ -230,8 +230,8 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-6 bg-secondary rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-secondary rounded"></div>
         </div>
       </div>
     );
@@ -258,8 +258,8 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       const isPredicted = data.predicted;
       
       return (
-        <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900 dark:text-gray-100">
+        <div className="bg-card p-3 border rounded-lg shadow-lg">
+          <p className="font-medium text-foreground">
             {label} {isPredicted && <Badge variant="outline" className="ml-2 text-xs">Forecast</Badge>}
           </p>
           {payload.map((entry: any, index: number) => (
@@ -278,10 +278,10 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       {/* Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-semibold text-foreground">
             Trend Analysis & Forecasting
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Historical trends with predictive insights
           </p>
         </div>
@@ -319,7 +319,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <BarChart3 className="w-5 h-5" />
             {metricInfo.name} Trend
           </CardTitle>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Historical data with {forecastPeriod} forecast (dotted line indicates predictions)
           </p>
         </CardHeader>
@@ -367,13 +367,13 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <TrendingUp className="w-5 h-5" />
             Trend Insights
           </CardTitle>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             AI-generated insights based on historical patterns
           </p>
         </CardHeader>
         <CardContent>
           {insights.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No significant trends detected</p>
               <p className="text-sm">Data appears stable with minor variations</p>
@@ -390,7 +390,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                     case 'seasonal':
                       return <Calendar className="w-5 h-5 text-blue-600" />;
                     default:
-                      return <Activity className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
+                      return <Activity className="w-5 h-5 text-muted-foreground" />;
                   }
                 };
 
@@ -403,12 +403,12 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                     case 'seasonal':
                       return 'text-blue-700 bg-blue-100 dark:bg-blue-900/20';
                     default:
-                      return 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900/20';
+                      return 'text-muted-foreground bg-background/20';
                   }
                 };
 
                 return (
-                  <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div key={index} className="p-4 border border-border rounded-lg">
                     <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-1">
                         {getInsightIcon()}
@@ -423,11 +423,11 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                           </Badge>
                         </div>
                         
-                        <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                        <h4 className="font-semibold text-foreground">
                           {insight.metric}
                         </h4>
                         
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground">
                           {insight.description}
                         </p>
                         
@@ -458,7 +458,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-blue-600">
               {Math.round(trendData[trendData.length - 1]?.completionRate || 0)}%
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Next {forecastPeriod === 'week' ? 'month' : forecastPeriod === 'month' ? 'quarter' : 'quarter'}
             </p>
           </CardContent>
@@ -473,7 +473,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-green-600">
               {Math.round(trendData[trendData.length - 1]?.avgDuration || 0)} days
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Expected average
             </p>
           </CardContent>
@@ -488,7 +488,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-purple-600">
               {Math.round(trendData[trendData.length - 1]?.projectCount || 0)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Expected volume
             </p>
           </CardContent>

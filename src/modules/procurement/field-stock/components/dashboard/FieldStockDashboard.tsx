@@ -19,11 +19,11 @@ interface StatsCardProps {
 
 function StatsCard({ title, value, icon, subItems, className = '' }: StatsCardProps) {
   return (
-    <div className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 dark:border-gray-700 dark:bg-gray-800 ${className}`}>
+    <div className={`rounded-lg border border-border bg-card p-6 dark:border-gray-700 dark:bg-gray-800 ${className}`}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
-          <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-white">{value}</p>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="mt-1 text-3xl font-bold text-foreground">{value}</p>
         </div>
         <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/30">
           {icon}
@@ -33,8 +33,8 @@ function StatsCard({ title, value, icon, subItems, className = '' }: StatsCardPr
         <div className="mt-4 space-y-2 border-t border-gray-100 pt-4 dark:border-gray-700">
           {subItems.map((item) => (
             <div key={item.label} className="flex justify-between text-sm">
-              <span className="text-gray-500 dark:text-gray-400">{item.label}</span>
-              <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
+              <span className="text-muted-foreground">{item.label}</span>
+              <span className="font-medium text-foreground">{item.value}</span>
             </div>
           ))}
         </div>
@@ -64,7 +64,7 @@ function AlertCard({ title, count, type }: AlertCardProps) {
         <AlertTriangle className="h-4 w-4" />
         <span className="font-medium">{title}</span>
       </div>
-      <span className="rounded-full bg-white dark:bg-gray-800/50 px-2 py-0.5 text-sm font-bold">{count}</span>
+      <span className="rounded-full bg-card/50 px-2 py-0.5 text-sm font-bold">{count}</span>
     </div>
   );
 }
@@ -128,15 +128,15 @@ export function FieldStockDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Field Stock Control</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <h1 className="text-2xl font-bold text-foreground">Field Stock Control</h1>
+          <p className="text-sm text-muted-foreground">
             Track materials, serials, and consumption across locations
           </p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-background disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh

@@ -107,10 +107,10 @@ export function VlmResultCard({
           <div className="flex-1">
             <p className="text-sm font-medium text-green-700 dark:text-green-300">{title}</p>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+              <span className="text-2xl font-bold text-foreground">
                 {Number(currentValue).toLocaleString()}
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{unit}</span>
+              <span className="text-sm text-muted-foreground">{unit}</span>
               <div className="flex items-center gap-1 ml-2">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
                 <span className="text-xs text-green-600 dark:text-green-400">
@@ -193,7 +193,7 @@ export function VlmResultCard({
               type="number"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:border-gray-700"
+              className="flex-1 px-3 py-2 border rounded-lg text-sm bg-card dark:border-gray-700"
               placeholder={`Enter ${title.toLowerCase()}`}
               autoFocus
             />
@@ -257,7 +257,7 @@ export function VlmResultCard({
                 type="number"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 dark:border-gray-700"
+                className="flex-1 px-3 py-2 border rounded-lg text-sm bg-card dark:border-gray-700"
                 autoFocus
               />
               <button
@@ -277,10 +277,10 @@ export function VlmResultCard({
             </div>
           ) : (
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">
+              <span className="text-2xl font-bold text-foreground">
                 {currentValue ? Number(currentValue).toLocaleString() : '--'}
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">{unit}</span>
+              <span className="text-sm text-muted-foreground">{unit}</span>
               <div className="flex items-center gap-1 ml-2">
                 <CheckCircle2 className={`w-4 h-4 ${
                   isHighConfidence
@@ -309,7 +309,7 @@ export function VlmResultCard({
               setEditValue(currentValue);
               setIsEditing(true);
             }}
-            className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+            className="p-2 text-muted-foreground hover:bg-accent rounded-lg"
             title="Edit value"
           >
             <Edit3 className="w-4 h-4" />
@@ -331,7 +331,7 @@ export function VlmResultCard({
 
       {/* Low confidence warning */}
       {!isHighConfidence && !needsVerification && !isEditing && (
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-muted-foreground">
           {isMediumConfidence
             ? 'Please verify this reading is correct'
             : 'Low confidence - please check and correct if needed'

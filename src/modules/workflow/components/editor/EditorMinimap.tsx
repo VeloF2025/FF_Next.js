@@ -178,13 +178,13 @@ export function EditorMinimap() {
   }, [state.connections, state.nodes, minimapConfig]);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2">
+    <div className="bg-card border border-border rounded-lg shadow-lg p-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+        <span className="text-xs font-medium text-muted-foreground">
           Minimap
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+        <span className="text-xs text-muted-foreground dark:text-gray-400">
           {state.nodes.length} nodes
         </span>
       </div>
@@ -202,13 +202,13 @@ export function EditorMinimap() {
             width="100%"
             height="100%"
             fill="currentColor"
-            className="text-gray-50 dark:text-gray-900 dark:text-gray-100"
+            className="text-gray-50 dark:text-foreground"
           />
           
           {/* Grid pattern */}
           <defs>
             <pattern id="minimap-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-gray-200 dark:text-gray-700 dark:text-gray-300" />
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-gray-200 dark:text-muted-foreground" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#minimap-grid)" opacity="0.5" />
@@ -239,7 +239,7 @@ export function EditorMinimap() {
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <div className="text-2xl mb-1">🗺️</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-muted-foreground">
                 No nodes
               </div>
             </div>
@@ -252,19 +252,19 @@ export function EditorMinimap() {
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-indigo-500 rounded"></div>
-            <span className="text-gray-600 dark:text-gray-400">Phase</span>
+            <span className="text-muted-foreground">Phase</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-emerald-500 rounded"></div>
-            <span className="text-gray-600 dark:text-gray-400">Step</span>
+            <span className="text-muted-foreground">Step</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-2 h-2 bg-violet-500 rounded"></div>
-            <span className="text-gray-600 dark:text-gray-400">Task</span>
+            <span className="text-muted-foreground">Task</span>
           </div>
         </div>
         
-        <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">
+        <span className="text-muted-foreground dark:text-gray-400">
           Click to navigate
         </span>
       </div>

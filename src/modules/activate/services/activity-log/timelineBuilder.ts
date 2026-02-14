@@ -66,7 +66,7 @@ export async function getActivityTimeline(
     const metadata = EVENT_METADATA[entry.event_type] || {
       title: entry.event_type,
       icon: '📌',
-      iconColor: 'text-gray-500 dark:text-gray-400',
+      iconColor: 'text-muted-foreground',
     };
 
     // Build description from event data

@@ -125,10 +125,10 @@ export function TrendChart({
     return (
       <div className="space-y-2">
         {title && (
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+          <div className="h-6 bg-secondary rounded w-48 animate-pulse" />
         )}
         <div
-          className="bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"
+          className="bg-secondary rounded-lg animate-pulse"
           style={{ height }}
         />
       </div>
@@ -139,15 +139,15 @@ export function TrendChart({
     return (
       <div className="space-y-2">
         {title && (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             {title}
           </h3>
         )}
         <div
-          className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+          className="flex items-center justify-center bg-input/50 rounded-lg border border-border"
           style={{ height }}
         >
-          <p className="text-gray-500 dark:text-gray-400">{emptyMessage}</p>
+          <p className="text-muted-foreground">{emptyMessage}</p>
         </div>
       </div>
     );
@@ -165,8 +165,8 @@ export function TrendChart({
     if (!active || !payload) return null;
 
     return (
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-        <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+      <div className="bg-card border border-border rounded-lg shadow-lg p-3">
+        <p className="text-sm font-medium text-foreground mb-2">
           {label}
         </p>
         {payload.map((entry, idx) => (
@@ -175,10 +175,10 @@ export function TrendChart({
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-gray-600 dark:text-gray-400">
+            <span className="text-muted-foreground">
               {entry.name}:
             </span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-medium text-foreground">
               {tooltipFormatter
                 ? tooltipFormatter(entry.value, entry.name)
                 : entry.value}
@@ -343,18 +343,18 @@ export function TrendChart({
       {(title || subtitle) && (
         <div>
           {title && (
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-foreground">
               {title}
             </h3>
           )}
           {subtitle && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               {subtitle}
             </p>
           )}
         </div>
       )}
-      <div className="text-gray-600 dark:text-gray-400">
+      <div className="text-muted-foreground">
         <ResponsiveContainer width="100%" height={height}>
           {renderChart()}
         </ResponsiveContainer>
@@ -390,10 +390,10 @@ export function FunnelChart({
     return (
       <div className="space-y-2">
         {title && (
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+          <div className="h-6 bg-secondary rounded w-48 animate-pulse" />
         )}
         <div
-          className="bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"
+          className="bg-secondary rounded-lg animate-pulse"
           style={{ height }}
         />
       </div>
@@ -404,15 +404,15 @@ export function FunnelChart({
     return (
       <div className="space-y-2">
         {title && (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             {title}
           </h3>
         )}
         <div
-          className="flex items-center justify-center bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+          className="flex items-center justify-center bg-input/50 rounded-lg border border-border"
           style={{ height }}
         >
-          <p className="text-gray-500 dark:text-gray-400">No funnel data</p>
+          <p className="text-muted-foreground">No funnel data</p>
         </div>
       </div>
     );
@@ -423,7 +423,7 @@ export function FunnelChart({
   return (
     <div className="space-y-3">
       {title && (
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-foreground">
           {title}
         </h3>
       )}
@@ -435,10 +435,10 @@ export function FunnelChart({
           return (
             <div key={stage.name} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="font-medium text-foreground">
                   {stage.name}
                 </span>
-                <span className="text-gray-500 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   {stage.value.toLocaleString()} ({stage.percentage}%)
                 </span>
               </div>
@@ -458,7 +458,7 @@ export function FunnelChart({
                 {idx < stages.length - 1 && (
                   <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
                     <svg
-                      className="w-4 h-2 text-gray-300 dark:text-gray-600 dark:text-gray-400"
+                      className="w-4 h-2 text-gray-300 dark:text-muted-foreground"
                       viewBox="0 0 16 8"
                     >
                       <path d="M0 0 L8 8 L16 0" fill="currentColor" />
@@ -525,7 +525,7 @@ export function GaugeChart({
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            className="text-gray-200 dark:text-gray-700 dark:text-gray-300"
+            className="text-gray-200 dark:text-muted-foreground"
           />
           {/* Progress circle */}
           <circle
@@ -551,7 +551,7 @@ export function GaugeChart({
               strokeWidth={2}
               strokeDasharray={`2 ${circumference - 2}`}
               strokeDashoffset={-((target / 100) * circumference)}
-              className="text-gray-400 dark:text-gray-500 dark:text-gray-400"
+              className="text-gray-400 dark:text-muted-foreground"
             />
           )}
         </svg>
@@ -571,11 +571,11 @@ export function GaugeChart({
           </span>
         </div>
       </div>
-      <span className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+      <span className="mt-2 text-sm font-medium text-muted-foreground">
         {label}
       </span>
       {target !== undefined && target !== 100 && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className="text-xs text-muted-foreground">
           Target: {target}%
         </span>
       )}

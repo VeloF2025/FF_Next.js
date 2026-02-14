@@ -17,15 +17,15 @@ export default function BOQVersionComparison({
   const { fromVersion, toVersion, changes } = comparison;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
         <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-lg font-semibold text-foreground">
             Version Comparison: {fromVersion.version} → {toVersion.version}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+            className="p-2 text-muted-foreground hover:text-muted-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -65,7 +65,7 @@ export default function BOQVersionComparison({
           {/* Added Items */}
           {changes.added.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
+              <h3 className="text-md font-medium text-foreground mb-3 flex items-center">
                 <Plus className="h-4 w-4 text-green-600 mr-2" />
                 Added Items
               </h3>
@@ -107,7 +107,7 @@ export default function BOQVersionComparison({
           {/* Removed Items */}
           {changes.removed.length > 0 && (
             <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
+              <h3 className="text-md font-medium text-foreground mb-3 flex items-center">
                 <Minus className="h-4 w-4 text-red-600 mr-2" />
                 Removed Items
               </h3>
@@ -149,7 +149,7 @@ export default function BOQVersionComparison({
           {/* Modified Items */}
           {changes.modified.length > 0 && (
             <div>
-              <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
+              <h3 className="text-md font-medium text-foreground mb-3 flex items-center">
                 <Edit3 className="h-4 w-4 text-blue-600 mr-2" />
                 Modified Items
               </h3>
@@ -168,7 +168,7 @@ export default function BOQVersionComparison({
                           <span className="text-red-700 line-through mr-2">
                             {String(change.oldValue ?? '')}
                           </span>
-                          <span className="text-gray-500 dark:text-gray-400">→</span>
+                          <span className="text-muted-foreground">→</span>
                           <span className="text-green-700 ml-2">
                             {String(change.newValue ?? '')}
                           </span>

@@ -311,7 +311,7 @@ export function AICategorizationTab({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading categorization...</span>
+        <span className="ml-3 text-muted-foreground">Loading categorization...</span>
       </div>
     );
   }
@@ -323,13 +323,13 @@ export function AICategorizationTab({
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-4">
           <span className="text-3xl">🏷️</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           AI Categorization Not Run
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-2">
+        <p className="text-muted-foreground mb-2">
           Run AI categorization to have the VLM identify and classify {photoCount} photos.
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mb-6">
+        <p className="text-sm text-muted-foreground dark:text-gray-400 mb-6">
           This will analyze each photo and predict which installation step it belongs to.
         </p>
         {error && <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>}
@@ -349,10 +349,10 @@ export function AICategorizationTab({
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400 mx-auto mb-4"></div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Categorizing Photos...
         </h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           The AI is analyzing {photoCount} photos. This may take a few minutes.
         </p>
       </div>
@@ -446,12 +446,12 @@ export function AICategorizationTab({
             return (
               <div
                 key={step}
-                className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center"
+                className="bg-background/50 border border-border rounded-lg p-3 text-center"
               >
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="text-2xl font-bold text-foreground">
                   {photosForStep.length}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <div className="text-xs text-muted-foreground truncate">
                   {STEP_LABELS[step]}
                 </div>
               </div>
@@ -479,18 +479,18 @@ export function AICategorizationTab({
         })()}
 
         {/* Toggle to show/edit individual photos */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="border border-border rounded-lg overflow-hidden">
           <button
             onClick={() => setShowAllPhotos(!showAllPhotos)}
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="w-full px-4 py-3 bg-input flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <div className="flex items-center gap-2">
               <span className="text-lg">📷</span>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
+              <span className="font-medium text-muted-foreground">
                 {showAllPhotos ? 'Hide' : 'Edit'} Individual Photos
               </span>
             </div>
-            <span className="text-gray-500 dark:text-gray-400 text-xl">
+            <span className="text-muted-foreground text-xl">
               {showAllPhotos ? '▲' : '▼'}
             </span>
           </button>
@@ -508,7 +508,7 @@ export function AICategorizationTab({
                     className={`border rounded-lg p-3 ${
                       wasOverridden
                         ? 'border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                        : 'border-border bg-card'
                     }`}
                   >
                     <div className="flex gap-3 items-center">
@@ -521,7 +521,7 @@ export function AICategorizationTab({
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           {result.photo_filename}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
@@ -531,7 +531,7 @@ export function AICategorizationTab({
                               defaultValue={finalStep}
                               onChange={(e) => updatePhotoStep(result.photo_filename, parseInt(e.target.value))}
                               disabled={isSavingEdit}
-                              className="text-sm border border-blue-300 dark:border-blue-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="text-sm border border-blue-300 dark:border-blue-600 rounded px-2 py-1 bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
                               onBlur={() => !isSavingEdit && setEditingPhoto(null)}
                             >
                               <option value="0" className="text-red-600">
@@ -545,7 +545,7 @@ export function AICategorizationTab({
                             </select>
                           ) : (
                             <>
-                              <span className="font-medium text-gray-900 dark:text-white">
+                              <span className="font-medium text-foreground">
                                 Step {finalStep}: {STEP_LABELS[finalStep]}
                               </span>
                               {wasOverridden && (
@@ -557,7 +557,7 @@ export function AICategorizationTab({
                           )}
                         </div>
                         {!isEditing && result.vlm_predicted_step !== finalStep && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             VLM predicted: Step {result.vlm_predicted_step} ({Math.round(result.vlm_confidence * 100)}%)
                           </p>
                         )}
@@ -567,7 +567,7 @@ export function AICategorizationTab({
                       {!isEditing && (
                         <button
                           onClick={() => setEditingPhoto(result.photo_filename)}
-                          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                          className="px-3 py-1.5 text-sm border border-border text-muted-foreground rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
                         >
                           Edit
                         </button>
@@ -644,7 +644,7 @@ export function AICategorizationTab({
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
                   : !matchesOriginal
                   ? 'border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/10'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                  : 'border-border bg-card'
               }`}
             >
               {/* Photo thumbnail and info */}
@@ -653,27 +653,27 @@ export function AICategorizationTab({
                   <img
                     src={`/api/activate/photo/${dropNumber}/${result.photo_filename}`}
                     alt={result.photo_filename}
-                    className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                    className="w-24 h-24 object-cover rounded-lg border border-border"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">
+                  <p className="text-xs text-muted-foreground truncate mb-1">
                     {result.photo_filename}
                   </p>
 
                   {/* Original vs Predicted */}
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-16">Original:</span>
-                      <span className="text-gray-700 dark:text-gray-300">
+                      <span className="text-muted-foreground w-16">Original:</span>
+                      <span className="text-muted-foreground">
                         {result.original_step
                           ? `Step ${result.original_step}: ${STEP_LABELS[result.original_step]}`
                           : 'Unknown'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-16">VLM:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
+                      <span className="text-muted-foreground w-16">VLM:</span>
+                      <span className="font-medium text-foreground">
                         Step {result.vlm_predicted_step}: {STEP_LABELS[result.vlm_predicted_step]}
                       </span>
                       <span
@@ -687,14 +687,14 @@ export function AICategorizationTab({
                   </div>
 
                   {/* VLM reasoning */}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">
+                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
                     {result.vlm_identified_as}
                   </p>
                 </div>
               </div>
 
               {/* Approval controls */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-4 border-t border-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -706,13 +706,13 @@ export function AICategorizationTab({
                         }
                         className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Approve</span>
+                      <span className="text-sm text-muted-foreground">Approve</span>
                     </label>
                   </div>
 
                   {!isApproved && (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Override to:</span>
+                      <span className="text-sm text-muted-foreground">Override to:</span>
                       <select
                         value={overrideStep ?? ''}
                         onChange={(e) =>
@@ -722,7 +722,7 @@ export function AICategorizationTab({
                             e.target.value ? parseInt(e.target.value) : undefined
                           )
                         }
-                        className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        className="text-sm border border-border rounded px-2 py-1 bg-card text-foreground"
                       >
                         <option value="">Select step...</option>
                         <option value="0" className="text-red-600">

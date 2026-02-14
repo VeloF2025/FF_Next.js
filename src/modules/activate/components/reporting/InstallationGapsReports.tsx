@@ -195,13 +195,13 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
 
       {/* Filter Buttons - like Anomalies */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Source:</span>
+        <span className="text-sm font-medium text-muted-foreground">Source:</span>
         {filterButtons.map((btn) => {
           const isActive = sourceFilter === btn.id;
           const colorStyles: Record<string, string> = {
             gray: isActive
               ? 'bg-gray-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+              : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600',
             green: isActive
               ? 'bg-green-600 text-white'
               : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40',
@@ -230,22 +230,22 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
 
       {/* Project Breakdown - inline chips */}
       {summary.by_project.length > 0 && (
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        <div className="bg-background/50 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-foreground mb-3">
             By Project
           </h4>
           <div className="flex flex-wrap gap-2">
             {summary.by_project.slice(0, 10).map((p) => (
               <span
                 key={p.project}
-                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full text-sm"
+                className="px-3 py-1.5 bg-card border border-border rounded-full text-sm"
               >
-                <span className="text-gray-700 dark:text-gray-300">{p.project}:</span>
+                <span className="text-muted-foreground">{p.project}:</span>
                 <span className="font-medium text-red-600 dark:text-red-400 ml-1">{p.count}</span>
               </span>
             ))}
             {summary.by_project.length > 10 && (
-              <span className="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400">
+              <span className="px-3 py-1.5 text-sm text-muted-foreground">
                 +{summary.by_project.length - 10} more
               </span>
             )}
@@ -256,32 +256,32 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
       {/* Data Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Source
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Days Since Install
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Photos
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 QA Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Action
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
             {filteredItems.map((item) => (
               <tr
                 key={item.drop_number}
@@ -295,10 +295,10 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
                         : ''
                 } hover:opacity-90`}
               >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {item.drop_number}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {item.project || '-'}
                 </td>
                 <td className="px-4 py-3">
@@ -320,7 +320,7 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
                     {item.days_since_install} days
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {item.photo_count || 0}
                 </td>
                 <td className="px-4 py-3">
@@ -342,22 +342,22 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex items-center justify-between pt-4 border-t border-border">
+          <div className="text-sm text-muted-foreground">
             Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-secondary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
               disabled={page >= pagination.totalPages}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-secondary hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -367,7 +367,7 @@ export function InstallationGapsReports({ filters, refreshKey }: InstallationGap
 
       {/* Empty State */}
       {filteredItems.length === 0 && (
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-12 text-muted-foreground">
           <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>No installation gaps found</p>
           <p className="text-sm mt-1">All installed DRs have been activated</p>
@@ -423,7 +423,7 @@ function QAStatusBadge({ status }: { status: string | null }) {
 
   return (
     <span
-      className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+      className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status] || 'bg-secondary text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
     >
       {status}
     </span>
@@ -435,11 +435,11 @@ function LoadingSkeleton() {
     <div className="p-6 space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          <div key={i} className="h-24 animate-pulse bg-secondary rounded-lg" />
         ))}
       </div>
-      <div className="h-12 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
-      <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-12 animate-pulse bg-secondary rounded" />
+      <div className="h-64 animate-pulse bg-secondary rounded" />
     </div>
   );
 }

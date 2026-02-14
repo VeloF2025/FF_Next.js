@@ -364,7 +364,7 @@ export function FinalDecisionPhase({
       case 'PASS': return 'text-green-600 dark:text-green-400';
       case 'FAIL': return 'text-red-600 dark:text-red-400';
       case 'REWORK_NEEDED': return 'text-yellow-600 dark:text-yellow-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -383,7 +383,7 @@ export function FinalDecisionPhase({
         <img
           src={photo.url}
           alt={label}
-          className="w-16 h-16 object-cover rounded border border-gray-300 dark:border-gray-600 hover:border-blue-500 transition-colors"
+          className="w-16 h-16 object-cover rounded border border-border hover:border-blue-500 transition-colors"
         />
         <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
           <span className="text-white text-xs">View</span>
@@ -408,7 +408,7 @@ export function FinalDecisionPhase({
             />
             <button
               onClick={() => setLightboxPhoto(null)}
-              className="absolute top-2 right-2 p-2 bg-white dark:bg-gray-800/20 rounded-full hover:bg-white dark:bg-gray-800/40"
+              className="absolute top-2 right-2 p-2 bg-card/20 rounded-full hover:bg-card/40"
             >
               <span className="text-white text-xl">×</span>
             </button>
@@ -452,12 +452,12 @@ export function FinalDecisionPhase({
                   </div>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{swapCheck.details}</p>
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="bg-white dark:bg-gray-800/50 dark:bg-black/20 p-2 rounded">
-                      <span className="text-gray-500 dark:text-gray-400">ONT field:</span>
+                    <div className="bg-card/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-muted-foreground">ONT field:</span>
                       <code className="ml-1 font-mono">{wizardState.prerequisites.ontSerial || 'N/A'}</code>
                     </div>
-                    <div className="bg-white dark:bg-gray-800/50 dark:bg-black/20 p-2 rounded">
-                      <span className="text-gray-500 dark:text-gray-400">UPS field:</span>
+                    <div className="bg-card/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-muted-foreground">UPS field:</span>
                       <code className="ml-1 font-mono">{wizardState.prerequisites.upsSerial || 'N/A'}</code>
                     </div>
                   </div>
@@ -485,8 +485,8 @@ export function FinalDecisionPhase({
       })()}
 
       {/* Decision Summary with Photo Viewer */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-4">
+      <div className="bg-background/50 rounded-lg p-4">
+        <h4 className="font-medium text-foreground mb-4">
           Decision Summary
         </h4>
 
@@ -494,19 +494,19 @@ export function FinalDecisionPhase({
           {/* Passing checks - compact */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">Prerequisites:</span>
+              <span className="text-muted-foreground">Prerequisites:</span>
               <span>{getStatusIcon(wizardState.prerequisites.passed)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">Photo Coverage:</span>
+              <span className="text-muted-foreground">Photo Coverage:</span>
               <span>{getStatusIcon(wizardState.photoReview.stepsMissing.length === 0)} {10 - wizardState.photoReview.stepsMissing.length}/10</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">Power Meter:</span>
+              <span className="text-muted-foreground">Power Meter:</span>
               <span>{getStatusIcon(wizardState.dataValidation.powerMeter.inRange)} {wizardState.dataValidation.powerMeter.value} dBm</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500 dark:text-gray-400">Serials Scanned:</span>
+              <span className="text-muted-foreground">Serials Scanned:</span>
               <span>
                 {(() => {
                   const swapped = detectSwappedSerials(
@@ -526,36 +526,36 @@ export function FinalDecisionPhase({
           {/* Internal QA: VLM Serial Comparison (collapsible, for QA team only) */}
           {hasSerialMismatch && (
             <details className="mt-4">
-              <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-gray-700 dark:hover:text-gray-300">
                 🔍 Internal QA: VLM Serial Comparison (click to expand)
               </summary>
-              <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              <div className="mt-2 p-4 bg-secondary border border-border rounded-lg">
+                <p className="text-xs text-muted-foreground mb-3">
                   This data is for internal QA/VLM improvement only. NOT sent to technicians.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* OneMap Serial */}
                   <div className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">OneMap Synced</div>
-                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600">
+                    <div className="text-xs text-muted-foreground mb-1">OneMap Synced</div>
+                    <div className="font-mono text-sm bg-background p-2 rounded border border-border">
                       {wizardState.dataValidation.serialValidation.onemapSerial || 'N/A'}
                     </div>
                   </div>
 
                   {/* Step 6 - ONT Back */}
                   <div className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">VLM Step 6</div>
+                    <div className="text-xs text-muted-foreground mb-1">VLM Step 6</div>
                     <PhotoThumbnail photo={getPhotoByStep(6)} label="Step 6" />
-                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 mt-2">
+                    <div className="font-mono text-sm bg-background p-2 rounded border border-border mt-2">
                       {wizardState.dataValidation.serialValidation.step6Serial || 'N/A'}
                     </div>
                   </div>
 
                   {/* Step 9 - Green Lights */}
                   <div className="text-center">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">VLM Step 9</div>
+                    <div className="text-xs text-muted-foreground mb-1">VLM Step 9</div>
                     <PhotoThumbnail photo={getPhotoByStep(9)} label="Step 9" />
-                    <div className="font-mono text-sm bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 mt-2">
+                    <div className="font-mono text-sm bg-background p-2 rounded border border-border mt-2">
                       {wizardState.dataValidation.serialValidation.step9Serial || 'N/A'}
                     </div>
                   </div>
@@ -567,8 +567,8 @@ export function FinalDecisionPhase({
       </div>
 
       {/* Issue Classification */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+      <div className="bg-card rounded-lg p-4 border border-border">
+        <h4 className="font-medium text-foreground mb-3">
           What's the Issue?
         </h4>
 
@@ -586,12 +586,12 @@ export function FinalDecisionPhase({
               className={`p-3 rounded-lg border text-left transition-all ${
                 issueClassification.issueType === type.id
                   ? `border-${type.color}-500 bg-${type.color}-50 dark:bg-${type.color}-900/20 ring-2 ring-${type.color}-500/20`
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-border'
               }`}
             >
               <div className="text-2xl mb-1">{type.icon}</div>
               <div className="font-medium text-sm">{type.label}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{type.desc}</div>
+              <div className="text-xs text-muted-foreground">{type.desc}</div>
             </button>
           ))}
         </div>
@@ -661,7 +661,7 @@ export function FinalDecisionPhase({
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   issueClassification.ticketType === 'maintenance'
                     ? 'border-red-500 bg-red-100 dark:bg-red-900/30 text-red-700'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-border'
                 }`}
               >
                 🔧 Maintenance Ticket
@@ -672,7 +672,7 @@ export function FinalDecisionPhase({
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   issueClassification.ticketType === 'qa'
                     ? 'border-orange-500 bg-orange-100 dark:bg-orange-900/30 text-orange-700'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-border'
                 }`}
               >
                 📋 QA Ticket
@@ -706,8 +706,8 @@ export function FinalDecisionPhase({
       {/* Internal Notes & Technician Feedback */}
       <div className="grid md:grid-cols-2 gap-4">
         {/* Internal Notes */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+        <div className="bg-card rounded-lg p-4 border border-border">
+          <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
             <span>📝</span> Internal Notes
             <span className="text-xs text-gray-400 font-normal">(not shared)</span>
           </h4>
@@ -721,8 +721,8 @@ export function FinalDecisionPhase({
         </div>
 
         {/* Technician Feedback */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+        <div className="bg-card rounded-lg p-4 border border-border">
+          <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
             <span>💬</span> Technician Feedback
             <span className="text-xs text-gray-400 font-normal">(sent via WhatsApp)</span>
           </h4>
@@ -737,8 +737,8 @@ export function FinalDecisionPhase({
       </div>
 
       {/* Final Decision */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+      <div className="bg-card rounded-lg p-4 border border-border">
+        <h4 className="font-medium text-foreground mb-3">
           Final Decision
         </h4>
 
@@ -753,7 +753,7 @@ export function FinalDecisionPhase({
                     : d === 'FAIL'
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
                       : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-border'
               }`}
             >
               <input
@@ -764,7 +764,7 @@ export function FinalDecisionPhase({
                 onChange={() => setDecision(d)}
                 className="w-4 h-4 text-blue-600 focus:ring-blue-500"
               />
-              <span className={`font-medium ${decision === d ? getDecisionColor(d) : 'text-gray-700 dark:text-gray-300'}`}>
+              <span className={`font-medium ${decision === d ? getDecisionColor(d) : 'text-muted-foreground'}`}>
                 {d === 'REWORK_NEEDED' ? 'REWORK' : d}
               </span>
             </label>
@@ -794,7 +794,7 @@ export function FinalDecisionPhase({
         {/* Override reason */}
         {isOverriding && (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
               Override Reason (required)
             </label>
             <input
@@ -813,7 +813,7 @@ export function FinalDecisionPhase({
         <button
           onClick={handleBack}
           disabled={savingDraft}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+          className="px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
           {savingDraft ? (
             <span className="flex items-center gap-2">
@@ -829,7 +829,7 @@ export function FinalDecisionPhase({
           disabled={!decision || loading || savingDraft || (isOverriding && !overrideReason)}
           className={`px-6 py-2 rounded-lg font-medium ${
             !decision || loading || savingDraft || (isOverriding && !overrideReason)
-              ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              ? 'bg-muted text-muted-foreground cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >

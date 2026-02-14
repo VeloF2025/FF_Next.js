@@ -27,15 +27,15 @@ export function StockMovementTab() {
   }
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="h-full bg-background flex flex-col">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card border-b border-border p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl font-semibold text-foreground">
               Stock Movement
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Managing inventory for {selectedProject.name} ({selectedProject.code})
             </p>
           </div>
@@ -55,16 +55,16 @@ export function StockMovementTab() {
               placeholder="Search by item name, SKU, or location..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
           
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <Filter className="h-4 w-4 text-muted-foreground" />
             <select
               value={movementType}
               onChange={(e) => setMovementType(e.target.value as typeof movementType)}
-              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">All Movements</option>
               <option value="in">Stock In</option>
@@ -76,7 +76,7 @@ export function StockMovementTab() {
       </div>
 
       {/* Stock Summary Cards */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card border-b border-border p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StockStatCard
             title="Total Items"
@@ -113,9 +113,9 @@ export function StockMovementTab() {
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* Recent Stock Movements */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Stock Movements</h3>
+          <div className="bg-card rounded-lg border border-border mb-6">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-medium text-foreground">Recent Stock Movements</h3>
             </div>
             
             <div className="divide-y divide-gray-200">
@@ -153,9 +153,9 @@ export function StockMovementTab() {
           </div>
 
           {/* Stock Management Integration */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Current Stock Levels</h3>
+          <div className="bg-card rounded-lg border border-border">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-medium text-foreground">Current Stock Levels</h3>
             </div>
             
             <div className="p-6">
@@ -185,16 +185,16 @@ function StockStatCard({ title, count, icon: Icon, color, trend }: StockStatCard
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="bg-card p-4 rounded-lg border border-border">
       <div className="flex items-center justify-between mb-2">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="h-5 w-5" />
         </div>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{trend}</span>
+        <span className="text-xs text-muted-foreground">{trend}</span>
       </div>
       <div>
-        <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{count.toLocaleString()}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
+        <p className="text-2xl font-bold text-foreground">{count.toLocaleString()}</p>
+        <p className="text-sm text-muted-foreground">{title}</p>
       </div>
     </div>
   );
@@ -230,7 +230,7 @@ function StockMovementItem({
       case 'transfer':
         return <Package className="h-4 w-4 text-blue-600" />;
       default:
-        return <Package className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+        return <Package className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -249,17 +249,17 @@ function StockMovementItem({
   };
 
   return (
-    <div className="p-4 hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="p-4 hover:bg-background transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {getMovementIcon(movementType)}
           <div>
-            <h4 className="font-medium text-gray-900 dark:text-gray-100">{itemName}</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-400">SKU: {sku}</p>
+            <h4 className="font-medium text-foreground">{itemName}</h4>
+            <p className="text-sm text-muted-foreground">SKU: {sku}</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
           {getMovementBadge(movementType)}
           <span className="font-medium">{quantity.toLocaleString()} {unit}</span>
           <span>{location}</span>
@@ -279,11 +279,11 @@ function NoProjectSelected() {
           <Package className="h-12 w-12 text-orange-600" />
         </div>
         
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <h3 className="text-xl font-semibold text-foreground mb-4">
           Project Selection Required
         </h3>
         
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Please select a project to view and manage its stock movements and inventory. 
           Stock management is project-specific to ensure accurate material tracking.
         </p>

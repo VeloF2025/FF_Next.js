@@ -164,15 +164,15 @@ export function VehicleCalibrationModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-background rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/30 rounded-t-2xl">
+        <div className="p-4 border-b border-border bg-blue-50 dark:bg-blue-900/30 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
               <Car className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-bold text-foreground">
                 First-Time Vehicle Setup
               </h2>
               <p className="text-sm text-blue-700 dark:text-blue-300">
@@ -184,13 +184,13 @@ export function VehicleCalibrationModal({
 
         <div className="p-4 space-y-6">
           {/* Vehicle Info */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Vehicle</p>
-            <p className="text-lg font-bold text-gray-900 dark:text-white">
+          <div className="bg-input rounded-lg p-3">
+            <p className="text-sm text-muted-foreground">Vehicle</p>
+            <p className="text-lg font-bold text-foreground">
               {vehicleRegistration}
             </p>
             {(vehicleMake || vehicleModel) && (
-              <p className="text-sm text-gray-600 dark:text-gray-300">
+              <p className="text-sm text-muted-foreground">
                 {vehicleMake} {vehicleModel}
               </p>
             )}
@@ -202,15 +202,15 @@ export function VehicleCalibrationModal({
               <div className={`p-1.5 rounded-full ${
                 isValidOdometer
                   ? 'bg-green-100 dark:bg-green-900'
-                  : 'bg-gray-100 dark:bg-gray-800'
+                  : 'bg-secondary'
               }`}>
                 {isValidOdometer ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">1</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-muted-foreground">1</span>
                 )}
               </div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-muted-foreground">
                 Enter Current Mileage
               </label>
             </div>
@@ -221,11 +221,11 @@ export function VehicleCalibrationModal({
                 value={odometer}
                 onChange={(e) => setOdometer(e.target.value)}
                 placeholder="e.g., 125430"
-                className="w-full pl-10 pr-16 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-lg font-medium
+                className="w-full pl-10 pr-16 py-3 border-2 border-border rounded-lg
+                         bg-card text-foreground text-lg font-medium
                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-medium">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
                 km
               </span>
             </div>
@@ -237,15 +237,15 @@ export function VehicleCalibrationModal({
               <div className={`p-1.5 rounded-full ${
                 isValidFuel
                   ? 'bg-green-100 dark:bg-green-900'
-                  : 'bg-gray-100 dark:bg-gray-800'
+                  : 'bg-secondary'
               }`}>
                 {isValidFuel ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">2</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-muted-foreground">2</span>
                 )}
               </div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-muted-foreground">
                 Select Fuel Level
               </label>
             </div>
@@ -258,7 +258,7 @@ export function VehicleCalibrationModal({
                   className={`p-2 rounded-lg border-2 text-sm font-medium transition-all ${
                     fuelLevel === level.value
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
+                      : 'border-border bg-card text-muted-foreground hover:border-border'
                   }`}
                 >
                   {level.label}
@@ -268,7 +268,7 @@ export function VehicleCalibrationModal({
             {fuelLevel !== null && (
               <div className="flex items-center gap-2 mt-2">
                 <Fuel className="w-4 h-4 text-blue-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   Selected: <span className="font-medium">{fuelLevel}%</span>
                 </span>
               </div>
@@ -281,20 +281,20 @@ export function VehicleCalibrationModal({
               <div className={`p-1.5 rounded-full ${
                 hasPhoto
                   ? 'bg-green-100 dark:bg-green-900'
-                  : 'bg-gray-100 dark:bg-gray-800'
+                  : 'bg-secondary'
               }`}>
                 {hasPhoto ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">3</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-muted-foreground">3</span>
                 )}
               </div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-muted-foreground">
                 Take Dashboard Photo
               </label>
             </div>
 
-            <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-600 dark:text-gray-400">
+            <div className="bg-secondary rounded-lg p-3 text-sm text-muted-foreground">
               <AlertCircle className="w-4 h-4 inline-block mr-1 text-blue-500" />
               This photo helps the AI learn where your odometer and fuel gauge are located.
             </div>
@@ -315,9 +315,9 @@ export function VehicleCalibrationModal({
                     <button
                       type="button"
                       onClick={capturePhoto}
-                      className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-100 dark:bg-gray-800 transition-colors"
+                      className="p-4 bg-card rounded-full shadow-lg hover:bg-secondary transition-colors"
                     >
-                      <Camera className="w-8 h-8 text-gray-900 dark:text-gray-100" />
+                      <Camera className="w-8 h-8 text-foreground" />
                     </button>
                   </div>
                 </>
@@ -331,8 +331,8 @@ export function VehicleCalibrationModal({
                   <button
                     type="button"
                     onClick={retakePhoto}
-                    className="absolute bottom-4 right-4 px-4 py-2 bg-white dark:bg-gray-800/90 rounded-lg shadow
-                             flex items-center gap-2 text-gray-900 dark:text-gray-100 font-medium hover:bg-white dark:bg-gray-800"
+                    className="absolute bottom-4 right-4 px-4 py-2 bg-card/90 rounded-lg shadow
+                             flex items-center gap-2 text-foreground font-medium hover:bg-card"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Retake
@@ -384,7 +384,7 @@ export function VehicleCalibrationModal({
           <div className={`p-4 rounded-lg ${
             canComplete
               ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
-              : 'bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+              : 'bg-input border border-border'
           }`}>
             <div className="flex items-center gap-3">
               {canComplete ? (
@@ -397,7 +397,7 @@ export function VehicleCalibrationModal({
               ) : (
                 <>
                   <AlertCircle className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                  <span className="text-sm text-muted-foreground">
                     Complete all steps to continue
                   </span>
                 </>
@@ -413,14 +413,14 @@ export function VehicleCalibrationModal({
             className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
               canComplete
                 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                : 'bg-secondary text-gray-400 cursor-not-allowed'
             }`}
           >
             Complete Setup
           </button>
 
           {/* Note about mandatory nature */}
-          <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-center text-muted-foreground">
             Setup by: {driverName}
           </p>
         </div>

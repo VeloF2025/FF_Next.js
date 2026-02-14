@@ -35,7 +35,7 @@ export function Progress({
   return (
     <div
       className={clsx(
-        'relative w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700',
+        'relative w-full overflow-hidden rounded-full bg-secondary',
         sizeStyles[size],
         className
       )}

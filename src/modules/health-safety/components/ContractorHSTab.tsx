@@ -59,8 +59,8 @@ export function ContractorHSTab({
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-        <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="h-32 bg-secondary rounded-lg" />
+        <div className="h-48 bg-secondary rounded-lg" />
       </div>
     );
   }
@@ -80,9 +80,9 @@ export function ContractorHSTab({
       <GateStatusBanner gate={gate} breakdown={breakdown} />
 
       {/* Score Overview */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Shield className="w-5 h-5 text-green-500" />
             Compliance Overview
           </h3>
@@ -124,7 +124,7 @@ export function ContractorHSTab({
       </div>
 
       {/* Section Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-2 border-b border-border">
         <TabButton
           active={activeSection === 'overview'}
           onClick={() => setActiveSection('overview')}
@@ -242,15 +242,15 @@ function ScoreCard({
 
   return (
     <div
-      className={`p-4 rounded-lg ${ragStatus ? ragColors[ragStatus] : 'bg-gray-50 dark:bg-gray-700/50'} ${large ? 'md:col-span-1' : ''}`}
+      className={`p-4 rounded-lg ${ragStatus ? ragColors[ragStatus] : 'bg-secondary/50'} ${large ? 'md:col-span-1' : ''}`}
     >
-      <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p
-        className={`font-bold ${large ? 'text-3xl' : 'text-2xl'} ${ragStatus ? '' : 'text-gray-900 dark:text-white'}`}
+        className={`font-bold ${large ? 'text-3xl' : 'text-2xl'} ${ragStatus ? '' : 'text-foreground'}`}
       >
         {displayValue}
       </p>
-      {subtitle && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -274,7 +274,7 @@ function TabButton({
       className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
         active
           ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          : 'border-transparent text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-200'
       }`}
     >
       <Icon className="w-4 h-4" />
@@ -298,8 +298,8 @@ function OverviewSection({
   return (
     <div className="grid md:grid-cols-2 gap-6">
       {/* Score Breakdown */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-4">Score Breakdown</h4>
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h4 className="font-medium text-foreground mb-4">Score Breakdown</h4>
         <div className="space-y-3">
           <ScoreBar label="Documents" value={compliance?.score?.documentScore} weight={25} />
           <ScoreBar label="Incidents" value={compliance?.score?.incidentScore} weight={30} />
@@ -310,15 +310,15 @@ function OverviewSection({
       </div>
 
       {/* Training Status */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h4 className="font-medium text-foreground mb-4 flex items-center gap-2">
           <GraduationCap className="w-5 h-5" />
           Training Status
         </h4>
         <div className="space-y-2">
           {Object.entries(compliance?.training?.status || {}).map(([key, valid]) => (
             <div key={key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-              <span className="text-sm text-gray-700 dark:text-gray-300 capitalize">
+              <span className="text-sm text-muted-foreground capitalize">
                 {key.replace(/_/g, ' ')}
               </span>
               {valid ? (
@@ -332,28 +332,28 @@ function OverviewSection({
       </div>
 
       {/* Corrective Actions */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <h4 className="font-medium text-gray-900 dark:text-white mb-4">Corrective Actions</h4>
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h4 className="font-medium text-foreground mb-4">Corrective Actions</h4>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <p className="text-2xl font-bold text-orange-500">{compliance?.corrective_actions?.open || 0}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Open</p>
+            <p className="text-xs text-muted-foreground">Open</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-red-500">{compliance?.corrective_actions?.overdue || 0}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Overdue</p>
+            <p className="text-xs text-muted-foreground">Overdue</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-green-500">{compliance?.corrective_actions?.closed || 0}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Closed</p>
+            <p className="text-xs text-muted-foreground">Closed</p>
           </div>
         </div>
       </div>
 
       {/* Gate Check Details */}
       {breakdown && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h4 className="font-medium text-gray-900 dark:text-white mb-4">Gate Requirements</h4>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h4 className="font-medium text-foreground mb-4">Gate Requirements</h4>
           <div className="space-y-3">
             <GateCheckItem
               label="Documents"
@@ -397,12 +397,12 @@ function ScoreBar({
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-gray-700 dark:text-gray-300">{label}</span>
-        <span className="text-gray-500 dark:text-gray-400">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground">
           {Math.round(score)}% <span className="text-xs">({weight}% weight)</span>
         </span>
       </div>
-      <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${score}%` }} />
       </div>
     </div>
@@ -426,8 +426,8 @@ function GateCheckItem({
         <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
       )}
       <div>
-        <p className="font-medium text-gray-900 dark:text-white">{label}</p>
-        {message && <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>}
+        <p className="font-medium text-foreground">{label}</p>
+        {message && <p className="text-sm text-muted-foreground">{message}</p>}
       </div>
     </div>
   );
@@ -455,7 +455,7 @@ function DocumentsSection({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground">
           {documents?.valid_count || 0} of {documents?.required_count || 0} required documents valid
         </p>
         <button
@@ -467,7 +467,7 @@ function DocumentsSection({
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+      <div className="bg-card rounded-lg border border-border divide-y divide-gray-200 dark:divide-gray-700">
         {REQUIRED_DOCUMENTS.map((docType) => {
           const doc = compliance[docType];
           const typeInfo = DOCUMENT_TYPES[docType as keyof typeof DOCUMENT_TYPES];
@@ -481,7 +481,7 @@ function DocumentsSection({
                       ? 'bg-green-100 dark:bg-green-900/30'
                       : doc?.status === 'invalid'
                         ? 'bg-red-100 dark:bg-red-900/30'
-                        : 'bg-gray-100 dark:bg-gray-700'
+                        : 'bg-secondary'
                   }`}
                 >
                   <FileText
@@ -495,10 +495,10 @@ function DocumentsSection({
                   />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
+                  <p className="font-medium text-foreground">
                     {typeInfo?.label || docType}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     {doc?.document?.expiry_date
                       ? `Expires: ${new Date(doc.document.expiry_date).toLocaleDateString()}`
                       : 'No expiry'}
@@ -518,7 +518,7 @@ function DocumentsSection({
                   </span>
                 )}
                 {doc?.status === 'missing' && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-400 rounded">
+                  <span className="px-2 py-1 text-xs font-medium bg-secondary text-gray-700 dark:bg-gray-700 dark:text-gray-400 rounded">
                     Missing
                   </span>
                 )}
@@ -550,29 +550,29 @@ function IncidentsSection({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
+          <p className="text-3xl font-bold text-foreground">
             {incidents?.total_12_months || 0}
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total (12 months)</p>
+          <p className="text-sm text-muted-foreground">Total (12 months)</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-3xl font-bold text-red-500">{incidents?.critical_12_months || 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Critical</p>
+          <p className="text-sm text-muted-foreground">Critical</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-3xl font-bold text-orange-500">{incidents?.open || 0}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Open</p>
+          <p className="text-sm text-muted-foreground">Open</p>
         </div>
       </div>
 
       {incidentList.length > 0 ? (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="bg-card rounded-lg border border-border divide-y divide-gray-200 dark:divide-gray-700">
           {incidentList.map((incident: any) => (
             <a
               key={incident.id}
               href={`/maintenance/tickets/${incident.id}`}
-              className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              className="p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div
@@ -581,7 +581,7 @@ function IncidentsSection({
                       ? 'bg-red-100 dark:bg-red-900/30'
                       : incident.severity === 'major'
                         ? 'bg-orange-100 dark:bg-orange-900/30'
-                        : 'bg-gray-100 dark:bg-gray-700'
+                        : 'bg-secondary'
                   }`}
                 >
                   <AlertTriangle
@@ -590,13 +590,13 @@ function IncidentsSection({
                         ? 'text-red-600'
                         : incident.severity === 'major'
                           ? 'text-orange-600'
-                          : 'text-gray-500 dark:text-gray-400'
+                          : 'text-muted-foreground'
                     }`}
                   />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{incident.title}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="font-medium text-foreground">{incident.title}</p>
+                  <p className="text-sm text-muted-foreground">
                     {new Date(incident.incident_date).toLocaleDateString()} •{' '}
                     {incident.incident_type?.replace(/_/g, ' ')}
                   </p>
@@ -618,9 +618,9 @@ function IncidentsSection({
           ))}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+        <div className="bg-card rounded-lg border border-border p-8 text-center">
           <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
-          <p className="text-gray-500 dark:text-gray-400">No incidents recorded</p>
+          <p className="text-muted-foreground">No incidents recorded</p>
         </div>
       )}
     </div>

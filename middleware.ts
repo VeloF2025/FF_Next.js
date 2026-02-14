@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import arcjet, { detectBot, fixedWindow, shield } from "@arcjet/next";
 
 // TODO: Re-enable Clerk middleware when ready for production
 
@@ -51,6 +52,97 @@ function setSecurityHeaders(response: NextResponse) {
   }
 }
 
+// Get API key from environment
+const ARCJET_KEY = process.env.ARCJET_KEY;
+
+// Rate limiting configurations per AUDIT-API.md H-002
+// Task #227: Add rate limiting to all API endpoints
+
+/**
+ * Auth endpoints - Strict rate limiting: 10 req/min
+ * Protects login, register, password reset, etc.
+ */
+const ajAuth = ARCJET_KEY ? arcjet({
+  key: ARCJET_KEY,
+  rules: [
+    detectBot({
+      mode: "LIVE",
+      allow: [], // No bots on auth endpoints
+    }),
+    fixedWindow({
+      mode: "LIVE",
+      window: "1m",
+      max: 10,
+    }),
+    shield({
+      mode: "LIVE",
+    }),
+  ],
+}) : null;
+
+/**
+ * Write operations - Moderate rate limiting: 30 req/min
+ * POST, PUT, PATCH, DELETE operations
+ */
+const ajWrite = ARCJET_KEY ? arcjet({
+  key: ARCJET_KEY,
+  rules: [
+    detectBot({
+      mode: "LIVE",
+      allow: ["CATEGORY:SEARCH_ENGINE"],
+    }),
+    fixedWindow({
+      mode: "LIVE",
+      window: "1m",
+      max: 30,
+    }),
+    shield({
+      mode: "LIVE",
+    }),
+  ],
+}) : null;
+
+/**
+ * General API endpoints - Standard rate limiting: 100 req/min
+ * GET requests and other general operations
+ */
+const ajGeneral = ARCJET_KEY ? arcjet({
+  key: ARCJET_KEY,
+  rules: [
+    detectBot({
+      mode: "LIVE",
+      allow: ["CATEGORY:SEARCH_ENGINE"],
+    }),
+    fixedWindow({
+      mode: "LIVE",
+      window: "1m",
+      max: 100,
+    }),
+    shield({
+      mode: "LIVE",
+    }),
+  ],
+}) : null;
+
+/**
+ * Health check endpoints - Very generous rate limiting: 300 req/min
+ * Monitoring systems need frequent access
+ */
+const ajHealth = ARCJET_KEY ? arcjet({
+  key: ARCJET_KEY,
+  rules: [
+    detectBot({
+      mode: "DRY_RUN", // Log but don't block monitoring bots
+      allow: ["CATEGORY:SEARCH_ENGINE"],
+    }),
+    fixedWindow({
+      mode: "LIVE",
+      window: "1m",
+      max: 300,
+    }),
+  ],
+}) : null;
+
 // TODO: Re-enable when adding Clerk auth back
 // const isPublicRoute = createRouteMatcher([
 //   '/sign-in(.*)',
@@ -58,6 +150,29 @@ function setSecurityHeaders(response: NextResponse) {
 //   '/api/health(.*)',
 //   '/',
 // ]);
+
+/**
+ * Determine which Arcjet protection to apply based on the endpoint
+ */
+function getArcjetProtection(pathname: string, method: string) {
+  // Health endpoints - generous limits
+  if (pathname.startsWith('/api/health') || pathname.startsWith('/api/monitoring')) {
+    return ajHealth;
+  }
+
+  // Auth endpoints - strict limits (10/min)
+  if (pathname.startsWith('/api/auth/')) {
+    return ajAuth;
+  }
+
+  // Write operations - moderate limits (30/min)
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+    return ajWrite;
+  }
+
+  // General endpoints - standard limits (100/min)
+  return ajGeneral;
+}
 
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
@@ -72,8 +187,75 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Log API requests
+  // Apply rate limiting to API requests
   if (pathname.startsWith('/api/')) {
+    // Get appropriate Arcjet protection
+    const aj = getArcjetProtection(pathname, request.method);
+
+    // Apply Arcjet protection if configured
+    if (aj && ARCJET_KEY) {
+      const decision = await aj.protect(request);
+
+      // Log decision
+      edgeLog('debug', 'Arcjet decision', {
+        id: decision.id,
+        conclusion: decision.conclusion,
+        reason: decision.reason.toString(),
+        ip: decision.ip,
+        path: pathname,
+        method: request.method,
+      });
+
+      // Block if denied
+      if (decision.isDenied()) {
+        let errorMessage = 'Request blocked';
+        let statusCode = 403;
+
+        if (decision.reason.isRateLimit()) {
+          errorMessage = 'Too many requests. Please try again later.';
+          statusCode = 429;
+          edgeLog('warn', 'Rate limit exceeded', {
+            path: pathname,
+            method: request.method,
+            ip: decision.ip,
+          });
+        } else if (decision.reason.isBot()) {
+          errorMessage = 'Automated requests are not allowed.';
+          statusCode = 403;
+          edgeLog('warn', 'Bot detected', {
+            path: pathname,
+            ip: decision.ip,
+          });
+        } else if (decision.reason.isShield()) {
+          errorMessage = 'Request blocked for security reasons.';
+          statusCode = 403;
+          edgeLog('error', 'Shield block', {
+            path: pathname,
+            ip: decision.ip,
+          });
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: decision.reason.toString(),
+              message: errorMessage,
+            },
+            meta: {
+              timestamp: new Date().toISOString(),
+            },
+          },
+          { status: statusCode }
+        );
+      }
+    } else if (!ARCJET_KEY) {
+      edgeLog('warn', 'Arcjet not configured', {
+        message: 'ARCJET_KEY not found - rate limiting disabled',
+      });
+    }
+
+    // Log API requests
     edgeLog('info', 'API Request', {
       method: request.method,
       path: pathname,

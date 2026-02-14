@@ -84,7 +84,7 @@ export function FunnelReports({ filters, refreshKey }: FunnelReportsProps) {
   return (
     <div className="p-6 space-y-6">
       {/* Sub-report tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-4">
         {subReports.map((sub) => {
           const Icon = sub.icon;
           return (
@@ -94,7 +94,7 @@ export function FunnelReports({ filters, refreshKey }: FunnelReportsProps) {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm font-medium transition-colors ${
                 activeSubReport === sub.id
                   ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border-b-2 border-cyan-500'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -202,7 +202,7 @@ function FunnelSection({
   return (
     <div className="space-y-6">
       {/* Visual Funnel */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6">
+      <div className="bg-background/50 rounded-lg p-6">
         <FunnelChart
           stages={funnelStages}
           title="QA Submission Funnel"
@@ -212,16 +212,16 @@ function FunnelSection({
 
       {/* Drop-off Analysis */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        <h4 className="text-sm font-semibold text-foreground mb-3">
           Drop-off Analysis
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {data.funnel.slice(1).map((stage, idx) => (
             <div
               key={stage.stage}
-              className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4"
+              className="bg-background/50 rounded-lg p-4"
             >
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div className="text-sm text-muted-foreground">
                 {data.funnel[idx]?.stage} → {stage.stage}
               </div>
               <div className="flex items-end justify-between mt-2">
@@ -236,7 +236,7 @@ function FunnelSection({
                 >
                   -{(stage.drop_off_percent ?? 0).toFixed(1)}%
                 </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   drop-off
                 </span>
               </div>
@@ -286,7 +286,7 @@ function PhotoStepsSection({
   return (
     <div className="space-y-6">
       {/* Horizontal Bar Chart */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         <TrendChart
           title="Photo Step Completion Rates"
           data={chartData}
@@ -302,7 +302,7 @@ function PhotoStepsSection({
 
       {/* Most Commonly Missing */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        <h4 className="text-sm font-semibold text-foreground mb-3">
           Most Commonly Missing Steps
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -317,19 +317,19 @@ function PhotoStepsSection({
                   <span className="text-lg font-bold text-red-600 dark:text-red-400">
                     #{step.step}
                   </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
+                  <span className="font-medium text-foreground">
                     {stepInfo?.label || `Step ${step.step}`}
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="text-sm text-muted-foreground">
                     Completion rate:
                   </span>
                   <span className="font-medium text-red-600 dark:text-red-400">
                     {(step.completion_rate ?? 0).toFixed(1)}%
                   </span>
                 </div>
-                <div className="mt-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="mt-1 h-2 bg-secondary rounded-full overflow-hidden">
                   <div
                     className="h-full bg-red-500 rounded-full"
                     style={{ width: `${step.completion_rate}%` }}
@@ -344,24 +344,24 @@ function PhotoStepsSection({
       {/* Detailed Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Step
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Label
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Completed
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Total
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Completion %
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 VLM Pass %
               </th>
             </tr>
@@ -371,16 +371,16 @@ function PhotoStepsSection({
               const stepData = data.find((d) => d.step === s.step);
               return (
                 <tr key={s.step}>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">
                     {s.step}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
                     {s.label}
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400">
                     {stepData?.completed || 0}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
                     {stepData?.total || 0}
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -429,38 +429,38 @@ function TimingSection({
         {data.map((stage) => (
           <div
             key={stage.stage}
-            className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4"
+            className="bg-background/50 rounded-lg p-4"
           >
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+            <h4 className="font-medium text-foreground mb-3">
               {stage.stage}
             </h4>
 
             {/* Percentile breakdown */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">P50:</span>
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">P50:</span>
+                <span className="font-medium text-foreground">
                   {formatTime(stage.p50)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">P90:</span>
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">P90:</span>
+                <span className="font-medium text-foreground">
                   {formatTime(stage.p90)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">P99:</span>
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">P99:</span>
+                <span className="font-medium text-foreground">
                   {formatTime(stage.p99)}
                 </span>
               </div>
             </div>
 
             {/* Target comparison */}
-            <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-4 pt-3 border-t border-border">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-500 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   Target: {formatTime(stage.target)}
                 </span>
                 <span
@@ -475,7 +475,7 @@ function TimingSection({
                   {stage.meeting_target_rate.toFixed(0)}% on target
                 </span>
               </div>
-              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-2 bg-secondary rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
                     stage.meeting_target_rate >= 80
@@ -493,7 +493,7 @@ function TimingSection({
       </div>
 
       {/* Comparison Chart */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         <TrendChart
           title="Processing Time Comparison (P50 vs Target)"
           data={data.map((d) => ({
@@ -554,14 +554,14 @@ function formatTime(minutes: number): string {
 function LoadingSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-64 animate-pulse bg-secondary rounded" />
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+    <div className="text-center py-12 text-muted-foreground">
       <Filter className="h-12 w-12 mx-auto mb-4 opacity-50" />
       <p>{message}</p>
     </div>

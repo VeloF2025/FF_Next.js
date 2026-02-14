@@ -295,7 +295,7 @@ export function PhotoReviewPhase({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading categorization...</span>
+        <span className="ml-3 text-muted-foreground">Loading categorization...</span>
       </div>
     );
   }
@@ -316,13 +316,13 @@ export function PhotoReviewPhase({
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 dark:bg-purple-900/30 mb-4">
           <span className="text-3xl">🏷️</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           AI Photo Categorization Required
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-2">
+        <p className="text-muted-foreground mb-2">
           Before proceeding, we need to categorize {photoCount} photos using AI.
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mb-6">
+        <p className="text-sm text-muted-foreground dark:text-gray-400 mb-6">
           The AI will identify which installation step each photo belongs to.
           You&apos;ll then review and approve the results.
         </p>
@@ -336,7 +336,7 @@ export function PhotoReviewPhase({
         <div className="flex justify-center gap-3">
           <button
             onClick={onBack}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent"
           >
             ← Back
           </button>
@@ -364,10 +364,10 @@ export function PhotoReviewPhase({
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Categorizing Photos...
         </h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           The AI is analyzing {photoCount} photos. This may take a few minutes.
         </p>
       </div>
@@ -418,8 +418,8 @@ export function PhotoReviewPhase({
             key={result.photo_filename}
             className={`border rounded-lg p-3 ${
               isDiscarded
-                ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/50 opacity-75 hover:opacity-100'
-                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                ? 'border-border bg-background/50 opacity-75 hover:opacity-100'
+                : 'border-border bg-card'
             }`}
           >
             <div className="flex gap-3">
@@ -433,7 +433,7 @@ export function PhotoReviewPhase({
                   src={photoUrl}
                   alt={result.photo_filename}
                   className={`w-20 h-20 object-cover rounded border ${
-                    isDiscarded ? 'border-gray-400 dark:border-gray-500 grayscale-[30%]' : 'border-gray-200 dark:border-gray-600'
+                    isDiscarded ? 'border-border grayscale-[30%]' : 'border-gray-200 dark:border-gray-600'
                   }`}
                 />
                 <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
@@ -444,11 +444,11 @@ export function PhotoReviewPhase({
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`font-medium text-sm ${isDiscarded ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                  <span className={`font-medium text-sm ${isDiscarded ? 'text-muted-foreground' : 'text-foreground'}`}>
                     {isDiscarded ? '❌ Discarded' : `Step ${currentStep}: ${STEP_LABELS[currentStep] || 'Unknown'}`}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
                   {result.vlm_identified_as}
                 </p>
 
@@ -462,7 +462,7 @@ export function PhotoReviewPhase({
                   className={`text-sm border rounded px-2 py-1 w-full ${
                     isDiscarded
                       ? 'border-orange-400 dark:border-orange-600 bg-orange-50 dark:bg-orange-900/20'
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'
+                      : 'border-border bg-card'
                   }`}
                 >
                   <option value="0">❌ Discard (Step 0)</option>
@@ -530,7 +530,7 @@ export function PhotoReviewPhase({
 
           {/* Active photos grid */}
           <div>
-            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <h5 className="text-sm font-medium text-muted-foreground mb-2">
               📷 Active Photos ({activePhotos.length})
             </h5>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
@@ -542,10 +542,10 @@ export function PhotoReviewPhase({
 
           {/* Discarded photos section */}
           {discardedPhotos.length > 0 && (
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
+            <div className="border-t border-border pt-4">
+              <h5 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                 <span>🗑️ Discarded Photos ({discardedPhotos.length})</span>
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 dark:text-gray-400">
+                <span className="text-xs font-normal text-gray-400 dark:text-muted-foreground">
                   — reassign to a step to include in review
                 </span>
               </h5>
@@ -556,10 +556,10 @@ export function PhotoReviewPhase({
           )}
 
           {/* Navigation */}
-          <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between pt-4 border-t border-border">
             <button
               onClick={() => setIsEditing(false)}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="px-4 py-2 text-muted-foreground hover:text-foreground"
             >
               ← Cancel
             </button>
@@ -641,7 +641,7 @@ export function PhotoReviewPhase({
                 className={`p-3 rounded-lg text-center border relative ${
                   isMissing
                     ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20'
-                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50'
+                    : 'border-border bg-background/50'
                 }`}
               >
                 {/* Warning icon for missing steps */}
@@ -653,13 +653,13 @@ export function PhotoReviewPhase({
                     ⚠️
                   </span>
                 )}
-                <div className={`text-xl font-bold ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                <div className={`text-xl font-bold ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
                   {count}
                 </div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                <div className="text-xs font-medium text-muted-foreground dark:text-gray-400">
                   Step {step}
                 </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <div className="text-xs text-muted-foreground truncate">
                   {STEP_LABELS[step]}
                 </div>
               </div>
@@ -683,10 +683,10 @@ export function PhotoReviewPhase({
         )}
 
         {/* Navigation */}
-        <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between pt-4 border-t border-border">
           <button
             onClick={onBack}
-            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            className="px-4 py-2 text-muted-foreground hover:text-foreground"
           >
             ← Back
           </button>
@@ -801,7 +801,7 @@ export function PhotoReviewPhase({
                   ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-900/20'
                   : result.vlm_confidence < 0.5
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                  : 'border-border bg-card'
               }`}
             >
               <div className="flex gap-3">
@@ -824,7 +824,7 @@ export function PhotoReviewPhase({
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-gray-900 dark:text-white text-sm">
+                    <span className="font-medium text-foreground text-sm">
                       Step {result.vlm_predicted_step}: {STEP_LABELS[result.vlm_predicted_step]}
                     </span>
                     <span
@@ -833,7 +833,7 @@ export function PhotoReviewPhase({
                       {Math.round(result.vlm_confidence * 100)}%
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                  <p className="text-xs text-muted-foreground line-clamp-2">
                     {result.vlm_identified_as}
                   </p>
 
@@ -851,7 +851,7 @@ export function PhotoReviewPhase({
                           }}
                           className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
                         />
-                        <span className="text-xs text-gray-600 dark:text-gray-400">Approve</span>
+                        <span className="text-xs text-muted-foreground">Approve</span>
                       </label>
 
                       {/* Step override dropdown - only show when approved */}
@@ -862,7 +862,7 @@ export function PhotoReviewPhase({
                             const newStep = e.target.value ? parseInt(e.target.value) : undefined;
                             setPhotoApproval(result.photo_filename, isApproved, newStep, rejectionReason);
                           }}
-                          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800"
+                          className="text-xs border border-border rounded px-1.5 py-0.5 bg-card"
                           title="Override step assignment"
                         >
                           <option value="">Step {result.vlm_predicted_step} (AI)</option>
@@ -908,10 +908,10 @@ export function PhotoReviewPhase({
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="flex justify-between pt-4 border-t border-border">
         <button
           onClick={onBack}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          className="px-4 py-2 text-muted-foreground hover:text-foreground"
         >
           ← Back
         </button>

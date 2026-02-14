@@ -39,13 +39,13 @@ const STATUS_COLORS: Record<PipelineStatus, { bg: string; text: string; label: s
   po_pending: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', label: 'PO Pending' },
   ready_to_plan: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', label: 'Ready to Plan' },
   planned: { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-700 dark:text-teal-300', label: 'Planned' },
-  on_hold: { bg: 'bg-gray-100 dark:bg-gray-700/30', text: 'text-gray-700 dark:text-gray-300', label: 'On Hold' },
+  on_hold: { bg: 'bg-secondary/30', text: 'text-muted-foreground', label: 'On Hold' },
   cancelled: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Cancelled' },
   lost: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', label: 'Lost' },
 };
 
 const PRIORITY_COLORS: Record<Priority, { bg: string; text: string }> = {
-  low: { bg: 'bg-gray-100 dark:bg-gray-700/30', text: 'text-gray-600 dark:text-gray-400' },
+  low: { bg: 'bg-secondary/30', text: 'text-muted-foreground' },
   medium: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400' },
   high: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-600 dark:text-orange-400' },
   critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400' },

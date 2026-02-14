@@ -12,17 +12,17 @@ interface QuickStatsProps {
 
 export function QuickStats({ stats }: QuickStatsProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Quick Stats</h3>
+    <div className="bg-card shadow rounded-lg">
+      <div className="px-6 py-4 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Quick Stats</h3>
       </div>
       <div className="p-6">
         <div className="space-y-4">
           {stats.map((stat, index) => (
             <div key={index} className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</span>
+              <span className="text-sm text-muted-foreground">{stat.label}</span>
               <span className={`text-lg font-semibold ${
-                stat.color === 'green' ? 'text-green-600' : 'text-gray-900 dark:text-gray-100'
+                stat.color === 'green' ? 'text-green-600' : 'text-foreground'
               }`}>
                 {stat.value}
               </span>

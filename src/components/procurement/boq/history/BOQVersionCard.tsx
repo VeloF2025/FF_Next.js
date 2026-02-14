@@ -39,13 +39,13 @@ export default function BOQVersionCard({
   onExport
 }: BOQVersionCardProps) {
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border ${isSelected ? 'border-blue-500 shadow-md' : 'border-gray-200 dark:border-gray-700'}`}>
+    <div className={`bg-card rounded-lg border ${isSelected ? 'border-blue-500 shadow-md' : 'border-border'}`}>
       <div className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3">
             <button
               onClick={onToggleExpand}
-              className="mt-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              className="mt-1 text-muted-foreground hover:text-muted-foreground"
             >
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4" />
@@ -57,7 +57,7 @@ export default function BOQVersionCard({
             <div className="flex-1">
               <div className="flex items-center space-x-3">
                 <GitBranch className="h-5 w-5 text-blue-500" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-medium text-foreground">
                   Version {version.version}
                 </h3>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -67,7 +67,7 @@ export default function BOQVersionCard({
                 </span>
               </div>
               
-              <div className="mt-2 flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <div className="mt-2 flex items-center space-x-4 text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-1" />
                   {new Date(version.createdAt).toISOString().split('T')[0]}
@@ -83,20 +83,20 @@ export default function BOQVersionCard({
               </div>
               
               {version.description && (
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{version.description}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{version.description}</p>
               )}
               
               <div className="mt-3 flex items-center space-x-4">
                 <div className="flex items-center text-sm">
                   <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
-                  <span className="text-gray-600 dark:text-gray-400">
+                  <span className="text-muted-foreground">
                     {version.mappedItems} mapped
                   </span>
                 </div>
                 {version.exceptionsCount > 0 && (
                   <div className="flex items-center text-sm">
                     <AlertTriangle className="h-4 w-4 text-orange-500 mr-1" />
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-muted-foreground">
                       {version.exceptionsCount} exceptions
                     </span>
                   </div>
@@ -116,7 +116,7 @@ export default function BOQVersionCard({
             
             <button
               onClick={onView}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              className="p-2 text-muted-foreground hover:text-muted-foreground"
               title="View version"
             >
               <Eye className="h-4 w-4" />
@@ -124,7 +124,7 @@ export default function BOQVersionCard({
             
             <button
               onClick={onRestore}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              className="p-2 text-muted-foreground hover:text-muted-foreground"
               title="Restore version"
             >
               <RotateCcw className="h-4 w-4" />
@@ -132,7 +132,7 @@ export default function BOQVersionCard({
             
             <button
               onClick={onExport}
-              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              className="p-2 text-muted-foreground hover:text-muted-foreground"
               title="Export version"
             >
               <Download className="h-4 w-4" />
@@ -142,15 +142,15 @@ export default function BOQVersionCard({
       </div>
       
       {isExpanded && version.changes && version.changes.length > 0 && (
-        <div className="border-t px-4 py-3 bg-gray-50 dark:bg-gray-900">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recent Changes</h4>
+        <div className="border-t px-4 py-3 bg-background">
+          <h4 className="text-sm font-medium text-muted-foreground mb-2">Recent Changes</h4>
           <div className="space-y-2">
             {version.changes.slice(0, 5).map(change => (
               <div key={change.id} className="flex items-start text-sm">
-                <span className="text-gray-500 dark:text-gray-400 mr-2">•</span>
+                <span className="text-muted-foreground mr-2">•</span>
                 <div className="flex-1">
-                  <span className="text-gray-700 dark:text-gray-300">{change.description}</span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-2">
+                  <span className="text-muted-foreground">{change.description}</span>
+                  <span className="text-muted-foreground ml-2">
                     by {change.userId}
                   </span>
                 </div>

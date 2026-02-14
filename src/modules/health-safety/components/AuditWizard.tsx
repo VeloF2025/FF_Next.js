@@ -187,7 +187,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
     return (
       <div className="p-8 text-center">
         <Loader2 className="w-12 h-12 mx-auto mb-4 text-orange-500 animate-spin" />
-        <p className="text-gray-500 dark:text-gray-400">Loading audit...</p>
+        <p className="text-muted-foreground">Loading audit...</p>
       </div>
     );
   }
@@ -195,13 +195,13 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="flex-shrink-0 bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold text-foreground">
               {audit?.audit_type?.charAt(0).toUpperCase() + audit?.audit_type?.slice(1)} Audit
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               {audit?.project_name} • {new Date(audit?.audit_date).toLocaleDateString()}
             </p>
           </div>
@@ -209,8 +209,8 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
           <div className="flex items-center gap-4">
             {/* Progress indicator */}
             <div className="text-right">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Progress</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+              <p className="text-sm text-muted-foreground">Progress</p>
+              <p className="text-lg font-semibold text-foreground">
                 {progress.answered}/{progress.total} ({progress.percentage}%)
               </p>
             </div>
@@ -219,7 +219,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             <button
               onClick={saveProgress}
               disabled={isSaving || Object.keys(responses).length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg disabled:opacity-50 transition-colors"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save
@@ -242,7 +242,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                   currentCategory === idx
                     ? 'bg-orange-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-secondary text-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {CHECKLIST_CATEGORIES[cat as keyof typeof CHECKLIST_CATEGORIES]?.label || cat}
@@ -270,13 +270,13 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="flex-shrink-0 bg-card border-t border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentCategory((c) => Math.max(0, c - 1))}
               disabled={currentCategory === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg disabled:opacity-50 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               Previous
@@ -285,7 +285,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             <button
               onClick={() => setCurrentCategory((c) => Math.min(categories.length - 1, c + 1))}
               disabled={currentCategory === categories.length - 1}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg disabled:opacity-50 transition-colors"
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -296,7 +296,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                className="px-4 py-2 text-muted-foreground hover:text-gray-800 dark:hover:text-gray-200"
               >
                 Cancel
               </button>
@@ -339,7 +339,7 @@ function ChecklistItemCard({
     critical: 'border-red-500 bg-red-50 dark:bg-red-900/10',
     high: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
     medium: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-    low: 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50',
+    low: 'border-border bg-secondary/50',
   };
 
   return (
@@ -356,15 +356,15 @@ function ChecklistItemCard({
                 Required
               </span>
             )}
-            <span className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+            <span className="text-xs text-muted-foreground capitalize">
               {item.severity} severity
             </span>
           </div>
 
-          <p className="text-gray-900 dark:text-white font-medium">{item.item_text}</p>
+          <p className="text-foreground font-medium">{item.item_text}</p>
 
           {item.regulation_reference && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <Info className="w-3 h-3" />
               {item.regulation_reference}
             </p>
@@ -378,7 +378,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'pass'
                 ? 'bg-green-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-green-100 hover:text-green-600'
+                : 'bg-secondary text-muted-foreground hover:bg-green-100 hover:text-green-600'
             }`}
             title="Pass"
           >
@@ -390,7 +390,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'fail'
                 ? 'bg-red-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 hover:text-red-600'
+                : 'bg-secondary text-muted-foreground hover:bg-red-100 hover:text-red-600'
             }`}
             title="Fail"
           >
@@ -402,7 +402,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'na'
                 ? 'bg-gray-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
             title="Not Applicable"
           >
@@ -415,7 +415,7 @@ function ChecklistItemCard({
               className={`p-2 rounded-lg ${
                 item.photo_url
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  : 'bg-secondary text-muted-foreground'
               }`}
               title="Photo required"
             >
@@ -429,7 +429,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               showNotes || item.notes
                 ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
             title="Add notes"
           >
@@ -445,18 +445,18 @@ function ChecklistItemCard({
             value={item.notes || ''}
             onChange={(e) => onNotes(e.target.value)}
             placeholder="Add notes or observations..."
-            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+            className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-card text-foreground resize-none"
             rows={2}
           />
 
           {/* Corrective action checkbox (only for failures) */}
           {item.response === 'fail' && (
-            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 checked={item.corrective_action_required || false}
                 onChange={(e) => onCA(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600 text-orange-500 focus:ring-orange-500"
+                className="rounded border-border text-orange-500 focus:ring-orange-500"
               />
               <AlertTriangle className="w-4 h-4 text-amber-500" />
               Requires corrective action

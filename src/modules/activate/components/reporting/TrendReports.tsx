@@ -195,7 +195,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       <div className="flex flex-wrap items-center gap-6">
         {/* Grouping Toggle */}
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-muted-foreground">
             Group by:
           </span>
           <div className="flex gap-2">
@@ -206,7 +206,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
                 className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                   groupBy === g
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {g === 'day' ? 'Daily' : 'Weekly'}
@@ -218,7 +218,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         {/* Daily Target Input */}
         <div className="flex items-center gap-3">
           <Target className="h-4 w-4 text-red-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-muted-foreground">
             Daily Target:
           </span>
           <input
@@ -226,12 +226,12 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             value={dailyTarget || ''}
             onChange={(e) => setDailyTarget(parseInt(e.target.value) || 0)}
             placeholder="e.g. 50"
-            className="w-24 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-24 px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           {dailyTarget > 0 && (
             <button
               onClick={() => setDailyTarget(0)}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500"
+              className="text-xs text-muted-foreground hover:text-red-500"
             >
               Clear
             </button>
@@ -240,7 +240,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
 
         {/* Series Visibility Toggles */}
         <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-muted-foreground">
             Series:
           </span>
           <label className="flex items-center gap-2 cursor-pointer">
@@ -248,7 +248,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.installed}
               onChange={() => toggleSeries('installed')}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-border text-blue-600 focus:ring-blue-500"
             />
             <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Installed</span>
           </label>
@@ -257,7 +257,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.activated}
               onChange={() => toggleSeries('activated')}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-cyan-600 focus:ring-cyan-500"
+              className="w-4 h-4 rounded border-border text-cyan-600 focus:ring-cyan-500"
             />
             <span className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Activated</span>
           </label>
@@ -266,7 +266,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.reviewed}
               onChange={() => toggleSeries('reviewed')}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
+              className="w-4 h-4 rounded border-border text-green-600 focus:ring-green-500"
             />
             <span className="text-sm text-green-600 dark:text-green-400 font-medium">Reviewed</span>
           </label>
@@ -275,7 +275,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.notReviewed}
               onChange={() => toggleSeries('notReviewed')}
-              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
+              className="w-4 h-4 rounded border-border text-red-600 focus:ring-red-500"
             />
             <span className="text-sm text-red-600 dark:text-red-400 font-medium">Not Reviewed</span>
           </label>
@@ -285,7 +285,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       {/* Project Visibility Toggles - only show when multiple projects available */}
       {availableProjects.length > 1 && (
         <div className="flex flex-wrap items-center gap-4 px-6 -mt-4">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span className="text-sm font-medium text-muted-foreground">
             Projects:
           </span>
           {availableProjects.map((proj, idx) => (
@@ -294,7 +294,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
                 type="checkbox"
                 checked={projectVisibility[proj] !== false}
                 onChange={() => toggleProject(proj)}
-                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 focus:ring-2"
+                className="w-4 h-4 rounded border-border focus:ring-2"
                 style={{ accentColor: getProjectColor(proj, idx) }}
               />
               <span
@@ -382,7 +382,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       </ReportCardGrid>
 
       {/* Main Trend Chart */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         <TrendChart
           title="Installation & Activation Trends"
           subtitle={`${filters.dateFrom} to ${filters.dateTo}${dailyTarget > 0 ? ` • Target: ${dailyTarget}/day` : ''}`}
@@ -432,7 +432,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       </div>
 
       {/* Per-Project Bar View */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+      <div className="bg-background/50 rounded-lg p-4">
         <TrendChart
           title="Daily Volume Distribution by Project"
           subtitle={`Showing: ${seriesVisibility.installed ? 'Installed' : seriesVisibility.activated ? 'Activated' : seriesVisibility.reviewed ? 'Reviewed' : 'Not Reviewed'}`}
@@ -494,29 +494,29 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       {/* Project Progress Table */}
       {projectProgress.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             Project Progress Tracker
           </h3>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
+              <thead className="bg-background/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Project
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Scope
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Installed
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Activated
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Progress
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                     Est. Completion
                   </th>
                 </tr>
@@ -524,10 +524,10 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {projectProgress.map((p) => (
                   <tr key={p.project}>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                    <td className="px-4 py-3 text-sm font-medium text-foreground">
                       {p.project}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {p.total_scope?.toLocaleString() || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
@@ -539,13 +539,13 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
                     <td className="px-4 py-3 text-sm">
                       {p.completion_percent !== null ? (
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                             <div
                               className="h-full bg-green-500 rounded-full"
                               style={{ width: `${Math.min(100, p.completion_percent)}%` }}
                             />
                           </div>
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                          <span className="text-xs font-medium text-muted-foreground">
                             {p.completion_percent.toFixed(1)}%
                           </span>
                         </div>
@@ -553,7 +553,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
                         <span className="text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
                       {p.estimated_completion || '-'}
                       {p.days_remaining !== null && p.days_remaining > 0 && (
                         <span className="text-xs text-gray-400 ml-1">
@@ -570,8 +570,8 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
       )}
 
       {/* Time-to-Activation Section */}
-      <div className="space-y-4 border-t border-gray-200 dark:border-gray-700 pt-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="space-y-4 border-t border-border pt-6">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Clock className="h-5 w-5 text-purple-500" />
           Time-to-Activation Metrics
         </h3>
@@ -579,7 +579,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
         {ttaLoading ? (
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
+              <div key={i} className="h-24 animate-pulse bg-secondary rounded-lg" />
             ))}
           </div>
         ) : timeToActivation ? (
@@ -614,7 +614,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             </ReportCardGrid>
 
             {/* Time Distribution */}
-            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+            <div className="bg-background/50 rounded-lg p-4">
               <TrendChart
                 title="Time-to-Activation Distribution"
                 subtitle="How long from WA submission to OES activation"
@@ -632,7 +632,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
 
             {/* Daily Average Trend */}
             {timeToActivation.daily_averages.length > 1 && (
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+              <div className="bg-background/50 rounded-lg p-4">
                 <TrendChart
                   title="Daily Average Time-to-Activation"
                   subtitle="Trend over selected period (lower is better)"
@@ -653,7 +653,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             )}
           </>
         ) : (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-muted-foreground">
             No time-to-activation data available for the selected period
           </div>
         )}

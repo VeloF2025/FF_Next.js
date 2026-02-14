@@ -12,8 +12,8 @@ export function ProjectDetailNotFound({ onNavigateBack }: ProjectDetailNotFoundP
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="text-center">
         <div className="text-red-500 text-6xl mb-4">⚠️</div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Project not found</h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
+        <h2 className="text-xl font-semibold text-foreground mb-2">Project not found</h2>
+        <p className="text-muted-foreground mb-4">
           The project you're looking for doesn't exist or has been deleted.
         </p>
         <button

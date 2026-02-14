@@ -38,8 +38,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Company Profile Directory</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h2 className="text-2xl font-bold text-foreground">Company Profile Directory</h2>
+          <p className="text-muted-foreground mt-1">
             Browse and manage supplier profiles. Select a supplier to filter other tabs.
           </p>
         </div>
@@ -55,7 +55,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="bg-card p-4 rounded-lg border border-border">
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-4 flex-1">
             {/* Search */}
@@ -64,7 +64,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <input
                 type="text"
                 placeholder="Search suppliers..."
-                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 pr-4 py-2 border border-border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={searchTerm}
                 onChange={(e) => onSearchChange(e.target.value)}
               />
@@ -74,7 +74,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <div className="flex items-center space-x-2">
               <Filter className="h-4 w-4 text-gray-400" />
               <select
-                className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+                className="border border-border rounded-md px-3 py-2 text-sm"
                 value={statusFilter}
                 onChange={(e) => onStatusFilterChange(e.target.value)}
               >
@@ -88,7 +88,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
             {/* Category Filter */}
             <select
-              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+              className="border border-border rounded-md px-3 py-2 text-sm"
               value={categoryFilter}
               onChange={(e) => onCategoryFilterChange(e.target.value)}
             >
@@ -101,14 +101,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
           {/* View Controls */}
           <div className="flex items-center space-x-2">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-sm text-muted-foreground">
               {resultCount} suppliers
             </div>
-            <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
+            <div className="flex border border-border rounded-md">
               <button
                 className={cn(
                   "px-3 py-2 text-sm",
-                  viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-700 dark:text-gray-300'
+                  viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-muted-foreground'
                 )}
                 onClick={() => onViewModeChange('grid')}
               >
@@ -117,7 +117,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <button
                 className={cn(
                   "px-3 py-2 text-sm",
-                  viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-700 dark:text-gray-300'
+                  viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-muted-foreground'
                 )}
                 onClick={() => onViewModeChange('list')}
               >

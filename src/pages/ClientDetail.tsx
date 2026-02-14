@@ -53,30 +53,30 @@ export function ClientDetail() {
       <div className="mb-6">
         <button
           onClick={() => navigate('/clients')}
-          className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-muted-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back to Client List
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="bg-card rounded-lg shadow-sm border border-border">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
                 <Building className="w-8 h-8 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{client.name}</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{client.contactPerson}</p>
+                <h1 className="text-xl font-semibold text-foreground">{client.name}</h1>
+                <p className="text-sm text-muted-foreground">{client.contactPerson}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate(`/clients/${id}/edit`)}
-                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-muted-foreground bg-card border border-border rounded-lg hover:bg-background"
               >
                 <Edit className="w-4 h-4 mr-1" />
                 Edit
@@ -84,7 +84,7 @@ export function ClientDetail() {
               <button
                 onClick={handleDelete}
                 disabled={deleteMutation.isPending}
-                className="px-3 py-1.5 text-sm font-medium text-red-600 bg-white dark:bg-gray-800 border border-red-300 rounded-lg hover:bg-red-50"
+                className="px-3 py-1.5 text-sm font-medium text-red-600 bg-card border border-red-300 rounded-lg hover:bg-red-50"
               >
                 Delete
               </button>
@@ -102,7 +102,7 @@ export function ClientDetail() {
             <span className={`inline-flex px-3 py-1 text-sm font-medium rounded-full ${getPriorityColor(client.priority)}`}>
               {client.priority.toUpperCase()} PRIORITY
             </span>
-            <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
+            <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-secondary text-foreground">
               {client.category.replace('_', ' ').toUpperCase()}
             </span>
           </div>

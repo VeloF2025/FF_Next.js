@@ -628,7 +628,7 @@ function PhotoCard({ photo, selected, onSelect, onClick }: PhotoCardProps) {
             onSelect(e.target.checked);
           }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-2 left-2 w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500/50 bg-white dark:bg-gray-800/80 z-10"
+          className="absolute top-2 left-2 w-4 h-4 rounded border-[var(--ff-border-light)] text-blue-500 focus:ring-blue-500/50 bg-card/80 z-10"
         />
         <div
           onClick={onClick}

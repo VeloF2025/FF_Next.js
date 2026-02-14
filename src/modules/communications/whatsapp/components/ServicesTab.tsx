@@ -112,7 +112,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        className="bg-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -122,7 +122,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
 
         {status === 'idle' && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Enter the phone number to link with this service. This will generate a pairing code.
             </p>
 
@@ -135,13 +135,13 @@ const PairingModal: React.FC<PairingModalProps> = ({
                 placeholder="+27821234567"
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Include country code (e.g., +27 for South Africa)</p>
+              <p className="text-xs text-muted-foreground mt-1">Include country code (e.g., +27 for South Africa)</p>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-background transition-colors"
               >
                 Cancel
               </button>
@@ -159,7 +159,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
         {status === 'generating' && (
           <div className="text-center py-8">
             <Loader2 className="w-12 h-12 animate-spin text-green-500 mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">Generating pairing code...</p>
+            <p className="text-muted-foreground">Generating pairing code...</p>
           </div>
         )}
 
@@ -190,23 +190,23 @@ const PairingModal: React.FC<PairingModalProps> = ({
               )}
             </div>
 
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+            <div className="bg-secondary rounded-lg p-3">
               <p className="text-sm font-medium mb-2">Instructions:</p>
-              <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+              <ol className="text-sm text-muted-foreground space-y-1">
                 {instructions.map((instruction, idx) => (
                   <li key={idx}>{instruction}</li>
                 ))}
               </ol>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
               Waiting for phone to connect...
             </div>
 
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+              className="w-full px-4 py-2 border rounded-lg hover:bg-background transition-colors"
             >
               Cancel
             </button>
@@ -217,7 +217,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-green-600">Paired Successfully!</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">The service is now connected.</p>
+            <p className="text-sm text-muted-foreground mt-2">The service is now connected.</p>
           </div>
         )}
 
@@ -231,7 +231,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-background transition-colors"
               >
                 Cancel
               </button>

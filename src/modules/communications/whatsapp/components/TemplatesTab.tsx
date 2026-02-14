@@ -113,9 +113,9 @@ const TemplatesTab: React.FC = () => {
       case 'notification':
         return 'bg-yellow-100 text-yellow-800';
       case 'system':
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
     }
   };
 

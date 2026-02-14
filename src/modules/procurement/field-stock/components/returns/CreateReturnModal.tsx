@@ -121,14 +121,14 @@ export function CreateReturnModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white dark:bg-gray-800 shadow-xl dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 p-4 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl dark:bg-gray-800">
+        <div className="flex items-center justify-between border-b border-border p-4 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-foreground">
             Create Stock Return
           </h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+            className="rounded-lg p-2 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
           >
             <X className="h-5 w-5" />
           </button>
@@ -138,7 +138,7 @@ export function CreateReturnModal({
           {/* Basic Info */}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Returned By
               </label>
               <input
@@ -146,19 +146,19 @@ export function CreateReturnModal({
                 value={returnedByName}
                 onChange={(e) => setReturnedByName(e.target.value)}
                 placeholder="Name of person returning..."
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="w-full rounded-lg border border-border bg-card py-2 px-3 text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Return To Location <span className="text-red-500">*</span>
               </label>
               <select
                 value={returnToLocationId}
                 onChange={(e) => setReturnToLocationId(e.target.value)}
                 required
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="w-full rounded-lg border border-border bg-card py-2 px-3 text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Select location...</option>
                 {warehouseLocations.map(loc => (
@@ -173,7 +173,7 @@ export function CreateReturnModal({
           {/* Return Lines */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-sm font-medium text-muted-foreground">
                 Items to Return
               </label>
               <button
@@ -190,20 +190,20 @@ export function CreateReturnModal({
               {lines.map((line, index) => (
                 <div
                   key={index}
-                  className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 dark:border-gray-700 dark:bg-gray-800/50"
+                  className="rounded-lg border border-border bg-background p-3 dark:border-gray-700 dark:bg-gray-800/50"
                 >
                   <div className="flex items-start gap-3">
                     <Package className="mt-2 h-5 w-5 text-gray-400 flex-shrink-0" />
                     <div className="flex-1 grid gap-3 md:grid-cols-2">
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Item
                         </label>
                         <select
                           value={line.stockItemId}
                           onChange={(e) => handleLineChange(index, 'stockItemId', e.target.value)}
                           required
-                          className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         >
                           <option value="">Select item...</option>
                           {stockItems.map(item => (
@@ -215,7 +215,7 @@ export function CreateReturnModal({
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Serial # (optional)
                         </label>
                         <input
@@ -223,12 +223,12 @@ export function CreateReturnModal({
                           value={line.serialNumber || ''}
                           onChange={(e) => handleLineChange(index, 'serialNumber', e.target.value)}
                           placeholder="Serial number..."
-                          className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Quantity
                         </label>
                         <input
@@ -236,18 +236,18 @@ export function CreateReturnModal({
                           min="1"
                           value={line.quantity}
                           onChange={(e) => handleLineChange(index, 'quantity', Number(e.target.value))}
-                          className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Condition
                         </label>
                         <select
                           value={line.condition}
                           onChange={(e) => handleLineChange(index, 'condition', e.target.value)}
-                          className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         >
                           {CONDITIONS.map(c => (
                             <option key={c.value} value={c.value}>
@@ -258,13 +258,13 @@ export function CreateReturnModal({
                       </div>
 
                       <div className="md:col-span-2">
-                        <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <label className="mb-1 block text-xs font-medium text-muted-foreground">
                           Reason for Return
                         </label>
                         <select
                           value={line.returnReason}
                           onChange={(e) => handleLineChange(index, 'returnReason', e.target.value)}
-                          className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          className="w-full rounded border border-border bg-card py-1.5 px-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         >
                           {RETURN_REASONS.map(r => (
                             <option key={r.value} value={r.value}>
@@ -292,7 +292,7 @@ export function CreateReturnModal({
 
           {/* Notes */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               Notes
             </label>
             <textarea
@@ -300,16 +300,16 @@ export function CreateReturnModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional notes..."
               rows={3}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-border bg-card py-2 px-3 text-foreground focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
               Cancel
             </button>

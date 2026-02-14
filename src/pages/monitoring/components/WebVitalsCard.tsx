@@ -20,7 +20,7 @@ export function WebVitalsCard({ webVitals }: WebVitalsCardProps) {
       </CardHeader>
       <CardContent>
         {webVitals.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-muted-foreground">
             <p>No metrics collected yet</p>
             <p className="text-sm mt-2">
               Web Vitals will appear here as users interact with the application
@@ -35,13 +35,13 @@ export function WebVitalsCard({ webVitals }: WebVitalsCardProps) {
                 return (
                   <div
                     key={metricName}
-                    className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-900"
+                    className="p-4 border rounded-lg bg-background"
                   >
-                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    <div className="text-sm font-medium text-muted-foreground">
                       {metricName}
                     </div>
                     <div className="text-2xl font-bold text-gray-400">-</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">No data</div>
+                    <div className="text-xs text-muted-foreground mt-1">No data</div>
                   </div>
                 );
               }

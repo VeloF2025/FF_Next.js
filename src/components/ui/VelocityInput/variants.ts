@@ -11,9 +11,9 @@ export const velocityInputVariants = cva(
   {
     variants: {
       variant: {
-        glass: 'bg-white dark:bg-gray-800/8 backdrop-blur-md border border-white/20 text-white focus:bg-white dark:bg-gray-800/12 focus:border-blue-400/60 focus:shadow-[0_0_25px_rgba(0,102,255,0.4)] hover:border-white/30',
+        glass: 'bg-card/8 backdrop-blur-md border border-white/20 text-white focus:bg-card/12 focus:border-blue-400/60 focus:shadow-[0_0_25px_rgba(0,102,255,0.4)] hover:border-white/30',
         'glass-dark': 'bg-black/25 backdrop-blur-md border border-white/15 text-white focus:bg-black/35 focus:border-blue-400/60 focus:shadow-[0_0_25px_rgba(0,102,255,0.4)] hover:border-white/25',
-        'glass-intense': 'bg-white dark:bg-gray-800/15 backdrop-blur-lg border border-white/30 text-white focus:bg-white dark:bg-gray-800/20 focus:border-blue-400/70 focus:shadow-[0_0_30px_rgba(0,102,255,0.5)] hover:border-white/40',
+        'glass-intense': 'bg-card/15 backdrop-blur-lg border border-white/30 text-white focus:bg-card/20 focus:border-blue-400/70 focus:shadow-[0_0_30px_rgba(0,102,255,0.5)] hover:border-white/40',
         
         // Enhanced neon variants
         neon: 'bg-transparent border-2 border-cyan-400/40 text-cyan-100 focus:border-cyan-300/80 focus:shadow-[0_0_25px_rgba(0,245,255,0.5)] focus:text-cyan-50 hover:border-cyan-400/60',

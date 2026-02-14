@@ -21,21 +21,21 @@ const glassCardVariants = cva(
     variants: {
       variant: {
         // Core transparency levels
-        subtle: 'bg-white dark:bg-gray-800/5 hover:bg-white dark:bg-gray-800/8 border-white/10 hover:border-white/15',
-        medium: 'bg-white dark:bg-gray-800/10 hover:bg-white dark:bg-gray-800/15 border-white/15 hover:border-white/20', 
-        strong: 'bg-white dark:bg-gray-800/15 hover:bg-white dark:bg-gray-800/20 border-white/20 hover:border-white/25',
+        subtle: 'bg-card/5 hover:bg-card/8 border-white/10 hover:border-white/15',
+        medium: 'bg-card/10 hover:bg-card/15 border-white/15 hover:border-white/20', 
+        strong: 'bg-card/15 hover:bg-card/20 border-white/20 hover:border-white/25',
         
         // Enhanced effect variants
-        glow: 'bg-white dark:bg-gray-800/10 hover:bg-white dark:bg-gray-800/15 border-blue-400/20 shadow-[0_0_20px_rgba(0,102,255,0.3)] hover:shadow-[0_0_30px_rgba(0,102,255,0.5)]',
+        glow: 'bg-card/10 hover:bg-card/15 border-blue-400/20 shadow-[0_0_20px_rgba(0,102,255,0.3)] hover:shadow-[0_0_30px_rgba(0,102,255,0.5)]',
         
-        neon: 'bg-white dark:bg-gray-800/5 hover:bg-cyan-400/5 border-cyan-400/30 hover:border-cyan-300/50 shadow-[0_0_15px_rgba(0,245,255,0.2)] hover:shadow-[0_0_25px_rgba(0,245,255,0.4)]',
+        neon: 'bg-card/5 hover:bg-cyan-400/5 border-cyan-400/30 hover:border-cyan-300/50 shadow-[0_0_15px_rgba(0,245,255,0.2)] hover:shadow-[0_0_25px_rgba(0,245,255,0.4)]',
         
         holographic: 'bg-gradient-to-br from-white/8 via-purple-500/8 to-cyan-500/8 hover:from-white/12 hover:via-purple-500/12 hover:to-cyan-500/12 border-transparent bg-clip-padding shadow-[0_0_20px_rgba(99,102,241,0.2)]',
         
         // New premium variants
-        'neon-purple': 'bg-white dark:bg-gray-800/5 hover:bg-purple-500/5 border-purple-400/30 hover:border-purple-300/50 shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.4)]',
+        'neon-purple': 'bg-card/5 hover:bg-purple-500/5 border-purple-400/30 hover:border-purple-300/50 shadow-[0_0_15px_rgba(99,102,241,0.2)] hover:shadow-[0_0_25px_rgba(99,102,241,0.4)]',
         
-        'neon-pink': 'bg-white dark:bg-gray-800/5 hover:bg-pink-500/5 border-pink-400/30 hover:border-pink-300/50 shadow-[0_0_15px_rgba(236,72,153,0.2)] hover:shadow-[0_0_25px_rgba(236,72,153,0.4)]',
+        'neon-pink': 'bg-card/5 hover:bg-pink-500/5 border-pink-400/30 hover:border-pink-300/50 shadow-[0_0_15px_rgba(236,72,153,0.2)] hover:shadow-[0_0_25px_rgba(236,72,153,0.4)]',
         
         plasma: 'bg-gradient-conic from-cyan-400/10 via-purple-500/10 to-pink-500/10 hover:from-cyan-400/15 hover:via-purple-500/15 hover:to-pink-500/15 border border-purple-400/20 shadow-[0_0_30px_rgba(138,43,226,0.3)]',
         

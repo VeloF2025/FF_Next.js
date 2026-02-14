@@ -66,7 +66,7 @@ export function ContractorAccountabilityList({
             placeholder="Search contractors..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
@@ -75,7 +75,7 @@ export function ContractorAccountabilityList({
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="appearance-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="appearance-none rounded-lg border border-border bg-card py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All Contractors</option>
             <option value="blocked">Blocked Only</option>
@@ -86,44 +86,44 @@ export function ContractorAccountabilityList({
 
       {/* Stats Summary */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
               <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {contractors.length}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Contractors</p>
+              <p className="text-sm text-muted-foreground">Total Contractors</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900/30">
               <Ban className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {contractors.filter(c => c.isBlocked).length}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Blocked</p>
+              <p className="text-sm text-muted-foreground">Blocked</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-2xl font-bold text-foreground">
                 {contractors.filter(c => c.unaccountedCount > 0).length}
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">With Unaccounted</p>
+              <p className="text-sm text-muted-foreground">With Unaccounted</p>
             </div>
           </div>
         </div>
@@ -131,54 +131,54 @@ export function ContractorAccountabilityList({
 
       {/* Contractors List */}
       {filteredContractors.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-card p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+          <h3 className="mt-2 text-sm font-medium text-foreground">
             No contractors found
           </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             {searchTerm || filter !== 'all'
               ? 'Try adjusting your filters'
               : 'Contractor accountability records will appear here'}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-hidden rounded-lg border border-border">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
+            <thead className="bg-input">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-left text-xs font-medium tracking-wide text-muted-foreground">
                   Contractor
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-center text-xs font-medium tracking-wide text-muted-foreground">
                   Status
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Issued
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Consumed
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Returned
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Unaccounted
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="px-4 py-3 text-right text-xs font-medium tracking-wide text-muted-foreground">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
               {filteredContractors.map((contractor) => (
-                <tr key={contractor.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <tr key={contractor.id} className="hover:bg-accent">
                   <td className="whitespace-nowrap px-4 py-3">
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-foreground">
                       {contractor.contractorName}
                     </div>
                     {contractor.lastReconciliationDate && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-xs text-muted-foreground">
                         Last reconciled: {new Date(contractor.lastReconciliationDate).toISOString().split('T')[0]}
                       </div>
                     )}
@@ -201,25 +201,25 @@ export function ContractorAccountabilityList({
                       </span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-muted-foreground">
                     {contractor.totalIssuedCount}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-muted-foreground">
                     {contractor.totalConsumedCount}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
+                  <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-muted-foreground">
                     {contractor.totalReturnedCount}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
                     {contractor.unaccountedCount > 0 ? (
                       <div className="text-sm font-medium text-red-600 dark:text-red-400">
                         {contractor.unaccountedCount}
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-muted-foreground">
                           R{contractor.unaccountedValue?.toFixed(2) || '0.00'}
                         </div>
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
+                      <span className="text-sm text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -227,7 +227,7 @@ export function ContractorAccountabilityList({
                       {onView && (
                         <button
                           onClick={() => onView(contractor)}
-                          className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                          className="rounded p-1 text-gray-400 hover:bg-secondary hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                           title="View details"
                         >
                           <Eye className="h-4 w-4" />

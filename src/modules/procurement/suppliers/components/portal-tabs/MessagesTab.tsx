@@ -35,7 +35,7 @@ export const MessagesTab: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Messages</h2>
+        <h2 className="text-xl font-semibold text-foreground">Messages</h2>
         <VelocityButton>
           <MessageSquare className="h-4 w-4 mr-2" />
           New Message
@@ -48,7 +48,7 @@ export const MessagesTab: React.FC = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-2">
-                  <h3 className={`font-medium ${!message.read ? 'text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                  <h3 className={`font-medium ${!message.read ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {message.subject}
                   </h3>
                   {!message.read && (
@@ -57,10 +57,10 @@ export const MessagesTab: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">From: {message.from}</p>
-                <p className="text-gray-700 dark:text-gray-300">{message.content}</p>
+                <p className="text-sm text-muted-foreground mb-2">From: {message.from}</p>
+                <p className="text-muted-foreground">{message.content}</p>
               </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div className="text-sm text-muted-foreground">
                 {new Date(message.date).toISOString().split('T')[0]}
               </div>
             </div>

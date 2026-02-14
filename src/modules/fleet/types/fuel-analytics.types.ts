@@ -353,7 +353,7 @@ export function getAnomalySeverityColor(severity: AnomalySeverity): string {
     case 'high': return 'text-orange-600 dark:text-orange-400';
     case 'medium': return 'text-yellow-600 dark:text-yellow-400';
     case 'low': return 'text-blue-600 dark:text-blue-400';
-    default: return 'text-gray-600 dark:text-gray-400';
+    default: return 'text-muted-foreground';
   }
 }
 
@@ -363,7 +363,7 @@ export function getAnomalySeverityBgColor(severity: AnomalySeverity): string {
     case 'high': return 'bg-orange-100 dark:bg-orange-900/30';
     case 'medium': return 'bg-yellow-100 dark:bg-yellow-900/30';
     case 'low': return 'bg-blue-100 dark:bg-blue-900/30';
-    default: return 'bg-gray-100 dark:bg-gray-900/30';
+    default: return 'bg-background/30';
   }
 }
 
@@ -385,8 +385,8 @@ export function getAnomalyStatusColor(status: AnomalyStatus): string {
     case 'detected': return 'text-red-600 dark:text-red-400';
     case 'investigating': return 'text-yellow-600 dark:text-yellow-400';
     case 'resolved': return 'text-green-600 dark:text-green-400';
-    case 'dismissed': return 'text-gray-600 dark:text-gray-400';
-    default: return 'text-gray-600 dark:text-gray-400';
+    case 'dismissed': return 'text-muted-foreground';
+    default: return 'text-muted-foreground';
   }
 }
 

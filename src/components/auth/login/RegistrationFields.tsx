@@ -39,7 +39,7 @@ export function RegistrationFields({
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             className="block w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="First name"
+            placeholder="First Name"
           />
         </div>
         <div>
@@ -55,7 +55,7 @@ export function RegistrationFields({
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             className="block w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Last name"
+            placeholder="Last Name"
           />
         </div>
       </div>

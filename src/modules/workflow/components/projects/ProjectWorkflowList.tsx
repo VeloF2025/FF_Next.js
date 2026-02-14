@@ -49,7 +49,7 @@ export function ProjectWorkflowList({
       case 'cancelled':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -64,7 +64,7 @@ export function ProjectWorkflowList({
       case 'cancelled':
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-secondary text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     }
   };
 
@@ -92,13 +92,13 @@ export function ProjectWorkflowList({
   if (workflows.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
-        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mb-4">
           <Calendar className="w-8 h-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+        <h3 className="text-lg font-medium text-foreground mb-2">
           No Active Workflows
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-4">
+        <p className="text-muted-foreground text-center max-w-md mb-4">
           Start managing your project workflows by assigning templates to projects. 
           Track progress, manage teams, and monitor execution.
         </p>
@@ -115,15 +115,15 @@ export function ProjectWorkflowList({
   return (
     <div className="h-full flex flex-col">
       {/* View Mode Toggle */}
-      <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-800 bg-background">
         <div className="flex items-center justify-between">
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <div className="flex bg-secondary rounded-lg p-1">
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               List View
@@ -132,14 +132,14 @@ export function ProjectWorkflowList({
               onClick={() => setViewMode('timeline')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 viewMode === 'timeline'
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               Timeline View
             </button>
           </div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-muted-foreground">
             {workflows.length} workflows
           </span>
         </div>
@@ -152,15 +152,15 @@ export function ProjectWorkflowList({
         ) : (
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {workflows.map((workflow) => (
-              <div key={workflow.id} className="bg-white dark:bg-gray-900">
-                <div className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+              <div key={workflow.id} className="bg-background">
+                <div className="p-6 hover:bg-accent/50 transition-colors">
                   <div className="flex items-start justify-between">
                     {/* Main Workflow Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-3 mb-3">
                         <div className="flex items-center space-x-2">
                           {getStatusIcon(workflow.status)}
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 truncate">
+                          <h3 className="text-lg font-medium text-foreground truncate">
                             {workflow.name}
                           </h3>
                         </div>
@@ -177,31 +177,31 @@ export function ProjectWorkflowList({
 
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Project</p>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <p className="text-sm text-muted-foreground">Project</p>
+                          <p className="text-sm font-medium text-foreground">
                             {workflow.project?.name || 'Unknown Project'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Template</p>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          <p className="text-sm text-muted-foreground">Template</p>
+                          <p className="text-sm font-medium text-foreground">
                             {workflow.template?.name || 'Unknown Template'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Assigned To</p>
+                          <p className="text-sm text-muted-foreground">Assigned To</p>
                           <div className="flex items-center space-x-1">
                             <User className="w-4 h-4 text-gray-400" />
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <p className="text-sm font-medium text-foreground">
                               {workflow.assignedUser?.name || 'Unassigned'}
                             </p>
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Team Size</p>
+                          <p className="text-sm text-muted-foreground">Team Size</p>
                           <div className="flex items-center space-x-1">
                             <Users className="w-4 h-4 text-gray-400" />
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <p className="text-sm font-medium text-foreground">
                               {workflow.teamMembers.length} members
                             </p>
                           </div>
@@ -215,7 +215,7 @@ export function ProjectWorkflowList({
                       />
 
                       {/* Timeline Info */}
-                      <div className="flex items-center space-x-6 mt-3 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center space-x-6 mt-3 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
                           <span>
@@ -248,27 +248,27 @@ export function ProjectWorkflowList({
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => handleActionClick('view', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="View Details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleActionClick('edit', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="Edit Workflow"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleActionClick('timeline', workflow.id)}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors"
                         title="Toggle Timeline"
                       >
                         <Calendar className="w-4 h-4" />
                       </button>
                       <div className="relative">
-                        <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent transition-colors">
                           <MoreVertical className="w-4 h-4" />
                         </button>
                         {/* TODO: Add dropdown menu for more actions */}
@@ -279,7 +279,7 @@ export function ProjectWorkflowList({
 
                 {/* Expanded Timeline View */}
                 {expandedWorkflow === workflow.id && (
-                  <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800 bg-input/50">
                     <WorkflowTimeline 
                       workflows={[workflow]} 
                       compact={true}

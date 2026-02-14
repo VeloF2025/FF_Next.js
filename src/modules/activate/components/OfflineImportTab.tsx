@@ -187,11 +187,11 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
   const getReasonColor = (reason: string) => {
     if (reason === 'Dying Gasp') return 'text-yellow-600 dark:text-yellow-400';
     if (reason === 'Device Not Active') return 'text-red-600 dark:text-red-400';
-    return 'text-gray-600 dark:text-gray-400';
+    return 'text-muted-foreground';
   };
 
   const getBucketColor = (bucket: string | undefined | null) => {
-    if (!bucket) return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    if (!bucket) return 'bg-secondary text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     if (bucket.includes('Less than 20')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
     if (bucket.includes('20') || bucket.includes('40')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
@@ -211,11 +211,11 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
 
       {/* Header */}
       <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <WifiOff className="w-5 h-5 text-red-500" />
           ARCH Import
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Import ARCH (network audit) reports. Matches offline devices against drops and OES activations,
           detects serial mismatches, and creates alerts for long-offline devices.
         </p>
@@ -223,15 +223,15 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
 
       {/* Date Picker */}
       <div className="max-w-xs">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Report Date
         </label>
         <input
           type="date"
           value={reportDate}
           onChange={(e) => setReportDate(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md
-                     bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+          className="w-full px-3 py-2 border border-border rounded-md
+                     bg-card text-foreground
                      focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
@@ -241,7 +241,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8
+          className="border-2 border-dashed border-border rounded-lg p-8
                      text-center hover:border-orange-500 dark:hover:border-orange-400 transition-colors
                      cursor-pointer"
           onClick={() => document.getElementById('offline-file-input')?.click()}
@@ -254,10 +254,10 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
             className="hidden"
           />
           <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             Drag and drop <strong>network audit</strong> Excel file here, or click to browse
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
+          <p className="text-sm text-muted-foreground dark:text-gray-400 mt-2">
             File should contain &quot;Offline Data&quot; sheet
           </p>
         </div>
@@ -265,13 +265,13 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
 
       {/* File Selected */}
       {file && !importResult && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+        <div className="bg-input rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <FileSpreadsheet className="w-8 h-8 text-orange-600" />
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                <p className="font-medium text-foreground">{file.name}</p>
+                <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
               </div>
             </div>
             <button onClick={() => resetForm()} className="text-sm text-red-600 hover:text-red-700">
@@ -285,7 +285,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
       {isParsing && (
         <div className="flex items-center justify-center gap-2 py-4">
           <Loader2 className="w-5 h-5 animate-spin text-orange-600" />
-          <span className="text-gray-600 dark:text-gray-400">Parsing file...</span>
+          <span className="text-muted-foreground">Parsing file...</span>
         </div>
       )}
 
@@ -319,17 +319,17 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
         <div className="space-y-4">
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <WifiOff className="w-4 h-4" />
                 Total Offline
               </div>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+              <p className="text-2xl font-bold text-foreground mt-1">
                 {previewData.totalRows.toLocaleString()}
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400 text-sm">
                 <AlertTriangle className="w-4 h-4" />
                 Dying Gasp
@@ -337,12 +337,12 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
               <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
                 {(previewData.reasonSummary['Dying Gasp'] || 0).toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {((previewData.reasonSummary['Dying Gasp'] || 0) / previewData.totalRows * 100).toFixed(1)}%
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm">
                 <XCircle className="w-4 h-4" />
                 Device Not Active
@@ -352,7 +352,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 text-sm">
                 <Clock className="w-4 h-4" />
                 {'>'} 20 Days Offline
@@ -367,8 +367,8 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
           </div>
 
           {/* Offline Bucket Breakdown */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3">Offline Duration Breakdown</h4>
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3">Offline Duration Breakdown</h4>
             <div className="space-y-2">
               {Object.entries(previewData.bucketSummary || {})
                 .filter(([k]) => k != null)
@@ -378,7 +378,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${getBucketColor(bucket)}`}>
                       {bucket}
                     </span>
-                    <span className="font-mono text-gray-900 dark:text-white">
+                    <span className="font-mono text-foreground">
                       {count.toLocaleString()} ({((count / previewData.totalRows) * 100).toFixed(1)}%)
                     </span>
                   </div>
@@ -387,36 +387,36 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
           </div>
 
           {/* Preview Table */}
-          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="font-medium text-gray-900 dark:text-white">
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="bg-input px-4 py-2 border-b border-border">
+              <h3 className="font-medium text-foreground">
                 Preview (first 10 of {previewData.totalRows.toLocaleString()})
               </h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-100 dark:bg-gray-700">
+                <thead className="bg-secondary">
                   <tr>
-                    <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Drop</th>
-                    <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Serial</th>
-                    <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Reason</th>
-                    <th className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">Days</th>
-                    <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">Bucket</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground">Drop</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground">Serial</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground">Reason</th>
+                    <th className="px-3 py-2 text-right text-muted-foreground">Days</th>
+                    <th className="px-3 py-2 text-left text-muted-foreground">Bucket</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {previewData.preview.slice(0, 10).map((row, i) => (
-                    <tr key={i} className="bg-white dark:bg-gray-800">
-                      <td className="px-3 py-2 font-mono text-gray-900 dark:text-white">
+                    <tr key={i} className="bg-card">
+                      <td className="px-3 py-2 font-mono text-foreground">
                         {row.drop_number}
                       </td>
-                      <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-400 text-xs">
+                      <td className="px-3 py-2 font-mono text-muted-foreground text-xs">
                         {row.serial_number}
                       </td>
                       <td className={`px-3 py-2 ${getReasonColor(row.last_down_reason)}`}>
                         {row.last_down_reason}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-gray-900 dark:text-white">
+                      <td className="px-3 py-2 text-right font-mono text-foreground">
                         {row.days_since_last_inform}
                       </td>
                       <td className="px-3 py-2">
@@ -450,7 +450,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
         <div className="flex justify-end gap-3">
           <button
             onClick={() => resetForm()}
-            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            className="px-4 py-2 text-muted-foreground hover:text-gray-800 dark:hover:text-gray-200"
           >
             Cancel
           </button>
@@ -486,41 +486,41 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                 Import Complete
               </h3>
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-card rounded p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">
                     {importResult.totalRows.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
+                  <p className="text-sm text-muted-foreground">Total</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
                     {importResult.matchedDrops.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched Drops</p>
+                  <p className="text-sm text-muted-foreground">Matched Drops</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-blue-600">
                     {importResult.matchedOes.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched OES</p>
+                  <p className="text-sm text-muted-foreground">Matched OES</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-600">
                     {importResult.unmatched.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Unmatched</p>
+                  <p className="text-sm text-muted-foreground">Unmatched</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-red-600">
                     {importResult.serialMismatches.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Serial Mismatches</p>
+                  <p className="text-sm text-muted-foreground">Serial Mismatches</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
+                <div className="bg-card rounded p-3 text-center">
                   <p className="text-2xl font-bold text-orange-600">
                     {importResult.alertsCreated.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Alerts Created</p>
+                  <p className="text-sm text-muted-foreground">Alerts Created</p>
                 </div>
               </div>
 
@@ -544,7 +544,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                     <AlertCircle className="w-4 h-4" />
                     <span className="font-medium">{importResult.errors.length} warnings</span>
                   </div>
-                  <ul className="mt-2 text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
+                  <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">
                     {importResult.errors.slice(0, 5).map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}

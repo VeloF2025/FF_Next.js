@@ -27,15 +27,15 @@ export function QuoteEvaluationTab() {
   }
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="h-full bg-background flex flex-col">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card border-b border-border p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl font-semibold text-foreground">
               Quote Evaluation
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Evaluating quotes for {selectedProject.name} ({selectedProject.code})
             </p>
           </div>
@@ -50,16 +50,16 @@ export function QuoteEvaluationTab() {
               placeholder="Search quotes by RFQ, supplier, or item..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
           
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <Filter className="h-4 w-4 text-muted-foreground" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending Evaluation</option>
@@ -71,7 +71,7 @@ export function QuoteEvaluationTab() {
       </div>
 
       {/* Stats Cards */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card border-b border-border p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <QuoteStatCard
             title="Pending Review"
@@ -104,9 +104,9 @@ export function QuoteEvaluationTab() {
       <div className="flex-1 p-6 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* Mock Quote Evaluation List */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Active Quote Evaluations</h3>
+          <div className="bg-card rounded-lg border border-border">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-medium text-foreground">Active Quote Evaluations</h3>
             </div>
             
             <div className="divide-y divide-gray-200">
@@ -160,14 +160,14 @@ function QuoteStatCard({ title, count, icon: Icon, color }: QuoteStatCardProps) 
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="bg-card p-4 rounded-lg border border-border">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{count}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
+          <p className="text-2xl font-bold text-foreground">{count}</p>
+          <p className="text-sm text-muted-foreground">{title}</p>
         </div>
       </div>
     </div>
@@ -210,15 +210,15 @@ function QuoteEvaluationItem({
   };
 
   return (
-    <div className="p-6 hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+    <div className="p-6 hover:bg-background transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">{rfqTitle}</h4>
+            <h4 className="text-lg font-medium text-foreground">{rfqTitle}</h4>
             {getStatusBadge(status)}
           </div>
           
-          <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <span>Ref: {rfqRef}</span>
             <span>Quotes: {quotesReceived}</span>
             <span>Due: {formatDate(dueDate)}</span>
@@ -227,14 +227,14 @@ function QuoteEvaluationItem({
           
           {recommendedSupplier && (
             <div className="mt-2 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Recommended: </span>
+              <span className="text-muted-foreground">Recommended: </span>
               <span className="font-medium text-green-700">{recommendedSupplier}</span>
             </div>
           )}
           
           {awardedSupplier && (
             <div className="mt-2 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Awarded to: </span>
+              <span className="text-muted-foreground">Awarded to: </span>
               <span className="font-medium text-blue-700">{awardedSupplier}</span>
             </div>
           )}
@@ -268,11 +268,11 @@ function NoProjectSelected() {
           <Quote className="h-12 w-12 text-green-600" />
         </div>
         
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <h3 className="text-xl font-semibold text-foreground mb-4">
           Project Selection Required
         </h3>
         
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Please select a project to view and evaluate its supplier quotes. 
           Quote evaluation helps you make informed procurement decisions.
         </p>

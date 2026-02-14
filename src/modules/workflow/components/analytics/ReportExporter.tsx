@@ -336,7 +336,7 @@ ${data.insights.map((insight: any) => `
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Report Type
               </label>
               <Select value={reportType} onValueChange={(value) => setReportType(value as ReportType)}>
@@ -354,7 +354,7 @@ ${data.insights.map((insight: any) => `
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Export Format
               </label>
               <div className="grid grid-cols-1 gap-2">
@@ -368,17 +368,17 @@ ${data.insights.map((insight: any) => `
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                         isSelected 
                           ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/10' 
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600'
+                          : 'border-border hover:border-border'
                       }`}
                       onClick={() => setExportFormat(format)}
                     >
                       <div className="flex items-start gap-3">
                         <Icon className={`w-5 h-5 mt-1 ${
-                          isSelected ? 'text-purple-600' : 'text-gray-500 dark:text-gray-400'
+                          isSelected ? 'text-purple-600' : 'text-muted-foreground'
                         }`} />
                         <div className="flex-1">
                           <p className="font-medium text-sm uppercase">{format}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                          <p className="text-xs text-muted-foreground">
                             {getFormatDescription(format)}
                           </p>
                         </div>
@@ -397,7 +397,7 @@ ${data.insights.map((insight: any) => `
         <Card>
           <CardHeader>
             <CardTitle>Report Sections</CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Customize which sections to include in your report
             </p>
           </CardHeader>
@@ -406,13 +406,13 @@ ${data.insights.map((insight: any) => `
               {sections.map((section) => {
                 const Icon = section.icon;
                 return (
-                  <div key={section.id} className="flex items-start gap-3 p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <div key={section.id} className="flex items-start gap-3 p-2 rounded hover:bg-accent/50">
                     <Checkbox 
                       id={section.id}
                       checked={section.included}
                       onCheckedChange={() => toggleSection(section.id)}
                     />
-                    <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
+                    <Icon className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
                     <div className="flex-1">
                       <label 
                         htmlFor={section.id}
@@ -420,7 +420,7 @@ ${data.insights.map((insight: any) => `
                       >
                         {section.name}
                       </label>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {section.description}
                       </p>
                     </div>
@@ -442,14 +442,14 @@ ${data.insights.map((insight: any) => `
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100">
+            <div className="p-4 bg-input/50 rounded-lg">
+              <h4 className="font-medium text-foreground">
                 Workflow Analytics Report
               </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 Performance Analysis for {dateRange.label}
               </p>
-              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                 <span>Period: {dateRange.from} to {dateRange.to}</span>
                 <span>•</span>
                 <span>Format: {exportFormat.toUpperCase()}</span>
@@ -472,25 +472,25 @@ ${data.insights.map((insight: any) => `
                   <p className="text-2xl font-bold text-blue-600">
                     {analytics.performanceMetrics.totalProjects}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">Total Projects</p>
+                  <p className="text-xs text-muted-foreground">Total Projects</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-green-600">
                     {Math.round(analytics.performanceMetrics.onTimeCompletion)}%
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">On-Time Rate</p>
+                  <p className="text-xs text-muted-foreground">On-Time Rate</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-purple-600">
                     {analytics.templateUsage.length}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">Templates</p>
+                  <p className="text-xs text-muted-foreground">Templates</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-orange-600">
                     {analytics.phaseMetrics.length}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">Phases</p>
+                  <p className="text-xs text-muted-foreground">Phases</p>
                 </div>
               </div>
             )}
@@ -500,7 +500,7 @@ ${data.insights.map((insight: any) => `
 
       {/* Export Actions */}
       <div className="flex justify-between items-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Report will be downloaded to your device
         </p>
         

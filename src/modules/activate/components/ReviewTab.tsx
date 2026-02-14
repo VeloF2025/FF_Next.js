@@ -197,11 +197,11 @@ export function ReviewTab({
   if (photosWithQa.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary mb-4">
           <span className="text-3xl">📷</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Photos to Review</h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h3 className="text-lg font-semibold text-foreground mb-2">No Photos to Review</h3>
+        <p className="text-muted-foreground">
           Fetch photos and run categorization first
         </p>
       </div>
@@ -214,12 +214,12 @@ export function ReviewTab({
       <div className="flex items-center justify-between mb-4">
         <div className="flex-1 mr-4">
           <div className="flex items-center justify-between text-sm mb-1">
-            <span className="text-gray-600 dark:text-gray-400">Review Progress</span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="text-muted-foreground">Review Progress</span>
+            <span className="font-medium text-foreground">
               {reviewedCount}/{totalSteps} steps ({progressPercent}%)
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-secondary rounded-full h-2">
             <div
               className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
@@ -237,7 +237,7 @@ export function ReviewTab({
       </div>
 
       {/* Keyboard Shortcuts Legend */}
-      <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg px-4 py-2">
+      <div className="flex items-center gap-6 text-sm text-muted-foreground bg-background/50 rounded-lg px-4 py-2">
         <span className="font-medium">Shortcuts:</span>
         <div className="flex items-center gap-1">
           <kbd className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded text-xs font-mono">A</kbd>
@@ -248,7 +248,7 @@ export function ReviewTab({
           <span>Reject</span>
         </div>
         <div className="flex items-center gap-1">
-          <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded text-xs font-mono">←→</kbd>
+          <kbd className="px-2 py-1 bg-secondary text-foreground rounded text-xs font-mono">←→</kbd>
           <span>Navigate</span>
         </div>
       </div>
@@ -274,10 +274,10 @@ export function ReviewTab({
 
       {/* Selected Photo Detail */}
       {selectedPhoto && (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          <div className="bg-gray-50 dark:bg-gray-900/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="border border-border rounded-lg overflow-hidden">
+          <div className="bg-background/50 px-4 py-3 border-b border-border">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
+              <h4 className="font-semibold text-foreground">
                 Step {selectedPhoto.step}: {selectedPhoto.stepLabel}
               </h4>
               <div className="flex items-center gap-2">
@@ -302,7 +302,7 @@ export function ReviewTab({
                     AI: {selectedPhoto.qaResult.passed ? 'Pass' : 'Fail'} ({selectedPhoto.qaResult.score}/100)
                   </span>
                 ) : (
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-secondary text-muted-foreground">
                     Pending Review
                   </span>
                 )}
@@ -312,7 +312,7 @@ export function ReviewTab({
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-4">
             {/* Photo Preview */}
-            <div className="aspect-[4/3] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+            <div className="aspect-[4/3] bg-secondary rounded-lg overflow-hidden">
               <img
                 src={selectedPhoto.url}
                 alt={`Step ${selectedPhoto.step}: ${selectedPhoto.stepLabel}`}
@@ -325,15 +325,15 @@ export function ReviewTab({
               {selectedPhoto.qaResult && (
                 <>
                   <div>
-                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Observations</h5>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
+                    <h5 className="text-sm font-medium text-muted-foreground mb-2">AI Observations</h5>
+                    <p className="text-sm text-muted-foreground bg-background/50 rounded-lg p-3">
                       {selectedPhoto.qaResult.observations || 'No observations'}
                     </p>
                   </div>
 
                   {selectedPhoto.qaResult.checks.length > 0 && (
                     <div>
-                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">QA Checks</h5>
+                      <h5 className="text-sm font-medium text-muted-foreground mb-2">QA Checks</h5>
                       <div className="space-y-2">
                         {selectedPhoto.qaResult.checks.map((check) => (
                           <div
@@ -350,11 +350,11 @@ export function ReviewTab({
                               {check.passed ? '✓' : '✗'}
                             </span>
                             <div>
-                              <span className="font-medium text-gray-900 dark:text-white">
+                              <span className="font-medium text-foreground">
                                 {check.description}
                               </span>
                               {!check.passed && check.details && (
-                                <p className="text-gray-600 dark:text-gray-400 mt-1">{check.details}</p>
+                                <p className="text-muted-foreground mt-1">{check.details}</p>
                               )}
                             </div>
                           </div>
@@ -365,8 +365,8 @@ export function ReviewTab({
 
                   {selectedPhoto.qaResult.feedback && (
                     <div>
-                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Feedback</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                      <h5 className="text-sm font-medium text-muted-foreground mb-2">AI Feedback</h5>
+                      <p className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
                         {selectedPhoto.qaResult.feedback}
                       </p>
                     </div>
@@ -376,7 +376,7 @@ export function ReviewTab({
 
               {/* Action Buttons */}
               {!isLocked && !selectedPhoto.humanOverride && (
-                <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex gap-3 pt-4 border-t border-border">
                   <button
                     onClick={() => handleApprove(selectedPhoto.step)}
                     disabled={isProcessing}
@@ -401,8 +401,8 @@ export function ReviewTab({
       {/* Reject Modal */}
       {showRejectModal && selectedPhoto && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Reject Step {selectedPhoto.step}: {selectedPhoto.stepLabel}
             </h3>
             <textarea
@@ -410,7 +410,7 @@ export function ReviewTab({
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="Enter reason for rejection..."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+              className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400"
               autoFocus
             />
             <div className="flex gap-3 mt-4">
@@ -419,7 +419,7 @@ export function ReviewTab({
                   setShowRejectModal(false);
                   setRejectReason('');
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="flex-1 px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent transition-colors"
               >
                 Cancel (Esc)
               </button>
@@ -462,7 +462,7 @@ function PhotoCard({
   isLocked,
 }: PhotoCardProps) {
   // Determine card status
-  let statusColor = 'border-gray-200 dark:border-gray-700';
+  let statusColor = 'border-border';
   let statusBadge = null;
 
   if (photo.humanOverride) {
@@ -499,7 +499,7 @@ function PhotoCard({
       className={`relative group cursor-pointer rounded-lg overflow-hidden border-2 ${statusColor} transition-all hover:shadow-lg`}
     >
       {/* Photo Thumbnail */}
-      <div className="aspect-square bg-gray-100 dark:bg-gray-800">
+      <div className="aspect-square bg-secondary">
         <img
           src={photo.url}
           alt={`Step ${photo.step}: ${photo.stepLabel}`}

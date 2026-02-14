@@ -61,7 +61,7 @@ const colorClasses: Record<ReportCardColor, string> = {
   red: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
   orange: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
   purple: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800',
-  gray: 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-700',
+  gray: 'bg-background/20 border-border',
   cyan: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800',
   pink: 'bg-pink-50 dark:bg-pink-900/20 border-pink-200 dark:border-pink-800',
 };
@@ -73,7 +73,7 @@ const textColorClasses: Record<ReportCardColor, string> = {
   red: 'text-red-600 dark:text-red-400',
   orange: 'text-orange-600 dark:text-orange-400',
   purple: 'text-purple-600 dark:text-purple-400',
-  gray: 'text-gray-600 dark:text-gray-400',
+  gray: 'text-muted-foreground',
   cyan: 'text-cyan-600 dark:text-cyan-400',
   pink: 'text-pink-600 dark:text-pink-400',
 };
@@ -135,8 +135,8 @@ export function ReportCard({
       <div
         className={`rounded-lg border ${colorClasses[color]} ${sizeClasses[size]} animate-pulse`}
       >
-        <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2" />
-        <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-16" />
+        <div className="h-4 bg-muted rounded w-24 mb-2" />
+        <div className="h-8 bg-muted rounded w-16" />
       </div>
     );
   }
@@ -171,7 +171,7 @@ export function ReportCard({
               isTrendPositive
                 ? 'text-green-600 dark:text-green-400'
                 : trend === 'stable'
-                  ? 'text-gray-500 dark:text-gray-400'
+                  ? 'text-muted-foreground'
                   : 'text-red-600 dark:text-red-400'
             }`}
           >
@@ -191,7 +191,7 @@ export function ReportCard({
       {/* Progress bar */}
       {progress !== undefined && (
         <div className="mt-3">
-          <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="relative h-2 bg-secondary rounded-full overflow-hidden">
             <div
               className={`absolute left-0 top-0 h-full ${progressColorClasses[color]} rounded-full transition-all duration-300`}
               style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
@@ -209,7 +209,7 @@ export function ReportCard({
               {progress.toFixed(0)}%
             </span>
             {target !== undefined && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 Target: {target}%
               </span>
             )}

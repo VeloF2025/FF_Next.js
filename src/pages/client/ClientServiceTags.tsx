@@ -14,7 +14,7 @@ export function ClientServiceTags({ client }: ClientServiceTagsProps) {
       {/* Service Types */}
       {client.serviceTypes && client.serviceTypes.length > 0 && (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Service Types</h2>
+          <h2 className="text-lg font-medium text-foreground mb-4">Service Types</h2>
           <div className="flex flex-wrap gap-2">
             {client.serviceTypes.map((service: string) => (
               <span
@@ -31,12 +31,12 @@ export function ClientServiceTags({ client }: ClientServiceTagsProps) {
       {/* Tags */}
       {client.tags && client.tags.length > 0 && (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Tags</h2>
+          <h2 className="text-lg font-medium text-foreground mb-4">Tags</h2>
           <div className="flex flex-wrap gap-2">
             {client.tags.map((tag: string) => (
               <span
                 key={tag}
-                className="inline-flex items-center px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-full"
+                className="inline-flex items-center px-3 py-1 text-sm font-medium bg-secondary text-foreground rounded-full"
               >
                 {tag}
               </span>

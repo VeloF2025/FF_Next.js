@@ -478,7 +478,7 @@ export function PPDataTab() {
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
                 {records.map((record) => {
-                  const statusStyle = STATUS_COLORS[record.resolution_status] || { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-800 dark:text-gray-300', label: record.resolution_status };
+                  const statusStyle = STATUS_COLORS[record.resolution_status] || { bg: 'bg-background/30', text: 'text-foreground', label: record.resolution_status };
                   const selectable = isSelectable(record);
                   return (
                     <tr key={record.id} className={`bg-[var(--ff-bg-secondary)] ${selectedIds.includes(record.id) ? 'bg-blue-900/10' : ''}`}>

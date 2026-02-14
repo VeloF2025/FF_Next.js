@@ -210,20 +210,20 @@ export function WorkflowAssignmentModal({
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
         
-        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white dark:bg-gray-900 shadow-xl rounded-2xl">
+        <div className="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-background shadow-xl rounded-2xl">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+              <h3 className="text-lg font-medium text-foreground">
                 Assign Workflow to Project
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Select a project and template to create a new workflow
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-accent"
             >
               <X className="w-5 h-5" />
             </button>
@@ -235,29 +235,29 @@ export function WorkflowAssignmentModal({
               step === 'project' ? 'text-green-600' : selectedProject ? 'text-green-600' : 'text-gray-400'
             }`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                selectedProject ? 'bg-green-600 text-white' : step === 'project' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                selectedProject ? 'bg-green-600 text-white' : step === 'project' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-secondary text-gray-400'
               }`}>
                 1
               </div>
               <span className="text-sm font-medium">Select Project</span>
             </div>
-            <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-600" />
+            <div className="w-12 h-0.5 bg-muted" />
             <div className={`flex items-center space-x-2 ${
               step === 'template' ? 'text-green-600' : selectedTemplate ? 'text-green-600' : 'text-gray-400'
             }`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                selectedTemplate ? 'bg-green-600 text-white' : step === 'template' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                selectedTemplate ? 'bg-green-600 text-white' : step === 'template' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-secondary text-gray-400'
               }`}>
                 2
               </div>
               <span className="text-sm font-medium">Choose Template</span>
             </div>
-            <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-600" />
+            <div className="w-12 h-0.5 bg-muted" />
             <div className={`flex items-center space-x-2 ${
               step === 'details' ? 'text-green-600' : 'text-gray-400'
             }`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step === 'details' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                step === 'details' ? 'bg-green-100 dark:bg-green-900/20 text-green-600' : 'bg-secondary text-gray-400'
               }`}>
                 3
               </div>
@@ -278,7 +278,7 @@ export function WorkflowAssignmentModal({
                       placeholder="Search projects..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground"
                     />
                   </div>
                 </div>
@@ -291,18 +291,18 @@ export function WorkflowAssignmentModal({
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                         selectedProject?.id === project.id
                           ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          : 'border-border hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                          <h4 className="font-medium text-foreground">
                             {project.name}
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-sm text-muted-foreground mt-1">
                             {project.description}
                           </p>
-                          <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                             <span>Status: {project.status}</span>
                             <span>Duration: {project.startDate} - {project.endDate}</span>
                           </div>
@@ -328,7 +328,7 @@ export function WorkflowAssignmentModal({
                       placeholder="Search templates..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-card text-foreground"
                     />
                   </div>
                 </div>
@@ -341,15 +341,15 @@ export function WorkflowAssignmentModal({
                       className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                         selectedTemplate?.id === template.id
                           ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          : 'border-border hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                          <h4 className="font-medium text-foreground">
                             {template.name}
                           </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-sm text-muted-foreground mt-1">
                             {template.description}
                           </p>
                           <div className="flex items-center space-x-3 mt-3 text-sm">
@@ -360,7 +360,7 @@ export function WorkflowAssignmentModal({
                             }`}>
                               {template.category}
                             </span>
-                            <span className="text-gray-500 dark:text-gray-400">
+                            <span className="text-muted-foreground">
                               {template.phases?.length || 0} phases
                             </span>
                           </div>
@@ -381,51 +381,51 @@ export function WorkflowAssignmentModal({
                 {/* Left Column - Basic Info */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Workflow Name
                     </label>
                     <input
                       type="text"
                       value={workflowName}
                       onChange={(e) => setWorkflowName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
                       placeholder="Enter workflow name"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
                         Start Date
                       </label>
                       <input
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
                         Planned End Date
                       </label>
                       <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Assign To
                     </label>
                     <select
                       value={assignedTo}
                       onChange={(e) => setAssignedTo(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
                     >
                       <option value="">Select project manager</option>
                       {staffMembers.map(member => (
@@ -437,14 +437,14 @@ export function WorkflowAssignmentModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Notes
                     </label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
                       placeholder="Additional notes or requirements..."
                     />
                   </div>
@@ -453,17 +453,17 @@ export function WorkflowAssignmentModal({
                 {/* Right Column - Team & Summary */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-muted-foreground mb-2">
                       Team Members
                     </label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 space-y-2">
+                    <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 space-y-2">
                       {loadingStaff ? (
                         <div className="flex items-center justify-center py-4">
                           <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-                          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Loading staff...</span>
+                          <span className="ml-2 text-sm text-muted-foreground">Loading staff...</span>
                         </div>
                       ) : staffMembers.length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No staff members available</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">No staff members available</p>
                       ) : (
                         staffMembers.map(member => (
                           <label key={member.id} className="flex items-center space-x-2 cursor-pointer">
@@ -471,13 +471,13 @@ export function WorkflowAssignmentModal({
                               type="checkbox"
                               checked={teamMembers.includes(member.id)}
                               onChange={() => toggleTeamMember(member.id)}
-                              className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
+                              className="rounded border-border text-green-600 focus:ring-green-500"
                             />
                             <div className="flex-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                              <span className="text-sm font-medium text-foreground">
                                 {member.name}
                               </span>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                              <span className="text-xs text-muted-foreground ml-2">
                                 {member.position}
                               </span>
                             </div>
@@ -488,28 +488,28 @@ export function WorkflowAssignmentModal({
                   </div>
 
                   {/* Summary */}
-                  <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">
+                  <div className="bg-input rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-foreground mb-3">
                       Assignment Summary
                     </h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Project:</span>
-                        <span className="text-gray-900 dark:text-gray-100">{selectedProject.name}</span>
+                        <span className="text-muted-foreground">Project:</span>
+                        <span className="text-foreground">{selectedProject.name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Template:</span>
-                        <span className="text-gray-900 dark:text-gray-100">{selectedTemplate.name}</span>
+                        <span className="text-muted-foreground">Template:</span>
+                        <span className="text-foreground">{selectedTemplate.name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Phases:</span>
-                        <span className="text-gray-900 dark:text-gray-100">
+                        <span className="text-muted-foreground">Phases:</span>
+                        <span className="text-foreground">
                           {selectedTemplate.phases?.length || 0} phases
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Team Size:</span>
-                        <span className="text-gray-900 dark:text-gray-100">{teamMembers.length} members</span>
+                        <span className="text-muted-foreground">Team Size:</span>
+                        <span className="text-foreground">{teamMembers.length} members</span>
                       </div>
                     </div>
                   </div>
@@ -519,7 +519,7 @@ export function WorkflowAssignmentModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between pt-6 mt-6 border-t border-border">
             <div className="flex items-center space-x-2">
               {step !== 'project' && (
                 <button
@@ -527,7 +527,7 @@ export function WorkflowAssignmentModal({
                     if (step === 'details') setStep('template');
                     else if (step === 'template') setStep('project');
                   }}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  className="px-4 py-2 text-muted-foreground bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   Back
                 </button>
@@ -537,7 +537,7 @@ export function WorkflowAssignmentModal({
             <div className="flex items-center space-x-3">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="px-4 py-2 text-muted-foreground bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>

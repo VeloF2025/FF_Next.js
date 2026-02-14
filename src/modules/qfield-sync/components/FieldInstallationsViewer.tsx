@@ -171,7 +171,7 @@ export function FieldInstallationsViewer() {
       case 'rejected':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
+        return 'bg-secondary text-muted-foreground';
     }
   };
 
@@ -205,10 +205,10 @@ export function FieldInstallationsViewer() {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8">
+      <div className="bg-card rounded-lg shadow p-8">
         <div className="flex flex-col items-center justify-center">
           <Activity className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading {dataType} data...</p>
+          <p className="text-muted-foreground">Loading {dataType} data...</p>
         </div>
       </div>
     );
@@ -216,7 +216,7 @@ export function FieldInstallationsViewer() {
 
   if (error) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-card rounded-lg shadow p-6">
         <div className="flex items-center space-x-2 text-red-600 mb-4">
           <AlertCircle className="h-5 w-5" />
           <span>Error: {error}</span>
@@ -235,21 +235,21 @@ export function FieldInstallationsViewer() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+      <div className="bg-card rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
               {dataType === 'poles' ? <MapPin className="h-7 w-7 text-blue-600" /> : <Home className="h-7 w-7 text-green-600" />}
               Field Installations - {dataType === 'poles' ? 'Poles' : 'Drops'}
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-muted-foreground mt-1">
               Track and sync {dataType} installations between field and office
             </p>
           </div>
 
           <button
             onClick={fetchData}
-            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 flex items-center gap-2"
+            className="px-4 py-2 bg-card border border-border rounded-md text-muted-foreground hover:bg-background flex items-center gap-2"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -263,7 +263,7 @@ export function FieldInstallationsViewer() {
             className={`px-4 py-2 rounded-lg font-medium ${
               dataType === 'poles'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-300'
             }`}
           >
             <MapPin className="h-4 w-4 inline mr-2" />
@@ -274,7 +274,7 @@ export function FieldInstallationsViewer() {
             className={`px-4 py-2 rounded-lg font-medium ${
               dataType === 'drops'
                 ? 'bg-green-600 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-300'
             }`}
           >
             <Home className="h-4 w-4 inline mr-2" />
@@ -283,13 +283,13 @@ export function FieldInstallationsViewer() {
         </div>
 
         {/* View Type Tabs */}
-        <div className="flex space-x-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex space-x-4 border-b border-border">
           <button
             onClick={() => setViewType('summary')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               viewType === 'summary'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
+                : 'border-transparent text-muted-foreground hover:text-muted-foreground'
             }`}
           >
             Summary
@@ -299,7 +299,7 @@ export function FieldInstallationsViewer() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               viewType === 'comparison'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
+                : 'border-transparent text-muted-foreground hover:text-muted-foreground'
             }`}
           >
             Comparison
@@ -309,7 +309,7 @@ export function FieldInstallationsViewer() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               viewType === 'details'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
+                : 'border-transparent text-muted-foreground hover:text-muted-foreground'
             }`}
           >
             Details
@@ -322,11 +322,11 @@ export function FieldInstallationsViewer() {
         <div className="space-y-4">
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-card rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">QFieldCloud</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">QFieldCloud</p>
+                  <p className="text-2xl font-semibold text-foreground mt-1">
                     {currentStats.qfieldcloud_total}
                   </p>
                 </div>
@@ -336,11 +336,11 @@ export function FieldInstallationsViewer() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-card rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">FibreFlow</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">FibreFlow</p>
+                  <p className="text-2xl font-semibold text-foreground mt-1">
                     {currentStats.fibreflow_total}
                   </p>
                 </div>
@@ -350,11 +350,11 @@ export function FieldInstallationsViewer() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-card rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Synchronized</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">Synchronized</p>
+                  <p className="text-2xl font-semibold text-foreground mt-1">
                     {currentStats.synchronized}
                   </p>
                 </div>
@@ -364,11 +364,11 @@ export function FieldInstallationsViewer() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="bg-card rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Need Sync</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">Need Sync</p>
+                  <p className="text-2xl font-semibold text-foreground mt-1">
                     {currentStats.needs_sync}
                   </p>
                 </div>
@@ -380,44 +380,44 @@ export function FieldInstallationsViewer() {
           </div>
 
           {/* Status Distribution */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Status Distribution</h3>
+          <div className="bg-card rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Status Distribution</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {dataType === 'poles' ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Installed</span>
+                    <span className="text-sm text-muted-foreground">Installed</span>
                     <span className="font-semibold">{currentStats.status_counts.installed || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Pending</span>
+                    <span className="text-sm text-muted-foreground">Pending</span>
                     <span className="font-semibold">{currentStats.status_counts.pending || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Verified</span>
+                    <span className="text-sm text-muted-foreground">Verified</span>
                     <span className="font-semibold">{currentStats.status_counts.verified || 0}</span>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Installed</span>
+                    <span className="text-sm text-muted-foreground">Installed</span>
                     <span className="font-semibold">{currentStats.status_counts.installed || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Planned</span>
+                    <span className="text-sm text-muted-foreground">Planned</span>
                     <span className="font-semibold">{currentStats.status_counts.planned || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">QC Approved</span>
+                    <span className="text-sm text-muted-foreground">QC Approved</span>
                     <span className="font-semibold">{currentStats.status_counts.qc_approved || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">QC Pending</span>
+                    <span className="text-sm text-muted-foreground">QC Pending</span>
                     <span className="font-semibold">{currentStats.status_counts.qc_pending || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">QC Failed</span>
+                    <span className="text-sm text-muted-foreground">QC Failed</span>
                     <span className="font-semibold">{currentStats.status_counts.qc_failed || 0}</span>
                   </div>
                 </>
@@ -431,7 +431,7 @@ export function FieldInstallationsViewer() {
       {viewType === 'comparison' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* QFieldCloud Data */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="bg-card rounded-lg shadow overflow-hidden">
             <div className="bg-blue-600 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">QFieldCloud Data</h3>
               <p className="text-sm text-blue-100 mt-1">
@@ -442,14 +442,14 @@ export function FieldInstallationsViewer() {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {dataType === 'poles' ? (
                   qfieldPoles.slice(0, 10).map((pole) => (
-                    <div key={pole.pole_number} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div key={pole.pole_number} className="border border-border rounded-lg p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{pole.pole_number}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="font-medium text-foreground">{pole.pole_number}</p>
+                          <p className="text-sm text-muted-foreground">
                             {pole.pole_type} - {pole.height}m
                           </p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3" />
                             {pole.address || 'GPS Captured'}
                             {pole.image_count > 0 && (
@@ -468,12 +468,12 @@ export function FieldInstallationsViewer() {
                   ))
                 ) : (
                   qfieldDrops.slice(0, 10).map((drop) => (
-                    <div key={drop.drop_number} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div key={drop.drop_number} className="border border-border rounded-lg p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{drop.drop_number}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{drop.customer_name}</p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <p className="font-medium text-foreground">{drop.drop_number}</p>
+                          <p className="text-sm text-muted-foreground">{drop.customer_name}</p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <Ruler className="h-3 w-3" />
                             {drop.cable_length || 'N/A'}
                             <span className={`ml-2 px-2 py-0.5 text-xs rounded ${getStatusColor(drop.qc_status || '')}`}>
@@ -493,7 +493,7 @@ export function FieldInstallationsViewer() {
           </div>
 
           {/* FibreFlow Data */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="bg-card rounded-lg shadow overflow-hidden">
             <div className="bg-green-600 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">FibreFlow Data</h3>
               <p className="text-sm text-green-100 mt-1">
@@ -504,14 +504,14 @@ export function FieldInstallationsViewer() {
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {dataType === 'poles' ? (
                   fibreflowPoles.slice(0, 10).map((pole) => (
-                    <div key={pole.pole_number} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div key={pole.pole_number} className="border border-border rounded-lg p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{pole.pole_number}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className="font-medium text-foreground">{pole.pole_number}</p>
+                          <p className="text-sm text-muted-foreground">
                             {pole.pole_type} - {pole.height}m
                           </p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <MapPin className="h-3 w-3" />
                             {pole.address || 'No address'}
                           </div>
@@ -524,12 +524,12 @@ export function FieldInstallationsViewer() {
                   ))
                 ) : (
                   fibreflowDrops.slice(0, 10).map((drop) => (
-                    <div key={drop.drop_number} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                    <div key={drop.drop_number} className="border border-border rounded-lg p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{drop.drop_number}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{drop.customer_name}</p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <p className="font-medium text-foreground">{drop.drop_number}</p>
+                          <p className="text-sm text-muted-foreground">{drop.customer_name}</p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <Ruler className="h-3 w-3" />
                             {drop.cable_length || 'N/A'}
                             <span className={`ml-2 px-2 py-0.5 text-xs rounded ${getStatusColor(drop.qc_status || '')}`}>
@@ -552,60 +552,60 @@ export function FieldInstallationsViewer() {
 
       {/* Details View */}
       {viewType === 'details' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <div className="bg-card rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-border">
+            <h3 className="text-lg font-semibold text-foreground">
               All {dataType === 'poles' ? 'Poles' : 'Drops'} ({dataType === 'poles' ? poles.length : drops.length})
             </h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     {dataType === 'poles' ? 'Pole Number' : 'Drop Number'}
                   </th>
                   {dataType === 'poles' ? (
                     <>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                         Type/Height
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                         Location
                       </th>
                     </>
                   ) : (
                     <>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                         Customer
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                         Cable/QC
                       </th>
                     </>
                   )}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Sync
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Source
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-gray-200">
                 {dataType === 'poles' ? (
                   poles.slice(0, 50).map((pole) => (
                     <tr key={pole.pole_number}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                         {pole.pole_number}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {pole.pole_type} / {pole.height}m
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {pole.address || 'GPS Available'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -616,7 +616,7 @@ export function FieldInstallationsViewer() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getSyncStatusBadge(pole.sync_status || 'pending')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {pole.source === 'both' ? 'Both' :
                          pole.source === 'qfieldcloud' ? 'QFieldCloud' : 'FibreFlow'}
                       </td>
@@ -625,13 +625,13 @@ export function FieldInstallationsViewer() {
                 ) : (
                   drops.slice(0, 50).map((drop) => (
                     <tr key={drop.drop_number}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                         {drop.drop_number}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {drop.customer_name || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {drop.cable_length || 'N/A'} / {drop.qc_status || 'Pending'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -642,7 +642,7 @@ export function FieldInstallationsViewer() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getSyncStatusBadge(drop.sync_status || 'pending')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {drop.source === 'both' ? 'Both' :
                          drop.source === 'qfieldcloud' ? 'QFieldCloud' : 'FibreFlow'}
                       </td>

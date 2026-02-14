@@ -114,10 +114,10 @@ export function AnalyticsTab() {
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <RefreshCw className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               Loading Analytics
             </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-muted-foreground">
               Analyzing workflow data and generating insights...
             </p>
           </div>
@@ -133,10 +133,10 @@ export function AnalyticsTab() {
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+          <h3 className="text-lg font-medium text-foreground mb-2">
             Analytics Error
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             {error}
           </p>
           <Button onClick={loadAnalytics} variant="outline">
@@ -184,17 +184,17 @@ export function AnalyticsTab() {
       {/* Header with Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 className="text-xl font-semibold text-foreground">
             Workflow Analytics
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-muted-foreground mt-1">
             Comprehensive insights into workflow performance and utilization
           </p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <Calendar className="w-4 h-4 text-muted-foreground" />
             <Select value={dateRange.label} onValueChange={handleDateRangeChange}>
               <SelectTrigger className="w-40">
                 <SelectValue />
@@ -235,10 +235,10 @@ export function AnalyticsTab() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <p className="text-sm text-muted-foreground">
                       {stat.title}
                     </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    <p className="text-2xl font-bold text-foreground">
                       {stat.value}
                     </p>
                   </div>
@@ -320,10 +320,10 @@ export function AnalyticsTab() {
         <TabsContent value="reports" className="space-y-6">
           <div className="text-center py-8">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            <h3 className="text-lg font-medium text-foreground mb-2">
               Custom Reports
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               Generate custom reports with specific metrics and time ranges
             </p>
             <ReportExporter 

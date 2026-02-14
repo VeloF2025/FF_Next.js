@@ -98,7 +98,7 @@ function getStatusConfig(status: string) {
     case 'not_started':
     case 'preparing':
     default:
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: 'Pending', icon: Clock };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: 'Pending', icon: Clock };
   }
 }
 
@@ -113,7 +113,7 @@ const pipelineStatusLabels: Record<string, string> = {
 };
 
 const pipelineStatusColors: Record<string, string> = {
-  lead: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  lead: 'bg-secondary text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   qualifying: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   planning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   ready_to_plan: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
@@ -476,7 +476,7 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
             {expiringAlerts.map(alert => (
               <div
                 key={alert.id}
-                className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded-lg"
+                className="flex items-center justify-between p-2 bg-card rounded-lg"
               >
                 <span className="text-sm text-[var(--ff-text-primary)]">{alert.name}</span>
                 <span className="text-sm text-orange-600 dark:text-orange-400">

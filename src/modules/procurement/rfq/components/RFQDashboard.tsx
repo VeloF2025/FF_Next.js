@@ -230,7 +230,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
   const getStatusColor = (status: RFQStatusType) => {
     switch (status) {
       case RFQStatus.DRAFT:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
       case RFQStatus.ISSUED:
         return 'bg-blue-100 text-blue-800';
       case RFQStatus.RESPONSES_RECEIVED:
@@ -242,7 +242,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
       case RFQStatus.CANCELLED:
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
     }
   };
 
@@ -286,13 +286,13 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
       <ProcurementErrorBoundary level="page">
         <div className="p-6 space-y-6">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+            <div className="h-8 bg-secondary rounded w-1/3 mb-4"></div>
             <div className="grid grid-cols-4 gap-6 mb-6">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div key={i} className="h-24 bg-secondary rounded"></div>
               ))}
             </div>
-            <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-96 bg-secondary rounded"></div>
           </div>
         </div>
       </ProcurementErrorBoundary>
@@ -305,20 +305,20 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Request for Quotations</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">Manage RFQs, track responses, and evaluate suppliers</p>
+            <h1 className="text-3xl font-bold text-foreground">Request for Quotations</h1>
+            <p className="text-muted-foreground mt-1">Manage RFQs, track responses, and evaluate suppliers</p>
           </div>
           <div className="flex space-x-3">
             <button
               onClick={loadRFQData}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </button>
             <Link
               to="/app/procurement/rfq/upload"
-              className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <Upload className="h-4 w-4 mr-2" />
               Import RFQ
@@ -347,7 +347,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -355,15 +355,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total RFQs</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.totalRFQs}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Total RFQs</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.totalRFQs}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -371,15 +371,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Active RFQs</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.activeRFQs}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Active RFQs</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.activeRFQs}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -387,15 +387,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Suppliers Engaged</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.suppliersEngaged}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Suppliers Engaged</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.suppliersEngaged}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -403,8 +403,8 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total Value</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Total Value</dt>
+                    <dd className="text-lg font-semibold text-foreground">
                       {formatCurrency(rfqStats.totalValue)}
                     </dd>
                   </dl>
@@ -416,7 +416,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
 
         {/* Additional Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -424,15 +424,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Completed</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.completedRFQs}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Completed</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.completedRFQs}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -440,15 +440,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Overdue</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.overdueRFQs}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Overdue</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.overdueRFQs}</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -456,15 +456,15 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg Response Time</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.averageResponseTime}d</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Avg Response Time</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.averageResponseTime}d</dd>
                   </dl>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-lg border">
+          <div className="bg-card overflow-hidden shadow-sm rounded-lg border">
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -472,8 +472,8 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Awaiting Responses</dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfqStats.awaitingResponses}</dd>
+                    <dt className="text-sm font-medium text-muted-foreground truncate">Awaiting Responses</dt>
+                    <dd className="text-lg font-semibold text-foreground">{rfqStats.awaitingResponses}</dd>
                   </dl>
                 </div>
               </div>
@@ -482,10 +482,10 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
         </div>
 
         {/* RFQ List */}
-        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg border">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-card shadow-sm rounded-lg border">
+          <div className="px-6 py-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent RFQs</h3>
+              <h3 className="text-lg font-medium text-foreground">Recent RFQs</h3>
               <div className="flex space-x-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -494,13 +494,13 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                     placeholder="Search RFQs..."
                     value={searchTerm}
                     onChange={(_e) => {/* Search handled by parent */}}
-                    className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="pl-10 pr-4 py-2 border border-border rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
                   />
                 </div>
                 <select
                   value={statusFilter}
                   onChange={(_e) => {/* Filter handled by parent */}}
-                  className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                  className="border border-border rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Status</option>
                   <option value={RFQStatus.DRAFT}>Draft</option>
@@ -516,37 +516,37 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
 
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-background">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     RFQ Details
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Deadline
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Suppliers
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Value
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+              <tbody className="bg-card divide-y divide-gray-200">
                 {filteredRFQs.map((rfq) => {
                   const StatusIcon = getStatusIcon(rfq.status);
                   return (
-                    <tr key={rfq.id} className="hover:bg-gray-50 dark:bg-gray-900">
+                    <tr key={rfq.id} className="hover:bg-background">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{rfq.rfqNumber}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{rfq.title}</div>
+                          <div className="text-sm font-medium text-foreground">{rfq.rfqNumber}</div>
+                          <div className="text-sm text-muted-foreground">{rfq.title}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -557,23 +557,23 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         <div>
                           <div>{rfq.responseDeadline.toISOString().split('T')[0]}</div>
-                          <div className={`text-xs ${rfq.isOverdue ? 'text-red-600' : rfq.daysRemaining <= 2 ? 'text-yellow-600' : 'text-gray-500 dark:text-gray-400'}`}>
+                          <div className={`text-xs ${rfq.isOverdue ? 'text-red-600' : rfq.daysRemaining <= 2 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
                             {rfq.isOverdue 
                               ? `${Math.abs(rfq.daysRemaining)} days overdue`
                               : `${rfq.daysRemaining} days remaining`}
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         <div className="flex items-center">
                           <span>{rfq.respondedSuppliersCount}/{rfq.invitedSuppliersCount}</span>
                           <Users className="h-4 w-4 ml-1 text-gray-400" />
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {rfq.totalBudgetEstimate ? formatCurrency(rfq.totalBudgetEstimate) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -611,8 +611,8 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
             {filteredRFQs.length === 0 && (
               <div className="text-center py-12">
                 <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No RFQs found</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <h3 className="mt-2 text-sm font-medium text-foreground">No RFQs found</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
                   {searchTerm || statusFilter !== 'all' 
                     ? 'Try adjusting your search or filter criteria.'
                     : 'Get started by creating your first RFQ.'}

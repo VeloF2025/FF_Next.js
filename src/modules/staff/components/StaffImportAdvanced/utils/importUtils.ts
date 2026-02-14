@@ -41,7 +41,7 @@ export const getStatusColor = (status: string): string => {
     case 'importing': return 'text-yellow-600';
     case 'completed': return 'text-green-600';
     case 'error': return 'text-red-600';
-    default: return 'text-gray-600 dark:text-gray-400';
+    default: return 'text-muted-foreground';
   }
 };
 

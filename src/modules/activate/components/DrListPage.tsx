@@ -432,7 +432,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                     <Filter className="h-4 w-4" />
                     Filters
                     {hasActiveFilters && (
-                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-white dark:bg-gray-800 text-[var(--ff-primary-500)] rounded-full">
+                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-card text-[var(--ff-primary-500)] rounded-full">
                         Active
                       </span>
                     )}

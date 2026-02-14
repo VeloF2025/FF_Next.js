@@ -387,19 +387,19 @@ export function QuoteScannerModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+      <div className="relative bg-card rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-foreground">
                 Scan Quote Document
               </h2>
               {rfqNumber && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Matching to {rfqNumber}
                 </p>
               )}
@@ -409,7 +409,7 @@ export function QuoteScannerModal({
             onClick={handleClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -426,17 +426,17 @@ export function QuoteScannerModal({
                   relative border-2 border-dashed rounded-lg p-8 text-center transition-colors
                   ${file
                     ? 'border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-900/20'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+                    : 'border-border hover:border-blue-400 dark:hover:border-blue-500'
                   }
                 `}
               >
                 {!file ? (
                   <>
                     <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <p className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <p className="text-lg font-medium text-muted-foreground mb-2">
                       Drop your quote document here
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    <p className="text-sm text-muted-foreground mb-4">
                       or click to browse
                     </p>
                     <Button
@@ -445,7 +445,7 @@ export function QuoteScannerModal({
                     >
                       Select File
                     </Button>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-4">
+                    <p className="text-xs text-gray-400 dark:text-muted-foreground mt-4">
                       Supports PDF, JPEG, PNG (max 20MB)
                     </p>
                   </>
@@ -459,15 +459,15 @@ export function QuoteScannerModal({
                           className="w-20 h-20 object-cover rounded-lg"
                         />
                       ) : (
-                        <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                        <div className="w-20 h-20 bg-secondary rounded-lg flex items-center justify-center">
                           <FileImage className="h-10 w-10 text-gray-400" />
                         </div>
                       )}
                       <div className="text-left">
-                        <p className="font-medium text-gray-900 dark:text-white">
+                        <p className="font-medium text-foreground">
                           {file.name}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground">
                           {(file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -516,15 +516,15 @@ export function QuoteScannerModal({
           {step === 'processing' && (
             <div className="text-center py-12">
               <Loader2 className="h-16 w-16 mx-auto text-blue-500 animate-spin mb-6" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 Analyzing Document
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 Extracting quote data using AI...
               </p>
 
               {/* Progress Bar */}
-              <div className="w-full max-w-xs mx-auto bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="w-full max-w-xs mx-auto bg-secondary rounded-full h-2">
                 <div
                   className="bg-blue-500 h-2 rounded-full transition-all duration-500"
                   style={{ width: `${progress}%` }}
@@ -538,17 +538,17 @@ export function QuoteScannerModal({
             <div className="space-y-4 max-h-[60vh] overflow-y-auto">
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle className="h-5 w-5 text-green-500" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                <h3 className="text-lg font-medium text-foreground">
                   Review Extracted Data
                 </h3>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              <p className="text-sm text-muted-foreground mb-4">
                 Please review and correct any errors before creating the quote.
               </p>
 
               {/* Document Preview */}
               {previewUrl && (
-                <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                <div className="mb-4 p-2 bg-secondary rounded-lg">
                   <img
                     src={previewUrl}
                     alt="Document"
@@ -582,7 +582,7 @@ export function QuoteScannerModal({
                       onChange={() => setSelectedSupplierId('new')}
                       className="text-blue-600"
                     />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="text-sm text-muted-foreground">
                       Create new supplier: <strong>{editableData.supplierName || '(enter name below)'}</strong>
                     </span>
                   </label>
@@ -597,14 +597,14 @@ export function QuoteScannerModal({
                         onChange={() => setSelectedSupplierId(matchedSupplier?.id || existingSuppliers[0]?.id || 'new')}
                         className="text-blue-600"
                       />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="text-sm text-muted-foreground">
                         Link to existing supplier:
                       </span>
                       <select
                         value={selectedSupplierId !== 'new' ? selectedSupplierId : ''}
                         onChange={(e) => setSelectedSupplierId(e.target.value)}
                         disabled={selectedSupplierId === 'new'}
-                        className="flex-1 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:opacity-50"
+                        className="flex-1 px-2 py-1 text-sm rounded border border-border bg-card text-foreground disabled:opacity-50"
                       >
                         <option value="">Select supplier...</option>
                         {existingSuppliers.map((s) => (
@@ -619,21 +619,21 @@ export function QuoteScannerModal({
 
                 {selectedSupplierId === 'new' && (
                   <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">
                       New Supplier Name *
                     </label>
                     <input
                       type="text"
                       value={editableData.supplierName}
                       onChange={(e) => setEditableData(prev => ({ ...prev, supplierName: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                       placeholder="Enter supplier name"
                     />
                   </div>
                 )}
 
                 {isLoadingSuppliers && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Loading suppliers...</p>
+                  <p className="text-xs text-muted-foreground mt-2">Loading suppliers...</p>
                 )}
               </div>
 
@@ -641,50 +641,50 @@ export function QuoteScannerModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Quote Number *
                   </label>
                   <input
                     type="text"
                     value={editableData.quoteNumber}
                     onChange={(e) => setEditableData(prev => ({ ...prev, quoteNumber: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="QUO-001"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Quote Date
                   </label>
                   <input
                     type="date"
                     value={editableData.quoteDate}
                     onChange={(e) => setEditableData(prev => ({ ...prev, quoteDate: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Valid Until
                   </label>
                   <input
                     type="date"
                     value={editableData.validUntil}
                     onChange={(e) => setEditableData(prev => ({ ...prev, validUntil: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Currency
                   </label>
                   <select
                     value={editableData.currency}
                     onChange={(e) => setEditableData(prev => ({ ...prev, currency: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                   >
                     <option value="ZAR">ZAR</option>
                     <option value="USD">USD</option>
@@ -694,7 +694,7 @@ export function QuoteScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Subtotal
                   </label>
                   <input
@@ -702,13 +702,13 @@ export function QuoteScannerModal({
                     step="0.01"
                     value={editableData.subtotal}
                     onChange={(e) => setEditableData(prev => ({ ...prev, subtotal: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     VAT Amount
                   </label>
                   <input
@@ -716,13 +716,13 @@ export function QuoteScannerModal({
                     step="0.01"
                     value={editableData.vatAmount}
                     onChange={(e) => setEditableData(prev => ({ ...prev, vatAmount: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Total *
                   </label>
                   <input
@@ -730,33 +730,33 @@ export function QuoteScannerModal({
                     step="0.01"
                     value={editableData.total}
                     onChange={(e) => setEditableData(prev => ({ ...prev, total: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Payment Terms
                   </label>
                   <input
                     type="text"
                     value={editableData.paymentTerms}
                     onChange={(e) => setEditableData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="e.g., Net 30"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Delivery Terms
                   </label>
                   <input
                     type="text"
                     value={editableData.deliveryTerms}
                     onChange={(e) => setEditableData(prev => ({ ...prev, deliveryTerms: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-card text-foreground"
                     placeholder="e.g., 7-14 days"
                   />
                 </div>
@@ -765,20 +765,20 @@ export function QuoteScannerModal({
               {/* Line Items Preview */}
               {result.extraction?.lineItems && result.extraction.lineItems.length > 0 && (
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">
                     Extracted Line Items ({result.extraction.lineItems.length})
                   </h4>
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                  <div className="bg-secondary/50 rounded-lg p-3 max-h-40 overflow-y-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-left text-gray-500 dark:text-gray-400">
+                        <tr className="text-left text-muted-foreground">
                           <th className="pb-2">Description</th>
                           <th className="pb-2 text-right">Qty</th>
                           <th className="pb-2 text-right">Unit Price</th>
                           <th className="pb-2 text-right">Total</th>
                         </tr>
                       </thead>
-                      <tbody className="text-gray-900 dark:text-white">
+                      <tbody className="text-foreground">
                         {result.extraction.lineItems.slice(0, 10).map((item: any, idx: number) => (
                           <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
                             <td className="py-1 truncate max-w-[200px]">{item.description}</td>
@@ -790,7 +790,7 @@ export function QuoteScannerModal({
                       </tbody>
                     </table>
                     {result.extraction.lineItems.length > 10 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         + {result.extraction.lineItems.length - 10} more items
                       </p>
                     )}
@@ -824,10 +824,10 @@ export function QuoteScannerModal({
           {step === 'complete' && result && (
             <div className="text-center py-8">
               <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-6" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 {quoteCreated ? 'Quote Created!' : 'Extraction Complete!'}
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 {quoteCreated
                   ? 'The quote has been added to this RFQ'
                   : `Successfully extracted ${result.extraction?.lineItems?.length || 0} line items${result.matching ? ` (${result.matching.totalMatched} matched to RFQ)` : ''}`
@@ -835,30 +835,30 @@ export function QuoteScannerModal({
               </p>
 
               {/* Summary */}
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 text-left mb-6">
+              <div className="bg-secondary/50 rounded-lg p-4 text-left mb-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Supplier:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-muted-foreground">Supplier:</span>
+                    <p className="font-medium text-foreground">
                       {result.extraction?.supplier?.name || 'Unknown'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Quote #:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-muted-foreground">Quote #:</span>
+                    <p className="font-medium text-foreground">
                       {result.extraction?.quoteInfo?.quoteNumber || 'N/A'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Total:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-muted-foreground">Total:</span>
+                    <p className="font-medium text-foreground">
                       {result.extraction?.totals?.currency || 'ZAR'}{' '}
                       {result.extraction?.totals?.total?.toLocaleString() || '0'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-500 dark:text-gray-400">Processing:</span>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                    <span className="text-muted-foreground">Processing:</span>
+                    <p className="font-medium text-foreground">
                       {(result.processingTimeMs / 1000).toFixed(1)}s
                     </p>
                   </div>
@@ -880,7 +880,7 @@ export function QuoteScannerModal({
               )}
 
               {!quoteCreated && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Extraction complete. You can create the quote manually if needed.
                 </p>
               )}
@@ -890,10 +890,10 @@ export function QuoteScannerModal({
           {step === 'error' && (
             <div className="text-center py-12">
               <AlertTriangle className="h-16 w-16 mx-auto text-red-500 mb-6" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 Extraction Failed
               </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 {error || 'An error occurred while processing the document'}
               </p>
               <Button variant="outline" onClick={handleReset}>
@@ -904,7 +904,7 @@ export function QuoteScannerModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-border">
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>

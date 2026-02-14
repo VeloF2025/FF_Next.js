@@ -173,14 +173,14 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
   const drNumbers = extractDRNumbers(input);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+    <div className="bg-card border border-border rounded-lg p-6">
       <div className="flex items-center gap-3 mb-4">
         <span className="text-2xl">📝</span>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             Manual DR Entry
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Add DRs manually when WhatsApp bridge is down
           </p>
         </div>
@@ -188,13 +188,13 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
 
       {/* Project Selection */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Project
         </label>
         <select
           value={project}
           onChange={(e) => setProject(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
         >
           <option value="">Select project...</option>
           <option value="Lawley">Lawley</option>
@@ -207,7 +207,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
 
       {/* Submitted Date */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Date Submitted
         </label>
         <input
@@ -215,16 +215,16 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
           value={submittedDate}
           onChange={(e) => setSubmittedDate(e.target.value)}
           max={new Date().toISOString().split('T')[0]}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground"
         />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs text-muted-foreground">
           When was this DR originally submitted? Defaults to today.
         </p>
       </div>
 
       {/* Text Input */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Drop Numbers (paste or type)
         </label>
         <textarea
@@ -232,7 +232,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Paste DR numbers here...&#10;DR1234567&#10;DR1234568&#10;Or any text containing DR numbers"
           rows={5}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 font-mono text-sm"
+          className="w-full px-3 py-2 border border-border rounded-lg bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400 font-mono text-sm"
         />
         {drNumbers.length > 0 && (
           <p className="mt-1 text-sm text-green-600 dark:text-green-400">
@@ -244,14 +244,14 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
 
       {/* File Upload */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label className="block text-sm font-medium text-muted-foreground mb-1">
           Or upload a text file
         </label>
         <input
           type="file"
           accept=".txt,.csv"
           onChange={handleFileUpload}
-          className="block w-full text-sm text-gray-500 dark:text-gray-400
+          className="block w-full text-sm text-muted-foreground
             file:mr-4 file:py-2 file:px-4
             file:rounded-lg file:border-0
             file:text-sm file:font-semibold
@@ -290,7 +290,7 @@ export function ManualDREntry({ onDRsAdded }: ManualDREntryProps) {
       {/* Results */}
       {results.length > 0 && (
         <div className="mt-4 space-y-2">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Results:</h4>
+          <h4 className="text-sm font-medium text-muted-foreground">Results:</h4>
           <div className="max-h-48 overflow-y-auto space-y-1">
             {results.map((result) => (
               <div

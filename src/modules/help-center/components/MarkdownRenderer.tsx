@@ -197,7 +197,7 @@ function MarkdownBlock({ block, searchHighlight }: { block: Block; searchHighlig
         <div className="overflow-x-auto rounded-lg border border-white/10">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-white dark:bg-gray-800/5">
+              <tr className="bg-card/5">
                 {block.rows[0].map((cell, i) => (
                   <th key={i} className="px-4 py-2 text-left font-semibold text-gray-200 border-b border-white/10">
                     <InlineMarkdown text={cell} highlight={searchHighlight} />
@@ -207,7 +207,7 @@ function MarkdownBlock({ block, searchHighlight }: { block: Block; searchHighlig
             </thead>
             <tbody>
               {block.rows.slice(1).map((row, ri) => (
-                <tr key={ri} className="border-b border-white/5 hover:bg-white dark:bg-gray-800/5">
+                <tr key={ri} className="border-b border-white/5 hover:bg-card/5">
                   {row.map((cell, ci) => (
                     <td key={ci} className="px-4 py-2 text-gray-300">
                       <InlineMarkdown text={cell} highlight={searchHighlight} />
@@ -237,7 +237,7 @@ function InlineMarkdown({ text, highlight }: { text: string; highlight?: string 
       {segments.map((seg, i) => {
         let el: React.ReactNode;
         if (seg.type === 'code') {
-          el = <code key={i} className="bg-white dark:bg-gray-800/10 px-1.5 py-0.5 rounded text-sm text-orange-300">{seg.text}</code>;
+          el = <code key={i} className="bg-card/10 px-1.5 py-0.5 rounded text-sm text-orange-300">{seg.text}</code>;
         } else if (seg.type === 'bold') {
           el = <strong key={i} className="text-white font-semibold">{seg.text}</strong>;
         } else if (seg.type === 'italic') {

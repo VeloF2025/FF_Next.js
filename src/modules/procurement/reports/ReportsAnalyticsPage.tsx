@@ -59,15 +59,15 @@ interface StatsCardProps {
 
 function StatsCard({ title, value, change, changeType, icon, loading }: StatsCardProps) {
   const changeColor = changeType === 'positive' ? 'text-green-600' : 
-                     changeType === 'negative' ? 'text-red-600' : 'text-gray-600 dark:text-gray-400';
+                     changeType === 'negative' ? 'text-red-600' : 'text-muted-foreground';
   
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-3xl font-bold text-foreground">
               {loading ? '...' : value}
             </p>
             {change && (
@@ -206,10 +206,10 @@ const ReportsAnalyticsPage: React.FC = () => {
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-700 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Procurement Reports & Analytics</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Comprehensive insights into procurement performance and spending patterns</p>
+          <h1 className="text-3xl font-bold text-foreground">Procurement Reports & Analytics</h1>
+          <p className="text-muted-foreground mt-2">Comprehensive insights into procurement performance and spending patterns</p>
         </div>
         <div className="flex gap-3 mt-4 sm:mt-0">
           <Button variant="outline" onClick={() => loadReportData()}>
@@ -228,7 +228,7 @@ const ReportsAnalyticsPage: React.FC = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-border">
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -240,7 +240,7 @@ const ReportsAnalyticsPage: React.FC = () => {
                   flex items-center py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors
                   ${activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
+                    : 'border-transparent text-muted-foreground hover:text-muted-foreground hover:border-border'
                   }
                 `}
               >
@@ -340,26 +340,26 @@ const ReportsAnalyticsPage: React.FC = () => {
           <ReportSection title="Top Supplier Performance">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 dark:bg-gray-900">
+                <thead className="bg-background">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                       Supplier
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                       Rating
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                       Total Spend
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                       On-Time Delivery
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
+                <tbody className="bg-card divide-y divide-gray-200">
                   {(supplierPerformanceData?.topPerformers || []).slice(0, 5).map((supplier: any) => (
                     <tr key={supplier.supplierId}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-foreground">
                         {supplier.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -367,10 +367,10 @@ const ReportsAnalyticsPage: React.FC = () => {
                           {supplier.rating.toFixed(1)}/5.0
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {formatCurrency(supplier.totalSpend)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                         {formatPercentage(supplier.onTimeDelivery)}
                       </td>
                     </tr>

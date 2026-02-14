@@ -57,8 +57,8 @@ export function CollapsibleSection({
           href={sectionLink}
           className={`w-full flex items-center gap-3 text-sm font-medium px-3 py-2.5 rounded-lg transition-colors ${
             isLinkActive
-              ? 'bg-white dark:bg-gray-800/10 text-white'
-              : 'hover:bg-white dark:bg-gray-800/5 text-gray-300 hover:text-white'
+              ? 'bg-card/10 text-white'
+              : 'hover:bg-card/5 text-gray-300 hover:text-white'
           }`}
           style={{
             color: isLinkActive ? themeConfig.colors.primary[400] : sidebarStyles.textColor,
@@ -80,7 +80,7 @@ export function CollapsibleSection({
           type="button"
           onClick={handleClick}
           className={`w-full flex items-center justify-between text-xs font-semibold tracking-wide mb-2 px-2 py-1 rounded transition-colors ${
-            isCollapsible ? 'hover:bg-white dark:bg-gray-800/5 cursor-pointer' : 'cursor-default'
+            isCollapsible ? 'hover:bg-card/5 cursor-pointer' : 'cursor-default'
           }`}
           style={{ color: hasActiveItem ? themeConfig.colors.primary[400] : sidebarStyles.textColorTertiary }}
           title={isCollapsible ? (isExpanded ? 'Click to collapse, Shift+click to keep others open' : 'Click to expand') : undefined}

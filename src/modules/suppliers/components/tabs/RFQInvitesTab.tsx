@@ -69,13 +69,13 @@ const statusConfig = {
   expired: {
     label: 'Expired',
     icon: AlertCircle,
-    color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700',
-    iconColor: 'text-gray-600 dark:text-gray-400'
+    color: 'bg-secondary text-foreground border-border',
+    iconColor: 'text-muted-foreground'
   }
 };
 
 const priorityConfig = {
-  low: { color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200', badge: '●' },
+  low: { color: 'bg-secondary text-foreground', badge: '●' },
   medium: { color: 'bg-yellow-100 text-yellow-800', badge: '●' },
   high: { color: 'bg-orange-100 text-orange-800', badge: '●' },
   urgent: { color: 'bg-red-100 text-red-800', badge: '●' }
@@ -146,11 +146,11 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
   const daysUntilDue = Math.ceil((new Date(rfq.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow">
+    <div className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center space-x-3 mb-2">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{rfq.title}</h3>
+            <h3 className="text-lg font-semibold text-foreground">{rfq.title}</h3>
             <span className={cn("px-2 py-1 rounded-full text-xs font-medium border", status.color)}>
               <StatusIcon className={cn("w-3 h-3 inline mr-1", status.iconColor)} />
               {status.label}
@@ -160,8 +160,8 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
               {rfq.priority.toUpperCase()}
             </span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{rfq.description}</p>
-          <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-muted-foreground text-sm mb-3">{rfq.description}</p>
+          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
             <span className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
               Sent: {new Date(rfq.sentDate).toISOString().split('T')[0]}
@@ -180,10 +180,10 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
       </div>
 
       <div className="mb-4">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Requirements:</p>
+        <p className="text-sm font-medium text-muted-foreground mb-2">Requirements:</p>
         <div className="flex flex-wrap gap-2">
           {rfq.requirements.map((req, index) => (
-            <span key={index} className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs">
+            <span key={index} className="bg-secondary text-muted-foreground px-2 py-1 rounded text-xs">
               {req}
             </span>
           ))}
@@ -191,7 +191,7 @@ function RFQCard({ rfq, onView }: RFQCardProps) {
       </div>
 
       <div className="flex items-center justify-between pt-4 border-t">
-        <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
           <span>{rfq.supplierName}</span>
           <span>{rfq.category}</span>
           {rfq.attachments > 0 && (
@@ -233,14 +233,14 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
   if (!rfq) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{rfq.title}</h2>
+            <h2 className="text-xl font-semibold text-foreground">{rfq.title}</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-400"
+              className="text-gray-400 hover:text-muted-foreground"
             >
               <XCircle className="w-6 h-6" />
             </button>
@@ -249,23 +249,23 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">RFQ Details</h3>
+              <h3 className="text-lg font-medium text-foreground mb-3">RFQ Details</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{rfq.description}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Description</label>
+                  <p className="text-sm text-muted-foreground">{rfq.description}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{rfq.category}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Category</label>
+                  <p className="text-sm text-muted-foreground">{rfq.category}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estimated Value</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">${rfq.estimatedValue.toLocaleString()}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Estimated Value</label>
+                  <p className="text-sm text-muted-foreground">${rfq.estimatedValue.toLocaleString()}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Requirements</label>
-                  <ul className="text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
+                  <label className="block text-sm font-medium text-muted-foreground">Requirements</label>
+                  <ul className="text-sm text-muted-foreground list-disc list-inside">
                     {rfq.requirements.map((req, index) => (
                       <li key={index}>{req}</li>
                     ))}
@@ -274,34 +274,34 @@ function RFQDetailModal({ rfq, onClose }: RFQDetailModalProps) {
               </div>
             </div>
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">Timeline & Status</h3>
+              <h3 className="text-lg font-medium text-foreground mb-3">Timeline & Status</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Sent Date</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(rfq.sentDate).toISOString().split('T')[0]}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Sent Date</label>
+                  <p className="text-sm text-muted-foreground">{new Date(rfq.sentDate).toISOString().split('T')[0]}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Due Date</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(rfq.dueDate).toISOString().split('T')[0]}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Due Date</label>
+                  <p className="text-sm text-muted-foreground">{new Date(rfq.dueDate).toISOString().split('T')[0]}</p>
                 </div>
                 {rfq.responseDate && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Response Date</label>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(rfq.responseDate).toISOString().split('T')[0]}</p>
+                    <label className="block text-sm font-medium text-muted-foreground">Response Date</label>
+                    <p className="text-sm text-muted-foreground">{new Date(rfq.responseDate).toISOString().split('T')[0]}</p>
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Current Status</label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{statusConfig[rfq.status].label}</p>
+                  <label className="block text-sm font-medium text-muted-foreground">Current Status</label>
+                  <p className="text-sm text-muted-foreground">{statusConfig[rfq.status].label}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="p-6 border-t bg-gray-50 dark:bg-gray-900 flex justify-end space-x-3">
+        <div className="p-6 border-t bg-background flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900"
+            className="px-4 py-2 border border-border rounded-md text-muted-foreground hover:bg-background"
           >
             Close
           </button>
@@ -354,8 +354,8 @@ export function RFQInvitesTab() {
     return (
       <div className="text-center py-12">
         <Send className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a Supplier</h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <h3 className="text-lg font-medium text-foreground mb-2">Select a Supplier</h3>
+        <p className="text-muted-foreground">
           Choose a supplier from the Company Profile tab to view their RFQ invitations and response history.
         </p>
       </div>
@@ -367,8 +367,8 @@ export function RFQInvitesTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">RFQ Invites</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <h2 className="text-2xl font-bold text-foreground">RFQ Invites</h2>
+          <p className="text-muted-foreground mt-1">
             Manage RFQ invitations and track responses for {selectedSupplier.name}
           </p>
         </div>
@@ -379,7 +379,7 @@ export function RFQInvitesTab() {
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="bg-card p-4 rounded-lg border border-border">
         <div className="flex items-center justify-between space-x-4">
           <div className="flex items-center space-x-4 flex-1">
             <div className="relative">
@@ -387,7 +387,7 @@ export function RFQInvitesTab() {
               <input
                 type="text"
                 placeholder="Search RFQs..."
-                className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 pr-4 py-2 border border-border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -395,7 +395,7 @@ export function RFQInvitesTab() {
             <div className="flex items-center space-x-2">
               <Filter className="h-4 w-4 text-gray-400" />
               <select
-                className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
+                className="border border-border rounded-md px-3 py-2 text-sm"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -409,7 +409,7 @@ export function RFQInvitesTab() {
               </select>
             </div>
           </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-muted-foreground">
             {filteredRFQs.length} of {mockRFQs.length} RFQs
           </div>
         </div>
@@ -457,10 +457,10 @@ export function RFQInvitesTab() {
 
       {/* RFQ List */}
       {filteredRFQs.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="text-center py-12 bg-card rounded-lg border border-border">
           <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No RFQs Found</h3>
-          <p className="text-gray-600 dark:text-gray-400">
+          <h3 className="text-lg font-medium text-foreground mb-2">No RFQs Found</h3>
+          <p className="text-muted-foreground">
             {searchTerm || statusFilter !== 'all' 
               ? 'No RFQs match your current filters.'
               : 'No RFQs have been sent to this supplier yet.'

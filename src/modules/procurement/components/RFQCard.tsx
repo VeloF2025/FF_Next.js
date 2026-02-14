@@ -25,7 +25,7 @@ export function RFQCard({ rfq }: RFQCardProps) {
       case RFQStatus.CANCELLED:
         return <XCircle className="h-4 w-4 text-red-500" />;
       case RFQStatus.EVALUATED:
-        return <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
       default:
         return <Clock className="h-4 w-4 text-yellow-500" />;
     }

@@ -6,12 +6,12 @@ export default function VFThemeTest() {
   const { themeConfig, setTheme } = useTheme();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">VF Theme Test Page</h1>
         
         {/* Theme Selector */}
-        <div className="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="mb-8 p-4 bg-card rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Theme Selection</h2>
           <div className="flex gap-4">
             {Object.keys(themes).map((themeName) => (
@@ -21,41 +21,41 @@ export default function VFThemeTest() {
                 className={`px-4 py-2 rounded-lg border-2 transition-all ${
                   themeConfig.name === themeName
                     ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                    : 'border-border hover:border-gray-400'
                 }`}
               >
                 {themeName.toUpperCase()} Theme
               </button>
             ))}
           </div>
-          <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-4 text-sm text-muted-foreground">
             Current Theme: <strong>{themeConfig.name}</strong>
           </p>
         </div>
 
         {/* VF Logo Component Test */}
-        <div className="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="mb-8 p-4 bg-card rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Logo Component (All Sizes)</h2>
           
           <div className="space-y-4">
             <div className="flex items-center gap-8">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Small:</p>
-                <div className="p-4 bg-white dark:bg-gray-800 border rounded">
+                <p className="text-sm text-muted-foreground mb-2">Small:</p>
+                <div className="p-4 bg-card border rounded">
                   <VFLogo size="small" />
                 </div>
               </div>
               
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Medium:</p>
-                <div className="p-4 bg-white dark:bg-gray-800 border rounded">
+                <p className="text-sm text-muted-foreground mb-2">Medium:</p>
+                <div className="p-4 bg-card border rounded">
                   <VFLogo size="medium" />
                 </div>
               </div>
               
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Large:</p>
-                <div className="p-4 bg-white dark:bg-gray-800 border rounded">
+                <p className="text-sm text-muted-foreground mb-2">Large:</p>
+                <div className="p-4 bg-card border rounded">
                   <VFLogo size="large" />
                 </div>
               </div>
@@ -64,7 +64,7 @@ export default function VFThemeTest() {
         </div>
 
         {/* Sidebar Preview */}
-        <div className="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="mb-8 p-4 bg-card rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">Sidebar Preview (VF Theme)</h2>
           
           {themeConfig.name === 'vf' ? (
@@ -90,12 +90,12 @@ export default function VFThemeTest() {
               </div>
             </div>
           ) : (
-            <p className="text-gray-600 dark:text-gray-400">Switch to VF theme to see the sidebar preview</p>
+            <p className="text-muted-foreground">Switch to VF theme to see the sidebar preview</p>
           )}
         </div>
 
         {/* Color Palette */}
-        <div className="mb-8 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="mb-8 p-4 bg-card rounded-lg shadow">
           <h2 className="text-xl font-semibold mb-4">VF Theme Colors</h2>
           
           {themeConfig.name === 'vf' && (
@@ -106,7 +106,7 @@ export default function VFThemeTest() {
                   style={{ backgroundColor: typeof themeConfig.colors.primary === 'string' ? themeConfig.colors.primary : themeConfig.colors.primary[500] }}
                 />
                 <p className="text-sm">Primary</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{typeof themeConfig.colors.primary === 'string' ? themeConfig.colors.primary : themeConfig.colors.primary[500]}</p>
+                <p className="text-xs text-muted-foreground">{typeof themeConfig.colors.primary === 'string' ? themeConfig.colors.primary : themeConfig.colors.primary[500]}</p>
               </div>
               
               <div>
@@ -115,7 +115,7 @@ export default function VFThemeTest() {
                   style={{ backgroundColor: themeConfig.colors.surface.sidebar || '#1e293b' }}
                 />
                 <p className="text-sm">Sidebar BG</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{themeConfig.colors.surface.sidebar || '#1e293b'}</p>
+                <p className="text-xs text-muted-foreground">{themeConfig.colors.surface.sidebar || '#1e293b'}</p>
               </div>
               
               <div>
@@ -126,7 +126,7 @@ export default function VFThemeTest() {
                   }}
                 />
                 <p className="text-sm">Sidebar Text</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{themeConfig.colors.text.sidebarPrimary || '#f8fafc'}</p>
+                <p className="text-xs text-muted-foreground">{themeConfig.colors.text.sidebarPrimary || '#f8fafc'}</p>
               </div>
               
               <div>
@@ -134,7 +134,7 @@ export default function VFThemeTest() {
                   className="h-20 rounded-lg mb-2 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500"
                 />
                 <p className="text-sm">VF Gradient</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Purple → Pink → Orange</p>
+                <p className="text-xs text-muted-foreground">Purple → Pink → Orange</p>
               </div>
             </div>
           )}

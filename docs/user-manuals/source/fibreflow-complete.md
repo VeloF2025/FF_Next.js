@@ -241,7 +241,7 @@ FibreFlow is a web application accessible from any modern browser (Chrome, Firef
 3. Click **Sign In**
 4. You will be redirected to the Dashboard
 
-![Login Page](../screenshots/complete/01-login.png)
+![Login Page](../help-screenshots/complete/01-login.png)
 *Figure 1.1: FibreFlow login page*
 
 > **Tip:** If you forget your password, contact your system administrator to reset it.
@@ -255,7 +255,7 @@ After logging in, you will see the main interface consisting of:
 - **Content Area** (center) — The active page content
 - **Tabs** (within modules) — Horizontal tab navigation within each module
 
-![Main Interface](../screenshots/complete/02-interface-overview.png)
+![Main Interface](../help-screenshots/complete/02-interface-overview.png)
 *Figure 1.2: FibreFlow main interface showing sidebar, header, and content area*
 
 ### 1.3 Navigation Structure
@@ -338,7 +338,7 @@ The Dashboard is your landing page after login. It provides a high-level overvie
 
 **Navigation:** Sidebar → **Main** → **Dashboard** (or click the FibreFlow logo)
 
-![Dashboard](../screenshots/complete/03-dashboard.png)
+![Dashboard](../help-screenshots/complete/03-dashboard.png)
 *Figure 2.1: Main Dashboard showing project overview cards, activity feed, and quick actions*
 
 #### Statistics Cards
@@ -378,7 +378,7 @@ The Meetings module integrates with Fireflies.ai to automatically sync meeting t
 
 **Navigation:** Sidebar → **Communications** → **Communications Portal** → **Meetings** tab
 
-![Meetings](../screenshots/complete/04-meetings.png)
+![Meetings](../help-screenshots/complete/04-meetings.png)
 *Figure 2.2: Meetings page showing synced transcripts with search and date filters*
 
 #### Features
@@ -431,7 +431,7 @@ Track tasks and follow-ups that come out of meetings, projects, or ad-hoc assign
 
 **Navigation:** Sidebar → **Communications** → **Action Items**
 
-![Action Items](../screenshots/complete/05-action-items.png)
+![Action Items](../help-screenshots/complete/05-action-items.png)
 *Figure 2.3: Action Items list with status filters and assignee tracking*
 
 #### Features
@@ -451,7 +451,7 @@ The Projects module is the core of FibreFlow, managing fiber network deployment 
 
 **Navigation:** Sidebar → **Project Management** → **Projects**
 
-![Projects List](../screenshots/complete/06-projects-list.png)
+![Projects List](../help-screenshots/complete/06-projects-list.png)
 *Figure 3.1: Projects list showing active projects with status, progress, and quick filters*
 
 #### Views
@@ -482,7 +482,7 @@ The Projects module is the core of FibreFlow, managing fiber network deployment 
 
 Click any project to view its detail page with comprehensive tabs.
 
-![Project Detail](../screenshots/complete/07-project-detail.png)
+![Project Detail](../help-screenshots/complete/07-project-detail.png)
 *Figure 3.2: Project detail page showing overview tab with team, timeline, and key metrics*
 
 #### Tabs
@@ -536,7 +536,7 @@ The Pipeline module tracks project progression through pre-construction phases �
 
 **Navigation:** Sidebar → **Project Management** → **Projects** → **Pipeline** tab
 
-![Pipeline](../screenshots/complete/08-pipeline.png)
+![Pipeline](../help-screenshots/complete/08-pipeline.png)
 *Figure 3.3: Pipeline view showing projects across approval stages*
 
 #### Sub-tabs
@@ -588,7 +588,7 @@ Manage health and safety compliance for each project.
 
 **Navigation:** Sidebar → **Project Management** → **Projects** → **Health & Safety** tab
 
-![Health & Safety](../screenshots/complete/09-health-safety.png)
+![Health & Safety](../help-screenshots/complete/09-health-safety.png)
 *Figure 3.4: Health & Safety dashboard showing incident tracking and compliance scores*
 
 #### Sub-tabs
@@ -612,7 +612,7 @@ Manage client organizations associated with your fiber projects.
 
 **Navigation:** Sidebar → **Project Management** → **Clients**
 
-![Clients](../screenshots/complete/10-clients.png)
+![Clients](../help-screenshots/complete/10-clients.png)
 *Figure 3.5: Clients list showing organization details and project counts*
 
 #### Features
@@ -686,7 +686,7 @@ The Activate module is FibreFlow's AI-powered quality assurance system for verif
 
 **Navigation:** Sidebar → **Activate** (click section header)
 
-![Activate Dashboard](../screenshots/complete/11-activate-dashboard.png)
+![Activate Dashboard](../help-screenshots/complete/11-activate-dashboard.png)
 *Figure 4.1: Activate Dashboard showing QA statistics, project filter, and drop counts by status*
 
 #### Statistics Cards
@@ -709,7 +709,7 @@ The QA Centre is the main workspace for reviewing field installation photos.
 
 **Navigation:** Sidebar → **Activate** → **QA Centre** tab
 
-![QA Centre](../screenshots/complete/12-activate-qa-centre.png)
+![QA Centre](../help-screenshots/complete/12-activate-qa-centre.png)
 *Figure 4.2: QA Centre showing DR list with status badges, search, and filter options*
 
 #### DR List
@@ -736,7 +736,7 @@ A searchable, filterable list of all drop reference numbers (DRs):
 
 Click any DR to open the QA Wizard — a guided 5-phase review process.
 
-![QA Wizard](../screenshots/complete/13-activate-qa-wizard.png)
+![QA Wizard](../help-screenshots/complete/13-activate-qa-wizard.png)
 *Figure 4.3: QA Wizard showing the photo review phase with categorized installation photos*
 
 #### Phase 1: Prerequisites
@@ -912,7 +912,7 @@ FibreFlow uses a Vision Language Model (VLM) — Qwen3-VL — to automatically p
 
 **Navigation:** Sidebar → **Activate** → **Reports** tab
 
-![Activate Reports](../screenshots/complete/14-activate-reports.png)
+![Activate Reports](../help-screenshots/complete/14-activate-reports.png)
 *Figure 4.4: Activate Reports dashboard showing trend analysis and performance metrics*
 
 Available report types:
@@ -953,7 +953,7 @@ QField QA is a comprehensive photo validation and quality assurance system for f
 
 **Navigation:** Sidebar → **Field Operations** → **QField QA**
 
-<!-- ![QField QA Dashboard](../screenshots/complete/15-qfield-qa-dashboard.png) -->
+<!-- ![QField QA Dashboard](../help-screenshots/complete/15-qfield-qa-dashboard.png) -->
 *Figure 5.1: QField QA Dashboard showing validation statistics and photo queue*
 
 #### Overview Tab
@@ -1056,7 +1056,7 @@ The Field App Portal is a mobile-optimized interface designed specifically for f
 
 **Navigation:** Direct URL: `/field` or Sidebar → **Field Operations** → **Field App**
 
-![Field App Portal](../screenshots/complete/36-field-app-portal.png)
+![Field App Portal](../help-screenshots/complete/36-field-app-portal.png)
 *Figure 5.4: Field App Portal showing offline status, device metrics, and field task queue*
 
 #### Overview
@@ -1339,7 +1339,7 @@ The Maintenance module manages the complete lifecycle of fiber network maintenan
 
 **Navigation:** Sidebar → **Maintenance** (click section header)
 
-![Maintenance Dashboard](../screenshots/complete/15-maintenance-dashboard.png)
+![Maintenance Dashboard](../help-screenshots/complete/15-maintenance-dashboard.png)
 *Figure 6.1: Maintenance Dashboard showing ticket statistics, SLA compliance, and workload*
 
 #### Key Metrics
@@ -1358,7 +1358,7 @@ The primary ticket management view with drag-and-drop columns.
 
 **Navigation:** Sidebar → **Maintenance** → **Work Orders** tab
 
-![Kanban Board](../screenshots/complete/16-maintenance-kanban.png)
+![Kanban Board](../help-screenshots/complete/16-maintenance-kanban.png)
 *Figure 6.2: Maintenance Kanban Board with tickets organized by status columns*
 
 #### Columns
@@ -1428,7 +1428,7 @@ The Procurement module manages the complete purchasing workflow — from Bill of
 
 **Navigation:** Sidebar → **Procurement** (click section header)
 
-![Procurement Dashboard](../screenshots/complete/17-procurement-dashboard.png)
+![Procurement Dashboard](../help-screenshots/complete/17-procurement-dashboard.png)
 *Figure 7.1: Procurement Dashboard showing order statistics, pending approvals, and quick actions*
 
 #### Quick Actions
@@ -1457,7 +1457,7 @@ The Bill of Quantities (BOQ) manages material requirements for projects.
 
 **Navigation:** Procurement → **Sourcing** tab
 
-![BOQ List](../screenshots/complete/18-procurement-boq.png)
+![BOQ List](../help-screenshots/complete/18-procurement-boq.png)
 *Figure 7.2: BOQ management showing project BOQs with upload and column mapping features*
 
 #### Creating a BOQ
@@ -1487,7 +1487,7 @@ Send requests for quotation to suppliers and compare responses.
 
 **Navigation:** Procurement → **Purchasing** tab → RFQ section
 
-![RFQ Detail](../screenshots/complete/19-procurement-rfq.png)
+![RFQ Detail](../help-screenshots/complete/19-procurement-rfq.png)
 *Figure 7.3: RFQ detail page showing line items, supplier responses, and comparison view*
 
 #### Creating an RFQ
@@ -1515,7 +1515,7 @@ Create and manage purchase orders with approval workflows.
 
 **Navigation:** Procurement → **Purchasing** tab → PO section
 
-![Purchase Order](../screenshots/complete/20-procurement-po.png)
+![Purchase Order](../help-screenshots/complete/20-procurement-po.png)
 *Figure 7.4: Purchase Order detail showing line items, approval status, and version history*
 
 #### PO Approval Workflow
@@ -1558,7 +1558,7 @@ Manage stock items, track movements, and perform stock takes.
 
 **Navigation:** Procurement → **Inventory** tab
 
-![Stock Management](../screenshots/complete/21-procurement-stock.png)
+![Stock Management](../help-screenshots/complete/21-procurement-stock.png)
 *Figure 7.5: Stock management dashboard showing items, levels, and movement history*
 
 #### Stock Items
@@ -1640,7 +1640,7 @@ The Field Stock Control module provides comprehensive tracking and management of
 
 **User Audiences:** Stock managers, warehouse staff, field technicians, contractors
 
-<!-- ![Field Stock Control Dashboard](../screenshots/complete/38-field-stock-dashboard.png) -->
+<!-- ![Field Stock Control Dashboard](../help-screenshots/complete/38-field-stock-dashboard.png) -->
 *Figure 7.9: Field Stock Control dashboard showing van stock levels, technician accountability, and recent movements*
 
 #### Overview
@@ -1979,7 +1979,7 @@ The Assets module provides complete asset lifecycle management for tools, equipm
 
 **Navigation:** Sidebar → **Assets** (click section header)
 
-![Assets Dashboard](../screenshots/complete/22-assets-dashboard.png)
+![Assets Dashboard](../help-screenshots/complete/22-assets-dashboard.png)
 *Figure 8.1: Assets Dashboard showing total assets, available, assigned, and maintenance alerts*
 
 #### Statistics Cards
@@ -1997,7 +1997,7 @@ The Assets module provides complete asset lifecycle management for tools, equipm
 
 **Navigation:** Assets → **All Assets** tab
 
-![Assets List](../screenshots/complete/23-assets-list.png)
+![Assets List](../help-screenshots/complete/23-assets-list.png)
 *Figure 8.2: Assets list with search, category filter, and status indicators*
 
 #### Viewing Assets
@@ -2093,14 +2093,14 @@ The Fleet module manages vehicles, drivers, fuel, GPS tracking, and daily check-
 
 **Navigation:** Sidebar → **Fleet** (click section header)
 
-![Fleet Dashboard](../screenshots/complete/24-fleet-dashboard.png)
+![Fleet Dashboard](../help-screenshots/complete/24-fleet-dashboard.png)
 *Figure 9.1: Fleet Dashboard showing vehicle count, fuel spend, maintenance alerts, and driver stats*
 
 ### 9.2 Vehicles **(ENHANCED)**
 
 **Navigation:** Fleet → **Vehicles** tab (now the default first tab)
 
-![Vehicles List](../screenshots/complete/25-fleet-vehicles.png)
+![Vehicles List](../help-screenshots/complete/25-fleet-vehicles.png)
 *Figure 9.2: Fleet vehicles list showing registration, make, driver assignment, and status*
 
 #### Key Changes
@@ -2276,7 +2276,7 @@ The Human Resources module manages staff information, departments, compliance, a
 
 **Navigation:** Sidebar → **Human Resources** (click section header)
 
-![Staff Directory](../screenshots/complete/26-staff-directory.png)
+![Staff Directory](../help-screenshots/complete/26-staff-directory.png)
 *Figure 10.1: Staff Directory showing employee list with search, department filter, and status*
 
 #### Key Enhancements
@@ -2311,7 +2311,7 @@ Additional details (position, department, salary, etc.) can be added later via t
 
 Click any staff member to view their full profile with granular tab access:
 
-![Staff Detail](../screenshots/complete/27-staff-detail.png)
+![Staff Detail](../help-screenshots/complete/27-staff-detail.png)
 *Figure 10.2: Staff detail page showing personal info, employment details, and compliance status*
 
 #### Granular Tab-Level Permissions **(NEW)**
@@ -2344,7 +2344,7 @@ The staff detail page now supports per-tab access control:
 
 **Navigation:** Human Resources → **Departments** tab
 
-![Departments](../screenshots/complete/28-departments.png)
+![Departments](../help-screenshots/complete/28-departments.png)
 *Figure 10.3: Departments grid showing department cards with member counts and status*
 
 - View all departments as cards with member count
@@ -2395,7 +2395,7 @@ The Analytics section provides dashboards and reports for organizational perform
 
 **Navigation:** Sidebar → **Analytics** → **Analytics Dashboard**
 
-![Analytics Dashboard](../screenshots/complete/29-analytics-dashboard.png)
+![Analytics Dashboard](../help-screenshots/complete/29-analytics-dashboard.png)
 *Figure 11.1: Analytics Dashboard showing project metrics, team performance, and trend charts*
 
 #### Components
@@ -2463,7 +2463,7 @@ The Communications section manages WhatsApp integration, meeting coordination, a
 
 **Navigation:** Sidebar → **Communications** → **Communications Portal**
 
-![Communications](../screenshots/complete/30-communications.png)
+![Communications](../help-screenshots/complete/30-communications.png)
 *Figure 12.1: Communications Portal showing unified messaging and meetings interface*
 
 The Communications Portal now provides a unified communications hub:
@@ -2489,7 +2489,7 @@ The Meetings module is now part of the Communications Portal, providing:
 
 **Navigation:** Sidebar → **Communications** → **WhatsApp Portal**
 
-![WhatsApp Admin](../screenshots/complete/31-whatsapp-admin.png)
+![WhatsApp Admin](../help-screenshots/complete/31-whatsapp-admin.png)
 *Figure 12.2: WhatsApp Administration showing groups, message logs, and service health*
 
 #### Tabs
@@ -2530,7 +2530,7 @@ FibreFlow includes a comprehensive Help Center with an AI-powered chat assistant
 
 **Navigation:** Sidebar → **Communications** → **Help Center**
 
-<!-- ![Help Center](../screenshots/complete/37-help-center.png) -->
+<!-- ![Help Center](../help-screenshots/complete/37-help-center.png) -->
 *Figure 12.4: Help Center showing searchable documentation with AI Chat Widget*
 
 #### Features
@@ -2593,7 +2593,7 @@ Mission Control is an AI agent coordination dashboard that provides real-time mo
 
 **Navigation:** Sidebar → **Communications** → **Mission Control**
 
-<!-- ![Mission Control Dashboard](../screenshots/complete/37-mission-control-dashboard.png) -->
+<!-- ![Mission Control Dashboard](../help-screenshots/complete/37-mission-control-dashboard.png) -->
 *Figure 12.5: Mission Control Dashboard showing agent status, statistics, and system health*
 
 #### Overview
@@ -2985,7 +2985,7 @@ The System section provides administrative tools for monitoring, data management
 
 **Navigation:** Sidebar → **System** → **System Health Hub**
 
-![System Health](../screenshots/complete/32-system-health.png)
+![System Health](../help-screenshots/complete/32-system-health.png)
 *Figure 13.1: System Health Hub showing service status, API health, and recent alerts*
 
 Monitor the health of all FibreFlow services:
@@ -2999,7 +2999,7 @@ Monitor the health of all FibreFlow services:
 
 **Navigation:** Sidebar → **System** → **Data Sync**
 
-![Data Sync](../screenshots/complete/33-data-sync.png)
+![Data Sync](../help-screenshots/complete/33-data-sync.png)
 *Figure 13.2: Data Sync page showing sync operations, OLT report, and operation history*
 
 #### Granular Tab-Level Permissions **(NEW)**

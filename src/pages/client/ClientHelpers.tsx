@@ -6,11 +6,11 @@ export const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
     'active': 'bg-green-100 text-green-800',
     'prospect': 'bg-blue-100 text-blue-800',
-    'inactive': 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
+    'inactive': 'bg-secondary text-foreground',
     'suspended': 'bg-red-100 text-red-800',
     'former': 'bg-orange-100 text-orange-800'
   };
-  return colors[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+  return colors[status] || 'bg-secondary text-foreground';
 };
 
 export const getPriorityColor = (priority: string) => {
@@ -19,9 +19,9 @@ export const getPriorityColor = (priority: string) => {
     'critical': 'bg-red-100 text-red-800',
     'high': 'bg-orange-100 text-orange-800',
     'medium': 'bg-yellow-100 text-yellow-800',
-    'low': 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+    'low': 'bg-secondary text-foreground'
   };
-  return colors[priority] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+  return colors[priority] || 'bg-secondary text-foreground';
 };
 
 export const getCreditRatingColor = (rating: string) => {
@@ -31,7 +31,7 @@ export const getCreditRatingColor = (rating: string) => {
     'fair': 'text-yellow-600',
     'poor': 'text-red-600'
   };
-  return colors[rating] || 'text-gray-600 dark:text-gray-400';
+  return colors[rating] || 'text-muted-foreground';
 };
 
 export const formatCurrency = (amount: number) => {

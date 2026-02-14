@@ -177,13 +177,13 @@ export function ProcurementDashboard() {
 
         {/* View Toggle */}
         <div className="flex justify-between items-center mb-6">
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+          <div className="flex space-x-1 bg-secondary p-1 rounded-lg">
             <button
               onClick={() => setActiveView('overview')}
               className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                 activeView === 'overview' 
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100'
+                  ? 'bg-card text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Overview
@@ -192,8 +192,8 @@ export function ProcurementDashboard() {
               onClick={() => setActiveView('detailed')}
               className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
                 activeView === 'detailed' 
-                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' 
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100'
+                  ? 'bg-card text-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Detailed View
@@ -211,7 +211,7 @@ export function ProcurementDashboard() {
         {/* Quick Actions Section */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h3>
+            <h3 className="text-lg font-semibold text-foreground">Quick Actions</h3>
           </div>
           <QuickActions actions={quickActions} />
         </div>
@@ -221,35 +221,35 @@ export function ProcurementDashboard() {
           {/* Recent Activities - Real Data */}
           <div className="ff-card">
             <div className="p-6">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h4>
+              <h4 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h4>
               {activitiesLoading ? (
-                <div className="text-center py-4 text-gray-500 dark:text-gray-400">Loading activities...</div>
+                <div className="text-center py-4 text-muted-foreground">Loading activities...</div>
               ) : recentActivities.length > 0 ? (
                 <div className="space-y-3">
                   {recentActivities.map((activity) => (
                     <div
                       key={activity.id}
-                      className="flex items-center justify-between p-3 hover:bg-gray-50 dark:bg-gray-900 rounded-lg"
+                      className="flex items-center justify-between p-3 hover:bg-background rounded-lg"
                     >
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${
                           activity.type === 'PO' ? 'bg-orange-100' :
                           activity.type === 'RFQ' ? 'bg-green-100' :
-                          activity.type === 'BOQ' ? 'bg-blue-100' : 'bg-gray-100 dark:bg-gray-800'
+                          activity.type === 'BOQ' ? 'bg-blue-100' : 'bg-secondary'
                         }`}>
                           <span className={`text-xs font-bold ${
                             activity.type === 'PO' ? 'text-orange-600' :
                             activity.type === 'RFQ' ? 'text-green-600' :
-                            activity.type === 'BOQ' ? 'text-blue-600' : 'text-gray-600 dark:text-gray-400'
+                            activity.type === 'BOQ' ? 'text-blue-600' : 'text-muted-foreground'
                           }`}>{activity.type}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.item}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{activity.action} - {activity.timestamp}</p>
+                          <p className="text-sm font-medium text-foreground">{activity.item}</p>
+                          <p className="text-xs text-muted-foreground">{activity.action} - {activity.timestamp}</p>
                         </div>
                       </div>
                       {activity.value !== undefined && activity.value > 0 && (
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <span className="text-sm font-medium text-foreground">
                           R {activity.value.toLocaleString()}
                         </span>
                       )}
@@ -257,7 +257,7 @@ export function ProcurementDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500 dark:text-gray-400">No recent activity</div>
+                <div className="text-center py-4 text-muted-foreground">No recent activity</div>
               )}
             </div>
           </div>
@@ -265,9 +265,9 @@ export function ProcurementDashboard() {
           {/* Process Status - Real Stats */}
           <div className="ff-card">
             <div className="p-6">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Process Status</h4>
+              <h4 className="text-lg font-semibold text-foreground mb-4">Process Status</h4>
               {isLoading ? (
-                <div className="text-center py-4 text-gray-500 dark:text-gray-400">Loading stats...</div>
+                <div className="text-center py-4 text-muted-foreground">Loading stats...</div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">

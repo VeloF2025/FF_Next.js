@@ -205,7 +205,7 @@ export const ImportAssistant: React.FC = () => {
                     <button
                       key={i}
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className="block w-full text-left text-xs bg-white dark:bg-gray-800 bg-opacity-20 hover:bg-opacity-30 rounded px-2 py-1 transition-colors"
+                      className="block w-full text-left text-xs bg-card bg-opacity-20 hover:bg-opacity-30 rounded px-2 py-1 transition-colors"
                     >
                       {suggestion}
                     </button>

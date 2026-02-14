@@ -69,8 +69,8 @@ const STATUS_CONFIG = {
     label: 'Pending Verification',
     icon: ShieldQuestion,
     color: 'gray',
-    bgClass: 'bg-gray-100 dark:bg-gray-700',
-    textClass: 'text-gray-700 dark:text-gray-300',
+    bgClass: 'bg-secondary',
+    textClass: 'text-muted-foreground',
     borderClass: 'border-gray-200 dark:border-gray-600',
     iconClass: 'text-gray-400',
   },
@@ -202,12 +202,12 @@ export function AssetVerificationPanel({
       {/* Verification Details */}
       {verifiedAt && (
         <div className="space-y-1 text-sm">
-          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
             <span>Verified: {formatDate(verifiedAt)}</span>
           </div>
           {verifiedBy && (
-            <div className="text-gray-500 dark:text-gray-500 dark:text-gray-400 ml-6">
+            <div className="text-muted-foreground dark:text-gray-400 ml-6">
               by {verifiedBy}
             </div>
           )}
@@ -244,9 +244,9 @@ export function AssetVerificationPanel({
               {lastResult.mismatches.map((m) => (
                 <div
                   key={m.field}
-                  className="text-xs bg-white dark:bg-gray-800 rounded p-2 flex items-center gap-2"
+                  className="text-xs bg-card rounded p-2 flex items-center gap-2"
                 >
-                  <span className="text-gray-500 dark:text-gray-400 w-24 capitalize">
+                  <span className="text-muted-foreground w-24 capitalize">
                     {m.field.replace(/([A-Z])/g, ' $1').trim()}:
                   </span>
                   <span className="text-red-600 dark:text-red-400">
@@ -264,7 +264,7 @@ export function AssetVerificationPanel({
 
       {/* No previous verification */}
       {!verifiedAt && !lastResult && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground">
           This asset has not been verified yet. Scan the label to verify details.
         </p>
       )}

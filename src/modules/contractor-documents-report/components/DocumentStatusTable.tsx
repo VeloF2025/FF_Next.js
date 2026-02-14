@@ -27,37 +27,37 @@ export default function DocumentStatusTable({
     <div className="space-y-6">
       {/* Company Documents Section */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
           <FileText size={20} />
           Company Documents ({companyDocuments.length})
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+          <table className="min-w-full bg-card border border-border rounded-lg">
+            <thead className="bg-background">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Document Type
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Expiry Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Action
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {companyDocuments.map((doc) => (
-                <tr key={doc.id} className="hover:bg-gray-50 dark:bg-gray-900">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{doc.type}</td>
+                <tr key={doc.id} className="hover:bg-background">
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">{doc.type}</td>
                   <td className="px-4 py-3">
                     <DocumentStatusBadge status={doc.displayStatus} size="sm" />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
                     {formatExpiryDate(doc.expiryDate, doc.daysUntilExpiry || null)}
                   </td>
                   <td className="px-4 py-3">
@@ -76,36 +76,36 @@ export default function DocumentStatusTable({
 
       {/* Team Member Documents Section */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
           <FileText size={20} />
           Team Member IDs ({teamDocuments.length})
         </h3>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+          <table className="min-w-full bg-card border border-border rounded-lg">
+            <thead className="bg-background">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Team Member
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Role
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   ID Document Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                   Action
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {teamDocuments.map((member) => (
-                <tr key={member.teamMemberId} className="hover:bg-gray-50 dark:bg-gray-900">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                <tr key={member.teamMemberId} className="hover:bg-background">
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">
                     {member.memberName}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{member.role}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">{member.role}</td>
                   <td className="px-4 py-3">
                     <DocumentStatusBadge status={member.displayStatus} size="sm" />
                   </td>

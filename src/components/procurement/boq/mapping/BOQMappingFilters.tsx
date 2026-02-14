@@ -37,9 +37,9 @@ export default function BOQMappingFilters({
   const hasActiveFilters = Object.values(filters).some(value => value !== '');
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border">
+    <div className="bg-card p-4 rounded-lg border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+        <h3 className="text-sm font-medium text-foreground">
           Filters {filteredCount !== totalCount && `(${filteredCount} of ${totalCount})`}
         </h3>
         {hasActiveFilters && (
@@ -62,7 +62,7 @@ export default function BOQMappingFilters({
             placeholder="Search items..."
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-3 py-2 border border-border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
@@ -70,7 +70,7 @@ export default function BOQMappingFilters({
         <select
           value={filters.severity}
           onChange={(e) => handleFilterChange('severity', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">All Severities</option>
           <option value="high">High</option>
@@ -82,7 +82,7 @@ export default function BOQMappingFilters({
         <select
           value={filters.status}
           onChange={(e) => handleFilterChange('status', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -94,7 +94,7 @@ export default function BOQMappingFilters({
         <select
           value={filters.exceptionType}
           onChange={(e) => handleFilterChange('exceptionType', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-2 border border-border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">All Types</option>
           {Object.entries(EXCEPTION_TYPE_LABELS).map(([value, label]) => (

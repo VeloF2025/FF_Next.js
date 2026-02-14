@@ -65,7 +65,7 @@ const QuoteEvaluationPage: React.FC = () => {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading evaluations...</p>
+        <p className="mt-4 text-muted-foreground">Loading evaluations...</p>
       </div>
     );
   }
@@ -93,8 +93,8 @@ const QuoteEvaluationPage: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Quote Evaluation</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Evaluate and compare supplier quotes</p>
+          <h1 className="text-2xl font-semibold text-foreground">Quote Evaluation</h1>
+          <p className="text-muted-foreground mt-1">Evaluate and compare supplier quotes</p>
         </div>
         <button
           onClick={() => router.push('/procurement/rfq')}
@@ -107,66 +107,66 @@ const QuoteEvaluationPage: React.FC = () => {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="bg-card p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Total</div>
+            <div className="text-sm text-muted-foreground">Total</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="bg-card p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Pending</div>
+            <div className="text-sm text-muted-foreground">Pending</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="bg-card p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-orange-600">{stats.inProgress}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">In Progress</div>
+            <div className="text-sm text-muted-foreground">In Progress</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="bg-card p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Completed</div>
+            <div className="text-sm text-muted-foreground">Completed</div>
           </div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="bg-card p-4 rounded-lg shadow">
             <div className="text-2xl font-bold text-purple-600">{stats.awarded}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Awarded</div>
+            <div className="text-sm text-muted-foreground">Awarded</div>
           </div>
         </div>
       )}
 
       {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+      <div className="bg-card rounded-lg shadow overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900">
+          <thead className="bg-background">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">RFQ</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Quotes</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Lowest Bid</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">RFQ</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Quotes</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Lowest Bid</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {evaluations.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
                   No evaluations found
                 </td>
               </tr>
             ) : (
               evaluations.map((evaluation) => (
-                <tr key={evaluation.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr key={evaluation.id} className="hover:bg-accent">
                   <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900 dark:text-white">{evaluation.rfqTitle}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{evaluation.rfqId}</div>
+                    <div className="font-medium text-foreground">{evaluation.rfqTitle}</div>
+                    <div className="text-sm text-muted-foreground">{evaluation.rfqId}</div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                       evaluation.status === 'AWARDED' ? 'bg-green-100 text-green-800' :
                       evaluation.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
                       evaluation.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+                      'bg-secondary text-foreground'
                     }`}>
                       {evaluation.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                  <td className="px-6 py-4 text-muted-foreground">
                     {evaluation.totalQuotes}
                   </td>
                   <td className="px-6 py-4 text-green-600 font-medium">

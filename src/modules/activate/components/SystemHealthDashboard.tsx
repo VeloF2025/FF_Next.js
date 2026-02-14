@@ -159,7 +159,7 @@ export function SystemHealthDashboard({
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
         <span>Checking system health...</span>
       </div>
@@ -204,7 +204,7 @@ export function SystemHealthDashboard({
           className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded-md transition-colors"
         >
           <div className={`w-2 h-2 rounded-full ${getStatusColor(health.overall === 'healthy' ? 'healthy' : health.overall === 'degraded' ? 'degraded' : 'down')}`} />
-          <span className="text-xs text-gray-600 dark:text-gray-400">
+          <span className="text-xs text-muted-foreground">
             {health.overall === 'healthy' ? 'All systems operational' :
              health.overall === 'degraded' ? 'Some issues detected' :
              'System issues'}
@@ -214,21 +214,21 @@ export function SystemHealthDashboard({
 
         {/* Expanded dropdown */}
         {isExpanded && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 min-w-[280px]">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase">Service Status</div>
+          <div className="absolute top-full left-0 mt-1 z-50 bg-card border border-border rounded-lg shadow-lg p-3 min-w-[280px]">
+            <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase">Service Status</div>
             <div className="space-y-2">
               {services.map(s => (
                 <div key={s.key} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <span>{s.icon}</span>
-                    <span className="text-gray-700 dark:text-gray-300">{s.label}</span>
+                    <span className="text-muted-foreground">{s.label}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs ${
                       s.status === 'healthy' ? 'text-green-600 dark:text-green-400' :
                       s.status === 'degraded' ? 'text-yellow-600 dark:text-yellow-400' :
                       s.status === 'down' ? 'text-red-600 dark:text-red-400' :
-                      'text-gray-500 dark:text-gray-400'
+                      'text-muted-foreground'
                     }`}>
                       {s.message}
                     </span>
@@ -238,7 +238,7 @@ export function SystemHealthDashboard({
               ))}
             </div>
             {lastRefresh && (
-              <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
                 Last updated: {lastRefresh.toLocaleTimeString()}
               </div>
             )}
@@ -257,11 +257,11 @@ export function SystemHealthDashboard({
           <div className="flex items-center gap-3">
             <div className={`w-4 h-4 rounded-full ${getStatusColor(health.overall === 'healthy' ? 'healthy' : health.overall === 'degraded' ? 'degraded' : 'down')}`} />
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">
+              <h3 className="font-semibold text-foreground">
                 System Status: {health.overall.charAt(0).toUpperCase() + health.overall.slice(1)}
               </h3>
               {lastRefresh && (
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   Last checked: {lastRefresh.toLocaleTimeString()}
                 </p>
               )}
@@ -269,7 +269,7 @@ export function SystemHealthDashboard({
           </div>
           <button
             onClick={fetchHealth}
-            className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="px-3 py-1 text-sm border border-border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             Refresh
           </button>
@@ -288,20 +288,20 @@ export function SystemHealthDashboard({
                 ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10'
                 : service.status === 'down'
                 ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800/50'
+                : 'border-border bg-background/50 dark:bg-gray-800/50'
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
               <span>{service.icon}</span>
-              <span className="font-medium text-gray-900 dark:text-white">{service.label}</span>
+              <span className="font-medium text-foreground">{service.label}</span>
               <span className={`ml-auto w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white ${getStatusColor(service.status)}`}>
                 {getStatusIcon(service.status)}
               </span>
             </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+            <p className="text-xs text-muted-foreground line-clamp-2">
               {service.message}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">
               {service.latencyMs}ms
             </p>
           </div>
@@ -310,29 +310,29 @@ export function SystemHealthDashboard({
 
       {/* Activity Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+        <div className="bg-input/50 border border-border rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-foreground">
             {health.recentActivity.drsLast24h}
           </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">DRs (24h)</div>
+          <div className="text-xs text-muted-foreground">DRs (24h)</div>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
+        <div className="bg-input/50 border border-border rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
             {health.recentActivity.pendingCategorization}
           </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Pending</div>
+          <div className="text-xs text-muted-foreground">Pending</div>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
+        <div className="bg-input/50 border border-border rounded-lg p-3 text-center">
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
             {health.recentActivity.failedCategorization}
           </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Failed</div>
+          <div className="text-xs text-muted-foreground">Failed</div>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
-          <div className="text-sm font-mono text-gray-900 dark:text-white truncate">
+        <div className="bg-input/50 border border-border rounded-lg p-3 text-center">
+          <div className="text-sm font-mono text-foreground truncate">
             {health.recentActivity.lastDRProcessed || '—'}
           </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Last DR</div>
+          <div className="text-xs text-muted-foreground">Last DR</div>
         </div>
       </div>
 

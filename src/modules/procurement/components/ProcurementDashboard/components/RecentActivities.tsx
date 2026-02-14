@@ -13,9 +13,9 @@ interface RecentActivitiesProps {
 
 export function RecentActivities({ activities }: RecentActivitiesProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Activities</h3>
+    <div className="bg-card shadow rounded-lg">
+      <div className="px-6 py-4 border-b border-border">
+        <h3 className="text-lg font-medium text-foreground">Recent Activities</h3>
       </div>
       <div className="p-6">
         <div className="space-y-4">
@@ -25,11 +25,11 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
                 {getStatusIcon(activity.status)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900 dark:text-gray-100">
+                <p className="text-sm text-foreground">
                   <span className="font-medium">{activity.type}</span> {activity.action}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{activity.item}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{activity.timestamp}</p>
+                <p className="text-sm text-muted-foreground mt-1">{activity.item}</p>
+                <p className="text-xs text-muted-foreground mt-1">{activity.timestamp}</p>
               </div>
             </div>
           ))}

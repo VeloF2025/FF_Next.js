@@ -180,13 +180,13 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     return (
       <div className="p-6 space-y-4">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="h-8 bg-secondary rounded w-1/3"></div>
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div key={i} className="h-24 bg-secondary rounded"></div>
             ))}
           </div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-64 bg-secondary rounded"></div>
         </div>
       </div>
     );
@@ -207,7 +207,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
   if (!data || filteredHierarchy.length === 0) {
     return (
       <div className="p-6">
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-12 text-muted-foreground">
           <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>No activation data found for the selected filters.</p>
           <p className="text-sm mt-2">Try adjusting the date range or project filter.</p>
@@ -224,14 +224,14 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* View Toggle */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">View:</span>
-          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <span className="text-sm text-muted-foreground">View:</span>
+          <div className="flex rounded-lg border border-border overflow-hidden">
             <button
               onClick={() => setView('hierarchy')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
                 view === 'hierarchy'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
               }`}
             >
               <GitBranch className="h-4 w-4" />
@@ -242,7 +242,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
               className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
                 view === 'flat'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
               }`}
             >
               <Table2 className="h-4 w-4" />
@@ -257,7 +257,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
           className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
             hideZeroValues
               ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+              : 'bg-card text-muted-foreground border-border hover:bg-accent'
           }`}
           title={hideZeroValues ? 'Showing zones/PONs with assigned values only' : 'Click to hide Zone 0 and PON 0'}
         >
@@ -267,8 +267,8 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
 
         {/* Granularity Tabs */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">Period:</span>
-          <div className="flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden">
+          <span className="text-sm text-muted-foreground">Period:</span>
+          <div className="flex rounded-lg border border-border overflow-hidden">
             {(['daily', 'weekly', 'cumulative'] as const).map(g => (
               <button
                 key={g}
@@ -276,7 +276,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
                   granularity === g
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    : 'bg-card text-muted-foreground hover:bg-accent'
                 }`}
               >
                 {g === 'daily' && <Calendar className="h-4 w-4" />}
@@ -367,17 +367,17 @@ function SummaryCard({ label, value, subtext, color, isPercent, percent }: Summa
 
   return (
     <div className={`rounded-lg border p-4 ${colors[color]}`}>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
       <p className={`text-2xl font-bold ${textColors[color]}`}>{value}</p>
       {isPercent && percent !== undefined && (
-        <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="mt-2 h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-purple-500 transition-all duration-500"
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
         </div>
       )}
-      <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-1">{subtext}</p>
+      <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">{subtext}</p>
     </div>
   );
 }
@@ -425,20 +425,20 @@ interface ProjectCardProps {
 
 function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZone }: ProjectCardProps) {
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="border border-border rounded-lg overflow-hidden">
       {/* Project Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors"
+        className="w-full flex items-center justify-between p-4 bg-input hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors"
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <ChevronDown className="h-5 w-5 text-muted-foreground" />
           ) : (
-            <ChevronRight className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
           )}
-          <span className="font-semibold text-gray-900 dark:text-white">{project.project_name}</span>
-          <span className="text-sm text-gray-500 dark:text-gray-400">({project.zones.length} zones)</span>
+          <span className="font-semibold text-foreground">{project.project_name}</span>
+          <span className="text-sm text-muted-foreground">({project.zones.length} zones)</span>
         </div>
         <div className="flex items-center gap-6">
           <ProgressStats
@@ -451,7 +451,7 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
 
       {/* Zones */}
       {isExpanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
+        <div className="border-t border-border">
           {project.zones.map(zone => {
             const zoneKey = `${project.project_id}-${zone.zone_no}`;
             const isZoneExpanded = expandedZones.has(zoneKey);
@@ -461,7 +461,7 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
                 {/* Zone Header */}
                 <button
                   onClick={() => onToggleZone(zoneKey)}
-                  className="w-full flex items-center justify-between p-3 pl-10 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="w-full flex items-center justify-between p-3 pl-10 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     {isZoneExpanded ? (
@@ -469,10 +469,10 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
                     ) : (
                       <ChevronRight className="h-4 w-4 text-gray-400" />
                     )}
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                    <span className="font-medium text-muted-foreground">
                       Zone {zone.zone_no || 'N/A'}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">({zone.pons.length} PONs)</span>
+                    <span className="text-xs text-muted-foreground">({zone.pons.length} PONs)</span>
                   </div>
                   <ProgressStats
                     total={zone.total_scope}
@@ -484,13 +484,13 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
 
                 {/* PONs */}
                 {isZoneExpanded && (
-                  <div className="bg-gray-50 dark:bg-gray-900/30">
+                  <div className="bg-background/30">
                     {zone.pons.map(pon => (
                       <div
                         key={pon.pon_no}
                         className="flex items-center justify-between p-2 pl-20 border-t border-gray-100 dark:border-gray-800"
                       >
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-sm text-muted-foreground">
                           PON {pon.pon_no || 'N/A'}
                         </span>
                         <ProgressStats
@@ -526,12 +526,12 @@ function ProgressStats({ total, activated, percent, small }: ProgressStatsProps)
 
   return (
     <div className="flex items-center gap-4">
-      <div className={`${textSize} text-gray-600 dark:text-gray-400`}>
+      <div className={`${textSize} text-muted-foreground`}>
         <span className="text-green-600 dark:text-green-400 font-medium">{activated}</span>
         <span className="mx-1">/</span>
         <span>{total}</span>
       </div>
-      <div className={`${barWidth} h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden`}>
+      <div className={`${barWidth} h-2 bg-secondary rounded-full overflow-hidden`}>
         <div
           className={`h-full transition-all duration-300 ${
             percent > 80 ? 'bg-green-500' :
@@ -564,7 +564,7 @@ interface FlatTableViewProps {
 function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps) {
   const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
     <th
-      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+      className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
       onClick={() => onSort(field)}
     >
       <div className="flex items-center gap-1">
@@ -577,35 +577,35 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
   );
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="border border-border rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
+          <thead className="bg-input">
             <tr>
               <SortHeader field="project_name" label="Project" />
               <SortHeader field="zone_no" label="Zone" />
               <SortHeader field="pon_no" label="PON" />
               <SortHeader field="total_scope" label="Total" />
               <SortHeader field="activated" label="Activated" />
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground tracking-wide">
                 Remaining
               </th>
               <SortHeader field="completion_percent" label="Progress" />
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+          <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-800">
             {rows.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+              <tr key={idx} className="hover:bg-accent/50">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {row.project_name}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {row.zone_no || 'N/A'}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {row.pon_no || 'N/A'}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {row.total_scope}
                 </td>
                 <td className="px-4 py-3 text-sm text-green-600 dark:text-green-400 font-medium">
@@ -616,7 +616,7 @@ function FlatTableView({ rows, sortField, sortDir, onSort }: FlatTableViewProps)
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div className="w-20 h-2 bg-secondary rounded-full overflow-hidden">
                       <div
                         className={`h-full ${
                           row.completion_percent > 80 ? 'bg-green-500' :

@@ -15,8 +15,8 @@ export function ClientAddressNotes({ client }: ClientAddressNotesProps) {
       {/* Address */}
       {client.address && (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Address</h2>
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <h2 className="text-lg font-medium text-foreground mb-4">Address</h2>
+          <div className="bg-background rounded-lg p-4">
             <p>{client.address}</p>
             <p>{client.city}, {client.province} {client.postalCode}</p>
             <p>{client.country}</p>
@@ -27,16 +27,16 @@ export function ClientAddressNotes({ client }: ClientAddressNotesProps) {
       {/* Notes */}
       {client.notes && (
         <div>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Notes</h2>
+          <h2 className="text-lg font-medium text-foreground mb-4">Notes</h2>
           <div className="bg-yellow-50 rounded-lg p-4">
-            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{client.notes}</p>
+            <p className="text-muted-foreground whitespace-pre-wrap">{client.notes}</p>
           </div>
         </div>
       )}
 
       {/* Timestamps */}
-      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-500 dark:text-gray-400">
+      <div className="pt-4 border-t border-border">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
           <div>
             <span className="font-medium">Created:</span>{' '}
             {client.createdAt?.toDate 

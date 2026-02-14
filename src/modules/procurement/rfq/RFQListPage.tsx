@@ -61,8 +61,8 @@ export function RFQListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Request for Quotes</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Request for Quotes</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage RFQs, supplier responses, and comparisons
           </p>
         </div>
@@ -103,7 +103,7 @@ export function RFQListPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as RFQStatus | 'all')}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="px-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="all">All Status</option>
             <option value={RFQStatus.DRAFT}>Draft</option>
@@ -118,20 +118,20 @@ export function RFQListPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total RFQs</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-sm text-muted-foreground">Total RFQs</p>
+          <p className="text-2xl font-bold text-foreground">{stats.total}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Sent to Suppliers</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-sm text-muted-foreground">Sent to Suppliers</p>
           <p className="text-2xl font-bold text-blue-600">{stats.sent}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Responses Received</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-sm text-muted-foreground">Responses Received</p>
           <p className="text-2xl font-bold text-yellow-600">{stats.responsesReceived}</p>
         </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Awarded</p>
+        <div className="bg-card p-4 rounded-lg border border-border">
+          <p className="text-sm text-muted-foreground">Awarded</p>
           <p className="text-2xl font-bold text-green-600">{stats.awarded}</p>
         </div>
       </div>
@@ -140,12 +140,12 @@ export function RFQListPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 animate-pulse">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+            <div key={i} className="bg-card p-6 rounded-lg border border-border animate-pulse">
+              <div className="h-4 bg-secondary rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-secondary rounded w-1/2 mb-4"></div>
               <div className="space-y-2">
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-3 bg-secondary rounded"></div>
+                <div className="h-3 bg-secondary rounded"></div>
               </div>
             </div>
           ))}
@@ -157,9 +157,9 @@ export function RFQListPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 p-12 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+        <div className="bg-card p-12 rounded-lg border border-border text-center">
           <Send className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">No RFQs found</p>
+          <p className="text-muted-foreground">No RFQs found</p>
           <Button
             onClick={handleCreate}
             className="mt-4"

@@ -100,7 +100,7 @@ export function InvoiceDetailModal({ projectId, invoice, onClose, onUpdated }: I
     paid: { bg: 'bg-green-500/20', text: 'text-green-400' },
     partially_paid: { bg: 'bg-teal-500/20', text: 'text-teal-400' },
     overdue: { bg: 'bg-red-500/20', text: 'text-red-400' },
-    cancelled: { bg: 'bg-gray-500/20', text: 'text-gray-500 dark:text-gray-400' },
+    cancelled: { bg: 'bg-gray-500/20', text: 'text-muted-foreground' },
   };
 
   const colors = statusColors[invoice.status] ?? { bg: 'bg-gray-500/20', text: 'text-gray-400' };

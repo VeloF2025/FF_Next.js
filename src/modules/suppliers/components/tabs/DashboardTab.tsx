@@ -36,11 +36,11 @@ function StatsCard({ title, value, icon: Icon, trend, color }: StatsCardProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{value}</p>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {trend && (
             <div className="flex items-center mt-2">
               <TrendingUp 
@@ -53,7 +53,7 @@ function StatsCard({ title, value, icon: Icon, trend, color }: StatsCardProps) {
               )}>
                 {trend.value}%
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">vs last month</span>
+              <span className="text-sm text-muted-foreground ml-1">vs last month</span>
             </div>
           )}
         </div>
@@ -68,28 +68,28 @@ function StatsCard({ title, value, icon: Icon, trend, color }: StatsCardProps) {
 // Quick actions component
 function QuickActions() {
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Quick Actions</h3>
+    <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
       <div className="grid grid-cols-2 gap-3">
-        <button className="p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+        <button className="p-3 text-left border border-border rounded-lg hover:bg-background transition-colors">
           <Building2 className="h-5 w-5 text-blue-600 mb-2" />
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Add New Supplier</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Register a new supplier</p>
+          <p className="text-sm font-medium text-foreground">Add New Supplier</p>
+          <p className="text-xs text-muted-foreground">Register a new supplier</p>
         </button>
-        <button className="p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+        <button className="p-3 text-left border border-border rounded-lg hover:bg-background transition-colors">
           <FileText className="h-5 w-5 text-green-600 mb-2" />
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Create RFQ</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Send request for quote</p>
+          <p className="text-sm font-medium text-foreground">Create RFQ</p>
+          <p className="text-xs text-muted-foreground">Send request for quote</p>
         </button>
-        <button className="p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+        <button className="p-3 text-left border border-border rounded-lg hover:bg-background transition-colors">
           <MessageSquare className="h-5 w-5 text-purple-600 mb-2" />
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Send Message</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Contact suppliers</p>
+          <p className="text-sm font-medium text-foreground">Send Message</p>
+          <p className="text-xs text-muted-foreground">Contact suppliers</p>
         </button>
-        <button className="p-3 text-left border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors">
+        <button className="p-3 text-left border border-border rounded-lg hover:bg-background transition-colors">
           <Activity className="h-5 w-5 text-orange-600 mb-2" />
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">View Reports</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Supplier analytics</p>
+          <p className="text-sm font-medium text-foreground">View Reports</p>
+          <p className="text-xs text-muted-foreground">Supplier analytics</p>
         </button>
       </div>
     </div>
@@ -145,8 +145,8 @@ function RecentActivity() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h3>
+    <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
       <div className="space-y-4">
         {activities.map((activity) => {
           const Icon = activity.icon;
@@ -156,8 +156,8 @@ function RecentActivity() {
                 <Icon className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{activity.message}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{activity.supplier}</p>
+                <p className="text-sm font-medium text-foreground">{activity.message}</p>
+                <p className="text-sm text-muted-foreground">{activity.supplier}</p>
                 <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
               </div>
             </div>
@@ -181,8 +181,8 @@ function TopSuppliers() {
     .slice(0, 5);
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Top Performing Suppliers</h3>
+    <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Top Performing Suppliers</h3>
       <div className="space-y-4">
         {topSuppliers.map((supplier, index) => (
           <div key={supplier.id} className="flex items-center justify-between">
@@ -191,7 +191,7 @@ function TopSuppliers() {
                 <div className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
                   index === 0 ? "bg-yellow-100 text-yellow-800" :
-                  index === 1 ? "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200" :
+                  index === 1 ? "bg-secondary text-foreground" :
                   index === 2 ? "bg-orange-100 text-orange-800" :
                   "bg-blue-100 text-blue-800"
                 )}>
@@ -199,14 +199,14 @@ function TopSuppliers() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{supplier.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{supplier.category}</p>
+                <p className="text-sm font-medium text-foreground">{supplier.name}</p>
+                <p className="text-xs text-muted-foreground">{supplier.category}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
               <Star className="h-4 w-4 text-yellow-500 fill-current" />
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{supplier.rating}</span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">({supplier.complianceScore}% compliance)</span>
+              <span className="text-sm font-medium text-foreground">{supplier.rating}</span>
+              <span className="text-xs text-muted-foreground">({supplier.complianceScore}% compliance)</span>
             </div>
           </div>
         ))}
@@ -226,10 +226,10 @@ export function DashboardTab() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h2 className="text-2xl font-bold text-foreground">
             {selectedSupplier ? `${selectedSupplier.name} Dashboard` : 'Suppliers Overview'}
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-muted-foreground mt-1">
             {selectedSupplier 
               ? `Comprehensive view of ${selectedSupplier.name} performance and activities`
               : 'Monitor and manage all supplier relationships from a unified dashboard'
@@ -301,26 +301,26 @@ export function DashboardTab() {
 
       {/* Additional Info Panel for Selected Supplier */}
       {selectedSupplier && (
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <div className="bg-card p-6 rounded-lg border border-border shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-4">
             {selectedSupplier.name} - Key Metrics
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="text-center p-4 bg-background rounded-lg">
               <p className="text-2xl font-bold text-blue-600">{selectedSupplier.rating}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Rating</p>
+              <p className="text-sm text-muted-foreground">Rating</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="text-center p-4 bg-background rounded-lg">
               <p className="text-2xl font-bold text-green-600">{selectedSupplier.complianceScore}%</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Compliance</p>
+              <p className="text-sm text-muted-foreground">Compliance</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="text-center p-4 bg-background rounded-lg">
               <p className="text-2xl font-bold text-purple-600">24</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Active RFQs</p>
+              <p className="text-sm text-muted-foreground">Active RFQs</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div className="text-center p-4 bg-background rounded-lg">
               <p className="text-2xl font-bold text-orange-600">$2.4M</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">YTD Spend</p>
+              <p className="text-sm text-muted-foreground">YTD Spend</p>
             </div>
           </div>
         </div>

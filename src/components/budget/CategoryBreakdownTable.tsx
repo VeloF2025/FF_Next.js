@@ -55,23 +55,23 @@ export function CategoryBreakdownTable({
 
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+      className="bg-card rounded-lg border border-border shadow-sm"
       data-testid="category-breakdown"
     >
       <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Category Breakdown</h3>
+        <h3 className="text-lg font-semibold text-foreground">Category Breakdown</h3>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <th className="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Category</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Allocated</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Committed</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Actual</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Available</th>
-              <th className="py-3 px-4 font-medium text-gray-600 dark:text-gray-300 w-32">Utilization</th>
+            <tr className="border-b border-border bg-background">
+              <th className="text-left py-3 px-4 font-medium text-muted-foreground">Category</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Allocated</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Committed</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actual</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Available</th>
+              <th className="py-3 px-4 font-medium text-muted-foreground w-32">Utilization</th>
               {canEdit && <th className="py-3 px-4 w-12"></th>}
             </tr>
           </thead>
@@ -81,24 +81,24 @@ export function CategoryBreakdownTable({
               return (
                 <tr
                   key={category.id}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                  className="border-b border-border hover:bg-accent/50"
                   data-testid="budget-category"
                 >
                   <td className="py-3 px-4">
                     <div className="flex flex-col">
-                      <span className="font-medium text-gray-900 dark:text-white">{category.categoryName}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-medium text-foreground">{category.categoryName}</span>
+                      <span className="text-xs text-muted-foreground">
                         {category.categoryCode}
                       </span>
                     </div>
                   </td>
-                  <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
+                  <td className="text-right py-3 px-4 text-muted-foreground">
                     {formatCurrency(category.allocatedAmount || 0, currency)}
                   </td>
-                  <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
+                  <td className="text-right py-3 px-4 text-muted-foreground">
                     {formatCurrency(category.committedAmount || 0, currency)}
                   </td>
-                  <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
+                  <td className="text-right py-3 px-4 text-muted-foreground">
                     {formatCurrency(category.actualAmount || 0, currency)}
                   </td>
                   <td className="text-right py-3 px-4 text-green-600 dark:text-green-400 font-medium">
@@ -106,7 +106,7 @@ export function CategoryBreakdownTable({
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
                         <div
                           className={`h-full ${getUtilizationColor(utilization)}`}
                           style={{ width: `${Math.min(utilization, 100)}%` }}
@@ -116,7 +116,7 @@ export function CategoryBreakdownTable({
                           aria-valuemax={100}
                         />
                       </div>
-                      <span className="text-xs w-10 text-right text-gray-600 dark:text-gray-400">
+                      <span className="text-xs w-10 text-right text-muted-foreground">
                         {utilization.toFixed(0)}%
                       </span>
                     </div>
@@ -136,15 +136,15 @@ export function CategoryBreakdownTable({
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-gray-300 dark:border-gray-600 font-semibold bg-gray-50 dark:bg-gray-900">
-              <td className="py-3 px-4 text-gray-900 dark:text-white">Total</td>
-              <td className="text-right py-3 px-4 text-gray-900 dark:text-white">
+            <tr className="border-t-2 border-border font-semibold bg-background">
+              <td className="py-3 px-4 text-foreground">Total</td>
+              <td className="text-right py-3 px-4 text-foreground">
                 {formatCurrency(totals.allocated, currency)}
               </td>
-              <td className="text-right py-3 px-4 text-gray-900 dark:text-white">
+              <td className="text-right py-3 px-4 text-foreground">
                 {formatCurrency(totals.committed, currency)}
               </td>
-              <td className="text-right py-3 px-4 text-gray-900 dark:text-white">
+              <td className="text-right py-3 px-4 text-foreground">
                 {formatCurrency(totals.actual, currency)}
               </td>
               <td className="text-right py-3 px-4 text-green-600 dark:text-green-400">

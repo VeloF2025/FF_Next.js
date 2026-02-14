@@ -84,7 +84,7 @@ export const CHANGE_TYPE_COLORS = {
   imported: 'bg-purple-100 text-purple-800',
   mapped: 'bg-yellow-100 text-yellow-800',
   approved: 'bg-green-100 text-green-800',
-  archived: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
+  archived: 'bg-secondary text-foreground'
 };
 
 export const CHANGE_RECORD_TYPE_LABELS = {

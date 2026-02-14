@@ -43,8 +43,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
         <GlassCard>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active RFQs</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.activeRFQs || 0}</p>
+              <p className="text-sm font-medium text-muted-foreground">Active RFQs</p>
+              <p className="text-2xl font-bold text-foreground">{stats?.activeRFQs || 0}</p>
             </div>
             <FileText className="h-8 w-8 text-blue-500" />
           </div>
@@ -53,8 +53,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
         <GlassCard>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Completed Quotes</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.completedQuotes || 0}</p>
+              <p className="text-sm font-medium text-muted-foreground">Completed Quotes</p>
+              <p className="text-2xl font-bold text-foreground">{stats?.completedQuotes || 0}</p>
             </div>
             <CheckCircle className="h-8 w-8 text-green-500" />
           </div>
@@ -63,8 +63,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
         <GlassCard>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Score</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.averageScore || 0}/5</p>
+              <p className="text-sm font-medium text-muted-foreground">Average Score</p>
+              <p className="text-2xl font-bold text-foreground">{stats?.averageScore || 0}/5</p>
             </div>
             <Award className="h-8 w-8 text-yellow-500" />
           </div>
@@ -73,8 +73,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
         <GlassCard>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Win Rate</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats?.winRate || 0}%</p>
+              <p className="text-sm font-medium text-muted-foreground">Win Rate</p>
+              <p className="text-2xl font-bold text-foreground">{stats?.winRate || 0}%</p>
             </div>
             <TrendingUp className="h-8 w-8 text-indigo-500" />
           </div>
@@ -85,20 +85,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
         {/* Recent RFQs */}
         <GlassCard>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Recent RFQ Invitations</h3>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{rfqInvitations.length} active</span>
+            <h3 className="text-lg font-semibold text-foreground">Recent RFQ Invitations</h3>
+            <span className="text-sm text-muted-foreground">{rfqInvitations.length} active</span>
           </div>
           <div className="space-y-3">
             {rfqInvitations.slice(0, 3).map((rfq) => (
-              <div key={rfq.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div key={rfq.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                 <div className="flex-1">
-                  <h4 className="font-medium text-gray-900 dark:text-gray-100">{rfq.title}</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{rfq.projectName}</p>
+                  <h4 className="font-medium text-foreground">{rfq.title}</h4>
+                  <p className="text-sm text-muted-foreground">{rfq.projectName}</p>
                   <div className="flex items-center space-x-2 mt-1">
                     <span className={`text-xs px-2 py-1 rounded-full ${getUrgencyColor(rfq.urgency)}`}>
                       {rfq.urgency}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Due: {new Date(rfq.dueDate).toISOString().split('T')[0]}</span>
+                    <span className="text-xs text-muted-foreground">Due: {new Date(rfq.dueDate).toISOString().split('T')[0]}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -124,12 +124,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
 
         {/* Compliance Status */}
         <GlassCard>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Compliance Status</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-4">Compliance Status</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-gray-700 dark:text-gray-300">Overall Status</span>
+              <span className="text-muted-foreground">Overall Status</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                stats ? getComplianceColor(stats.complianceStatus) : 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900'
+                stats ? getComplianceColor(stats.complianceStatus) : 'text-muted-foreground bg-background'
               }`}>
                 {stats?.complianceStatus || 'Unknown'}
               </span>
@@ -137,15 +137,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ stats, rfqInvitation
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Tax Compliance</span>
+                <span className="text-sm text-muted-foreground">Tax Compliance</span>
                 <CheckCircle className="h-4 w-4 text-green-500" />
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 dark:text-gray-400">BEE Certificate</span>
+                <span className="text-sm text-muted-foreground">BEE Certificate</span>
                 <CheckCircle className="h-4 w-4 text-green-500" />
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Insurance</span>
+                <span className="text-sm text-muted-foreground">Insurance</span>
                 <AlertTriangle className="h-4 w-4 text-yellow-500" />
               </div>
             </div>

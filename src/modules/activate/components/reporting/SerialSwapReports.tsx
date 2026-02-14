@@ -152,7 +152,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
         );
       case 'false_positive':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300">
             <XCircle className="h-3 w-3" />
             False Positive
           </span>
@@ -214,13 +214,13 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-muted-foreground">
             Status:
           </label>
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
           >
             <option value="">All</option>
             <option value="pending_correction">Pending Correction</option>
@@ -258,50 +258,50 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       {/* Data Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
+          <thead className="bg-input">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 ONT Serial
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 UPS Serial
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Swap Details
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Days Pending
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-background divide-y divide-gray-200 dark:divide-gray-700">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   Loading...
                 </td>
               </tr>
             ) : data?.records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   No serial swaps found for the selected filters
                 </td>
               </tr>
             ) : (
               data?.records.map((record: SerialSwapRecord) => (
-                <tr key={record.drop_number} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <tr key={record.drop_number} className="hover:bg-accent">
                   <td className="px-4 py-3">
                     <a
                       href={`/activate/${record.drop_number}`}
@@ -313,16 +313,16 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                  <td className="px-4 py-3 text-sm text-foreground">
                     {record.project || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100">
+                  <td className="px-4 py-3 text-sm font-mono text-foreground">
                     {record.ont_serial || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-900 dark:text-gray-100">
+                  <td className="px-4 py-3 text-sm font-mono text-foreground">
                     {record.ups_serial || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate">
+                  <td className="px-4 py-3 text-sm text-muted-foreground max-w-xs truncate">
                     {record.swap_details}
                   </td>
                   <td className="px-4 py-3">
@@ -336,13 +336,13 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                             ? 'text-red-600 dark:text-red-400'
                             : record.days_pending > 3
                               ? 'text-yellow-600 dark:text-yellow-400'
-                              : 'text-gray-600 dark:text-gray-400'
+                              : 'text-muted-foreground'
                         }`}
                       >
                         {record.days_pending} days
                       </span>
                     ) : (
-                      <span className="text-gray-500 dark:text-gray-400">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -365,7 +365,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                       </div>
                     )}
                     {record.swap_status === 'corrected_in_1map' && record.corrected_at && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-muted-foreground">
                         {new Date(record.corrected_at).toISOString().split('T')[0]}
                       </span>
                     )}
@@ -379,8 +379,8 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
 
       {/* Pagination */}
       {data && data.total_count > pageSize && (
-        <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <p className="text-sm text-muted-foreground">
             Showing {(page - 1) * pageSize + 1} to{' '}
             {Math.min(page * pageSize, data.total_count)} of {data.total_count} results
           </p>
@@ -388,14 +388,14 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={page * pageSize >= data.total_count}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <ChevronRight className="h-4 w-4" />
             </button>

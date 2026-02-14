@@ -9,7 +9,7 @@ export interface CategoryConfig {
 type MessageCategoryKey = 'general' | 'rfq' | 'contract' | 'quality' | 'delivery' | 'payment' | 'compliance';
 
 export const categoryConfig: Record<MessageCategoryKey, CategoryConfig> = {
-  general: { label: 'General', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' },
+  general: { label: 'General', color: 'bg-secondary text-foreground' },
   rfq: { label: 'RFQ', color: 'bg-blue-100 text-blue-800' },
   contract: { label: 'Contract', color: 'bg-purple-100 text-purple-800' },
   quality: { label: 'Quality', color: 'bg-green-100 text-green-800' },

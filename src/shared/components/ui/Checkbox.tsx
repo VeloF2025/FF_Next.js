@@ -30,7 +30,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             'flex h-4 w-4 items-center justify-center rounded border-2 transition-colors',
             checked
               ? 'bg-purple-600 border-purple-600 text-white'
-              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-purple-600',
+              : 'border-border bg-card hover:border-purple-600',
             props.disabled && 'opacity-50 cursor-not-allowed',
             className
           )}

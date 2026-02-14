@@ -41,7 +41,7 @@ export function NeonSOWDisplay({ projectId }: NeonSOWDisplayProps) {
 
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-card rounded-lg shadow-sm border border-border">
       <NeonSOWHeader {...(neonHealth && { neonHealth })} />
       
       <NeonSOWTabs 

@@ -166,7 +166,7 @@ export function Dashboard() {
   ];
 
   return (
-    <div className="min-h-full bg-gray-50 dark:bg-gray-900 py-8">
+    <div className="min-h-full bg-background py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Dashboard Header */}
         <DashboardHeader 
@@ -196,41 +196,41 @@ export function Dashboard() {
         {/* Additional Dashboard Content */}
         <div className="mt-12 space-y-8">
           {/* Recent Activity */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h3>
+          <div className="bg-card rounded-lg shadow-sm border p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">New project "Lawley" created</span>
+                  <span className="text-sm text-muted-foreground">New project "Lawley" created</span>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">2 hours ago</span>
+                <span className="text-xs text-muted-foreground">2 hours ago</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Staff member "John Doe" added</span>
+                  <span className="text-sm text-muted-foreground">Staff member "John Doe" added</span>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">4 hours ago</span>
+                <span className="text-xs text-muted-foreground">4 hours ago</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">BOQ updated for Mamelodi POP 1</span>
+                  <span className="text-sm text-muted-foreground">BOQ updated for Mamelodi POP 1</span>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">6 hours ago</span>
+                <span className="text-xs text-muted-foreground">6 hours ago</span>
               </div>
             </div>
           </div>
 
           {/* Quick Actions - Full Width for Better Display */}
-          <div className="ff-quick-actions-container bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+          <div className="ff-quick-actions-container bg-card rounded-xl shadow-sm border border-border p-8">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Frequently used actions to boost productivity</p>
+                <h3 className="text-xl font-semibold text-foreground">Quick Actions</h3>
+                <p className="text-sm text-muted-foreground mt-1">Frequently used actions to boost productivity</p>
               </div>
-              <div className="text-xs text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-1 rounded-full">
+              <div className="text-xs text-gray-400 bg-background px-3 py-1 rounded-full">
                 {quickActions.length} actions
               </div>
             </div>

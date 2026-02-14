@@ -151,7 +151,7 @@ export function BudgetItemsTable({
   const getVarianceColor = (variance: number) => {
     if (variance < 0) return 'text-red-600 dark:text-red-400';
     if (variance > 0) return 'text-green-600 dark:text-green-400';
-    return 'text-gray-600 dark:text-gray-400';
+    return 'text-muted-foreground';
   };
 
   // Sort indicator
@@ -162,12 +162,12 @@ export function BudgetItemsTable({
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8">
+      <div className="bg-card rounded-lg border border-border p-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="h-10 bg-secondary rounded w-1/3"></div>
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div key={i} className="h-12 bg-secondary rounded"></div>
             ))}
           </div>
         </div>
@@ -177,10 +177,10 @@ export function BudgetItemsTable({
 
   if (items.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-        <Package className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Budget Items</h3>
-        <p className="text-gray-500 dark:text-gray-400">
+      <div className="bg-card rounded-lg border border-border p-8 text-center">
+        <Package className="h-12 w-12 mx-auto text-gray-400 dark:text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium text-foreground mb-2">No Budget Items</h3>
+        <p className="text-muted-foreground">
           Import a BOQ to create budget items for tracking.
         </p>
       </div>
@@ -188,11 +188,11 @@ export function BudgetItemsTable({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div className="bg-card rounded-lg border border-border shadow-sm">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             Budget Items ({filteredItems.length})
           </h3>
           <div className="flex items-center gap-3">
@@ -204,16 +204,16 @@ export function BudgetItemsTable({
                 placeholder="Search items..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-48"
+                className="pl-9 pr-3 py-1.5 text-sm border border-border rounded-md bg-card text-foreground placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 w-48"
               />
             </div>
             {/* Group toggle */}
-            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 checked={groupByCategory}
                 onChange={(e) => setGroupByCategory(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                className="rounded border-border text-blue-600 focus:ring-blue-500"
               />
               Group by category
             </label>
@@ -221,13 +221,13 @@ export function BudgetItemsTable({
               <div className="flex gap-1">
                 <button
                   onClick={expandAll}
-                  className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   Expand All
                 </button>
                 <button
                   onClick={collapseAll}
-                  className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                   Collapse All
                 </button>
@@ -241,32 +241,32 @@ export function BudgetItemsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <tr className="border-b border-border bg-background">
               <th
                 onClick={() => handleSort('itemCode')}
-                className="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white"
+                className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
               >
                 Item Code <SortIndicator field="itemCode" />
               </th>
               <th
                 onClick={() => handleSort('description')}
-                className="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white"
+                className="text-left py-3 px-4 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
               >
                 Description <SortIndicator field="description" />
               </th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600 dark:text-gray-300">UOM</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Rate</th>
+              <th className="text-left py-3 px-4 font-medium text-muted-foreground">UOM</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Qty</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Rate</th>
               <th
                 onClick={() => handleSort('budgetedAmount')}
-                className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white"
+                className="text-right py-3 px-4 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
               >
                 Budgeted <SortIndicator field="budgetedAmount" />
               </th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300">Actual</th>
+              <th className="text-right py-3 px-4 font-medium text-muted-foreground">Actual</th>
               <th
                 onClick={() => handleSort('varianceAmount')}
-                className="text-right py-3 px-4 font-medium text-gray-600 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white"
+                className="text-right py-3 px-4 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
               >
                 Variance <SortIndicator field="varianceAmount" />
               </th>
@@ -306,22 +306,22 @@ export function BudgetItemsTable({
       </div>
 
       {/* Summary Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+      <div className="p-4 border-t border-border bg-background">
         <div className="flex justify-end gap-8 text-sm">
           <div>
-            <span className="text-gray-500 dark:text-gray-400">Total Budgeted:</span>
-            <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+            <span className="text-muted-foreground">Total Budgeted:</span>
+            <span className="ml-2 font-semibold text-foreground">
               {formatCurrency(filteredItems.reduce((sum, i) => sum + i.budgetedAmount, 0))}
             </span>
           </div>
           <div>
-            <span className="text-gray-500 dark:text-gray-400">Total Actual:</span>
-            <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+            <span className="text-muted-foreground">Total Actual:</span>
+            <span className="ml-2 font-semibold text-foreground">
               {formatCurrency(filteredItems.reduce((sum, i) => sum + i.actualAmount, 0))}
             </span>
           </div>
           <div>
-            <span className="text-gray-500 dark:text-gray-400">Total Variance:</span>
+            <span className="text-muted-foreground">Total Variance:</span>
             <span
               className={`ml-2 font-semibold ${getVarianceColor(
                 filteredItems.reduce((sum, i) => sum + i.varianceAmount, 0)
@@ -363,28 +363,28 @@ function CategoryGroup({
       {/* Category header row */}
       <tr
         onClick={onToggle}
-        className="bg-gray-100 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+        className="bg-secondary/50 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
       >
-        <td colSpan={2} className="py-2 px-4 font-medium text-gray-900 dark:text-white">
+        <td colSpan={2} className="py-2 px-4 font-medium text-foreground">
           <div className="flex items-center gap-2">
             {expanded ? (
-              <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             )}
             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded">
               {category}
             </span>
             <span>{categoryName}</span>
-            <span className="text-gray-500 dark:text-gray-400 font-normal">({items.length} items)</span>
+            <span className="text-muted-foreground font-normal">({items.length} items)</span>
           </div>
         </td>
         <td colSpan={2}></td>
-        <td className="py-2 px-4 text-right font-medium text-gray-700 dark:text-gray-300"></td>
-        <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+        <td className="py-2 px-4 text-right font-medium text-muted-foreground"></td>
+        <td className="py-2 px-4 text-right font-medium text-foreground">
           {formatCurrency(totals.budgeted)}
         </td>
-        <td className="py-2 px-4 text-right font-medium text-gray-900 dark:text-white">
+        <td className="py-2 px-4 text-right font-medium text-foreground">
           {formatCurrency(totals.actual)}
         </td>
         <td className={`py-2 px-4 text-right font-medium ${getVarianceColor(totals.variance)}`}>
@@ -426,30 +426,30 @@ function ItemRow({
   return (
     <tr
       onClick={onClick}
-      className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${
+      className={`border-b border-gray-100 dark:border-gray-700 hover:bg-accent/30 ${
         onClick ? 'cursor-pointer' : ''
       }`}
     >
-      <td className={`py-2 px-4 text-gray-600 dark:text-gray-400 ${indent ? 'pl-10' : ''}`}>
+      <td className={`py-2 px-4 text-muted-foreground ${indent ? 'pl-10' : ''}`}>
         {item.itemCode || '-'}
       </td>
-      <td className="py-2 px-4 text-gray-900 dark:text-white max-w-xs truncate" title={item.description}>
+      <td className="py-2 px-4 text-foreground max-w-xs truncate" title={item.description}>
         <div className="flex items-center gap-2">
           {hasVarianceWarning && <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />}
           <span className="truncate">{item.description}</span>
         </div>
       </td>
-      <td className="py-2 px-4 text-gray-600 dark:text-gray-400">{item.uom || '-'}</td>
-      <td className="py-2 px-4 text-right text-gray-700 dark:text-gray-300">
+      <td className="py-2 px-4 text-muted-foreground">{item.uom || '-'}</td>
+      <td className="py-2 px-4 text-right text-muted-foreground">
         {item.budgetedQuantity.toLocaleString()}
       </td>
-      <td className="py-2 px-4 text-right text-gray-700 dark:text-gray-300">
+      <td className="py-2 px-4 text-right text-muted-foreground">
         {formatCurrency(item.budgetedRate)}
       </td>
-      <td className="py-2 px-4 text-right text-gray-900 dark:text-white font-medium">
+      <td className="py-2 px-4 text-right text-foreground font-medium">
         {formatCurrency(item.budgetedAmount)}
       </td>
-      <td className="py-2 px-4 text-right text-gray-700 dark:text-gray-300">
+      <td className="py-2 px-4 text-right text-muted-foreground">
         {formatCurrency(item.actualAmount)}
       </td>
       <td className={`py-2 px-4 text-right font-medium ${getVarianceColor(item.varianceAmount)}`}>

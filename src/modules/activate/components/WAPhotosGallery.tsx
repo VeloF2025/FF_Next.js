@@ -51,9 +51,9 @@ export function WAPhotosGallery({
 
   if (photos.length === 0) {
     return (
-      <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="text-center py-8 bg-background/50 rounded-lg border border-border">
         <Camera className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-        <p className="text-gray-600 dark:text-gray-400">{emptyMessage}</p>
+        <p className="text-muted-foreground">{emptyMessage}</p>
       </div>
     );
   }
@@ -104,7 +104,7 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
   return (
     <div
       onClick={onClick}
-      className="group relative bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 dark:hover:ring-blue-400 transition-all"
+      className="group relative bg-secondary rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 dark:hover:ring-blue-400 transition-all"
     >
       {/* Image */}
       <div className="aspect-square relative">
@@ -116,7 +116,7 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 dark:text-gray-400">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-muted-foreground">
             <Camera className="h-10 w-10 mb-2" />
             <span className="text-xs">Failed to load</span>
           </div>
@@ -139,12 +139,12 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
       </div>
 
       {/* Metadata Footer */}
-      <div className="p-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+      <div className="p-2 bg-card border-t border-border">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <User className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{photo.sender_name || 'Unknown'}</span>
         </div>
-        <div className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-1">
+        <div className="text-xs text-muted-foreground dark:text-gray-400 mt-1">
           {format(new Date(photo.message_timestamp), 'dd MMM HH:mm')}
         </div>
 
@@ -153,7 +153,7 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
           <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 space-y-1">
             {photo.vlm_ont_serial && (
               <div className="text-xs">
-                <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">ONT:</span>{' '}
+                <span className="text-muted-foreground dark:text-gray-400">ONT:</span>{' '}
                 <span className="font-mono text-green-600 dark:text-green-400">
                   {photo.vlm_ont_serial}
                 </span>
@@ -161,7 +161,7 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
             )}
             {photo.vlm_ups_serial && (
               <div className="text-xs">
-                <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">UPS:</span>{' '}
+                <span className="text-muted-foreground dark:text-gray-400">UPS:</span>{' '}
                 <span className="font-mono text-blue-600 dark:text-blue-400">
                   {photo.vlm_ups_serial}
                 </span>
@@ -226,9 +226,9 @@ function WAPhotoLightbox({ photo, onClose }: WAPhotoLightboxProps) {
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="flex items-center justify-center min-h-[400px] text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
               <div className="text-center">
-                <Camera className="h-24 w-24 mx-auto mb-4 text-gray-600 dark:text-gray-400" />
+                <Camera className="h-24 w-24 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-white">Failed to load image</p>
               </div>
             </div>

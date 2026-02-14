@@ -21,7 +21,7 @@ export function SupplierCard({ supplier }: SupplierCardProps) {
       case SupplierStatus.ACTIVE:
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case SupplierStatus.INACTIVE:
-        return <XCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
+        return <XCircle className="h-4 w-4 text-muted-foreground" />;
       case SupplierStatus.PENDING:
         return <Clock className="h-4 w-4 text-yellow-500" />;
       case SupplierStatus.SUSPENDED:

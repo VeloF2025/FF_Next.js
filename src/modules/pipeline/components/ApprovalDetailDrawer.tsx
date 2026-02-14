@@ -43,7 +43,7 @@ const STATUS_CONFIG: Record<
   ApprovalStatus,
   { label: string; color: string; bgColor: string }
 > = {
-  not_started: { label: 'Not Started', color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-100 dark:bg-gray-800' },
+  not_started: { label: 'Not Started', color: 'text-muted-foreground', bgColor: 'bg-secondary' },
   preparing: { label: 'Preparing', color: 'text-blue-600', bgColor: 'bg-blue-100' },
   internal_review: { label: 'Internal Review', color: 'text-blue-600', bgColor: 'bg-blue-100' },
   submitted: { label: 'Submitted', color: 'text-purple-600', bgColor: 'bg-purple-100' },
@@ -54,7 +54,7 @@ const STATUS_CONFIG: Record<
   conditionally_approved: { label: 'Conditionally Approved', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   expired: { label: 'Expired', color: 'text-red-600', bgColor: 'bg-red-100' },
   renewed: { label: 'Renewed', color: 'text-green-600', bgColor: 'bg-green-100' },
-  withdrawn: { label: 'Withdrawn', color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-100 dark:bg-gray-800' },
+  withdrawn: { label: 'Withdrawn', color: 'text-muted-foreground', bgColor: 'bg-secondary' },
 };
 
 const INTERNAL_STATUS_CONFIG: Record<
@@ -327,7 +327,7 @@ export function ApprovalDetailDrawer({
               </span>
             )}
             {!approval.is_required && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-secondary text-muted-foreground">
                 Optional
               </span>
             )}

@@ -11,7 +11,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
   if (!isOpen || !meeting) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-[var(--ff-border-light)] flex items-center justify-between">
           <h2 className="text-xl font-semibold text-[var(--ff-text-primary)]">{meeting.title}</h2>

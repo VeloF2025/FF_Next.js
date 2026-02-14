@@ -80,7 +80,7 @@ export function CheckInPhotoGrid({
 
   return (
     <div className="space-y-4">
-      <h3 className="font-medium text-gray-900 dark:text-white">Vehicle Photos</h3>
+      <h3 className="font-medium text-foreground">Vehicle Photos</h3>
 
       <div className="grid grid-cols-2 gap-4">
         {visiblePhotos.map(({ type, label, required }) => {
@@ -103,7 +103,7 @@ export function CheckInPhotoGrid({
 
               {hasPhoto ? (
                 /* Photo preview */
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary">
                   <img
                     src={photo.dataUrl}
                     alt={label}
@@ -134,12 +134,12 @@ export function CheckInPhotoGrid({
                   onClick={() => handleCapture(type)}
                   className={`w-full aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors ${
                     required
-                      ? 'border-gray-300 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                      ? 'border-border hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                      : 'border-border hover:border-gray-400'
                   }`}
                 >
                   <Camera className={`w-8 h-8 ${required ? 'text-gray-400' : 'text-gray-300'}`} />
-                  <span className={`text-sm font-medium ${required ? 'text-gray-600 dark:text-gray-300' : 'text-gray-400'}`}>
+                  <span className={`text-sm font-medium ${required ? 'text-muted-foreground' : 'text-gray-400'}`}>
                     {label}
                   </span>
                   {required && (

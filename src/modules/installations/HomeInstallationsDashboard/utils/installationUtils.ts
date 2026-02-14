@@ -7,13 +7,13 @@ export const getStatusColor = (status: Installation['status']): string => {
     case 'in_progress': 
       return 'bg-blue-100 text-blue-800';
     case 'scheduled': 
-      return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      return 'bg-secondary text-foreground';
     case 'issue': 
       return 'bg-red-100 text-red-800';
     case 'cancelled': 
       return 'bg-orange-100 text-orange-800';
     default: 
-      return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      return 'bg-secondary text-foreground';
   }
 };
 

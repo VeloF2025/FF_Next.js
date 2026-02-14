@@ -30,11 +30,11 @@ export function SystemHealthCard({ systemHealth }: SystemHealthCardProps) {
               <div className="text-2xl font-bold">
                 {systemHealth.uptime.toFixed(2)}%
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Uptime (30 days)</div>
+              <div className="text-sm text-muted-foreground">Uptime (30 days)</div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Target SLA</div>
+            <div className="text-sm text-muted-foreground">Target SLA</div>
             <div className="text-2xl font-bold">99.9%</div>
           </div>
         </div>

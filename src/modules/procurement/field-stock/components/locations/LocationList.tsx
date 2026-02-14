@@ -44,7 +44,7 @@ const locationTypeColors: Record<LocationType, string> = {
   technician: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   customer: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
   scrap: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  adjustment: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+  adjustment: 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-300',
 };
 
 export function LocationList({
@@ -104,7 +104,7 @@ export function LocationList({
             placeholder="Search locations..."
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-sm text-foreground placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
           />
         </div>
 
@@ -114,7 +114,7 @@ export function LocationList({
             className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
               showFilters
                 ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+                : 'border-border bg-card text-muted-foreground hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -135,14 +135,14 @@ export function LocationList({
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-background p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleTypeFilter('')}
               className={`rounded-full px-3 py-1 text-sm font-medium ${
                 typeFilter === ''
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               All Types
@@ -154,7 +154,7 @@ export function LocationList({
                 className={`rounded-full px-3 py-1 text-sm font-medium ${
                   typeFilter === type
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+                    : 'bg-card text-muted-foreground hover:bg-secondary dark:text-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {label}
@@ -173,22 +173,22 @@ export function LocationList({
 
       {/* Location List */}
       {!loading && locations.length === 0 && (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-border bg-background p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <MapPin className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-gray-600 dark:text-gray-300">No locations found</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-2 text-muted-foreground">No locations found</p>
+          <p className="text-sm text-muted-foreground">
             {search ? 'Try a different search term' : 'Create your first location to get started'}
           </p>
         </div>
       )}
 
       {!loading && locations.length > 0 && (
-        <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+        <div className="divide-y divide-gray-200 rounded-lg border border-border bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
           {locations.map((location) => (
             <button
               key={location.id}
               onClick={() => onSelectLocation?.(location)}
-              className={`flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700 ${
+              className={`flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent ${
                 selectedLocationId === location.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
               }`}
             >
@@ -197,8 +197,8 @@ export function LocationList({
                   {locationTypeIcons[location.locationType]}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{location.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <p className="font-medium text-foreground">{location.name}</p>
+                  <p className="text-sm text-muted-foreground">
                     {location.code}
                     {location.assignedToName && ` • ${location.assignedToName}`}
                   </p>

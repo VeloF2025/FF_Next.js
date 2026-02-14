@@ -188,7 +188,7 @@ export function FileImportDemo() {
           <span>Processing...</span>
           <span>{Math.round(state.progress)}%</span>
         </div>
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div className="w-full bg-secondary rounded-full h-2">
           <div 
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${state.progress}%` }}
@@ -242,9 +242,9 @@ export function FileImportDemo() {
         <h3 className="text-lg font-medium mb-2">Benchmark Results</h3>
         <div className="space-y-2">
           {state.benchmark.results.map((result: BenchmarkResult, index: number) => (
-            <div key={index} className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+            <div key={index} className="flex justify-between items-center p-2 bg-card rounded border">
               <span className="font-medium capitalize">{result.strategy}</span>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="text-sm text-muted-foreground">
                 {result.success ? (
                   <>
                     {Math.round(result.processingTime)}ms | 
@@ -268,14 +268,14 @@ export function FileImportDemo() {
     if (state.logs.length === 0) return null;
 
     return (
-      <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+      <div className="bg-background p-4 rounded-lg">
         <h3 className="text-lg font-medium mb-2 flex items-center">
           <Clock className="w-5 h-5 mr-2" />
           Processing Logs
         </h3>
         <div className="space-y-1 max-h-40 overflow-y-auto">
           {state.logs.map((log, index) => (
-            <div key={index} className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 px-2 py-1 rounded">
+            <div key={index} className="text-xs font-mono text-muted-foreground bg-card px-2 py-1 rounded">
               {log}
             </div>
           ))}
@@ -288,20 +288,20 @@ export function FileImportDemo() {
     <div className="max-w-4xl mx-auto p-6">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2">🚀 High-Performance File Import Demo</h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           Test the new Excel and CSV processing capabilities with streaming, Web Workers, and smart strategy selection
         </p>
       </div>
 
       {/* File Upload */}
       <div className="mb-6">
-        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:bg-gray-800">
+        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-background hover:bg-secondary">
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             <Upload className="w-10 h-10 mb-3 text-gray-400" />
-            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mb-2 text-sm text-muted-foreground">
               <span className="font-semibold">Click to upload</span> or drag and drop
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">CSV, XLSX, or XLS files</p>
+            <p className="text-xs text-muted-foreground">CSV, XLSX, or XLS files</p>
           </div>
           <input
             type="file"
@@ -358,12 +358,12 @@ export function FileImportDemo() {
       {renderLogs()}
 
       {/* Features Info */}
-      <div className="mt-8 bg-gray-100 dark:bg-gray-800 p-6 rounded-lg">
+      <div className="mt-8 bg-secondary p-6 rounded-lg">
         <h2 className="text-xl font-bold mb-4">🎯 Enhanced Features</h2>
         <div className="grid md:grid-cols-2 gap-4 text-sm">
           <div>
             <h3 className="font-medium mb-2">Performance Optimizations:</h3>
-            <ul className="space-y-1 text-gray-700 dark:text-gray-300">
+            <ul className="space-y-1 text-muted-foreground">
               <li>• Smart processing strategy selection</li>
               <li>• Memory-efficient streaming for large files</li>
               <li>• Web Worker support for non-blocking processing</li>
@@ -373,7 +373,7 @@ export function FileImportDemo() {
           </div>
           <div>
             <h3 className="font-medium mb-2">File Processing:</h3>
-            <ul className="space-y-1 text-gray-700 dark:text-gray-300">
+            <ul className="space-y-1 text-muted-foreground">
               <li>• PapaParse for high-speed CSV processing</li>
               <li>• ExcelJS + XLSX for comprehensive Excel support</li>
               <li>• Advanced validation and error reporting</li>

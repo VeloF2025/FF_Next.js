@@ -99,17 +99,17 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
 
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-card rounded-lg shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+          <h2 className="text-2xl font-bold text-foreground flex items-center">
             <Filter className="h-6 w-6 mr-2" />
             Filter Purchase Orders
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 p-2"
+            className="text-muted-foreground hover:text-muted-foreground p-2"
           >
             <X className="h-6 w-6" />
           </button>
@@ -127,13 +127,13 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Project
                   </label>
                   <select
                     value={localFilters.projectId || ''}
                     onChange={(e) => updateFilter('projectId', e.target.value || undefined)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={isLoadingData}
                   >
                     <option value="">
@@ -153,13 +153,13 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Supplier
                   </label>
                   <select
                     value={localFilters.supplierId || ''}
                     onChange={(e) => updateFilter('supplierId', e.target.value || undefined)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={isLoadingData}
                   >
                     <option value="">
@@ -189,7 +189,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Start Date
                   </label>
                   <input
@@ -203,12 +203,12 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                       start: e.target.value ? new Date(e.target.value) : undefined,
                       end: localFilters.dateRange?.end
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     End Date
                   </label>
                   <input
@@ -222,7 +222,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                       start: localFilters.dateRange?.start,
                       end: e.target.value ? new Date(e.target.value) : undefined
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -237,7 +237,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Minimum Amount
                   </label>
                   <input
@@ -250,13 +250,13 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                       min: parseFloat(e.target.value) || undefined,
                       max: localFilters.amountRange?.max
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="0.00"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Maximum Amount
                   </label>
                   <input
@@ -269,7 +269,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                       min: localFilters.amountRange?.min,
                       max: parseFloat(e.target.value) || undefined
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="999999.99"
                   />
                 </div>
@@ -308,9 +308,9 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                           updateFilter('status', (localFilters.status || []).filter(s => s !== status));
                         }
                       }}
-                      className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                    <span className="ml-2 text-sm text-muted-foreground">
                       {status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
                   </label>
@@ -344,9 +344,9 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                           updateFilter('approvalStatus', (localFilters.approvalStatus || []).filter(s => s !== status));
                         }
                       }}
-                      className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">
+                    <span className="ml-2 text-xs text-muted-foreground">
                       {status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
                   </label>
@@ -376,9 +376,9 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                           updateFilter('deliveryStatus', (localFilters.deliveryStatus || []).filter(s => s !== status));
                         }
                       }}
-                      className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">
+                    <span className="ml-2 text-xs text-muted-foreground">
                       {status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
                   </label>
@@ -407,9 +407,9 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
                           updateFilter('invoiceStatus', (localFilters.invoiceStatus || []).filter(s => s !== status));
                         }
                       }}
-                      className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-border text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="ml-2 text-xs text-gray-700 dark:text-gray-300">
+                    <span className="ml-2 text-xs text-muted-foreground">
                       {status.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
                     </span>
                   </label>
@@ -420,7 +420,7 @@ export const POFiltersPanel: React.FC<POFiltersPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t bg-gray-50 dark:bg-gray-900">
+        <div className="flex items-center justify-between p-6 border-t bg-background">
           <VelocityButton
             variant="outline"
             onClick={handleResetFilters}

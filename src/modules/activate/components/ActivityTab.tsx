@@ -212,7 +212,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading activity...</span>
+        <span className="ml-3 text-muted-foreground">Loading activity...</span>
       </div>
     );
   }
@@ -238,9 +238,9 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
     <div className="space-y-6">
       {/* Phase Progress (if summary available) */}
       {summary && (
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+        <div className="bg-background/50 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <h4 className="font-medium text-gray-900 dark:text-white">Current Phase</h4>
+            <h4 className="font-medium text-foreground">Current Phase</h4>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${
               summary.currentPhase === 'complete'
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
@@ -262,14 +262,14 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                         ? 'bg-blue-500 dark:bg-blue-400'
                         : isPast
                         ? 'bg-green-500 dark:bg-green-400'
-                        : 'bg-gray-200 dark:bg-gray-700'
+                        : 'bg-secondary'
                     }`}
                   />
                 </div>
               );
             })}
           </div>
-          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span>Submitted</span>
             <span>Complete</span>
           </div>
@@ -278,13 +278,13 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
 
       {/* View Toggle */}
       <div className="flex items-center justify-between">
-        <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+        <div className="flex rounded-lg bg-secondary p-1">
           <button
             onClick={() => setViewMode('timeline')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               viewMode === 'timeline'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-card text-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📅 Timeline
@@ -293,8 +293,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
             onClick={() => setViewMode('history')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               viewMode === 'history'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-card text-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             📋 QA History ({reviews.length})
@@ -303,8 +303,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
             onClick={() => setViewMode('serials')}
             className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
               viewMode === 'serials'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-card text-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             🔢 Serial History ({serialHistory.length})
@@ -315,7 +315,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
               ✓ Feedback Sent
             </span>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {formatDate(feedbackSentAt)}
             </p>
           </div>
@@ -326,14 +326,14 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
       {viewMode === 'timeline' && (
         <div className="space-y-4">
           {timeline.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               <span className="text-4xl mb-4 block">📅</span>
               <p>No activity recorded yet</p>
             </div>
           ) : (
             <div className="relative">
               {/* Timeline Line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
+              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-secondary" />
 
               {/* Timeline Events */}
               {timeline.map((entry, index) => (
@@ -352,13 +352,13 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                   </div>
 
                   {/* Event Card */}
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                  <div className="bg-card border border-border rounded-lg p-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h5 className="font-medium text-gray-900 dark:text-white">
+                        <h5 className="font-medium text-foreground">
                           {entry.title}
                         </h5>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        <p className="text-sm text-muted-foreground mt-1">
                           {entry.description}
                         </p>
 
@@ -368,11 +368,11 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                             {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ont && (
                               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
                                 <span className="font-medium text-orange-700 dark:text-orange-300 w-12">ONT:</span>
-                                <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                                <span className="text-muted-foreground font-mono text-xs">
                                   {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.old || 'null'}
                                 </span>
                                 <span className="text-orange-500">→</span>
-                                <span className="text-gray-900 dark:text-white font-mono text-xs font-medium">
+                                <span className="text-foreground font-mono text-xs font-medium">
                                   {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.new}
                                 </span>
                               </div>
@@ -380,11 +380,11 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                             {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ups && (
                               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
                                 <span className="font-medium text-orange-700 dark:text-orange-300 w-12">UPS:</span>
-                                <span className="text-gray-500 dark:text-gray-400 font-mono text-xs">
+                                <span className="text-muted-foreground font-mono text-xs">
                                   {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.old || 'null'}
                                 </span>
                                 <span className="text-orange-500">→</span>
-                                <span className="text-gray-900 dark:text-white font-mono text-xs font-medium">
+                                <span className="text-foreground font-mono text-xs font-medium">
                                   {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.new}
                                 </span>
                               </div>
@@ -405,7 +405,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span>⚠️</span>
                               <span className="font-medium">Serials appear swapped!</span>
                             </div>
-                            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                            <div className="mt-2 text-xs text-muted-foreground font-mono">
                               <div>ONT field: {entry.metadata.ont_serial as string}</div>
                               <div>UPS field: {entry.metadata.ups_serial as string}</div>
                             </div>
@@ -419,7 +419,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span>🔴</span>
                               <span className="font-medium">ONT replaced but not updated in 1Map</span>
                             </div>
-                            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 font-mono">
+                            <div className="mt-2 text-xs text-muted-foreground font-mono">
                               <div>1Map shows: {entry.metadata.onemap_serial as string}</div>
                               <div>OES activated: {entry.metadata.oes_serial as string}</div>
                             </div>
@@ -429,15 +429,15 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                       <div className="text-right ml-4 flex-shrink-0">
                         {/* Show "Detected" label for batch sync events */}
                         {entry.actor === 'batch_sync' && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 block">
+                          <span className="text-xs text-gray-400 dark:text-muted-foreground block">
                             Detected:
                           </span>
                         )}
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                        <span className="text-xs text-muted-foreground">
                           {formatDateTime(entry.timestamp)}
                         </span>
                         {entry.actor && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-muted-foreground mt-1">
                             by {entry.actor === 'batch_sync' ? 'Auto Sync' : entry.actor}
                           </p>
                         )}
@@ -456,7 +456,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
         <>
           {/* No reviews */}
           {reviews.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               <span className="text-4xl mb-4 block">📋</span>
               <p>No review history found for this DR</p>
             </div>
@@ -471,7 +471,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
             ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800'
             : passFail === 'fail'
             ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800'
-            : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600';
+            : 'bg-secondary text-foreground border-gray-200 dark:border-gray-600';
 
           return (
             <div
@@ -481,7 +481,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               {/* Review Header - Clickable */}
               <button
                 onClick={() => toggleExpand(review.id)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white dark:bg-gray-800/5 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 dark:hover:bg-card/5 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <div className="text-left">
@@ -495,7 +495,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                           Desktop QA
                         </span>
                       ) : (
-                        <span className="px-1.5 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                        <span className="px-1.5 py-0.5 text-xs rounded bg-secondary text-muted-foreground">
                           Excel Import
                         </span>
                       )}
@@ -535,7 +535,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                 <div className="px-4 pb-4 border-t border-current/10">
                   {/* Comment */}
                   {review.comment && (
-                    <div className="mt-4 p-3 bg-white dark:bg-gray-800/50 dark:bg-black/20 rounded-lg">
+                    <div className="mt-4 p-3 bg-card/50 dark:bg-black/20 rounded-lg">
                       <div className="text-xs font-medium uppercase tracking-wide mb-1 opacity-60">
                         Comment
                       </div>
@@ -633,28 +633,28 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
 
           {/* Serial History Summary */}
           {serialSummary && serialSummary.total_changes > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 dark:text-white mb-3">Change Summary</h4>
+            <div className="bg-background/50 rounded-lg p-4">
+              <h4 className="font-medium text-foreground mb-3">Change Summary</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{serialSummary.total_changes}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Total Changes</p>
+                <div className="p-3 bg-card rounded-lg border border-border">
+                  <p className="text-2xl font-bold text-foreground">{serialSummary.total_changes}</p>
+                  <p className="text-xs text-muted-foreground">Total Changes</p>
                 </div>
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-3 bg-card rounded-lg border border-border">
                   <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{serialSummary.ont_changes}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">ONT Changes</p>
+                  <p className="text-xs text-muted-foreground">ONT Changes</p>
                 </div>
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-3 bg-card rounded-lg border border-border">
                   <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{serialSummary.ups_changes}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">UPS Changes</p>
+                  <p className="text-xs text-muted-foreground">UPS Changes</p>
                 </div>
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-3 bg-card rounded-lg border border-border">
                   <p className="text-2xl font-bold text-red-600 dark:text-red-400">{serialSummary.swaps_detected}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Swaps Detected</p>
+                  <p className="text-xs text-muted-foreground">Swaps Detected</p>
                 </div>
               </div>
               {serialSummary.first_recorded && (
-                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Tracking since {formatDate(serialSummary.first_recorded)}
                 </p>
               )}
@@ -663,14 +663,14 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
 
           {/* Serial Change History */}
           {serialHistory.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-muted-foreground">
               <span className="text-4xl mb-4 block">🔢</span>
               <p>No serial changes recorded yet</p>
               <p className="text-sm mt-2">Changes will be tracked when serials are updated</p>
             </div>
           ) : (
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900 dark:text-white">Change History</h4>
+              <h4 className="font-medium text-foreground">Change History</h4>
               {serialHistory.map((entry) => {
                 const isOnt = entry.change_type === 'ont_serial';
                 const sourceLabel: Record<string, string> = {
@@ -714,23 +714,23 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                             }`}>
                               {isOnt ? 'ONT Serial' : 'UPS Serial'}
                             </span>
-                            <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                            <span className="text-xs px-2 py-0.5 bg-secondary rounded text-muted-foreground">
                               {sourceLabel[entry.change_source] || entry.change_source}
                             </span>
                           </div>
                           {/* Value Change */}
                           <div className="mt-2 flex items-baseline gap-2 text-sm font-mono flex-wrap">
-                            <span className="text-gray-500 dark:text-gray-400 break-all" title={entry.old_value || 'null'}>
+                            <span className="text-muted-foreground break-all" title={entry.old_value || 'null'}>
                               {entry.old_value || '(empty)'}
                             </span>
                             <span className={`shrink-0 ${isOnt ? 'text-orange-500' : 'text-purple-500'}`}>→</span>
-                            <span className="font-medium text-gray-900 dark:text-white break-all" title={entry.new_value || 'null'}>
+                            <span className="font-medium text-foreground break-all" title={entry.new_value || 'null'}>
                               {entry.new_value || '(empty)'}
                             </span>
                           </div>
                           {/* Reason */}
                           {entry.change_reason && (
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <p className="mt-1 text-xs text-muted-foreground">
                               Reason: {reasonLabel[entry.change_reason] || entry.change_reason}
                             </p>
                           )}
@@ -744,7 +744,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                         </div>
                       </div>
                       {/* Timestamp & Actor */}
-                      <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+                      <div className="text-right text-xs text-muted-foreground">
                         <p>{formatDateTime(entry.detected_at)}</p>
                         <p className="mt-1">by {entry.actor}</p>
                       </div>

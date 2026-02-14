@@ -16,7 +16,7 @@ export function NetworkProgressCard({ network, isLoading = false }: NetworkProgr
   if (isLoading) {
     return (
       <div className="ff-card animate-pulse">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-32 bg-secondary rounded" />
       </div>
     );
   }
@@ -41,7 +41,7 @@ export function NetworkProgressCard({ network, isLoading = false }: NetworkProgr
           <span>{network.progressPercent.toFixed(1)}% complete</span>
           <span>{network.completedDrops.toLocaleString()} / {network.totalDrops.toLocaleString()} drops</span>
         </div>
-        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-3 bg-secondary rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
             style={{ width: `${progressPercent}%` }}

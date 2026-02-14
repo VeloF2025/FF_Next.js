@@ -42,7 +42,7 @@ export function DevQueueCard({ item, onVote, onDelete, onEdit, onAttachments, is
       case 'low':
         return 'bg-green-100 text-green-800 border-green-200';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700';
+        return 'bg-secondary text-foreground border-border';
     }
   };
 
@@ -56,7 +56,7 @@ export function DevQueueCard({ item, onVote, onDelete, onEdit, onAttachments, is
       'XL': 'bg-pink-100 text-pink-800',
     };
     return (
-      <span className={`text-xs px-2 py-0.5 rounded ${colors[effort] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}>
+      <span className={`text-xs px-2 py-0.5 rounded ${colors[effort] || 'bg-secondary text-foreground'}`}>
         {effort}
       </span>
     );

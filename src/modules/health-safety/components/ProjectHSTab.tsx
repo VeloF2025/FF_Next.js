@@ -90,8 +90,8 @@ export function ProjectHSTab({
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-        <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="h-32 bg-secondary rounded-lg" />
+        <div className="h-48 bg-secondary rounded-lg" />
       </div>
     );
   }
@@ -103,15 +103,15 @@ export function ProjectHSTab({
   return (
     <div className="space-y-6">
       {/* Summary Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-card rounded-lg border border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Shield className="w-5 h-5 text-green-500" />
             Health & Safety Status
           </h3>
           <button
             onClick={() => setShowConfigModal(true)}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-200"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -163,7 +163,7 @@ export function ProjectHSTab({
 
         <button
           onClick={() => window.location.href = `/health-safety/incidents?project_id=${projectId}`}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary dark:hover:bg-gray-600 text-foreground rounded-lg transition-colors"
         >
           <AlertTriangle className="w-4 h-4" />
           Report Incident
@@ -171,9 +171,9 @@ export function ProjectHSTab({
       </div>
 
       {/* Recent Audits */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h4 className="font-medium text-gray-900 dark:text-white">Recent Audits</h4>
+      <div className="bg-card rounded-lg border border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h4 className="font-medium text-foreground">Recent Audits</h4>
           <a
             href={`/health-safety/project/${projectId}/audits`}
             className="text-sm text-orange-500 hover:text-orange-600 flex items-center gap-1"
@@ -183,7 +183,7 @@ export function ProjectHSTab({
         </div>
 
         {audits.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+          <div className="p-8 text-center text-muted-foreground">
             <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
             <p>No audits yet</p>
             <p className="text-sm">Start your first audit to track H&S compliance</p>
@@ -198,9 +198,9 @@ export function ProjectHSTab({
       </div>
 
       {/* Contractor Compliance Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h4 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="bg-card rounded-lg border border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h4 className="font-medium text-foreground flex items-center gap-2">
             <Building className="w-5 h-5 text-blue-500" />
             Contractor Compliance
           </h4>
@@ -211,9 +211,9 @@ export function ProjectHSTab({
       </div>
 
       {/* Incidents Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h4 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="bg-card rounded-lg border border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <h4 className="font-medium text-foreground flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
             Incidents
           </h4>
@@ -239,12 +239,12 @@ function NotConfiguredState({
   onConfigure?: () => void;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+    <div className="bg-card rounded-lg border border-border p-8 text-center">
       <Shield className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+      <h3 className="text-lg font-semibold text-foreground mb-2">
         H&S Not Configured
       </h3>
-      <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
         Configure Health & Safety settings for this project to enable audits, incident tracking, and
         compliance monitoring.
       </p>
@@ -277,9 +277,9 @@ function ScoreCard({
   };
 
   return (
-    <div className={`p-4 rounded-lg ${ragStatus ? ragColors[ragStatus] : 'bg-gray-50 dark:bg-gray-700/50'}`}>
-      <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
-      <p className={`text-2xl font-bold ${ragStatus ? '' : 'text-gray-900 dark:text-white'}`}>
+    <div className={`p-4 rounded-lg ${ragStatus ? ragColors[ragStatus] : 'bg-secondary/50'}`}>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className={`text-2xl font-bold ${ragStatus ? '' : 'text-foreground'}`}>
         {value}
         {suffix && typeof value === 'number' && <span className="text-lg">{suffix}</span>}
       </p>
@@ -306,14 +306,14 @@ function StatCard({
   };
 
   return (
-    <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+    <div className="p-4 rounded-lg bg-secondary/50">
       <div className="flex items-center gap-2 mb-1">
         <div className={`p-1 rounded ${colors[color]}`}>
           <Icon className="w-4 h-4" />
         </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
       </div>
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      <p className="text-2xl font-bold text-foreground">{value}</p>
     </div>
   );
 }
@@ -338,20 +338,20 @@ function DueDateCard({
           ? 'bg-red-50 dark:bg-red-900/20'
           : isDueSoon
             ? 'bg-amber-50 dark:bg-amber-900/20'
-            : 'bg-gray-50 dark:bg-gray-700/50'
+            : 'bg-secondary/50'
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
-        <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`} />
-        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+        <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : 'text-muted-foreground'}`} />
+        <p className="text-sm text-muted-foreground">{label}</p>
       </div>
       {dueDate ? (
         <>
-          <p className={`text-lg font-semibold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-gray-900 dark:text-white'}`}>
+          <p className={`text-lg font-semibold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-foreground'}`}>
             {dueDate.toLocaleDateString()}
           </p>
           {frequency && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{frequency}</p>
+            <p className="text-xs text-muted-foreground capitalize">{frequency}</p>
           )}
         </>
       ) : (
@@ -372,17 +372,17 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
   return (
     <a
       href={`/health-safety/audits/${audit.id}`}
-      className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+      className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
     >
       <div className="flex items-center gap-4">
-        <div className={`p-2 rounded-lg ${ragColors[audit.rag_status] || 'bg-gray-100 dark:bg-gray-700'}`}>
+        <div className={`p-2 rounded-lg ${ragColors[audit.rag_status] || 'bg-secondary'}`}>
           <BarChart3 className="w-5 h-5" />
         </div>
         <div>
-          <p className="font-medium text-gray-900 dark:text-white">
+          <p className="font-medium text-foreground">
             {audit.audit_type.charAt(0).toUpperCase() + audit.audit_type.slice(1)} Audit
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             {new Date(audit.audit_date).toLocaleDateString()}
             {audit.auditor_name && ` • ${audit.auditor_name}`}
           </p>
@@ -391,7 +391,7 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
 
       <div className="flex items-center gap-3">
         {audit.overall_score !== null && (
-          <span className={`text-lg font-semibold ${ragColors[audit.rag_status]?.split(' ')[1] || 'text-gray-600 dark:text-gray-400'}`}>
+          <span className={`text-lg font-semibold ${ragColors[audit.rag_status]?.split(' ')[1] || 'text-muted-foreground'}`}>
             {audit.overall_score}%
           </span>
         )}
@@ -424,23 +424,23 @@ function ConfigDetails({ config }: { config: HSProjectConfig | null }) {
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+    <div className="bg-card rounded-lg border border-border">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full p-4 flex items-center justify-between text-left"
       >
-        <span className="font-medium text-gray-900 dark:text-white">Configuration Details</span>
+        <span className="font-medium text-foreground">Configuration Details</span>
         <ChevronRight
           className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
         />
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-500 dark:text-gray-400">Audit Frequency</p>
-              <p className="font-medium text-gray-900 dark:text-white capitalize">
+              <p className="text-muted-foreground">Audit Frequency</p>
+              <p className="font-medium text-foreground capitalize">
                 {config.audit_frequency}
                 {config.audit_frequency === 'custom' && config.custom_frequency_days && (
                   <span> ({config.custom_frequency_days} days)</span>
@@ -448,18 +448,18 @@ function ConfigDetails({ config }: { config: HSProjectConfig | null }) {
               </p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400">Min Score Threshold</p>
-              <p className="font-medium text-gray-900 dark:text-white">{config.min_score_threshold}%</p>
+              <p className="text-muted-foreground">Min Score Threshold</p>
+              <p className="font-medium text-foreground">{config.min_score_threshold}%</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400">Daily Briefing</p>
-              <p className="font-medium text-gray-900 dark:text-white">
+              <p className="text-muted-foreground">Daily Briefing</p>
+              <p className="font-medium text-foreground">
                 {config.requires_daily_briefing ? 'Required' : 'Not Required'}
               </p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400">Active Permits</p>
-              <p className="font-medium text-gray-900 dark:text-white">
+              <p className="text-muted-foreground">Active Permits</p>
+              <p className="font-medium text-foreground">
                 {activePermits.length > 0
                   ? activePermits.map((p) => p.label).join(', ')
                   : 'None'}
@@ -469,8 +469,8 @@ function ConfigDetails({ config }: { config: HSProjectConfig | null }) {
 
           {config.notes && (
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">Notes</p>
-              <p className="text-sm text-gray-900 dark:text-white">{config.notes}</p>
+              <p className="text-muted-foreground text-sm">Notes</p>
+              <p className="text-sm text-foreground">{config.notes}</p>
             </div>
           )}
         </div>

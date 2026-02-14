@@ -24,7 +24,7 @@ export const responsiveClasses = {
   
   // Project filter classes
   projectFilter: 'min-w-[250px] sm:min-w-[280px] lg:min-w-[300px] justify-between',
-  projectFilterDropdown: 'absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50',
+  projectFilterDropdown: 'absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50',
   
   // Content area classes
   contentArea: 'flex-1 overflow-hidden',

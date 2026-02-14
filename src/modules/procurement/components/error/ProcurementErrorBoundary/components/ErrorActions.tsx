@@ -27,7 +27,7 @@ export function ErrorActions({ onReset, onReload, isComponentLevel }: ErrorActio
       
       <button
         onClick={onReset}
-        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-background transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Try Again
@@ -36,7 +36,7 @@ export function ErrorActions({ onReset, onReload, isComponentLevel }: ErrorActio
       {!isComponentLevel && (
         <Link
           to="/app/procurement"
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-background transition-colors"
         >
           <Home className="h-4 w-4" />
           Procurement Home

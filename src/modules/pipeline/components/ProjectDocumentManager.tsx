@@ -311,10 +311,10 @@ export function ProjectDocumentManager({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-foreground">
             Project Documents
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-muted-foreground">
             {documents.length} document{documents.length !== 1 ? 's' : ''} total
           </p>
         </div>
@@ -337,7 +337,7 @@ export function ProjectDocumentManager({
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-input rounded-lg">
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -346,14 +346,14 @@ export function ProjectDocumentManager({
               placeholder="Search documents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+              className="w-full pl-9 pr-3 py-2 border border-border rounded-lg bg-card"
             />
           </div>
         </div>
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+          className="px-3 py-2 border border-border rounded-lg bg-card"
         >
           <option value="all">All Types</option>
           {DOCUMENT_TYPES.map((t) => (
@@ -362,16 +362,16 @@ export function ProjectDocumentManager({
             </option>
           ))}
         </select>
-        <div className="flex border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
+        <div className="flex border border-border rounded-lg overflow-hidden">
           <button
             onClick={() => setViewMode('grouped')}
-            className={`px-3 py-2 text-sm ${viewMode === 'grouped' ? 'bg-blue-100 text-blue-700' : 'bg-white dark:bg-gray-700'}`}
+            className={`px-3 py-2 text-sm ${viewMode === 'grouped' ? 'bg-blue-100 text-blue-700' : 'bg-card'}`}
           >
             Grouped
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`px-3 py-2 text-sm ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'bg-white dark:bg-gray-700'}`}
+            className={`px-3 py-2 text-sm ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'bg-card'}`}
           >
             List
           </button>
@@ -380,9 +380,9 @@ export function ProjectDocumentManager({
 
       {/* Document List */}
       {filteredDocs.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="text-center py-12 bg-input rounded-lg">
           <FolderOpen className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">No documents found</p>
+          <p className="text-muted-foreground">No documents found</p>
           {!readonly && (
             <button
               onClick={() => setShowUploadForm(true)}
@@ -397,7 +397,7 @@ export function ProjectDocumentManager({
           {/* Project-level documents */}
           {projectLevel.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+              <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
                 <FolderOpen className="w-4 h-4" />
                 Project Documents ({projectLevel.length})
               </h4>
@@ -423,7 +423,7 @@ export function ProjectDocumentManager({
             if (visibleDocs.length === 0) return null;
             return (
               <div key={approvalName}>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   {approvalName} ({visibleDocs.length})
                 </h4>
@@ -460,8 +460,8 @@ export function ProjectDocumentManager({
       {/* Upload Form Modal */}
       {showUploadForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div className="bg-card rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-border flex items-center justify-between">
               <h3 className="text-lg font-semibold">Add Document</h3>
               <button
                 onClick={() => setShowUploadForm(false)}
@@ -479,7 +479,7 @@ export function ProjectDocumentManager({
                   value={uploadData.document_name}
                   onChange={(e) => setUploadData({ ...uploadData, document_name: e.target.value })}
                   placeholder="e.g., Eskom Wayleave Approval"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg"
                 />
               </div>
 
@@ -489,7 +489,7 @@ export function ProjectDocumentManager({
                   <select
                     value={uploadData.document_type}
                     onChange={(e) => setUploadData({ ...uploadData, document_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    className="w-full px-3 py-2 border border-border rounded-lg"
                   >
                     {DOCUMENT_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -505,7 +505,7 @@ export function ProjectDocumentManager({
                     value={uploadData.reference_number}
                     onChange={(e) => setUploadData({ ...uploadData, reference_number: e.target.value })}
                     placeholder="e.g., WL-2024-001"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    className="w-full px-3 py-2 border border-border rounded-lg"
                   />
                 </div>
               </div>
@@ -517,7 +517,7 @@ export function ProjectDocumentManager({
                   value={uploadData.file_name}
                   onChange={(e) => setUploadData({ ...uploadData, file_name: e.target.value })}
                   placeholder="e.g., eskom_approval.pdf"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg"
                 />
               </div>
 
@@ -539,7 +539,7 @@ export function ProjectDocumentManager({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingFile}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 text-sm whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg hover:bg-accent disabled:opacity-50 text-sm whitespace-nowrap"
                     title="Upload file"
                   >
                     {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -550,10 +550,10 @@ export function ProjectDocumentManager({
                     value={uploadData.file_url}
                     onChange={(e) => setUploadData({ ...uploadData, file_url: e.target.value })}
                     placeholder="https://... or upload a file"
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    className="flex-1 px-3 py-2 border border-border rounded-lg"
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload a file or paste a URL</p>
+                <p className="text-xs text-muted-foreground mt-1">Upload a file or paste a URL</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -563,7 +563,7 @@ export function ProjectDocumentManager({
                     type="date"
                     value={uploadData.issue_date}
                     onChange={(e) => setUploadData({ ...uploadData, issue_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    className="w-full px-3 py-2 border border-border rounded-lg"
                   />
                 </div>
                 <div>
@@ -572,7 +572,7 @@ export function ProjectDocumentManager({
                     type="date"
                     value={uploadData.expiry_date}
                     onChange={(e) => setUploadData({ ...uploadData, expiry_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    className="w-full px-3 py-2 border border-border rounded-lg"
                   />
                 </div>
               </div>
@@ -584,7 +584,7 @@ export function ProjectDocumentManager({
                   value={uploadData.issuing_authority}
                   onChange={(e) => setUploadData({ ...uploadData, issuing_authority: e.target.value })}
                   placeholder="e.g., Eskom Holdings"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg"
                 />
               </div>
 
@@ -595,12 +595,12 @@ export function ProjectDocumentManager({
                   onChange={(e) => setUploadData({ ...uploadData, description: e.target.value })}
                   rows={2}
                   placeholder="Optional notes..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg"
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+            <div className="p-4 border-t border-border flex gap-3">
               <button
                 onClick={handleUpload}
                 disabled={uploading || !uploadData.document_name || !uploadData.file_name}
@@ -611,7 +611,7 @@ export function ProjectDocumentManager({
               </button>
               <button
                 onClick={() => setShowUploadForm(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-accent"
               >
                 Cancel
               </button>
@@ -638,11 +638,11 @@ function DocumentRow({
   showApproval?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-sm group">
+    <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-lg hover:shadow-sm group">
       <div className="flex-shrink-0 text-2xl">{getDocTypeIcon(doc.document_type)}</div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="font-medium text-gray-900 dark:text-white truncate">{doc.document_name}</p>
+          <p className="font-medium text-foreground truncate">{doc.document_name}</p>
           {doc.is_verified && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
           {doc.smartsheet_attachment_id && (
             <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">Smartsheet</span>
@@ -656,7 +656,7 @@ function DocumentRow({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
           <span>{DOCUMENT_TYPES.find((t) => t.value === doc.document_type)?.label || doc.document_type}</span>
           {doc.file_size && <span>• {formatFileSize(doc.file_size)}</span>}
           {doc.reference_number && <span>• Ref: {doc.reference_number}</span>}
@@ -679,7 +679,7 @@ function DocumentRow({
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
             title="Open document"
           >
-            <ExternalLink className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <ExternalLink className="w-4 h-4 text-muted-foreground" />
           </a>
         )}
         {!readonly && (

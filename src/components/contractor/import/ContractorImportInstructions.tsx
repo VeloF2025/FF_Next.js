@@ -21,8 +21,8 @@ export function ContractorImportInstructions() {
 
       <div className="space-y-3">
         <div>
-          <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Required Fields</h5>
-          <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+          <h5 className="text-sm font-semibold text-foreground mb-2">Required Fields</h5>
+          <ul className="space-y-1 text-sm text-muted-foreground">
             <li className="flex items-center">
               <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
               Company Name
@@ -43,8 +43,8 @@ export function ContractorImportInstructions() {
         </div>
 
         <div>
-          <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Optional Fields</h5>
-          <div className="text-xs text-gray-600 dark:text-gray-400 grid grid-cols-2 gap-1">
+          <h5 className="text-sm font-semibold text-foreground mb-2">Optional Fields</h5>
+          <div className="text-xs text-muted-foreground grid grid-cols-2 gap-1">
             <div>• Phone Number</div>
             <div>• Business Type</div>
             <div>• Industry</div>
@@ -56,9 +56,9 @@ export function ContractorImportInstructions() {
           </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-900 border rounded-lg p-3">
-          <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Tips for Success</h5>
-          <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+        <div className="bg-background border rounded-lg p-3">
+          <h5 className="text-sm font-semibold text-foreground mb-2">Tips for Success</h5>
+          <ul className="space-y-1 text-xs text-muted-foreground">
             <li>• Use the first row for column headers</li>
             <li>• Ensure required fields are not empty</li>
             <li>• Valid email addresses are required</li>

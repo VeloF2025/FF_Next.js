@@ -39,8 +39,8 @@ export const PORejectModal: React.FC<PORejectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-card rounded-lg shadow-2xl w-full max-w-md mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-red-50">
           <div className="flex items-center gap-2 text-red-800">
@@ -50,7 +50,7 @@ export const PORejectModal: React.FC<PORejectModalProps> = ({
           <button
             onClick={onCancel}
             disabled={loading}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 p-1"
+            className="text-muted-foreground hover:text-muted-foreground p-1"
           >
             <X className="h-5 w-5" />
           </button>
@@ -58,7 +58,7 @@ export const PORejectModal: React.FC<PORejectModalProps> = ({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+          <p className="text-muted-foreground mb-4">
             You are about to reject <strong>{poNumber}</strong>. The PO will be
             returned to draft status for revision. Please provide a reason for
             rejection to help the requester understand what changes are needed.
@@ -67,7 +67,7 @@ export const PORejectModal: React.FC<PORejectModalProps> = ({
           <div className="mb-4">
             <label
               htmlFor="rejection-reason"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              className="block text-sm font-medium text-muted-foreground mb-1"
             >
               Rejection Reason <span className="text-red-500">*</span>
             </label>
@@ -82,7 +82,7 @@ export const PORejectModal: React.FC<PORejectModalProps> = ({
               rows={4}
               disabled={loading}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
-                error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                error ? 'border-red-500' : 'border-border'
               }`}
             />
             {error && (

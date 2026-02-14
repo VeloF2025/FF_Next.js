@@ -108,7 +108,7 @@ export function OfflineBanner({ className = '' }: OfflineBannerProps) {
         {/* Progress bar */}
         <div className="w-full bg-blue-400/30 rounded-full h-1.5">
           <div
-            className="bg-white dark:bg-gray-800 h-1.5 rounded-full transition-all duration-300"
+            className="bg-card h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -135,7 +135,7 @@ export function OfflineBanner({ className = '' }: OfflineBannerProps) {
         </div>
         <button
           onClick={handleSync}
-          className="flex items-center gap-2 bg-white dark:bg-gray-800/20 hover:bg-white dark:bg-gray-800/30 px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-card/20 hover:bg-card/30 px-4 py-2 rounded-lg transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           <span className="text-sm font-medium">Retry</span>
@@ -180,7 +180,7 @@ export function OfflineBanner({ className = '' }: OfflineBannerProps) {
         <button
           onClick={handleSync}
           disabled={isSyncing}
-          className="flex items-center gap-2 bg-white dark:bg-gray-800/20 hover:bg-white dark:bg-gray-800/30 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 bg-card/20 hover:bg-card/30 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
           <span className="text-sm font-medium">Sync Now</span>

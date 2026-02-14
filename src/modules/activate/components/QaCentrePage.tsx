@@ -33,7 +33,7 @@ const BADGE_COLORS = {
   // Status badges
   installed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
   activated: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200',
-  pending: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+  pending: 'bg-secondary text-gray-800 dark:bg-gray-700 dark:text-gray-200',
   inReview: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
   pass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
   fail: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
@@ -159,12 +159,12 @@ function SerialDisplay({ label, serial, status, showMissingAlert = true }: Seria
       <span className={`font-semibold ${labelColor}`}>{label}:</span>
       {serial ? (
         <>
-          <span className="font-mono text-gray-700 dark:text-gray-300">{serial}</span>
+          <span className="font-mono text-muted-foreground">{serial}</span>
           {getStatusIcon()}
         </>
       ) : (
         <>
-          <span className="text-gray-400 dark:text-gray-500 dark:text-gray-400 italic">-</span>
+          <span className="text-gray-400 dark:text-muted-foreground italic">-</span>
           {showMissingAlert && (
             <span className="text-[10px] font-semibold bg-yellow-800 text-yellow-200 px-1 py-0.5 rounded">
               {label}?
@@ -459,7 +459,7 @@ function QaCentrePageContent() {
 
   // Skeleton component
   const Skeleton = ({ className }: { className?: string }) => (
-    <div className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className || ''}`} />
+    <div className={`animate-pulse bg-secondary rounded ${className || ''}`} />
   );
 
   const hasActiveFilters = filters.searchTerm || filters.dateFrom || filters.dateTo ||
@@ -467,7 +467,7 @@ function QaCentrePageContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
             <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading DRs</h3>
@@ -535,13 +535,13 @@ function QaCentrePageContent() {
             {/* Search Bar Row */}
             <div className="flex items-center gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 dark:text-gray-400 h-5 w-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-muted-foreground h-5 w-5" />
                 <input
                   type="text"
                   placeholder="Search drop number..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  className="w-full pl-10 pr-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
               <button
@@ -549,13 +549,13 @@ function QaCentrePageContent() {
                 className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
                   showFilters || hasActiveFilters
                     ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    : 'bg-secondary text-muted-foreground hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 <Filter className="h-5 w-5" />
                 Filters
                 {hasActiveFilters && (
-                  <span className="ml-1 px-2 py-0.5 bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 rounded-full text-xs font-semibold">
+                  <span className="ml-1 px-2 py-0.5 bg-background text-blue-600 dark:text-blue-400 rounded-full text-xs font-semibold">
                     Active
                   </span>
                 )}
@@ -575,42 +575,42 @@ function QaCentrePageContent() {
 
             {/* Filter Options */}
             {showFilters && (
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4 pt-4 border-t border-border">
                 {/* From Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     From Date
                   </label>
                   <input
                     type="date"
                     value={filters.dateFrom}
                     onChange={(e) => updateFilter('dateFrom', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   />
                 </div>
 
                 {/* To Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     To Date
                   </label>
                   <input
                     type="date"
                     value={filters.dateTo}
                     onChange={(e) => updateFilter('dateTo', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   />
                 </div>
 
                 {/* Install Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Install Status
                   </label>
                   <select
                     value={filters.statusFilter}
                     onChange={(e) => updateFilter('statusFilter', e.target.value as 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed')}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   >
                     <option value="all">All</option>
                     <option value="installed">Installed Only</option>
@@ -620,13 +620,13 @@ function QaCentrePageContent() {
 
                 {/* QA Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     QA Status
                   </label>
                   <select
                     value={filters.qaStatusFilter}
                     onChange={(e) => updateFilter('qaStatusFilter', e.target.value as QaStatusFilter)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   >
                     <option value="all">All</option>
                     <option value="pending">Pending</option>
@@ -638,13 +638,13 @@ function QaCentrePageContent() {
 
                 {/* Serial Status Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Serial Status
                   </label>
                   <select
                     value={filters.serialStatusFilter}
                     onChange={(e) => updateFilter('serialStatusFilter', e.target.value as SerialStatusFilter)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   >
                     <option value="all">All</option>
                     <option value="valid">✓ Confirmed</option>
@@ -656,13 +656,13 @@ function QaCentrePageContent() {
 
                 {/* Project Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Project
                   </label>
                   <select
                     value={filters.projectFilter}
                     onChange={(e) => updateFilter('projectFilter', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
                   >
                     <option value="all">All Projects</option>
                     {projects
@@ -680,9 +680,9 @@ function QaCentrePageContent() {
                       type="checkbox"
                       checked={filters.resubmissionsOnly}
                       onChange={(e) => updateFilter('resubmissionsOnly', e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-border text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
                       <span className="text-base">🔄</span>
                       Show Resubmissions Only
                     </span>
@@ -694,7 +694,7 @@ function QaCentrePageContent() {
                   <div className="md:col-span-6 flex justify-end">
                     <button
                       onClick={handleClearFilters}
-                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
+                      className="px-4 py-2 bg-secondary text-muted-foreground rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
                     >
                       <X className="h-4 w-4" />
                       Clear All Filters
@@ -745,11 +745,11 @@ function QaCentrePageContent() {
             </div>
           ) : filteredDrops.length === 0 ? (
             <div className="p-12 text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
-                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500 dark:text-gray-400" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-secondary mb-4">
+                <Search className="h-8 w-8 text-gray-400 dark:text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No DRs Found</h3>
-              <p className="text-gray-600 dark:text-gray-400">
+              <h3 className="text-lg font-semibold text-foreground mb-2">No DRs Found</h3>
+              <p className="text-muted-foreground">
                 {hasActiveFilters
                   ? 'Try adjusting your filters to see more results.'
                   : 'DRs will appear here once they are received from WhatsApp Monitor.'}
@@ -758,7 +758,7 @@ function QaCentrePageContent() {
           ) : (
             <div className="p-4">
               {/* Table Header */}
-              <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 px-3 py-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-300 dark:border-gray-600 mb-2">
+              <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-b border-border mb-2">
                 <span>Project</span>
                 <span>DR</span>
                 <span>Installed</span>
@@ -802,7 +802,7 @@ function QaCentrePageContent() {
                     if (drop.qaDecision === 'FAIL') return { label: 'Fail', color: 'bg-red-600 text-white' };
                     if (drop.qaDecision === 'REWORK_NEEDED') return { label: 'Rework', color: 'bg-orange-600 text-white' };
                     if (drop.hasMaintenanceTicket) return { label: 'Maint', color: 'bg-amber-700 text-white' };
-                    return { label: '-', color: 'text-gray-500 dark:text-gray-400' };
+                    return { label: '-', color: 'text-muted-foreground' };
                   };
 
                   // Get serial issue indicator
@@ -823,7 +823,7 @@ function QaCentrePageContent() {
                     <button
                       key={drop.id}
                       onClick={() => handleSelectDr(drop.dropNumber)}
-                      className="w-full text-left bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-gray-200 dark:border-gray-700"
+                      className="w-full text-left bg-background/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-all hover:shadow-md border border-border"
                     >
                       {/* Row 1: Project | DR | Installed | Activated | [CENTER: QA Status | Outcome] | [RIGHT: Issues] */}
                       <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 items-center text-xs mb-1">
@@ -833,7 +833,7 @@ function QaCentrePageContent() {
                         </span>
 
                         {/* DR Number with Resubmission Badge */}
-                        <span className="font-bold text-sm text-gray-900 dark:text-white truncate flex items-center gap-1">
+                        <span className="font-bold text-sm text-foreground truncate flex items-center gap-1">
                           {drop.dropNumber}
                           {drop.isResubmission && (
                             <span className="text-base" title={`Submission #${drop.submissionCount} (was ${drop.previousPhotoCount || 0} photos)`}>
@@ -881,11 +881,11 @@ function QaCentrePageContent() {
                       </div>
 
                       {/* Row 2: Tech ID | Photos | WA Time | [empty] | [empty] | [RIGHT: ONT serial | UPS serial] */}
-                      <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 text-[10px] text-gray-500 dark:text-gray-400 items-center">
-                        <span className="font-medium text-gray-600 dark:text-gray-300 truncate">
+                      <div className="grid grid-cols-[70px_95px_65px_65px_1fr_160px] gap-2 text-[10px] text-muted-foreground items-center">
+                        <span className="font-medium text-muted-foreground truncate">
                           {formatAgent(drop.senderPhone) || '–'}
                         </span>
-                        <span className="font-medium text-gray-600 dark:text-gray-300">
+                        <span className="font-medium text-muted-foreground">
                           📷 {drop.photoCount || 0}
                         </span>
                         {/* WA Submission Time (below Installed date) */}
@@ -918,9 +918,9 @@ function QaCentrePageContent() {
 
           {/* Pagination Controls */}
           {pagination.totalPages > 1 && !isLoading && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="bg-background/50 px-6 py-4 border-t border-border">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-sm text-muted-foreground">
                   Page {currentPage} of {pagination.totalPages} • Showing {filteredDrops.length} drops per page
                 </div>
                 <div className="flex gap-2">

@@ -95,11 +95,11 @@ const MigrationStatus: React.FC = () => {
       case 'in_progress':
         return 'bg-yellow-100 text-yellow-800';
       case 'pending':
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
       case 'error':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+        return 'bg-secondary text-foreground';
     }
   };
 
@@ -136,14 +136,14 @@ const MigrationStatus: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Database Migration Status</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">Real-time monitoring of the FF_React_Neon migration</p>
+              <h1 className="text-3xl font-bold text-foreground">Database Migration Status</h1>
+              <p className="text-muted-foreground mt-2">Real-time monitoring of the FF_React_Neon migration</p>
             </div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2">
@@ -153,7 +153,7 @@ const MigrationStatus: React.FC = () => {
                   onChange={(e) => setAutoRefresh(e.target.checked)}
                   className="rounded"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-400">Auto-refresh</span>
+                <span className="text-sm text-muted-foreground">Auto-refresh</span>
               </label>
               <button
                 onClick={() => refetch()}
@@ -164,13 +164,13 @@ const MigrationStatus: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          <div className="mt-2 text-sm text-muted-foreground">
             Last updated: {new Date(healthData.timestamp).toLocaleString()}
           </div>
         </div>
 
         {/* Overall Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold mb-2">Overall Health</h2>
@@ -194,16 +194,16 @@ const MigrationStatus: React.FC = () => {
         </div>
 
         {/* Migration Progress */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Migration Progress</h2>
           
           {/* Progress Bar */}
           <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <div className="flex justify-between text-sm text-muted-foreground mb-2">
               <span>{healthData.checks.migration.summary.completed} of {healthData.checks.migration.summary.total} modules</span>
               <span>{healthData.checks.migration.summary.percentComplete}%</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+            <div className="w-full bg-secondary rounded-full h-3">
               <div 
                 className="bg-blue-500 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${healthData.checks.migration.summary.percentComplete}%` }}
@@ -224,11 +224,11 @@ const MigrationStatus: React.FC = () => {
                     {module.status.replace('_', ' ')}
                   </span>
                   {module.agent && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400">{module.agent}</span>
+                    <span className="text-sm text-muted-foreground">{module.agent}</span>
                   )}
                 </div>
                 {module.completedAt && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  <div className="text-xs text-muted-foreground mt-2">
                     Completed: {new Date(module.completedAt).toLocaleString()}
                   </div>
                 )}
@@ -240,7 +240,7 @@ const MigrationStatus: React.FC = () => {
         {/* Database & API Status */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Database Status */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div className="bg-card rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4">Database Connection</h2>
             <div className="flex items-center gap-3">
               {healthData.checks.database.connected ? (
@@ -248,7 +248,7 @@ const MigrationStatus: React.FC = () => {
                   <CheckCircle className="w-8 h-8 text-green-500" />
                   <div>
                     <p className="font-medium text-green-600">Connected</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-muted-foreground">
                       Last check: {new Date(healthData.checks.database.timestamp || '').toLocaleTimeString()}
                     </p>
                   </div>
@@ -266,11 +266,11 @@ const MigrationStatus: React.FC = () => {
           </div>
 
           {/* Code Quality */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div className="bg-card rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold mb-4">Code Quality</h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Direct DB Usage</span>
+                <span className="text-muted-foreground">Direct DB Usage</span>
                 <div className="flex items-center gap-2">
                   {healthData.checks.codeQuality.directDatabaseUsage.violationsCount === 0 ? (
                     <>
@@ -287,7 +287,7 @@ const MigrationStatus: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div className="text-sm text-muted-foreground">
                 Scanned {healthData.checks.codeQuality.directDatabaseUsage.totalFiles} files
               </div>
             </div>
@@ -295,7 +295,7 @@ const MigrationStatus: React.FC = () => {
         </div>
 
         {/* API Endpoints */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-card rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">API Endpoints</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {healthData.checks.endpoints.map((endpoint) => (
@@ -304,7 +304,7 @@ const MigrationStatus: React.FC = () => {
                 <div className="flex items-center gap-2">
                   {getStatusIcon(endpoint.status)}
                   <span className={`text-sm ${
-                    endpoint.status === 'available' ? 'text-green-600' : 'text-gray-500 dark:text-gray-400'
+                    endpoint.status === 'available' ? 'text-green-600' : 'text-muted-foreground'
                   }`}>
                     {endpoint.status.replace('_', ' ')}
                   </span>

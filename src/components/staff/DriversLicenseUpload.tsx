@@ -166,7 +166,7 @@ export function DriversLicenseUpload({
                 </div>
               ) : (
                 <div className="w-24 h-16 rounded bg-gray-800 flex items-center justify-center">
-                  <ImageIcon className="w-8 h-8 text-gray-600 dark:text-gray-400" />
+                  <ImageIcon className="w-8 h-8 text-muted-foreground" />
                 </div>
               )}
 
@@ -208,11 +208,11 @@ export function DriversLicenseUpload({
             `}
           >
             <input {...getInputProps()} />
-            <Upload className={`w-8 h-8 mx-auto mb-2 ${isDragActive ? 'text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} />
+            <Upload className={`w-8 h-8 mx-auto mb-2 ${isDragActive ? 'text-blue-400' : 'text-muted-foreground'}`} />
             <p className="text-sm text-gray-400">
               {isDragActive ? 'Drop file here' : 'Click or drag to upload'}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               JPG, PNG, or PDF (max 10MB)
             </p>
           </div>
@@ -244,11 +244,11 @@ export function DriversLicenseUpload({
 
       {/* Status indicator */}
       <div className="flex items-center justify-center gap-4 pt-2">
-        <div className={`flex items-center gap-2 text-sm ${files.front ? 'text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        <div className={`flex items-center gap-2 text-sm ${files.front ? 'text-green-400' : 'text-muted-foreground'}`}>
           {files.front ? <Check className="w-4 h-4" /> : <div className="w-4 h-4 rounded-full border border-current" />}
           <span>Front uploaded</span>
         </div>
-        <div className={`flex items-center gap-2 text-sm ${files.back ? 'text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+        <div className={`flex items-center gap-2 text-sm ${files.back ? 'text-green-400' : 'text-muted-foreground'}`}>
           {files.back ? <Check className="w-4 h-4" /> : <div className="w-4 h-4 rounded-full border border-current" />}
           <span>Back uploaded</span>
         </div>

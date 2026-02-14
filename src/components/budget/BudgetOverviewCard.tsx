@@ -64,7 +64,7 @@ const getStatusBadgeClass = (status: BudgetStatus): string => {
     case 'approved':
       return 'bg-green-100 text-green-800';
     case 'locked':
-      return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+      return 'bg-secondary text-foreground';
     case 'closed':
       return 'bg-red-100 text-red-800';
     default:
@@ -88,12 +88,12 @@ export function BudgetOverviewCard({
 }: BudgetOverviewCardProps) {
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+      className="bg-card rounded-lg border border-border shadow-sm"
       data-testid="budget-overview"
     >
       <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Budget Overview</h3>
+          <h3 className="text-lg font-semibold text-foreground">Budget Overview</h3>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(status)}`}>
             {status}
           </span>
@@ -108,21 +108,21 @@ export function BudgetOverviewCard({
         {/* Total Budget */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Total Budget</span>
-            <span className="text-sm text-gray-500 dark:text-gray-400 capitalize">
+            <span className="text-sm text-muted-foreground">Total Budget</span>
+            <span className="text-sm text-muted-foreground capitalize">
               Source: {sourceType}
             </span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(totalBudget, currency)}</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(totalBudget, currency)}</p>
         </div>
 
         {/* Utilization Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-700 dark:text-gray-300">Utilization</span>
-            <span className="font-medium text-gray-900 dark:text-white">{utilizationPercent.toFixed(1)}%</span>
+            <span className="text-muted-foreground">Utilization</span>
+            <span className="font-medium text-foreground">{utilizationPercent.toFixed(1)}%</span>
           </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
             <div
               className={`h-full transition-all ${getHealthColor(health)}`}
               style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
@@ -137,15 +137,15 @@ export function BudgetOverviewCard({
         {/* Budget Breakdown */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div className="space-y-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Committed</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(committedAmount, currency)}</p>
+            <p className="text-xs text-muted-foreground">Committed</p>
+            <p className="text-sm font-semibold text-foreground">{formatCurrency(committedAmount, currency)}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Actual</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(actualAmount, currency)}</p>
+            <p className="text-xs text-muted-foreground">Actual</p>
+            <p className="text-sm font-semibold text-foreground">{formatCurrency(actualAmount, currency)}</p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Available</p>
+            <p className="text-xs text-muted-foreground">Available</p>
             <p className="text-sm font-semibold text-green-600 dark:text-green-400">
               {formatCurrency(availableBudget, currency)}
             </p>
@@ -166,7 +166,7 @@ export function BudgetOverviewCard({
             {canAdjust && onAdjust && (
               <button
                 onClick={onAdjust}
-                className="px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
+                className="px-3 py-1.5 text-sm bg-secondary text-muted-foreground rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"
               >
                 Adjust Budget
               </button>

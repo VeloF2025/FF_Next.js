@@ -686,7 +686,7 @@ function ProjectionBadge({ projection }: { projection: ProjectionData }) {
     high: 'text-green-500',
     medium: 'text-blue-500',
     low: 'text-orange-500',
-    unknown: 'text-gray-500 dark:text-gray-400',
+    unknown: 'text-muted-foreground',
   };
 
   return (

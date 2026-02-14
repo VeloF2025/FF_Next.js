@@ -323,7 +323,7 @@ export function PipelineKanban({ projects, onStatusChange, loading }: PipelineKa
                           project.pipeline_status === 'planned'
                             ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                             : project.pipeline_status === 'on_hold'
-                            ? 'bg-gray-100 dark:bg-gray-700/30 text-gray-700 dark:text-gray-300'
+                            ? 'bg-secondary/30 text-muted-foreground'
                             : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                         }`}
                       >

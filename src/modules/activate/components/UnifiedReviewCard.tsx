@@ -60,7 +60,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading review...</p>
+          <p className="text-muted-foreground">Loading review...</p>
         </div>
       </div>
     );
@@ -115,13 +115,13 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-900/50">
+    <div className="bg-card rounded-lg shadow-lg dark:shadow-gray-900/50">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      <div className="border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{dropNumber}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <h2 className="text-2xl font-bold text-foreground">{dropNumber}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Project: {review.project || 'N/A'}
             </p>
           </div>
@@ -141,7 +141,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-border">
         <nav className="flex -mb-px">
           {tabs.map((tab) => (
             <button
@@ -152,7 +152,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
                 ${
                   activeTab === tab.key
                     ? 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
+                    : 'border-transparent text-muted-foreground hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
                 }
               `}
             >
@@ -260,8 +260,8 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">10-Step Quality Checklist</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <h3 className="text-lg font-semibold text-foreground">10-Step Quality Checklist</h3>
+        <p className="text-sm text-muted-foreground">
           Completed: {Object.values(getStepValues(review)).filter(Boolean).length}/10
         </p>
       </div>
@@ -274,7 +274,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
           const isIncorrect = incorrectSteps.has(step);
 
           return (
-            <div key={step} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+            <div key={step} className="border border-border rounded-lg p-4 bg-background/50">
               <div className="flex items-start gap-4">
                 {/* Step Checkbox */}
                 <div className="flex items-center">
@@ -283,13 +283,13 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                     checked={stepValue}
                     onChange={() => handleStepToggle(step, stepValue)}
                     disabled={isUpdating}
-                    className="h-5 w-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
+                    className="h-5 w-5 rounded border-border text-blue-600 focus:ring-blue-500 dark:bg-gray-700"
                   />
                 </div>
 
                 {/* Step Label */}
                 <div className="flex-1">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  <label className="text-sm font-medium text-foreground">
                     Step {step}: {label}
                   </label>
 
@@ -299,9 +299,9 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                       type="checkbox"
                       checked={isIncorrect}
                       onChange={() => handleIncorrectToggle(step)}
-                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500 dark:bg-gray-700"
+                      className="h-4 w-4 rounded border-border text-red-600 focus:ring-red-500 dark:bg-gray-700"
                     />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Mark as incorrect</span>
+                    <span className="text-sm text-muted-foreground">Mark as incorrect</span>
                   </div>
 
                   {/* Comment Field */}
@@ -312,7 +312,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                         onChange={(e) => handleCommentChange(step, e.target.value)}
                         placeholder="Enter reason for marking this step as incorrect..."
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                        className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400"
                       />
                     </div>
                   )}
@@ -325,7 +325,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
                       ✓ Pass
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-secondary text-foreground">
                       Pending
                     </span>
                   )}
@@ -575,20 +575,20 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
       )}
 
       {/* Serial Numbers from OneMap */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-background/50 rounded-lg border border-border">
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
+          <label className="block text-xs font-medium text-muted-foreground tracking-wide mb-1">
             ONT Barcode
           </label>
-          <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
+          <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-foreground' : 'text-gray-400 dark:text-muted-foreground'}`}>
             {review.ont_serial_scanned || '— not synced'}
           </p>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
+          <label className="block text-xs font-medium text-muted-foreground tracking-wide mb-1">
             UPS Serial
           </label>
-          <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
+          <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-foreground' : 'text-gray-400 dark:text-muted-foreground'}`}>
             {review.ups_serial_scanned || '— not synced'}
           </p>
         </div>
@@ -611,22 +611,22 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
           return (
             <div
               key={section.id}
-              className={`border rounded-lg bg-white dark:bg-gray-800 overflow-hidden ${colors.border}`}
+              className={`border rounded-lg bg-card overflow-hidden ${colors.border}`}
             >
               {/* Section Header */}
               <button
                 onClick={() => toggleSection(section.id)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-accent transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <span className={`flex items-center justify-center w-8 h-8 rounded-full ${colors.bg}`}>
                     <Icon className={`h-4 w-4 ${colors.text}`} />
                   </span>
                   <div className="text-left">
-                    <h4 className="font-medium text-gray-900 dark:text-white">
+                    <h4 className="font-medium text-foreground">
                       {section.label} Photos
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       {section.loading ? (
                         'Loading...'
                       ) : (
@@ -651,12 +651,12 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
 
               {/* Section Content */}
               {isExpanded && (
-                <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                <div className="border-t border-border p-4">
                   {section.id === 'installation' && (
                     <>
                       {/* Refresh button for installation */}
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                        <div className="text-sm text-muted-foreground">
                           {installationPhotos.length > 0
                             ? `Source: ${review.photo_source || 'OneMap'}`
                             : 'No photos loaded yet'}
@@ -701,9 +701,9 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                           <RefreshCw className="h-6 w-6 text-orange-500 animate-spin" />
                         </div>
                       ) : maintenancePhotos.length === 0 ? (
-                        <div className="text-center py-8 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                        <div className="text-center py-8 bg-background/50 rounded-lg">
                           <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-600 dark:text-gray-400">
+                          <p className="text-muted-foreground">
                             No maintenance photos for this DR
                           </p>
                         </div>
@@ -712,14 +712,14 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                           {maintenancePhotos.map((photo) => (
                             <div
                               key={photo.id}
-                              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                              className="bg-card border border-border rounded-lg overflow-hidden"
                             >
                               {photo.sharepoint_url ? (
                                 <a
                                   href={photo.sharepoint_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="block aspect-square bg-gray-100 dark:bg-gray-900 relative group"
+                                  className="block aspect-square bg-background relative group"
                                 >
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <Wrench className="h-8 w-8 text-gray-400" />
@@ -729,10 +729,10 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                                   </div>
                                 </a>
                               ) : (
-                                <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                                <div className="aspect-square bg-background flex items-center justify-center">
                                   <div className="text-center">
                                     <Wrench className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    <span className="text-xs text-muted-foreground">
                                       {photo.upload_status === 'pending' && 'Pending'}
                                       {photo.upload_status === 'uploading' && 'Uploading...'}
                                       {photo.upload_status === 'failed' && 'Failed'}
@@ -740,7 +740,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                                   </div>
                                 </div>
                               )}
-                              <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                              <div className="px-3 py-2 text-xs text-muted-foreground">
                                 <div className="truncate">
                                   {photo.original_filename || `Photo ${photo.photo_index}`}
                                 </div>
@@ -797,7 +797,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     <div className="space-y-6">
       {/* Generate Button */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">WhatsApp Feedback</h3>
+        <h3 className="text-lg font-semibold text-foreground">WhatsApp Feedback</h3>
         <button
           onClick={handleGenerateFeedback}
           className="px-4 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 transition-colors flex items-center gap-2"
@@ -809,7 +809,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
 
       {/* Message Editor */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-muted-foreground mb-2">
           Feedback Message
         </label>
         <textarea
@@ -817,7 +817,7 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
           onChange={(e) => setMessage(e.target.value)}
           rows={10}
           placeholder="Enter feedback message or click 'Generate Auto-Feedback' to create one automatically..."
-          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+          className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400"
         />
       </div>
 

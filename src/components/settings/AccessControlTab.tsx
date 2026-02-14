@@ -50,7 +50,7 @@ function ToggleSwitch({
       title={label}
     >
       <span
-        className={`inline-block ${s.thumb} transform rounded-full bg-white dark:bg-gray-800 shadow-lg transition-transform duration-200 ${
+        className={`inline-block ${s.thumb} transform rounded-full bg-card shadow-lg transition-transform duration-200 ${
           checked ? s.translate : 'translate-x-0.5'
         }`}
       />

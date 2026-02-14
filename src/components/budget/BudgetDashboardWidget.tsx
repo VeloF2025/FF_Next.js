@@ -80,7 +80,7 @@ const getHealthBgColor = (health: BudgetHealth): string => {
     case 'critical':
       return 'bg-red-50';
     default:
-      return 'bg-gray-50 dark:bg-gray-900';
+      return 'bg-background';
   }
 };
 
@@ -151,16 +151,16 @@ export function BudgetDashboardWidget({
   if (loading) {
     return (
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4"
+        className="bg-card rounded-lg border border-border shadow-sm p-4"
         data-testid="budget-widget"
       >
         <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+          <div className="h-4 bg-secondary rounded w-1/3"></div>
           <div className="flex justify-between">
-            <div className="h-16 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+            <div className="h-16 w-16 bg-secondary rounded-full"></div>
             <div className="space-y-2 flex-1 ml-4">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              <div className="h-4 bg-secondary rounded w-full"></div>
+              <div className="h-4 bg-secondary rounded w-3/4"></div>
             </div>
           </div>
         </div>
@@ -174,7 +174,7 @@ export function BudgetDashboardWidget({
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden ${
+      className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden ${
         health === 'critical' ? 'ring-2 ring-red-200' : ''
       }`}
       data-testid="budget-widget"
@@ -183,12 +183,12 @@ export function BudgetDashboardWidget({
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Budget Status</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground">Budget Status</h3>
             {getHealthIcon(health)}
           </div>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             status === 'approved' ? 'bg-green-100 text-green-800' :
-            status === 'locked' ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200' :
+            status === 'locked' ? 'bg-secondary text-foreground' :
             'bg-blue-100 text-blue-800'
           }`}>
             {status}
@@ -205,7 +205,7 @@ export function BudgetDashboardWidget({
           {/* Stats */}
           <div className="flex-1 space-y-2">
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total Budget</p>
+              <p className="text-xs text-muted-foreground">Total Budget</p>
               <p className="text-lg font-bold">{formatCompact(totalBudget, currency)}</p>
             </div>
             <div className="flex items-center gap-1">
@@ -224,15 +224,15 @@ export function BudgetDashboardWidget({
         {/* Quick Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
           <div className="text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Committed</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatCompact(committedAmount, currency)}</p>
+            <p className="text-xs text-muted-foreground">Committed</p>
+            <p className="text-sm font-semibold text-foreground">{formatCompact(committedAmount, currency)}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Actual</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatCompact(actualAmount, currency)}</p>
+            <p className="text-xs text-muted-foreground">Actual</p>
+            <p className="text-sm font-semibold text-foreground">{formatCompact(actualAmount, currency)}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400">Available</p>
+            <p className="text-xs text-muted-foreground">Available</p>
             <p className="text-sm font-semibold text-green-600">{formatCompact(availableBudget, currency)}</p>
           </div>
         </div>
@@ -257,9 +257,9 @@ export function BudgetDashboardWidget({
       {/* Footer Link */}
       <Link
         href={`/projects/${projectId}/budget`}
-        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 hover:bg-gray-100 dark:bg-gray-800 transition-colors"
+        className="flex items-center justify-between p-3 bg-background border-t border-gray-100 hover:bg-secondary transition-colors"
       >
-        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">View Budget Details</span>
+        <span className="text-sm font-medium text-muted-foreground">View Budget Details</span>
         <ArrowRight className="h-4 w-4 text-gray-400" />
       </Link>
     </div>
@@ -270,15 +270,15 @@ export function BudgetDashboardWidget({
 export function BudgetDashboardWidgetEmpty({ projectId }: { projectId: string }) {
   return (
     <div
-      className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-4"
+      className="bg-card rounded-lg border border-border shadow-sm p-4"
       data-testid="budget-widget-empty"
     >
       <div className="text-center py-4">
-        <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
+        <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center mx-auto mb-3">
           <TrendingUp className="h-5 w-5 text-gray-400" />
         </div>
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">No Budget Set</h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-1">No Budget Set</h3>
+        <p className="text-xs text-muted-foreground mb-3">
           Set up a budget to track project spending
         </p>
         <Link

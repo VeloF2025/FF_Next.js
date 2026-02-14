@@ -43,7 +43,7 @@ export default function BOQOverview({
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading overview...</span>
+        <span className="ml-2 text-muted-foreground">Loading overview...</span>
       </div>
     );
   }
@@ -54,56 +54,56 @@ export default function BOQOverview({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <button
           onClick={onUpload}
-          className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-blue-400"
+          className="p-6 bg-card rounded-lg shadow hover:shadow-md transition-shadow border-2 border-dashed border-border hover:border-blue-400"
         >
           <Upload className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-          <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">Upload BOQ</span>
+          <span className="block text-sm font-medium text-foreground">Upload BOQ</span>
         </button>
         
         <button
           onClick={onViewList}
-          className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow"
+          className="p-6 bg-card rounded-lg shadow hover:shadow-md transition-shadow"
         >
           <List className="h-8 w-8 text-green-600 mx-auto mb-2" />
-          <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">View BOQs</span>
+          <span className="block text-sm font-medium text-foreground">View BOQs</span>
         </button>
         
         <button
           onClick={onViewAnalytics}
-          className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow"
+          className="p-6 bg-card rounded-lg shadow hover:shadow-md transition-shadow"
         >
           <TrendingUp className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-          <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">Analytics</span>
+          <span className="block text-sm font-medium text-foreground">Analytics</span>
         </button>
         
         <button
           onClick={onExport}
-          className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow"
+          className="p-6 bg-card rounded-lg shadow hover:shadow-md transition-shadow"
         >
           <FileText className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-          <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">Export Report</span>
+          <span className="block text-sm font-medium text-foreground">Export Report</span>
         </button>
       </div>
 
       {/* Statistics Overview */}
       {stats && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">BOQ Statistics</h3>
+        <div className="bg-card rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">BOQ Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total BOQs</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalBOQs}</p>
+              <p className="text-sm text-muted-foreground">Total BOQs</p>
+              <p className="text-2xl font-bold text-foreground">{stats.totalBOQs}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Active</p>
+              <p className="text-sm text-muted-foreground">Active</p>
               <p className="text-2xl font-bold text-green-600">{stats.activeBOQs}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
+              <p className="text-sm text-muted-foreground">Pending</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.pendingApproval}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Exceptions</p>
+              <p className="text-sm text-muted-foreground">Exceptions</p>
               <p className="text-2xl font-bold text-red-600">{stats.exceptionsCount}</p>
             </div>
           </div>
@@ -120,8 +120,8 @@ export default function BOQOverview({
           <div className="mt-2 space-y-2">
             {activeJobs.map(job => (
               <div key={job.id} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700 dark:text-gray-300">{job.fileName}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-sm text-muted-foreground">{job.fileName}</span>
+                <span className="text-xs text-muted-foreground">
                   {job.progress}% - {job.status}
                 </span>
               </div>
@@ -132,20 +132,20 @@ export default function BOQOverview({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent BOQs */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent BOQs</h3>
+        <div className="bg-card rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Recent BOQs</h3>
           <div className="space-y-3">
             {recentBOQs.length > 0 ? (
               recentBOQs.map(boq => (
                 <button
                   key={boq.id}
                   onClick={() => onSelectBOQ(boq)}
-                  className="w-full text-left p-3 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
+                  className="w-full text-left p-3 rounded-lg hover:bg-background transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">{boq.name}</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="font-medium text-foreground">{boq.name}</p>
+                      <p className="text-sm text-muted-foreground">
                         {boq.itemCount} items • ${boq.totalValue?.toLocaleString()}
                       </p>
                     </div>
@@ -156,14 +156,14 @@ export default function BOQOverview({
                 </button>
               ))
             ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-4">No recent BOQs</p>
+              <p className="text-muted-foreground text-center py-4">No recent BOQs</p>
             )}
           </div>
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Activity</h3>
+        <div className="bg-card rounded-lg shadow p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Recent Activity</h3>
           <div className="space-y-3">
             {recentActivity.length > 0 ? (
               recentActivity.map(activity => (
@@ -172,18 +172,18 @@ export default function BOQOverview({
                     {activity.type === 'upload' && <Upload className="h-4 w-4 text-blue-600 mt-1" />}
                     {activity.type === 'mapping' && <FileText className="h-4 w-4 text-yellow-600 mt-1" />}
                     {activity.type === 'approval' && <FileText className="h-4 w-4 text-green-600 mt-1" />}
-                    {activity.type === 'update' && <Clock className="h-4 w-4 text-gray-600 dark:text-gray-400 mt-1" />}
+                    {activity.type === 'update' && <Clock className="h-4 w-4 text-muted-foreground mt-1" />}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm text-gray-900 dark:text-gray-100">{activity.description}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-foreground">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground">
                       {activity.userId} • {formatRelativeTime(activity.timestamp)}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-4">No recent activity</p>
+              <p className="text-muted-foreground text-center py-4">No recent activity</p>
             )}
           </div>
         </div>

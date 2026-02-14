@@ -175,8 +175,8 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-6 bg-secondary rounded w-1/4 mb-4"></div>
+          <div className="h-64 bg-secondary rounded"></div>
         </div>
       </div>
     );
@@ -194,10 +194,10 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Comparison & Benchmarking
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-muted-foreground">
           Compare templates, analyze performance, and benchmark against industry standards
         </p>
       </div>
@@ -218,14 +218,14 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                 <GitCompare className="w-5 h-5" />
                 Template Comparison
               </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 Select two templates to compare their structure and performance
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     First Template
                   </label>
                   <Select value={selectedTemplate1} onValueChange={setSelectedTemplate1}>
@@ -243,7 +243,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
                     Second Template
                   </label>
                   <Select 
@@ -285,23 +285,23 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Phases:</span>
+                          <span className="text-sm text-muted-foreground">Phases:</span>
                           <span className="font-medium">{comparison.comparison.phaseCount.template1}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Steps/Phase:</span>
+                          <span className="text-sm text-muted-foreground">Avg Steps/Phase:</span>
                           <span className="font-medium">{comparison.comparison.avgStepsPerPhase.template1.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Tasks/Step:</span>
+                          <span className="text-sm text-muted-foreground">Avg Tasks/Step:</span>
                           <span className="font-medium">{comparison.comparison.avgTasksPerStep.template1.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Est. Duration:</span>
+                          <span className="text-sm text-muted-foreground">Est. Duration:</span>
                           <span className="font-medium">{comparison.comparison.estimatedDuration.template1} days</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Complexity:</span>
+                          <span className="text-sm text-muted-foreground">Complexity:</span>
                           <Badge variant="outline">{comparison.comparison.complexity.template1}</Badge>
                         </div>
                       </CardContent>
@@ -314,23 +314,23 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Phases:</span>
+                          <span className="text-sm text-muted-foreground">Phases:</span>
                           <span className="font-medium">{comparison.comparison.phaseCount.template2}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Steps/Phase:</span>
+                          <span className="text-sm text-muted-foreground">Avg Steps/Phase:</span>
                           <span className="font-medium">{comparison.comparison.avgStepsPerPhase.template2.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Tasks/Step:</span>
+                          <span className="text-sm text-muted-foreground">Avg Tasks/Step:</span>
                           <span className="font-medium">{comparison.comparison.avgTasksPerStep.template2.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Est. Duration:</span>
+                          <span className="text-sm text-muted-foreground">Est. Duration:</span>
                           <span className="font-medium">{comparison.comparison.estimatedDuration.template2} days</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Complexity:</span>
+                          <span className="text-sm text-muted-foreground">Complexity:</span>
                           <Badge variant="outline">{comparison.comparison.complexity.template2}</Badge>
                         </div>
                       </CardContent>
@@ -348,7 +348,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent>
                         {comparison.comparison.similarities.length === 0 ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">No significant similarities found</p>
+                          <p className="text-sm text-muted-foreground">No significant similarities found</p>
                         ) : (
                           <ul className="space-y-2">
                             {comparison.comparison.similarities.map((similarity, index) => (
@@ -371,7 +371,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent>
                         {comparison.comparison.differences.length === 0 ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">No significant differences found</p>
+                          <p className="text-sm text-muted-foreground">No significant differences found</p>
                         ) : (
                           <ul className="space-y-2">
                             {comparison.comparison.differences.map((difference, index) => (
@@ -398,7 +398,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
             <Card>
               <CardHeader>
                 <CardTitle>Template Performance Comparison</CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Success rate vs. efficiency across templates
                 </p>
               </CardHeader>
@@ -413,7 +413,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                         if (payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="bg-white dark:bg-gray-800 p-3 border rounded-lg shadow-lg">
+                            <div className="bg-card p-3 border rounded-lg shadow-lg">
                               <p className="font-medium">{data.fullName}</p>
                               <p className="text-sm">Success Rate: {data.successRate}%</p>
                               <p className="text-sm">Projects: {data.projectCount}</p>
@@ -434,7 +434,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
             <Card>
               <CardHeader>
                 <CardTitle>Phase Completion Analysis</CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Completion rates by workflow phase
                 </p>
               </CardHeader>
@@ -454,7 +454,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                           >
                             {phase.completionRate}%
                           </Badge>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{phase.avgDuration}d</span>
+                          <span className="text-xs text-muted-foreground">{phase.avgDuration}d</span>
                         </div>
                       </div>
                       <Progress value={phase.completionRate} className="h-2" />
@@ -473,7 +473,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
             <Card>
               <CardHeader>
                 <CardTitle>Performance vs Industry Benchmarks</CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Your performance compared to industry standards
                 </p>
               </CardHeader>
@@ -547,10 +547,10 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                   const Icon = status.icon;
                   
                   return (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div key={index} className="flex items-center justify-between p-3 bg-input/50 rounded-lg">
                       <div>
                         <p className="font-medium text-sm">{item.metric}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground">
                           Industry: {Math.round(item.industry)}{item.unit}
                         </p>
                       </div>

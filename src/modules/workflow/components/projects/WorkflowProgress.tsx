@@ -66,9 +66,9 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
       case 'paused':
         return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20';
       case 'pending':
-        return 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800';
+        return 'border-border bg-input';
       default:
-        return 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800';
+        return 'border-border bg-input';
     }
   };
 
@@ -79,12 +79,12 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
         <div className="flex items-center space-x-3">
           <div className="flex-1">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Progress</span>
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-sm text-muted-foreground">Progress</span>
+              <span className="text-sm font-medium text-foreground">
                 {Math.round(workflow.progressPercentage || 0)}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-secondary rounded-full h-2">
               <div 
                 className="bg-green-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${workflow.progressPercentage || 0}%` }}
@@ -105,7 +105,7 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
                   <div className="w-2 h-2 rounded-full bg-current opacity-60" />
                 </div>
                 {index < phases.length - 1 && (
-                  <div className="w-4 h-0.5 bg-gray-300 dark:bg-gray-600 mx-1" />
+                  <div className="w-4 h-0.5 bg-muted mx-1" />
                 )}
               </div>
             ))}
@@ -118,22 +118,22 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
   return (
     <div className="space-y-6">
       {/* Overall Progress */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <div className="bg-background rounded-lg p-4 border border-border">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+          <h3 className="text-lg font-medium text-foreground">
             Overall Progress
           </h3>
           <div className="text-right">
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="text-2xl font-bold text-foreground">
               {Math.round(workflow.progressPercentage || 0)}%
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-sm text-muted-foreground">
               Complete
             </div>
           </div>
         </div>
         
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+        <div className="w-full bg-secondary rounded-full h-3">
           <div 
             className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-500"
             style={{ width: `${workflow.progressPercentage || 0}%` }}
@@ -141,7 +141,7 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
         </div>
         
         {workflow.currentPhase && (
-          <div className="flex items-center space-x-2 mt-3 text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center space-x-2 mt-3 text-sm text-muted-foreground">
             <Play className="w-4 h-4" />
             <span>Currently in: {workflow.currentPhase.name}</span>
           </div>
@@ -150,8 +150,8 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
 
       {/* Phase Progress */}
       {showPhases && phases.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+        <div className="bg-background rounded-lg p-4 border border-border">
+          <h3 className="text-lg font-medium text-foreground mb-4">
             Phase Progress
           </h3>
           
@@ -162,10 +162,10 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
                 <div className="flex items-center space-x-2 w-48">
                   {getPhaseIcon(phase.status, phase.progress)}
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    <div className="text-sm font-medium text-foreground truncate">
                       {phase.name}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
+                    <div className="text-xs text-muted-foreground capitalize">
                       {phase.status}
                     </div>
                   </div>
@@ -174,14 +174,14 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
                 {/* Progress Bar */}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground">
                       {phase.estimatedDuration ? `${phase.estimatedDuration} days` : 'Duration TBD'}
                     </span>
-                    <span className="text-xs font-medium text-gray-900 dark:text-gray-100">
+                    <span className="text-xs font-medium text-foreground">
                       {Math.round(phase.progress)}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div className="w-full bg-secondary rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full transition-all duration-300 ${
                         phase.status === 'completed' 
@@ -222,12 +222,12 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
 
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-background rounded-lg p-4 border border-border">
           <div className="flex items-center space-x-2">
             <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Time Elapsed</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="text-sm text-muted-foreground">Time Elapsed</div>
+              <div className="text-lg font-semibold text-foreground">
                 {workflow.startDate 
                   ? `${Math.ceil((new Date().getTime() - new Date(workflow.startDate).getTime()) / (1000 * 60 * 60 * 24))} days`
                   : 'Not started'
@@ -237,19 +237,19 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-background rounded-lg p-4 border border-border">
           <div className="flex items-center space-x-2">
             <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
             <div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Phases Complete</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="text-sm text-muted-foreground">Phases Complete</div>
+              <div className="text-lg font-semibold text-foreground">
                 {phaseProgress.filter(p => p.status === 'completed').length} / {phases.length}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="bg-background rounded-lg p-4 border border-border">
           <div className="flex items-center space-x-2">
             <AlertCircle className={`w-5 h-5 ${
               workflow.plannedEndDate && new Date(workflow.plannedEndDate) < new Date()
@@ -257,8 +257,8 @@ export function WorkflowProgress({ workflow, compact = false, showPhases = true 
                 : 'text-gray-400'
             }`} />
             <div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Status</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <div className="text-sm text-muted-foreground">Status</div>
+              <div className="text-lg font-semibold text-foreground">
                 {workflow.plannedEndDate && new Date(workflow.plannedEndDate) < new Date() && workflow.status === 'active'
                   ? 'Overdue'
                   : 'On Track'

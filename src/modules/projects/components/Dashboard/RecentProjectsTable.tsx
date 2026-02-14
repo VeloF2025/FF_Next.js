@@ -32,9 +32,9 @@ function getStatusBadge(status: string): { bg: string; text: string; label: stri
     case 'complete':
       return { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-300', label: 'Completed' };
     case 'on_hold':
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: 'On Hold' };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: 'On Hold' };
     default:
-      return { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-700 dark:text-gray-300', label: status };
+      return { bg: 'bg-secondary', text: 'text-muted-foreground', label: status };
   }
 }
 
@@ -60,7 +60,7 @@ function ProgressBar({ value, completedDrops, totalDrops }: { value: number; com
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
         <div
           className={`h-full ${color} rounded-full transition-all duration-300`}
           style={{ width: `${Math.max(percent, hasProgress ? 2 : 0)}%` }}
@@ -78,12 +78,12 @@ export function RecentProjectsTable({ projects, isLoading = false }: RecentProje
     return (
       <div className="ff-card">
         <div className="flex items-center justify-between mb-4">
-          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          <div className="h-5 w-32 bg-secondary rounded animate-pulse" />
+          <div className="h-4 w-20 bg-secondary rounded animate-pulse" />
         </div>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div key={i} className="h-12 bg-secondary rounded animate-pulse" />
           ))}
         </div>
       </div>

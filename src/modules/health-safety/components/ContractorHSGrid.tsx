@@ -104,10 +104,10 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
   if (isLoading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+        <div className="h-20 bg-secondary rounded-lg" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            <div key={i} className="h-32 bg-secondary rounded-lg" />
           ))}
         </div>
       </div>
@@ -134,10 +134,10 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
 
   if (contractors.length === 0) {
     return (
-      <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+      <div className="p-6 bg-input rounded-lg border border-border text-center">
         <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-        <h4 className="font-medium text-gray-900 dark:text-white mb-1">No Contractors Assigned</h4>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <h4 className="font-medium text-foreground mb-1">No Contractors Assigned</h4>
+        <p className="text-sm text-muted-foreground">
           Assign contractors to this project to track their H&S compliance.
         </p>
       </div>
@@ -148,14 +148,14 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
     <div className="space-y-4">
       {/* Summary Bar */}
       {!compact && summary && (
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+        <div className="flex flex-wrap items-center gap-4 p-4 bg-input rounded-lg">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Contractors:</span>
-            <span className="font-semibold text-gray-900 dark:text-white">{summary.total}</span>
+            <span className="text-sm text-muted-foreground">Contractors:</span>
+            <span className="font-semibold text-foreground">{summary.total}</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4 text-green-500" />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{summary.gate_approved} Gate Approved</span>
+            <span className="text-sm text-muted-foreground">{summary.gate_approved} Gate Approved</span>
           </div>
           {summary.gate_blocked > 0 && (
             <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Avg Score:</span>
+            <span className="text-sm text-muted-foreground">Avg Score:</span>
             <span className={`font-semibold ${
               summary.average_score >= 80 ? 'text-green-600 dark:text-green-400' :
               summary.average_score >= 50 ? 'text-amber-600 dark:text-amber-400' :
@@ -183,7 +183,7 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
           )}
           <button
             onClick={() => mutate()}
-            className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-muted-foreground dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
             title="Refresh"
           >
             <RefreshCw className="w-4 h-4" />
@@ -199,7 +199,7 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
           return (
             <div
               key={contractor.contractor_id}
-              className={`bg-white dark:bg-gray-800 rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer ${ragColor.border}`}
+              className={`bg-card rounded-lg border overflow-hidden hover:shadow-md transition-shadow cursor-pointer ${ragColor.border}`}
               onClick={() => router.push(`/contractors/${contractor.contractor_id}/health-safety`)}
             >
               {/* Header with RAG */}
@@ -219,13 +219,13 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
                 {/* Company Name */}
                 <div className="flex items-center gap-2 mb-2">
                   <Building className="w-4 h-4 text-gray-400" />
-                  <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                  <h4 className="font-medium text-foreground truncate">
                     {contractor.company_name}
                   </h4>
                 </div>
 
                 {/* Role */}
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                <p className="text-sm text-muted-foreground mb-3">
                   {contractor.role}
                 </p>
 
@@ -263,20 +263,20 @@ export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGri
                 {!compact && (
                   <div className="grid grid-cols-4 gap-2 text-center mb-3">
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Docs</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor.document_score}%</p>
+                      <p className="text-xs text-muted-foreground">Docs</p>
+                      <p className="text-sm font-semibold text-foreground">{contractor.document_score}%</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Safety</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor.incident_score}%</p>
+                      <p className="text-xs text-muted-foreground">Safety</p>
+                      <p className="text-sm font-semibold text-foreground">{contractor.incident_score}%</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Training</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor.training_score}%</p>
+                      <p className="text-xs text-muted-foreground">Training</p>
+                      <p className="text-sm font-semibold text-foreground">{contractor.training_score}%</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Audit</p>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{contractor.audit_score}%</p>
+                      <p className="text-xs text-muted-foreground">Audit</p>
+                      <p className="text-sm font-semibold text-foreground">{contractor.audit_score}%</p>
                     </div>
                   </div>
                 )}

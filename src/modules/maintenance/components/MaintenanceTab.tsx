@@ -156,7 +156,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
       <div className="flex items-center justify-center min-h-[300px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 mx-auto mb-3"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading maintenance data...</p>
+          <p className="text-muted-foreground">Loading maintenance data...</p>
         </div>
       </div>
     );
@@ -183,12 +183,12 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
 
   if (!data || data.message_count === 0) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-8 text-center">
+      <div className="bg-background/50 rounded-lg p-8 text-center">
         <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-medium text-foreground mb-2">
           No Maintenance Messages
         </h3>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           No maintenance-related WhatsApp messages found for {dropNumber}.
         </p>
       </div>
@@ -214,17 +214,17 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
       {/* Header with Status */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-orange-600" />
             Maintenance Issue Tracking
           </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             WhatsApp messages and photos related to maintenance issues for this DR.
           </p>
         </div>
         <button
           onClick={fetchData}
-          className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          className="p-2 text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           title="Refresh"
         >
           <RefreshCw className="h-5 w-5" />
@@ -233,7 +233,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
 
       {/* Status Card */}
       {data.flag && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-card border border-border rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <span
@@ -245,7 +245,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                 {data.flag.issue_status.replace('_', ' ').toUpperCase()}
               </span>
 
-              <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-6 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <MessageSquare className="h-4 w-4" />
                   <span>{data.flag.wa_message_count} messages</span>
@@ -294,12 +294,12 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
           )}
 
           {data.flag.issue_description && (
-            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-gray-700 pt-3">
+            <p className="mt-3 text-sm text-muted-foreground border-t border-gray-100 dark:border-gray-700 pt-3">
               {data.flag.issue_description}
             </p>
           )}
 
-          <div className="mt-3 flex items-center gap-6 text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <div className="mt-3 flex items-center gap-6 text-xs text-muted-foreground dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3">
             <span>
               First reported:{' '}
               {format(new Date(data.flag.first_reported_at), 'dd MMM yyyy HH:mm')}
@@ -319,30 +319,30 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
 
       {/* Message Timeline */}
       <div>
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+        <h4 className="text-sm font-medium text-foreground mb-4">
           Message Timeline
         </h4>
         <div className="space-y-3">
           {data.messages.map((message) => (
             <div
               key={message.id}
-              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+              className="bg-card border border-border rounded-lg p-4"
             >
               <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <User className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                <div className="flex-shrink-0 w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
+                  <User className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900 dark:text-white">
+                    <span className="font-medium text-foreground">
                       {message.sender_name || 'Unknown'}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
+                    <span className="text-xs text-muted-foreground dark:text-gray-400">
                       {format(new Date(message.message_timestamp), 'dd MMM yyyy HH:mm')}
                     </span>
                   </div>
                   {message.message_text && (
-                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
                       {message.message_text}
                     </p>
                   )}
@@ -364,21 +364,21 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
       {/* Photos Grid */}
       {data.photos.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          <h4 className="text-sm font-medium text-foreground mb-4">
             Photos ({data.photos.length})
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {data.photos.map((photo) => (
               <div
                 key={photo.id}
-                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                className="bg-card border border-border rounded-lg overflow-hidden"
               >
                 {photo.sharepoint_url ? (
                   <a
                     href={photo.sharepoint_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block aspect-square bg-gray-100 dark:bg-gray-900 relative group"
+                    className="block aspect-square bg-background relative group"
                   >
                     <div className="absolute inset-0 flex items-center justify-center">
                       <ImageIcon className="h-8 w-8 text-gray-400" />
@@ -388,10 +388,10 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                     </div>
                   </a>
                 ) : (
-                  <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+                  <div className="aspect-square bg-background flex items-center justify-center">
                     <div className="text-center">
                       <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-muted-foreground">
                         {photo.upload_status === 'pending' && 'Pending upload'}
                         {photo.upload_status === 'uploading' && 'Uploading...'}
                         {photo.upload_status === 'failed' && 'Upload failed'}
@@ -399,11 +399,11 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                     </div>
                   </div>
                 )}
-                <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="px-3 py-2 text-xs text-muted-foreground">
                   <div className="truncate">
                     {photo.original_filename || `Photo ${photo.photo_index}`}
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
+                  <div className="text-muted-foreground">
                     {format(new Date(photo.created_at), 'dd MMM HH:mm')}
                   </div>
                 </div>

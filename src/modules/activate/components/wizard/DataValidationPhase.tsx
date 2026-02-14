@@ -136,10 +136,10 @@ export function DataValidationPhase({
       {!extractionDone && !loading && (
         <div className="text-center py-8">
           <div className="text-4xl mb-4">🔍</div>
-          <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          <h4 className="text-lg font-medium text-foreground mb-2">
             Data Extraction
           </h4>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             Extract and validate power meter reading and serial numbers from photos.
           </p>
           <button
@@ -155,10 +155,10 @@ export function DataValidationPhase({
       {loading && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-muted-foreground">
             Extracting data from photos using VLM...
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
+          <p className="text-sm text-muted-foreground dark:text-gray-400 mt-2">
             This may take 30-60 seconds
           </p>
         </div>
@@ -181,30 +181,30 @@ export function DataValidationPhase({
       {result && extractionDone && (
         <>
           {/* Power Meter Section */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+          <div className="bg-background/50 rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
               <span>Power Meter Reading</span>
               <span>{getStatusIcon(result.summary.powerMeterStatus)}</span>
             </h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">VLM Extracted:</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">VLM Extracted:</span>
+                <span className="font-mono text-foreground">
                   {result.validation.powerMeter.value !== null
                     ? `${result.validation.powerMeter.value} dBm`
                     : 'Not extracted'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">Valid Range:</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
+                <span className="text-muted-foreground">Valid Range:</span>
+                <span className="text-sm text-muted-foreground">
                   -18 to -24 dBm
                 </span>
               </div>
               <p className="text-sm">{result.summary.powerMeterStatus}</p>
 
               {/* Manual override */}
-              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-3 pt-3 border-t border-border">
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -212,7 +212,7 @@ export function DataValidationPhase({
                     onChange={(e) => setUseManualPower(e.target.checked)}
                     className="rounded"
                   />
-                  <span className="text-gray-600 dark:text-gray-400">Override with manual value</span>
+                  <span className="text-muted-foreground">Override with manual value</span>
                 </label>
                 {useManualPower && (
                   <div className="mt-2 flex items-center gap-2">
@@ -224,7 +224,7 @@ export function DataValidationPhase({
                       step="0.1"
                       className="w-32 px-3 py-1 border rounded-lg dark:bg-gray-800 dark:border-gray-600"
                     />
-                    <span className="text-gray-500 dark:text-gray-400">dBm</span>
+                    <span className="text-muted-foreground">dBm</span>
                   </div>
                 )}
               </div>
@@ -232,26 +232,26 @@ export function DataValidationPhase({
           </div>
 
           {/* Serial Validation Section */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+          <div className="bg-background/50 rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3">
               ONT Serial Validation (3-Way Check)
             </h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">OneMap Synced:</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">OneMap Synced:</span>
+                <span className="font-mono text-foreground">
                   {result.validation.serialCrossReference.onemapSerial || 'N/A'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">VLM Step 6 (Back):</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">VLM Step 6 (Back):</span>
+                <span className="font-mono text-foreground">
                   {result.validation.serialCrossReference.step6Serial || 'Not extracted'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">VLM Step 9 (Front):</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">VLM Step 9 (Front):</span>
+                <span className="font-mono text-foreground">
                   {result.validation.serialCrossReference.step9Serial || 'Not extracted'}
                 </span>
               </div>
@@ -260,18 +260,18 @@ export function DataValidationPhase({
           </div>
 
           {/* DR Number Validation */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+          <div className="bg-background/50 rounded-lg p-4">
+            <h4 className="font-medium text-foreground mb-3">
               DR Number Validation (Step 9 Label)
             </h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">Expected:</span>
-                <span className="font-mono text-gray-900 dark:text-white">{dropNumber}</span>
+                <span className="text-muted-foreground">Expected:</span>
+                <span className="font-mono text-foreground">{dropNumber}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">VLM Extracted:</span>
-                <span className="font-mono text-gray-900 dark:text-white">
+                <span className="text-muted-foreground">VLM Extracted:</span>
+                <span className="font-mono text-foreground">
                   {result.validation.serialCrossReference.step9DrNumber || 'Not extracted'}
                 </span>
               </div>
@@ -283,7 +283,7 @@ export function DataValidationPhase({
           <div className="flex justify-between pt-4">
             <button
               onClick={onBack}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="px-4 py-2 text-muted-foreground hover:text-foreground"
             >
               ← Back
             </button>

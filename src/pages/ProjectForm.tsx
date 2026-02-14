@@ -126,15 +126,15 @@ export function ProjectForm() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate('/app/projects')}
-          className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:bg-gray-800 rounded-full"
+          className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl font-semibold text-foreground">
             {isEditing ? 'Edit Project' : 'Create New Project'}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-muted-foreground mt-1">
             {isEditing 
               ? 'Update project information and settings' 
               : 'Set up a new fiber optic project'
@@ -184,13 +184,13 @@ export function ProjectForm() {
         />
 
         {/* Form Actions */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
+        <div className="bg-card rounded-lg shadow-sm border border-border">
+          <div className="px-6 py-4 bg-background border-t border-border rounded-b-lg">
             <div className="flex items-center justify-end gap-4">
               <button
                 type="button"
                 onClick={() => navigate('/app/projects')}
-                className="px-6 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors font-medium"
+                className="px-6 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background transition-colors font-medium"
               >
                 Cancel
               </button>

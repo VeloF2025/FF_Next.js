@@ -51,12 +51,12 @@ export function UniversalField({
   if (mode === 'view') {
     return (
       <div className={`space-y-1 ${className}`}>
-        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
+        <label className="block text-sm font-medium text-muted-foreground">
           {label}
         </label>
         <div className="flex items-center space-x-2">
           {icon && <span className="text-gray-400">{icon}</span>}
-          <div className="text-gray-900 dark:text-gray-100 font-medium">
+          <div className="text-foreground font-medium">
             {formatDisplayValue(value, type, options)}
           </div>
         </div>
@@ -70,7 +70,7 @@ export function UniversalField({
   // Create/Edit mode - editable fields
   return (
     <div className={`space-y-1 ${className}`}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <label className="block text-sm font-medium text-muted-foreground">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       
@@ -91,8 +91,8 @@ export function UniversalField({
             className={`
               w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
               ${icon ? 'pl-10' : ''}
-              ${fieldError ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'}
-              ${readOnly ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'}
+              ${fieldError ? 'border-red-300' : 'border-border'}
+              ${readOnly ? 'bg-background' : 'bg-card'}
             `}
           />
         ) : type === 'select' ? (
@@ -103,8 +103,8 @@ export function UniversalField({
             className={`
               w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
               ${icon ? 'pl-10' : ''}
-              ${fieldError ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'}
-              ${readOnly ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'}
+              ${fieldError ? 'border-red-300' : 'border-border'}
+              ${readOnly ? 'bg-background' : 'bg-card'}
             `}
           >
             <option value="">Select {label.toLowerCase()}</option>
@@ -128,15 +128,15 @@ export function UniversalField({
             className={`
               w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500
               ${icon ? 'pl-10' : ''}
-              ${fieldError ? 'border-red-300' : 'border-gray-300 dark:border-gray-600'}
-              ${readOnly ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-800'}
+              ${fieldError ? 'border-red-300' : 'border-border'}
+              ${readOnly ? 'bg-background' : 'bg-card'}
             `}
           />
         )}
       </div>
       
       {hint && !fieldError && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
       )}
       
       {fieldError && (

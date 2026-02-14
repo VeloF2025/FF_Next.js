@@ -30,11 +30,11 @@ export default function CompletionProgressBar({
     <div className="w-full">
       {showLabel && (
         <div className="mb-1 flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700 dark:text-gray-300">Document Completion</span>
-          <span className="font-semibold text-gray-900 dark:text-gray-100">{percentage}%</span>
+          <span className="font-medium text-muted-foreground">Document Completion</span>
+          <span className="font-semibold text-foreground">{percentage}%</span>
         </div>
       )}
-      <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ${heightClasses[height]}`}>
+      <div className={`w-full bg-secondary rounded-full overflow-hidden ${heightClasses[height]}`}>
         <div
           className={`${barColor} ${heightClasses[height]} rounded-full transition-all duration-500 ease-out`}
           style={{ width: `${percentage}%` }}

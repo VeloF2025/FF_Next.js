@@ -24,7 +24,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+        <h3 className="text-lg font-semibold text-foreground flex items-center">
           <Package className="h-5 w-5 mr-2" />
           Line Items
         </h3>
@@ -39,9 +39,9 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
       </div>
 
       {formData.items.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="text-center py-12 bg-background rounded-lg">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">No items added yet</p>
+          <p className="text-muted-foreground">No items added yet</p>
           <VelocityButton
             variant="outline"
             size="sm"
@@ -57,7 +57,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
           {formData.items.map((item, index) => (
             <GlassCard key={item.tempId} className="p-4">
               <div className="flex items-start justify-between mb-4">
-                <h4 className="font-medium text-gray-900 dark:text-gray-100">Item #{index + 1}</h4>
+                <h4 className="font-medium text-foreground">Item #{index + 1}</h4>
                 <button
                   onClick={() => removeItem(item.tempId)}
                   className="text-red-600 hover:text-red-800 p-1"
@@ -68,39 +68,39 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Description *
                   </label>
                   <input
                     type="text"
                     value={item.description}
                     onChange={(e) => updateItem(item.tempId, { description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter item description"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Category
                   </label>
                   <input
                     type="text"
                     value={item.category || ''}
                     onChange={(e) => updateItem(item.tempId, { category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter category"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     UOM
                   </label>
                   <select
                     value={item.uom}
                     onChange={(e) => updateItem(item.tempId, { uom: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="pieces">Pieces</option>
                     <option value="meters">Meters</option>
@@ -114,7 +114,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
 
               <div className="grid grid-cols-3 gap-4 mt-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Quantity *
                   </label>
                   <input
@@ -123,12 +123,12 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
                     step="1"
                     value={item.quantity}
                     onChange={(e) => updateItem(item.tempId, { quantity: parseFloat(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Unit Price (ZAR) *
                   </label>
                   <input
@@ -137,12 +137,12 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
                     step="0.01"
                     value={item.unitPrice}
                     onChange={(e) => updateItem(item.tempId, { unitPrice: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Line Total
                   </label>
                   <input
@@ -152,7 +152,7 @@ export const LineItemsStep: React.FC<LineItemsStepProps> = ({
                       currency: 'ZAR'
                     }).format(item.quantity * item.unitPrice)}
                     readOnly
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-muted-foreground"
                   />
                 </div>
               </div>

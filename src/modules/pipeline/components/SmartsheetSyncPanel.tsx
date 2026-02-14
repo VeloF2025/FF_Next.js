@@ -133,7 +133,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
           <div
             className={`${
               t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+            } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
           >
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
@@ -147,16 +147,16 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                   )}
                 </div>
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-foreground">
                     Smartsheet Sync Complete
                   </p>
                   <div className="mt-2 space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Database className="h-4 w-4 text-blue-500" />
                       <span>{syncResult.stats.processed.toLocaleString()} projects synced</span>
                       <CheckCircle className="h-4 w-4 text-green-500" />
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <ArrowUpDown className="h-4 w-4 text-purple-500" />
                       <span className="text-green-600">+{syncResult.stats.created} new</span>
                       <span className="text-blue-600">~{syncResult.stats.updated} updated</span>
@@ -165,13 +165,13 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                       )}
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Duration: {(syncResult.duration_ms / 1000).toFixed(1)}s
                   </p>
                 </div>
               </div>
             </div>
-            <div className="flex border-l border-gray-200 dark:border-gray-700">
+            <div className="flex border-l border-border">
               <button
                 onClick={() => toast.dismiss(t.id)}
                 className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
@@ -224,7 +224,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
           <div
             className={`${
               t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+            } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
           >
             <div className="flex-1 w-0 p-4">
               <div className="flex items-start">
@@ -238,12 +238,12 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                   )}
                 </div>
                 <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-foreground">
                     Document Sync Complete
                   </p>
                   <div className="mt-2 space-y-1">
                     {/* Total in Smartsheet */}
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <FileDown className="h-4 w-4 text-blue-500" />
                       <span>{docResult.totalAttachments.toLocaleString()} total in Smartsheet</span>
                     </div>
@@ -256,14 +256,14 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <CheckCircle className="h-4 w-4 text-gray-400" />
                         <span>No new documents to sync</span>
                       </div>
                     )}
                     {/* Already synced */}
                     {docResult.skipped > 0 && (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Database className="h-4 w-4 text-gray-400" />
                         <span>{docResult.skipped.toLocaleString()} already synced</span>
                       </div>
@@ -276,13 +276,13 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                       </div>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Duration: {(docResult.duration_ms / 1000).toFixed(1)}s
                   </p>
                 </div>
               </div>
             </div>
-            <div className="flex border-l border-gray-200 dark:border-gray-700">
+            <div className="flex border-l border-border">
               <button
                 onClick={() => toast.dismiss(t.id)}
                 className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
@@ -333,14 +333,14 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
   if (compact) {
     const config = configs[0];
     return (
-      <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+      <div className="flex items-center gap-3 p-3 bg-background rounded-lg">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Smartsheet Sync</span>
+            <span className="text-sm font-medium text-muted-foreground">Smartsheet Sync</span>
             {config && getStatusIcon(config.last_sync_status)}
           </div>
           {config?.last_sync_at && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Last: {formatDate(config.last_sync_at)}
               {config.last_sync_rows_processed && ` (${config.last_sync_rows_processed} rows)`}
             </p>
@@ -360,12 +360,12 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
 
   // Full panel mode
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-3 bg-background border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Settings className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">Smartsheet Sync</h3>
+          <Settings className="w-5 h-5 text-muted-foreground" />
+          <h3 className="font-medium text-foreground">Smartsheet Sync</h3>
         </div>
         <button
           onClick={handleSync}
@@ -404,24 +404,24 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
             </div>
             <div className="grid grid-cols-5 gap-2 text-xs">
               <div className="text-center">
-                <div className="font-semibold text-gray-900 dark:text-gray-100">{lastResult.stats.processed}</div>
-                <div className="text-gray-500 dark:text-gray-400">Processed</div>
+                <div className="font-semibold text-foreground">{lastResult.stats.processed}</div>
+                <div className="text-muted-foreground">Processed</div>
               </div>
               <div className="text-center">
                 <div className="font-semibold text-green-600">{lastResult.stats.created}</div>
-                <div className="text-gray-500 dark:text-gray-400">Created</div>
+                <div className="text-muted-foreground">Created</div>
               </div>
               <div className="text-center">
                 <div className="font-semibold text-blue-600">{lastResult.stats.updated}</div>
-                <div className="text-gray-500 dark:text-gray-400">Updated</div>
+                <div className="text-muted-foreground">Updated</div>
               </div>
               <div className="text-center">
-                <div className="font-semibold text-gray-600 dark:text-gray-400">{lastResult.stats.skipped}</div>
-                <div className="text-gray-500 dark:text-gray-400">Skipped</div>
+                <div className="font-semibold text-muted-foreground">{lastResult.stats.skipped}</div>
+                <div className="text-muted-foreground">Skipped</div>
               </div>
               <div className="text-center">
                 <div className="font-semibold text-red-600">{lastResult.stats.errored}</div>
-                <div className="text-gray-500 dark:text-gray-400">Errors</div>
+                <div className="text-muted-foreground">Errors</div>
               </div>
             </div>
             {lastResult.errors.length > 0 && (
@@ -438,11 +438,11 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
         )}
 
         {/* Document Sync Section */}
-        <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md border border-gray-200 dark:border-gray-700">
+        <div className="p-3 bg-background rounded-md border border-border">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <FileDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <span className="font-medium text-gray-900 dark:text-gray-100">Document Sync</span>
+              <FileDown className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium text-foreground">Document Sync</span>
             </div>
             <button
               onClick={handleDocSync}
@@ -453,7 +453,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
               {isDocSyncing ? 'Syncing Docs...' : 'Sync Documents'}
             </button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          <p className="text-xs text-muted-foreground mb-2">
             Downloads documents from Smartsheet and stores them on the Velocity server
           </p>
 
@@ -481,19 +481,19 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
               <div className="grid grid-cols-4 gap-2 text-xs text-center">
                 <div>
                   <div className="font-semibold">{docSyncResult.totalAttachments}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Total</div>
+                  <div className="text-muted-foreground">Total</div>
                 </div>
                 <div>
                   <div className="font-semibold text-blue-600">{docSyncResult.downloaded}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Downloaded</div>
+                  <div className="text-muted-foreground">Downloaded</div>
                 </div>
                 <div>
                   <div className="font-semibold text-green-600">{docSyncResult.uploaded}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Uploaded</div>
+                  <div className="text-muted-foreground">Uploaded</div>
                 </div>
                 <div>
                   <div className="font-semibold text-purple-600">{docSyncResult.linked}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Linked</div>
+                  <div className="text-muted-foreground">Linked</div>
                 </div>
               </div>
               {docSyncResult.errors.length > 0 && (
@@ -501,7 +501,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                   {docSyncResult.errors.length} errors
                 </div>
               )}
-              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-1 text-xs text-muted-foreground">
                 Duration: {formatDuration(docSyncResult.duration_ms)}
               </div>
             </div>
@@ -512,20 +512,20 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
         {configs.length > 0 && (
           <div className="space-y-2">
             {configs.map((config) => (
-              <div key={config.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md">
+              <div key={config.id} className="p-3 bg-background rounded-md">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                      <span className="font-medium text-foreground">
                         {config.sheet_name || 'Velocity_Master_Tracker'}
                       </span>
                       {getStatusIcon(config.last_sync_status)}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Sheet ID: {config.sheet_id}
                     </p>
                   </div>
-                  <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-right text-xs text-muted-foreground">
                     <div>Last sync: {formatDate(config.last_sync_at)}</div>
                     {config.last_sync_rows_processed && (
                       <div>{config.last_sync_rows_processed} rows processed</div>
@@ -542,7 +542,7 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
           <div>
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-gray-100"
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               Sync History ({history.length})
@@ -553,14 +553,14 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-900 rounded text-xs"
+                    className="flex items-center justify-between p-2 bg-background rounded text-xs"
                   >
                     <div className="flex items-center gap-2">
                       {getStatusIcon(item.status)}
                       <span>{formatDate(item.sync_started_at)}</span>
                       <span className="text-gray-400">({item.triggered_by})</span>
                     </div>
-                    <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center gap-3 text-muted-foreground">
                       <span>{item.rows_processed} rows</span>
                       <span className="text-green-600">+{item.rows_created}</span>
                       <span className="text-blue-600">~{item.rows_updated}</span>

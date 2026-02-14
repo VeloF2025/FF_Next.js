@@ -12,7 +12,7 @@ interface StaffSkillsProps {
 export function StaffSkills({ formData, onSkillToggle }: StaffSkillsProps) {
   return (
     <div>
-      <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Skills</h2>
+      <h2 className="text-lg font-medium text-foreground mb-4">Skills</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {Object.values(Skill).map(skill => (
           <label key={skill} className="flex items-center">

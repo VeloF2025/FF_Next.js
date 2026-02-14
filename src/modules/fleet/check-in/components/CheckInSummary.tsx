@@ -73,10 +73,10 @@ export function CheckInSummary({
             <StatusIcon className={`w-16 h-16 ${config.iconColor}`} />
           </div>
         </div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h2 className="text-xl font-semibold text-foreground mb-2">
           {config.title}
         </h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-muted-foreground">
           {config.subtitle}
         </p>
       </div>
@@ -95,15 +95,15 @@ export function CheckInSummary({
 
       {/* Details */}
       <div className="mt-6 space-y-3">
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-3 text-muted-foreground">
           <Car className="w-5 h-5" />
           <span>{vehicleRegistration}</span>
         </div>
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-3 text-muted-foreground">
           <User className="w-5 h-5" />
           <span>{record.driverName}</span>
         </div>
-        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-3 text-muted-foreground">
           <Calendar className="w-5 h-5" />
           <span>
             {new Date(record.checkDate).toISOString().split('T')[0]} at{' '}
@@ -118,7 +118,7 @@ export function CheckInSummary({
           <button
             type="button"
             onClick={onViewDetails}
-            className="w-full py-3 px-4 border rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="w-full py-3 px-4 border rounded-lg font-medium text-muted-foreground hover:bg-accent"
           >
             View Details
           </button>

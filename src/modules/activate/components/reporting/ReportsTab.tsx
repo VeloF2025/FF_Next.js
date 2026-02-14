@@ -181,21 +181,21 @@ export function ReportsTab() {
   // Skeleton component
   const Skeleton = ({ className }: { className?: string }) => (
     <div
-      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className || ''}`}
+      className={`animate-pulse bg-secondary rounded ${className || ''}`}
     />
   );
 
   return (
     <div className="space-y-6">
       {/* Report Type Navigation (Daily Counts moved to Dashboard) */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveReport('discrepancy')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
               activeReport === 'discrepancy'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <AlertTriangle className="h-4 w-4" />
@@ -206,7 +206,7 @@ export function ReportsTab() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
               activeReport === 'serial-validation'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <Hash className="h-4 w-4" />
@@ -217,7 +217,7 @@ export function ReportsTab() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
               activeReport === 'user-attribution'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <Users className="h-4 w-4" />
@@ -227,7 +227,7 @@ export function ReportsTab() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-4">
         <div className="flex flex-wrap items-center gap-4">
           {/* Quick Filters */}
           <div className="flex gap-2">
@@ -236,7 +236,7 @@ export function ReportsTab() {
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                 getActiveQuickFilter() === 'today'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Today
@@ -246,7 +246,7 @@ export function ReportsTab() {
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                 getActiveQuickFilter() === 'yesterday'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Yesterday
@@ -256,7 +256,7 @@ export function ReportsTab() {
               className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
                 getActiveQuickFilter() === 'last7days'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               Last 7 Days
@@ -272,16 +272,16 @@ export function ReportsTab() {
               onChange={(e) =>
                 setFilters({ ...filters, dateFrom: e.target.value })
               }
-              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             />
-            <span className="text-gray-500 dark:text-gray-400">to</span>
+            <span className="text-muted-foreground">to</span>
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) =>
                 setFilters({ ...filters, dateTo: e.target.value })
               }
-              className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-2 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             />
           </div>
 
@@ -289,7 +289,7 @@ export function ReportsTab() {
           <button
             onClick={() => fetchReportData()}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-secondary text-muted-foreground rounded text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
           >
             <RefreshCw
               className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
@@ -307,7 +307,7 @@ export function ReportsTab() {
       )}
 
       {/* Report Content */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
+      <div className="bg-card rounded-lg shadow-md dark:shadow-gray-900/50 p-6">
         {/* Discrepancy Report */}
         {activeReport === 'discrepancy' && (
           <DiscrepancyContent data={discrepancyData} isLoading={isLoading} />
@@ -344,18 +344,18 @@ function DiscrepancyContent({ data, isLoading }: DiscrepancyContentProps) {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg"
+              className="h-24 animate-pulse bg-secondary rounded-lg"
             />
           ))}
         </div>
-        <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-64 animate-pulse bg-secondary rounded" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No data available for the selected date.
       </div>
     );
@@ -397,26 +397,26 @@ function DiscrepancyContent({ data, isLoading }: DiscrepancyContentProps) {
       {/* Discrepancy Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Project
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 WA Submitted By
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 OES Team
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
             {data.records.slice(0, 50).map((record) => (
               <tr
                 key={record.drop_number}
@@ -428,10 +428,10 @@ function DiscrepancyContent({ data, isLoading }: DiscrepancyContentProps) {
                       : 'bg-orange-50 dark:bg-orange-900/10'
                 }`}
               >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {record.drop_number}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.project || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -451,10 +451,10 @@ function DiscrepancyContent({ data, isLoading }: DiscrepancyContentProps) {
                         : 'OES Only'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.wa_submitted_by || record.wa_sender_phone || '-'}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm text-muted-foreground">
                   {record.oes_team || '-'}
                 </td>
               </tr>
@@ -462,7 +462,7 @@ function DiscrepancyContent({ data, isLoading }: DiscrepancyContentProps) {
           </tbody>
         </table>
         {data.records.length > 50 && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+          <p className="text-sm text-muted-foreground mt-2 text-center">
             Showing first 50 of {data.records.length} records
           </p>
         )}
@@ -493,18 +493,18 @@ function SerialValidationContent({
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg"
+              className="h-24 animate-pulse bg-secondary rounded-lg"
             />
           ))}
         </div>
-        <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-64 animate-pulse bg-secondary rounded" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No data available for the selected date range.
       </div>
     );
@@ -555,9 +555,9 @@ function SerialValidationContent({
             type="checkbox"
             checked={showMismatchesOnly}
             onChange={(e) => setShowMismatchesOnly(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
+            className="rounded border-border text-red-600 focus:ring-red-500"
           />
-          <span className="text-sm text-gray-700 dark:text-gray-300">
+          <span className="text-sm text-muted-foreground">
             Show mismatches only ({data.mismatches_only.length})
           </span>
         </label>
@@ -566,26 +566,26 @@ function SerialValidationContent({
       {/* Validation Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-900/50">
+          <thead className="bg-background/50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 DR Number
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 ONT (WA)
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 ONT (OES)
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                 UPS
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
             {displayRecords.slice(0, 50).map((record) => (
               <tr
                 key={record.drop_number}
@@ -597,13 +597,13 @@ function SerialValidationContent({
                       : 'bg-yellow-50 dark:bg-yellow-900/10'
                 }`}
               >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-4 py-3 text-sm font-medium text-foreground">
                   {record.drop_number}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
                   {record.ont_serial_wa || '-'}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
+                <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
                   {record.ont_serial_oes || '-'}
                 </td>
                 <td className="px-4 py-3 text-sm">
@@ -635,7 +635,7 @@ function SerialValidationContent({
           </tbody>
         </table>
         {displayRecords.length > 50 && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
+          <p className="text-sm text-muted-foreground mt-2 text-center">
             Showing first 50 of {displayRecords.length} records
           </p>
         )}
@@ -663,18 +663,18 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg"
+              className="h-24 animate-pulse bg-secondary rounded-lg"
             />
           ))}
         </div>
-        <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-64 animate-pulse bg-secondary rounded" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No data available for the selected date range.
       </div>
     );
@@ -713,7 +713,7 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
           className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
             activeView === 'users'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >
           Users ({data.users.length})
@@ -723,7 +723,7 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
           className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
             activeView === 'teams'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >
           Teams ({data.teams.length})
@@ -734,45 +734,45 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
       {activeView === 'users' && (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
+            <thead className="bg-background/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Project
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Installed
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Reviewed
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Review %
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Serial %
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Activated %
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
               {data.users.map((user, idx) => (
                 <tr key={idx}>
                   <td className="px-4 py-3 text-sm">
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-foreground">
                       {user.user_name || 'Unknown'}
                     </div>
-                    <div className="text-gray-500 dark:text-gray-400 text-xs">
+                    <div className="text-muted-foreground text-xs">
                       {user.sender_phone
                         ? user.sender_phone.replace(/^27/, '0')
                         : '-'}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
                     {user.project}
                   </td>
                   <td className="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
@@ -821,35 +821,35 @@ function UserTeamContent({ data, isLoading }: UserTeamContentProps) {
       {activeView === 'teams' && (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900/50">
+            <thead className="bg-background/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Team
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Project
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Total Activations
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Matched to WA
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Match Rate
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
               {data.teams.map((team, idx) => (
                 <tr key={idx}>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-sm font-medium text-foreground">
                     {team.team}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
                     {team.project || '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-sm text-foreground">
                     {team.total_activations}
                   </td>
                   <td className="px-4 py-3 text-sm text-green-600 dark:text-green-500">
@@ -901,7 +901,7 @@ function SummaryCard({ title, value, color, subtitle }: SummaryCardProps) {
       'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400',
     purple:
       'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
-    gray: 'bg-gray-50 dark:bg-gray-900/20 text-gray-600 dark:text-gray-400',
+    gray: 'bg-background/20 text-muted-foreground',
   };
 
   return (

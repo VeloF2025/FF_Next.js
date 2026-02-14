@@ -16,7 +16,7 @@ interface ProjectTableViewProps {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status as keyof typeof statusColors] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[status as keyof typeof statusColors] || 'bg-secondary text-foreground'}`}>
       {status ? status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ') : 'Unknown'}
     </span>
   );
@@ -24,7 +24,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityColors[priority as keyof typeof priorityColors] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityColors[priority as keyof typeof priorityColors] || 'bg-secondary text-foreground'}`}>
       {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Normal'}
     </span>
   );
@@ -53,7 +53,7 @@ export function ProjectTableView({ projects, isLoading, onProjectView }: Project
           <div className="flex justify-between text-sm mb-1">
             <span>{formatProgressPercentage(project.actualProgress)}%</span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-secondary rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full"
               style={{ width: `${project.actualProgress || 0}%` }}

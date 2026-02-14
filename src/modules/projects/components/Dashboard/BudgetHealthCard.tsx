@@ -40,7 +40,7 @@ function getHealthColor(health: BudgetMetrics['health']): {
     case 'critical':
       return { text: 'text-red-600', bg: 'bg-red-100', dot: 'bg-red-500' };
     default:
-      return { text: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800', dot: 'bg-gray-500' };
+      return { text: 'text-muted-foreground', bg: 'bg-secondary', dot: 'bg-gray-500' };
   }
 }
 
@@ -51,7 +51,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
   if (isLoading) {
     return (
       <div className="ff-card animate-pulse">
-        <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded" />
+        <div className="h-32 bg-secondary rounded" />
       </div>
     );
   }
@@ -64,9 +64,9 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
           <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] tracking-wide">
             Budget Overview
           </h3>
-          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
+          <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-secondary">
             <span className="w-2 h-2 rounded-full bg-gray-400" />
-            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">No Data</span>
+            <span className="text-xs font-medium text-muted-foreground">No Data</span>
           </div>
         </div>
         <div className="text-center py-6">
@@ -103,7 +103,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
           <span>{budget.utilizationPercent.toFixed(0)}% utilized</span>
           <span>{formatCurrency(budget.totalActual)} / {formatCurrency(budget.totalBudget)}</span>
         </div>
-        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-secondary rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               budget.health === 'healthy' ? 'bg-green-500' :

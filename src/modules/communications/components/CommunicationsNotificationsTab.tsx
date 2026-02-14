@@ -18,8 +18,8 @@ export function CommunicationsNotificationsTab({
               <div className={`w-2 h-2 rounded-full mt-2 mr-3 ${!notification.read ? 'bg-blue-500' : 'bg-gray-300'}`} />
               <div>
                 <h4 className="font-medium">{notification.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{notification.message}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
+                <p className="text-xs text-muted-foreground mt-2">
                   {notification.timestamp.toLocaleString()}
                 </p>
               </div>

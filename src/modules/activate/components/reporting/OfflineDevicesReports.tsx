@@ -156,7 +156,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
     <div className="p-6 space-y-6">
       {/* Header with export */}
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <WifiOff className="h-5 w-5 text-red-500" />
           Offline Devices Report
         </h3>
@@ -223,8 +223,8 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
 
           {/* Bucket Distribution */}
           {Object.keys(data.summary.by_bucket).length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            <div className="bg-background/50 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-foreground mb-3">
                 Offline Duration Distribution
               </h4>
               <div className="flex flex-wrap gap-3">
@@ -252,11 +252,11 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
           )}
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-wrap gap-3 bg-card p-4 rounded-lg border border-border">
             <select
               value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Zones</option>
               {data.available_zones.map((z) => (
@@ -269,7 +269,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
             <select
               value={selectedBucket}
               onChange={(e) => setSelectedBucket(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Buckets</option>
               {data.available_buckets.map((b) => (
@@ -282,7 +282,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
             <select
               value={selectedMatchStatus}
               onChange={(e) => setSelectedMatchStatus(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Match Status</option>
               <option value="matched_drops">Matched Drops</option>
@@ -293,7 +293,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
             <select
               value={selectedReason}
               onChange={(e) => setSelectedReason(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="px-3 py-1.5 border border-border rounded text-sm bg-card text-foreground"
             >
               <option value="">All Down Reasons</option>
               {data.available_reasons.slice(0, 20).map((r) => (
@@ -308,9 +308,9 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
                 type="checkbox"
                 checked={serialMismatchOnly}
                 onChange={(e) => setSerialMismatchOnly(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
+                className="rounded border-border text-red-600 focus:ring-red-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="text-sm text-muted-foreground">
                 Serial mismatches only
               </span>
             </label>
@@ -324,7 +324,7 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
                   setSelectedReason('');
                   setSerialMismatchOnly(false);
                 }}
-                className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
               >
                 Clear Filters
               </button>
@@ -336,8 +336,8 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
                 Showing {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, data.total_count)} of{' '}
                 {data.total_count} devices
               </p>
@@ -345,18 +345,18 @@ export function OfflineDevicesReports({ filters, refreshKey }: OfflineDevicesRep
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </button>
-                <span className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400">
+                <span className="px-3 py-1.5 text-sm text-muted-foreground">
                   Page {page} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-1.5 border border-border rounded text-sm disabled:opacity-50"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
@@ -385,7 +385,7 @@ function OfflineDevicesTable({
 }) {
   if (records.length === 0 && !isLoading) {
     return (
-      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         No offline devices found matching the filters
       </div>
     );
@@ -394,36 +394,36 @@ function OfflineDevicesTable({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-900/50">
+        <thead className="bg-background/50">
           <tr>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               DR Number
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Serial
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Zone
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Pole
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Down Reason
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               <Clock className="h-4 w-4 inline mr-1" />
               Days Offline
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Match
             </th>
-            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+            <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
               Action
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
           {records.map((record) => (
             <tr
               key={`${record.drop_number}-${record.report_date}-${record.pole_number}`}
@@ -437,10 +437,10 @@ function OfflineDevicesTable({
                       : ''
               }`}
             >
-              <td className="px-3 py-3 text-sm font-medium text-gray-900 dark:text-white">
+              <td className="px-3 py-3 text-sm font-medium text-foreground">
                 {record.drop_number}
               </td>
-              <td className="px-3 py-3 text-sm font-mono text-gray-600 dark:text-gray-400">
+              <td className="px-3 py-3 text-sm font-mono text-muted-foreground">
                 <div className="flex flex-col">
                   <span>{record.serial_number || '-'}</span>
                   {record.serial_mismatch && record.expected_serial && (
@@ -450,13 +450,13 @@ function OfflineDevicesTable({
                   )}
                 </div>
               </td>
-              <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-3 py-3 text-sm text-muted-foreground">
                 {record.zone || '-'}
               </td>
-              <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-400">
+              <td className="px-3 py-3 text-sm text-muted-foreground">
                 {record.pole_number || '-'}
               </td>
-              <td className="px-3 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-[200px] truncate" title={record.last_down_reason}>
+              <td className="px-3 py-3 text-sm text-muted-foreground max-w-[200px] truncate" title={record.last_down_reason}>
                 {record.last_down_reason}
               </td>
               <td className="px-3 py-3 text-sm">
@@ -589,18 +589,18 @@ function LoadingSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-5 gap-4">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          <div key={i} className="h-24 animate-pulse bg-secondary rounded-lg" />
         ))}
       </div>
-      <div className="h-12 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" />
-      <div className="h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-12 animate-pulse bg-secondary rounded-lg" />
+      <div className="h-64 animate-pulse bg-secondary rounded" />
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+    <div className="text-center py-12 text-muted-foreground">
       <WifiOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
       <p>{message}</p>
       <p className="text-sm mt-2">Import offline data using the Data Import tab first.</p>
