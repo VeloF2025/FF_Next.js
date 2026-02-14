@@ -16,7 +16,7 @@ import { ProjectKeyDetails } from './detail/ProjectKeyDetails';
 import { ProjectQuickStats } from './detail/ProjectQuickStats';
 import { ProjectHierarchyTab } from './detail/ProjectHierarchyTab';
 import { ProjectTimelineTab } from './detail/ProjectTimelineTab';
-import { ProjectDetailLoading, TabContentLoading } from './detail/ProjectDetailLoading';
+import { ProjectDetailLoading } from './detail/ProjectDetailLoading';
 import { ProjectDetailNotFound } from './detail/ProjectDetailNotFound';
 // PRD-058: Enhanced Overview components
 import { ProjectOverviewKPICards } from './detail/ProjectOverviewKPICards';
@@ -32,17 +32,10 @@ import { ProjectAgreementsTab } from './detail/ProjectAgreementsTab';
 import { ProjectWayleavesTab } from './detail/ProjectWayleavesTab';
 // Finance Dashboard - Direct import to avoid pulling in server-only dependencies
 import { FinanceDashboardTab } from '@/modules/projects/components/finance/FinanceDashboardTab';
-// Income Tab (lazy load)
-import dynamic from 'next/dynamic';
-const ProjectIncomeTab = dynamic(
-  () => import('./detail/ProjectIncomeTab').then(m => ({ default: m.ProjectIncomeTab })),
-  { loading: () => <TabContentLoading /> }
-);
-// Documents Tab (lazy load)
-const ProjectDocumentsTab = dynamic(
-  () => import('./detail/ProjectDocumentsTab').then(m => ({ default: m.ProjectDocumentsTab })),
-  { loading: () => <TabContentLoading /> }
-);
+// Income Tab
+import { ProjectIncomeTab } from './detail/ProjectIncomeTab';
+// Documents Tab
+import { ProjectDocumentsTab } from './detail/ProjectDocumentsTab';
 
 interface ProjectDetailProps {
   projectId: string;
