@@ -53,7 +53,7 @@ const MigrationStatus: React.FC = () => {
   const { data: healthData, isLoading, error, refetch } = useQuery<HealthData>({
     queryKey: ['migration-health'],
     queryFn: async () => {
-      const response = await axios.get('/api/monitoring/health');
+      const response = await axios.get('/api/health');
       return response.data;
     },
     refetchInterval: autoRefresh ? 30000 : false, // Refresh every 30 seconds

@@ -36,7 +36,7 @@ export function useMonitoringData() {
         }
 
         // Check System Health
-        const healthRes = await fetch('/api/monitoring/health');
+        const healthRes = await fetch('/api/health');
         if (healthRes.ok) {
           const data = await healthRes.json();
           setSystemHealth(data.health || systemHealth);
