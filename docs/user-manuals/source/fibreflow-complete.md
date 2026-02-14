@@ -953,7 +953,7 @@ QField QA is a comprehensive photo validation and quality assurance system for f
 
 **Navigation:** Sidebar → **Field Operations** → **QField QA**
 
-![QField QA Dashboard](../screenshots/complete/15-qfield-qa-dashboard.png)
+<!-- ![QField QA Dashboard](../screenshots/complete/15-qfield-qa-dashboard.png) -->
 *Figure 5.1: QField QA Dashboard showing validation statistics and photo queue*
 
 #### Overview Tab
@@ -1339,7 +1339,7 @@ The Maintenance module manages the complete lifecycle of fiber network maintenan
 
 **Navigation:** Sidebar → **Maintenance** (click section header)
 
-![Maintenance Dashboard](../screenshots/complete/16-maintenance-dashboard.png)
+![Maintenance Dashboard](../screenshots/complete/15-maintenance-dashboard.png)
 *Figure 6.1: Maintenance Dashboard showing ticket statistics, SLA compliance, and workload*
 
 #### Key Metrics
@@ -1358,7 +1358,7 @@ The primary ticket management view with drag-and-drop columns.
 
 **Navigation:** Sidebar → **Maintenance** → **Work Orders** tab
 
-![Kanban Board](../screenshots/complete/17-maintenance-kanban.png)
+![Kanban Board](../screenshots/complete/16-maintenance-kanban.png)
 *Figure 6.2: Maintenance Kanban Board with tickets organized by status columns*
 
 #### Columns
@@ -1428,7 +1428,7 @@ The Procurement module manages the complete purchasing workflow — from Bill of
 
 **Navigation:** Sidebar → **Procurement** (click section header)
 
-![Procurement Dashboard](../screenshots/complete/18-procurement-dashboard.png)
+![Procurement Dashboard](../screenshots/complete/17-procurement-dashboard.png)
 *Figure 7.1: Procurement Dashboard showing order statistics, pending approvals, and quick actions*
 
 #### Quick Actions
@@ -1457,7 +1457,7 @@ The Bill of Quantities (BOQ) manages material requirements for projects.
 
 **Navigation:** Procurement → **Sourcing** tab
 
-![BOQ List](../screenshots/complete/19-procurement-boq.png)
+![BOQ List](../screenshots/complete/18-procurement-boq.png)
 *Figure 7.2: BOQ management showing project BOQs with upload and column mapping features*
 
 #### Creating a BOQ
@@ -1487,7 +1487,7 @@ Send requests for quotation to suppliers and compare responses.
 
 **Navigation:** Procurement → **Purchasing** tab → RFQ section
 
-![RFQ Detail](../screenshots/complete/20-procurement-rfq.png)
+![RFQ Detail](../screenshots/complete/19-procurement-rfq.png)
 *Figure 7.3: RFQ detail page showing line items, supplier responses, and comparison view*
 
 #### Creating an RFQ
@@ -1515,7 +1515,7 @@ Create and manage purchase orders with approval workflows.
 
 **Navigation:** Procurement → **Purchasing** tab → PO section
 
-![Purchase Order](../screenshots/complete/21-procurement-po.png)
+![Purchase Order](../screenshots/complete/20-procurement-po.png)
 *Figure 7.4: Purchase Order detail showing line items, approval status, and version history*
 
 #### PO Approval Workflow
@@ -1558,7 +1558,7 @@ Manage stock items, track movements, and perform stock takes.
 
 **Navigation:** Procurement → **Inventory** tab
 
-![Stock Management](../screenshots/complete/22-procurement-stock.png)
+![Stock Management](../screenshots/complete/21-procurement-stock.png)
 *Figure 7.5: Stock management dashboard showing items, levels, and movement history*
 
 #### Stock Items
@@ -1640,7 +1640,7 @@ The Field Stock Control module provides comprehensive tracking and management of
 
 **User Audiences:** Stock managers, warehouse staff, field technicians, contractors
 
-![Field Stock Control Dashboard](../screenshots/complete/37-field-stock-dashboard.png)
+<!-- ![Field Stock Control Dashboard](../screenshots/complete/37-field-stock-dashboard.png) -->
 *Figure 7.9: Field Stock Control dashboard showing van stock levels, technician accountability, and recent movements*
 
 #### Overview
@@ -1979,7 +1979,7 @@ The Assets module provides complete asset lifecycle management for tools, equipm
 
 **Navigation:** Sidebar → **Assets** (click section header)
 
-![Assets Dashboard](../screenshots/complete/23-assets-dashboard.png)
+![Assets Dashboard](../screenshots/complete/22-assets-dashboard.png)
 *Figure 8.1: Assets Dashboard showing total assets, available, assigned, and maintenance alerts*
 
 #### Statistics Cards
@@ -1997,7 +1997,7 @@ The Assets module provides complete asset lifecycle management for tools, equipm
 
 **Navigation:** Assets → **All Assets** tab
 
-![Assets List](../screenshots/complete/24-assets-list.png)
+![Assets List](../screenshots/complete/23-assets-list.png)
 *Figure 8.2: Assets list with search, category filter, and status indicators*
 
 #### Viewing Assets
@@ -2093,14 +2093,14 @@ The Fleet module manages vehicles, drivers, fuel, GPS tracking, and daily check-
 
 **Navigation:** Sidebar → **Fleet** (click section header)
 
-![Fleet Dashboard](../screenshots/complete/25-fleet-dashboard.png)
+![Fleet Dashboard](../screenshots/complete/24-fleet-dashboard.png)
 *Figure 9.1: Fleet Dashboard showing vehicle count, fuel spend, maintenance alerts, and driver stats*
 
 ### 9.2 Vehicles **(ENHANCED)**
 
 **Navigation:** Fleet → **Vehicles** tab (now the default first tab)
 
-![Vehicles List](../screenshots/complete/26-fleet-vehicles.png)
+![Vehicles List](../screenshots/complete/25-fleet-vehicles.png)
 *Figure 9.2: Fleet vehicles list showing registration, make, driver assignment, and status*
 
 #### Key Changes
@@ -2276,7 +2276,7 @@ The Human Resources module manages staff information, departments, compliance, a
 
 **Navigation:** Sidebar → **Human Resources** (click section header)
 
-![Staff Directory](../screenshots/complete/27-staff-directory.png)
+![Staff Directory](../screenshots/complete/26-staff-directory.png)
 *Figure 10.1: Staff Directory showing employee list with search, department filter, and status*
 
 #### Key Enhancements
@@ -2311,7 +2311,7 @@ Additional details (position, department, salary, etc.) can be added later via t
 
 Click any staff member to view their full profile with granular tab access:
 
-![Staff Detail](../screenshots/complete/28-staff-detail.png)
+![Staff Detail](../screenshots/complete/27-staff-detail.png)
 *Figure 10.2: Staff detail page showing personal info, employment details, and compliance status*
 
 #### Granular Tab-Level Permissions **(NEW)**
@@ -2344,7 +2344,7 @@ The staff detail page now supports per-tab access control:
 
 **Navigation:** Human Resources → **Departments** tab
 
-![Departments](../screenshots/complete/29-departments.png)
+![Departments](../screenshots/complete/28-departments.png)
 *Figure 10.3: Departments grid showing department cards with member counts and status*
 
 - View all departments as cards with member count
@@ -2395,7 +2395,7 @@ The Analytics section provides dashboards and reports for organizational perform
 
 **Navigation:** Sidebar → **Analytics** → **Analytics Dashboard**
 
-![Analytics Dashboard](../screenshots/complete/30-analytics-dashboard.png)
+![Analytics Dashboard](../screenshots/complete/29-analytics-dashboard.png)
 *Figure 11.1: Analytics Dashboard showing project metrics, team performance, and trend charts*
 
 #### Components
@@ -2463,7 +2463,7 @@ The Communications section manages WhatsApp integration, meeting coordination, a
 
 **Navigation:** Sidebar → **Communications** → **Communications Portal**
 
-![Communications](../screenshots/complete/31-communications.png)
+![Communications](../screenshots/complete/30-communications.png)
 *Figure 12.1: Communications Portal showing unified messaging and meetings interface*
 
 The Communications Portal now provides a unified communications hub:
@@ -2489,7 +2489,7 @@ The Meetings module is now part of the Communications Portal, providing:
 
 **Navigation:** Sidebar → **Communications** → **WhatsApp Portal**
 
-![WhatsApp Admin](../screenshots/complete/32-whatsapp-admin.png)
+![WhatsApp Admin](../screenshots/complete/31-whatsapp-admin.png)
 *Figure 12.2: WhatsApp Administration showing groups, message logs, and service health*
 
 #### Tabs
@@ -2530,7 +2530,7 @@ FibreFlow includes a comprehensive Help Center with an AI-powered chat assistant
 
 **Navigation:** Sidebar → **Communications** → **Help Center**
 
-![Help Center](../screenshots/complete/38-help-center.png)
+<!-- ![Help Center](../screenshots/complete/37-help-center.png) -->
 *Figure 12.4: Help Center showing searchable documentation with AI Chat Widget*
 
 #### Features
@@ -2593,7 +2593,7 @@ Mission Control is an AI agent coordination dashboard that provides real-time mo
 
 **Navigation:** Sidebar → **Communications** → **Mission Control**
 
-![Mission Control Dashboard](../screenshots/complete/36-mission-control-dashboard.png)
+<!-- ![Mission Control Dashboard](../screenshots/complete/36-mission-control-dashboard.png) -->
 *Figure 12.5: Mission Control Dashboard showing agent status, statistics, and system health*
 
 #### Overview
@@ -2985,7 +2985,7 @@ The System section provides administrative tools for monitoring, data management
 
 **Navigation:** Sidebar → **System** → **System Health Hub**
 
-![System Health](../screenshots/complete/33-system-health.png)
+![System Health](../screenshots/complete/32-system-health.png)
 *Figure 13.1: System Health Hub showing service status, API health, and recent alerts*
 
 Monitor the health of all FibreFlow services:
@@ -2999,7 +2999,7 @@ Monitor the health of all FibreFlow services:
 
 **Navigation:** Sidebar → **System** → **Data Sync**
 
-![Data Sync](../screenshots/complete/34-data-sync.png)
+![Data Sync](../screenshots/complete/33-data-sync.png)
 *Figure 13.2: Data Sync page showing sync operations, OLT report, and operation history*
 
 #### Granular Tab-Level Permissions **(NEW)**
