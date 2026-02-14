@@ -1,3 +1,25 @@
+---
+⚠️ **DEPRECATED DOCUMENTATION** ⚠️
+
+**This document describes the OLD VPS deployment architecture (Hostinger Lithuania, 72.60.17.245).**
+
+**Current deployment uses:**
+- **Server:** velo-server (local infrastructure)
+- **Process Manager:** systemd (NOT PM2)
+- **Path:** `/home/velo/fibreflow-production`
+- **Service:** `fibreflow-production.service`
+- **Port:** 3000
+
+**For current deployment procedures, see:**
+- `docs/INFRASTRUCTURE.md` - Current server architecture
+- `docs/DEPLOYMENT_WORKFLOW.md` - Updated deployment procedures (systemd-based)
+- Root `CLAUDE.md` - Agent deployment reference
+
+**This document is preserved for historical reference only.**
+
+---
+
+
 # VPS Deployment Documentation
 
 **Date:** November 3, 2025

@@ -1,179 +1,291 @@
 # FibreFlow Deployment Workflow
 
+**Current as of:** February 2026  
+**Process Manager:** systemd  
+**Server:** velo-server (local infrastructure)
+
+---
+
 ## 🎯 Golden Rule
-**ALWAYS deploy to DEV first → Test → Then deploy to PRODUCTION**
+**ALWAYS deploy to STAGING first → Test → Then deploy to PRODUCTION**
+
+---
 
 ## 📋 Quick Reference
 
 ### Environments
 
-| Environment | URL | Branch | Use Case |
-|------------|-----|--------|----------|
-| **Dev** | https://dev.fibreflow.app | `develop` | Testing new features |
-| **Production** | https://app.fibreflow.app | `master` | Live customer-facing site |
+| Environment | Path | Port | Service | Branch | URL |
+|---|---|---|---|---|---|---|
+| **Production** | `/home/velo/fibreflow-production` | 3000 | `fibreflow-production` | `master` | app.fibreflow.app |
+| **Staging** | `/home/velo/fibreflow-staging` | 3005/3006 | — | varies | vf.fibreflow.app |
 
-## 🔄 Standard Workflow
-
-### 1️⃣ Start New Feature
+### SSH Access
 ```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/my-feature-name
+# From Docker container (agent context)
+sshpass -p "velo2026" ssh velo@172.17.0.1 "command"
+
+# From localhost
+sshpass -p "velo2026" ssh velo@localhost "command"
 ```
 
-### 2️⃣ Develop & Test Locally
+---
+
+## 🔄 Standard Deployment Pipeline
+
+### 1️⃣ Record Current State (Rollback Lifeline)
 ```bash
-# Make your changes
-npm run build
-PORT=3005 npm start
-# Test at http://localhost:3005
+cd /home/velo/fibreflow-production
+ROLLBACK_HASH=$(git rev-parse HEAD)
+echo "Rollback commit: $ROLLBACK_HASH"
+# Save this! You'll need it if rollback is required.
 ```
 
-### 3️⃣ Deploy to DEV
+### 2️⃣ Pull Latest Code
 ```bash
-# Commit changes
-git add .
-git commit -m "feat: description"
-
-# Merge to develop
-git checkout develop
-git merge feature/my-feature-name
-git push origin develop
-
-# Deploy to DEV server
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
-```
-
-**Test at: https://dev.fibreflow.app** ✅
-
-### 4️⃣ Test on DEV
-- [ ] All features work correctly
-- [ ] No console errors
-- [ ] User flows tested
-- [ ] API endpoints verified
-- [ ] Responsive design checked
-- [ ] Performance acceptable
-
-### 5️⃣ Deploy to PRODUCTION
-**Only after DEV testing passes!**
-
-```bash
-# Merge develop to master
-git checkout master
+cd /home/velo/fibreflow-production
+git fetch origin
 git pull origin master
-git merge develop
-git push origin master
-
-# Deploy to PRODUCTION server
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
 ```
 
-**Verify at: https://app.fibreflow.app** ✅
-
-## 🚨 Hotfix Workflow
-
-For critical production bugs:
-
+### 3️⃣ Check for Dependency Changes
 ```bash
-# Create hotfix from master
-git checkout master
-git checkout -b hotfix/critical-fix
-
-# Fix the issue
-git add .
-git commit -m "fix: critical bug description"
-
-# Deploy directly to production
-git checkout master
-git merge hotfix/critical-fix
-git push origin master
-
-# Deploy to PROD
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
-
-# Merge back to develop
-git checkout develop
-git merge master
-git push origin develop
+git diff $ROLLBACK_HASH HEAD package.json package-lock.json
 ```
 
-## 📊 Monitoring
-
-### Check PM2 Status
+If `package.json` changed:
 ```bash
-ssh root@72.60.17.245 "pm2 list"
+npm install
+```
+
+### 4️⃣ Build Application
+```bash
+npm run build
+```
+
+**Build Requirements:**
+- Free disk space: >2GB on `/home`
+- Free RAM: >2GB (builds OOM at ~3.5GB system RAM usage)
+
+Check resources before building:
+```bash
+df -h /home
+free -h
+```
+
+### 5️⃣ Run Database Migrations (if any)
+```bash
+npm run db:migrate
+```
+
+Check migration status:
+```bash
+npm run db:validate
+```
+
+### 6️⃣ Restart Service
+```bash
+echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+```
+
+### 7️⃣ Verify Deployment
+```bash
+# Wait for service to start
+sleep 5
+
+# Check service status
+systemctl is-active fibreflow-production
+
+# Check HTTP response
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+
+# Check health endpoint
+curl -s http://localhost:3000/api/monitoring/health | jq .
+
+# Check for errors in recent logs
+journalctl -u fibreflow-production --since "5 min ago" --priority=err --no-pager
+```
+
+---
+
+## 🤖 Full Deployment (Single Command - Agent Context)
+
+From Docker container:
+```bash
+sshpass -p "velo2026" ssh velo@172.17.0.1 "cd /home/velo/fibreflow-production && \
+  ROLLBACK_HASH=\$(git rev-parse HEAD) && \
+  echo \"Rollback: \$ROLLBACK_HASH\" && \
+  git pull origin master && \
+  npm install && \
+  npm run build && \
+  npm run db:migrate && \
+  echo 'velo2026' | sudo -S systemctl restart fibreflow-production && \
+  sleep 5 && \
+  systemctl is-active fibreflow-production && \
+  curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/"
+```
+
+---
+
+## 🚨 Rollback Procedures
+
+### Quick Rollback
+```bash
+cd /home/velo/fibreflow-production
+git checkout <ROLLBACK_HASH>
+npm run build
+echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+```
+
+### Verify Rollback
+```bash
+sleep 5
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
+systemctl status fibreflow-production
+```
+
+**Rule:** Rollback first, debug later. If production is down, speed matters.
+
+---
+
+## 📊 Monitoring & Troubleshooting
+
+### Check Service Status
+```bash
+systemctl status fibreflow-production
+systemctl is-active fibreflow-production
 ```
 
 ### View Logs
 ```bash
-# DEV logs
-ssh root@72.60.17.245 "pm2 logs fibreflow-dev"
+# Last 50 lines
+journalctl -u fibreflow-production -n 50 --no-pager
 
-# PRODUCTION logs
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod"
+# Follow logs in real-time
+journalctl -u fibreflow-production -f
+
+# Errors only (last 5 minutes)
+journalctl -u fibreflow-production --since "5 min ago" --priority=err --no-pager
+
+# Specific time range
+journalctl -u fibreflow-production --since "2026-02-14 10:00:00" --until "2026-02-14 11:00:00"
 ```
 
-### Restart Services
+### Restart Service
 ```bash
-# Restart DEV
-ssh root@72.60.17.245 "pm2 restart fibreflow-dev"
-
-# Restart PRODUCTION
-ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+echo 'velo2026' | sudo -S systemctl restart fibreflow-production
 ```
 
-## 🔙 Rollback
-
-If production deployment fails:
-
+### Check System Resources
 ```bash
-ssh root@72.60.17.245
-cd /var/www/fibreflow
+# Disk space
+df -h /home
 
-# View recent commits
-git log --oneline -10
+# Memory usage
+free -h
 
-# Rollback to last working commit
-git reset --hard <commit-hash>
-npm ci
+# Process memory
+ps aux | grep node | grep fibreflow-production
+
+# Database connections
+npm run check:db-connections
+```
+
+---
+
+## 🛠️ Common Issues & Solutions
+
+### Build Fails with OOM
+```bash
+# Check current memory usage
+free -h
+
+# If <2GB free, stop service temporarily
+echo 'velo2026' | sudo -S systemctl stop fibreflow-production
 npm run build
-pm2 restart fibreflow-prod
+echo 'velo2026' | sudo -S systemctl start fibreflow-production
 ```
 
-## 🤖 AI Assistant Protocol
+### Service Won't Start
+```bash
+# Check for port conflicts
+sudo lsof -i :3000
 
-When Claude Code implements features:
+# Check environment variables
+systemctl show fibreflow-production --property=Environment
 
-1. ✅ **Create feature branch** from `develop`
-2. ✅ **Deploy to DEV** for testing
-3. ⏸️ **Wait for user approval** before production
-4. ✅ **Deploy to PRODUCTION** after confirmation
-5. ✅ **Document changes** in logs
+# Check recent errors
+journalctl -u fibreflow-production -n 100 --priority=err --no-pager
+```
 
-## 📝 Branch Naming Conventions
+### Database Connection Issues
+```bash
+# Check connection pool
+npm run check:db-connections
 
-- `feature/description` - New features
-- `fix/description` - Bug fixes
-- `hotfix/description` - Critical production fixes
-- `refactor/description` - Code improvements
-- `docs/description` - Documentation updates
+# Verify .env.local has DATABASE_URL
+cat /home/velo/fibreflow-production/.env.local | grep DATABASE_URL
+```
 
-## ⚠️ Never Do This
+---
 
-- ❌ Push directly to `master` without testing on `develop`
-- ❌ Skip DEV deployment for "small changes"
-- ❌ Deploy to production during peak hours (unless critical)
-- ❌ Deploy without testing
-- ❌ Forget to document changes
+## 🔒 Safety Rules
 
-## ✅ Always Do This
+1. ✅ **ALWAYS record the current commit hash before deploying** (your rollback lifeline)
+2. ✅ **NEVER run destructive database operations without reading the SQL first**
+3. ✅ **NEVER modify `.env.local`** unless explicitly instructed
+4. ✅ **NEVER force-push or force-checkout** on production branch
+5. ✅ **Rollback first, debug later** if production is down
+6. ✅ **Check disk space before builds** (need >2GB free)
+7. ✅ **Check memory before builds** (need >2GB free RAM)
+8. ✅ **Don't deploy during business hours** (08:00-17:00 SAST) without approval
+9. ✅ **Verify after every deploy** (a deploy without QA is incomplete)
+10. ✅ **One deploy at a time** (never run concurrent deploys)
 
-- ✅ Test locally first
-- ✅ Deploy to DEV before production
-- ✅ Wait for confirmation before going live
-- ✅ Monitor logs after deployment
-- ✅ Document changes in CHANGELOG.md
-- ✅ Verify both environments after deployment
+---
+
+## 📝 Key npm Scripts
+
+| Script | Purpose |
+|---|---|
+| `npm run build` | Production build (Next.js) |
+| `npm run start` | Start production server (handled by systemd) |
+| `npm run dev` | Development server |
+| `npm run type-check` | TypeScript check without building |
+| `npm run lint` | ESLint check |
+| `npm run db:migrate` | Run database migrations |
+| `npm run db:validate` | Validate database schema |
+| `npm run check:db-connections` | Check connection pool health |
+| `npm run test` | Run Vitest unit tests |
+| `npm run test:e2e:smoke` | Playwright smoke tests |
+
+---
+
+## 🤖 AI Agent Protocol
+
+When Forge (deployment agent) executes deployments:
+
+1. ✅ Record rollback commit hash
+2. ✅ Pull latest code from master
+3. ✅ Install dependencies if package.json changed
+4. ✅ Build application
+5. ✅ Run database migrations
+6. ✅ Restart systemd service
+7. ✅ Verify deployment (health checks, logs, HTTP status)
+8. ✅ Report results to Mission Control
+9. ⚠️ Rollback immediately if verification fails
+
+---
+
+## 📚 Related Documentation
+
+- **Root CLAUDE.md** - Agent reference for Forge
+- **docs/INFRASTRUCTURE.md** - Server architecture
+- **docs/VPS/DEPLOYMENT.md** - Old VPS setup (DEPRECATED)
+- **skills/deploy-pipeline.md** - Detailed deployment procedures
+- **skills/rollback-procedures.md** - Emergency rollback guide
+- **skills/build-troubleshooting.md** - Build failure diagnostics
+
+---
+
+**Last Updated:** 2026-02-14 by Forge (Task #85)
