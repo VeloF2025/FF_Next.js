@@ -1,12 +1,8 @@
+import { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
-import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-
-const ProjectDetail = dynamic(() => import('@/pages/ProjectDetail').then(mod => mod.ProjectDetail || mod.default), {
-  ssr: false,
-  loading: () => <div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div></div>
-});
+import { ProjectDetail } from '@/pages/ProjectDetail';
 
 // UUID v4 regex for validating project IDs
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
