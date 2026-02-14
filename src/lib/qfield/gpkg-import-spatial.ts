@@ -8,6 +8,14 @@ import { log } from '@/lib/logger';
 
 const BATCH_SIZE = 1000;
 
+/** Safely parse a value to integer — handles comma-separated strings like "67,80,81" */
+function safeInt(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).split(',')[0].trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
 export interface LayerResult {
   created: number;
   updated: number;
@@ -38,8 +46,8 @@ export async function importCableSpans(sql: SqlFn, features: any[], projectId: s
     const spanLabels   = batch.map(f => f.span_label);
     const cableSizes   = batch.map(f => f.cable_size || null);
     const spanTypes    = batch.map(f => f.span_type || null);
-    const ponNos       = batch.map(f => f.pon_no != null ? Number(f.pon_no) : null);
-    const zoneNos      = batch.map(f => f.zone_no != null ? Number(f.zone_no) : null);
+    const ponNos       = batch.map(f => safeInt(f.pon_no));
+    const zoneNos      = batch.map(f => safeInt(f.zone_no));
     const lengths      = batch.map(f => f.length_meters != null ? Number(f.length_meters) : null);
     const geojsons     = batch.map(f => f.geojson ? JSON.stringify(f.geojson) : null);
     const sources      = batch.map(() => 'qfield');
@@ -97,7 +105,7 @@ export async function importZoneBoundaries(sql: SqlFn, features: any[], projectI
     const batch = features.slice(i, i + BATCH_SIZE);
 
     const projectIds = batch.map(() => projectId);
-    const zoneNos    = batch.map(f => Number(f.zone_no));
+    const zoneNos    = batch.map(f => safeInt(f.zone_no));
     const geojsons   = batch.map(f => JSON.stringify(f.geojson));
 
     if (mode === 'merge') {
@@ -139,8 +147,8 @@ export async function importPonBoundaries(sql: SqlFn, features: any[], projectId
     const batch = features.slice(i, i + BATCH_SIZE);
 
     const projectIds = batch.map(() => projectId);
-    const ponNos     = batch.map(f => Number(f.pon_no));
-    const zoneNos    = batch.map(f => f.zone_no != null ? Number(f.zone_no) : null);
+    const ponNos     = batch.map(f => safeInt(f.pon_no));
+    const zoneNos    = batch.map(f => safeInt(f.zone_no));
     const ponLabels  = batch.map(f => f.pon_label || null);
     const geojsons   = batch.map(f => JSON.stringify(f.geojson));
 

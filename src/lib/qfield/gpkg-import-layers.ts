@@ -13,6 +13,14 @@ export { importCableSpans, importZoneBoundaries, importPonBoundaries, importPops
 
 const BATCH_SIZE = 1000;
 
+/** Safely parse a value to integer — handles comma-separated strings like "67,80,81" */
+function safeInt(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).split(',')[0].trim();
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
 export interface LayerResult {
   created: number;
   updated: number;
@@ -51,8 +59,8 @@ export async function importPoles(sql: SqlFn, features: any[], projectId: string
     const fieldAgents    = batch.map(f => f.field_agent || null);
     const polePlanteds   = batch.map(f => f.pole_planted || null);
     const auditDates     = batch.map(f => f.audit_complete || null);
-    const zoneNos        = batch.map(f => f.zone_no != null ? Number(f.zone_no) : null);
-    const ponNos         = batch.map(f => f.pon_no != null ? Number(f.pon_no) : null);
+    const zoneNos        = batch.map(f => safeInt(f.zone_no));
+    const ponNos         = batch.map(f => safeInt(f.pon_no));
     const sources        = batch.map(() => 'qfield');
 
     if (mode === 'merge') {
@@ -125,8 +133,8 @@ export async function importJoints(sql: SqlFn, features: any[], projectId: strin
     const cableCapacities = batch.map(f => f.cable_capacity || null);
     const latitudes       = batch.map(f => f.latitude != null ? Number(f.latitude) : null);
     const longitudes      = batch.map(f => f.longitude != null ? Number(f.longitude) : null);
-    const ponNos          = batch.map(f => f.pon_no != null ? Number(f.pon_no) : null);
-    const zoneNos         = batch.map(f => f.zone_no != null ? Number(f.zone_no) : null);
+    const ponNos          = batch.map(f => safeInt(f.pon_no));
+    const zoneNos         = batch.map(f => safeInt(f.zone_no));
     const sources         = batch.map(() => 'qfield');
 
     if (mode === 'merge') {
@@ -185,8 +193,8 @@ export async function importDrops(sql: SqlFn, features: any[], projectId: string
     const dropNumbers     = batch.map(f => f.drop_number);
     const poleNumbers     = batch.map(f => f.pole_number || null);
     const cableCapacities = batch.map(f => f.cable_capacity || null);
-    const ponNos          = batch.map(f => f.pon_no != null ? Number(f.pon_no) : null);
-    const zoneNos         = batch.map(f => f.zone_no != null ? Number(f.zone_no) : null);
+    const ponNos          = batch.map(f => safeInt(f.pon_no));
+    const zoneNos         = batch.map(f => safeInt(f.zone_no));
     const latitudes       = batch.map(f => f.latitude != null ? Number(f.latitude) : null);
     const longitudes      = batch.map(f => f.longitude != null ? Number(f.longitude) : null);
     const sources         = batch.map(() => 'qfield');

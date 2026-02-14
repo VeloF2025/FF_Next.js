@@ -317,6 +317,27 @@ def _get_field(row: Dict[str, Any], *candidates: str) -> Any:
     return None
 
 
+def _safe_int(val: Any) -> Optional[int]:
+    """Parse a value to int — handles comma-separated strings like '67,80,81'."""
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        return int(val) if not (val != val) else None  # NaN check
+    s = str(val).split(",")[0].strip()
+    if not s:
+        return None
+    try:
+        return int(s)
+    except (ValueError, TypeError):
+        # Try float first (e.g. "67.0")
+        try:
+            return int(float(s))
+        except (ValueError, TypeError):
+            return None
+
+
 def map_feature_fields(
     layer_type: str, row: Dict[str, Any], geom: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
@@ -342,8 +363,8 @@ def map_feature_fields(
         feature["audit_complete"] = _get_field(
             row, "Audit Complete", "AuditComplete", "AuditCompl",
         )
-        feature["zone_no"] = _get_field(row, "zone_no")
-        feature["pon_no"] = _get_field(row, "pon_no")
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
+        feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
         if geom and geom["type"] == "Point":
             feature["longitude"] = geom["coordinates"][0]
             feature["latitude"] = geom["coordinates"][1]
@@ -353,8 +374,8 @@ def map_feature_fields(
         feature["joint_label"] = _get_field(row, "label", "name", "fid")
         feature["joint_type"] = _get_field(row, "type", "joint_type")
         feature["cable_capacity"] = _get_field(row, "cblcpty", "cable_capacity")
-        feature["zone_no"] = _get_field(row, "zone_no")
-        feature["pon_no"] = _get_field(row, "pon_no")
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
+        feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
         if geom and geom["type"] == "Point":
             feature["longitude"] = geom["coordinates"][0]
             feature["latitude"] = geom["coordinates"][1]
@@ -367,8 +388,8 @@ def map_feature_fields(
         feature["span_type"] = _get_field(
             row, "SpanType", "Span_Type", "span_type", "type",
         )
-        feature["pon_no"] = _get_field(row, "pon_no")
-        feature["zone_no"] = _get_field(row, "zone_no")
+        feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
         feature["length_meters"] = _get_field(row, "Length", "length", "length_m")
         if geom:
             feature["geojson"] = geom
@@ -378,32 +399,19 @@ def map_feature_fields(
             row, "DropNumber", "drop_number", "label", "fid",
         )
         feature["cable_capacity"] = _get_field(row, "cblcpty", "cable_capacity")
-        feature["pon_no"] = _get_field(row, "pon_no")
-        feature["zone_no"] = _get_field(row, "zone_no")
+        feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
         if geom:
             feature["geojson"] = geom
 
     elif layer_type == "zone_boundaries":
-        feature["zone_no"] = _get_field(row, "zone_no")
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
         if geom:
             feature["geojson"] = geom
 
     elif layer_type == "pon_boundaries":
-        raw_pon = _get_field(row, "pon_no")
-        raw_zone = _get_field(row, "zone_no")
-        # Handle string-formatted numbers like "001" and comma-separated "001,005"
-        if isinstance(raw_pon, str):
-            raw_pon = raw_pon.split(",")[0].strip()
-        if isinstance(raw_zone, str):
-            raw_zone = raw_zone.split(",")[0].strip()
-        try:
-            feature["pon_no"] = int(raw_pon) if raw_pon else None
-        except (ValueError, TypeError):
-            feature["pon_no"] = None
-        try:
-            feature["zone_no"] = int(raw_zone) if raw_zone else None
-        except (ValueError, TypeError):
-            feature["zone_no"] = None
+        feature["pon_no"] = _safe_int(_get_field(row, "pon_no"))
+        feature["zone_no"] = _safe_int(_get_field(row, "zone_no"))
         feature["pon_label"] = _get_field(row, "pon_label", "label")
         if geom:
             feature["geojson"] = geom
