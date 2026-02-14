@@ -28,6 +28,7 @@ import { QFieldImportPanel } from '@/modules/qfield-import';
 import { useSOWUpload } from '@/modules/projects/components/SOWUploadSection/hooks/useSOWUpload';
 import { FILE_TYPE_CONFIGS } from '@/modules/projects/components/SOWUploadSection/types/sowUpload.types';
 import { useProjectSOW } from '@/hooks/useNeonSOW';
+import { ClientPOCreateModal } from '@/modules/projects/components/finance/ClientPOCreateModal';
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import type { ClientPurchaseOrder } from '@/types/finance';
 import { log } from '@/lib/logger';
@@ -47,6 +48,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   const [clientPOs, setClientPOs] = useState<ClientPurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadState, setUploadState] = useState<Record<string, DocumentUploadState>>({});
+  const [showCreatePO, setShowCreatePO] = useState(false);
 
   // File input refs
   const bssInputRef = useRef<HTMLInputElement>(null);
@@ -186,16 +188,25 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
 
       {/* Client PO Documents Section */}
       <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
-        <div className="p-4 border-b border-[var(--ff-border-light)]">
-          <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">Client PO Documents</h3>
-          <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-            Source PDF documents uploaded with Client Purchase Orders
-          </p>
+        <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">Client PO Documents</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+              Source PDF documents uploaded with Client Purchase Orders
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreatePO(true)}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Add Client PO
+          </button>
         </div>
         <div className="p-4">
-          {posWithDocs.length > 0 ? (
+          {clientPOs.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {posWithDocs.map((po) => (
+              {clientPOs.map((po) => (
                 <div
                   key={po.id}
                   className="flex items-center gap-3 p-3 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]"
@@ -207,17 +218,21 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
                     <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
                       {po.sourceDocumentName || `${po.poNumber}.pdf`}
                     </p>
-                    <p className="text-xs text-[var(--ff-text-secondary)]">PO: {po.poNumber}</p>
+                    <p className="text-xs text-[var(--ff-text-secondary)]">
+                      PO: {po.poNumber} | {(po.contractedDrops || 0).toLocaleString()} drops @ R{(po.pricePerDrop || 0).toLocaleString()}
+                    </p>
                   </div>
-                  <a
-                    href={po.sourceDocumentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 text-[var(--ff-text-secondary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-                    title="Open document"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
+                  {po.sourceDocumentUrl && (
+                    <a
+                      href={po.sourceDocumentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-[var(--ff-text-secondary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                      title="Open document"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
@@ -226,12 +241,24 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
               <FileText className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
               <p className="text-sm text-[var(--ff-text-secondary)]">No PO documents uploaded yet</p>
               <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                Upload PO PDFs via the Income tab when creating Client POs
+                Click &quot;Add Client PO&quot; to upload a PO PDF with AI extraction
               </p>
             </div>
           )}
         </div>
       </section>
+
+      {/* Client PO Create Modal */}
+      {showCreatePO && (
+        <ClientPOCreateModal
+          projectId={projectId}
+          onClose={() => setShowCreatePO(false)}
+          onCreated={() => {
+            setShowCreatePO(false);
+            fetchData();
+          }}
+        />
+      )}
 
       {/* Service Schedules Section (BSS/MSS) */}
       <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
