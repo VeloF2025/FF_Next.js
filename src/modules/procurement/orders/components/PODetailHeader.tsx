@@ -84,14 +84,14 @@ export const PODetailHeader: React.FC<PODetailHeaderProps> = ({
       <div className="flex items-center justify-between p-6">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-gray-900">{po.poNumber}</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{po.poNumber}</h2>
             {version > 1 && (
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                 v{version}
               </span>
             )}
           </div>
-          <p className="text-gray-600">{po.title}</p>
+          <p className="text-gray-600 dark:text-gray-400">{po.title}</p>
           <div className="flex items-center space-x-3 mt-2">
             <StatusBadge status={po.status} />
             {po.approvalStatus && approvalStatusLower !== 'not_submitted' && (
@@ -171,7 +171,7 @@ export const PODetailHeader: React.FC<PODetailHeaderProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 p-2"
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 p-2"
         >
           <X className="h-6 w-6" />
         </button>

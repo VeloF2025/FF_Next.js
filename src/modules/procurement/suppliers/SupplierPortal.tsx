@@ -23,35 +23,35 @@ import type { ProcurementPortalContext } from '@/types/procurement/portal.types'
 const SupplierRegistry = () => (
   <div className="p-6">
     <h3 className="text-lg font-semibold mb-4">Supplier Registry</h3>
-    <p className="text-gray-600">Component under development - Supplier profile management coming soon.</p>
+    <p className="text-gray-600 dark:text-gray-400">Component under development - Supplier profile management coming soon.</p>
   </div>
 );
 
 const PerformanceDashboard = () => (
   <div className="p-6">
     <h3 className="text-lg font-semibold mb-4">Performance Dashboard</h3>
-    <p className="text-gray-600">Component under development - Supplier performance analytics coming soon.</p>
+    <p className="text-gray-600 dark:text-gray-400">Component under development - Supplier performance analytics coming soon.</p>
   </div>
 );
 
 const CommunicationCenter = () => (
   <div className="p-6">
     <h3 className="text-lg font-semibold mb-4">Communication Center</h3>
-    <p className="text-gray-600">Component under development - Supplier communications coming soon.</p>
+    <p className="text-gray-600 dark:text-gray-400">Component under development - Supplier communications coming soon.</p>
   </div>
 );
 
 const SelfServicePortal = () => (
   <div className="p-6">
     <h3 className="text-lg font-semibold mb-4">Self-Service Portal</h3>
-    <p className="text-gray-600">Component under development - Supplier self-service features coming soon.</p>
+    <p className="text-gray-600 dark:text-gray-400">Component under development - Supplier self-service features coming soon.</p>
   </div>
 );
 
 const SupplierOnboarding = () => (
   <div className="p-6">
     <h3 className="text-lg font-semibold mb-4">Supplier Onboarding</h3>
-    <p className="text-gray-600">Component under development - Supplier onboarding workflow coming soon.</p>
+    <p className="text-gray-600 dark:text-gray-400">Component under development - Supplier onboarding workflow coming soon.</p>
   </div>
 );
 
@@ -146,26 +146,26 @@ export default function SupplierPortal() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Supplier Portal</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Supplier Portal</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Comprehensive supplier relationship management and portal access
             </p>
           </div>
           
           {selectedProject && (
             <div className="text-right">
-              <p className="text-sm text-gray-500">Project Context</p>
-              <p className="text-sm font-medium text-gray-900">{selectedProject.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Project Context</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedProject.name}</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-6">
           <nav className="flex space-x-8" aria-label="Tabs">
             {availableTabs.map((tab) => {
@@ -181,7 +181,7 @@ export default function SupplierPortal() {
                     transition-colors duration-200
                     ${isActive
                       ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
                     }
                   `}
                 >
@@ -195,8 +195,8 @@ export default function SupplierPortal() {
       </div>
 
       {/* Tab Description */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-        <p className="text-sm text-gray-600">{currentTab.description}</p>
+      <div className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
+        <p className="text-sm text-gray-600 dark:text-gray-400">{currentTab.description}</p>
       </div>
 
       {/* Tab Content */}

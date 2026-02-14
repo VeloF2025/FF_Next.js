@@ -460,7 +460,7 @@ export function QaWizardContainer({
                       ? 'font-semibold text-blue-600 dark:text-blue-400'
                       : isComplete
                         ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-gray-500'
+                        : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'
                   }`}
                 >
                   {PHASE_SHORT_LABELS[phase]}
@@ -489,7 +489,7 @@ export function QaWizardContainer({
       <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
         {PHASE_LABELS[state.phase]}
       </h3>
-      <span className="text-xs text-gray-400 dark:text-gray-500">
+      <span className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400">
         {PHASE_ORDER.indexOf(state.phase) + 1}/{PHASE_ORDER.length}
       </span>
     </div>

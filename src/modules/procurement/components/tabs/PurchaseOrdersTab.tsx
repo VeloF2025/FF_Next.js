@@ -37,10 +37,10 @@ export function PurchaseOrdersTab() {
         return (
           <div className="h-full p-6">
             <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Create Purchase Order</h3>
-                  <p className="text-sm text-gray-600">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Create Purchase Order</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Create a new Purchase Order for {selectedProject.name}
                   </p>
                 </div>
@@ -48,8 +48,8 @@ export function PurchaseOrdersTab() {
                 <div className="p-6">
                   <div className="text-center py-12">
                     <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Purchase Order Creation Form</h4>
-                    <p className="text-gray-600 mb-6">
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Purchase Order Creation Form</h4>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
                       This would be the PO creation form component
                     </p>
                     <div className="flex gap-3 justify-center">
@@ -70,13 +70,13 @@ export function PurchaseOrdersTab() {
         return (
           <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="bg-white border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     Purchase Orders
                   </h2>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Managing orders for {selectedProject.name} ({selectedProject.code})
                   </p>
                 </div>
@@ -100,16 +100,16 @@ export function PurchaseOrdersTab() {
                     placeholder="Search POs by number, supplier, or item..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
+                  <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="all">All Status</option>
                     <option value="draft">Draft</option>
@@ -123,7 +123,7 @@ export function PurchaseOrdersTab() {
             </div>
 
             {/* PO Stats Cards */}
-            <div className="bg-white border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <POStatCard
                   title="Draft"
@@ -160,9 +160,9 @@ export function PurchaseOrdersTab() {
 
             {/* PO List */}
             <div className="flex-1 p-6 overflow-auto">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900">Purchase Orders</h3>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Purchase Orders</h3>
                 </div>
                 
                 <div className="divide-y divide-gray-200">
@@ -203,7 +203,7 @@ export function PurchaseOrdersTab() {
   };
 
   return (
-    <div className="h-full bg-gray-50">
+    <div className="h-full bg-gray-50 dark:bg-gray-900">
       {renderContent()}
     </div>
   );
@@ -218,7 +218,7 @@ interface POStatCardProps {
 
 function POStatCard({ title, count, icon: Icon, color }: POStatCardProps) {
   const colorClasses = {
-    gray: 'bg-gray-100 text-gray-700',
+    gray: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
     yellow: 'bg-yellow-100 text-yellow-700',
     green: 'bg-green-100 text-green-700',
     blue: 'bg-blue-100 text-blue-700',
@@ -226,14 +226,14 @@ function POStatCard({ title, count, icon: Icon, color }: POStatCardProps) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-gray-200">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-lg font-bold text-gray-900">{count}</p>
-          <p className="text-sm text-gray-600">{title}</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{count}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
         </div>
       </div>
     </div>
@@ -263,7 +263,7 @@ function PurchaseOrderItem({
 }: PurchaseOrderItemProps) {
   const getStatusBadge = (status: string) => {
     const classes = {
-      draft: 'bg-gray-100 text-gray-800',
+      draft: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200',
       sent: 'bg-yellow-100 text-yellow-800',
       confirmed: 'bg-green-100 text-green-800',
       received: 'bg-blue-100 text-blue-800',
@@ -278,20 +278,20 @@ function PurchaseOrderItem({
   };
 
   return (
-    <div className="p-6 hover:bg-gray-50 transition-colors">
+    <div className="p-6 hover:bg-gray-50 dark:bg-gray-900 transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h4 className="text-lg font-medium text-gray-900">{poNumber}</h4>
+            <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100">{poNumber}</h4>
             {getStatusBadge(status)}
           </div>
           
-          <div className="text-sm text-gray-600 mb-2">
+          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
             <p className="font-medium">{supplier}</p>
             <p>{description}</p>
           </div>
           
-          <div className="flex items-center gap-6 text-sm text-gray-600">
+          <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
             <span>Created: {formatDate(dateCreated)}</span>
             <span>Expected: {formatDate(expectedDelivery)}</span>
             {actualDelivery && (
@@ -331,11 +331,11 @@ function NoProjectSelected() {
           <ShoppingCart className="h-12 w-12 text-blue-600" />
         </div>
         
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Project Selection Required
         </h3>
         
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
           Please select a project to view and manage its Purchase Orders. 
           Purchase Orders are project-specific and track all procurement commitments.
         </p>

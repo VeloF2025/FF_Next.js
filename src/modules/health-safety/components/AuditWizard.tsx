@@ -187,7 +187,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
     return (
       <div className="p-8 text-center">
         <Loader2 className="w-12 h-12 mx-auto mb-4 text-orange-500 animate-spin" />
-        <p className="text-gray-500">Loading audit...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading audit...</p>
       </div>
     );
   }
@@ -219,7 +219,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             <button
               onClick={saveProgress}
               disabled={isSaving || Object.keys(responses).length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save
@@ -276,7 +276,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             <button
               onClick={() => setCurrentCategory((c) => Math.max(0, c - 1))}
               disabled={currentCategory === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               Previous
@@ -285,7 +285,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
             <button
               onClick={() => setCurrentCategory((c) => Math.min(categories.length - 1, c + 1))}
               disabled={currentCategory === categories.length - 1}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg disabled:opacity-50 transition-colors"
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -339,7 +339,7 @@ function ChecklistItemCard({
     critical: 'border-red-500 bg-red-50 dark:bg-red-900/10',
     high: 'border-orange-500 bg-orange-50 dark:bg-orange-900/10',
     medium: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10',
-    low: 'border-gray-300 bg-gray-50 dark:bg-gray-700/50',
+    low: 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50',
   };
 
   return (
@@ -378,7 +378,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'pass'
                 ? 'bg-green-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-green-100 hover:text-green-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-green-100 hover:text-green-600'
             }`}
             title="Pass"
           >
@@ -390,7 +390,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'fail'
                 ? 'bg-red-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-red-100 hover:text-red-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-red-100 hover:text-red-600'
             }`}
             title="Fail"
           >
@@ -402,7 +402,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               item.response === 'na'
                 ? 'bg-gray-500 text-white'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
             title="Not Applicable"
           >
@@ -415,7 +415,7 @@ function ChecklistItemCard({
               className={`p-2 rounded-lg ${
                 item.photo_url
                   ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}
               title="Photo required"
             >
@@ -429,7 +429,7 @@ function ChecklistItemCard({
             className={`p-2 rounded-lg transition-colors ${
               showNotes || item.notes
                 ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
             title="Add notes"
           >

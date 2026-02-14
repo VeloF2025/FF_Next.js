@@ -207,7 +207,7 @@ export function VehicleCalibrationModal({
                 {isValidOdometer ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500">1</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">1</span>
                 )}
               </div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -225,7 +225,7 @@ export function VehicleCalibrationModal({
                          bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-lg font-medium
                          focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-medium">
                 km
               </span>
             </div>
@@ -242,7 +242,7 @@ export function VehicleCalibrationModal({
                 {isValidFuel ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500">2</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">2</span>
                 )}
               </div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -258,7 +258,7 @@ export function VehicleCalibrationModal({
                   className={`p-2 rounded-lg border-2 text-sm font-medium transition-all ${
                     fuelLevel === level.value
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
                   }`}
                 >
                   {level.label}
@@ -286,7 +286,7 @@ export function VehicleCalibrationModal({
                 {hasPhoto ? (
                   <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500">3</span>
+                  <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400">3</span>
                 )}
               </div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -315,9 +315,9 @@ export function VehicleCalibrationModal({
                     <button
                       type="button"
                       onClick={capturePhoto}
-                      className="p-4 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+                      className="p-4 bg-white dark:bg-gray-800 rounded-full shadow-lg hover:bg-gray-100 dark:bg-gray-800 transition-colors"
                     >
-                      <Camera className="w-8 h-8 text-gray-900" />
+                      <Camera className="w-8 h-8 text-gray-900 dark:text-gray-100" />
                     </button>
                   </div>
                 </>
@@ -331,8 +331,8 @@ export function VehicleCalibrationModal({
                   <button
                     type="button"
                     onClick={retakePhoto}
-                    className="absolute bottom-4 right-4 px-4 py-2 bg-white/90 rounded-lg shadow
-                             flex items-center gap-2 text-gray-900 font-medium hover:bg-white"
+                    className="absolute bottom-4 right-4 px-4 py-2 bg-white dark:bg-gray-800/90 rounded-lg shadow
+                             flex items-center gap-2 text-gray-900 dark:text-gray-100 font-medium hover:bg-white dark:bg-gray-800"
                   >
                     <RefreshCw className="w-4 h-4" />
                     Retake

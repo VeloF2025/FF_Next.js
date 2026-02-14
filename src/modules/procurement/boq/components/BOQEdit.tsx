@@ -19,7 +19,7 @@ export function BOQEdit({ boqId: _boqId, projectId: _projectId, onSave: _onSave,
     <ProcurementErrorBoundary level="component">
       <div className="p-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Edit Bill of Quantities</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Edit Bill of Quantities</h1>
           
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <div className="flex">

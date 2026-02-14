@@ -429,7 +429,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                       <div className="text-right ml-4 flex-shrink-0">
                         {/* Show "Detected" label for batch sync events */}
                         {entry.actor === 'batch_sync' && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500 block">
+                          <span className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 block">
                             Detected:
                           </span>
                         )}
@@ -437,7 +437,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                           {formatDateTime(entry.timestamp)}
                         </span>
                         {entry.actor && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                          <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-1">
                             by {entry.actor === 'batch_sync' ? 'Auto Sync' : entry.actor}
                           </p>
                         )}
@@ -481,7 +481,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               {/* Review Header - Clickable */}
               <button
                 onClick={() => toggleExpand(review.id)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white dark:bg-gray-800/5 transition-colors"
               >
                 <div className="flex items-center gap-4">
                   <div className="text-left">
@@ -535,7 +535,7 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                 <div className="px-4 pb-4 border-t border-current/10">
                   {/* Comment */}
                   {review.comment && (
-                    <div className="mt-4 p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                    <div className="mt-4 p-3 bg-white dark:bg-gray-800/50 dark:bg-black/20 rounded-lg">
                       <div className="text-xs font-medium uppercase tracking-wide mb-1 opacity-60">
                         Comment
                       </div>

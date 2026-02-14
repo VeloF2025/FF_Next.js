@@ -24,8 +24,8 @@ export function HeaderSection({
       <div className="flex items-center">
         <Grid3x3 className="h-8 w-8 text-blue-600 mr-3" />
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Imports Data Grid</h1>
-          <p className="text-gray-600">View SOW and OneMap field data imports</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Imports Data Grid</h1>
+          <p className="text-gray-600 dark:text-gray-400">View SOW and OneMap field data imports</p>
         </div>
       </div>
 

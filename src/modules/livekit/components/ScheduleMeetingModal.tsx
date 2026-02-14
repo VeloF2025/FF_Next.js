@@ -145,7 +145,7 @@ export function ScheduleMeetingModal({ isOpen, onClose, onSuccess }: ScheduleMee
                     </h2>
                     <button
                         onClick={handleClose}
-                        className="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white/10"
+                        className="p-1 text-white/80 hover:text-white rounded-lg hover:bg-white dark:bg-gray-800/10"
                     >
                         <X className="w-5 h-5" />
                     </button>

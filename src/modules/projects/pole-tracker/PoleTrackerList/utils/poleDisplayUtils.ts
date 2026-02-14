@@ -13,7 +13,7 @@ export const getPhaseColor = (phase: string): string => {
     case 'installation': return 'text-purple-600';
     case 'excavation': return 'text-orange-600';
     case 'permission': return 'text-yellow-600';
-    default: return 'text-gray-600';
+    default: return 'text-gray-600 dark:text-gray-400';
   }
 };
 

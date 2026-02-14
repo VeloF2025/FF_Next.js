@@ -68,7 +68,7 @@ export function ProcurementPageHeader({
   };
 
   return (
-    <div className="bg-white shadow-sm border-b border-gray-200">
+    <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
       <div className="px-4 sm:px-6 lg:px-8">
         {/* Breadcrumbs */}
         <nav className="flex pt-4 pb-2" aria-label="Breadcrumb">
@@ -79,13 +79,13 @@ export function ProcurementPageHeader({
                   <ChevronRight className="h-4 w-4 text-gray-400 mx-2" />
                 )}
                 {breadcrumb.isActive ? (
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {breadcrumb.label}
                   </span>
                 ) : (
                   <Link
                     to={breadcrumb.path || '#'}
-                    className="text-sm font-medium text-gray-500 hover:text-gray-700"
+                    className="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
                   >
                     {breadcrumb.label}
                   </Link>
@@ -99,10 +99,10 @@ export function ProcurementPageHeader({
         <div className="pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{title}</h1>
               {helpText && (
                 <div className="ml-3 group relative">
-                  <HelpCircle className="h-5 w-5 text-gray-400 hover:text-gray-500 cursor-help" />
+                  <HelpCircle className="h-5 w-5 text-gray-400 hover:text-gray-500 dark:text-gray-400 cursor-help" />
                   <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg z-10">
                     {helpText}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
@@ -111,7 +111,7 @@ export function ProcurementPageHeader({
               )}
             </div>
             {helpText && (
-              <p className="mt-1 text-sm text-gray-500 sm:hidden">{helpText}</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 sm:hidden">{helpText}</p>
             )}
           </div>
 
@@ -127,7 +127,7 @@ export function ProcurementPageHeader({
             {permissions.canAccessReports && (
               <Link
                 to="/app/procurement/reports"
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <Settings className="h-4 w-4" />
                 <span className="ml-2 hidden sm:inline">Reports</span>

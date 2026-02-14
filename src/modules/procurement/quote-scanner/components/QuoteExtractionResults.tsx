@@ -154,7 +154,7 @@ export function QuoteExtractionResults({
       {/* Supplier Info */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Building className="h-5 w-5 text-gray-500" />
+          <Building className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           <h3 className="font-semibold text-gray-900 dark:text-white">Supplier Information</h3>
         </div>
 
@@ -213,7 +213,7 @@ export function QuoteExtractionResults({
       {/* Quote Info */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <FileText className="h-5 w-5 text-gray-500" />
+          <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           <h3 className="font-semibold text-gray-900 dark:text-white">Quote Details</h3>
         </div>
 
@@ -299,7 +299,7 @@ export function QuoteExtractionResults({
       {/* Line Items */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Package className="h-5 w-5 text-gray-500" />
+          <Package className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           <h3 className="font-semibold text-gray-900 dark:text-white">
             Line Items ({extraction.lineItems?.length || 0})
           </h3>
@@ -408,7 +408,7 @@ export function QuoteExtractionResults({
       {/* Totals */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="h-5 w-5 text-gray-500" />
+          <DollarSign className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           <h3 className="font-semibold text-gray-900 dark:text-white">Totals</h3>
         </div>
 

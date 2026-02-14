@@ -25,36 +25,36 @@ export function ProjectScheduleCard({ project }: ProjectScheduleCardProps) {
   const endDate = toDate(project.endDate);
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Schedule & Resources</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Schedule & Resources</h2>
       
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-gray-600 dark:text-gray-400">
             <Calendar className="h-4 w-4 mr-2" />
             <span className="text-sm">Start Date</span>
           </div>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {startDate ? startDate.toISOString().split('T')[0] : 'Not set'}
           </span>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-gray-600 dark:text-gray-400">
             <Calendar className="h-4 w-4 mr-2" />
             <span className="text-sm">End Date</span>
           </div>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {endDate ? endDate.toISOString().split('T')[0] : 'Not set'}
           </span>
         </div>
         
         <div className="flex items-center justify-between">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-gray-600 dark:text-gray-400">
             <Clock className="h-4 w-4 mr-2" />
             <span className="text-sm">Duration</span>
           </div>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {startDate && endDate
               ? `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`
               : 'Not set'}
@@ -62,22 +62,22 @@ export function ProjectScheduleCard({ project }: ProjectScheduleCardProps) {
         </div>
         
         <div className="flex items-center justify-between">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-gray-600 dark:text-gray-400">
             <DollarSign className="h-4 w-4 mr-2" />
             <span className="text-sm">Budget</span>
           </div>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {project.budget ? `R ${project.budget.toLocaleString()}` : 'Not set'}
           </span>
         </div>
         
         {project.projectManager && (
           <div className="flex items-center justify-between">
-            <div className="flex items-center text-gray-600">
+            <div className="flex items-center text-gray-600 dark:text-gray-400">
               <Users className="h-4 w-4 mr-2" />
               <span className="text-sm">Project Manager</span>
             </div>
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {project.projectManager}
             </span>
           </div>

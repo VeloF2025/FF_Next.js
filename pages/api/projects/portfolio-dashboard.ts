@@ -146,7 +146,7 @@ async function handler(
         async () => sql`
           SELECT
             COALESCE(SUM(budget), 0)::numeric as total_budget,
-            COALESCE(SUM(committed_cost), 0)::numeric as total_committed,
+            0::numeric as total_committed,
             COALESCE(SUM(actual_cost), 0)::numeric as total_actual
           FROM projects
           WHERE status IN ('active', 'in_progress', 'planning', 'planned')

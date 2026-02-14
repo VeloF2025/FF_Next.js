@@ -75,20 +75,20 @@ const EnhancedStatCardComponent = ({
       case 'down':
         return <TrendingDown className="w-4 h-4 text-red-500" />;
       case 'stable':
-        return <Minus className="w-4 h-4 text-gray-500" />;
+        return <Minus className="w-4 h-4 text-gray-500 dark:text-gray-400" />;
       default:
         return null;
     }
   };
 
   const getTrendTextColor = () => {
-    if (!trend) return 'text-gray-500';
+    if (!trend) return 'text-gray-500 dark:text-gray-400';
     
     switch (trend.direction) {
       case 'up': return 'text-green-600';
       case 'down': return 'text-red-600';
-      case 'stable': return 'text-gray-600';
-      default: return 'text-gray-600';
+      case 'stable': return 'text-gray-600 dark:text-gray-400';
+      default: return 'text-gray-600 dark:text-gray-400';
     }
   };
 

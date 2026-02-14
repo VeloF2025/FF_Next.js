@@ -191,7 +191,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
   };
 
   const getBucketColor = (bucket: string | undefined | null) => {
-    if (!bucket) return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+    if (!bucket) return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     if (bucket.includes('Less than 20')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
     if (bucket.includes('20') || bucket.includes('40')) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
     return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
@@ -257,7 +257,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
           <p className="text-gray-600 dark:text-gray-400">
             Drag and drop <strong>network audit</strong> Excel file here, or click to browse
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
             File should contain &quot;Offline Data&quot; sheet
           </p>
         </div>
@@ -271,7 +271,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
               <FileSpreadsheet className="w-8 h-8 text-orange-600" />
               <div>
                 <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                <p className="text-sm text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
               </div>
             </div>
             <button onClick={() => resetForm()} className="text-sm text-red-600 hover:text-red-700">
@@ -337,7 +337,7 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
               <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
                 {(previewData.reasonSummary['Dying Gasp'] || 0).toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {((previewData.reasonSummary['Dying Gasp'] || 0) / previewData.totalRows * 100).toFixed(1)}%
               </p>
             </div>
@@ -490,37 +490,37 @@ export function OfflineImportTab({ onImportComplete }: OfflineImportTabProps) {
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {importResult.totalRows.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Total</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
                     {importResult.matchedDrops.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Matched Drops</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched Drops</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-blue-600">
                     {importResult.matchedOes.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Matched OES</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched OES</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-600">
                     {importResult.unmatched.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Unmatched</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Unmatched</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-red-600">
                     {importResult.serialMismatches.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Serial Mismatches</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Serial Mismatches</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-orange-600">
                     {importResult.alertsCreated.toLocaleString()}
                   </p>
-                  <p className="text-sm text-gray-500">Alerts Created</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Alerts Created</p>
                 </div>
               </div>
 

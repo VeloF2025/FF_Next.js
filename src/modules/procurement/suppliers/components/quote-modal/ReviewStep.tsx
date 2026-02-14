@@ -10,28 +10,28 @@ interface ReviewStepProps {
 export const ReviewStep: React.FC<ReviewStepProps> = ({ formData }) => {
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold text-gray-900">Review & Submit</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Review & Submit</h3>
 
       {/* Quote Summary */}
       <GlassCard>
-        <h4 className="font-semibold text-gray-900 mb-4">Quote Summary</h4>
+        <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Quote Summary</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-600">Total Amount:</span>
+            <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
             <p className="font-semibold text-lg">R{(formData.totalAmount || 0).toLocaleString()}</p>
           </div>
           <div>
-            <span className="text-gray-600">Valid Until:</span>
+            <span className="text-gray-600 dark:text-gray-400">Valid Until:</span>
             <p className="font-medium">
               {formData.validityPeriod} days from submission
             </p>
           </div>
           <div>
-            <span className="text-gray-600">Payment Terms:</span>
+            <span className="text-gray-600 dark:text-gray-400">Payment Terms:</span>
             <p className="font-medium">{formData.paymentTerms}</p>
           </div>
           <div>
-            <span className="text-gray-600">Delivery:</span>
+            <span className="text-gray-600 dark:text-gray-400">Delivery:</span>
             <p className="font-medium">{formData.estimatedDeliveryDate}</p>
           </div>
         </div>
@@ -39,13 +39,13 @@ export const ReviewStep: React.FC<ReviewStepProps> = ({ formData }) => {
 
       {/* Line Items Summary */}
       <GlassCard>
-        <h4 className="font-semibold text-gray-900 mb-4">Line Items ({(formData.lineItems || []).length})</h4>
+        <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Line Items ({(formData.lineItems || []).length})</h4>
         <div className="space-y-3">
           {(formData.lineItems || []).map((item, index) => (
             <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
               <div>
                 <p className="font-medium">{item.itemName} ({item.itemCode})</p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {item.quantity} {item.unit} @ R{item.unitPrice.toLocaleString()} each
                 </p>
               </div>

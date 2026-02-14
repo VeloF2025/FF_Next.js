@@ -24,7 +24,7 @@ const velocityButtonVariants = cva(
     variants: {
       variant: {
         // Glass morphism variants (enhanced)
-        glass: 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-md border border-white/20 hover:border-white/30 hover:shadow-lg hover:scale-105 active:scale-95',
+        glass: 'bg-white dark:bg-gray-800/10 text-white hover:bg-white dark:bg-gray-800/20 backdrop-blur-md border border-white/20 hover:border-white/30 hover:shadow-lg hover:scale-105 active:scale-95',
         'glass-primary': 'bg-blue-500/20 text-blue-100 hover:bg-blue-500/30 backdrop-blur-md border border-blue-400/30 hover:border-blue-400/50 hover:shadow-[0_8px_32px_rgba(0,102,255,0.4)] hover:scale-105 active:scale-95',
         'glass-success': 'bg-green-500/20 text-green-100 hover:bg-green-500/30 backdrop-blur-md border border-green-400/30 hover:border-green-400/50 hover:shadow-[0_8px_32px_rgba(34,197,94,0.3)] hover:scale-105 active:scale-95',
         'glass-warning': 'bg-yellow-500/20 text-yellow-100 hover:bg-yellow-500/30 backdrop-blur-md border border-yellow-400/30 hover:border-yellow-400/50 hover:shadow-[0_8px_32px_rgba(245,158,11,0.3)] hover:scale-105 active:scale-95',
@@ -64,7 +64,7 @@ const velocityButtonVariants = cva(
         'solid-destructive': 'bg-red-600 text-white hover:bg-red-700 border-0 hover:shadow-lg hover:scale-105 active:scale-95',
         
         outline: 'bg-transparent text-blue-400 border border-blue-400/50 hover:bg-blue-400/10 hover:border-blue-400 hover:scale-105 active:scale-95',
-        ghost: 'bg-transparent text-white hover:bg-white/10 hover:scale-105 active:scale-95',
+        ghost: 'bg-transparent text-white hover:bg-white dark:bg-gray-800/10 hover:scale-105 active:scale-95',
       },
       size: {
         xs: 'h-7 px-2 text-xs',
@@ -186,7 +186,7 @@ const VelocityButton = React.forwardRef<HTMLButtonElement, VelocityButtonProps>(
       <>
         {/* Ripple effect overlay */}
         {ripple && isClicked && (
-          <div className="absolute inset-0 bg-white/20 animate-ping pointer-events-none" />
+          <div className="absolute inset-0 bg-white dark:bg-gray-800/20 animate-ping pointer-events-none" />
         )}
         
         {/* Loading spinner with neon effect */}

@@ -274,7 +274,7 @@ export function ReportsTab() {
               }
               className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
-            <span className="text-gray-500">to</span>
+            <span className="text-gray-500 dark:text-gray-400">to</span>
             <input
               type="date"
               value={filters.dateTo}
@@ -555,7 +555,7 @@ function SerialValidationContent({
             type="checkbox"
             checked={showMismatchesOnly}
             onChange={(e) => setShowMismatchesOnly(e.target.checked)}
-            className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+            className="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">
             Show mismatches only ({data.mismatches_only.length})

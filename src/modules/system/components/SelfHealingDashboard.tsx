@@ -145,13 +145,13 @@ export default function SelfHealingDashboard() {
               <Shield className="w-5 h-5 text-yellow-400" />
               <h3 className="text-lg font-medium text-white">Pending Approvals</h3>
             </div>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {data.pendingApprovals.length} pending
             </span>
           </div>
 
           {data.pendingApprovals.length === 0 ? (
-            <p className="text-gray-500 text-sm py-4 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-sm py-4 text-center">
               No pending approvals
             </p>
           ) : (
@@ -180,13 +180,13 @@ export default function SelfHealingDashboard() {
               <Lightbulb className="w-5 h-5 text-purple-400" />
               <h3 className="text-lg font-medium text-white">AI Suggestions</h3>
             </div>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
               {data.suggestions.length} pending
             </span>
           </div>
 
           {data.suggestions.length === 0 ? (
-            <p className="text-gray-500 text-sm py-4 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-sm py-4 text-center">
               No suggestions at this time
             </p>
           ) : (
@@ -306,21 +306,21 @@ function DaemonControlPanel({
       {isRunning && (
         <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-700">
           <div>
-            <span className="text-sm text-gray-500">Interval</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Interval</span>
             <p className="text-white">{(daemon.intervalMs / 1000).toFixed(0)}s</p>
           </div>
           <div>
-            <span className="text-sm text-gray-500">Cycles</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Cycles</span>
             <p className="text-white">{daemon.cycleCount}</p>
           </div>
           <div>
-            <span className="text-sm text-gray-500">Errors</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Errors</span>
             <p className={daemon.errorCount > 0 ? 'text-red-400' : 'text-white'}>
               {daemon.errorCount}
             </p>
           </div>
           <div>
-            <span className="text-sm text-gray-500">Started</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">Started</span>
             <p className="text-white">
               {daemon.startedAt ? formatRelativeTime(new Date(daemon.startedAt)) : 'N/A'}
             </p>
@@ -367,8 +367,8 @@ function ApprovalCard({
           <span className="text-white">{item.actionName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-500" />
-          <span className="text-sm text-gray-500">
+          <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             {formatRelativeTime(new Date(item.requestedAt))}
           </span>
           {isExpanded ? (
@@ -382,12 +382,12 @@ function ApprovalCard({
       {isExpanded && (
         <div className="px-3 pb-3 space-y-3">
           <div className="text-sm">
-            <span className="text-gray-500">Service: </span>
+            <span className="text-gray-500 dark:text-gray-400">Service: </span>
             <span className="text-gray-300">{item.serviceName}</span>
           </div>
           {item.reason && (
             <div className="text-sm">
-              <span className="text-gray-500">Reason: </span>
+              <span className="text-gray-500 dark:text-gray-400">Reason: </span>
               <span className="text-gray-300">{item.reason}</span>
             </div>
           )}
@@ -428,7 +428,7 @@ function SuggestionCard({ suggestion }: { suggestion: ClassificationSuggestion }
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-300">{suggestion.serviceName}</p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Suggest: {suggestion.currentRiskLevel} → {suggestion.suggestedRiskLevel}
           </p>
         </div>
@@ -545,7 +545,7 @@ function RecoveryHistory() {
   if (history.length === 0) {
     return (
       <div className="bg-gray-800 rounded-lg p-4 text-center">
-        <p className="text-gray-500 text-sm">No recovery actions in history</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">No recovery actions in history</p>
       </div>
     );
   }
@@ -567,10 +567,10 @@ function RecoveryHistory() {
             <tr key={item.id} className="border-t border-gray-700">
               <td className="px-4 py-2 text-gray-300">{item.actionName}</td>
               <td className="px-4 py-2 text-gray-300">{item.serviceName}</td>
-              <td className="px-4 py-2 text-gray-500">
+              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
                 {formatRelativeTime(new Date(item.executedAt))}
               </td>
-              <td className="px-4 py-2 text-gray-500">{item.duration}ms</td>
+              <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{item.duration}ms</td>
               <td className="px-4 py-2">
                 {item.success ? (
                   <CheckCircle className="w-4 h-4 text-green-400" />

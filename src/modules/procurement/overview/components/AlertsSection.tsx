@@ -9,8 +9,8 @@ interface AlertsSectionProps {
 
 export function AlertsSection({ onNavigate }: AlertsSectionProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Alerts & Notifications</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Alerts & Notifications</h2>
       <div className="space-y-3">
         <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
           <XCircle className="h-5 w-5 text-red-600 mt-0.5" />

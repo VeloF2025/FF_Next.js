@@ -60,7 +60,7 @@ export function StaffList() {
       case StaffStatus.SUSPENDED:
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
     }
   };
 
@@ -197,10 +197,10 @@ export function StaffList() {
 
       {/* Custom Filters */}
       {showFilters && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
               <select
                 value={filter.department?.[0] || ''}
                 onChange={(e) => {
@@ -212,7 +212,7 @@ export function StaffList() {
                   }
                   setFilter(newFilter);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
               >
                 <option value="">All Departments</option>
                 {Object.values(Department).map(dept => (
@@ -224,7 +224,7 @@ export function StaffList() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Level</label>
               <select
                 value={filter.level?.[0] || ''}
                 onChange={(e) => {
@@ -236,7 +236,7 @@ export function StaffList() {
                   }
                   setFilter(newFilter);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
               >
                 <option value="">All Levels</option>
                 {Object.values(StaffLevel).map(level => (
@@ -248,7 +248,7 @@ export function StaffList() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
               <select
                 value={filter.status?.[0] || ''}
                 onChange={(e) => {
@@ -260,7 +260,7 @@ export function StaffList() {
                   }
                   setFilter(newFilter);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
               >
                 <option value="">All Statuses</option>
                 {Object.values(StaffStatus).map(status => (

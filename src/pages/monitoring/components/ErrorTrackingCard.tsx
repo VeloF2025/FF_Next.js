@@ -32,14 +32,14 @@ export function ErrorTrackingCard({ errors }: ErrorTrackingCardProps) {
               />
             </svg>
             <p className="font-semibold">No Errors Detected</p>
-            <p className="text-sm text-gray-600 mt-1">System is running smoothly</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">System is running smoothly</p>
           </div>
         ) : (
           <div className="space-y-3">
             {errors.slice(0, 5).map((error, index) => (
               <div
                 key={index}
-                className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50"
+                className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50 dark:bg-gray-900"
               >
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
@@ -52,17 +52,17 @@ export function ErrorTrackingCard({ errors }: ErrorTrackingCardProps) {
                     >
                       {error.severity}
                     </span>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
                       {new Date(error.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm font-medium text-gray-900">
+                  <p className="mt-1 text-sm font-medium text-gray-900 dark:text-gray-100">
                     {error.message}
                   </p>
                 </div>
                 <div className="ml-4 text-right">
-                  <div className="text-lg font-bold text-gray-900">{error.count}</div>
-                  <div className="text-xs text-gray-500">occurrences</div>
+                  <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{error.count}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">occurrences</div>
                 </div>
               </div>
             ))}

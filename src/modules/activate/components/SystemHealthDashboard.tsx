@@ -228,7 +228,7 @@ export function SystemHealthDashboard({
                       s.status === 'healthy' ? 'text-green-600 dark:text-green-400' :
                       s.status === 'degraded' ? 'text-yellow-600 dark:text-yellow-400' :
                       s.status === 'down' ? 'text-red-600 dark:text-red-400' :
-                      'text-gray-500'
+                      'text-gray-500 dark:text-gray-400'
                     }`}>
                       {s.message}
                     </span>
@@ -288,7 +288,7 @@ export function SystemHealthDashboard({
                 ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-900/10'
                 : service.status === 'down'
                 ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10'
-                : 'border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50'
+                : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800/50'
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
@@ -301,7 +301,7 @@ export function SystemHealthDashboard({
             <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
               {service.message}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-1">
               {service.latencyMs}ms
             </p>
           </div>

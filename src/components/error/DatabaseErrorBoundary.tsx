@@ -86,9 +86,9 @@ export class DatabaseErrorBoundary extends Component<
       // Special handling for database errors
       if (this.state.isDatabaseError) {
         return (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
             <div className="max-w-lg w-full">
-              <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
                 {/* Error Icon */}
                 <div className="w-16 h-16 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
                   <svg 
@@ -107,12 +107,12 @@ export class DatabaseErrorBoundary extends Component<
                 </div>
 
                 {/* Title */}
-                <h1 className="text-2xl font-semibold text-gray-900 mb-3">
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
                   Database Connection Issue
                 </h1>
 
                 {/* Description */}
-                <p className="text-gray-600 mb-8 leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
                   We're experiencing connectivity issues with the database. This may be temporary due to network conditions or server maintenance.
                 </p>
 
@@ -127,7 +127,7 @@ export class DatabaseErrorBoundary extends Component<
                   
                   <button 
                     onClick={this.handleReload}
-                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+                    className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
                   >
                     Reload Application
                   </button>
@@ -135,15 +135,15 @@ export class DatabaseErrorBoundary extends Component<
 
                 {/* Technical Details (Expandable) */}
                 <details className="mt-6 text-left">
-                  <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 focus:outline-none">
+                  <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:text-gray-300 focus:outline-none">
                     Technical Details
                   </summary>
-                  <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                    <div className="text-xs font-mono text-gray-700 break-all">
+                  <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
                       <div className="mb-2">
                         <strong>Error:</strong> {this.state.error?.message}
                       </div>
-                      <div className="text-gray-500">
+                      <div className="text-gray-500 dark:text-gray-400">
                         <strong>Time:</strong> {new Date().toLocaleString()}
                       </div>
                     </div>
@@ -164,20 +164,20 @@ export class DatabaseErrorBoundary extends Component<
 
       // Generic error fallback
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
           <div className="max-w-md w-full">
-            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 text-center">
               <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                 Something went wrong
               </h2>
               
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
                 An unexpected error occurred. Please try again.
               </p>
               
@@ -191,15 +191,15 @@ export class DatabaseErrorBoundary extends Component<
                 
                 <button 
                   onClick={this.handleReload}
-                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors"
+                  className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Reload Page
                 </button>
               </div>
 
               <details className="mt-4 text-left">
-                <summary className="text-xs text-gray-500 cursor-pointer">Error Details</summary>
-                <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono text-gray-700 break-all">
+                <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer">Error Details</summary>
+                <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono text-gray-700 dark:text-gray-300 break-all">
                   {this.state.error?.message}
                 </div>
               </details>

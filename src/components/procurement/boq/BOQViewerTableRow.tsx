@@ -33,7 +33,7 @@ export default function BOQViewerTableRow({
   const isEditing = !!editing;
 
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="hover:bg-gray-50 dark:bg-gray-900">
       {mode === 'edit' && (
         <td className="px-6 py-4 whitespace-nowrap text-sm">
           {isEditing ? (
@@ -55,7 +55,7 @@ export default function BOQViewerTableRow({
           ) : (
             <button
               onClick={() => onStartEdit(item)}
-              className="p-1 text-gray-500 hover:text-gray-700"
+              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
             >
               <Edit3 className="h-4 w-4" />
             </button>
@@ -64,19 +64,19 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.lineNumber && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.lineNumber}
         </td>
       )}
       
       {visibleColumns.itemCode && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {isEditing ? (
             <input
               type="text"
               value={editing!.data.itemCode || ''}
               onChange={(e) => onUpdateEdit(item.id, 'itemCode', e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm"
             />
           ) : (
             item.itemCode || '-'
@@ -85,12 +85,12 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.description && (
-        <td className="px-6 py-4 text-sm text-gray-900">
+        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
           {isEditing ? (
             <textarea
               value={editing!.data.description || ''}
               onChange={(e) => onUpdateEdit(item.id, 'description', e.target.value)}
-              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm"
               rows={2}
             />
           ) : (
@@ -102,19 +102,19 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.category && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.category || '-'}
         </td>
       )}
       
       {visibleColumns.quantity && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {isEditing ? (
             <input
               type="number"
               value={editing!.data.quantity || ''}
               onChange={(e) => onUpdateEdit(item.id, 'quantity', parseFloat(e.target.value))}
-              className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm"
             />
           ) : (
             item.quantity.toLocaleString()
@@ -123,20 +123,20 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.uom && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.uom}
         </td>
       )}
       
       {visibleColumns.unitPrice && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {isEditing ? (
             <input
               type="number"
               step="0.01"
               value={editing!.data.unitPrice || ''}
               onChange={(e) => onUpdateEdit(item.id, 'unitPrice', parseFloat(e.target.value))}
-              className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm"
             />
           ) : (
             item.unitPrice ? `R${item.unitPrice.toFixed(2)}` : '-'
@@ -145,7 +145,7 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.totalPrice && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.totalPrice ? `R${item.totalPrice.toFixed(2)}` : '-'}
         </td>
       )}
@@ -170,19 +170,19 @@ export default function BOQViewerTableRow({
       )}
       
       {visibleColumns.phase && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.phase || '-'}
         </td>
       )}
       
       {visibleColumns.task && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.task || '-'}
         </td>
       )}
       
       {visibleColumns.site && (
-        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
           {item.site || '-'}
         </td>
       )}

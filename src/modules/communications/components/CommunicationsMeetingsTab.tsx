@@ -94,7 +94,7 @@ export function CommunicationsMeetingsTab({
             {filter.count > 0 && (
               <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${
                 activeFilter === filter.key
-                  ? 'bg-white/20 text-white'
+                  ? 'bg-white dark:bg-gray-800/20 text-white'
                   : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-tertiary)]'
               }`}>
                 {filter.count}

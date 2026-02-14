@@ -173,7 +173,7 @@ function StepGroupedGallery({ photos, source, onPhotoClick }: StepGroupedGallery
                     </div>
                   </div>
                   <svg
-                    className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform ${
+                    className={`w-5 h-5 text-gray-400 dark:text-gray-500 dark:text-gray-400 transition-transform ${
                       isExpanded ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -273,7 +273,7 @@ function PhotoThumbnail({ photo, onClick }: PhotoThumbnailProps) {
           onError={() => setImageError(true)}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500 dark:text-gray-400">
           <svg
             className="w-12 h-12 mb-2"
             fill="none"
@@ -357,7 +357,7 @@ function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
               onError={() => setImageError(true)}
             />
           ) : (
-            <div className="flex items-center justify-center min-h-[400px] text-gray-500">
+            <div className="flex items-center justify-center min-h-[400px] text-gray-500 dark:text-gray-400">
               <div className="text-center">
                 <svg
                   className="w-24 h-24 mx-auto mb-4"

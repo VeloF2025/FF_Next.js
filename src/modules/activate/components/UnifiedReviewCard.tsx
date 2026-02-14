@@ -580,7 +580,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
             ONT Barcode
           </label>
-          <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+          <p className={`text-lg font-mono font-semibold ${hasOntSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
             {review.ont_serial_scanned || '— not synced'}
           </p>
         </div>
@@ -588,7 +588,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide mb-1">
             UPS Serial
           </label>
-          <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+          <p className={`text-lg font-mono font-semibold ${hasUpsSerial ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500 dark:text-gray-400'}`}>
             {review.ups_serial_scanned || '— not synced'}
           </p>
         </div>
@@ -732,7 +732,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
                                 <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
                                   <div className="text-center">
                                     <Wrench className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
                                       {photo.upload_status === 'pending' && 'Pending'}
                                       {photo.upload_status === 'uploading' && 'Uploading...'}
                                       {photo.upload_status === 'failed' && 'Failed'}

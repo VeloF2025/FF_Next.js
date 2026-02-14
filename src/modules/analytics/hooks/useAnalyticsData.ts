@@ -104,7 +104,7 @@ export function useAnalyticsData(timeRange: TimeRange) {
       case 'on-track': return 'text-green-600';
       case 'delayed': return 'text-red-600';
       case 'ahead': return 'text-blue-600';
-      default: return 'text-gray-600';
+      default: return 'text-gray-600 dark:text-gray-400';
     }
   };
 

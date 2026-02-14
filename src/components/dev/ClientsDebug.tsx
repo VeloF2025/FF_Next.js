@@ -56,18 +56,18 @@ export function ClientsDebug() {
       ) : (
         <div className="space-y-2">
           {clients.map(client => (
-            <div key={client.id} className="bg-gray-100 p-3 rounded">
+            <div key={client.id} className="bg-gray-100 dark:bg-gray-800 p-3 rounded">
               <div className="font-semibold">ID: {client.id}</div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Name: {client.name || 'No name'}
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Contact: {client.contact_person || 'No contact'}
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Email: {client.email || 'No email'}
               </div>
-              <div className="text-xs text-gray-500 mt-2">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 <pre>{JSON.stringify(client, null, 2)}</pre>
               </div>
             </div>

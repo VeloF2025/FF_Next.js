@@ -43,8 +43,8 @@ export default function StockManagementPage() {
       <div className="p-6">
         <div className="text-center py-12">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Project</h3>
-          <p className="text-gray-500">Choose a project to view and manage stock inventory.</p>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a Project</h3>
+          <p className="text-gray-500 dark:text-gray-400">Choose a project to view and manage stock inventory.</p>
         </div>
       </div>
     );
@@ -55,8 +55,8 @@ export default function StockManagementPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Stock Management</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Track inventory, manage stock movements, and control project materials
           </p>
         </div>
@@ -105,9 +105,9 @@ export default function StockManagementPage() {
       <StockStatsCards stats={stats} />
 
       {/* Main Content with Tabs */}
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="flex space-x-8 px-6">
             {[
               { key: 'inventory', label: 'Inventory' },
@@ -120,7 +120,7 @@ export default function StockManagementPage() {
                 className={`py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab.key
                     ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:border-gray-600'
                 }`}
               >
                 {tab.label}
@@ -147,7 +147,7 @@ export default function StockManagementPage() {
               />
 
               {/* Stock Items List */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="divide-y divide-gray-200">
                   {filteredItems.map((item) => (
                     <StockItemCard
@@ -165,10 +165,10 @@ export default function StockManagementPage() {
 
               {/* Empty State */}
               {filteredItems.length === 0 && (
-                <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No stock items found</h3>
-                  <p className="text-gray-500 mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No stock items found</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
                     {searchTerm || filterStatus !== 'all'
                       ? 'Try adjusting your search or filters.'
                       : 'Start by receiving stock from purchase orders.'

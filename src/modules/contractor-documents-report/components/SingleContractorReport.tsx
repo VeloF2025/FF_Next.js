@@ -37,7 +37,7 @@ export default function SingleContractorReport({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading document report...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading document report...</p>
         </div>
       </div>
     );
@@ -53,8 +53,8 @@ export default function SingleContractorReport({
 
   if (!data) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p className="text-gray-600">No report data available</p>
+      <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <p className="text-gray-600 dark:text-gray-400">No report data available</p>
       </div>
     );
   }
@@ -112,17 +112,17 @@ export default function SingleContractorReport({
           {showBackButton && (
             <Link
               href="/contractors/documents-report"
-              className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 mb-2"
+              className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 mb-2"
             >
               <ArrowLeft size={16} />
               Back to All Contractors
             </Link>
           )}
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <FileText size={28} />
             {data.contractor.name} - Document Status Report
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Last updated: {new Date(data.lastUpdated).toLocaleString('en-ZA')}
           </p>
         </div>
@@ -131,21 +131,21 @@ export default function SingleContractorReport({
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
           >
             <Download size={16} />
             <span className="hidden sm:inline">CSV</span>
           </button>
           <button
             onClick={handleExportPDF}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
           >
             <Download size={16} />
             <span className="hidden sm:inline">PDF</span>
           </button>
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
           >
             <Printer size={16} />
             <span className="hidden sm:inline">Print</span>
@@ -156,14 +156,14 @@ export default function SingleContractorReport({
       {/* Alerts Section */}
       {data.alerts.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">⚠️ Alerts</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">⚠️ Alerts</h2>
           <ExpiryAlert alerts={data.alerts} />
         </div>
       )}
 
       {/* Summary Card */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Document Completion Summary</h2>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Document Completion Summary</h2>
 
         {/* Progress Bar */}
         <div className="mb-6">
@@ -178,26 +178,26 @@ export default function SingleContractorReport({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{data.summary.verified}</div>
-            <div className="text-xs text-gray-600 mt-1">Verified</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Verified</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-yellow-600">{data.summary.pending}</div>
-            <div className="text-xs text-gray-600 mt-1">Pending</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Pending</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-gray-600">{data.summary.missing}</div>
-            <div className="text-xs text-gray-600 mt-1">Missing</div>
+            <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{data.summary.missing}</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Missing</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">{data.summary.expired}</div>
-            <div className="text-xs text-gray-600 mt-1">Expired</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Expired</div>
           </div>
         </div>
 
         {/* Additional Stats */}
-        <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
+            <span className="text-gray-600 dark:text-gray-400">
               Total Documents: <strong>{data.summary.totalDocuments}</strong>
             </span>
             {data.summary.expiring > 0 && (
@@ -215,7 +215,7 @@ export default function SingleContractorReport({
       </div>
 
       {/* Documents Table */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
         <DocumentStatusTable
           companyDocuments={data.companyDocuments}
           teamDocuments={data.teamDocuments}

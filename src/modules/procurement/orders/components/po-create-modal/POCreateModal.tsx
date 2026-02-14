@@ -58,18 +58,18 @@ export const POCreateModal: React.FC<POCreateModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-6xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Create Purchase Order</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Purchase Order</h2>
             <div className="mt-2">
               <ProgressStepper currentStep={step} totalSteps={3} />
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 p-2"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 p-2"
           >
             <X className="h-6 w-6" />
           </button>
@@ -110,7 +110,7 @@ export const POCreateModal: React.FC<POCreateModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50 dark:bg-gray-900">
           <div>
             {step > 1 && (
               <VelocityButton

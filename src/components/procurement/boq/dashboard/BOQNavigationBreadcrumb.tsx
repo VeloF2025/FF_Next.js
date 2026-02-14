@@ -34,7 +34,7 @@ export default function BOQNavigationBreadcrumb({
   }
 
   return (
-    <div className="flex items-center justify-between bg-white px-4 py-2 rounded-lg shadow-sm">
+    <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm">
       <nav className="flex items-center space-x-2">
         {breadcrumbItems.map((item, index) => (
           <div key={item.view} className="flex items-center">
@@ -44,7 +44,7 @@ export default function BOQNavigationBreadcrumb({
               className={`text-sm font-medium ${
                 item.view === currentView
                   ? 'text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
               }`}
             >
               {item.label}
@@ -56,7 +56,7 @@ export default function BOQNavigationBreadcrumb({
       {onRefresh && currentView === 'overview' && (
         <button
           onClick={onRefresh}
-          className="p-1 text-gray-400 hover:text-gray-600"
+          className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-400"
           title="Refresh dashboard"
         >
           <RefreshCw className="h-4 w-4" />

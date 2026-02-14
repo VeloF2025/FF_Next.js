@@ -59,17 +59,17 @@ export function DailyProgressDashboard() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Daily Progress Tracking</h1>
-        <p className="text-gray-600 mt-1">Monitor and report daily KPIs and project progress</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Daily Progress Tracking</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Monitor and report daily KPIs and project progress</p>
       </div>
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {kpiSummary.map((kpi) => (
-          <div key={kpi.label} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p className="text-sm text-gray-600 mb-1">{kpi.label}</p>
+          <div key={kpi.label} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{kpi.label}</p>
             <div className="flex items-end justify-between">
-              <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{kpi.value}</p>
               <span className={`text-sm ${kpi.positive ? 'text-green-600' : 'text-red-600'}`}>
                 {kpi.change}
               </span>
@@ -84,17 +84,17 @@ export function DailyProgressDashboard() {
           <div
             key={card.title}
             onClick={card.onClick}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start space-x-4">
               <div className={`${card.color} p-3 rounded-lg`}>
                 <card.icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
                   {card.title}
                 </h3>
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{card.description}</p>
               </div>
             </div>
           </div>
@@ -103,10 +103,10 @@ export function DailyProgressDashboard() {
 
       {/* Recent Entries */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Progress Entries</h2>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Progress Entries</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="p-6">
-            <p className="text-gray-500 text-center">No progress entries found</p>
+            <p className="text-gray-500 dark:text-gray-400 text-center">No progress entries found</p>
           </div>
         </div>
       </div>

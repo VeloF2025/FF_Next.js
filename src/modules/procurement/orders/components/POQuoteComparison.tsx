@@ -43,8 +43,8 @@ export const POQuoteComparison: React.FC<POQuoteComparisonProps> = ({
 }) => {
   if (!quoteComparison || !quoteComparison.rfqId) {
     return (
-      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="flex items-center gap-2 text-gray-500">
+      <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
           <AlertCircle className="h-4 w-4" />
           <span className="text-sm">No RFQ linked to this purchase order</span>
         </div>
@@ -79,7 +79,7 @@ export const POQuoteComparison: React.FC<POQuoteComparisonProps> = ({
     : 0;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
         <div className="flex items-center justify-between">
@@ -166,30 +166,30 @@ export const POQuoteComparison: React.FC<POQuoteComparisonProps> = ({
       {/* Other Quotes Comparison */}
       {otherQuotes.length > 0 && (
         <div className="p-4">
-          <p className="text-sm font-medium text-gray-700 mb-3">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             Other Quotes Received ({otherQuotes.length})
           </p>
           <div className="space-y-2">
             {otherQuotes.map((quote) => (
               <div
                 key={quote.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {quote.supplierName}
                   </p>
-                  <p className="text-xs text-gray-500">{quote.quoteNumber}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{quote.quoteNumber}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {formatCurrency(quote.totalAmount)}
                   </p>
                   {selectedQuote && (
                     <p className={`text-xs ${
                       quote.totalAmount < selectedQuote.totalAmount
                         ? 'text-green-600'
-                        : 'text-gray-500'
+                        : 'text-gray-500 dark:text-gray-400'
                     }`}>
                       {quote.totalAmount < selectedQuote.totalAmount
                         ? `${formatCurrency(selectedQuote.totalAmount - quote.totalAmount)} cheaper`
@@ -206,12 +206,12 @@ export const POQuoteComparison: React.FC<POQuoteComparisonProps> = ({
       )}
 
       {/* Summary Footer */}
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">
+          <span className="text-gray-600 dark:text-gray-400">
             {quoteComparison.allQuotes.length} quote{quoteComparison.allQuotes.length !== 1 ? 's' : ''} received
           </span>
-          <span className="text-gray-600">
+          <span className="text-gray-600 dark:text-gray-400">
             Range: {formatCurrency(lowestQuoteAmount)} - {formatCurrency(Math.max(...quoteComparison.allQuotes.map(q => q.totalAmount)))}
           </span>
         </div>

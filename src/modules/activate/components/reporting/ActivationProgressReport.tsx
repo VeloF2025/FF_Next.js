@@ -377,7 +377,7 @@ function SummaryCard({ label, value, subtext, color, isPercent, percent }: Summa
           />
         </div>
       )}
-      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{subtext}</p>
+      <p className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-1">{subtext}</p>
     </div>
   );
 }
@@ -433,12 +433,12 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
       >
         <div className="flex items-center gap-3">
           {isExpanded ? (
-            <ChevronDown className="h-5 w-5 text-gray-500" />
+            <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           ) : (
-            <ChevronRight className="h-5 w-5 text-gray-500" />
+            <ChevronRight className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           )}
           <span className="font-semibold text-gray-900 dark:text-white">{project.project_name}</span>
-          <span className="text-sm text-gray-500">({project.zones.length} zones)</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">({project.zones.length} zones)</span>
         </div>
         <div className="flex items-center gap-6">
           <ProgressStats
@@ -472,7 +472,7 @@ function ProjectCard({ project, isExpanded, expandedZones, onToggle, onToggleZon
                     <span className="font-medium text-gray-700 dark:text-gray-300">
                       Zone {zone.zone_no || 'N/A'}
                     </span>
-                    <span className="text-xs text-gray-500">({zone.pons.length} PONs)</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">({zone.pons.length} PONs)</span>
                   </div>
                   <ProgressStats
                     total={zone.total_scope}

@@ -373,7 +373,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
         </CardHeader>
         <CardContent>
           {insights.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No significant trends detected</p>
               <p className="text-sm">Data appears stable with minor variations</p>
@@ -390,7 +390,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                     case 'seasonal':
                       return <Calendar className="w-5 h-5 text-blue-600" />;
                     default:
-                      return <Activity className="w-5 h-5 text-gray-600" />;
+                      return <Activity className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
                   }
                 };
 
@@ -403,7 +403,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
                     case 'seasonal':
                       return 'text-blue-700 bg-blue-100 dark:bg-blue-900/20';
                     default:
-                      return 'text-gray-700 bg-gray-100 dark:bg-gray-900/20';
+                      return 'text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-900/20';
                   }
                 };
 
@@ -458,7 +458,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-blue-600">
               {Math.round(trendData[trendData.length - 1]?.completionRate || 0)}%
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Next {forecastPeriod === 'week' ? 'month' : forecastPeriod === 'month' ? 'quarter' : 'quarter'}
             </p>
           </CardContent>
@@ -473,7 +473,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-green-600">
               {Math.round(trendData[trendData.length - 1]?.avgDuration || 0)} days
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Expected average
             </p>
           </CardContent>
@@ -488,7 +488,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
             <p className="text-2xl font-bold text-purple-600">
               {Math.round(trendData[trendData.length - 1]?.projectCount || 0)}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Expected volume
             </p>
           </CardContent>

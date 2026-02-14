@@ -29,14 +29,14 @@ export function FieldSection({
   }[columns];
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 p-6 ${className}`}>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
           {icon && <span className="mr-2">{icon}</span>}
           {title}
         </h3>
         {description && (
-          <p className="mt-1 text-sm text-gray-600">{description}</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</p>
         )}
       </div>
       

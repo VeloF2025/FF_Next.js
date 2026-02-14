@@ -2,32 +2,32 @@ export function HomePage(): JSX.Element {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
           Welcome to FibreFlow React
         </h1>
-        <p className="text-lg text-gray-600">
+        <p className="text-lg text-gray-600 dark:text-gray-400">
           This is the React migration of the FibreFlow application. 
           The migration is in progress.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-3 text-blue-600">Migration Status</h2>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Project structure created. Ready for component migration from Angular version.
           </p>
           <div className="mt-4">
-            <div className="bg-gray-200 rounded-full h-2">
+            <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div className="bg-blue-600 h-2 rounded-full w-1/4"></div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">25% Complete</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">25% Complete</p>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-3 text-green-600">Next Steps</h2>
-          <ul className="text-gray-600 space-y-2">
+          <ul className="text-gray-600 dark:text-gray-400 space-y-2">
             <li>• Analyze Angular components</li>
             <li>• Migrate core components</li>
             <li>• Set up state management</li>
@@ -35,9 +35,9 @@ export function HomePage(): JSX.Element {
           </ul>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold mb-3 text-purple-600">Tech Stack</h2>
-          <ul className="text-gray-600 space-y-2">
+          <ul className="text-gray-600 dark:text-gray-400 space-y-2">
             <li>• React 18 + TypeScript</li>
             <li>• Vite build tool</li>
             <li>• React Query for data</li>

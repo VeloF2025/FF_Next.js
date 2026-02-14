@@ -57,7 +57,7 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
       {evaluation ? (
         <div className="space-y-4">
           {/* Overall Status */}
-          <div className="flex items-center justify-between p-4 rounded-lg border-2 border-white/20 bg-white/5" role="region" aria-label="Evaluation summary">
+          <div className="flex items-center justify-between p-4 rounded-lg border-2 border-white/20 bg-white dark:bg-gray-800/5" role="region" aria-label="Evaluation summary">
             <div>
               <p className="text-sm text-[var(--ff-text-tertiary)]" id="status-label">Overall Status</p>
               <div className="flex items-center gap-2 mt-1">
@@ -84,11 +84,11 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
 
           {/* Step Counts */}
           <div className="grid grid-cols-2 gap-4" role="region" aria-label="Step results">
-            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+            <div className="bg-white dark:bg-gray-800/5 rounded-lg p-4 border border-white/10">
               <p className="text-sm text-[var(--ff-text-tertiary)]" id="steps-passed-label">Steps Passed</p>
               <p className="text-2xl font-bold text-green-400" aria-labelledby="steps-passed-label">{evaluation.passed_steps}</p>
             </div>
-            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+            <div className="bg-white dark:bg-gray-800/5 rounded-lg p-4 border border-white/10">
               <p className="text-sm text-[var(--ff-text-tertiary)]" id="steps-failed-label">Steps Failed</p>
               <p className="text-2xl font-bold text-red-400" aria-labelledby="steps-failed-label">
                 {evaluation.total_steps - evaluation.passed_steps}
@@ -105,7 +105,7 @@ export function AIEvaluationCard({ dr_number, evaluation, isEvaluating, onEvalua
               </span>
             </div>
             <div
-              className="w-full bg-white/10 rounded-full h-3 border border-white/20"
+              className="w-full bg-white dark:bg-gray-800/10 rounded-full h-3 border border-white/20"
               role="progressbar"
               aria-valuenow={(evaluation.passed_steps / evaluation.total_steps) * 100}
               aria-valuemin={0}

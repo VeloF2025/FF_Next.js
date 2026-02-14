@@ -69,10 +69,10 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
-          <div className="h-32 bg-gray-200 rounded-lg mb-6"></div>
+          <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-6"></div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-64 bg-gray-200 rounded-lg"></div>
-            <div className="h-64 bg-gray-200 rounded-lg"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
           </div>
         </div>
       </div>
@@ -83,7 +83,7 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
     return (
       <div className="text-center py-12">
         <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-500">No supplier performance data available</p>
+        <p className="text-gray-500 dark:text-gray-400">No supplier performance data available</p>
       </div>
     );
   }
@@ -96,8 +96,8 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Suppliers</p>
-                <p className="text-3xl font-bold text-gray-900">{data.totalSuppliers}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Suppliers</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.totalSuppliers}</p>
               </div>
               <div className="p-3 bg-blue-50 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600" />
@@ -110,9 +110,9 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Suppliers</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Suppliers</p>
                 <p className="text-3xl font-bold text-green-600">{data.activeSuppliers}</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {formatPercentage((data.activeSuppliers / data.totalSuppliers) * 100)}
                 </p>
               </div>
@@ -127,7 +127,7 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Average Rating</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Rating</p>
                 <p className="text-3xl font-bold text-yellow-600">{data.averageRating.toFixed(1)}</p>
                 <div className="flex items-center mt-1">
                   {[...Array(5)].map((_, i) => (
@@ -153,11 +153,11 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Top Performers</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Top Performers</p>
                 <p className="text-3xl font-bold text-purple-600">
                   {data.topPerformers.filter(s => s.rating >= 4.5).length}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">4.5+ Rating</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">4.5+ Rating</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg">
                 <Award className="w-6 h-6 text-purple-600" />
@@ -226,35 +226,35 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
         <CardContent>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Supplier
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Rating
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Total Spend
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Performance
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     On-Time Delivery
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
                 {data.topPerformers.slice(0, 10).map((supplier) => (
-                  <tr key={supplier.supplierId} className="hover:bg-gray-50">
+                  <tr key={supplier.supplierId} className="hover:bg-gray-50 dark:bg-gray-900">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                             {supplier.name}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
                             ID: {supplier.supplierId}
                           </div>
                         </div>
@@ -274,10 +274,10 @@ export function SupplierPerformanceReport({ data, loading }: SupplierPerformance
                             />
                           ))}
                         </div>
-                        <span className="text-sm text-gray-900">{supplier.rating.toFixed(1)}</span>
+                        <span className="text-sm text-gray-900 dark:text-gray-100">{supplier.rating.toFixed(1)}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {formatCurrency(supplier.totalSpend)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

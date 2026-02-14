@@ -329,7 +329,7 @@ export function AICategorizationTab({
         <p className="text-gray-600 dark:text-gray-400 mb-2">
           Run AI categorization to have the VLM identify and classify {photoCount} photos.
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+        <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mb-6">
           This will analyze each photo and predict which installation step it belongs to.
         </p>
         {error && <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>}

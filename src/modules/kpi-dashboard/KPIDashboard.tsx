@@ -103,22 +103,22 @@ export function KPIDashboard() {
 
       {/* Legacy KPI Cards for comparison */}
       <div className="mb-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Legacy KPI View</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Legacy KPI View</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {legacyKpiCards.map((kpi) => (
-            <div key={kpi.title} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div key={kpi.title} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className={`${kpi.color} p-3 rounded-lg`}>
                   <kpi.icon className="w-6 h-6 text-white" />
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-gray-900">{kpi.value}</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{kpi.value}</p>
                   <span className={`text-sm ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
                     {kpi.change} vs last month
                   </span>
                 </div>
               </div>
-              <h3 className="text-sm font-medium text-gray-600">{kpi.title}</h3>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">{kpi.title}</h3>
             </div>
           ))}
         </div>
@@ -126,25 +126,25 @@ export function KPIDashboard() {
 
       {/* Chart Placeholder */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Trend</h2>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-            <p className="text-gray-500">Chart visualization coming soon</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Performance Trend</h2>
+          <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded">
+            <p className="text-gray-500 dark:text-gray-400">Chart visualization coming soon</p>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Team Comparison</h2>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-            <p className="text-gray-500">Chart visualization coming soon</p>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Team Comparison</h2>
+          <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded">
+            <p className="text-gray-500 dark:text-gray-400">Chart visualization coming soon</p>
           </div>
         </div>
       </div>
 
       {/* Recent Performance */}
-      <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Performance Updates</h2>
+      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Performance Updates</h2>
         <div className="space-y-4">
-          <p className="text-gray-500 text-center">No recent updates</p>
+          <p className="text-gray-500 dark:text-gray-400 text-center">No recent updates</p>
         </div>
       </div>
     </div>

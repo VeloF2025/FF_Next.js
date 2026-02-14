@@ -113,7 +113,7 @@ export function StatCard({
           <p className="text-2xl font-semibold text-white truncate">{displayValue}</p>
         )}
         {subtitle && (
-          <p className="text-xs text-gray-500 mt-1 truncate">{subtitle}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{subtitle}</p>
         )}
         {trend && (
           <div className="flex items-center mt-2">
@@ -123,7 +123,7 @@ export function StatCard({
               {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}{trend.label || '%'}
             </span>
             {!trend.label && (
-              <span className="text-xs text-gray-500 ml-2">vs last period</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">vs last period</span>
             )}
           </div>
         )}

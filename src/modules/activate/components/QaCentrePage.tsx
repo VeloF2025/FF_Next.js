@@ -33,7 +33,7 @@ const BADGE_COLORS = {
   // Status badges
   installed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200',
   activated: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200',
-  pending: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+  pending: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
   inReview: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200',
   pass: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
   fail: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
@@ -164,7 +164,7 @@ function SerialDisplay({ label, serial, status, showMissingAlert = true }: Seria
         </>
       ) : (
         <>
-          <span className="text-gray-400 dark:text-gray-500 italic">-</span>
+          <span className="text-gray-400 dark:text-gray-500 dark:text-gray-400 italic">-</span>
           {showMissingAlert && (
             <span className="text-[10px] font-semibold bg-yellow-800 text-yellow-200 px-1 py-0.5 rounded">
               {label}?
@@ -535,7 +535,7 @@ function QaCentrePageContent() {
             {/* Search Bar Row */}
             <div className="flex items-center gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-5 w-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 dark:text-gray-400 h-5 w-5" />
                 <input
                   type="text"
                   placeholder="Search drop number..."
@@ -746,7 +746,7 @@ function QaCentrePageContent() {
           ) : filteredDrops.length === 0 ? (
             <div className="p-12 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 mb-4">
-                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                <Search className="h-8 w-8 text-gray-400 dark:text-gray-500 dark:text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No DRs Found</h3>
               <p className="text-gray-600 dark:text-gray-400">
@@ -802,7 +802,7 @@ function QaCentrePageContent() {
                     if (drop.qaDecision === 'FAIL') return { label: 'Fail', color: 'bg-red-600 text-white' };
                     if (drop.qaDecision === 'REWORK_NEEDED') return { label: 'Rework', color: 'bg-orange-600 text-white' };
                     if (drop.hasMaintenanceTicket) return { label: 'Maint', color: 'bg-amber-700 text-white' };
-                    return { label: '-', color: 'text-gray-500' };
+                    return { label: '-', color: 'text-gray-500 dark:text-gray-400' };
                   };
 
                   // Get serial issue indicator

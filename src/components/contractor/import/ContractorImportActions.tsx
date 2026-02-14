@@ -26,7 +26,7 @@ export function ContractorImportActions({
       
       <button
         onClick={onExportAll}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
         title="Export all existing contractors to Excel file"
       >
         <Upload className="h-4 w-4" />

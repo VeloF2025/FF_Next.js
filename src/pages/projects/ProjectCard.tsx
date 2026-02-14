@@ -67,12 +67,12 @@ export function ProjectCard({
 
         <div className="flex items-center gap-2 mb-4">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            statusColors[project.status] || 'bg-gray-100 text-gray-800'
+            statusColors[project.status] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
           }`}>
             {project.status ? project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ') : 'Unknown'}
           </span>
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            priorityColors[project.priority] || 'bg-gray-100 text-gray-800'
+            priorityColors[project.priority] || 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
           }`}>
             {project.priority ? project.priority.charAt(0).toUpperCase() + project.priority.slice(1) : 'Normal'}
           </span>

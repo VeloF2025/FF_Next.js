@@ -285,23 +285,23 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Phases:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Phases:</span>
                           <span className="font-medium">{comparison.comparison.phaseCount.template1}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Avg Steps/Phase:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Steps/Phase:</span>
                           <span className="font-medium">{comparison.comparison.avgStepsPerPhase.template1.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Avg Tasks/Step:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Tasks/Step:</span>
                           <span className="font-medium">{comparison.comparison.avgTasksPerStep.template1.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Est. Duration:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Est. Duration:</span>
                           <span className="font-medium">{comparison.comparison.estimatedDuration.template1} days</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Complexity:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Complexity:</span>
                           <Badge variant="outline">{comparison.comparison.complexity.template1}</Badge>
                         </div>
                       </CardContent>
@@ -314,23 +314,23 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Phases:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Phases:</span>
                           <span className="font-medium">{comparison.comparison.phaseCount.template2}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Avg Steps/Phase:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Steps/Phase:</span>
                           <span className="font-medium">{comparison.comparison.avgStepsPerPhase.template2.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Avg Tasks/Step:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Avg Tasks/Step:</span>
                           <span className="font-medium">{comparison.comparison.avgTasksPerStep.template2.toFixed(1)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Est. Duration:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Est. Duration:</span>
                           <span className="font-medium">{comparison.comparison.estimatedDuration.template2} days</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Complexity:</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Complexity:</span>
                           <Badge variant="outline">{comparison.comparison.complexity.template2}</Badge>
                         </div>
                       </CardContent>
@@ -348,7 +348,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent>
                         {comparison.comparison.similarities.length === 0 ? (
-                          <p className="text-sm text-gray-500">No significant similarities found</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">No significant similarities found</p>
                         ) : (
                           <ul className="space-y-2">
                             {comparison.comparison.similarities.map((similarity, index) => (
@@ -371,7 +371,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                       </CardHeader>
                       <CardContent>
                         {comparison.comparison.differences.length === 0 ? (
-                          <p className="text-sm text-gray-500">No significant differences found</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">No significant differences found</p>
                         ) : (
                           <ul className="space-y-2">
                             {comparison.comparison.differences.map((difference, index) => (
@@ -454,7 +454,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                           >
                             {phase.completionRate}%
                           </Badge>
-                          <span className="text-xs text-gray-500">{phase.avgDuration}d</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{phase.avgDuration}d</span>
                         </div>
                       </div>
                       <Progress value={phase.completionRate} className="h-2" />
@@ -550,7 +550,7 @@ export function ComparisonTools({ analytics, dateRange: _dateRange }: Comparison
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                       <div>
                         <p className="font-medium text-sm">{item.metric}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
                           Industry: {Math.round(item.industry)}{item.unit}
                         </p>
                       </div>

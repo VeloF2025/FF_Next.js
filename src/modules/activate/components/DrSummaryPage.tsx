@@ -30,7 +30,7 @@ const STATE_LABELS: Record<DRState, { label: string; color: string; icon: string
   reviewed_pass: { label: 'Reviewed, Passed', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: '✅' },
   reviewed_fail: { label: 'Reviewed, Failed', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: '❌' },
   reviewed_rework: { label: 'Reviewed, Rework', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: '🔄' },
-  not_reviewed: { label: 'Not Reviewed', color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '⏳' },
+  not_reviewed: { label: 'Not Reviewed', color: 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-200', icon: '⏳' },
 };
 
 function formatDate(dateStr: string | null): string {
@@ -508,7 +508,7 @@ function OntSwapBanner({
           ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
           : isPending
             ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
-            : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -527,26 +527,26 @@ function OntSwapBanner({
       </div>
       <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
         <div className="flex gap-2">
-          <span className="text-gray-500 w-16">New:</span>
+          <span className="text-gray-500 dark:text-gray-400 w-16">New:</span>
           <span className="font-mono font-medium text-gray-900 dark:text-white">{swap.newSerial}</span>
         </div>
         {swap.oldSerial && (
           <div className="flex gap-2">
-            <span className="text-gray-500 w-16">Old:</span>
-            <span className="font-mono line-through text-gray-500">{swap.oldSerial}</span>
+            <span className="text-gray-500 dark:text-gray-400 w-16">Old:</span>
+            <span className="font-mono line-through text-gray-500 dark:text-gray-400">{swap.oldSerial}</span>
           </div>
         )}
         <div className="flex gap-2">
-          <span className="text-gray-500 w-16">Type:</span>
+          <span className="text-gray-500 dark:text-gray-400 w-16">Type:</span>
           <span>{swap.swapType === 'pre_provision' ? 'Pre-Provision' : 'Encrypted ONT'}</span>
         </div>
         <div className="flex gap-2">
-          <span className="text-gray-500 w-16">Reported:</span>
+          <span className="text-gray-500 dark:text-gray-400 w-16">Reported:</span>
           <span>{formatDate(swap.reportedAt)}</span>
         </div>
         {swap.confirmedAt && (
           <div className="flex gap-2">
-            <span className="text-gray-500 w-16">Live:</span>
+            <span className="text-gray-500 dark:text-gray-400 w-16">Live:</span>
             <span>{formatDate(swap.confirmedAt)}</span>
           </div>
         )}
@@ -574,7 +574,7 @@ function TimelineItem({
         className={`text-sm ${
           highlight
             ? 'text-gray-900 dark:text-white font-medium'
-            : 'text-gray-500 dark:text-gray-500'
+            : 'text-gray-500 dark:text-gray-500 dark:text-gray-400'
         }`}
       >
         {date}
@@ -650,7 +650,7 @@ function SerialSourceIndicator({
                 ? verification.allAgree
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300'
                   : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
-                : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
             }
           `}
           title={`${src.label}: ${src.value || 'No data'}`}
@@ -695,7 +695,7 @@ function SerialVerificationBadge({
     },
     silver: {
       bg: 'bg-gradient-to-r from-gray-300 to-gray-400',
-      text: 'text-gray-800',
+      text: 'text-gray-800 dark:text-gray-200',
       border: 'border-gray-400',
       icon: '✓',
     },

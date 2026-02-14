@@ -231,7 +231,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
           {dailyTarget > 0 && (
             <button
               onClick={() => setDailyTarget(0)}
-              className="text-xs text-gray-500 hover:text-red-500"
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500"
             >
               Clear
             </button>
@@ -248,7 +248,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.installed}
               onChange={() => toggleSeries('installed')}
-              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
             />
             <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Installed</span>
           </label>
@@ -257,7 +257,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.activated}
               onChange={() => toggleSeries('activated')}
-              className="w-4 h-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-cyan-600 focus:ring-cyan-500"
             />
             <span className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">Activated</span>
           </label>
@@ -266,7 +266,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.reviewed}
               onChange={() => toggleSeries('reviewed')}
-              className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500"
             />
             <span className="text-sm text-green-600 dark:text-green-400 font-medium">Reviewed</span>
           </label>
@@ -275,7 +275,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
               type="checkbox"
               checked={seriesVisibility.notReviewed}
               onChange={() => toggleSeries('notReviewed')}
-              className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
             />
             <span className="text-sm text-red-600 dark:text-red-400 font-medium">Not Reviewed</span>
           </label>
@@ -294,7 +294,7 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
                 type="checkbox"
                 checked={projectVisibility[proj] !== false}
                 onChange={() => toggleProject(proj)}
-                className="w-4 h-4 rounded border-gray-300 focus:ring-2"
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 focus:ring-2"
                 style={{ accentColor: getProjectColor(proj, idx) }}
               />
               <span
@@ -501,22 +501,22 @@ export function TrendReports({ filters, refreshKey }: TrendReportsProps) {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Project
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Scope
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Installed
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Activated
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Progress
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                     Est. Completion
                   </th>
                 </tr>

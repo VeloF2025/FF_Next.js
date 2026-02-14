@@ -143,7 +143,7 @@ function KPICard({ metric }: KPICardProps) {
                    metric.trend === 'down' ? TrendingDown : Activity;
 
   const trendColor = metric.trend === 'up' ? 'text-green-600' : 
-                    metric.trend === 'down' ? 'text-red-600' : 'text-gray-600';
+                    metric.trend === 'down' ? 'text-red-600' : 'text-gray-600 dark:text-gray-400';
 
   const statusStyle = statusConfig[metric.status];
   const isAboveTarget = metric.value >= metric.target;
@@ -153,7 +153,7 @@ function KPICard({ metric }: KPICardProps) {
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <h3 className="font-semibold text-lg">{metric.name}</h3>
-          <p className="text-sm text-gray-600 mt-1">{metric.description}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{metric.description}</p>
         </div>
         <div className={cn("px-2 py-1 rounded-full text-xs font-medium", statusStyle.badgeColor)}>
           {metric.status.toUpperCase()}
@@ -164,12 +164,12 @@ function KPICard({ metric }: KPICardProps) {
         <div>
           <div className="flex items-baseline space-x-2">
             <span className="text-3xl font-bold">{metric.value}</span>
-            <span className="text-sm font-medium text-gray-600">{metric.unit}</span>
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{metric.unit}</span>
           </div>
           
           <div className="flex items-center space-x-3 mt-2">
             <div className="flex items-center space-x-1">
-              <span className="text-sm text-gray-600">Target:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Target:</span>
               <span className="text-sm font-medium">{metric.target}{metric.unit}</span>
               {isAboveTarget ? (
                 <CheckCircle className="w-4 h-4 text-green-600" />
@@ -188,7 +188,7 @@ function KPICard({ metric }: KPICardProps) {
         </div>
 
         <div className="text-right">
-          <div className="w-16 h-16 bg-white bg-opacity-50 rounded-lg flex items-center justify-center">
+          <div className="w-16 h-16 bg-white dark:bg-gray-800 bg-opacity-50 rounded-lg flex items-center justify-center">
             <Target className={cn("w-8 h-8", statusStyle.iconColor)} />
           </div>
         </div>
@@ -196,11 +196,11 @@ function KPICard({ metric }: KPICardProps) {
 
       {/* Progress bar */}
       <div className="mt-4">
-        <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+        <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
           <span>Progress vs Target</span>
           <span>{Math.round((metric.value / metric.target) * 100)}%</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div 
             className={cn("h-2 rounded-full transition-all duration-300", 
               isAboveTarget ? 'bg-green-500' : 'bg-yellow-500'
@@ -228,8 +228,8 @@ function PerformanceSummary({ metrics }: { metrics: PerformanceMetric[] }) {
   }, 0) / metrics.length;
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Summary</h3>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Performance Summary</h3>
       
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="text-center p-4 bg-green-50 rounded-lg">
@@ -252,8 +252,8 @@ function PerformanceSummary({ metrics }: { metrics: PerformanceMetric[] }) {
 
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-3xl font-bold text-gray-900">{overallScore.toFixed(1)}/4.0</div>
-          <div className="text-sm text-gray-600">Overall Performance Score</div>
+          <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{overallScore.toFixed(1)}/4.0</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Overall Performance Score</div>
         </div>
         <div className="flex items-center space-x-2">
           {overallScore >= 3.5 ? (
@@ -281,8 +281,8 @@ function PerformanceSummary({ metrics }: { metrics: PerformanceMetric[] }) {
 // Performance trends component
 function PerformanceTrends({ metrics }: { metrics: PerformanceMetric[] }) {
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Trends</h3>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Performance Trends</h3>
       
       <div className="space-y-4">
         {metrics.map((metric) => {
@@ -290,13 +290,13 @@ function PerformanceTrends({ metrics }: { metrics: PerformanceMetric[] }) {
                            metric.trend === 'down' ? TrendingDown : Activity;
           
           const trendColor = metric.trend === 'up' ? 'text-green-600' : 
-                            metric.trend === 'down' ? 'text-red-600' : 'text-gray-600';
+                            metric.trend === 'down' ? 'text-red-600' : 'text-gray-600 dark:text-gray-400';
           
           return (
             <div key={metric.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
               <div>
-                <p className="font-medium text-gray-900">{metric.name}</p>
-                <p className="text-sm text-gray-600">{metric.value}{metric.unit}</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{metric.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{metric.value}{metric.unit}</p>
               </div>
               
               <div className="flex items-center space-x-2">
@@ -312,7 +312,7 @@ function PerformanceTrends({ metrics }: { metrics: PerformanceMetric[] }) {
       </div>
       
       <div className="mt-4 pt-4 border-t">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Trends compared to previous quarter. Green indicates improvement, red indicates decline.
         </p>
       </div>
@@ -330,16 +330,16 @@ function BenchmarkingSection({ }: { metrics: PerformanceMetric[] }) {
   ];
 
   return (
-    <div className="bg-white p-6 rounded-lg border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Industry Benchmarking</h3>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Industry Benchmarking</h3>
       
       <div className="space-y-4">
         {benchmarkData.map((benchmark, index) => (
           <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
             <div>
-              <p className="font-medium text-gray-900">{benchmark.category}</p>
+              <p className="font-medium text-gray-900 dark:text-gray-100">{benchmark.category}</p>
               <div className="flex items-center space-x-2 mt-1">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
                   Rank {benchmark.rank} of {benchmark.totalSuppliers}
                 </span>
                 {benchmark.rank <= 3 && (
@@ -349,8 +349,8 @@ function BenchmarkingSection({ }: { metrics: PerformanceMetric[] }) {
             </div>
             
             <div className="text-right">
-              <div className="text-lg font-bold text-gray-900">{benchmark.score}%</div>
-              <div className="text-xs text-gray-500">Industry Score</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">{benchmark.score}%</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Industry Score</div>
             </div>
           </div>
         ))}
@@ -377,8 +377,8 @@ export function PerformanceTab() {
     return (
       <div className="text-center py-12">
         <BarChart3 className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Supplier</h3>
-        <p className="text-gray-600">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a Supplier</h3>
+        <p className="text-gray-600 dark:text-gray-400">
           Choose a supplier from the Company Profile tab to view their performance metrics and KPIs.
         </p>
       </div>
@@ -392,10 +392,10 @@ export function PerformanceTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             Performance Dashboard - {selectedSupplier.name}
           </h2>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             Comprehensive performance metrics and KPI tracking for strategic supplier evaluation
           </p>
         </div>
@@ -404,7 +404,7 @@ export function PerformanceTab() {
           <div className="flex items-center space-x-2">
             <Calendar className="w-4 h-4 text-gray-400" />
             <select
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm"
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
             >
@@ -435,9 +435,9 @@ export function PerformanceTab() {
       </div>
 
       {/* Historical Performance */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Historical Performance</h3>
-        <div className="text-center py-8 text-gray-500">
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Historical Performance</h3>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <BarChart3 className="mx-auto h-12 w-12 text-gray-300 mb-4" />
           <p>Historical performance charts would be displayed here</p>
           <p className="text-sm mt-1">Integration with analytics service required</p>
@@ -445,8 +445,8 @@ export function PerformanceTab() {
       </div>
 
       {/* Action Items */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Actions</h3>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recommended Actions</h3>
         <div className="space-y-3">
           <div className="flex items-start space-x-3 p-3 bg-green-50 rounded-lg">
             <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />

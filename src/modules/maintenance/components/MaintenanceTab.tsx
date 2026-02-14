@@ -299,7 +299,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
             </p>
           )}
 
-          <div className="mt-3 flex items-center gap-6 text-xs text-gray-500 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <div className="mt-3 flex items-center gap-6 text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3">
             <span>
               First reported:{' '}
               {format(new Date(data.flag.first_reported_at), 'dd MMM yyyy HH:mm')}
@@ -337,7 +337,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                     <span className="font-medium text-gray-900 dark:text-white">
                       {message.sender_name || 'Unknown'}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
                       {format(new Date(message.message_timestamp), 'dd MMM yyyy HH:mm')}
                     </span>
                   </div>
@@ -391,7 +391,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                   <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
                     <div className="text-center">
                       <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-1" />
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {photo.upload_status === 'pending' && 'Pending upload'}
                         {photo.upload_status === 'uploading' && 'Uploading...'}
                         {photo.upload_status === 'failed' && 'Upload failed'}
@@ -403,7 +403,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                   <div className="truncate">
                     {photo.original_filename || `Photo ${photo.photo_index}`}
                   </div>
-                  <div className="text-gray-500">
+                  <div className="text-gray-500 dark:text-gray-400">
                     {format(new Date(photo.created_at), 'dd MMM HH:mm')}
                   </div>
                 </div>

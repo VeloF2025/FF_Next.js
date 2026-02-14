@@ -319,7 +319,7 @@ export function ActivationBlockersCard({
           className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
             canActivate
               ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500 dark:text-gray-400'
           }`}
         >
           {activating ? (

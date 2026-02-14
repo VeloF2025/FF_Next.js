@@ -1916,7 +1916,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                                       : <XCircle className="w-3 h-3 inline text-red-400 ml-0.5" />}
                                                   </>
                                                 ) : (
-                                                  <span className="text-gray-500 italic">Not on 1Map</span>
+                                                  <span className="text-gray-500 dark:text-gray-400 italic">Not on 1Map</span>
                                                 )}
                                               </p>
                                               {lookup.drB.foundOn1Map && (
@@ -1924,7 +1924,7 @@ export function OltReportGroup({ activeTab, onTabChange }: OltReportGroupProps) 
                                                   UPS: {lookup.drB.oneMapUps ? (
                                                     <span className="font-mono text-gray-400">{lookup.drB.oneMapUps}</span>
                                                   ) : (
-                                                    <span className={`italic ${lookup.upsTransfer?.needed ? 'text-amber-400' : 'text-gray-500'}`}>
+                                                    <span className={`italic ${lookup.upsTransfer?.needed ? 'text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                       {lookup.upsTransfer?.needed ? 'Empty — will receive transfer' : 'Empty'}
                                                     </span>
                                                   )}

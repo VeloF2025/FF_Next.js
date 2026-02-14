@@ -20,7 +20,7 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
           <Link
             key={card.title}
             to={card.link}
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
+            className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
           >
             <div className="p-5">
               <div className="flex items-center">
@@ -31,17 +31,17 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                       {card.title}
                     </dt>
-                    <dd className="text-lg font-semibold text-gray-900">
+                    <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {card.count}
                     </dd>
                   </dl>
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{card.description}</p>
               </div>
             </div>
           </Link>

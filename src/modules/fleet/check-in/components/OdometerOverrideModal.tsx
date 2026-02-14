@@ -160,7 +160,7 @@ export function OdometerOverrideModal({
             </div>
             <button
               onClick={handleClose}
-              className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             >
               <X className="w-5 h-5" />
             </button>
@@ -190,7 +190,7 @@ export function OdometerOverrideModal({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                isValidReading ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                isValidReading ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
                 {isValidReading ? <CheckCircle2 className="w-4 h-4" /> : '1'}
               </div>
@@ -222,7 +222,7 @@ export function OdometerOverrideModal({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                hasVerificationPhoto ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                hasVerificationPhoto ? 'bg-green-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
                 {hasVerificationPhoto ? <CheckCircle2 className="w-4 h-4" /> : '2'}
               </div>
@@ -257,7 +257,7 @@ export function OdometerOverrideModal({
                   />
                   <button
                     onClick={capturePhoto}
-                    className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 bg-white rounded-full border-4 border-gray-300 shadow-lg flex items-center justify-center hover:bg-gray-100"
+                    className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 bg-white dark:bg-gray-800 rounded-full border-4 border-gray-300 dark:border-gray-600 shadow-lg flex items-center justify-center hover:bg-gray-100 dark:bg-gray-800"
                   >
                     <div className="w-10 h-10 bg-red-500 rounded-full" />
                   </button>
@@ -265,7 +265,7 @@ export function OdometerOverrideModal({
               ) : (
                 <button
                   onClick={startCamera}
-                  className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                  className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
                 >
                   {cameraError ? (
                     <>
@@ -301,7 +301,7 @@ export function OdometerOverrideModal({
             className={`flex-1 py-3 px-4 rounded-lg font-medium flex items-center justify-center gap-2 ${
               canConfirm
                 ? 'bg-green-500 text-white hover:bg-green-600'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
             }`}
           >
             <CheckCircle2 className="w-5 h-5" />

@@ -34,7 +34,7 @@ export function OptimizedList<T>({
   );
 
   if (items.length === 0) {
-    return <div className="text-center text-gray-500 py-8">{emptyMessage}</div>;
+    return <div className="text-center text-gray-500 dark:text-gray-400 py-8">{emptyMessage}</div>;
   }
 
   return <>{renderedItems}</>;

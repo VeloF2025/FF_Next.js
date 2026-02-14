@@ -158,7 +158,7 @@ export function DataValidationPhase({
           <p className="text-gray-600 dark:text-gray-400">
             Extracting data from photos using VLM...
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
             This may take 30-60 seconds
           </p>
         </div>
@@ -224,7 +224,7 @@ export function DataValidationPhase({
                       step="0.1"
                       className="w-32 px-3 py-1 border rounded-lg dark:bg-gray-800 dark:border-gray-600"
                     />
-                    <span className="text-gray-500">dBm</span>
+                    <span className="text-gray-500 dark:text-gray-400">dBm</span>
                   </div>
                 )}
               </div>

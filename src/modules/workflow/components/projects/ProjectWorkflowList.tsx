@@ -49,7 +49,7 @@ export function ProjectWorkflowList({
       case 'cancelled':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
+        return <Clock className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -64,7 +64,7 @@ export function ProjectWorkflowList({
       case 'cancelled':
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     }
   };
 

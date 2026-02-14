@@ -95,7 +95,7 @@ export function CheckInItemRow({ item, response, onResponse }: CheckInItemRowPro
           <button
             type="button"
             onClick={() => setShowNotes(!showNotes)}
-            className="mt-2 flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400"
+            className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400"
           >
             {showNotes ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
             {showNotes ? 'Hide notes' : 'Add notes'}

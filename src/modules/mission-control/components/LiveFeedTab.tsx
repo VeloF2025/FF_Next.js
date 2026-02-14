@@ -92,7 +92,7 @@ export function LiveFeedTab({ messages }: LiveFeedTabProps) {
             return (
               <div
                 key={msg.id}
-                className="flex items-start gap-3 p-2 rounded hover:bg-white/5 transition-colors"
+                className="flex items-start gap-3 p-2 rounded hover:bg-white dark:bg-gray-800/5 transition-colors"
               >
                 <span className="text-lg mt-0.5">{getAgentIcon(msg.from_agent)}</span>
                 <div className="flex-1 min-w-0">

@@ -28,7 +28,7 @@ export function PerformanceMetricsGrid() {
       title: 'Active Users',
       value: '1,247',
       change: '↑ 12% vs yesterday',
-      changeColor: 'text-gray-600',
+      changeColor: 'text-gray-600 dark:text-gray-400',
     },
   ];
 

@@ -52,7 +52,7 @@ const getStatusBadge = (status: AlertStatus) => {
       );
     case 'acknowledged':
       return (
-        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
           Acknowledged
         </span>
       );
@@ -175,7 +175,7 @@ export function BudgetAlertsPanel({
                   data-testid="alert-item"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCheck className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <CheckCheck className="h-4 w-4 text-gray-400 dark:text-gray-500 dark:text-gray-400" />
                     <span className="text-sm text-gray-700 dark:text-gray-300">{alert.title}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       Resolved {alert.resolvedAt ? formatDate(alert.resolvedAt) : ''}

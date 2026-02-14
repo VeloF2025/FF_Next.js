@@ -140,7 +140,7 @@ export function DocumentTypeSelector({
             Documents with Data Extraction
           </h3>
         </div>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
           We&apos;ll automatically extract information from these documents
         </p>
         <div className="space-y-2">
@@ -156,7 +156,7 @@ export function DocumentTypeSelector({
             Upload Only Documents
           </h3>
         </div>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
           These documents will be saved without automatic data extraction
         </p>
         <div className="space-y-2">

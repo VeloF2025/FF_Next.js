@@ -41,9 +41,9 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ po }) => {
               className="flex items-start space-x-4 border-l-2 border-blue-500 pl-4"
             >
               <div className="flex-1">
-                <p className="font-medium text-gray-900">{entry.action}</p>
-                <p className="text-sm text-gray-600">by {entry.user}</p>
-                <p className="text-xs text-gray-500">{formatDate(entry.date)}</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{entry.action}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">by {entry.user}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(entry.date)}</p>
               </div>
             </div>
           ))}

@@ -221,7 +221,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
       case 'down':
         return <TrendingDown className="w-4 h-4 text-red-600" />;
       default:
-        return <Activity className="w-4 h-4 text-gray-600" />;
+        return <Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -261,7 +261,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {metric.value}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {metric.description}
                       </p>
                     </div>
@@ -275,7 +275,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
                   
                   {metric.target && (
                     <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-gray-500">
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                         <span>Target: {metric.target}%</span>
                         <span>{Math.round(progressValue)}%</span>
                       </div>
@@ -303,7 +303,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
           </CardHeader>
           <CardContent>
             {topPerformers.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>No templates with sufficient data</p>
               </div>
@@ -350,7 +350,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
           </CardHeader>
           <CardContent>
             {improvementAreas.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <CheckCircle className="w-12 h-12 mx-auto mb-2 opacity-50 text-green-600" />
                 <p>All metrics within acceptable ranges</p>
               </div>
@@ -379,7 +379,7 @@ export function PerformanceMetrics({ analytics, dateRange }: PerformanceMetricsP
                         </p>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 italic">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                       💡 {area.recommendation}
                     </p>
                   </div>

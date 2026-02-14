@@ -169,6 +169,6 @@ export function getDriverStatusColor(status: DriverStatus): string {
     case 'RESIGNED':
     case 'RETIRED':
     default:
-      return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+      return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
   }
 }

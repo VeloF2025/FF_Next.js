@@ -309,7 +309,7 @@ export function VlmResultCard({
               setEditValue(currentValue);
               setIsEditing(true);
             }}
-            className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+            className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             title="Edit value"
           >
             <Edit3 className="w-4 h-4" />

@@ -30,7 +30,7 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ po }) => {
 
       <GlassCard className="p-6">
         <h4 className="font-semibold mb-4">Invoices</h4>
-        <p className="text-center text-gray-500">No invoices submitted yet</p>
+        <p className="text-center text-gray-500 dark:text-gray-400">No invoices submitted yet</p>
       </GlassCard>
     </div>
   );

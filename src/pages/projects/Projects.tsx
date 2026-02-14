@@ -40,8 +40,8 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Failed to load projects</h2>
-          <p className="text-gray-600">{error.message}</p>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Failed to load projects</h2>
+          <p className="text-gray-600 dark:text-gray-400">{error.message}</p>
         </div>
       </div>
     );
@@ -62,13 +62,13 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
         <div className="flex gap-2">
           <button
             onClick={() => setViewMode('card')}
-            className={`px-3 py-1 rounded ${viewMode === 'card' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-1 rounded ${viewMode === 'card' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
           >
             Card
           </button>
           <button
             onClick={() => setViewMode('table')}
-            className={`px-3 py-1 rounded ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            className={`px-3 py-1 rounded ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
           >
             Table
           </button>

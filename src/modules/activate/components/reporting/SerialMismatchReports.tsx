@@ -236,7 +236,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
         );
       case 'false_positive':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
             <XCircle className="h-3 w-3" />
             False +
           </span>
@@ -442,13 +442,13 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : data?.records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   No serial mismatches found for the selected filters
                 </td>
               </tr>
@@ -463,7 +463,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
 
                 // Helper to get cell color based on agreement with OES (reference)
                 const getSerialColor = (serial: string | null | undefined, isReference = false) => {
-                  if (!serial) return 'text-gray-400 dark:text-gray-500';
+                  if (!serial) return 'text-gray-400 dark:text-gray-500 dark:text-gray-400';
                   if (isReference) return 'text-green-600 dark:text-green-400';
                   if (oesSerial && serial.toUpperCase() === oesSerial) return 'text-green-600 dark:text-green-400';
                   return 'text-red-600 dark:text-red-400';
@@ -522,7 +522,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                     <td className="px-3 py-3">
                       {getStatusBadge(record.status)}
                       {record.ticket_id && (
-                        <span className="ml-1 text-xs text-gray-500">
+                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
                           ({record.ticket_status})
                         </span>
                       )}
@@ -567,7 +567,7 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                         </button>
                       )}
                       {record.status === 'resolved' && record.resolved_at && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
                           {new Date(record.resolved_at).toISOString().split('T')[0]}
                         </span>
                       )}
@@ -620,23 +620,23 @@ export function SerialMismatchReports({ filters, refreshKey }: SerialMismatchRep
                 <strong className="block mb-1">4-Way Serial Comparison:</strong>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <span className="text-gray-500">OES:</span>{' '}
+                    <span className="text-gray-500 dark:text-gray-400">OES:</span>{' '}
                     <span className="font-mono text-green-600">{resolutionModal.record.serial_comparison?.oes || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Offline:</span>{' '}
+                    <span className="text-gray-500 dark:text-gray-400">Offline:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.offline?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.offline || '-'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">1Map:</span>{' '}
+                    <span className="text-gray-500 dark:text-gray-400">1Map:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.onemap?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.onemap || '-'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">WA Photo:</span>{' '}
+                    <span className="text-gray-500 dark:text-gray-400">WA Photo:</span>{' '}
                     <span className={`font-mono ${resolutionModal.record.serial_comparison?.wa_photo?.toUpperCase() === resolutionModal.record.serial_comparison?.oes?.toUpperCase() ? 'text-green-600' : 'text-red-600'}`}>
                       {resolutionModal.record.serial_comparison?.wa_photo || (resolutionModal.record.serial_comparison?.wa_photo_processed ? '-' : 'pending')}
                     </span>

@@ -13,7 +13,7 @@ export function ProjectStatusView({ projectMetrics, getStatusColor }: ProjectSta
     switch (trend) {
       case 'up': return <TrendingUp className="w-4 h-4 text-green-500" />;
       case 'down': return <TrendingDown className="w-4 h-4 text-red-500" />;
-      default: return <ArrowRight className="w-4 h-4 text-gray-500" />;
+      default: return <ArrowRight className="w-4 h-4 text-gray-500 dark:text-gray-400" />;
     }
   };
 

@@ -437,7 +437,7 @@ export function SystemSettingsTab() {
                                 }`}
                               >
                                 <span
-                                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                  className={`inline-block h-3 w-3 transform rounded-full bg-white dark:bg-gray-800 transition-transform ${
                                     tabEnabled ? 'translate-x-5' : 'translate-x-1'
                                   }`}
                                 />

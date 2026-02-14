@@ -191,7 +191,7 @@ export function CheckInForm({
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'daily'
                 ? 'bg-blue-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             <Calendar className="w-4 h-4" />
@@ -203,7 +203,7 @@ export function CheckInForm({
             className={`flex-1 py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-medium transition-colors ${
               checkType === 'weekly'
                 ? 'bg-purple-500 text-white'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
             <CalendarDays className="w-4 h-4" />
@@ -508,7 +508,7 @@ export function CheckInForm({
                 : checkType === 'daily'
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
                   : 'bg-purple-500 text-white hover:bg-purple-600'
-              : 'bg-gray-200 text-gray-500 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600 dark:text-gray-400'
           }`}
         >
           {isSubmitting ? (

@@ -97,7 +97,7 @@ export function FeedbackButton({
 
             {/* Message Preview */}
             <div className="p-6">
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="bg-white dark:bg-gray-800/5 rounded-lg p-4 border border-white/10">
                 <pre className="whitespace-pre-wrap text-sm text-[var(--ff-text-primary)] font-sans">
                   {formatFeedbackMessage()}
                 </pre>

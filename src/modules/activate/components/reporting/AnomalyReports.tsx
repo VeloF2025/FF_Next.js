@@ -637,7 +637,7 @@ function SerialSection({
             type="checkbox"
             checked={showMismatchesOnly}
             onChange={(e) => setShowMismatchesOnly(e.target.checked)}
-            className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+            className="rounded border-gray-300 dark:border-gray-600 text-red-600 focus:ring-red-500"
           />
           <span className="text-sm text-gray-700 dark:text-gray-300">
             Show mismatches only ({data.mismatches_only.length})
@@ -668,19 +668,19 @@ function SerialTable({
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               DR Number
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               ONT (WA/Scanned)
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               ONT (OES)
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
               UPS Scanned
             </th>
           </tr>
@@ -727,7 +727,7 @@ function SerialTable({
         </tbody>
       </table>
       {records.length > 50 && (
-        <p className="text-sm text-gray-500 mt-2 text-center">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
           Showing first 50 of {records.length}
         </p>
       )}
@@ -794,19 +794,19 @@ function ResubmissionSection({
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Project
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Total
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Resubmitted
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Rate
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Avg Submissions
                   </th>
                 </tr>
@@ -853,16 +853,16 @@ function ResubmissionSection({
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     DR Number
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Project
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Submissions
                   </th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase text-xs">
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 dark:text-gray-400 uppercase text-xs">
                     Submitted By
                   </th>
                 </tr>

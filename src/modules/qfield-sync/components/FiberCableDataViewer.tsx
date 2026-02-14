@@ -137,9 +137,9 @@ export function FiberCableDataViewer() {
       case 'ongoing':
         return 'bg-yellow-100 text-yellow-800';
       case 'pending':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
     }
   };
 
@@ -197,10 +197,10 @@ export function FiberCableDataViewer() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8">
         <div className="flex flex-col items-center justify-center">
           <Activity className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-          <p className="text-gray-600">Loading fiber cable data...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading fiber cable data...</p>
         </div>
       </div>
     );
@@ -208,7 +208,7 @@ export function FiberCableDataViewer() {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex items-center space-x-2 text-red-600 mb-4">
           <AlertCircle className="h-5 w-5" />
           <span>Error: {error}</span>
@@ -227,20 +227,20 @@ export function FiberCableDataViewer() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
               <Cable className="h-7 w-7 text-blue-600" />
               Fiber Cable Data
             </h2>
-            <p className="text-gray-600 mt-1">Compare and sync fiber cable data between systems</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">Compare and sync fiber cable data between systems</p>
           </div>
 
           <div className="flex gap-3">
             <button
               onClick={fetchCableData}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 flex items-center gap-2"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -248,7 +248,7 @@ export function FiberCableDataViewer() {
             <button
               onClick={handleExport}
               disabled={cables.length === 0}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:bg-gray-100 dark:bg-gray-800 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Export CSV
@@ -257,13 +257,13 @@ export function FiberCableDataViewer() {
         </div>
 
         {/* View Tabs */}
-        <div className="flex space-x-4 border-b border-gray-200">
+        <div className="flex space-x-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setView('comparison')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               view === 'comparison'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
             }`}
           >
             Comparison View
@@ -273,7 +273,7 @@ export function FiberCableDataViewer() {
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               view === 'details'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'
             }`}
           >
             Details View
@@ -297,7 +297,7 @@ export function FiberCableDataViewer() {
                 className={`px-4 py-2 rounded-lg ${
                   filter === option.value
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    : 'bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900'
                 }`}
               >
                 {option.label}
@@ -307,11 +307,11 @@ export function FiberCableDataViewer() {
 
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">QFieldCloud Cables</p>
-                  <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.qfieldcloud_total}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">QFieldCloud Cables</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">{stats.qfieldcloud_total}</p>
                 </div>
                 <div className="bg-blue-100 p-3 rounded-full">
                   <Cable className="h-6 w-6 text-blue-600" />
@@ -319,11 +319,11 @@ export function FiberCableDataViewer() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">FibreFlow Cables</p>
-                  <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.fibreflow_total}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">FibreFlow Cables</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">{stats.fibreflow_total}</p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-full">
                   <Cable className="h-6 w-6 text-green-600" />
@@ -331,11 +331,11 @@ export function FiberCableDataViewer() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Synchronized</p>
-                  <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.synchronized}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Synchronized</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">{stats.synchronized}</p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-full">
                   <CheckCircle className="h-6 w-6 text-green-600" />
@@ -343,11 +343,11 @@ export function FiberCableDataViewer() {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Need Sync</p>
-                  <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.needs_sync}</p>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Need Sync</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-1">{stats.needs_sync}</p>
                 </div>
                 <div className="bg-yellow-100 p-3 rounded-full">
                   <Clock className="h-6 w-6 text-yellow-600" />
@@ -359,7 +359,7 @@ export function FiberCableDataViewer() {
           {/* Data Tables */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* QFieldCloud Data */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
               <div className="bg-blue-600 px-6 py-4">
                 <h3 className="text-lg font-semibold text-white">QFieldCloud Data</h3>
                 <p className="text-sm text-blue-100 mt-1">{qfieldCables.length} cables found</p>
@@ -368,14 +368,14 @@ export function FiberCableDataViewer() {
                 {qfieldCables.length > 0 ? (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {qfieldCables.slice(0, 10).map((cable) => (
-                      <div key={cable.cable_id} className="border border-gray-200 rounded-lg p-3">
+                      <div key={cable.cable_id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium text-gray-900">{cable.cable_id}</p>
-                            <p className="text-sm text-gray-600">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">{cable.cable_id}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                               {cable.cable_type || cable.cable_size || 'Unknown type'}
                             </p>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
                               <MapPin className="h-3 w-3" />
                               {cable.from_chamber || 'N/A'} → {cable.to_chamber || 'N/A'}
                             </div>
@@ -388,13 +388,13 @@ export function FiberCableDataViewer() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">No fiber cable data available</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">No fiber cable data available</p>
                 )}
               </div>
             </div>
 
             {/* FibreFlow Data */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
               <div className="bg-green-600 px-6 py-4">
                 <h3 className="text-lg font-semibold text-white">FibreFlow Data</h3>
                 <p className="text-sm text-green-100 mt-1">{fibreflowCables.length} cables found</p>
@@ -403,14 +403,14 @@ export function FiberCableDataViewer() {
                 {fibreflowCables.length > 0 ? (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {fibreflowCables.slice(0, 10).map((cable) => (
-                      <div key={cable.cable_id} className="border border-gray-200 rounded-lg p-3">
+                      <div key={cable.cable_id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div className="flex justify-between items-start">
                           <div>
-                            <p className="font-medium text-gray-900">{cable.cable_id}</p>
-                            <p className="text-sm text-gray-600">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">{cable.cable_id}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
                               {cable.cable_type || cable.cable_size || 'Unknown type'}
                             </p>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
                               <MapPin className="h-3 w-3" />
                               {cable.from_chamber || 'N/A'} → {cable.to_chamber || 'N/A'}
                             </div>
@@ -423,7 +423,7 @@ export function FiberCableDataViewer() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-center py-8">No fiber cable data available</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">No fiber cable data available</p>
                 )}
               </div>
             </div>
@@ -432,53 +432,53 @@ export function FiberCableDataViewer() {
       )}
 
       {view === 'details' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">All Cables ({cables.length})</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">All Cables ({cables.length})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Cable ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Route
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Length (m)
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Sync
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 tracking-wide">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                     Source
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
                 {cables.length > 0 ? (
                   cables.map((cable) => (
                     <tr key={cable.cable_id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                         {cable.cable_id}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cable.cable_type || cable.cable_size || '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cable.from_chamber && cable.to_chamber
                           ? `${cable.from_chamber} → ${cable.to_chamber}`
                           : '-'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cable.length_m || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -489,7 +489,7 @@ export function FiberCableDataViewer() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getSyncStatusBadge(cable.sync_status || 'pending')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cable.source === 'both' ? 'Both' :
                          cable.source === 'qfieldcloud' ? 'QFieldCloud' : 'FibreFlow'}
                       </td>
@@ -497,7 +497,7 @@ export function FiberCableDataViewer() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       No cable data available
                     </td>
                   </tr>

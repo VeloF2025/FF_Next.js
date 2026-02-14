@@ -423,7 +423,7 @@ function QAStatusBadge({ status }: { status: string | null }) {
 
   return (
     <span
-      className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+      className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status] || 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
     >
       {status}
     </span>

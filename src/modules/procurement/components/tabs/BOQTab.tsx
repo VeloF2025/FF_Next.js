@@ -89,13 +89,13 @@ export function BOQTab() {
         return (
           <div className="h-full flex flex-col">
             {/* BOQ Header */}
-            <div className="bg-white border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     Bill of Quantities
                   </h2>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Managing BOQs for {selectedProject.name} ({selectedProject.code})
                   </p>
                 </div>
@@ -139,7 +139,7 @@ export function BOQTab() {
                     placeholder="Search BOQs by name, category, or item..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
                 
@@ -165,7 +165,7 @@ export function BOQTab() {
   };
 
   return (
-    <div className="h-full bg-gray-50">
+    <div className="h-full bg-gray-50 dark:bg-gray-900">
       {renderContent()}
     </div>
   );
@@ -182,11 +182,11 @@ function NoProjectSelected() {
           <FileText className="h-12 w-12 text-blue-600" />
         </div>
         
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Project Selection Required
         </h3>
         
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
           Please select a project to view and manage its Bill of Quantities (BOQ). 
           BOQs are project-specific and contain detailed cost breakdowns for materials and services.
         </p>

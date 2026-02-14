@@ -356,7 +356,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
           <p className="text-gray-600 dark:text-gray-400">
             Drag and drop OES Excel file here, or click to browse
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
             Supports .xlsx and .xls files
           </p>
         </div>
@@ -370,7 +370,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
               <FileSpreadsheet className="w-8 h-8 text-green-600" />
               <div>
                 <p className="font-medium text-gray-900 dark:text-white">{file.name}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   {(file.size / 1024).toFixed(1)} KB
                 </p>
               </div>
@@ -454,7 +454,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                       <span className={`px-2 py-0.5 rounded text-xs font-medium
                         ${row.status === 'Active'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
                         {row.status}
                       </span>
                     </td>
@@ -530,31 +530,31 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {importResult.totalRows}
                   </p>
-                  <p className="text-sm text-gray-500">Total Rows</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Total Rows</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-green-600">
                     {importResult.inserted}
                   </p>
-                  <p className="text-sm text-gray-500">New Inserts</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">New Inserts</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-blue-600">
                     {importResult.updated}
                   </p>
-                  <p className="text-sm text-gray-500">Updated</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Updated</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-emerald-600">
                     {importResult.matched}
                   </p>
-                  <p className="text-sm text-gray-500">Matched Drops</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Matched Drops</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded p-3 text-center">
                   <p className="text-2xl font-bold text-yellow-600">
                     {importResult.unmatched}
                   </p>
-                  <p className="text-sm text-gray-500">Not in Drops</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Not in Drops</p>
                 </div>
               </div>
               {importResult.errors.length > 0 && (
@@ -622,7 +622,7 @@ export function OESImportTab({ onImportComplete }: OESImportTabProps) {
                   {qfieldSyncResult.totalPoints} drop locations synced to QFieldCloud as "OES Report" layer with DR number labels
                 </p>
               )}
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+              <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mt-2">
                 ✓ Points display with drop numbers visible on map<br/>
                 ✓ Data available in QField mobile app after sync
               </p>

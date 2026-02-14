@@ -458,7 +458,7 @@ export function FunnelChart({
                 {idx < stages.length - 1 && (
                   <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
                     <svg
-                      className="w-4 h-2 text-gray-300 dark:text-gray-600"
+                      className="w-4 h-2 text-gray-300 dark:text-gray-600 dark:text-gray-400"
                       viewBox="0 0 16 8"
                     >
                       <path d="M0 0 L8 8 L16 0" fill="currentColor" />
@@ -525,7 +525,7 @@ export function GaugeChart({
             fill="none"
             stroke="currentColor"
             strokeWidth={stroke}
-            className="text-gray-200 dark:text-gray-700"
+            className="text-gray-200 dark:text-gray-700 dark:text-gray-300"
           />
           {/* Progress circle */}
           <circle
@@ -551,7 +551,7 @@ export function GaugeChart({
               strokeWidth={2}
               strokeDasharray={`2 ${circumference - 2}`}
               strokeDashoffset={-((target / 100) * circumference)}
-              className="text-gray-400 dark:text-gray-500"
+              className="text-gray-400 dark:text-gray-500 dark:text-gray-400"
             />
           )}
         </svg>

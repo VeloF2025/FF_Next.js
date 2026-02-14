@@ -137,7 +137,7 @@ export function ConsumptionRecorder({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 dark:border-gray-700 dark:bg-gray-800">
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Recording consumption for</p>
         <p className="text-lg font-bold text-gray-900 dark:text-white">{jobReference}</p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -162,7 +162,7 @@ export function ConsumptionRecorder({
 
         {/* Serial Scanner */}
         {showSerialScanner ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-4 flex items-center justify-between">
               <h4 className="font-medium text-gray-900 dark:text-white">Scan Serial Number</h4>
               <button
@@ -180,7 +180,7 @@ export function ConsumptionRecorder({
             />
           </div>
         ) : showItemPicker ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-4 flex items-center justify-between">
               <h4 className="font-medium text-gray-900 dark:text-white">Add Quantity Item</h4>
               <button
@@ -203,7 +203,7 @@ export function ConsumptionRecorder({
                     const item = quantityItems.find((i) => i.id === e.target.value);
                     setSelectedItem(item || null);
                   }}
-                  className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">Select item...</option>
                   {quantityItems.map((item) => (
@@ -224,7 +224,7 @@ export function ConsumptionRecorder({
                         min="1"
                         value={quantity}
                         onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                       />
                     </div>
                     <button
@@ -242,7 +242,7 @@ export function ConsumptionRecorder({
           <div className="grid gap-4 sm:grid-cols-2">
             <button
               onClick={() => setShowSerialScanner(true)}
-              className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-gray-600 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+              className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-6 text-gray-600 dark:text-gray-400 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-blue-500 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
             >
               <Plus className="h-5 w-5" />
               <span className="font-medium">Scan Serial (ONT/Router/UPS)</span>
@@ -250,7 +250,7 @@ export function ConsumptionRecorder({
 
             <button
               onClick={() => setShowItemPicker(true)}
-              className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-gray-600 hover:border-green-500 hover:bg-green-50 hover:text-green-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-green-500 dark:hover:bg-green-900/20 dark:hover:text-green-400"
+              className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-6 text-gray-600 dark:text-gray-400 hover:border-green-500 hover:bg-green-50 hover:text-green-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:border-green-500 dark:hover:bg-green-900/20 dark:hover:text-green-400"
             >
               <Plus className="h-5 w-5" />
               <span className="font-medium">Add Quantity Item</span>
@@ -265,14 +265,14 @@ export function ConsumptionRecorder({
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Materials to Record ({items.length})
           </h3>
-          <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
+          <div className="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
             {items.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between p-4"
               >
                 <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-700">
+                  <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-2 dark:bg-gray-700">
                     <Package className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                   </div>
                   <div>
@@ -303,7 +303,7 @@ export function ConsumptionRecorder({
         <button
           onClick={onCancel}
           disabled={submitting}
-          className="flex-1 rounded-lg border border-gray-300 bg-white py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
         >
           Cancel
         </button>

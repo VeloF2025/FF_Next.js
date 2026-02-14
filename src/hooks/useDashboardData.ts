@@ -116,8 +116,8 @@ export function useDashboardData() {
     switch (direction) {
       case 'up': return 'text-green-600';
       case 'down': return 'text-red-600';
-      case 'stable': return 'text-gray-600';
-      default: return 'text-gray-600';
+      case 'stable': return 'text-gray-600 dark:text-gray-400';
+      default: return 'text-gray-600 dark:text-gray-400';
     }
   }, []);
 

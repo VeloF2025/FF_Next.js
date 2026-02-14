@@ -55,7 +55,7 @@ export function BusinessTypeSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 text-xs mt-1">
+      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
         South African business entity type
       </p>
     </div>
@@ -152,7 +152,7 @@ export function RegionSelect({
             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
           `}
         >
-          <span className={value.length === 0 ? 'text-gray-500' : ''}>
+          <span className={value.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''}>
             {value.length === 0 
               ? 'Select provinces...' 
               : `${value.length} province${value.length > 1 ? 's' : ''} selected`
@@ -177,7 +177,7 @@ export function RegionSelect({
                       type="checkbox"
                       checked={value.includes(province)}
                       onChange={() => handleProvinceToggle(province)}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
                     />
                     <span className="text-sm">{province}</span>
                   </label>
@@ -214,7 +214,7 @@ export function RegionSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 text-xs mt-1">
+      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
         Select all provinces where contractor operates
       </p>
     </div>
@@ -321,7 +321,7 @@ export function ServiceSelect({
           Services
         </label>
         <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-md animate-pulse" />
-        <p className="text-gray-500 text-xs mt-1">Loading services...</p>
+        <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">Loading services...</p>
       </div>
     );
   }
@@ -343,7 +343,7 @@ export function ServiceSelect({
             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
           `}
         >
-          <span className={value.length === 0 ? 'text-gray-500' : ''}>
+          <span className={value.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''}>
             {value.length === 0 
               ? 'Select services...' 
               : `${value.length} service${value.length > 1 ? 's' : ''} selected`
@@ -368,13 +368,13 @@ export function ServiceSelect({
                       type="checkbox"
                       checked={value.includes(service)}
                       onChange={() => handleServiceToggle(service)}
-                      className="mr-2 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="mr-2 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
                     />
                     <span className="text-sm">{service}</span>
                   </label>
                 ))}
                 {availableServices.length === 0 && (
-                  <div className="px-2 py-2 text-sm text-gray-500">
+                  <div className="px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
                     No services available
                   </div>
                 )}
@@ -410,7 +410,7 @@ export function ServiceSelect({
       {error && (
         <p className="text-red-500 text-xs mt-1">{error}</p>
       )}
-      <p className="text-gray-500 text-xs mt-1">
+      <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
         Select services from your configured rate card templates
       </p>
     </div>

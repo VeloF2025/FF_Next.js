@@ -46,7 +46,7 @@ export default function BOQHistory({
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading version history...</span>
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Loading version history...</span>
       </div>
     );
   }
@@ -57,8 +57,8 @@ export default function BOQHistory({
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <History className="h-6 w-6 text-blue-500 mr-2" />
-          <h2 className="text-xl font-semibold text-gray-900">Version History</h2>
-          <span className="ml-3 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Version History</h2>
+          <span className="ml-3 px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm">
             {versions.length} versions
           </span>
         </div>
@@ -81,7 +81,7 @@ export default function BOQHistory({
 
           <button
             onClick={loadVersionHistory}
-            className="p-2 text-gray-500 hover:text-gray-700"
+            className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
             title="Refresh history"
           >
             <RefreshCw className="h-5 w-5" />
@@ -117,10 +117,10 @@ export default function BOQHistory({
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-lg border">
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border">
           <History className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No Version History</h3>
-          <p className="mt-2 text-sm text-gray-500">
+          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">No Version History</h3>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
             {versions.length === 0
               ? "This BOQ doesn't have any version history yet."
               : "No versions match your current filters."}

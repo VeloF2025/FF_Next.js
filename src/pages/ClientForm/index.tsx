@@ -155,7 +155,7 @@ export function ClientForm() {
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-neutral-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-neutral-200">
         <div className="p-6 border-b border-neutral-200">
           <h2 className="text-2xl font-semibold text-neutral-900">
             {isEditing ? 'Edit Client' : 'New Client'}

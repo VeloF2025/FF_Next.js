@@ -19,7 +19,7 @@ interface StatsCardProps {
 
 function StatsCard({ title, value, icon, subItems, className = '' }: StatsCardProps) {
   return (
-    <div className={`rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800 ${className}`}>
+    <div className={`rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 dark:border-gray-700 dark:bg-gray-800 ${className}`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
@@ -64,7 +64,7 @@ function AlertCard({ title, count, type }: AlertCardProps) {
         <AlertTriangle className="h-4 w-4" />
         <span className="font-medium">{title}</span>
       </div>
-      <span className="rounded-full bg-white/50 px-2 py-0.5 text-sm font-bold">{count}</span>
+      <span className="rounded-full bg-white dark:bg-gray-800/50 px-2 py-0.5 text-sm font-bold">{count}</span>
     </div>
   );
 }
@@ -136,7 +136,7 @@ export function FieldStockDashboard() {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          className="flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
         >
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh

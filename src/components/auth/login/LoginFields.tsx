@@ -99,7 +99,7 @@ export function LoginFields({
               // TODO: Implement forgot password modal
             }}
           >
-            Forgot password?
+            Forgot Password?
           </button>
         </div>
       </div>

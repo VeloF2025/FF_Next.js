@@ -14,7 +14,7 @@ interface ErrorDisplayProps {
 
 export function ErrorDisplay({ errorDetails, error /* isComponentLevel */ }: ErrorDisplayProps) {
   return (
-    <div className="bg-white shadow-lg rounded-lg p-8">
+    <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-8">
       {/* Error Icon and Title */}
       <div className="flex items-center justify-center mb-6">
         <div className="bg-red-100 rounded-full p-3">
@@ -22,11 +22,11 @@ export function ErrorDisplay({ errorDetails, error /* isComponentLevel */ }: Err
         </div>
       </div>
       
-      <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-center mb-2">
         {errorDetails.title}
       </h1>
       
-      <p className="text-gray-600 text-center mb-6">
+      <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
         {errorDetails.message}
       </p>
 

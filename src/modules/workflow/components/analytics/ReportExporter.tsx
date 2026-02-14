@@ -368,13 +368,13 @@ ${data.insights.map((insight: any) => `
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
                         isSelected 
                           ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/10' 
-                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:border-gray-600'
                       }`}
                       onClick={() => setExportFormat(format)}
                     >
                       <div className="flex items-start gap-3">
                         <Icon className={`w-5 h-5 mt-1 ${
-                          isSelected ? 'text-purple-600' : 'text-gray-500'
+                          isSelected ? 'text-purple-600' : 'text-gray-500 dark:text-gray-400'
                         }`} />
                         <div className="flex-1">
                           <p className="font-medium text-sm uppercase">{format}</p>
@@ -412,7 +412,7 @@ ${data.insights.map((insight: any) => `
                       checked={section.included}
                       onCheckedChange={() => toggleSection(section.id)}
                     />
-                    <Icon className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
+                    <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400 mt-1 flex-shrink-0" />
                     <div className="flex-1">
                       <label 
                         htmlFor={section.id}
@@ -449,7 +449,7 @@ ${data.insights.map((insight: any) => `
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Performance Analysis for {dateRange.label}
               </p>
-              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                 <span>Period: {dateRange.from} to {dateRange.to}</span>
                 <span>•</span>
                 <span>Format: {exportFormat.toUpperCase()}</span>
@@ -472,25 +472,25 @@ ${data.insights.map((insight: any) => `
                   <p className="text-2xl font-bold text-blue-600">
                     {analytics.performanceMetrics.totalProjects}
                   </p>
-                  <p className="text-xs text-gray-600">Total Projects</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Total Projects</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-green-600">
                     {Math.round(analytics.performanceMetrics.onTimeCompletion)}%
                   </p>
-                  <p className="text-xs text-gray-600">On-Time Rate</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">On-Time Rate</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-purple-600">
                     {analytics.templateUsage.length}
                   </p>
-                  <p className="text-xs text-gray-600">Templates</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Templates</p>
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-orange-600">
                     {analytics.phaseMetrics.length}
                   </p>
-                  <p className="text-xs text-gray-600">Phases</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Phases</p>
                 </div>
               </div>
             )}

@@ -206,7 +206,7 @@ export function ProjectWorkflowDetail({
       case 'cancelled':
         return <AlertCircle className="w-5 h-5 text-red-600" />;
       default:
-        return <Clock className="w-5 h-5 text-gray-600" />;
+        return <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -221,7 +221,7 @@ export function ProjectWorkflowDetail({
       case 'cancelled':
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     }
   };
 
@@ -279,7 +279,7 @@ export function ProjectWorkflowDetail({
             {onEdit && (
               <button
                 onClick={() => onEdit(workflow.id)}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center space-x-2 px-3 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <Edit2 className="w-4 h-4" />
                 <span>Edit</span>

@@ -14,9 +14,9 @@ export function getBOQStatusInfo(status: BOQStatus): StatusDisplayInfo {
     'draft': {
       label: 'Draft',
       color: 'gray',
-      bgColor: 'bg-gray-100',
-      textColor: 'text-gray-800',
-      borderColor: 'border-gray-200'
+      bgColor: 'bg-gray-100 dark:bg-gray-800',
+      textColor: 'text-gray-800 dark:text-gray-200',
+      borderColor: 'border-gray-200 dark:border-gray-700'
     },
     'mapping_review': {
       label: 'Mapping Review',
@@ -52,8 +52,8 @@ export function getMappingStatusInfo(status: BOQItemMappingStatusType): StatusDi
     'pending': {
       label: 'Pending',
       color: 'gray',
-      bgColor: 'bg-gray-100',
-      textColor: 'text-gray-800',
+      bgColor: 'bg-gray-100 dark:bg-gray-800',
+      textColor: 'text-gray-800 dark:text-gray-200',
       icon: '⏳'
     },
     'mapped': {
@@ -90,8 +90,8 @@ export function getProcurementStatusInfo(status: ProcurementStatusType): StatusD
     'pending': {
       label: 'Pending',
       color: 'gray',
-      bgColor: 'bg-gray-100',
-      textColor: 'text-gray-800',
+      bgColor: 'bg-gray-100 dark:bg-gray-800',
+      textColor: 'text-gray-800 dark:text-gray-200',
       icon: '📋'
     },
     'rfq_created': {

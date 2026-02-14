@@ -38,17 +38,17 @@ export class QFieldSyncErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full">
               <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
 
-            <h2 className="mt-4 text-lg font-semibold text-center text-gray-900">
+            <h2 className="mt-4 text-lg font-semibold text-center text-gray-900 dark:text-gray-100">
               Oops! Something went wrong
             </h2>
 
-            <p className="mt-2 text-sm text-center text-gray-600">
+            <p className="mt-2 text-sm text-center text-gray-600 dark:text-gray-400">
               We encountered an error while loading the QField Sync module.
             </p>
 
@@ -63,7 +63,7 @@ export class QFieldSyncErrorBoundary extends Component<Props, State> {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={this.handleReset}
-                className="flex-1 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="flex-1 flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again

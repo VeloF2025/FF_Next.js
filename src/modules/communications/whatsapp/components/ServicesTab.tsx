@@ -135,13 +135,13 @@ const PairingModal: React.FC<PairingModalProps> = ({
                 placeholder="+27821234567"
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none"
               />
-              <p className="text-xs text-gray-500 mt-1">Include country code (e.g., +27 for South Africa)</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Include country code (e.g., +27 for South Africa)</p>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
               >
                 Cancel
               </button>
@@ -159,7 +159,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
         {status === 'generating' && (
           <div className="text-center py-8">
             <Loader2 className="w-12 h-12 animate-spin text-green-500 mx-auto mb-4" />
-            <p className="text-gray-600">Generating pairing code...</p>
+            <p className="text-gray-600 dark:text-gray-400">Generating pairing code...</p>
           </div>
         )}
 
@@ -199,14 +199,14 @@ const PairingModal: React.FC<PairingModalProps> = ({
               </ol>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
               <Loader2 className="w-4 h-4 animate-spin" />
               Waiting for phone to connect...
             </div>
 
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
             >
               Cancel
             </button>
@@ -217,7 +217,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
           <div className="text-center py-8">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <p className="text-lg font-medium text-green-600">Paired Successfully!</p>
-            <p className="text-sm text-gray-500 mt-2">The service is now connected.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">The service is now connected.</p>
           </div>
         )}
 
@@ -231,7 +231,7 @@ const PairingModal: React.FC<PairingModalProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 dark:bg-gray-900 transition-colors"
               >
                 Cancel
               </button>

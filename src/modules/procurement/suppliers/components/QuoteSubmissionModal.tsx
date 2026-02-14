@@ -210,25 +210,25 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               Submit Quote - {rfq.rfqNumber}
             </h2>
-            <p className="text-sm text-gray-600">{rfq.title}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{rfq.title}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-gray-100 dark:bg-gray-800 rounded-lg"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Progress Steps */}
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-4">
             {[1, 2, 3].map((step) => (
               <div key={step} className="flex items-center">
@@ -236,21 +236,21 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                   className={`flex items-center justify-center w-8 h-8 rounded-full ${
                     step <= currentStep
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                   }`}
                 >
                   {step}
                 </div>
                 <span
                   className={`ml-2 text-sm ${
-                    step <= currentStep ? 'text-blue-600' : 'text-gray-500'
+                    step <= currentStep ? 'text-blue-600' : 'text-gray-500 dark:text-gray-400'
                   }`}
                 >
                   {step === 1 && 'Line Items'}
                   {step === 2 && 'Quote Details'}
                   {step === 3 && 'Review & Submit'}
                 </span>
-                {step < 3 && <div className="w-8 h-0.5 bg-gray-200 ml-4" />}
+                {step < 3 && <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 ml-4" />}
               </div>
             ))}
           </div>
@@ -261,7 +261,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Quote Line Items</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quote Line Items</h3>
                 <VelocityButton onClick={addLineItem} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
@@ -280,38 +280,38 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                   <GlassCard key={`${item.itemId}-${index}`}>
                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Item Code
                         </label>
                         <input
                           type="text"
                           value={item.itemCode}
                           onChange={(e) => updateLineItem(index, 'itemCode', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           readOnly={!!rfq.items}
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Item Name
                         </label>
                         <input
                           type="text"
                           value={item.itemName}
                           onChange={(e) => updateLineItem(index, 'itemName', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           readOnly={!!rfq.items}
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Quantity
                         </label>
                         <input
                           type="number"
                           value={item.quantity}
                           onChange={(e) => updateLineItem(index, 'quantity', parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           readOnly={!!rfq.items}
                         />
                       </div>
@@ -329,7 +329,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Unit Price (ZAR)
                         </label>
                         <input
@@ -338,7 +338,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                           value={item.unitPrice}
                           onChange={(e) => updateLineItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors[`unitPrice_${index}`] ? 'border-red-500' : 'border-gray-300'
+                            errors[`unitPrice_${index}`] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                           }`}
                         />
                         {errors[`unitPrice_${index}`] && (
@@ -346,18 +346,18 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Total Price
                         </label>
                         <input
                           type="text"
                           value={`R${item.totalPrice.toLocaleString()}`}
                           readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Delivery Time (days)
                         </label>
                         <input
@@ -365,7 +365,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                           value={item.deliveryTime}
                           onChange={(e) => updateLineItem(index, 'deliveryTime', parseInt(e.target.value) || 0)}
                           className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            errors[`deliveryTime_${index}`] ? 'border-red-500' : 'border-gray-300'
+                            errors[`deliveryTime_${index}`] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                           }`}
                         />
                         {errors[`deliveryTime_${index}`] && (
@@ -373,28 +373,28 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           Unit
                         </label>
                         <input
                           type="text"
                           value={item.unit}
                           onChange={(e) => updateLineItem(index, 'unit', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           readOnly={!!rfq.items}
                         />
                       </div>
                     </div>
 
                     <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Notes
                       </label>
                       <textarea
                         value={item.notes || ''}
                         onChange={(e) => updateLineItem(index, 'notes', e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Optional notes for this item..."
                       />
                     </div>
@@ -405,7 +405,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
               {/* Quote Total */}
               <GlassCard className="bg-blue-50 border-blue-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold text-gray-900">Quote Total:</span>
+                  <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quote Total:</span>
                   <span className="text-2xl font-bold text-blue-600">
                     R{(formData.totalAmount || 0).toLocaleString()}
                   </span>
@@ -416,11 +416,11 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
           {currentStep === 2 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Quote Details</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quote Details</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Validity Period (days)
                   </label>
                   <input
@@ -428,7 +428,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                     value={formData.validityPeriod}
                     onChange={(e) => setFormData(prev => ({ ...prev, validityPeriod: parseInt(e.target.value) || 30 }))}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.validityPeriod ? 'border-red-500' : 'border-gray-300'
+                      errors.validityPeriod ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   />
                   {errors.validityPeriod && (
@@ -437,14 +437,14 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Payment Terms
                   </label>
                   <select
                     value={formData.paymentTerms}
                     onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.paymentTerms ? 'border-red-500' : 'border-gray-300'
+                      errors.paymentTerms ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   >
                     <option value="30 days net">30 days net</option>
@@ -458,14 +458,14 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Delivery Terms
                   </label>
                   <select
                     value={formData.deliveryTerms}
                     onChange={(e) => setFormData(prev => ({ ...prev, deliveryTerms: e.target.value }))}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.deliveryTerms ? 'border-red-500' : 'border-gray-300'
+                      errors.deliveryTerms ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   >
                     <option value="Ex Works">Ex Works (EXW)</option>
@@ -479,7 +479,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Estimated Delivery Date
                   </label>
                   <input
@@ -487,7 +487,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
                     value={formData.estimatedDeliveryDate}
                     onChange={(e) => setFormData(prev => ({ ...prev, estimatedDeliveryDate: e.target.value }))}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      errors.estimatedDeliveryDate ? 'border-red-500' : 'border-gray-300'
+                      errors.estimatedDeliveryDate ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
                     }`}
                   />
                   {errors.estimatedDeliveryDate && (
@@ -497,40 +497,40 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Delivery Location
                 </label>
                 <input
                   type="text"
                   value={formData.deliveryLocation || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, deliveryLocation: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Delivery address or location..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Warranties
                 </label>
                 <textarea
                   value={formData.warranties || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, warranties: e.target.value }))}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Warranty terms and conditions..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Additional Notes
                 </label>
                 <textarea
                   value={formData.additionalNotes || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, additionalNotes: e.target.value }))}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Any additional information or terms..."
                 />
               </div>
@@ -539,28 +539,28 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
           {currentStep === 3 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Review & Submit</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Review & Submit</h3>
 
               {/* Quote Summary */}
               <GlassCard>
-                <h4 className="font-semibold text-gray-900 mb-4">Quote Summary</h4>
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Quote Summary</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
                     <p className="font-semibold text-lg">R{(formData.totalAmount || 0).toLocaleString()}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Valid Until:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Valid Until:</span>
                     <p className="font-medium">
                       {formData.validityPeriod} days from submission
                     </p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Payment Terms:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Payment Terms:</span>
                     <p className="font-medium">{formData.paymentTerms}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Delivery:</span>
+                    <span className="text-gray-600 dark:text-gray-400">Delivery:</span>
                     <p className="font-medium">{formData.estimatedDeliveryDate}</p>
                   </div>
                 </div>
@@ -568,19 +568,19 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
 
               {/* Line Items Summary */}
               <GlassCard>
-                <h4 className="font-semibold text-gray-900 mb-4">Line Items ({(formData.lineItems || []).length})</h4>
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Line Items ({(formData.lineItems || []).length})</h4>
                 <div className="space-y-3">
                   {(formData.lineItems || []).map((item, index) => (
                     <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
                       <div>
                         <p className="font-medium">{item.itemName} ({item.itemCode})</p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
                           {item.quantity} {item.unit} @ R{item.unitPrice.toLocaleString()} each
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">R{item.totalPrice.toLocaleString()}</p>
-                        <p className="text-sm text-gray-600">{item.deliveryTime} days</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{item.deliveryTime} days</p>
                       </div>
                     </div>
                   ))}
@@ -599,7 +599,7 @@ const QuoteSubmissionModal: React.FC<QuoteSubmissionModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
+        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
           <div>
             {currentStep > 1 && (
               <VelocityButton

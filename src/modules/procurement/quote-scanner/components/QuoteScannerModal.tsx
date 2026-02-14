@@ -409,7 +409,7 @@ export function QuoteScannerModal({
             onClick={handleClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-500" />
+            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -445,7 +445,7 @@ export function QuoteScannerModal({
                     >
                       Select File
                     </Button>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-4">
+                    <p className="text-xs text-gray-400 dark:text-gray-500 dark:text-gray-400 mt-4">
                       Supports PDF, JPEG, PNG (max 20MB)
                     </p>
                   </>
@@ -633,7 +633,7 @@ export function QuoteScannerModal({
                 )}
 
                 {isLoadingSuppliers && (
-                  <p className="text-xs text-gray-500 mt-2">Loading suppliers...</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Loading suppliers...</p>
                 )}
               </div>
 
@@ -790,7 +790,7 @@ export function QuoteScannerModal({
                       </tbody>
                     </table>
                     {result.extraction.lineItems.length > 10 && (
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         + {result.extraction.lineItems.length - 10} more items
                       </p>
                     )}

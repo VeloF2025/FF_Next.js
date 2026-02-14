@@ -156,7 +156,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
         const codeMatch = remaining.match(/`([^`]+)`/);
         if (codeMatch && codeMatch.index !== undefined) {
           if (codeMatch.index > 0) parts.push(remaining.substring(0, codeMatch.index));
-          parts.push(<code key={`c-${i}-${key++}`} className="bg-white/10 px-1.5 py-0.5 rounded text-xs font-mono">{codeMatch[1]}</code>);
+          parts.push(<code key={`c-${i}-${key++}`} className="bg-white dark:bg-gray-800/10 px-1.5 py-0.5 rounded text-xs font-mono">{codeMatch[1]}</code>);
           remaining = remaining.substring(codeMatch.index + codeMatch[0].length);
           continue;
         }
@@ -203,11 +203,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
           <div className="flex-shrink-0 bg-gradient-to-r from-emerald-600 to-cyan-600 p-4">
             <div className="flex items-center gap-3">
               {selectedTopic && (
-                <button onClick={goBack} className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors">
+                <button onClick={goBack} className="p-1 rounded-lg hover:bg-white dark:bg-gray-800/10 text-white/70 hover:text-white transition-colors">
                   <ChevronLeft className="w-5 h-5" />
                 </button>
               )}
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+              <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800/20 flex items-center justify-center backdrop-blur-sm">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -216,7 +216,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
                   {selectedTopic ? selectedTopic.label : 'Choose a topic to get started'}
                 </p>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors">
+              <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg hover:bg-white dark:bg-gray-800/10 text-white/70 hover:text-white transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>

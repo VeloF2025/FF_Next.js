@@ -152,7 +152,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
         );
       case 'false_positive':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
             <XCircle className="h-3 w-3" />
             False Positive
           </span>
@@ -289,13 +289,13 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   Loading...
                 </td>
               </tr>
             ) : data?.records.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   No serial swaps found for the selected filters
                 </td>
               </tr>
@@ -342,7 +342,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                         {record.days_pending} days
                       </span>
                     ) : (
-                      <span className="text-gray-500">-</span>
+                      <span className="text-gray-500 dark:text-gray-400">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -365,7 +365,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
                       </div>
                     )}
                     {record.swap_status === 'corrected_in_1map' && record.corrected_at && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {new Date(record.corrected_at).toISOString().split('T')[0]}
                       </span>
                     )}

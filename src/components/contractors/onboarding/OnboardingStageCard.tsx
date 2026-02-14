@@ -57,10 +57,10 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
         };
       case 'skipped':
         return {
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
-          textColor: 'text-gray-600',
-          badgeColor: 'bg-gray-100 text-gray-600',
+          bgColor: 'bg-gray-50 dark:bg-gray-900',
+          borderColor: 'border-gray-200 dark:border-gray-700',
+          textColor: 'text-gray-600 dark:text-gray-400',
+          badgeColor: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
           icon: '⤳',
           label: 'Skipped',
         };
@@ -107,7 +107,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className={`text-2xl ${config.textColor}`}>{config.icon}</span>
-            <h4 className="text-lg font-semibold text-gray-900">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {stage.stageOrder}. {stage.stageName}
             </h4>
           </div>
@@ -121,12 +121,12 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
       {stage.requiredDocuments.length > 0 && (
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-gray-600">Documents</span>
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Documents</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {stage.completedDocuments.length} / {stage.requiredDocuments.length}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <div
               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
               style={{ width: `${documentProgress}%` }}
@@ -136,7 +136,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
       )}
 
       {/* Timestamps */}
-      <div className="text-xs text-gray-600 space-y-1 mb-3">
+      <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1 mb-3">
         {stage.startedAt && (
           <div>Started: {new Date(stage.startedAt).toISOString().split('T')[0]}</div>
         )}
@@ -154,7 +154,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded text-sm"
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded text-sm"
             rows={3}
             placeholder="Add notes..."
           />
@@ -168,7 +168,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
             </button>
             <button
               onClick={() => setShowNotes(false)}
-              className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+              className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded hover:bg-gray-300"
             >
               Cancel
             </button>
@@ -176,7 +176,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
         </div>
       ) : (
         stage.notes && (
-          <div className="mb-3 p-2 bg-white rounded text-sm text-gray-700">
+          <div className="mb-3 p-2 bg-white dark:bg-gray-800 rounded text-sm text-gray-700 dark:text-gray-300">
             {stage.notes}
           </div>
         )
@@ -214,7 +214,7 @@ export function OnboardingStageCard({ stage, onUpdateStage }: OnboardingStageCar
         {!showNotes && (
           <button
             onClick={() => setShowNotes(true)}
-            className="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+            className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm rounded hover:bg-gray-300"
           >
             {stage.notes ? 'Edit Notes' : 'Add Notes'}
           </button>

@@ -24,38 +24,38 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
     <GlassCard>
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Item Code
           </label>
           <input
             type="text"
             value={item.itemCode}
             onChange={(e) => onUpdate(index, 'itemCode', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             readOnly={readOnly}
           />
         </div>
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Item Name
           </label>
           <input
             type="text"
             value={item.itemName}
             onChange={(e) => onUpdate(index, 'itemName', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             readOnly={readOnly}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Quantity
           </label>
           <input
             type="number"
             value={item.quantity}
             onChange={(e) => onUpdate(index, 'quantity', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             readOnly={readOnly}
           />
         </div>
@@ -73,7 +73,7 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Unit Price (ZAR)
           </label>
           <input
@@ -82,7 +82,7 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
             value={item.unitPrice}
             onChange={(e) => onUpdate(index, 'unitPrice', parseFloat(e.target.value) || 0)}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors[`unitPrice_${index}`] ? 'border-red-500' : 'border-gray-300'
+              errors[`unitPrice_${index}`] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             }`}
           />
           {errors[`unitPrice_${index}`] && (
@@ -90,19 +90,19 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Unit
           </label>
           <input
             type="text"
             value={item.unit}
             onChange={(e) => onUpdate(index, 'unit', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             readOnly={readOnly}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Delivery Time (days)
           </label>
           <input
@@ -110,7 +110,7 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
             value={item.deliveryTime}
             onChange={(e) => onUpdate(index, 'deliveryTime', parseInt(e.target.value) || 0)}
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              errors[`deliveryTime_${index}`] ? 'border-red-500' : 'border-gray-300'
+              errors[`deliveryTime_${index}`] ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
             }`}
           />
           {errors[`deliveryTime_${index}`] && (
@@ -118,27 +118,27 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Total Price
           </label>
           <input
             type="text"
             value={`R ${item.totalPrice.toLocaleString()}`}
             readOnly
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-medium"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 font-medium"
           />
         </div>
       </div>
 
       <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Notes
         </label>
         <textarea
           value={item.notes || ''}
           onChange={(e) => onUpdate(index, 'notes', e.target.value)}
           rows={2}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Add any notes or special requirements..."
         />
       </div>

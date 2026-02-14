@@ -194,7 +194,7 @@ export function AnalyticsTab() {
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-500" />
+            <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
             <Select value={dateRange.label} onValueChange={handleDateRangeChange}>
               <SelectTrigger className="w-40">
                 <SelectValue />

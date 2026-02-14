@@ -89,12 +89,12 @@ export function ComparisonTable({ manualSteps, aiSteps }: ComparisonTableProps) 
   return (
     <div className="space-y-4">
       {/* Statistics Header */}
-      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             label="Total Steps"
             value={totalSteps}
-            color="text-gray-900"
+            color="text-gray-900 dark:text-gray-100"
           />
           <StatCard
             label="Agreement"
@@ -110,38 +110,38 @@ export function ComparisonTable({ manualSteps, aiSteps }: ComparisonTableProps) 
           <StatCard
             label="No AI Data"
             value={totalSteps - stepsWithAI}
-            color="text-gray-500"
+            color="text-gray-500 dark:text-gray-400"
           />
         </div>
       </div>
 
       {/* Comparison Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   Step
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   Manual QA
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   AI Evaluation
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   AI Score
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   AI Comment
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 tracking-wide">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide">
                   Status
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
               {comparisonRows.map((row) => (
                 <ComparisonRow key={row.step} row={row} />
               ))}
@@ -151,8 +151,8 @@ export function ComparisonTable({ manualSteps, aiSteps }: ComparisonTableProps) 
       </div>
 
       {/* Legend */}
-      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Legend</h4>
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Legend</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <LegendItem
             color="bg-green-100 text-green-800"
@@ -170,7 +170,7 @@ export function ComparisonTable({ manualSteps, aiSteps }: ComparisonTableProps) 
             description="Manual and AI results differ"
           />
           <LegendItem
-            color="bg-gray-100 text-gray-600"
+            color="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
             label="No AI Data"
             description="AI evaluation not available"
           />
@@ -194,7 +194,7 @@ interface StatCardProps {
 function StatCard({ label, value, subValue, color }: StatCardProps) {
   return (
     <div className="text-center">
-      <p className="text-sm text-gray-600 mb-1">{label}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{label}</p>
       <p className={`text-2xl font-bold ${color}`}>
         {value}
       </p>
@@ -227,7 +227,7 @@ function ComparisonRow({ row }: ComparisonRowProps) {
       case 'disagree-ai-pass':
         return { label: '⚠ Disagree', color: 'bg-orange-100 text-orange-800' };
       case 'no-ai-data':
-        return { label: '— No Data', color: 'bg-gray-100 text-gray-600' };
+        return { label: '— No Data', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' };
     }
   };
 
@@ -244,7 +244,7 @@ function ComparisonRow({ row }: ComparisonRowProps) {
       case 'disagree-ai-pass':
         return 'bg-orange-50';
       case 'no-ai-data':
-        return 'bg-white';
+        return 'bg-white dark:bg-gray-800';
     }
   };
 
@@ -256,7 +256,7 @@ function ComparisonRow({ row }: ComparisonRowProps) {
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
             {row.step}
           </span>
-          <span className="text-sm font-medium text-gray-900">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {row.label}
           </span>
         </div>
@@ -272,7 +272,7 @@ function ComparisonRow({ row }: ComparisonRowProps) {
         {row.aiPassed !== null ? (
           <PassFailBadge passed={row.aiPassed} />
         ) : (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
             No Data
           </span>
         )}
@@ -282,10 +282,10 @@ function ComparisonRow({ row }: ComparisonRowProps) {
       <td className="px-4 py-3 whitespace-nowrap">
         {row.aiScore !== null ? (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {row.aiScore.toFixed(1)}
             </span>
-            <span className="text-xs text-gray-500">/10</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">/10</span>
             <ScoreBar score={row.aiScore} />
           </div>
         ) : (
@@ -296,7 +296,7 @@ function ComparisonRow({ row }: ComparisonRowProps) {
       {/* AI Comment */}
       <td className="px-4 py-3">
         {row.aiComment ? (
-          <p className="text-sm text-gray-700 max-w-md">
+          <p className="text-sm text-gray-700 dark:text-gray-300 max-w-md">
             {row.aiComment}
           </p>
         ) : (
@@ -357,7 +357,7 @@ function ScoreBar({ score }: ScoreBarProps) {
   };
 
   return (
-    <div className="flex-1 max-w-[100px] h-2 bg-gray-200 rounded-full overflow-hidden">
+    <div className="flex-1 max-w-[100px] h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
       <div
         className={`h-full ${getColor()} transition-all duration-300`}
         style={{ width: `${percentage}%` }}
@@ -382,7 +382,7 @@ function LegendItem({ color, label, description }: LegendItemProps) {
       <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${color} shrink-0`}>
         {label}
       </span>
-      <span className="text-xs text-gray-600">
+      <span className="text-xs text-gray-600 dark:text-gray-400">
         {description}
       </span>
     </div>

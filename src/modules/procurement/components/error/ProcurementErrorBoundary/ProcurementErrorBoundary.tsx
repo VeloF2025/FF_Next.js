@@ -73,7 +73,7 @@ export class ProcurementErrorBoundary extends Component<ErrorBoundaryProps, Erro
       const isComponentLevel = this.props.level === 'component';
 
       return (
-        <div className={`${isComponentLevel ? 'bg-red-50 border border-red-200 rounded-lg p-4' : 'min-h-screen bg-gray-50 flex items-center justify-center px-4'}`}>
+        <div className={`${isComponentLevel ? 'bg-red-50 border border-red-200 rounded-lg p-4' : 'min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4'}`}>
           <div className={`${isComponentLevel ? 'w-full' : 'max-w-2xl w-full'}`}>
             <ErrorDisplay
               errorDetails={errorDetails}
@@ -96,7 +96,7 @@ export class ProcurementErrorBoundary extends Component<ErrorBoundaryProps, Erro
 
             {/* Help Text */}
             {!isComponentLevel && (
-              <p className="text-center text-sm text-gray-500 mt-6">
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
                 If this problem persists, please contact support with the error details above.
               </p>
             )}

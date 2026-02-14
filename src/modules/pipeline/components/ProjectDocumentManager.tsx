@@ -314,7 +314,7 @@ export function ProjectDocumentManager({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Project Documents
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {documents.length} document{documents.length !== 1 ? 's' : ''} total
           </p>
         </div>
@@ -382,7 +382,7 @@ export function ProjectDocumentManager({
       {filteredDocs.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
           <FolderOpen className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-500">No documents found</p>
+          <p className="text-gray-500 dark:text-gray-400">No documents found</p>
           {!readonly && (
             <button
               onClick={() => setShowUploadForm(true)}
@@ -553,7 +553,7 @@ export function ProjectDocumentManager({
                     className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Upload a file or paste a URL</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload a file or paste a URL</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -656,7 +656,7 @@ function DocumentRow({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
           <span>{DOCUMENT_TYPES.find((t) => t.value === doc.document_type)?.label || doc.document_type}</span>
           {doc.file_size && <span>• {formatFileSize(doc.file_size)}</span>}
           {doc.reference_number && <span>• Ref: {doc.reference_number}</span>}
@@ -679,7 +679,7 @@ function DocumentRow({
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
             title="Open document"
           >
-            <ExternalLink className="w-4 h-4 text-gray-500" />
+            <ExternalLink className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </a>
         )}
         {!readonly && (

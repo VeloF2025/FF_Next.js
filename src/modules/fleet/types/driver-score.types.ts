@@ -387,7 +387,7 @@ export function getRankBadge(rank: number): { label: string; color: string; icon
   if (rank === 2) return { label: 'Silver', color: 'text-gray-400', icon: '🥈' };
   if (rank === 3) return { label: 'Bronze', color: 'text-orange-500', icon: '🥉' };
   if (rank <= 10) return { label: 'Top 10', color: 'text-blue-500', icon: '⭐' };
-  return { label: `#${rank}`, color: 'text-gray-500', icon: '' };
+  return { label: `#${rank}`, color: 'text-gray-500 dark:text-gray-400', icon: '' };
 }
 
 /**

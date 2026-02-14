@@ -67,7 +67,7 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
                 {isSyncing ? (
                   <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
                 ) : (
-                  <RefreshCw className="w-4 h-4 text-gray-500" />
+                  <RefreshCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 )}
               </button>
             )}
@@ -83,23 +83,23 @@ export function OfflineIndicator({ showDetails = false }: OfflineIndicatorProps)
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
                 {syncStatus.pending}
               </p>
-              <p className="text-xs text-gray-500">Pending</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Pending</p>
             </div>
             <div>
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
                 {syncStatus.syncing}
               </p>
-              <p className="text-xs text-gray-500">Syncing</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Syncing</p>
             </div>
             <div>
               <p className="text-lg font-semibold text-red-600 dark:text-red-400">
                 {syncStatus.failed}
               </p>
-              <p className="text-xs text-gray-500">Failed</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Failed</p>
             </div>
           </div>
           {syncStatus.lastSyncAt && (
-            <p className="mt-2 text-xs text-gray-500 text-center">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
               Last sync: {new Date(syncStatus.lastSyncAt).toLocaleString()}
             </p>
           )}

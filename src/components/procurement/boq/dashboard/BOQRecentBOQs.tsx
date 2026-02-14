@@ -21,10 +21,10 @@ export default function BOQRecentBOQs({
   getStatusColor
 }: BOQRecentBOQsProps) {
   return (
-    <div className="bg-white rounded-lg border">
-      <div className="p-6 border-b border-gray-200">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">Recent BOQs</h3>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent BOQs</h3>
           <button
             onClick={onViewAll}
             className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
@@ -36,7 +36,7 @@ export default function BOQRecentBOQs({
       </div>
       <div className="divide-y divide-gray-200">
         {recentBOQs.length === 0 ? (
-          <div className="p-6 text-center text-gray-500">
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
             <FileText className="mx-auto h-8 w-8 text-gray-300 mb-2" />
             <p>No BOQs yet</p>
           </div>
@@ -44,22 +44,22 @@ export default function BOQRecentBOQs({
           recentBOQs.map((boq) => (
             <div
               key={boq.id}
-              className="p-4 hover:bg-gray-50 cursor-pointer"
+              className="p-4 hover:bg-gray-50 dark:bg-gray-900 cursor-pointer"
               onClick={() => onSelectBOQ(boq)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <FileText className="h-5 w-5 text-gray-400" />
                   <div>
-                    <p className="font-medium text-gray-900">{boq.version}</p>
-                    <p className="text-sm text-gray-500">{boq.fileName}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">{boq.version}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{boq.fileName}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(boq.status)}`}>
                     {boq.status.replace('_', ' ')}
                   </span>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {formatRelativeTime(boq.createdAt)}
                   </p>
                 </div>

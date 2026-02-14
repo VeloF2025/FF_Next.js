@@ -122,14 +122,14 @@ export function InfrastructureHealthDashboard() {
               type="checkbox"
               checked={autoRefresh}
               onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="w-4 h-4 rounded border-white/20 bg-white/5 text-velocity-accent focus:ring-velocity-accent"
+              className="w-4 h-4 rounded border-white/20 bg-white dark:bg-gray-800/5 text-velocity-accent focus:ring-velocity-accent"
             />
             Auto-refresh
           </label>
           <button
             onClick={fetchHealth}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800/5 hover:bg-white dark:bg-gray-800/10 rounded-lg transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -182,7 +182,7 @@ export function InfrastructureHealthDashboard() {
       {loading && !health && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-32 bg-white/5 rounded-xl animate-pulse" />
+            <div key={i} className="h-32 bg-white dark:bg-gray-800/5 rounded-xl animate-pulse" />
           ))}
         </div>
       )}
@@ -300,9 +300,9 @@ export function InfrastructureHealthDashboard() {
                 <Activity className="w-5 h-5 text-red-400" />
                 <h3 className="text-lg font-semibold text-white">Recent Recovery Actions</h3>
               </div>
-              <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+              <div className="bg-white dark:bg-gray-800/5 rounded-xl border border-white/10 overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-white/5">
+                  <thead className="bg-white dark:bg-gray-800/5">
                     <tr>
                       <th className="text-left px-4 py-2 text-white/60 font-medium">Time</th>
                       <th className="text-left px-4 py-2 text-white/60 font-medium">Service</th>
@@ -312,7 +312,7 @@ export function InfrastructureHealthDashboard() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {health.recentRecoveryActions.map((action) => (
-                      <tr key={action.id} className="hover:bg-white/5">
+                      <tr key={action.id} className="hover:bg-white dark:bg-gray-800/5">
                         <td className="px-4 py-2 text-white/80">
                           {action.minutesAgo !== undefined
                             ? `${action.minutesAgo}m ago`

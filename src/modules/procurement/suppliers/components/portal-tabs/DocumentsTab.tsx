@@ -46,19 +46,19 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = () => {
       case 'approved': return 'text-green-600 bg-green-50';
       case 'pending': return 'text-yellow-600 bg-yellow-50';
       case 'rejected': return 'text-red-600 bg-red-50';
-      case 'expired': return 'text-gray-600 bg-gray-50';
-      default: return 'text-gray-600 bg-gray-50';
+      case 'expired': return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900';
+      default: return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900';
     }
   };
 
   const getDocumentIcon = (_type: string) => {
-    return <FileText className="h-5 w-5 text-gray-500" />;
+    return <FileText className="h-5 w-5 text-gray-500 dark:text-gray-400" />;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Document Management</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Document Management</h2>
         <VelocityButton>
           <Upload className="h-4 w-4 mr-2" />
           Upload Document
@@ -72,8 +72,8 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = () => {
               <div className="flex items-center space-x-4">
                 {getDocumentIcon(doc.type)}
                 <div>
-                  <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                  <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">{doc.name}</h3>
+                  <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
                     <span>Uploaded: {new Date(doc.uploadedDate).toISOString().split('T')[0]}</span>
                     {doc.expiryDate && (
                       <span>Expires: {new Date(doc.expiryDate).toISOString().split('T')[0]}</span>

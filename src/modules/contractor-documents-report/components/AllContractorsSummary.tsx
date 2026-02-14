@@ -23,7 +23,7 @@ export default function AllContractorsSummary() {
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading contractors summary...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading contractors summary...</p>
         </div>
       </div>
     );
@@ -39,8 +39,8 @@ export default function AllContractorsSummary() {
 
   if (!data) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <p className="text-gray-600">No summary data available</p>
+      <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <p className="text-gray-600 dark:text-gray-400">No summary data available</p>
       </div>
     );
   }
@@ -60,11 +60,11 @@ export default function AllContractorsSummary() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <FileText size={28} />
             Contractor Documents Status Report
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Overview of document compliance across all contractors
           </p>
         </div>
@@ -72,14 +72,14 @@ export default function AllContractorsSummary() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportAll}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
           >
             <Download size={16} />
             Export All CSV
           </button>
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:bg-gray-900"
           >
             Print
           </button>
@@ -87,8 +87,8 @@ export default function AllContractorsSummary() {
       </div>
 
       {/* Overall Statistics */}
-      <div className="bg-white p-6 rounded-lg border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">📊 Overall Statistics</h2>
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">📊 Overall Statistics</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="text-3xl font-bold text-green-700">{data.overallStats.fullyCompliant}</div>
@@ -109,7 +109,7 @@ export default function AllContractorsSummary() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
@@ -117,41 +117,41 @@ export default function AllContractorsSummary() {
             placeholder="Search contractors..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
       </div>
 
       {/* Contractors Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Contractor
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Completion
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Missing
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Expired
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Pending
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 tracking-wide">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 dark:text-gray-300 tracking-wide">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
               {filteredContractors.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     {searchTerm ? 'No contractors found matching your search' : 'No contractors available'}
                   </td>
                 </tr>
@@ -166,17 +166,17 @@ export default function AllContractorsSummary() {
                       : '';
 
                   return (
-                    <tr key={contractor.id} className={`hover:bg-gray-50 ${rowClass}`}>
+                    <tr key={contractor.id} className={`hover:bg-gray-50 dark:bg-gray-900 ${rowClass}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           {contractor.hasAlerts && (
                             <AlertCircle size={16} className="text-orange-500 flex-shrink-0" />
                           )}
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                               {contractor.name}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
                               {contractor.verified} verified, {contractor.totalDocuments} total
                             </div>
                           </div>
@@ -189,7 +189,7 @@ export default function AllContractorsSummary() {
                             showLabel={false}
                             height="sm"
                           />
-                          <div className="text-xs text-gray-600 mt-1 text-center font-medium">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 text-center font-medium">
                             {contractor.completionPercentage}%
                           </div>
                         </div>
@@ -198,7 +198,7 @@ export default function AllContractorsSummary() {
                         <span
                           className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
                             contractor.missing > 0
-                              ? 'bg-gray-100 text-gray-800'
+                              ? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200'
                               : 'bg-green-100 text-green-800'
                           }`}
                         >
@@ -245,7 +245,7 @@ export default function AllContractorsSummary() {
       </div>
 
       {/* Footer Info */}
-      <div className="text-sm text-gray-500 text-center">
+      <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
         Showing {filteredContractors.length} of {data.contractors.length} contractors
       </div>
     </div>

@@ -28,26 +28,26 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({ po }) => {
         </h3>
         <div className="space-y-3">
           <div>
-            <span className="font-medium text-gray-700">Title:</span>
-            <p className="text-gray-900">{po.title}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Title:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.title}</p>
           </div>
           {po.description && (
             <div>
-              <span className="font-medium text-gray-700">Description:</span>
-              <p className="text-gray-900">{po.description}</p>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
+              <p className="text-gray-900 dark:text-gray-100">{po.description}</p>
             </div>
           )}
           <div>
-            <span className="font-medium text-gray-700">Order Type:</span>
-            <p className="text-gray-900">{po.orderType}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Order Type:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.orderType}</p>
           </div>
           <div>
-            <span className="font-medium text-gray-700">Created By:</span>
-            <p className="text-gray-900">{po.createdBy}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Created By:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.createdBy}</p>
           </div>
           <div>
-            <span className="font-medium text-gray-700">Created Date:</span>
-            <p className="text-gray-900">{formatDate(po.createdAt)}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Created Date:</span>
+            <p className="text-gray-900 dark:text-gray-100">{formatDate(po.createdAt)}</p>
           </div>
         </div>
       </GlassCard>
@@ -60,31 +60,31 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({ po }) => {
         </h3>
         <div className="space-y-3">
           <div>
-            <span className="font-medium text-gray-700">Name:</span>
-            <p className="text-gray-900">{po.supplier.name}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Name:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.supplier.name}</p>
           </div>
           {po.supplier.code && (
             <div>
-              <span className="font-medium text-gray-700">Code:</span>
-              <p className="text-gray-900">{po.supplier.code}</p>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Code:</span>
+              <p className="text-gray-900 dark:text-gray-100">{po.supplier.code}</p>
             </div>
           )}
           {po.supplier.contactPerson && (
             <div>
-              <span className="font-medium text-gray-700">Contact Person:</span>
-              <p className="text-gray-900">{po.supplier.contactPerson}</p>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Contact Person:</span>
+              <p className="text-gray-900 dark:text-gray-100">{po.supplier.contactPerson}</p>
             </div>
           )}
           {po.supplier.email && (
             <div>
-              <span className="font-medium text-gray-700">Email:</span>
-              <p className="text-gray-900">{po.supplier.email}</p>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Email:</span>
+              <p className="text-gray-900 dark:text-gray-100">{po.supplier.email}</p>
             </div>
           )}
           {po.supplier.phone && (
             <div>
-              <span className="font-medium text-gray-700">Phone:</span>
-              <p className="text-gray-900">{po.supplier.phone}</p>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Phone:</span>
+              <p className="text-gray-900 dark:text-gray-100">{po.supplier.phone}</p>
             </div>
           )}
         </div>
@@ -98,17 +98,17 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({ po }) => {
         </h3>
         <div className="space-y-3">
           <div className="flex justify-between">
-            <span className="font-medium text-gray-700">Subtotal:</span>
-            <span className="text-gray-900">{formatCurrency(po.subtotal)}</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Subtotal:</span>
+            <span className="text-gray-900 dark:text-gray-100">{formatCurrency(po.subtotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="font-medium text-gray-700">Tax Amount:</span>
-            <span className="text-gray-900">{formatCurrency(po.taxAmount)}</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Tax Amount:</span>
+            <span className="text-gray-900 dark:text-gray-100">{formatCurrency(po.taxAmount)}</span>
           </div>
           {po.discountAmount && po.discountAmount > 0 && (
             <div className="flex justify-between">
-              <span className="font-medium text-gray-700">Discount:</span>
-              <span className="text-gray-900">-{formatCurrency(po.discountAmount)}</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">Discount:</span>
+              <span className="text-gray-900 dark:text-gray-100">-{formatCurrency(po.discountAmount)}</span>
             </div>
           )}
           <div className="flex justify-between border-t pt-3 text-lg font-semibold">
@@ -126,20 +126,20 @@ export const DetailsTab: React.FC<DetailsTabProps> = ({ po }) => {
         </h3>
         <div className="space-y-3">
           <div>
-            <span className="font-medium text-gray-700">Payment Terms:</span>
-            <p className="text-gray-900">{po.paymentTerms}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Payment Terms:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.paymentTerms}</p>
           </div>
           <div>
-            <span className="font-medium text-gray-700">Delivery Terms:</span>
-            <p className="text-gray-900">{po.deliveryTerms}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Delivery Terms:</span>
+            <p className="text-gray-900 dark:text-gray-100">{po.deliveryTerms}</p>
           </div>
           <div>
-            <span className="font-medium text-gray-700">Expected Delivery:</span>
-            <p className="text-gray-900">{formatDate(po.expectedDeliveryDate)}</p>
+            <span className="font-medium text-gray-700 dark:text-gray-300">Expected Delivery:</span>
+            <p className="text-gray-900 dark:text-gray-100">{formatDate(po.expectedDeliveryDate)}</p>
           </div>
           <div>
-            <span className="font-medium text-gray-700">Delivery Address:</span>
-            <div className="text-gray-900">
+            <span className="font-medium text-gray-700 dark:text-gray-300">Delivery Address:</span>
+            <div className="text-gray-900 dark:text-gray-100">
               <p>{po.deliveryAddress.street}</p>
               <p>{po.deliveryAddress.city}, {po.deliveryAddress.province}</p>
               <p>{po.deliveryAddress.postalCode}, {po.deliveryAddress.country}</p>

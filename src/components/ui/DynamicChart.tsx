@@ -31,7 +31,7 @@ const createLazyChartComponent = (componentName: string) =>
         // Return a fallback component
         const FallbackComponent: React.ComponentType<FallbackComponentProps> = ({ className, children }) =>
           React.createElement('div', {
-            className: className || 'p-4 text-center text-gray-500 border-2 border-dashed border-gray-300 rounded'
+            className: className || 'p-4 text-center text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded'
           }, children || `Chart component (${componentName}) failed to load`);
 
         return { default: FallbackComponent };

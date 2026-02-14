@@ -63,7 +63,7 @@ function ScoreGauge({ score, label, icon: Icon, description, trend, trendValue }
         </div>
         {trend && (
           <div className={`flex items-center gap-1 text-sm ${
-            trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-500'
+            trend === 'up' ? 'text-green-500' : trend === 'down' ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'
           }`}>
             {trend === 'up' ? <TrendingUp className="w-4 h-4" /> : trend === 'down' ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
             {trendValue !== null && <span>{trendValue > 0 ? '+' : ''}{trendValue.toFixed(1)}</span>}

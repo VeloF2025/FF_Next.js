@@ -66,7 +66,7 @@ export function ContractorAccountabilityList({
             placeholder="Search contractors..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           />
         </div>
 
@@ -75,7 +75,7 @@ export function ContractorAccountabilityList({
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as typeof filter)}
-            className="appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="appearance-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="all">All Contractors</option>
             <option value="blocked">Blocked Only</option>
@@ -86,7 +86,7 @@ export function ContractorAccountabilityList({
 
       {/* Stats Summary */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
               <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -100,7 +100,7 @@ export function ContractorAccountabilityList({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900/30">
               <Ban className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -114,7 +114,7 @@ export function ContractorAccountabilityList({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -131,7 +131,7 @@ export function ContractorAccountabilityList({
 
       {/* Contractors List */}
       {filteredContractors.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
             No contractors found
@@ -219,7 +219,7 @@ export function ContractorAccountabilityList({
                         </div>
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-500">-</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -227,7 +227,7 @@ export function ContractorAccountabilityList({
                       {onView && (
                         <button
                           onClick={() => onView(contractor)}
-                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 dark:bg-gray-800 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                           title="View details"
                         >
                           <Eye className="h-4 w-4" />

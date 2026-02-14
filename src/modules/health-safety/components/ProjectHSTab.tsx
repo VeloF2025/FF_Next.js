@@ -111,7 +111,7 @@ export function ProjectHSTab({
           </h3>
           <button
             onClick={() => setShowConfigModal(true)}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             <Settings className="w-5 h-5" />
           </button>
@@ -163,7 +163,7 @@ export function ProjectHSTab({
 
         <button
           onClick={() => window.location.href = `/health-safety/incidents?project_id=${projectId}`}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
         >
           <AlertTriangle className="w-4 h-4" />
           Report Incident
@@ -342,7 +342,7 @@ function DueDateCard({
       }`}
     >
       <div className="flex items-center gap-2 mb-1">
-        <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : 'text-gray-500'}`} />
+        <Calendar className={`w-4 h-4 ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : 'text-gray-500 dark:text-gray-400'}`} />
         <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
       </div>
       {dueDate ? (
@@ -391,7 +391,7 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
 
       <div className="flex items-center gap-3">
         {audit.overall_score !== null && (
-          <span className={`text-lg font-semibold ${ragColors[audit.rag_status]?.split(' ')[1] || 'text-gray-600'}`}>
+          <span className={`text-lg font-semibold ${ragColors[audit.rag_status]?.split(' ')[1] || 'text-gray-600 dark:text-gray-400'}`}>
             {audit.overall_score}%
           </span>
         )}

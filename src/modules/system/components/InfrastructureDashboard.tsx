@@ -169,7 +169,7 @@ export default function InfrastructureDashboard() {
               <div className="flex items-center gap-3">
                 <Icon className={`w-5 h-5 ${config.color}`} />
                 <span className="text-lg font-medium text-white">{config.label}</span>
-                <span className="text-sm text-gray-500">({services.length})</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">({services.length})</span>
               </div>
               {isExpanded ? (
                 <ChevronDown className="w-5 h-5 text-gray-400" />
@@ -244,7 +244,7 @@ function ServiceRow({
 
         <div className="flex items-center gap-4">
           {health?.responseTimeMs && (
-            <span className="text-sm text-gray-500">{health.responseTimeMs}ms</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">{health.responseTimeMs}ms</span>
           )}
           <StatusIcon className={`w-4 h-4 ${statusConfig.color}`} />
           {isExpanded ? (
@@ -261,19 +261,19 @@ function ServiceRow({
           {/* Service Details */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-gray-500">Health Check</span>
+              <span className="text-gray-500 dark:text-gray-400">Health Check</span>
               <p className="text-gray-300">{service.healthCheckType}</p>
             </div>
             <div>
-              <span className="text-gray-500">Timeout</span>
+              <span className="text-gray-500 dark:text-gray-400">Timeout</span>
               <p className="text-gray-300">{service.timeoutMs}ms</p>
             </div>
             <div>
-              <span className="text-gray-500">Recovery</span>
+              <span className="text-gray-500 dark:text-gray-400">Recovery</span>
               <p className="text-gray-300">{service.recoveryEnabled ? 'Enabled' : 'Disabled'}</p>
             </div>
             <div>
-              <span className="text-gray-500">Cooldown</span>
+              <span className="text-gray-500 dark:text-gray-400">Cooldown</span>
               <p className="text-gray-300">{service.cooldownMinutes}min</p>
             </div>
           </div>
@@ -281,7 +281,7 @@ function ServiceRow({
           {/* Endpoint */}
           {service.healthEndpoint && (
             <div className="text-sm">
-              <span className="text-gray-500">Endpoint: </span>
+              <span className="text-gray-500 dark:text-gray-400">Endpoint: </span>
               <code className="text-gray-300 bg-gray-800 px-2 py-0.5 rounded">
                 {service.healthEndpoint}
               </code>

@@ -322,7 +322,7 @@ export function PhotoReviewPhase({
         <p className="text-gray-600 dark:text-gray-400 mb-2">
           Before proceeding, we need to categorize {photoCount} photos using AI.
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+        <p className="text-sm text-gray-500 dark:text-gray-500 dark:text-gray-400 mb-6">
           The AI will identify which installation step each photo belongs to.
           You&apos;ll then review and approve the results.
         </p>
@@ -545,7 +545,7 @@ export function PhotoReviewPhase({
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <h5 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2">
                 <span>🗑️ Discarded Photos ({discardedPhotos.length})</span>
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 dark:text-gray-400">
                   — reassign to a step to include in review
                 </span>
               </h5>
@@ -656,7 +656,7 @@ export function PhotoReviewPhase({
                 <div className={`text-xl font-bold ${isMissing ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
                   {count}
                 </div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-500">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-500 dark:text-gray-400">
                   Step {step}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">

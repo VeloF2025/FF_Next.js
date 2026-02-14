@@ -70,7 +70,7 @@ export function ExecutionLogs({
       case 'assigned':
         return <User className="w-4 h-4 text-indigo-600" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-600" />;
+        return <Clock className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -89,7 +89,7 @@ export function ExecutionLogs({
       case 'assigned':
         return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400';
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     }
   };
 

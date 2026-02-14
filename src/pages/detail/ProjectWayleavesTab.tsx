@@ -113,7 +113,7 @@ const pipelineStatusLabels: Record<string, string> = {
 };
 
 const pipelineStatusColors: Record<string, string> = {
-  lead: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  lead: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
   qualifying: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   planning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
   ready_to_plan: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',

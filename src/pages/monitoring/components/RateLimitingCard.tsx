@@ -32,7 +32,7 @@ export function RateLimitingCard() {
             >
               <div>
                 <div className="font-medium">{stat.label}</div>
-                <div className="text-sm text-gray-600">{stat.description}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{stat.description}</div>
               </div>
               <div className="text-2xl font-bold">{stat.value}</div>
             </div>

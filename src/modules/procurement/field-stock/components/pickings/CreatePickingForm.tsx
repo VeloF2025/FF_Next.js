@@ -255,7 +255,7 @@ export function CreatePickingForm({
         <select
           value={pickingType}
           onChange={(e) => setPickingType(e.target.value as PickingType)}
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
         >
           <option value="issue">Issue to Technician</option>
           <option value="transfer">Transfer Between Locations</option>
@@ -275,7 +275,7 @@ export function CreatePickingForm({
             value={sourceLocationId}
             onChange={(e) => setSourceLocationId(e.target.value)}
             disabled={loadingLocations}
-            className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="">Select source...</option>
             {getLocationsByType('source').map(loc => (
@@ -296,7 +296,7 @@ export function CreatePickingForm({
               value={destinationLocationId}
               onChange={(e) => setDestinationLocationId(e.target.value)}
               disabled={loadingLocations}
-              className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
             >
               <option value="">Select destination...</option>
               {getLocationsByType('destination').map(loc => (
@@ -311,7 +311,7 @@ export function CreatePickingForm({
 
       {/* Contractor/Technician Info */}
       {(contractorName || technicianName) && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 dark:border-gray-700 dark:bg-gray-800">
           <p className="text-sm text-gray-500 dark:text-gray-400">Issuing to:</p>
           <p className="font-medium text-gray-900 dark:text-white">
             {technicianName || contractorName}
@@ -335,7 +335,7 @@ export function CreatePickingForm({
         </div>
 
         {lines.length === 0 ? (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-600 dark:bg-gray-800">
+          <div className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-8 text-center dark:border-gray-600 dark:bg-gray-800">
             <Package className="mx-auto h-10 w-10 text-gray-400" />
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               No items added yet. Click "Add Item" to start.
@@ -346,7 +346,7 @@ export function CreatePickingForm({
             {lines.map((line, index) => (
               <div
                 key={line.id}
-                className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+                className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 dark:border-gray-700 dark:bg-gray-800"
               >
                 <div className="flex-1 grid gap-3 sm:grid-cols-3">
                   <div className="sm:col-span-2">
@@ -356,7 +356,7 @@ export function CreatePickingForm({
                     <select
                       value={line.stockItemId}
                       onChange={(e) => updateLine(line.id, { stockItemId: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     >
                       <option value="">Select item...</option>
                       {stockItems.map(item => (
@@ -379,7 +379,7 @@ export function CreatePickingForm({
                       onChange={(e) => updateLine(line.id, {
                         plannedQuantity: Math.max(1, parseInt(e.target.value) || 1)
                       })}
-                      className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                 </div>
@@ -406,7 +406,7 @@ export function CreatePickingForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           placeholder="Any additional notes..."
-          className="w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-gray-900 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-2 px-3 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
         />
       </div>
 
@@ -416,7 +416,7 @@ export function CreatePickingForm({
           <button
             onClick={onCancel}
             disabled={submitting}
-            className="flex-1 rounded-lg border border-gray-300 bg-white py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+            className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:bg-gray-900 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
           >
             Cancel
           </button>

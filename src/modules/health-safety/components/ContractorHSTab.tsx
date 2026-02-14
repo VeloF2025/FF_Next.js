@@ -274,7 +274,7 @@ function TabButton({
       className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
         active
           ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+          : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
       }`}
     >
       <Icon className="w-4 h-4" />
@@ -518,7 +518,7 @@ function DocumentsSection({
                   </span>
                 )}
                 {doc?.status === 'missing' && (
-                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-400 rounded">
+                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:bg-gray-700 dark:text-gray-400 rounded">
                     Missing
                   </span>
                 )}
@@ -590,7 +590,7 @@ function IncidentsSection({
                         ? 'text-red-600'
                         : incident.severity === 'major'
                           ? 'text-orange-600'
-                          : 'text-gray-500'
+                          : 'text-gray-500 dark:text-gray-400'
                     }`}
                   />
                 </div>

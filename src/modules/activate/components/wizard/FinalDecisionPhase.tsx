@@ -408,7 +408,7 @@ export function FinalDecisionPhase({
             />
             <button
               onClick={() => setLightboxPhoto(null)}
-              className="absolute top-2 right-2 p-2 bg-white/20 rounded-full hover:bg-white/40"
+              className="absolute top-2 right-2 p-2 bg-white dark:bg-gray-800/20 rounded-full hover:bg-white dark:bg-gray-800/40"
             >
               <span className="text-white text-xl">×</span>
             </button>
@@ -452,12 +452,12 @@ export function FinalDecisionPhase({
                   </div>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{swapCheck.details}</p>
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
-                      <span className="text-gray-500">ONT field:</span>
+                    <div className="bg-white dark:bg-gray-800/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-gray-500 dark:text-gray-400">ONT field:</span>
                       <code className="ml-1 font-mono">{wizardState.prerequisites.ontSerial || 'N/A'}</code>
                     </div>
-                    <div className="bg-white/50 dark:bg-black/20 p-2 rounded">
-                      <span className="text-gray-500">UPS field:</span>
+                    <div className="bg-white dark:bg-gray-800/50 dark:bg-black/20 p-2 rounded">
+                      <span className="text-gray-500 dark:text-gray-400">UPS field:</span>
                       <code className="ml-1 font-mono">{wizardState.prerequisites.upsSerial || 'N/A'}</code>
                     </div>
                   </div>
@@ -494,19 +494,19 @@ export function FinalDecisionPhase({
           {/* Passing checks - compact */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Prerequisites:</span>
+              <span className="text-gray-500 dark:text-gray-400">Prerequisites:</span>
               <span>{getStatusIcon(wizardState.prerequisites.passed)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Photo Coverage:</span>
+              <span className="text-gray-500 dark:text-gray-400">Photo Coverage:</span>
               <span>{getStatusIcon(wizardState.photoReview.stepsMissing.length === 0)} {10 - wizardState.photoReview.stepsMissing.length}/10</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Power Meter:</span>
+              <span className="text-gray-500 dark:text-gray-400">Power Meter:</span>
               <span>{getStatusIcon(wizardState.dataValidation.powerMeter.inRange)} {wizardState.dataValidation.powerMeter.value} dBm</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Serials Scanned:</span>
+              <span className="text-gray-500 dark:text-gray-400">Serials Scanned:</span>
               <span>
                 {(() => {
                   const swapped = detectSwappedSerials(
@@ -586,12 +586,12 @@ export function FinalDecisionPhase({
               className={`p-3 rounded-lg border text-left transition-all ${
                 issueClassification.issueType === type.id
                   ? `border-${type.color}-500 bg-${type.color}-50 dark:bg-${type.color}-900/20 ring-2 ring-${type.color}-500/20`
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
               }`}
             >
               <div className="text-2xl mb-1">{type.icon}</div>
               <div className="font-medium text-sm">{type.label}</div>
-              <div className="text-xs text-gray-500">{type.desc}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{type.desc}</div>
             </button>
           ))}
         </div>
@@ -661,7 +661,7 @@ export function FinalDecisionPhase({
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   issueClassification.ticketType === 'maintenance'
                     ? 'border-red-500 bg-red-100 dark:bg-red-900/30 text-red-700'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
                 }`}
               >
                 🔧 Maintenance Ticket
@@ -672,7 +672,7 @@ export function FinalDecisionPhase({
                 className={`px-4 py-2 rounded-lg border transition-colors ${
                   issueClassification.ticketType === 'qa'
                     ? 'border-orange-500 bg-orange-100 dark:bg-orange-900/30 text-orange-700'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
                 }`}
               >
                 📋 QA Ticket
@@ -753,7 +753,7 @@ export function FinalDecisionPhase({
                     : d === 'FAIL'
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
                       : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:border-gray-600'
               }`}
             >
               <input

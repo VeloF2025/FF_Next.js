@@ -184,7 +184,7 @@ export function EditorMinimap() {
         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
           Minimap
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-500">
+        <span className="text-xs text-gray-500 dark:text-gray-500 dark:text-gray-400">
           {state.nodes.length} nodes
         </span>
       </div>
@@ -202,13 +202,13 @@ export function EditorMinimap() {
             width="100%"
             height="100%"
             fill="currentColor"
-            className="text-gray-50 dark:text-gray-900"
+            className="text-gray-50 dark:text-gray-900 dark:text-gray-100"
           />
           
           {/* Grid pattern */}
           <defs>
             <pattern id="minimap-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-gray-200 dark:text-gray-700" />
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-gray-200 dark:text-gray-700 dark:text-gray-300" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#minimap-grid)" opacity="0.5" />
@@ -264,7 +264,7 @@ export function EditorMinimap() {
           </div>
         </div>
         
-        <span className="text-gray-500 dark:text-gray-500">
+        <span className="text-gray-500 dark:text-gray-500 dark:text-gray-400">
           Click to navigate
         </span>
       </div>

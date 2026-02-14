@@ -121,7 +121,7 @@ export default function OverviewDashboard() {
             ))}
           </div>
           {(health.services?.length || 0) > 10 && (
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               +{(health.services?.length || 0) - 10} more services
             </p>
           )}
@@ -135,7 +135,7 @@ export default function OverviewDashboard() {
               <ActivityItem key={event.id} event={event} />
             ))}
             {(recentActivity?.length || 0) === 0 && (
-              <p className="text-gray-500 text-sm">No recent activity</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">No recent activity</p>
             )}
           </div>
         </div>
@@ -261,7 +261,7 @@ function ServiceStatusCard({ service }: { service: ServiceHealth }) {
       <div className={`w-2 h-2 rounded-full ${statusConfig.dot}`} />
       <span className="text-sm text-gray-300 truncate">{service.serviceName}</span>
       {service.responseTimeMs && (
-        <span className="text-xs text-gray-500 ml-auto">{service.responseTimeMs}ms</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{service.responseTimeMs}ms</span>
       )}
     </div>
   );
@@ -283,7 +283,7 @@ function ActivityItem({ event }: { event: ActivityEvent }) {
       <Icon className={`w-4 h-4 mt-0.5 ${iconConfig.color}`} />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-300 truncate">{event.description}</p>
-        <p className="text-xs text-gray-500">{formatRelativeTime(new Date(event.timestamp))}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{formatRelativeTime(new Date(event.timestamp))}</p>
       </div>
     </div>
   );

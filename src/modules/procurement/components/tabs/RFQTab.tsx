@@ -39,10 +39,10 @@ export function RFQTab() {
         return (
           <div className="h-full p-6">
             <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Create RFQ</h3>
-                  <p className="text-sm text-gray-600">
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Create RFQ</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Create a new Request for Quotation for {selectedProject.name}
                   </p>
                 </div>
@@ -50,8 +50,8 @@ export function RFQTab() {
                 <div className="p-6">
                   <div className="text-center py-12">
                     <Send className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">RFQ Creation Form</h4>
-                    <p className="text-gray-600 mb-6">
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">RFQ Creation Form</h4>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
                       This would be the RFQ creation form component
                     </p>
                     <div className="flex gap-3 justify-center">
@@ -72,13 +72,13 @@ export function RFQTab() {
         return (
           <div className="h-full flex flex-col">
             {/* RFQ Header */}
-            <div className="bg-white border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                     Request for Quotations
                   </h2>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Managing RFQs for {selectedProject.name} ({selectedProject.code})
                   </p>
                 </div>
@@ -102,17 +102,17 @@ export function RFQTab() {
                     placeholder="Search RFQs by title, supplier, or reference..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
                 
                 {/* Status Filter */}
                 <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-gray-500" />
+                  <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="all">All Status</option>
                     <option value="draft">Draft</option>
@@ -125,7 +125,7 @@ export function RFQTab() {
             </div>
 
             {/* RFQ Stats Cards */}
-            <div className="bg-white border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <RFQStatCard
                   title="Draft RFQs"
@@ -169,7 +169,7 @@ export function RFQTab() {
   };
 
   return (
-    <div className="h-full bg-gray-50">
+    <div className="h-full bg-gray-50 dark:bg-gray-900">
       {renderContent()}
     </div>
   );
@@ -191,14 +191,14 @@ function RFQStatCard({ title, count, icon: Icon, color }: RFQStatCardProps) {
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-gray-200">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-2xl font-bold text-gray-900">{count}</p>
-          <p className="text-sm text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{count}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
         </div>
       </div>
     </div>
@@ -216,11 +216,11 @@ function NoProjectSelected() {
           <Send className="h-12 w-12 text-blue-600" />
         </div>
         
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Project Selection Required
         </h3>
         
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
           Please select a project to view and manage its Request for Quotations (RFQs). 
           RFQs are project-specific and help you gather competitive quotes from suppliers.
         </p>

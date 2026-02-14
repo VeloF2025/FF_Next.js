@@ -42,14 +42,14 @@ export function MessagesTab() {
   }
 
   return (
-    <div className="h-[800px] bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div className="h-[800px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <div className="flex h-full">
         {/* Messages List - Left Panel */}
-        <div className="w-96 border-r border-gray-200 flex flex-col">
+        <div className="w-96 border-r border-gray-200 dark:border-gray-700 flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Messages</h2>
               <button className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">
                 <Send className="w-4 h-4 inline mr-1" />
                 New
@@ -62,7 +62,7 @@ export function MessagesTab() {
               <input
                 type="text"
                 placeholder="Search messages..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

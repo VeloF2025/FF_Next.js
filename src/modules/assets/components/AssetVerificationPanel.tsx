@@ -207,7 +207,7 @@ export function AssetVerificationPanel({
             <span>Verified: {formatDate(verifiedAt)}</span>
           </div>
           {verifiedBy && (
-            <div className="text-gray-500 dark:text-gray-500 ml-6">
+            <div className="text-gray-500 dark:text-gray-500 dark:text-gray-400 ml-6">
               by {verifiedBy}
             </div>
           )}
@@ -246,7 +246,7 @@ export function AssetVerificationPanel({
                   key={m.field}
                   className="text-xs bg-white dark:bg-gray-800 rounded p-2 flex items-center gap-2"
                 >
-                  <span className="text-gray-500 w-24 capitalize">
+                  <span className="text-gray-500 dark:text-gray-400 w-24 capitalize">
                     {m.field.replace(/([A-Z])/g, ' $1').trim()}:
                   </span>
                   <span className="text-red-600 dark:text-red-400">

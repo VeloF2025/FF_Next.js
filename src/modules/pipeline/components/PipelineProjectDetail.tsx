@@ -713,7 +713,7 @@ export function PipelineProjectDetail() {
                                       {approval.approval_type_name}
                                     </h3>
                                     {isNotApplicable && (
-                                      <span className="px-1.5 py-0.5 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
+                                      <span className="px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:bg-gray-700/30 dark:text-gray-400 rounded">
                                         N/A
                                       </span>
                                     )}

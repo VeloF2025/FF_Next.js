@@ -212,7 +212,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isOptional || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isOptional: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Optional Phase</span>
         </label>
@@ -221,7 +221,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isParallel || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isParallel: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Can run in parallel</span>
         </label>
@@ -322,7 +322,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isRequired !== false}
             onChange={(e) => setFormData(prev => ({ ...prev, isRequired: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Required Step</span>
         </label>
@@ -331,7 +331,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isAutomated || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isAutomated: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Automated</span>
         </label>
@@ -421,7 +421,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.isOptional || false}
             onChange={(e) => setFormData(prev => ({ ...prev, isOptional: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Optional Task</span>
         </label>
@@ -430,7 +430,7 @@ export function WorkflowEditorForms() {
             type="checkbox"
             checked={formData.canBeParallel || false}
             onChange={(e) => setFormData(prev => ({ ...prev, canBeParallel: e.target.checked }))}
-            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+            className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-gray-600"
           />
           <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Can run in parallel</span>
         </label>

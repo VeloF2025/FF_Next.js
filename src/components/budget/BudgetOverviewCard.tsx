@@ -64,7 +64,7 @@ const getStatusBadgeClass = (status: BudgetStatus): string => {
     case 'approved':
       return 'bg-green-100 text-green-800';
     case 'locked':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
     case 'closed':
       return 'bg-red-100 text-red-800';
     default:

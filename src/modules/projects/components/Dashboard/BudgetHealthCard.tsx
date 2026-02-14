@@ -40,7 +40,7 @@ function getHealthColor(health: BudgetMetrics['health']): {
     case 'critical':
       return { text: 'text-red-600', bg: 'bg-red-100', dot: 'bg-red-500' };
     default:
-      return { text: 'text-gray-600', bg: 'bg-gray-100', dot: 'bg-gray-500' };
+      return { text: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800', dot: 'bg-gray-500' };
   }
 }
 
@@ -66,7 +66,7 @@ export function BudgetHealthCard({ budget, isLoading = false }: BudgetHealthCard
           </h3>
           <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800">
             <span className="w-2 h-2 rounded-full bg-gray-400" />
-            <span className="text-xs font-medium text-gray-500">No Data</span>
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">No Data</span>
           </div>
         </div>
         <div className="text-center py-6">

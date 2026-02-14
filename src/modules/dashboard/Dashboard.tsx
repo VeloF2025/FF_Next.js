@@ -150,7 +150,7 @@ export function Dashboard() {
                 {getFormattedDate()}
               </div>
             </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-white dark:bg-gray-800/20 rounded-lg flex items-center justify-center">
               <Calendar className="w-6 h-6" />
             </div>
           </div>

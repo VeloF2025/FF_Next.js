@@ -23,27 +23,27 @@ export function ContractorFilePreview({
 }: ContractorFilePreviewProps) {
   return (
     <div className="space-y-6">
-      <div className="bg-gray-50 border rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-gray-900 mb-2">Import Preview</h4>
+      <div className="bg-gray-50 dark:bg-gray-900 border rounded-lg p-4">
+        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Import Preview</h4>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-600">Total Records:</span>
+            <span className="text-gray-600 dark:text-gray-400">Total Records:</span>
             <span className="ml-2 font-medium">{data.contractors.length}</span>
           </div>
           <div>
-            <span className="text-gray-600">Valid Records:</span>
+            <span className="text-gray-600 dark:text-gray-400">Valid Records:</span>
             <span className="ml-2 font-medium text-green-600">
               {data.contractors.filter(c => c.isValid).length}
             </span>
           </div>
           <div>
-            <span className="text-gray-600">Errors:</span>
+            <span className="text-gray-600 dark:text-gray-400">Errors:</span>
             <span className="ml-2 font-medium text-red-600">
               {data.contractors.filter(c => !c.isValid).length}
             </span>
           </div>
           <div>
-            <span className="text-gray-600">Duplicates:</span>
+            <span className="text-gray-600 dark:text-gray-400">Duplicates:</span>
             <span className="ml-2 font-medium text-yellow-600">
               {data.contractors.filter(c => c.isDuplicate).length}
             </span>
@@ -76,16 +76,16 @@ export function ContractorFilePreview({
 
       <div className="max-h-64 overflow-y-auto border rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Errors</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Company</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Contact</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Errors</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200">
             {data.contractors.slice(0, 10).map((contractor, index) => (
               <tr key={index}>
                 <td className="px-3 py-2 text-xs">
@@ -107,7 +107,7 @@ export function ContractorFilePreview({
                         <div key={errorIndex} className="text-xs">{error}</div>
                       ))}
                       {contractor.errors.length > 3 && (
-                        <div className="text-xs text-gray-500">+{contractor.errors.length - 3} more...</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">+{contractor.errors.length - 3} more...</div>
                       )}
                     </div>
                   ) : contractor.warnings && contractor.warnings.length > 0 ? (
@@ -129,7 +129,7 @@ export function ContractorFilePreview({
       <div className="flex justify-end space-x-3">
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:bg-gray-900"
           disabled={isProcessing}
         >
           Cancel

@@ -299,7 +299,7 @@ export function FeedbackPhase({
       case 'PASS': return 'text-green-600 dark:text-green-400';
       case 'FAIL': return 'text-red-600 dark:text-red-400';
       case 'REWORK_NEEDED': return 'text-yellow-600 dark:text-yellow-400';
-      default: return 'text-gray-600';
+      default: return 'text-gray-600 dark:text-gray-400';
     }
   };
 
@@ -361,7 +361,7 @@ export function FeedbackPhase({
               </p>
             </div>
           </div>
-          <div className="text-right text-sm text-gray-500">
+          <div className="text-right text-sm text-gray-500 dark:text-gray-400">
             {new Date().toISOString().split('T')[0]} {new Date().toTimeString().slice(0, 5)}
           </div>
         </div>
@@ -388,8 +388,8 @@ export function FeedbackPhase({
                 </div>
                 <p className="text-sm text-red-600 dark:text-red-400">{swapCheck.details}</p>
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                  <div>ONT field: <code className="bg-white/50 px-1 rounded">{wizardState.prerequisites.ontSerial || 'N/A'}</code></div>
-                  <div>UPS field: <code className="bg-white/50 px-1 rounded">{wizardState.prerequisites.upsSerial || 'N/A'}</code></div>
+                  <div>ONT field: <code className="bg-white dark:bg-gray-800/50 px-1 rounded">{wizardState.prerequisites.ontSerial || 'N/A'}</code></div>
+                  <div>UPS field: <code className="bg-white dark:bg-gray-800/50 px-1 rounded">{wizardState.prerequisites.upsSerial || 'N/A'}</code></div>
                 </div>
               </div>
             );
@@ -404,7 +404,7 @@ export function FeedbackPhase({
               {wizardState.prerequisites.passed ? '✅' : '❌'}
             </div>
             <div className="text-sm font-medium">Prerequisites</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {wizardState.prerequisites.photoCount} photos
             </div>
           </div>
@@ -415,7 +415,7 @@ export function FeedbackPhase({
               {wizardState.photoReview.stepsMissing?.length === 0 ? '✅' : '⚠️'}
             </div>
             <div className="text-sm font-medium">Photo Coverage</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {10 - (wizardState.photoReview.stepsMissing?.length || 0)}/10 steps
             </div>
           </div>
@@ -426,7 +426,7 @@ export function FeedbackPhase({
               {wizardState.dataValidation.powerMeter.inRange ? '✅' : '❌'}
             </div>
             <div className="text-sm font-medium">Power Meter</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {wizardState.dataValidation.powerMeter.value ?? 'N/A'} dBm
             </div>
           </div>
@@ -444,7 +444,7 @@ export function FeedbackPhase({
               })()}
             </div>
             <div className="text-sm font-medium">Serials</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {(() => {
                 const ontStatus = getSerialStatus(wizardState.prerequisites.ontSerial, 'ont');
                 const upsStatus = getSerialStatus(wizardState.prerequisites.upsSerial, 'ups');
@@ -568,7 +568,7 @@ export function FeedbackPhase({
           placeholder="Feedback message to technician..."
         />
 
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
           This message will be sent to the project WhatsApp group.
         </p>
       </div>
@@ -593,7 +593,7 @@ export function FeedbackPhase({
                   value="group"
                   checked={feedbackDestination === 'group'}
                   onChange={() => setFeedbackDestination('group')}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Group only ({project || 'Project Group'})
@@ -607,7 +607,7 @@ export function FeedbackPhase({
                   checked={feedbackDestination === 'private'}
                   onChange={() => setFeedbackDestination('private')}
                   disabled={!hasTechnicianJid}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Private message to technician only
@@ -621,7 +621,7 @@ export function FeedbackPhase({
                   checked={feedbackDestination === 'both'}
                   onChange={() => setFeedbackDestination('both')}
                   disabled={!hasTechnicianJid}
-                  className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">
                   Both group and private
@@ -659,7 +659,7 @@ export function FeedbackPhase({
                   </option>
                 ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Selected staff will be @mentioned in the WhatsApp message.
               {availableStaff.filter(s => s.whatsappId).length === 0 && !loadingStaff && (
                 <span className="text-yellow-600"> No staff have WhatsApp IDs configured.</span>
@@ -675,13 +675,13 @@ export function FeedbackPhase({
                 id="sendStaffPrivate"
                 checked={sendStaffPrivate}
                 onChange={(e) => setSendStaffPrivate(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
               />
               <div>
                 <label htmlFor="sendStaffPrivate" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Also send private copy to selected staff
                 </label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Staff will receive a private message in addition to being tagged.
                 </p>
               </div>
@@ -697,13 +697,13 @@ export function FeedbackPhase({
               id="createTask"
               checked={createTask}
               onChange={(e) => setCreateTask(e.target.checked)}
-              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
             />
             <div>
               <label htmlFor="createTask" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Create follow-up task
               </label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {feedback.decision === 'PASS'
                   ? 'Optionally create a task for this review.'
                   : 'A task will be created for rework tracking.'}

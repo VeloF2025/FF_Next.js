@@ -252,7 +252,7 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
                     <button
                       type="button"
                       onClick={(e) => toggleGroup(item.label, e.shiftKey)}
-                      className="w-full flex items-center rounded-lg transition-all duration-200 px-3 py-2 space-x-3 hover:bg-white/5"
+                      className="w-full flex items-center rounded-lg transition-all duration-200 px-3 py-2 space-x-3 hover:bg-white dark:bg-gray-800/5"
                       style={{
                         color: hasActiveSubItem
                           ? themeConfig.colors.primary[400]

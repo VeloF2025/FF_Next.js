@@ -178,7 +178,7 @@ export function BudgetItemsTable({
   if (items.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
-        <Package className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 mb-4" />
+        <Package className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-500 dark:text-gray-400 mb-4" />
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Budget Items</h3>
         <p className="text-gray-500 dark:text-gray-400">
           Import a BOQ to create budget items for tracking.
@@ -368,9 +368,9 @@ function CategoryGroup({
         <td colSpan={2} className="py-2 px-4 font-medium text-gray-900 dark:text-white">
           <div className="flex items-center gap-2">
             {expanded ? (
-              <ChevronDown className="h-4 w-4 text-gray-500" />
+              <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-gray-500" />
+              <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
             )}
             <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded">
               {category}

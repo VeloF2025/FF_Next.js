@@ -14,7 +14,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ supplier }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Company Profile</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Company Profile</h2>
         <VelocityButton
           onClick={() => setEditing(!editing)}
           variant={editing ? 'outline' : 'solid'}
@@ -25,37 +25,37 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ supplier }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <GlassCard>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Company Information</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Company Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Company Name</label>
               <input
                 type="text"
                 value={profileData?.name || ''}
                 readOnly={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Registration Number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Registration Number</label>
               <input
                 type="text"
                 value={profileData?.code || ''}
                 readOnly={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Business Type</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Business Type</label>
               <select
                 value={profileData?.businessType || ''}
                 disabled={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               >
                 <option value="manufacturer">Manufacturer</option>
@@ -68,38 +68,38 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({ supplier }) => {
         </GlassCard>
 
         <GlassCard>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Contact Information</h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Primary Contact</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Primary Contact</label>
               <input
                 type="text"
                 value={profileData?.primaryContact?.name || ''}
                 readOnly={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input
                 type="email"
                 value={profileData?.primaryContact?.email || ''}
                 readOnly={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
               <input
                 type="tel"
                 value={profileData?.primaryContact?.phone || ''}
                 readOnly={!editing}
                 className={`mt-1 block w-full px-3 py-2 border rounded-lg ${
-                  editing ? 'border-gray-300 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 bg-gray-50'
+                  editing ? 'border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900'
                 }`}
               />
             </div>
