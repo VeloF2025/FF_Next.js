@@ -254,7 +254,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               onClick={() => setActiveTab('manual')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'manual'
-                  ? 'border-blue-500 text-blue-400'
+                  ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'
                   : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
             >
@@ -264,7 +264,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               onClick={() => setActiveTab('import')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'import'
-                  ? 'border-blue-500 text-blue-400'
+                  ? 'border-[var(--ff-accent)] text-[var(--ff-accent)]'
                   : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
             >
@@ -282,13 +282,13 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               onDragLeave={handleDragLeave}
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive
-                  ? 'border-blue-500 bg-blue-500/10'
+                  ? 'border-[var(--ff-accent)] bg-[var(--ff-accent)]/10'
                   : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] hover:border-[var(--ff-text-secondary)]'
               }`}
             >
               {extracting ? (
                 <div className="flex flex-col items-center">
-                  <svg className="w-12 h-12 animate-spin text-blue-500 mb-4" fill="none" viewBox="0 0 24 24">
+                  <svg className="w-12 h-12 animate-spin text-[var(--ff-accent)] mb-4" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
@@ -313,7 +313,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                       onChange={handleFileInput}
                       className="hidden"
                     />
-                    <span className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
+                    <span className="px-4 py-2 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] text-white rounded-lg font-medium cursor-pointer transition-colors">
                       Select PDF
                     </span>
                   </label>
@@ -353,7 +353,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="text"
                   value={formData.poNumber || ''}
                   onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   placeholder="PO-001"
                 />
               </div>
@@ -365,7 +365,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="text"
                   value={formData.reference || ''}
                   onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   placeholder="MAM.POP2"
                 />
               </div>
@@ -380,7 +380,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="number"
                   value={formData.contractedDrops || ''}
                   onChange={(e) => setFormData({ ...formData, contractedDrops: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   min="1"
                 />
               </div>
@@ -392,14 +392,14 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="number"
                   value={formData.pricePerDrop || ''}
                   onChange={(e) => setFormData({ ...formData, pricePerDrop: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   min="0.01"
                   step="0.01"
                 />
               </div>
             </div>
 
-            <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg space-y-2">
+            <div className="p-4 bg-[var(--ff-accent)]/10 border border-[var(--ff-accent)]/30 rounded-lg space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-[var(--ff-text-secondary)]">Subtotal (excl. VAT)</span>
                 <span className="text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -412,9 +412,9 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   R {vatAmount.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-blue-500/30">
+              <div className="flex justify-between items-center pt-2 border-t border-[var(--ff-accent)]/30">
                 <span className="text-sm font-medium text-[var(--ff-text-primary)]">Total (incl. VAT)</span>
-                <span className="text-xl font-bold text-blue-400">
+                <span className="text-xl font-bold text-[var(--ff-accent)]">
                   R {totalIncVat.toLocaleString()}
                 </span>
               </div>
@@ -429,7 +429,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="date"
                   value={formData.poDate || ''}
                   onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                 />
               </div>
               <div>
@@ -440,7 +440,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   type="number"
                   value={formData.taxRate ?? 15}
                   onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 15 })}
-                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   min="0"
                   max="100"
                   step="0.01"
@@ -456,7 +456,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)] resize-none"
                 placeholder="Additional details about this PO..."
               />
             </div>
@@ -472,7 +472,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] disabled:bg-[var(--ff-accent)]/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 {loading && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

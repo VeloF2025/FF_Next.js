@@ -163,7 +163,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--ff-accent)]" />
         <span className="ml-3 text-[var(--ff-text-secondary)]">Loading documents...</span>
       </div>
     );
@@ -174,8 +174,8 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
       {/* Header */}
       <div className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)] p-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-            <FileText className="w-5 h-5 text-blue-400" />
+          <div className="w-10 h-10 rounded-lg bg-[var(--ff-accent)]/20 flex items-center justify-center">
+            <FileText className="w-5 h-5 text-[var(--ff-accent)]" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Project Documents</h2>
@@ -197,7 +197,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
           </div>
           <button
             onClick={() => setShowCreatePO(true)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5"
           >
             <Upload className="w-3.5 h-3.5" />
             Add Client PO
@@ -227,7 +227,7 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
                       href={po.sourceDocumentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 text-[var(--ff-text-secondary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                      className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] hover:bg-[var(--ff-accent)]/10 rounded-lg transition-colors"
                       title="Open document"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -394,20 +394,20 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
         </div>
         <div className="p-4">
           <div className="text-center py-8 bg-[var(--ff-bg-secondary)] rounded-lg border border-dashed border-[var(--ff-border-light)]">
-            <FileSpreadsheet className="w-12 h-12 mx-auto text-blue-400 mb-3" />
+            <FileSpreadsheet className="w-12 h-12 mx-auto text-[var(--ff-accent)] mb-3" />
             <p className="text-sm text-[var(--ff-text-primary)] mb-3">
               Import BOQ data via the Procurement module
             </p>
             <a
               href={`/procurement/boq/new?projectId=${projectId}`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] text-white text-sm font-medium rounded-lg transition-colors"
             >
               <Upload className="w-4 h-4" />
               Import BOQ
             </a>
             <p className="text-xs text-[var(--ff-text-tertiary)] mt-3">
               Existing BOQs can be viewed in{' '}
-              <a href="/procurement/boq" className="text-blue-400 hover:underline">Procurement &rarr; BOQ</a>
+              <a href="/procurement/boq" className="text-[var(--ff-accent)] hover:underline">Procurement &rarr; BOQ</a>
             </p>
           </div>
         </div>
@@ -490,7 +490,7 @@ function DocumentUploadCard({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-blue-500/50 hover:bg-blue-500/5 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-accent)]/50 hover:bg-[var(--ff-accent)]/5 transition-colors disabled:opacity-50"
         >
           {uploading ? (
             <>
@@ -564,8 +564,8 @@ function SOWUploadCard({
     <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
-            <Icon className="w-4 h-4 text-blue-400" />
+          <div className="w-8 h-8 rounded-lg bg-[var(--ff-accent)]/20 flex items-center justify-center">
+            <Icon className="w-4 h-4 text-[var(--ff-accent)]" />
           </div>
           <div>
             <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">{label}</h4>
@@ -586,7 +586,7 @@ function SOWUploadCard({
               ? 'bg-red-500/10 text-red-400'
               : isSuccess
               ? 'bg-green-500/10 text-green-400'
-              : 'bg-blue-500/10 text-blue-400'
+              : 'bg-[var(--ff-accent)]/10 text-[var(--ff-accent)]'
           }`}
         >
           {fileState.message}
@@ -620,7 +620,7 @@ function SOWUploadCard({
 
         <button
           onClick={onDownloadTemplate}
-          className="px-3 py-2 text-[var(--ff-text-tertiary)] hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+          className="px-3 py-2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-accent)] hover:bg-[var(--ff-accent)]/10 rounded-lg transition-colors"
           title="Download template"
         >
           <Download className="w-4 h-4" />
