@@ -95,6 +95,7 @@ export async function importPoles(sql: SqlFn, features: any[], projectId: string
           ${sources}::varchar[]
         )
         ON CONFLICT (project_id, pole_number) DO UPDATE SET
+          pole_type      = COALESCE(EXCLUDED.pole_type, poles.pole_type),
           dome_joint     = COALESCE(poles.dome_joint, EXCLUDED.dome_joint),
           type_of_join   = COALESCE(poles.type_of_join, EXCLUDED.type_of_join),
           splitter       = COALESCE(poles.splitter, EXCLUDED.splitter),
