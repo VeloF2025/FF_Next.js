@@ -109,7 +109,7 @@ Hourly cron on VPS keeps backup in sync with master:
 
 **Cloudflare Tunnel Service:** `cloudflared-tunnel.service`
 - Tunnel name: `vf-downloads`
-- Config: `/home/louis/.cloudflared/config.yml`
+- Config: `/home/velo/.cloudflared/config.yml`
 
 ---
 
@@ -176,7 +176,7 @@ Automated health monitoring runs every 5 minutes on Velocity:
 
 Self-hosted QFieldCloud for mobile GIS field data collection.
 
-**Location:** `/home/louis/qfieldcloud/`
+**Location:** `/home/velo/qfieldcloud/`
 **Access URL:** `http://100.96.203.105:8082`
 
 ### QFieldCloud Docker Containers
@@ -202,7 +202,7 @@ docker ps --filter 'name=qfieldcloud'
 docker logs -f qfieldcloud-app-1
 
 # Restart all services
-cd /home/louis/qfieldcloud/source && docker-compose restart
+cd /home/velo/qfieldcloud/source && docker-compose restart
 
 # Access PostgreSQL
 docker exec -it qfieldcloud-db-1 psql -U qfieldcloud
