@@ -101,7 +101,7 @@ export function RegistrationFields({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="block w-full pl-10 pr-10 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Enter your password"
+            placeholder="Enter Your Password"
             minLength={6}
           />
           <button
@@ -136,7 +136,7 @@ export function RegistrationFields({
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="block w-full pl-10 pr-10 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Confirm your password"
+            placeholder="Confirm Your Password"
             minLength={6}
           />
           <button

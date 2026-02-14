@@ -303,7 +303,7 @@ export function PremiumLoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          placeholder="Enter your password"
+          placeholder="Enter Your Password"
           autoComplete="current-password"
           disabled={loading}
           className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -361,7 +361,7 @@ export function PremiumLoginPage() {
           icon={<Lock className="w-5 h-5" />}
           iconPosition="left"
           showPasswordReveal
-          placeholder="Create a strong password"
+          placeholder="Create A Strong Password"
           autoComplete="new-password"
           disabled={loading}
           disableFloating
@@ -386,7 +386,7 @@ export function PremiumLoginPage() {
           icon={<Lock className="w-5 h-5" />}
           iconPosition="left"
           showPasswordReveal
-          placeholder="Confirm your password"
+          placeholder="Confirm Your Password"
           autoComplete="new-password"
           disabled={loading}
           disableFloating
