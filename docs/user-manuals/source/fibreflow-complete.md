@@ -1056,7 +1056,7 @@ The Field App Portal is a mobile-optimized interface designed specifically for f
 
 **Navigation:** Direct URL: `/field` or Sidebar → **Field Operations** → **Field App**
 
-![Field App Portal](../screenshots/complete/35-field-app-portal.png)
+![Field App Portal](../screenshots/complete/36-field-app-portal.png)
 *Figure 5.4: Field App Portal showing offline status, device metrics, and field task queue*
 
 #### Overview
@@ -1640,7 +1640,7 @@ The Field Stock Control module provides comprehensive tracking and management of
 
 **User Audiences:** Stock managers, warehouse staff, field technicians, contractors
 
-<!-- ![Field Stock Control Dashboard](../screenshots/complete/37-field-stock-dashboard.png) -->
+<!-- ![Field Stock Control Dashboard](../screenshots/complete/38-field-stock-dashboard.png) -->
 *Figure 7.9: Field Stock Control dashboard showing van stock levels, technician accountability, and recent movements*
 
 #### Overview
@@ -2593,7 +2593,7 @@ Mission Control is an AI agent coordination dashboard that provides real-time mo
 
 **Navigation:** Sidebar → **Communications** → **Mission Control**
 
-<!-- ![Mission Control Dashboard](../screenshots/complete/36-mission-control-dashboard.png) -->
+<!-- ![Mission Control Dashboard](../screenshots/complete/37-mission-control-dashboard.png) -->
 *Figure 12.5: Mission Control Dashboard showing agent status, statistics, and system health*
 
 #### Overview
