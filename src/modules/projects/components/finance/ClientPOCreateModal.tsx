@@ -2,9 +2,10 @@
  * Client PO Create Modal
  * Form to create a new Client Purchase Order
  * Supports manual entry and PDF import via VLM extraction
+ * WCAG 2.1 AA compliant - Task #239
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ClientPOCreateInput } from '@/types/finance';
 import { log } from '@/lib/logger';
 import type { POExtractionAPIResponse, POExtractionResult } from '@/modules/projects/types/po-extraction.types';
@@ -39,6 +40,66 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+
+  // Accessibility refs
+  const modalRef = useRef<HTMLDivElement>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // FIX #1: ESC key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // FIX #2: Focus trap
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const focusableElements = modal.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    modal.addEventListener('keydown', handleTabKey as EventListener);
+    return () => modal.removeEventListener('keydown', handleTabKey as EventListener);
+  }, [activeTab]); // Re-run when tab changes (different focusable elements)
+
+  // FIX #4: Auto-focus first input on mount
+  useEffect(() => {
+    if (activeTab === 'manual') {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        firstInputRef.current?.focus();
+      }, 100);
+    }
+  }, [activeTab]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,10 +295,18 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--ff-bg-card)] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div 
+        ref={modalRef}
+        className="bg-[var(--ff-bg-card)] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         <div className="sticky top-0 bg-[var(--ff-bg-card)] px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Create Client PO</h2>
+          <h2 id="modal-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">Create Client PO</h2>
+          {/* FIX #3: Close button already has aria-label ✓ */}
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close dialog"
             className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
@@ -248,10 +317,14 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
           </button>
         </div>
 
-        {/* Tab buttons */}
+        {/* FIX #8: Tab buttons with ARIA roles */}
         <div className="px-6 pt-4">
-          <div className="flex border-b border-[var(--ff-border-light)]">
+          <div className="flex border-b border-[var(--ff-border-light)]" role="tablist" aria-label="PO creation methods">
             <button
+              role="tab"
+              aria-selected={activeTab === 'manual'}
+              aria-controls="manual-panel"
+              id="manual-tab"
               onClick={() => setActiveTab('manual')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'manual'
@@ -262,6 +335,10 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               Manual Entry
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'import'}
+              aria-controls="import-panel"
+              id="import-tab"
               onClick={() => setActiveTab('import')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'import'
@@ -276,7 +353,12 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
         {/* Import Tab */}
         {activeTab === 'import' && (
-          <div className="p-6 bg-[var(--ff-bg-card)]">
+          <div 
+            id="import-panel"
+            role="tabpanel"
+            aria-labelledby="import-tab"
+            className="p-6 bg-[var(--ff-bg-card)]"
+          >
             <div
               role="button"
               tabIndex={0}
@@ -310,8 +392,10 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
                   <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
                     We&apos;ll extract PO details automatically using AI
                   </p>
-                  <label className="inline-block">
+                  {/* FIX #5: File input with htmlFor association */}
+                  <label htmlFor="pdf-upload-input" className="inline-block">
                     <input
+                      id="pdf-upload-input"
                       type="file"
                       accept=".pdf"
                       onChange={handleFileInput}
@@ -325,8 +409,13 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               )}
             </div>
 
+            {/* FIX #6: Error with role="alert" and aria-live */}
             {error && (
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <div 
+                role="alert" 
+                aria-live="assertive"
+                className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
+              >
                 {error}
               </div>
             )}
@@ -339,33 +428,50 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
         {/* Manual Entry Tab */}
         {activeTab === 'manual' && (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form 
+            onSubmit={handleSubmit} 
+            id="manual-panel"
+            role="tabpanel"
+            aria-labelledby="manual-tab"
+            className="p-6 space-y-4"
+          >
             {renderConfidenceIndicator()}
 
+            {/* FIX #6: Error with role="alert" and aria-live */}
             {error && !extractionResult && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <div 
+                role="alert" 
+                aria-live="assertive"
+                className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
+              >
                 {error}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                {/* FIX #7: Required fields with aria-required */}
+                <label htmlFor="po-number" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   PO Number *
                 </label>
                 <input
+                  id="po-number"
+                  ref={firstInputRef}
                   type="text"
                   value={formData.poNumber || ''}
                   onChange={(e) => setFormData({ ...formData, poNumber: e.target.value })}
+                  aria-required="true"
+                  required
                   className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   placeholder="PO-001"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <label htmlFor="client-reference" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Client Reference
                 </label>
                 <input
+                  id="client-reference"
                   type="text"
                   value={formData.reference || ''}
                   onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
@@ -377,25 +483,33 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                {/* FIX #7: Required fields with aria-required */}
+                <label htmlFor="contracted-drops" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Contracted Drops *
                 </label>
                 <input
+                  id="contracted-drops"
                   type="number"
                   value={formData.contractedDrops || ''}
                   onChange={(e) => setFormData({ ...formData, contractedDrops: parseInt(e.target.value) || 0 })}
+                  aria-required="true"
+                  required
                   className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   min="1"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                {/* FIX #7: Required fields with aria-required */}
+                <label htmlFor="price-per-drop" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Price per Drop (R) *
                 </label>
                 <input
+                  id="price-per-drop"
                   type="number"
                   value={formData.pricePerDrop || ''}
                   onChange={(e) => setFormData({ ...formData, pricePerDrop: parseFloat(e.target.value) || 0 })}
+                  aria-required="true"
+                  required
                   className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                   min="0.01"
                   step="0.01"
@@ -426,21 +540,26 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                {/* FIX #7: Required fields with aria-required */}
+                <label htmlFor="po-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   PO Date *
                 </label>
                 <input
+                  id="po-date"
                   type="date"
                   value={formData.poDate || ''}
                   onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
+                  aria-required="true"
+                  required
                   className="w-full px-3 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-[var(--ff-accent)]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                <label htmlFor="tax-rate" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Tax Rate (%)
                 </label>
                 <input
+                  id="tax-rate"
                   type="number"
                   value={formData.taxRate ?? 15}
                   onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 15 })}
@@ -453,10 +572,11 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+              <label htmlFor="description" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                 Description
               </label>
               <textarea
+                id="description"
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={3}
