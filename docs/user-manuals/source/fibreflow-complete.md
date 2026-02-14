@@ -953,8 +953,8 @@ QField QA is a comprehensive photo validation and quality assurance system for f
 
 **Navigation:** Sidebar → **Field Operations** → **QField QA**
 
-![QField QA Dashboard](../screenshots/complete/15-qfield-qa-dashboard.png)
-*Figure 5.1: QField QA Dashboard showing validation statistics and photo queue*
+<!-- ![QField QA Dashboard](../screenshots/complete/15-qfield-qa-dashboard.png) -->
+<!-- *Figure 5.1: QField QA Dashboard showing validation statistics and photo queue* -->
 
 #### Overview Tab
 
@@ -1251,7 +1251,7 @@ The Maintenance module manages the complete lifecycle of fiber network maintenan
 
 **Navigation:** Sidebar → **Maintenance** (click section header)
 
-![Maintenance Dashboard](../screenshots/complete/16-maintenance-dashboard.png)
+![Maintenance Dashboard](../screenshots/complete/16-maintenance-kanban.png)
 *Figure 6.1: Maintenance Dashboard showing ticket statistics, SLA compliance, and workload*
 
 #### Key Metrics
@@ -2103,7 +2103,7 @@ FibreFlow includes a comprehensive Help Center with an AI-powered chat assistant
 
 **Navigation:** Sidebar → **Communications** → **Help Center**
 
-![Help Center](../screenshots/complete/36-help-center.png)
+<!-- Help Center screenshot — To be added in future update -->
 *Figure 12.3: Help Center showing searchable documentation with AI Chat Widget*
 
 #### Features
@@ -2316,7 +2316,7 @@ Monitor FibreFlow infrastructure:
 
 **Navigation:** Sidebar → **System** → **Settings**
 
-![Settings](../screenshots/complete/35-settings.png)
+![Settings](../screenshots/complete/34-settings.png)
 *Figure 13.3: Settings page showing organizational, procurement, and user preference tabs*
 
 #### Settings Tabs
