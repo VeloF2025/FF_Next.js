@@ -325,21 +325,22 @@ def map_feature_fields(
 
     if layer_type == "poles":
         feature["pole_number"] = _get_field(
-            row, "PoleNumber", "Pole_No", "Pole Nr", "pole_number"
+            row, "PoleNumber", "Pole_No", "Pole Nr", "pole_number",
+            "label_1", "label",  # MAM-style: label_1 is the pole number
         )
         feature["type"] = _get_field(row, "Pole Type", "PoleType", "pole_type")
         feature["dome_joint"] = _get_field(row, "Dome Joint", "DomeJoint")
         feature["type_of_join"] = _get_field(row, "Type of join", "TypeOfJoin")
         feature["splitter"] = _get_field(row, "Splitter", "splitter")
         feature["slack_on_pole"] = _get_field(
-            row, "Slack on Pole", "SlackOnPole"
+            row, "Slack on Pole", "SlackOnPole", "SlackonPol",
         )
         feature["field_agent"] = _get_field(row, "Field Agent", "FieldAgent")
         feature["pole_planted"] = _get_field(
-            row, "Pole Planted", "PolePlanted"
+            row, "Pole Planted", "PolePlanted", "Pole Plant",
         )
         feature["audit_complete"] = _get_field(
-            row, "Audit Complete", "AuditComplete"
+            row, "Audit Complete", "AuditComplete", "AuditCompl",
         )
         feature["zone_no"] = _get_field(row, "zone_no")
         feature["pon_no"] = _get_field(row, "pon_no")
@@ -348,7 +349,8 @@ def map_feature_fields(
             feature["latitude"] = geom["coordinates"][1]
 
     elif layer_type == "joints":
-        feature["joint_label"] = _get_field(row, "fid", "label", "name")
+        # Check 'label' before 'fid' — fid is just a row ID
+        feature["joint_label"] = _get_field(row, "label", "name", "fid")
         feature["joint_type"] = _get_field(row, "type", "joint_type")
         feature["cable_capacity"] = _get_field(row, "cblcpty", "cable_capacity")
         feature["zone_no"] = _get_field(row, "zone_no")
@@ -358,21 +360,26 @@ def map_feature_fields(
             feature["latitude"] = geom["coordinates"][1]
 
     elif layer_type == "cable_spans":
-        feature["span_label"] = _get_field(row, "fid", "label", "span_label")
+        feature["span_label"] = _get_field(row, "label", "fid", "span_label")
         feature["cable_size"] = _get_field(
-            row, "Cable size", "Cable_size", "cable_size"
+            row, "Cable size", "Cable_size", "cable_size", "CableSize",
         )
         feature["span_type"] = _get_field(
-            row, "SpanType", "Span_Type", "span_type"
+            row, "SpanType", "Span_Type", "span_type", "type",
         )
+        feature["pon_no"] = _get_field(row, "pon_no")
+        feature["zone_no"] = _get_field(row, "zone_no")
+        feature["length_meters"] = _get_field(row, "Length", "length", "length_m")
         if geom:
             feature["geojson"] = geom
 
     elif layer_type == "drops":
         feature["drop_number"] = _get_field(
-            row, "DropNumber", "drop_number", "label", "fid"
+            row, "DropNumber", "drop_number", "label", "fid",
         )
         feature["cable_capacity"] = _get_field(row, "cblcpty", "cable_capacity")
+        feature["pon_no"] = _get_field(row, "pon_no")
+        feature["zone_no"] = _get_field(row, "zone_no")
         if geom:
             feature["geojson"] = geom
 
@@ -382,8 +389,21 @@ def map_feature_fields(
             feature["geojson"] = geom
 
     elif layer_type == "pon_boundaries":
-        feature["pon_no"] = _get_field(row, "pon_no")
-        feature["zone_no"] = _get_field(row, "zone_no")
+        raw_pon = _get_field(row, "pon_no")
+        raw_zone = _get_field(row, "zone_no")
+        # Handle string-formatted numbers like "001" and comma-separated "001,005"
+        if isinstance(raw_pon, str):
+            raw_pon = raw_pon.split(",")[0].strip()
+        if isinstance(raw_zone, str):
+            raw_zone = raw_zone.split(",")[0].strip()
+        try:
+            feature["pon_no"] = int(raw_pon) if raw_pon else None
+        except (ValueError, TypeError):
+            feature["pon_no"] = None
+        try:
+            feature["zone_no"] = int(raw_zone) if raw_zone else None
+        except (ValueError, TypeError):
+            feature["zone_no"] = None
         feature["pon_label"] = _get_field(row, "pon_label", "label")
         if geom:
             feature["geojson"] = geom
