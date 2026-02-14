@@ -19,7 +19,6 @@ import {
 import { db } from '@/config/firebase';
 import { Product, ProductFormData, ProductFilter } from './types';
 import { log } from '@/lib/logger';
-import { sanitizeProductData } from '@/lib/security/sanitization';
 
 const PRODUCTS_COLLECTION = 'products';
 
@@ -82,14 +81,11 @@ export class ProductCrudService {
    */
   static async createProduct(data: ProductFormData): Promise<string> {
     try {
-      // Sanitize input data to prevent XSS attacks
-      const sanitized = sanitizeProductData(data);
-      
       const product: Omit<Product, 'id'> = {
-        ...sanitized,
+        ...data,
         pricing: {
-          unitPrice: sanitized.unitPrice || 0,
-          currency: sanitized.currency || 'ZAR',
+          unitPrice: data.unitPrice || 0,
+          currency: data.currency || 'ZAR',
           vatInclusive: true
         },
         isActive: true,
@@ -111,13 +107,10 @@ export class ProductCrudService {
    */
   static async updateProduct(id: string, data: Partial<ProductFormData>): Promise<void> {
     try {
-      // Sanitize input data to prevent XSS attacks
-      const sanitized = sanitizeProductData(data);
-      
       const docRef = doc(db, PRODUCTS_COLLECTION, id);
       
       const updateData = {
-        ...sanitized,
+        ...data,
         updatedAt: Timestamp.now()
       };
       

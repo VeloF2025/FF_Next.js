@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 import { ProcurementContext } from '../../../../types/procurement/base.types';
 import { ImportConfig, MappingResults, SaveResult } from './types';
 import { log } from '../../../../lib/logger';
+import { sanitizeText } from '@/lib/security/sanitization';
 
 // Initialize Neon client
 const sql = neon(process.env.DATABASE_URL!);
@@ -224,9 +225,9 @@ export class BOQImportDatabaseSaver {
         ${boqId}::uuid,
         ${context.projectId || null},
         ${lineNumber},
-        ${item.itemCode || null},
-        ${item.description || 'No description'},
-        ${item.category || null},
+        ${item.itemCode ? sanitizeText(item.itemCode) : null},
+        ${sanitizeText(item.description || 'No description')},
+        ${item.category ? sanitizeText(item.category) : null},
         ${item.quantity || 0},
         ${item.uom || 'each'},
         ${item.unitPrice || null},
@@ -276,12 +277,12 @@ export class BOQImportDatabaseSaver {
         ${boqId}::uuid,
         ${context.projectId || null},
         ${itemData.lineNumber || null},
-        ${itemData.itemCode || null},
-        ${itemData.description || 'No description'},
+        ${itemData.itemCode ? sanitizeText(itemData.itemCode) : null},
+        ${sanitizeText(itemData.description || 'No description')},
         ${itemData.quantity || null},
         ${itemData.uom || null},
         ${itemData.unitPrice || null},
-        ${itemData.category || null},
+        ${itemData.category ? sanitizeText(itemData.category) : null},
         ${'no_match'},
         ${'No catalog match found for this item'},
         ${exception.suggestions ? JSON.stringify(exception.suggestions) : '[]'},
@@ -461,9 +462,9 @@ export class BOQImportDatabaseSaver {
       ) VALUES (
         ${exception.boq_id}::uuid,
         ${exception.project_id},
-        ${resolution.customItemData?.itemCode || exception.item_code},
-        ${resolution.customItemData?.description || exception.description},
-        ${resolution.customItemData?.category || exception.category},
+        ${sanitizeText(resolution.customItemData?.itemCode || exception.item_code || '')},
+        ${sanitizeText(resolution.customItemData?.description || exception.description || '')},
+        ${sanitizeText(resolution.customItemData?.category || exception.category || '')},
         ${exception.quantity},
         ${resolution.customItemData?.uom || exception.uom},
         ${resolution.customItemData?.unitPrice || exception.unit_price},

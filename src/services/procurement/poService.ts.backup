@@ -19,7 +19,6 @@ import {
   PODeliveryStatus,
   POInvoiceStatus,
 } from '../../types/procurement/po.types';
-import { sanitizeOrderData } from '@/lib/security/sanitization';
 
 // API response types
 interface ApiResponse<T> {
@@ -141,23 +140,20 @@ class POService {
   }
 
   async createPO(data: CreatePORequest): Promise<PurchaseOrder> {
-    // Sanitize input data to prevent XSS attacks
-    const sanitized = sanitizeOrderData(data);
-    
     const response = await fetch(this.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        supplierId: sanitized.supplierId,
-        projectId: sanitized.projectId,
-        deliveryAddress: typeof sanitized.deliveryAddress === 'string'
-          ? sanitized.deliveryAddress
-          : `${sanitized.deliveryAddress.street}, ${sanitized.deliveryAddress.city}, ${sanitized.deliveryAddress.province} ${sanitized.deliveryAddress.postalCode}`,
-        expectedDeliveryDate: sanitized.expectedDeliveryDate,
-        paymentTerms: sanitized.paymentTerms,
-        deliveryTerms: sanitized.deliveryTerms,
-        notes: sanitized.notes,
-        items: sanitized.items?.map(item => ({
+        supplierId: data.supplierId,
+        projectId: data.projectId,
+        deliveryAddress: typeof data.deliveryAddress === 'string'
+          ? data.deliveryAddress
+          : `${data.deliveryAddress.street}, ${data.deliveryAddress.city}, ${data.deliveryAddress.province} ${data.deliveryAddress.postalCode}`,
+        expectedDeliveryDate: data.expectedDeliveryDate,
+        paymentTerms: data.paymentTerms,
+        deliveryTerms: data.deliveryTerms,
+        notes: data.notes,
+        items: data.items.map(item => ({
           itemCode: item.itemCode,
           itemDescription: item.description,
           quantity: item.quantity,
