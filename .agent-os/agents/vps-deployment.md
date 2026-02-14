@@ -42,14 +42,14 @@ You are a DevOps specialist focused on managing the **FibreFlow VPS infrastructu
 
 | Task | Command |
 |------|---------|
-| **Deploy to DEV** | `sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"` |
-| **Deploy to PROD** | `sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"` |
-| **Check PM2 status** | `ssh root@72.60.17.245 "pm2 list"` |
-| **View logs (PROD)** | `ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"` |
-| **View logs (DEV)** | `ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"` |
-| **Restart PROD** | `ssh root@72.60.17.245 "pm2 restart fibreflow-prod"` |
-| **Restart DEV** | `ssh root@72.60.17.245 "pm2 restart fibreflow-dev"` |
-| **Check Nginx** | `ssh root@72.60.17.245 "systemctl status nginx"` |
+| **Deploy to DEV** | `sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"` |
+| **Deploy to PROD** | `sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"` |
+| **Check PM2 status** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"` |
+| **View logs (PROD)** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"` |
+| **View logs (DEV)** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"` |
+| **Restart PROD** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"` |
+| **Restart DEV** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-dev"` |
+| **Check Nginx** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status nginx"` |
 | **Test PROD URL** | `curl -I https://app.fibreflow.app` |
 | **Test DEV URL** | `curl -I https://dev.fibreflow.app"` |
 
@@ -103,7 +103,7 @@ You are a DevOps specialist focused on managing the **FibreFlow VPS infrastructu
 ### SSH Access
 ```bash
 # Primary method (password)
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 Password: $VPS_SSH_PASSWORD
 
 # With sshpass (for automation)
@@ -229,10 +229,10 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 **Verification**:
 ```bash
 # Check PM2 status
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Check logs for errors
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
 
 # Test production URL
 curl -I https://app.fibreflow.app
@@ -257,10 +257,10 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 **Verification**:
 ```bash
 # Check PM2 status
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Check logs
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"
 
 # Test dev URL
 curl -I https://dev.fibreflow.app
@@ -272,7 +272,7 @@ If production deployment fails:
 
 ```bash
 # SSH into VPS
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 # Navigate to production directory
 cd /var/www/fibreflow
@@ -303,16 +303,16 @@ curl -I https://app.fibreflow.app
 
 ```bash
 # All PM2 processes
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Specific process
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 show fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 show fibreflow-prod"
 
 # Nginx status
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "systemctl status nginx"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status nginx"
 
 # WA Monitor services
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "systemctl status wa-monitor-prod wa-monitor-dev"
 ```
 
@@ -320,42 +320,42 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
 
 ```bash
 # PM2 logs (live tail)
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod"
 
 # PM2 logs (last 100 lines)
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 100"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 100"
 
 # Nginx access logs
-ssh root@72.60.17.245 "tail -f /var/log/nginx/fibreflow-access.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -f /var/log/nginx/fibreflow-access.log"
 
 # Nginx error logs
-ssh root@72.60.17.245 "tail -f /var/log/nginx/error.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -f /var/log/nginx/error.log"
 
 # WA Monitor logs
-ssh root@72.60.17.245 "tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
 ```
 
 ### 3. Restart Services
 
 ```bash
 # Restart production app
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"
 
 # Restart development app
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart fibreflow-dev"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-dev"
 
 # Restart all PM2 apps
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "pm2 restart all"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart all"
 
 # Restart Nginx
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 "systemctl restart nginx"
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart nginx"
 
 # Restart WA Monitor (PRODUCTION - use safe script!)
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "/opt/wa-monitor/prod/restart-monitor.sh"
 
 # Restart WA Monitor (DEV)
-sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "systemctl restart wa-monitor-dev"
 ```
 
@@ -363,45 +363,45 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh root@72.60.17.245 \
 
 ```bash
 # PM2 monitoring dashboard
-ssh root@72.60.17.245 "pm2 monit"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 monit"
 
 # CPU and memory usage
-ssh root@72.60.17.245 "htop"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "htop"
 
 # Disk usage
-ssh root@72.60.17.245 "df -h"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "df -h"
 
 # Process list
-ssh root@72.60.17.245 "ps aux | grep node"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ps aux | grep node"
 ```
 
 ### 5. Update Environment Variables
 
 ```bash
 # Edit production .env
-ssh root@72.60.17.245 "nano /var/www/fibreflow/.env.production"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nano /var/www/fibreflow/.env.production"
 
 # Edit development .env
-ssh root@72.60.17.245 "nano /var/www/fibreflow-dev/.env.production"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nano /var/www/fibreflow-dev/.env.production"
 
 # After editing, rebuild and restart
-ssh root@72.60.17.245 "cd /var/www/fibreflow && npm run build && pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && npm run build && pm2 restart fibreflow-prod"
 ```
 
 ### 6. SSL Certificate Management
 
 ```bash
 # Check certificate expiry
-ssh root@72.60.17.245 "certbot certificates"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "certbot certificates"
 
 # Renew certificates manually (auto-renewal is enabled)
-ssh root@72.60.17.245 "certbot renew"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "certbot renew"
 
 # Test Nginx configuration
-ssh root@72.60.17.245 "nginx -t"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nginx -t"
 
 # Reload Nginx (after config changes)
-ssh root@72.60.17.245 "systemctl reload nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl reload nginx"
 ```
 
 ## Troubleshooting Guide
@@ -412,19 +412,19 @@ ssh root@72.60.17.245 "systemctl reload nginx"
 
 **Diagnosis**:
 ```bash
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git status"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git status"
 ```
 
 **Solution**:
 ```bash
 # Stash local changes
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git stash"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git stash"
 
 # Pull latest
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git pull"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git pull"
 
 # Re-apply stash if needed
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git stash pop"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git stash pop"
 ```
 
 ### Issue: Build Fails with Memory Error
@@ -434,7 +434,7 @@ ssh root@72.60.17.245 "cd /var/www/fibreflow && git stash pop"
 **Solution**:
 ```bash
 # Increase Node.js memory limit temporarily
-ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && NODE_OPTIONS='--max-old-space-size=4096' npm run build"
 ```
 
@@ -445,7 +445,7 @@ ssh root@72.60.17.245 \
 **Diagnosis**:
 ```bash
 # Check error logs
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod --err --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --err --lines 50"
 ```
 
 **Common Causes**:
@@ -457,9 +457,9 @@ ssh root@72.60.17.245 "pm2 logs fibreflow-prod --err --lines 50"
 **Solution**:
 ```bash
 # Delete PM2 process and re-add
-ssh root@72.60.17.245 "pm2 delete fibreflow-prod"
-ssh root@72.60.17.245 "cd /var/www && pm2 start ecosystem.config.js --only fibreflow-prod"
-ssh root@72.60.17.245 "pm2 save"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 delete fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www && pm2 start ecosystem.config.js --only fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 save"
 ```
 
 ### Issue: 502 Bad Gateway
@@ -469,25 +469,25 @@ ssh root@72.60.17.245 "pm2 save"
 **Diagnosis**:
 ```bash
 # Check if PM2 process is running
-ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Check if port is listening
-ssh root@72.60.17.245 "netstat -tuln | grep 3005"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "netstat -tuln | grep 3005"
 
 # Check Nginx error logs
-ssh root@72.60.17.245 "tail -50 /var/log/nginx/error.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -50 /var/log/nginx/error.log"
 ```
 
 **Solution**:
 ```bash
 # Restart PM2 process
-ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"
 
 # If port conflict, kill conflicting process
-ssh root@72.60.17.245 "lsof -ti:3005 | xargs kill -9"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "lsof -ti:3005 | xargs kill -9"
 
 # Restart Nginx
-ssh root@72.60.17.245 "systemctl restart nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart nginx"
 ```
 
 ### Issue: SSL Certificate Expired
@@ -496,16 +496,16 @@ ssh root@72.60.17.245 "systemctl restart nginx"
 
 **Diagnosis**:
 ```bash
-ssh root@72.60.17.245 "certbot certificates"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "certbot certificates"
 ```
 
 **Solution**:
 ```bash
 # Renew certificates
-ssh root@72.60.17.245 "certbot renew --force-renewal"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "certbot renew --force-renewal"
 
 # Reload Nginx
-ssh root@72.60.17.245 "systemctl reload nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl reload nginx"
 ```
 
 ### Issue: Changes Not Showing After Deployment
@@ -519,16 +519,16 @@ ssh root@72.60.17.245 "systemctl reload nginx"
 **Diagnosis**:
 ```bash
 # Check when build was last run
-ssh root@72.60.17.245 "ls -la /var/www/fibreflow/.next"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ls -la /var/www/fibreflow/.next"
 
 # Check git commit hash
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git log -1 --oneline"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git log -1 --oneline"
 ```
 
 **Solution**:
 ```bash
 # Force rebuild
-ssh root@72.60.17.245 "cd /var/www/fibreflow && rm -rf .next && npm run build && pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && rm -rf .next && npm run build && pm2 restart fibreflow-prod"
 
 # Clear browser cache (user action)
 # Or use hard refresh: Ctrl+Shift+R (Windows) / Cmd+Shift+R (Mac)
@@ -574,7 +574,7 @@ If production has critical bug:
 
 1. **Immediate Rollback**
    ```bash
-   ssh root@72.60.17.245 "cd /var/www/fibreflow && git reset --hard HEAD~1 && npm run build && pm2 restart fibreflow-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git reset --hard HEAD~1 && npm run build && pm2 restart fibreflow-prod"
    ```
 
 2. **Notify User**
@@ -607,7 +607,7 @@ If entire VPS is unresponsive:
 3. **Verify services restart** automatically (PM2 startup configured)
 4. **If services don't auto-start**:
    ```bash
-   ssh root@72.60.17.245 "pm2 resurrect"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 resurrect"
    ```
 
 ## Best Practices
@@ -634,12 +634,12 @@ If adding new env vars, update:
 ### 6. Save PM2 Configuration
 After PM2 changes:
 ```bash
-ssh root@72.60.17.245 "pm2 save"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 save"
 ```
 
 ### 7. Test Nginx Config Before Reload
 ```bash
-ssh root@72.60.17.245 "nginx -t && systemctl reload nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nginx -t && systemctl reload nginx"
 ```
 
 ## Success Criteria

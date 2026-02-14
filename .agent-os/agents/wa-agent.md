@@ -106,7 +106,7 @@ Rejection log:
 |-------|---------------------|-----------------|
 | **Drop missing** | `psql $DATABASE_URL -c "SELECT * FROM qa_photo_reviews WHERE drop_number = 'DR123456';"` | Should return 1 row if exists |
 | **Drop rejected?** | `psql $DATABASE_URL -c "SELECT * FROM invalid_drop_submissions WHERE drop_number = 'DR123456';"` | Shows rejection reason if rejected |
-| **Services running?** | `ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod wa-monitor-dev whatsapp-bridge"` | Should show: active, active, active |
+| **Services running?** | `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active wa-monitor-prod wa-monitor-dev whatsapp-bridge"` | Should show: active, active, active |
 | **Today's drop counts** | `psql $DATABASE_URL -c "SELECT project, COUNT(*) FROM qa_photo_reviews WHERE DATE(whatsapp_message_date) = CURRENT_DATE GROUP BY project;"` | Shows counts by project |
 | **Check for LIDs** | `psql $DATABASE_URL -c "SELECT drop_number, submitted_by FROM qa_photo_reviews WHERE LENGTH(submitted_by) > 11 LIMIT 10;"` | Should return 0 rows (no LIDs) |
 
@@ -150,7 +150,7 @@ Rejection log:
 
 ```bash
 # SSH to VPS
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 # Check service status
 systemctl status wa-monitor-prod wa-monitor-dev
@@ -226,13 +226,13 @@ psql $DATABASE_URL -c "
 
 ```bash
 # View production config
-ssh root@72.60.17.245 "cat /opt/wa-monitor/prod/config/projects.yaml"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cat /opt/wa-monitor/prod/config/projects.yaml"
 
 # View dev config
-ssh root@72.60.17.245 "cat /opt/wa-monitor/dev/config/projects.yaml"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cat /opt/wa-monitor/dev/config/projects.yaml"
 
 # Edit production config (use nano)
-ssh root@72.60.17.245 "nano /opt/wa-monitor/prod/config/projects.yaml"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nano /opt/wa-monitor/prod/config/projects.yaml"
 ```
 
 ## Common Tasks
@@ -247,7 +247,7 @@ ssh root@72.60.17.245 "nano /opt/wa-monitor/prod/config/projects.yaml"
 
 ```bash
 # 1. Find Group JID
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 tail -100 /opt/velo-test-monitor/logs/whatsapp-bridge.log | grep "Chat="
 
 # 2. Test in DEV first
@@ -283,10 +283,10 @@ psql $DATABASE_URL -c "SELECT * FROM qa_photo_reviews WHERE drop_number = 'DR123
 psql $DATABASE_URL -c "SELECT * FROM invalid_drop_submissions WHERE drop_number = 'DR1234567';"
 
 # Check WhatsApp bridge logs
-ssh root@72.60.17.245 "grep 'DR1234567' /opt/velo-test-monitor/logs/whatsapp-bridge.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'DR1234567' /opt/velo-test-monitor/logs/whatsapp-bridge.log"
 
 # Check monitor logs
-ssh root@72.60.17.245 "grep 'DR1234567' /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'DR1234567' /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
 ```
 
 ### 3. Fixing LID Issues
@@ -302,7 +302,7 @@ psql $DATABASE_URL -c "
 "
 
 # 2. Look up LID in WhatsApp database
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 sqlite3 /opt/velo-test-monitor/services/whatsapp-bridge/store/whatsapp.db \
   "SELECT lid, pn FROM whatsmeow_lid_map WHERE lid = 'PASTE_LID_HERE';"
 
@@ -314,7 +314,7 @@ psql $DATABASE_URL -c "
 "
 
 # 4. Restart monitor (fix is in code, just clear cache)
-ssh root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
 ```
 
 **Documentation**: See "✅ RESOLVED: Resubmission Handler LID Bug" in CLAUDE.md
@@ -344,20 +344,20 @@ psql $DATABASE_URL -c "
 
 ```bash
 # Quick health check
-ssh root@72.60.17.245 "
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "
   systemctl is-active wa-monitor-prod wa-monitor-dev whatsapp-bridge &&
   echo '✅ All services active'
 "
 
 # Check for errors in last hour
-ssh root@72.60.17.245 "
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "
   tail -1000 /opt/wa-monitor/prod/logs/wa-monitor-prod.log |
   grep -i 'error\|exception\|failed' |
   tail -20
 "
 
 # Monitor live activity
-ssh root@72.60.17.245 "
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "
   tail -f /opt/wa-monitor/prod/logs/wa-monitor-prod.log
 "
 ```

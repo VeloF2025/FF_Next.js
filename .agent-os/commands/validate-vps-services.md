@@ -26,7 +26,7 @@ VPS Server (72.60.17.245)
 
 ### 1. Verify VPS Access
 ```bash
-ssh root@72.60.17.245 "echo 'VPS accessible'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "echo 'VPS accessible'"
 ```
 **Expected**: "VPS accessible"
 **On Failure**: Cannot proceed - check network/credentials
@@ -41,7 +41,7 @@ ssh root@72.60.17.245 "echo 'VPS accessible'"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "top -bn1 | grep 'Cpu(s)' | awk '{print 100 - \$8}' | cut -d. -f1"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "top -bn1 | grep 'Cpu(s)' | awk '{print 100 - \$8}' | cut -d. -f1"
 ```
 
 **Expected Output**: Number 0-100
@@ -56,7 +56,7 @@ ssh root@72.60.17.245 "top -bn1 | grep 'Cpu(s)' | awk '{print 100 - \$8}' | cut 
 **On Failure**:
 1. Check top consumers:
    ```bash
-   ssh root@72.60.17.245 "ps aux --sort=-%cpu | head -5"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ps aux --sort=-%cpu | head -5"
    ```
 2. Report: "CPU usage high ([X]%). Top processes: [list]"
 
@@ -68,7 +68,7 @@ ssh root@72.60.17.245 "top -bn1 | grep 'Cpu(s)' | awk '{print 100 - \$8}' | cut 
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "free | grep Mem | awk '{printf \"%.0f\", \$3/\$2 * 100}'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "free | grep Mem | awk '{printf \"%.0f\", \$3/\$2 * 100}'"
 ```
 
 **Expected Output**: Number 0-100
@@ -82,11 +82,11 @@ ssh root@72.60.17.245 "free | grep Mem | awk '{printf \"%.0f\", \$3/\$2 * 100}'"
 **On Failure**:
 1. Show memory details:
    ```bash
-   ssh root@72.60.17.245 "free -h"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "free -h"
    ```
 2. Check top consumers:
    ```bash
-   ssh root@72.60.17.245 "ps aux --sort=-%mem | head -5"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ps aux --sort=-%mem | head -5"
    ```
 3. Report: "Memory usage high ([X]%). Consider optimization."
 
@@ -98,7 +98,7 @@ ssh root@72.60.17.245 "free | grep Mem | awk '{printf \"%.0f\", \$3/\$2 * 100}'"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'"
 ```
 
 **Expected Output**: Number 0-100
@@ -112,11 +112,11 @@ ssh root@72.60.17.245 "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'"
 **On Failure**:
 1. Check disk breakdown:
    ```bash
-   ssh root@72.60.17.245 "df -h"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "df -h"
    ```
 2. Find large directories:
    ```bash
-   ssh root@72.60.17.245 "du -sh /var/log /var/www /opt 2>/dev/null"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "du -sh /var/log /var/www /opt 2>/dev/null"
    ```
 3. Report: "Disk usage high ([X]%). Clean up logs or temp files."
 
@@ -128,7 +128,7 @@ ssh root@72.60.17.245 "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "cat /proc/loadavg | awk '{print \$1}'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cat /proc/loadavg | awk '{print \$1}'"
 ```
 
 **Expected Output**: Load average number
@@ -142,11 +142,11 @@ ssh root@72.60.17.245 "cat /proc/loadavg | awk '{print \$1}'"
 **On Failure**:
 1. Check CPU cores:
    ```bash
-   ssh root@72.60.17.245 "nproc"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nproc"
    ```
 2. Check uptime:
    ```bash
-   ssh root@72.60.17.245 "uptime"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "uptime"
    ```
 3. Report: "Load average [X] on [Y] cores. Investigate if sustained."
 
@@ -162,7 +162,7 @@ ssh root@72.60.17.245 "cat /proc/loadavg | awk '{print \$1}'"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 ```
 
 **Expected Output**: `active`
@@ -176,11 +176,11 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 **On Failure** (with self-correction):
 1. Check status:
    ```bash
-   ssh root@72.60.17.245 "systemctl status wa-monitor-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status wa-monitor-prod"
    ```
 2. Attempt safe restart:
    ```bash
-   ssh root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
    ```
 3. Wait 5 seconds
 4. Re-test
@@ -196,7 +196,7 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl is-active wa-monitor-dev"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active wa-monitor-dev"
 ```
 
 **Expected Output**: `active`
@@ -215,7 +215,7 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-dev"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "pgrep -f whatsapp-bridge | wc -l"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pgrep -f whatsapp-bridge | wc -l"
 ```
 
 **Expected Output**: Number > 0
@@ -229,7 +229,7 @@ ssh root@72.60.17.245 "pgrep -f whatsapp-bridge | wc -l"
 **On Failure** (diagnostics only):
 1. Check process details:
    ```bash
-   ssh root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
    ```
 2. Report: "WhatsApp bridge not running. Manual restart required (DO NOT auto-restart)."
 
@@ -243,7 +243,7 @@ ssh root@72.60.17.245 "pgrep -f whatsapp-bridge | wc -l"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl is-active nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active nginx"
 ```
 
 **Expected Output**: `active`
@@ -257,11 +257,11 @@ ssh root@72.60.17.245 "systemctl is-active nginx"
 **On Failure** (with self-correction):
 1. Check configuration:
    ```bash
-   ssh root@72.60.17.245 "nginx -t 2>&1"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nginx -t 2>&1"
    ```
 2. If config OK, restart:
    ```bash
-   ssh root@72.60.17.245 "systemctl restart nginx"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart nginx"
    ```
 3. Wait 3 seconds
 4. Re-test
@@ -279,7 +279,7 @@ ssh root@72.60.17.245 "systemctl is-active nginx"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "ping -c 3 -W 2 8.8.8.8 | grep 'received' | awk '{print \$4}'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ping -c 3 -W 2 8.8.8.8 | grep 'received' | awk '{print \$4}'"
 ```
 
 **Expected Output**: `3`
@@ -295,11 +295,11 @@ ssh root@72.60.17.245 "ping -c 3 -W 2 8.8.8.8 | grep 'received' | awk '{print \$
 **On Failure**:
 1. Check network interfaces:
    ```bash
-   ssh root@72.60.17.245 "ip addr show | grep 'inet '"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ip addr show | grep 'inet '"
    ```
 2. Try alternative:
    ```bash
-   ssh root@72.60.17.245 "ping -c 2 1.1.1.1 | grep 'received'"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ping -c 2 1.1.1.1 | grep 'received'"
    ```
 3. Report: "No internet connectivity. Check network configuration or contact VPS provider."
 
@@ -313,7 +313,7 @@ ssh root@72.60.17.245 "ping -c 3 -W 2 8.8.8.8 | grep 'received' | awk '{print \$
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "nslookup google.com 2>&1 | grep -A1 'Name:' | tail -1 | grep -c '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nslookup google.com 2>&1 | grep -A1 'Name:' | tail -1 | grep -c '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*'"
 ```
 
 **Expected Output**: `1` (IP found)
@@ -329,7 +329,7 @@ ssh root@72.60.17.245 "nslookup google.com 2>&1 | grep -A1 'Name:' | tail -1 | g
 **On Failure**:
 1. Check DNS config:
    ```bash
-   ssh root@72.60.17.245 "cat /etc/resolv.conf"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cat /etc/resolv.conf"
    ```
 2. Report: "DNS resolution failing. Check /etc/resolv.conf."
 
@@ -358,7 +358,7 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 https://app.fibreflow
 **On Failure**:
 1. Check from VPS:
    ```bash
-   ssh root@72.60.17.245 "curl -I localhost:3005 2>&1 | head -1"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "curl -I localhost:3005 2>&1 | head -1"
    ```
 2. Report: "HTTPS not accessible. App: [status], check Nginx and firewall."
 
@@ -372,7 +372,7 @@ curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 https://app.fibreflow
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq 'length'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 jlist 2>/dev/null | jq 'length'"
 ```
 
 **Expected Output**: Number ≥ 2
@@ -388,7 +388,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq 'length'"
 **On Failure**:
 1. Check PM2:
    ```bash
-   ssh root@72.60.17.245 "which pm2 && pm2 list"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "which pm2 && pm2 list"
    ```
 2. Report: "PM2 not managing processes. Check PM2 installation."
 
@@ -400,7 +400,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq 'length'"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-prod\") | .pm2_env.status' -r"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-prod\") | .pm2_env.status' -r"
 ```
 
 **Expected Output**: `online`
@@ -415,11 +415,11 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibrefl
 **On Failure** (with self-correction):
 1. Check logs:
    ```bash
-   ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 20 --nostream --err"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 20 --nostream --err"
    ```
 2. Attempt restart:
    ```bash
-   ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"
    ```
 3. Wait 5 seconds
 4. Re-test
@@ -435,7 +435,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibrefl
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-dev\") | .pm2_env.status' -r"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-dev\") | .pm2_env.status' -r"
 ```
 
 **Expected Output**: `online`
@@ -454,7 +454,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibrefl
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-prod\") | .pm2_env.restart_time'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibreflow-prod\") | .pm2_env.restart_time'"
 ```
 
 **Expected Output**: Number
@@ -468,7 +468,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibrefl
 **On Failure**:
 1. Check both apps:
    ```bash
-   ssh root@72.60.17.245 "pm2 list"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
    ```
 2. Report: "App restarting frequently ([X] times). Check logs for crashes."
 
@@ -484,7 +484,7 @@ ssh root@72.60.17.245 "pm2 jlist 2>/dev/null | jq '.[] | select(.name==\"fibrefl
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "nginx -t 2>&1 | grep -c 'syntax is ok'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nginx -t 2>&1 | grep -c 'syntax is ok'"
 ```
 
 **Expected Output**: `1`
@@ -498,7 +498,7 @@ ssh root@72.60.17.245 "nginx -t 2>&1 | grep -c 'syntax is ok'"
 **On Failure**:
 1. Show errors:
    ```bash
-   ssh root@72.60.17.245 "nginx -t 2>&1"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nginx -t 2>&1"
    ```
 2. Report: "Nginx configuration invalid. Errors: [details]. DO NOT reload Nginx."
 
@@ -526,7 +526,7 @@ curl --insecure -vvI https://app.fibreflow.app 2>&1 | grep 'expire date' | head 
 **On Failure**:
 1. Check certbot:
    ```bash
-   ssh root@72.60.17.245 "certbot certificates 2>&1"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "certbot certificates 2>&1"
    ```
 2. Report: "SSL certificate issue. Check expiry and renewal."
 
@@ -540,7 +540,7 @@ curl --insecure -vvI https://app.fibreflow.app 2>&1 | grep 'expire date' | head 
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "test -r /var/log/nginx/fibreflow-access.log && echo 'OK' || echo 'FAIL'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "test -r /var/log/nginx/fibreflow-access.log && echo 'OK' || echo 'FAIL'"
 ```
 
 **Expected Output**: `OK`
@@ -555,7 +555,7 @@ ssh root@72.60.17.245 "test -r /var/log/nginx/fibreflow-access.log && echo 'OK' 
 **On Failure**:
 1. Check permissions:
    ```bash
-   ssh root@72.60.17.245 "ls -la /var/log/nginx/fibreflow-access.log"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ls -la /var/log/nginx/fibreflow-access.log"
    ```
 2. Report: "Cannot access Nginx logs. Check permissions."
 
@@ -569,7 +569,7 @@ ssh root@72.60.17.245 "test -r /var/log/nginx/fibreflow-access.log && echo 'OK' 
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "test -d /opt/wa-monitor/prod && test -d /opt/wa-monitor/dev && test -d /var/www/fibreflow && test -d /var/www/fibreflow-dev && echo 'OK' || echo 'MISSING'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "test -d /opt/wa-monitor/prod && test -d /opt/wa-monitor/dev && test -d /var/www/fibreflow && test -d /var/www/fibreflow-dev && echo 'OK' || echo 'MISSING'"
 ```
 
 **Expected Output**: `OK`
@@ -583,7 +583,7 @@ ssh root@72.60.17.245 "test -d /opt/wa-monitor/prod && test -d /opt/wa-monitor/d
 **On Failure**:
 1. Check which missing:
    ```bash
-   ssh root@72.60.17.245 "for dir in /opt/wa-monitor/prod /opt/wa-monitor/dev /var/www/fibreflow /var/www/fibreflow-dev; do test -d \$dir && echo \"\$dir: OK\" || echo \"\$dir: MISSING\"; done"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "for dir in /opt/wa-monitor/prod /opt/wa-monitor/dev /var/www/fibreflow /var/www/fibreflow-dev; do test -d \$dir && echo \"\$dir: OK\" || echo \"\$dir: MISSING\"; done"
    ```
 2. Report: "Missing directories: [list]. Check deployment."
 
@@ -595,7 +595,7 @@ ssh root@72.60.17.245 "test -d /opt/wa-monitor/prod && test -d /opt/wa-monitor/d
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "touch /opt/wa-monitor/prod/logs/test.tmp && rm /opt/wa-monitor/prod/logs/test.tmp && echo 'OK' || echo 'FAIL'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "touch /opt/wa-monitor/prod/logs/test.tmp && rm /opt/wa-monitor/prod/logs/test.tmp && echo 'OK' || echo 'FAIL'"
 ```
 
 **Expected Output**: `OK`
@@ -609,7 +609,7 @@ ssh root@72.60.17.245 "touch /opt/wa-monitor/prod/logs/test.tmp && rm /opt/wa-mo
 **On Failure**:
 1. Check permissions:
    ```bash
-   ssh root@72.60.17.245 "ls -ld /opt/wa-monitor/prod/logs"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ls -ld /opt/wa-monitor/prod/logs"
    ```
 2. Report: "Log directory not writable. Fix permissions."
 
@@ -623,7 +623,7 @@ ssh root@72.60.17.245 "touch /opt/wa-monitor/prod/logs/test.tmp && rm /opt/wa-mo
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl show wa-monitor-prod -p NRestarts --value"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl show wa-monitor-prod -p NRestarts --value"
 ```
 
 **Expected Output**: Number
@@ -637,7 +637,7 @@ ssh root@72.60.17.245 "systemctl show wa-monitor-prod -p NRestarts --value"
 **On Failure**:
 1. Check journal:
    ```bash
-   ssh root@72.60.17.245 "journalctl -u wa-monitor-prod -n 50 | grep -E 'Failed|Error'"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "journalctl -u wa-monitor-prod -n 50 | grep -E 'Failed|Error'"
    ```
 2. Report: "Service restarting frequently. Check logs for crash causes."
 

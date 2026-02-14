@@ -23,8 +23,8 @@ Validate that the wa-agent can correctly diagnose WhatsApp Monitor issues and pr
 
 - [ ] **VPS commands provided**
   ```bash
-  ssh root@72.60.17.245 "grep 'DR9999999' /opt/velo-test-monitor/logs/whatsapp-bridge.log"
-  ssh root@72.60.17.245 "grep 'DR9999999' /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
+  sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'DR9999999' /opt/velo-test-monitor/logs/whatsapp-bridge.log"
+  sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'DR9999999' /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
   ```
 
 - [ ] **Possible causes identified**
@@ -90,13 +90,13 @@ Validate that the wa-agent can correctly diagnose WhatsApp Monitor issues and pr
 - [ ] **Commands provided**
   ```bash
   # Edit dev config
-  ssh root@72.60.17.245 "nano /opt/wa-monitor/dev/config/projects.yaml"
+  sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nano /opt/wa-monitor/dev/config/projects.yaml"
 
   # Restart dev service
-  ssh root@72.60.17.245 "systemctl restart wa-monitor-dev"
+  sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart wa-monitor-dev"
 
   # Monitor logs
-  ssh root@72.60.17.245 "tail -f /opt/wa-monitor/dev/logs/wa-monitor-dev.log"
+  sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -f /opt/wa-monitor/dev/logs/wa-monitor-dev.log"
   ```
 
 - [ ] **Production deployment**

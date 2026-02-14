@@ -64,7 +64,7 @@ Verification checklist:
 - ✅ Forms validate properly
 - ✅ Error handling shows user-friendly messages
 - ✅ Mobile responsive (test in DevTools device toolbar)
-- ✅ No PM2 errors: `ssh root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"`
+- ✅ No PM2 errors: `sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-dev --lines 50"`
 
 ### Step 4: Get User Approval
 
@@ -88,10 +88,10 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 ```bash
 # Check PM2 status
-ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Check logs for errors
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
 
 # Test production URL
 curl -I https://app.fibreflow.app
@@ -155,16 +155,16 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 ### Check Service Status
 ```bash
-ssh root@72.60.17.245 "pm2 list"
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
-ssh root@72.60.17.245 "systemctl status nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status nginx"
 ```
 
 ### Restart Services
 ```bash
-ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
-ssh root@72.60.17.245 "pm2 restart fibreflow-dev"
-ssh root@72.60.17.245 "systemctl restart nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-dev"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart nginx"
 ```
 
 ## Rollback Procedure
@@ -173,7 +173,7 @@ If production deployment fails:
 
 ```bash
 # SSH into VPS
-ssh root@72.60.17.245
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 
 # Navigate to production directory
 cd /var/www/fibreflow
@@ -246,7 +246,7 @@ touch scripts/migrations/YYYY-MM-DD-feature-name.ts
 npm run db:migrate
 
 # After testing, run on production (via SSH)
-ssh root@72.60.17.245 "cd /var/www/fibreflow && npm run db:migrate"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && npm run db:migrate"
 ```
 
 ### Migration Best Practices
@@ -267,18 +267,18 @@ ssh root@72.60.17.245 "cd /var/www/fibreflow && npm run db:migrate"
 
 2. **Add to development VPS**
    ```bash
-   ssh root@72.60.17.245 "echo 'NEW_VARIABLE=value' >> /var/www/fibreflow-dev/.env.production"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "echo 'NEW_VARIABLE=value' >> /var/www/fibreflow-dev/.env.production"
    ```
 
 3. **Add to production VPS** (after dev testing)
    ```bash
-   ssh root@72.60.17.245 "echo 'NEW_VARIABLE=value' >> /var/www/fibreflow/.env.production"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "echo 'NEW_VARIABLE=value' >> /var/www/fibreflow/.env.production"
    ```
 
 4. **Restart processes**
    ```bash
-   ssh root@72.60.17.245 "cd /var/www/fibreflow-dev && npm run build && pm2 restart fibreflow-dev"
-   ssh root@72.60.17.245 "cd /var/www/fibreflow && npm run build && pm2 restart fibreflow-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow-dev && npm run build && pm2 restart fibreflow-dev"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && npm run build && pm2 restart fibreflow-prod"
    ```
 
 5. **Document in VPS docs**
@@ -301,37 +301,37 @@ Currently manual deployment. Future improvements:
 ### Deployment Fails on `git pull`
 ```bash
 # Stash local changes
-ssh root@72.60.17.245 "cd /var/www/fibreflow && git stash && git pull"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git stash && git pull"
 ```
 
 ### Build Fails with Memory Error
 ```bash
 # Increase Node.js memory limit
-ssh root@72.60.17.245 \
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
   "cd /var/www/fibreflow && NODE_OPTIONS='--max-old-space-size=4096' npm run build"
 ```
 
 ### PM2 Process Not Starting
 ```bash
 # Check logs
-ssh root@72.60.17.245 "pm2 logs fibreflow-prod --err --lines 50"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 logs fibreflow-prod --err --lines 50"
 
 # Delete and re-add process
-ssh root@72.60.17.245 "pm2 delete fibreflow-prod"
-ssh root@72.60.17.245 "cd /var/www && pm2 start ecosystem.config.js --only fibreflow-prod"
-ssh root@72.60.17.245 "pm2 save"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 delete fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www && pm2 start ecosystem.config.js --only fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 save"
 ```
 
 ### 502 Bad Gateway
 ```bash
 # Check if PM2 process running
-ssh root@72.60.17.245 "pm2 list"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 list"
 
 # Restart PM2 process
-ssh root@72.60.17.245 "pm2 restart fibreflow-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 restart fibreflow-prod"
 
 # Restart Nginx
-ssh root@72.60.17.245 "systemctl restart nginx"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart nginx"
 ```
 
 ## Emergency Procedures
@@ -340,7 +340,7 @@ ssh root@72.60.17.245 "systemctl restart nginx"
 
 1. **Immediate Rollback**
    ```bash
-   ssh root@72.60.17.245 "cd /var/www/fibreflow && git reset --hard HEAD~1 && npm run build && pm2 restart fibreflow-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "cd /var/www/fibreflow && git reset --hard HEAD~1 && npm run build && pm2 restart fibreflow-prod"
    ```
 
 2. **Notify User** of rollback and issue
@@ -358,7 +358,7 @@ ssh root@72.60.17.245 "systemctl restart nginx"
 3. Verify services restart (PM2 startup configured)
 4. If services don't auto-start:
    ```bash
-   ssh root@72.60.17.245 "pm2 resurrect"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 resurrect"
    ```
 
 ## Best Practices

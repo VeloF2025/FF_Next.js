@@ -23,7 +23,7 @@ Before running validation tests, verify prerequisites are met:
 
 ### 1. Verify VPS Access
 ```bash
-ssh root@72.60.17.245 "echo 'VPS accessible'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "echo 'VPS accessible'"
 ```
 **Expected**: "VPS accessible"
 **On Failure**: Cannot proceed - VPS unreachable. Check network connection.
@@ -50,7 +50,7 @@ Critical foundation - all services must be running for system to function.
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 ```
 
 **Expected Output**: `active`
@@ -66,19 +66,19 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 **On Failure - Self-Correction Attempt**:
 1. Check service status details:
    ```bash
-   ssh root@72.60.17.245 "systemctl status wa-monitor-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status wa-monitor-prod"
    ```
 2. Check recent logs for errors:
    ```bash
-   ssh root@72.60.17.245 "tail -50 /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -50 /opt/wa-monitor/prod/logs/wa-monitor-prod.log"
    ```
 3. Check for Python cache issue:
    ```bash
-   ssh root@72.60.17.245 "ls -la /opt/wa-monitor/prod/modules/__pycache__/*.pyc"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ls -la /opt/wa-monitor/prod/modules/__pycache__/*.pyc"
    ```
 4. Attempt safe restart (clears Python cache):
    ```bash
-   ssh root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
    ```
 5. Wait 5 seconds for service stabilization
 6. Re-test service status
@@ -96,7 +96,7 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-prod"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "systemctl is-active wa-monitor-dev"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl is-active wa-monitor-dev"
 ```
 
 **Expected Output**: `active`
@@ -108,15 +108,15 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-dev"
 **On Failure - Self-Correction Attempt**:
 1. Check service status:
    ```bash
-   ssh root@72.60.17.245 "systemctl status wa-monitor-dev"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status wa-monitor-dev"
    ```
 2. Check logs:
    ```bash
-   ssh root@72.60.17.245 "tail -50 /opt/wa-monitor/dev/logs/wa-monitor-dev.log"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -50 /opt/wa-monitor/dev/logs/wa-monitor-dev.log"
    ```
 3. Attempt restart (regular restart OK for dev):
    ```bash
-   ssh root@72.60.17.245 "systemctl restart wa-monitor-dev"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl restart wa-monitor-dev"
    ```
 4. Wait 5 seconds
 5. Re-test
@@ -132,7 +132,7 @@ ssh root@72.60.17.245 "systemctl is-active wa-monitor-dev"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
 ```
 
 **Expected Output**: Process line containing `whatsapp-bridge` with PID
@@ -149,15 +149,15 @@ ssh root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
 **On Failure - Diagnostics Only (No Auto-Fix)**:
 1. Check if it's a systemd service:
    ```bash
-   ssh root@72.60.17.245 "systemctl status whatsapp-bridge"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "systemctl status whatsapp-bridge"
    ```
 2. Check bridge logs:
    ```bash
-   ssh root@72.60.17.245 "tail -100 /opt/velo-test-monitor/logs/whatsapp-bridge.log"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "tail -100 /opt/velo-test-monitor/logs/whatsapp-bridge.log"
    ```
 3. Check messages.db last update:
    ```bash
-   ssh root@72.60.17.245 "stat /opt/velo-test-monitor/services/whatsapp-bridge/store/messages.db | grep Modify"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "stat /opt/velo-test-monitor/services/whatsapp-bridge/store/messages.db | grep Modify"
    ```
 4. Report: ❌ FAIL "WhatsApp bridge is not running. Last messages.db update: [timestamp]. Manual restart required - DO NOT auto-restart (critical service)."
 
@@ -173,7 +173,7 @@ ssh root@72.60.17.245 "ps aux | grep whatsapp-bridge | grep -v grep"
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
 ```
 
 **Expected Output**:
@@ -200,15 +200,15 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **On Failure - Diagnostics**:
 1. Test VPS internet connectivity:
    ```bash
-   ssh root@72.60.17.245 "ping -c 3 8.8.8.8"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ping -c 3 8.8.8.8"
    ```
 2. Test DNS resolution:
    ```bash
-   ssh root@72.60.17.245 "nslookup ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "nslookup ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech"
    ```
 3. Check if monitor config has correct database URL:
    ```bash
-   ssh root@72.60.17.245 "grep -A 2 'NEON_DB_URL' /opt/wa-monitor/prod/modules/database.py | head -3"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -A 2 'NEON_DB_URL' /opt/wa-monitor/prod/modules/database.py | head -3"
    ```
 4. Report: ❌ FAIL "VPS cannot reach Neon database. Internet: [ok/failed], DNS: [ok/failed], Database URL in config: [correct/incorrect]. Check VPS networking and Neon database status at console.neon.tech"
 
@@ -250,7 +250,7 @@ curl -s https://app.fibreflow.app/api/wa-monitor-drops | jq '.success'
    ```
 4. If app is down, check PM2 status:
    ```bash
-   ssh root@72.60.17.245 "pm2 status fibreflow-prod"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "pm2 status fibreflow-prod"
    ```
 5. Report: ❌ FAIL "FibreFlow app cannot reach database. App status: [up/down], Error: [from API response]. Check PM2 logs and app deployment."
 
@@ -264,7 +264,7 @@ curl -s https://app.fibreflow.app/api/wa-monitor-drops | jq '.success'
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, project, submitted_by, LENGTH(submitted_by) as len FROM qa_photo_reviews ORDER BY whatsapp_message_date DESC LIMIT 1;\""
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, project, submitted_by, LENGTH(submitted_by) as len FROM qa_photo_reviews ORDER BY whatsapp_message_date DESC LIMIT 1;\""
 ```
 
 **Expected Output**:
@@ -291,7 +291,7 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **On Failure - Diagnostics**:
 1. Check total record count:
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c 'SELECT COUNT(*) FROM qa_photo_reviews;'"
    ```
 2. If count = 0:
    - Report: ⚠️ WARNING "Database is empty. No drops to validate. This may be expected if testing fresh deployment."
@@ -403,7 +403,7 @@ curl -s "https://app.fibreflow.app/api/wa-monitor-daily-drops" | jq .
 **On Failure - Diagnostics**:
 1. Check database for today's drops (verify expected count):
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT project, COUNT(DISTINCT drop_number) as drops FROM qa_photo_reviews WHERE DATE(whatsapp_message_date AT TIME ZONE 'Africa/Johannesburg') = CURRENT_DATE GROUP BY project;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT project, COUNT(DISTINCT drop_number) as drops FROM qa_photo_reviews WHERE DATE(whatsapp_message_date AT TIME ZONE 'Africa/Johannesburg') = CURRENT_DATE GROUP BY project;\""
    ```
 2. Compare database result vs API result
 3. Report: ❌ FAIL "Daily drops API mismatch. Database shows: [project counts], API shows: [project counts]"
@@ -420,7 +420,7 @@ curl -s "https://app.fibreflow.app/api/wa-monitor-daily-drops" | jq .
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, COUNT(*) as occurrences FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1 LIMIT 10;\""
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, COUNT(*) as occurrences FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1 LIMIT 10;\""
 ```
 
 **Expected Output**:
@@ -440,11 +440,11 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **On Failure - Detailed Diagnostics**:
 1. List all duplicates with full details:
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, id, created_at, updated_at, project FROM qa_photo_reviews WHERE drop_number IN (SELECT drop_number FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1) ORDER BY drop_number, created_at;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, id, created_at, updated_at, project FROM qa_photo_reviews WHERE drop_number IN (SELECT drop_number FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(*) > 1) ORDER BY drop_number, created_at;\""
    ```
 2. Check if duplicates are from different projects (shouldn't happen):
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, array_agg(DISTINCT project) as projects FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(DISTINCT project) > 1;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, array_agg(DISTINCT project) as projects FROM qa_photo_reviews GROUP BY drop_number HAVING COUNT(DISTINCT project) > 1;\""
    ```
 3. Report: ❌ CRITICAL BUG "Found X duplicate drop number(s): [list]. This indicates resubmission handler ON CONFLICT logic is not working. Duplicates: [detailed list from step 1]"
 
@@ -460,7 +460,7 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, submitted_by, LENGTH(submitted_by) as len, whatsapp_message_date FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11 ORDER BY whatsapp_message_date DESC LIMIT 10;\""
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, submitted_by, LENGTH(submitted_by) as len, whatsapp_message_date FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11 ORDER BY whatsapp_message_date DESC LIMIT 10;\""
 ```
 
 **Expected Output**:
@@ -481,19 +481,19 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **On Failure - Critical Bug Detected**:
 1. Report number of affected drops:
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT COUNT(*) as lid_drops FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT COUNT(*) as lid_drops FROM qa_photo_reviews WHERE submitted_by IS NOT NULL AND LENGTH(submitted_by) > 11;\""
    ```
 2. Show sample of affected drops (first 5):
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, submitted_by, project, DATE(whatsapp_message_date) as date FROM qa_photo_reviews WHERE LENGTH(submitted_by) > 11 ORDER BY whatsapp_message_date DESC LIMIT 5;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT drop_number, submitted_by, project, DATE(whatsapp_message_date) as date FROM qa_photo_reviews WHERE LENGTH(submitted_by) > 11 ORDER BY whatsapp_message_date DESC LIMIT 5;\""
    ```
 3. Check monitor logs for LID resolution errors:
    ```bash
-   ssh root@72.60.17.245 "grep -i 'lid' /opt/wa-monitor/prod/logs/wa-monitor-prod.log | tail -20"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -i 'lid' /opt/wa-monitor/prod/logs/wa-monitor-prod.log | tail -20"
    ```
 4. Check if Python cache may be the issue:
    ```bash
-   ssh root@72.60.17.245 "ls -lah /opt/wa-monitor/prod/modules/__pycache__/*.pyc | head -5"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "ls -lah /opt/wa-monitor/prod/modules/__pycache__/*.pyc | head -5"
    ```
 5. Report: ❌ CRITICAL BUG "LID resolution bug detected! Found X drops with unresolved LIDs. Sample: [list from step 2]. This is the bug from Nov 11-13, 2025. Likely cause: Python cache not cleared after code update. Recommend: Run /opt/wa-monitor/prod/restart-monitor.sh to clear cache and restart service."
 
@@ -566,10 +566,10 @@ curl -s "https://app.fibreflow.app/api/wa-monitor-daily-drops" | jq 'has("succes
 **Commands**:
 ```bash
 # Check prod logs for recent Velo Test processing
-ssh root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/prod/logs/wa-monitor-prod.log | tail -5"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/prod/logs/wa-monitor-prod.log | tail -5"
 
 # Check dev logs for recent Velo Test processing
-ssh root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/dev/logs/wa-monitor-dev.log | tail -5"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/dev/logs/wa-monitor-dev.log | tail -5"
 ```
 
 **Expected Output**: Both commands return recent log entries (within last 24 hours) mentioning "Velo Test"
@@ -588,16 +588,16 @@ ssh root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/dev/logs/wa-monitor-dev.
 **On Failure - Identify Which Service Failed**:
 1. Check production config for Velo Test:
    ```bash
-   ssh root@72.60.17.245 "grep -A 3 'Velo Test' /opt/wa-monitor/prod/config/projects.yaml"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -A 3 'Velo Test' /opt/wa-monitor/prod/config/projects.yaml"
    ```
 2. Check dev config for Velo Test:
    ```bash
-   ssh root@72.60.17.245 "grep -A 3 'Velo Test' /opt/wa-monitor/dev/config/projects.yaml"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -A 3 'Velo Test' /opt/wa-monitor/dev/config/projects.yaml"
    ```
 3. Check which service has recent activity:
    ```bash
-   ssh root@72.60.17.245 "stat /opt/wa-monitor/prod/logs/wa-monitor-prod.log | grep Modify"
-   ssh root@72.60.17.245 "stat /opt/wa-monitor/dev/logs/wa-monitor-dev.log | grep Modify"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "stat /opt/wa-monitor/prod/logs/wa-monitor-prod.log | grep Modify"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "stat /opt/wa-monitor/dev/logs/wa-monitor-dev.log | grep Modify"
    ```
 4. Report:
    - If prod missing: ⚠️ WARNING "Production monitor not processing Velo Test. Config enabled: [yes/no]. Service active: [checked in 1.1]"
@@ -616,7 +616,7 @@ ssh root@72.60.17.245 "grep 'Velo Test' /opt/wa-monitor/dev/logs/wa-monitor-dev.
 
 **Command**:
 ```bash
-ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, incorrect_steps, incorrect_comments, jsonb_array_length(incorrect_steps) as step_count FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL AND jsonb_array_length(incorrect_steps) > 0 ORDER BY updated_at DESC LIMIT 3;\""
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require' -c \"SELECT drop_number, incorrect_steps, incorrect_comments, jsonb_array_length(incorrect_steps) as step_count FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL AND jsonb_array_length(incorrect_steps) > 0 ORDER BY updated_at DESC LIMIT 3;\""
 ```
 
 **Expected Output**:
@@ -645,7 +645,7 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **On Failure - Diagnostics**:
 1. Check if ANY drops have been marked incorrect:
    ```bash
-   ssh root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT COUNT(*) as marked_incorrect FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL;\""
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "psql 'postgresql://...' -c \"SELECT COUNT(*) as marked_incorrect FROM qa_photo_reviews WHERE incorrect_steps IS NOT NULL;\""
    ```
 2. If count = 0:
    - Report: ℹ️ INFO "No drops have been marked incorrect yet. Cannot validate JSONB fields. This test will be skipped."
@@ -668,10 +668,10 @@ ssh root@72.60.17.245 "psql 'postgresql://neondb_owner:npg_aRNLhZc1G2CD@ep-dry-n
 **Commands**:
 ```bash
 # Check prod monitor database URL
-ssh root@72.60.17.245 "grep 'ep-dry-night-a9qyh4sj\|ep-damp-credit' /opt/wa-monitor/prod/modules/database.py"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'ep-dry-night-a9qyh4sj\|ep-damp-credit' /opt/wa-monitor/prod/modules/database.py"
 
 # Check dev monitor database URL
-ssh root@72.60.17.245 "grep 'ep-dry-night-a9qyh4sj\|ep-damp-credit' /opt/wa-monitor/dev/modules/database.py"
+sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep 'ep-dry-night-a9qyh4sj\|ep-damp-credit' /opt/wa-monitor/dev/modules/database.py"
 
 # App database already verified in Test 2.2 (API connection)
 ```
@@ -692,10 +692,10 @@ ssh root@72.60.17.245 "grep 'ep-dry-night-a9qyh4sj\|ep-damp-credit' /opt/wa-moni
 1. Show which environment has wrong database:
    ```bash
    # Prod full database URL
-   ssh root@72.60.17.245 "grep -A 1 'NEON_DB_URL' /opt/wa-monitor/prod/modules/database.py | head -2"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -A 1 'NEON_DB_URL' /opt/wa-monitor/prod/modules/database.py | head -2"
 
    # Dev full database URL
-   ssh root@72.60.17.245 "grep -A 1 'NEON_DB_URL' /opt/wa-monitor/dev/modules/database.py | head -2"
+   sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "grep -A 1 'NEON_DB_URL' /opt/wa-monitor/dev/modules/database.py | head -2"
    ```
 2. Report: ❌ CRITICAL CONFIG ERROR "Database configuration mismatch detected!
    - Correct database: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
@@ -832,7 +832,7 @@ REQUIRED ACTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. CRITICAL: Fix LID resolution bug
-   → Run: ssh root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
+   → Run: sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 "/opt/wa-monitor/prod/restart-monitor.sh"
    → This will clear Python cache and restart service properly
    → Re-run validation after restart
 
