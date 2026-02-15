@@ -129,6 +129,14 @@ export const getGroupedTabConfig = (): TabGroup[] => [
     tabs: [
       { id: 'timeline', label: 'Timeline' },
       { id: 'hierarchy', label: 'Hierarchy' },
+      { id: 'prereqs', label: 'Pre-Reqs' },
+    ],
+  },
+  {
+    id: 'build',
+    label: 'Build',
+    tabs: [
+      { id: 'pon-stages', label: 'PON Stages' },
     ],
   },
   {

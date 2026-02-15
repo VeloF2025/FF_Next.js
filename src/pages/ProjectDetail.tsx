@@ -36,6 +36,9 @@ import { FinanceDashboardTab } from '@/modules/projects/components/finance/Finan
 import { ProjectIncomeTab } from './detail/ProjectIncomeTab';
 // Documents Tab
 import { ProjectDocumentsTab } from './detail/ProjectDocumentsTab';
+// PON Stages & Pre-Reqs Tabs
+import { PonStageTracker } from '@/modules/projects/components/pon-stages/PonStageTracker';
+import { ProjectPrereqs } from '@/modules/projects/components/prereqs/ProjectPrereqs';
 
 interface ProjectDetailProps {
   projectId: string;
@@ -58,6 +61,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
     'finance-documents': 'documents',
     'sow-data': 'sow',
     'health-safety': 'hs',
+    // Build tab aliases
+    'build': 'pon-stages',
+    'stages': 'pon-stages',
+    'pre-reqs': 'prereqs',
   };
 
   // Read tab from URL query param, normalize aliases, default to 'overview'
@@ -293,6 +300,14 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'documents' && (
         <ProjectDocumentsTab projectId={id!} />
+      )}
+
+      {activeTab === 'pon-stages' && (
+        <PonStageTracker projectId={id!} />
+      )}
+
+      {activeTab === 'prereqs' && (
+        <ProjectPrereqs projectId={id!} />
       )}
     </div>
   );
