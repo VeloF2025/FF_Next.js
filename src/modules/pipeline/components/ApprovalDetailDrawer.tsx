@@ -1,6 +1,7 @@
 /**
  * Approval Detail Drawer Component
  * Shows approval details and allows workflow actions
+ * NOW WITH INLINE EDITING FOR APPROVAL DETAILS
  */
 
 import { useState } from 'react';
@@ -20,6 +21,10 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronDown,
+  Pencil,
+  Save,
+  Calendar,
+  DollarSign,
 } from 'lucide-react';
 import type {
   PipelineProjectApprovalWithType,
@@ -67,6 +72,38 @@ const INTERNAL_STATUS_CONFIG: Record<
   rejected: { label: 'Rejected', color: 'text-red-600', bgColor: 'bg-red-100' },
 };
 
+type EditSection = 'timeline' | 'references' | 'financial' | 'details' | 'followup' | null;
+
+interface TimelineEditData {
+  application_date: string;
+  issue_date: string;
+  expiry_date: string;
+  approval_date: string;
+}
+
+interface ReferencesEditData {
+  application_reference: string;
+  approval_reference: string;
+}
+
+interface FinancialEditData {
+  application_fee: string;
+  fee_paid: boolean;
+  fee_paid_date: string;
+  fee_receipt_reference: string;
+}
+
+interface DetailsEditData {
+  conditions: string;
+  coverage_description: string;
+  notes: string;
+}
+
+interface FollowupEditData {
+  next_followup_date: string;
+  followup_notes: string;
+}
+
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
   return new Date(date).toISOString().split('T')[0] ?? '-';
@@ -93,11 +130,39 @@ export function ApprovalDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [showApproveForm, setShowApproveForm] = useState(false);
+  const [togglingRequired, setTogglingRequired] = useState(false);
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [showAuthorityPicker, setShowAuthorityPicker] = useState(false);
   const [savingAuthority, setSavingAuthority] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionsExpanded, setActionsExpanded] = useState(false);
+
+  // Inline editing state
+  const [editingSection, setEditingSection] = useState<EditSection>(null);
+  const [timelineData, setTimelineData] = useState<TimelineEditData>({
+    application_date: approval.application_date || '',
+    issue_date: approval.issue_date || '',
+    expiry_date: approval.expiry_date || '',
+    approval_date: approval.approval_date || '',
+  });
+  const [referencesData, setReferencesData] = useState<ReferencesEditData>({
+    application_reference: approval.application_reference || '',
+    approval_reference: approval.approval_reference || '',
+  });
+  const [financialData, setFinancialData] = useState<FinancialEditData>({
+    application_fee: approval.application_fee?.toString() || '',
+    fee_paid: approval.fee_paid || false,
+    fee_paid_date: approval.fee_paid_date || '',
+    fee_receipt_reference: approval.fee_receipt_reference || '',
+  });
+  const [detailsData, setDetailsData] = useState<DetailsEditData>({
+    conditions: approval.conditions || '',
+    coverage_description: approval.coverage_description || '',
+    notes: approval.notes || '',
+  });
+  const [followupData, setFollowupData] = useState<FollowupEditData>({
+    next_followup_date: approval.next_followup_date || '',
+    followup_notes: approval.followup_notes || '',
+  });
 
   // Form state for submission
   const [submitData, setSubmitData] = useState({
@@ -148,6 +213,98 @@ export function ApprovalDetailDrawer({
     ['submitted', 'in_review', 'additional_info_required'].includes(approval.status);
 
   const hasActions = canPmApprove || canOpsApprove || canSubmit || canMarkApproved || canMarkRejected;
+  const canEdit = ['admin', 'pm', 'ops'].includes(currentUserRole);
+
+  // Reset edit data when starting to edit a section
+  function startEdit(section: EditSection) {
+    if (section === 'timeline') {
+      setTimelineData({
+        application_date: approval.application_date || '',
+        issue_date: approval.issue_date || '',
+        expiry_date: approval.expiry_date || '',
+        approval_date: approval.approval_date || '',
+      });
+    } else if (section === 'references') {
+      setReferencesData({
+        application_reference: approval.application_reference || '',
+        approval_reference: approval.approval_reference || '',
+      });
+    } else if (section === 'financial') {
+      setFinancialData({
+        application_fee: approval.application_fee?.toString() || '',
+        fee_paid: approval.fee_paid || false,
+        fee_paid_date: approval.fee_paid_date || '',
+        fee_receipt_reference: approval.fee_receipt_reference || '',
+      });
+    } else if (section === 'details') {
+      setDetailsData({
+        conditions: approval.conditions || '',
+        coverage_description: approval.coverage_description || '',
+        notes: approval.notes || '',
+      });
+    } else if (section === 'followup') {
+      setFollowupData({
+        next_followup_date: approval.next_followup_date || '',
+        followup_notes: approval.followup_notes || '',
+      });
+    }
+    setEditingSection(section);
+  }
+
+  function cancelEdit() {
+    setEditingSection(null);
+    setError(null);
+  }
+
+  async function saveEdit() {
+    setLoading(true);
+    setError(null);
+    try {
+      const updateData: any = { updated_by: currentUserId };
+
+      if (editingSection === 'timeline') {
+        updateData.application_date = timelineData.application_date || null;
+        updateData.issue_date = timelineData.issue_date || null;
+        updateData.expiry_date = timelineData.expiry_date || null;
+        updateData.approval_date = timelineData.approval_date || null;
+      } else if (editingSection === 'references') {
+        updateData.application_reference = referencesData.application_reference || null;
+        updateData.approval_reference = referencesData.approval_reference || null;
+      } else if (editingSection === 'financial') {
+        updateData.application_fee = financialData.application_fee
+          ? parseFloat(financialData.application_fee)
+          : null;
+        updateData.fee_paid = financialData.fee_paid;
+        updateData.fee_paid_date = financialData.fee_paid_date || null;
+        updateData.fee_receipt_reference = financialData.fee_receipt_reference || null;
+      } else if (editingSection === 'details') {
+        updateData.conditions = detailsData.conditions || null;
+        updateData.coverage_description = detailsData.coverage_description || null;
+        updateData.notes = detailsData.notes || null;
+      } else if (editingSection === 'followup') {
+        updateData.next_followup_date = followupData.next_followup_date || null;
+        updateData.followup_notes = followupData.followup_notes || null;
+      }
+
+      const response = await fetch(`/api/pipeline/approvals/${approval.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update approval');
+      }
+
+      onUpdate();
+      setEditingSection(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleInternalApprove(action: 'pm_approve' | 'ops_approve' | 'reject') {
     setLoading(true);
@@ -326,11 +483,31 @@ export function ApprovalDetailDrawer({
                 {internalStatusConfig.label}
               </span>
             )}
-            {!approval.is_required && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-secondary text-muted-foreground">
-                Optional
-              </span>
-            )}
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                setTogglingRequired(true);
+                try {
+                  const res = await fetch(`/api/pipeline/approvals/${approval.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ is_required: !approval.is_required }),
+                  });
+                  if (res.ok) onUpdate();
+                } finally {
+                  setTogglingRequired(false);
+                }
+              }}
+              disabled={togglingRequired}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium cursor-pointer transition-colors ${
+                approval.is_required
+                  ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+              } disabled:opacity-50`}
+              title={approval.is_required ? "Click to mark as optional" : "Click to mark as required"}
+            >
+              {togglingRequired ? "..." : approval.is_required ? "Required" : "Optional"}
+            </button>
           </div>
         </div>
 
@@ -342,7 +519,314 @@ export function ApprovalDetailDrawer({
             </div>
           )}
 
-          {/* Documents Section — FIRST for visibility */}
+          {/* WORKFLOW ACTIONS - PROMINENT PLACEMENT (top, always visible) */}
+          {hasActions && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4">
+              {/* Internal Approval Workflow */}
+              {(canPmApprove || canOpsApprove) && !showRejectForm && (
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Internal Approval Required
+                  </h3>
+                  {canPmApprove && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleInternalApprove('pm_approve')}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        PM Approve
+                      </button>
+                      <button
+                        onClick={() => setShowRejectForm(true)}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                      >
+                        <XCircle className="w-5 h-5" />
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                  {canOpsApprove && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleInternalApprove('ops_approve')}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                        Ops Approve
+                      </button>
+                      <button
+                        onClick={() => setShowRejectForm(true)}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                      >
+                        <XCircle className="w-5 h-5" />
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Submit to Authority Action */}
+              {canSubmit && !showSubmitForm && (
+                <button
+                  onClick={() => setShowSubmitForm(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                >
+                  <Send className="w-5 h-5" />
+                  Submit to Authority
+                </button>
+              )}
+
+              {/* Submit Form */}
+              {showSubmitForm && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-300">
+                    Submit Application
+                  </h3>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Application Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={submitData.application_date}
+                      onChange={(e) =>
+                        setSubmitData({ ...submitData, application_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Reference Number
+                    </label>
+                    <input
+                      type="text"
+                      value={submitData.application_reference}
+                      onChange={(e) =>
+                        setSubmitData({ ...submitData, application_reference: e.target.value })
+                      }
+                      placeholder="e.g., APP-2024-001"
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Application Fee
+                    </label>
+                    <input
+                      type="number"
+                      value={submitData.application_fee}
+                      onChange={(e) =>
+                        setSubmitData({ ...submitData, application_fee: e.target.value })
+                      }
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Notes
+                    </label>
+                    <textarea
+                      value={submitData.notes}
+                      onChange={(e) =>
+                        setSubmitData({ ...submitData, notes: e.target.value })
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSubmitApplication}
+                      disabled={loading || !submitData.application_date}
+                      className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {loading ? 'Submitting...' : 'Submit'}
+                    </button>
+                    <button
+                      onClick={() => setShowSubmitForm(false)}
+                      disabled={loading}
+                      className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mark Approved/Rejected Actions */}
+              {(canMarkApproved || canMarkRejected) && !showApproveForm && !showRejectForm && (
+                <div className="flex gap-2">
+                  {canMarkApproved && (
+                    <button
+                      onClick={() => setShowApproveForm(true)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      Mark Approved
+                    </button>
+                  )}
+                  {canMarkRejected && (
+                    <button
+                      onClick={() => setShowRejectForm(true)}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                    >
+                      <XCircle className="w-5 h-5" />
+                      Mark Rejected
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Approve Form */}
+              {showApproveForm && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-green-900 dark:text-green-300">
+                    Record Approval
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                        Approval Date *
+                      </label>
+                      <input
+                        type="date"
+                        value={approveData.approval_date}
+                        onChange={(e) =>
+                          setApproveData({ ...approveData, approval_date: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                        Reference *
+                      </label>
+                      <input
+                        type="text"
+                        value={approveData.approval_reference}
+                        onChange={(e) =>
+                          setApproveData({ ...approveData, approval_reference: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                        Issue Date
+                      </label>
+                      <input
+                        type="date"
+                        value={approveData.issue_date}
+                        onChange={(e) =>
+                          setApproveData({ ...approveData, issue_date: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                        Expiry Date
+                      </label>
+                      <input
+                        type="date"
+                        value={approveData.expiry_date}
+                        onChange={(e) =>
+                          setApproveData({ ...approveData, expiry_date: e.target.value })
+                        }
+                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Conditions
+                    </label>
+                    <textarea
+                      value={approveData.conditions}
+                      onChange={(e) =>
+                        setApproveData({ ...approveData, conditions: e.target.value })
+                      }
+                      rows={2}
+                      placeholder="Any conditions attached to the approval..."
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleMarkApproved}
+                      disabled={loading || !approveData.approval_date || !approveData.approval_reference}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {loading ? 'Saving...' : 'Confirm Approval'}
+                    </button>
+                    <button
+                      onClick={() => setShowApproveForm(false)}
+                      disabled={loading}
+                      className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reject Form */}
+              {showRejectForm && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-red-900 dark:text-red-300">
+                    Record Rejection
+                  </h3>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Rejection Reason *
+                    </label>
+                    <textarea
+                      value={rejectData.rejection_reason}
+                      onChange={(e) =>
+                        setRejectData({ ...rejectData, rejection_reason: e.target.value })
+                      }
+                      rows={3}
+                      placeholder="Reason for rejection..."
+                      className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={
+                        canPmApprove || canOpsApprove
+                          ? () => handleInternalApprove('reject')
+                          : handleMarkRejected
+                      }
+                      disabled={loading || !rejectData.rejection_reason}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {loading ? 'Saving...' : 'Confirm Rejection'}
+                    </button>
+                    <button
+                      onClick={() => setShowRejectForm(false)}
+                      disabled={loading}
+                      className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Documents Section */}
           <div>
             <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
               <FileText className="w-4 h-4" />
@@ -434,457 +918,516 @@ export function ApprovalDetailDrawer({
             )}
           </div>
 
-          {/* Application Details */}
-          {(approval.application_date || approval.application_reference) && (
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-                <Send className="w-4 h-4" />
-                Application Details
+          {/* Timeline Section (EDITABLE) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Timeline
               </h3>
+              {canEdit && editingSection !== 'timeline' && (
+                <button
+                  onClick={() => startEdit('timeline')}
+                  className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
+                  title="Edit timeline"
+                >
+                  <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                </button>
+              )}
+            </div>
+            
+            {editingSection === 'timeline' ? (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Application Date
+                    </label>
+                    <input
+                      type="date"
+                      value={timelineData.application_date}
+                      onChange={(e) => setTimelineData({ ...timelineData, application_date: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Issue Date
+                    </label>
+                    <input
+                      type="date"
+                      value={timelineData.issue_date}
+                      onChange={(e) => setTimelineData({ ...timelineData, issue_date: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      value={timelineData.expiry_date}
+                      onChange={(e) => setTimelineData({ ...timelineData, expiry_date: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                      Approval Date
+                    </label>
+                    <input
+                      type="date"
+                      value={timelineData.approval_date}
+                      onChange={(e) => setTimelineData({ ...timelineData, approval_date: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-[var(--ff-text-secondary)]">Date</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Application Date</span>
                   <span className="text-sm text-[var(--ff-text-primary)]">
                     {formatDate(approval.application_date)}
                   </span>
                 </div>
-                {approval.application_reference && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Reference</span>
-                    <span className="text-sm text-[var(--ff-text-primary)]">
-                      {approval.application_reference}
-                    </span>
-                  </div>
-                )}
-                {approval.application_fee && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Fee</span>
-                    <span className="text-sm text-[var(--ff-text-primary)]">
-                      {formatCurrency(approval.application_fee)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Approval Details */}
-          {(approval.approval_date || approval.approval_reference) && (
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                Approval Details
-              </h3>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-[var(--ff-text-secondary)]">Approved</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Issue Date</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatDate(approval.issue_date)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Expiry Date</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatDate(approval.expiry_date)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Approval Date</span>
                   <span className="text-sm text-[var(--ff-text-primary)]">
                     {formatDate(approval.approval_date)}
                   </span>
                 </div>
-                {approval.approval_reference && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Reference</span>
-                    <span className="text-sm text-[var(--ff-text-primary)]">
-                      {approval.approval_reference}
-                    </span>
-                  </div>
-                )}
-                {approval.issue_date && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Issue Date</span>
-                    <span className="text-sm text-[var(--ff-text-primary)]">
-                      {formatDate(approval.issue_date)}
-                    </span>
-                  </div>
-                )}
-                {approval.expiry_date && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Expiry Date</span>
-                    <span className="text-sm text-[var(--ff-text-primary)]">
-                      {formatDate(approval.expiry_date)}
-                    </span>
-                  </div>
-                )}
+              </div>
+            )}
+          </div>
+
+          {/* References Section (EDITABLE) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                References
+              </h3>
+              {canEdit && editingSection !== 'references' && (
+                <button
+                  onClick={() => startEdit('references')}
+                  className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
+                  title="Edit references"
+                >
+                  <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                </button>
+              )}
+            </div>
+
+            {editingSection === 'references' ? (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Application Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={referencesData.application_reference}
+                    onChange={(e) => setReferencesData({ ...referencesData, application_reference: e.target.value })}
+                    placeholder="e.g., APP-2024-001"
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Approval Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={referencesData.approval_reference}
+                    onChange={(e) => setReferencesData({ ...referencesData, approval_reference: e.target.value })}
+                    placeholder="e.g., APR-2024-001"
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Application Reference</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {approval.application_reference || '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Approval Reference</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {approval.approval_reference || '-'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Financial Section (EDITABLE) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Financial
+              </h3>
+              {canEdit && editingSection !== 'financial' && (
+                <button
+                  onClick={() => startEdit('financial')}
+                  className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
+                  title="Edit financial details"
+                >
+                  <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                </button>
+              )}
+            </div>
+
+            {editingSection === 'financial' ? (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Application Fee (R)
+                  </label>
+                  <input
+                    type="number"
+                    value={financialData.application_fee}
+                    onChange={(e) => setFinancialData({ ...financialData, application_fee: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="fee_paid"
+                    checked={financialData.fee_paid}
+                    onChange={(e) => setFinancialData({ ...financialData, fee_paid: e.target.checked })}
+                    className="w-4 h-4 rounded border-[var(--ff-border-light)]"
+                  />
+                  <label htmlFor="fee_paid" className="text-sm text-[var(--ff-text-secondary)]">
+                    Fee Paid
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Fee Paid Date
+                  </label>
+                  <input
+                    type="date"
+                    value={financialData.fee_paid_date}
+                    onChange={(e) => setFinancialData({ ...financialData, fee_paid_date: e.target.value })}
+                    className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Fee Receipt Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={financialData.fee_receipt_reference}
+                    onChange={(e) => setFinancialData({ ...financialData, fee_receipt_reference: e.target.value })}
+                    placeholder="e.g., RCP-2024-001"
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Application Fee</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatCurrency(approval.application_fee)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Fee Paid</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {approval.fee_paid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Paid Date</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatDate(approval.fee_paid_date)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Receipt Reference</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {approval.fee_receipt_reference || '-'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Details Section (EDITABLE) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Details
+              </h3>
+              {canEdit && editingSection !== 'details' && (
+                <button
+                  onClick={() => startEdit('details')}
+                  className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
+                  title="Edit details"
+                >
+                  <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                </button>
+              )}
+            </div>
+
+            {editingSection === 'details' ? (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Conditions
+                  </label>
+                  <textarea
+                    value={detailsData.conditions}
+                    onChange={(e) => setDetailsData({ ...detailsData, conditions: e.target.value })}
+                    rows={3}
+                    placeholder="Any conditions attached to the approval..."
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Coverage Description
+                  </label>
+                  <textarea
+                    value={detailsData.coverage_description}
+                    onChange={(e) => setDetailsData({ ...detailsData, coverage_description: e.target.value })}
+                    rows={2}
+                    placeholder="Description of what the approval covers..."
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={detailsData.notes}
+                    onChange={(e) => setDetailsData({ ...detailsData, notes: e.target.value })}
+                    rows={3}
+                    placeholder="General notes about this approval..."
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 {approval.conditions && (
-                  <div className="pt-2 border-t border-[var(--ff-border-light)]">
-                    <span className="text-sm text-[var(--ff-text-secondary)]">Conditions</span>
-                    <p className="text-sm text-[var(--ff-text-primary)] mt-1">
+                  <div>
+                    <span className="text-xs font-medium text-[var(--ff-text-secondary)]">Conditions</span>
+                    <p className="text-sm text-[var(--ff-text-primary)] mt-1 whitespace-pre-wrap">
                       {approval.conditions}
                     </p>
                   </div>
                 )}
+                {approval.coverage_description && (
+                  <div>
+                    <span className="text-xs font-medium text-[var(--ff-text-secondary)]">Coverage</span>
+                    <p className="text-sm text-[var(--ff-text-primary)] mt-1 whitespace-pre-wrap">
+                      {approval.coverage_description}
+                    </p>
+                  </div>
+                )}
+                {approval.notes && (
+                  <div>
+                    <span className="text-xs font-medium text-[var(--ff-text-secondary)]">Notes</span>
+                    <p className="text-sm text-[var(--ff-text-primary)] mt-1 whitespace-pre-wrap">
+                      {approval.notes}
+                    </p>
+                  </div>
+                )}
+                {!approval.conditions && !approval.coverage_description && !approval.notes && (
+                  <p className="text-sm text-[var(--ff-text-tertiary)] italic">
+                    No additional details recorded
+                  </p>
+                )}
               </div>
-            </div>
-          )}
-
-          {/* Follow-up Information */}
-          <div>
-            <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Follow-up
-            </h3>
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-[var(--ff-text-secondary)]">Next Follow-up</span>
-                <span className="text-sm text-[var(--ff-text-primary)]">
-                  {formatDate(approval.next_followup_date)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-[var(--ff-text-secondary)]">Last Follow-up</span>
-                <span className="text-sm text-[var(--ff-text-primary)]">
-                  {formatDate(approval.last_followup_date)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-[var(--ff-text-secondary)]">Follow-up Count</span>
-                <span className="text-sm text-[var(--ff-text-primary)]">
-                  {approval.followup_count || 0}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Notes */}
-          {approval.notes && (
-            <div>
-              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-3 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Notes
+          {/* Follow-up Section (EDITABLE) */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)] flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Follow-up
               </h3>
-              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4">
-                <p className="text-sm text-[var(--ff-text-primary)] whitespace-pre-wrap">
-                  {approval.notes}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Workflow Actions — collapsible at bottom */}
-          {hasActions && (
-            <div className="border-t border-[var(--ff-border-light)] pt-4">
-              <button
-                onClick={() => setActionsExpanded(!actionsExpanded)}
-                className="w-full flex items-center justify-between text-sm font-medium text-[var(--ff-text-primary)] hover:text-[var(--ff-accent)] transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Workflow Actions
-                </span>
-                {actionsExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </button>
-
-              {actionsExpanded && (
-                <div className="mt-4 space-y-4">
-                  {/* Internal Approval Workflow */}
-                  {(canPmApprove || canOpsApprove) && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                      <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-3">
-                        Internal Approval Required
-                      </h3>
-                      {canPmApprove && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleInternalApprove('pm_approve')}
-                            disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            PM Approve
-                          </button>
-                          <button
-                            onClick={() => setShowRejectForm(true)}
-                            disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                      {canOpsApprove && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleInternalApprove('ops_approve')}
-                            disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Ops Approve
-                          </button>
-                          <button
-                            onClick={() => setShowRejectForm(true)}
-                            disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Submit to Authority Action */}
-                  {canSubmit && !showSubmitForm && (
-                    <button
-                      onClick={() => setShowSubmitForm(true)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                    >
-                      <Send className="w-4 h-4" />
-                      Submit to Authority
-                    </button>
-                  )}
-
-                  {/* Submit Form */}
-                  {showSubmitForm && (
-                    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 space-y-4">
-                      <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300">
-                        Submit Application
-                      </h3>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Application Date *
-                        </label>
-                        <input
-                          type="date"
-                          value={submitData.application_date}
-                          onChange={(e) =>
-                            setSubmitData({ ...submitData, application_date: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Reference Number
-                        </label>
-                        <input
-                          type="text"
-                          value={submitData.application_reference}
-                          onChange={(e) =>
-                            setSubmitData({ ...submitData, application_reference: e.target.value })
-                          }
-                          placeholder="e.g., APP-2024-001"
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Application Fee
-                        </label>
-                        <input
-                          type="number"
-                          value={submitData.application_fee}
-                          onChange={(e) =>
-                            setSubmitData({ ...submitData, application_fee: e.target.value })
-                          }
-                          placeholder="0.00"
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Notes
-                        </label>
-                        <textarea
-                          value={submitData.notes}
-                          onChange={(e) =>
-                            setSubmitData({ ...submitData, notes: e.target.value })
-                          }
-                          rows={3}
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSubmitApplication}
-                          disabled={loading || !submitData.application_date}
-                          className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                        >
-                          {loading ? 'Submitting...' : 'Submit'}
-                        </button>
-                        <button
-                          onClick={() => setShowSubmitForm(false)}
-                          disabled={loading}
-                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mark Approved/Rejected Actions */}
-                  {(canMarkApproved || canMarkRejected) && !showApproveForm && !showRejectForm && (
-                    <div className="flex gap-2">
-                      {canMarkApproved && (
-                        <button
-                          onClick={() => setShowApproveForm(true)}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Mark Approved
-                        </button>
-                      )}
-                      {canMarkRejected && (
-                        <button
-                          onClick={() => setShowRejectForm(true)}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Mark Rejected
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Approve Form */}
-                  {showApproveForm && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-4">
-                      <h3 className="text-sm font-medium text-green-900 dark:text-green-300">
-                        Record Approval
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                            Approval Date *
-                          </label>
-                          <input
-                            type="date"
-                            value={approveData.approval_date}
-                            onChange={(e) =>
-                              setApproveData({ ...approveData, approval_date: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                            Reference *
-                          </label>
-                          <input
-                            type="text"
-                            value={approveData.approval_reference}
-                            onChange={(e) =>
-                              setApproveData({ ...approveData, approval_reference: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                            Issue Date
-                          </label>
-                          <input
-                            type="date"
-                            value={approveData.issue_date}
-                            onChange={(e) =>
-                              setApproveData({ ...approveData, issue_date: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                            Expiry Date
-                          </label>
-                          <input
-                            type="date"
-                            value={approveData.expiry_date}
-                            onChange={(e) =>
-                              setApproveData({ ...approveData, expiry_date: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Conditions
-                        </label>
-                        <textarea
-                          value={approveData.conditions}
-                          onChange={(e) =>
-                            setApproveData({ ...approveData, conditions: e.target.value })
-                          }
-                          rows={2}
-                          placeholder="Any conditions attached to the approval..."
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleMarkApproved}
-                          disabled={loading || !approveData.approval_date || !approveData.approval_reference}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {loading ? 'Saving...' : 'Confirm Approval'}
-                        </button>
-                        <button
-                          onClick={() => setShowApproveForm(false)}
-                          disabled={loading}
-                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Reject Form */}
-                  {showRejectForm && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-4">
-                      <h3 className="text-sm font-medium text-red-900 dark:text-red-300">
-                        Record Rejection
-                      </h3>
-                      <div>
-                        <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                          Rejection Reason *
-                        </label>
-                        <textarea
-                          value={rejectData.rejection_reason}
-                          onChange={(e) =>
-                            setRejectData({ ...rejectData, rejection_reason: e.target.value })
-                          }
-                          rows={3}
-                          placeholder="Reason for rejection..."
-                          className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 bg-[var(--ff-bg-primary)]"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={
-                            canPmApprove || canOpsApprove
-                              ? () => handleInternalApprove('reject')
-                              : handleMarkRejected
-                          }
-                          disabled={loading || !rejectData.rejection_reason}
-                          className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {loading ? 'Saving...' : 'Confirm Rejection'}
-                        </button>
-                        <button
-                          onClick={() => setShowRejectForm(false)}
-                          disabled={loading}
-                          className="px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-secondary)]"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {canEdit && editingSection !== 'followup' && (
+                <button
+                  onClick={() => startEdit('followup')}
+                  className="p-1 hover:bg-[var(--ff-bg-secondary)] rounded transition-colors"
+                  title="Edit follow-up"
+                >
+                  <Pencil className="w-4 h-4 text-[var(--ff-text-secondary)]" />
+                </button>
               )}
             </div>
-          )}
+
+            {editingSection === 'followup' ? (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Next Follow-up Date
+                  </label>
+                  <input
+                    type="date"
+                    value={followupData.next_followup_date}
+                    onChange={(e) => setFollowupData({ ...followupData, next_followup_date: e.target.value })}
+                    className="w-full px-2 py-1.5 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    Follow-up Notes
+                  </label>
+                  <textarea
+                    value={followupData.followup_notes}
+                    onChange={(e) => setFollowupData({ ...followupData, followup_notes: e.target.value })}
+                    rows={3}
+                    placeholder="Notes about follow-up actions..."
+                    className="w-full px-3 py-2 text-sm border border-[var(--ff-border-light)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--ff-bg-primary)]"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={saveEdit}
+                    disabled={loading}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    disabled={loading}
+                    className="px-3 py-1.5 text-sm border border-[var(--ff-border-light)] rounded hover:bg-[var(--ff-bg-secondary)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Next Follow-up</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatDate(approval.next_followup_date)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Last Follow-up</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {formatDate(approval.last_followup_date)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-[var(--ff-text-secondary)]">Follow-up Count</span>
+                  <span className="text-sm text-[var(--ff-text-primary)]">
+                    {approval.followup_count || 0}
+                  </span>
+                </div>
+                {approval.followup_notes && (
+                  <div className="pt-2 border-t border-[var(--ff-border-light)]">
+                    <span className="text-xs font-medium text-[var(--ff-text-secondary)]">Notes</span>
+                    <p className="text-sm text-[var(--ff-text-primary)] mt-1 whitespace-pre-wrap">
+                      {approval.followup_notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

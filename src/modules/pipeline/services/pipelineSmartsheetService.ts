@@ -577,15 +577,21 @@ export async function syncFromSmartsheet(
             await sql`
               INSERT INTO pipeline_project_approvals (
                 pipeline_project_id, approval_type_id, status,
+                internal_status,
                 application_date, expiry_date, notes, last_synced_at
               ) VALUES (
                 ${projectId}, ${typeId}, 'approved',
+                'ops_approved',
                 ${wlAppDate || null}, ${wlExpiryDate || null},
                 ${wlComments || null}, NOW()
               )
               ON CONFLICT (pipeline_project_id, approval_type_id)
               DO UPDATE SET
                 status = 'approved',
+                internal_status = CASE 
+                  WHEN pipeline_project_approvals.internal_status = 'pending' THEN 'ops_approved'
+                  ELSE pipeline_project_approvals.internal_status
+                END,
                 expiry_date = EXCLUDED.expiry_date,
                 notes = EXCLUDED.notes,
                 last_synced_at = NOW()

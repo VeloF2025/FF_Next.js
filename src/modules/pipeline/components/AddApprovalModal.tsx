@@ -45,6 +45,7 @@ export function AddApprovalModal({
   const [loadingTypes, setLoadingTypes] = useState(true);
   const [selectedType, setSelectedType] = useState<ApprovalType | null>(null);
   const [selectedAuthority, setSelectedAuthority] = useState<ServiceAuthority | null>(null);
+  const [isRequired, setIsRequired] = useState(false);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export function AddApprovalModal({
     if (isOpen) {
       setSelectedType(null);
       setSelectedAuthority(null);
+      setIsRequired(false);
       setNotes('');
       setError(null);
     }
@@ -94,6 +96,7 @@ export function AddApprovalModal({
     try {
       const body: Record<string, unknown> = {
         approval_type_id: selectedType.id,
+        is_required: isRequired,
         notes: notes || undefined,
       };
 
@@ -252,6 +255,26 @@ export function AddApprovalModal({
                   </p>
                 </div>
               )}
+
+              {/* Required Toggle */}
+              <div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isRequired}
+                    onChange={(e) => setIsRequired(e.target.checked)}
+                    className="w-4 h-4 rounded border-[var(--ff-border-light)] text-[var(--ff-accent)] focus:ring-[var(--ff-accent)]"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-[var(--ff-text-primary)]">
+                      Required
+                    </span>
+                    <p className="text-xs text-[var(--ff-text-tertiary)]">
+                      Mark this approval as compulsory for this project
+                    </p>
+                  </div>
+                </label>
+              </div>
 
               {/* Notes */}
               <div>

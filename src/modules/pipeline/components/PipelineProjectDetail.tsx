@@ -14,6 +14,7 @@ import {
   Building2,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   Clock,
   AlertTriangle,
   FileText,
@@ -161,6 +162,7 @@ export function PipelineProjectDetail() {
   const leaseFileRef = useRef<HTMLInputElement>(null);
   const cessionFileRef = useRef<HTMLInputElement>(null);
   const [transitioning, setTransitioning] = useState(false);
+  const [bulkApproving, setBulkApproving] = useState(false);
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
   const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -206,7 +208,7 @@ export function PipelineProjectDetail() {
         continue;
       }
 
-      if (approval.approval_type_is_compulsory) {
+      if (approval.is_required) {
         compulsory.push(approval);
       } else {
         other.push(approval);
@@ -215,6 +217,12 @@ export function PipelineProjectDetail() {
 
     return { compulsoryApprovals: compulsory, otherApprovals: other };
   }, [approvals, legalDocs.is_rural, project?.is_rural]);
+
+  const pendingInternalCount = useMemo(() => {
+    return approvals.filter(
+      (a) => ['approved', 'conditionally_approved'].includes(a.status) && a.internal_status === 'pending'
+    ).length;
+  }, [approvals]);
 
   const handleApprovalClick = (approval: PipelineProjectApprovalWithType) => {
     setSelectedApproval(approval);
@@ -237,6 +245,26 @@ export function PipelineProjectDetail() {
 
   const handleAddApprovalSuccess = () => {
     loadProject();
+  };
+
+  const handleBulkInternalApprove = async () => {
+    if (!id || !currentUser || bulkApproving) return;
+    setBulkApproving(true);
+    try {
+      const res = await fetch(`/api/pipeline/projects/${id}/bulk-internal-approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved_by: currentUser.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadProject();
+      }
+    } catch (error) {
+      log.error('Bulk internal approve failed', { error }, 'PipelineProjectDetail');
+    } finally {
+      setBulkApproving(false);
+    }
   };
 
   const handleTransitionToPlanned = async () => {
@@ -487,12 +515,14 @@ export function PipelineProjectDetail() {
             className={`px-3 py-1 rounded-full text-sm font-medium ${
               project.pipeline_status === 'ready_to_plan'
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                : project.pipeline_status === 'approvals_complete'
+                : (project.pipeline_status === 'approvals_complete' && (!approvalStatus || approvalStatus.complete))
                 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                 : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
             }`}
           >
-            {STATUS_LABELS[project.pipeline_status]}
+            {project.pipeline_status === 'approvals_complete' && approvalStatus && !approvalStatus.complete
+              ? `Approvals Pending (${approvalStatus.approved}/${approvalStatus.total})`
+              : STATUS_LABELS[project.pipeline_status]}
           </span>
         </div>
 
@@ -539,6 +569,32 @@ export function PipelineProjectDetail() {
                 <span className="font-medium">Expired:</span> {approvalStatus.expired.join(', ')}
               </p>
             )}
+
+            {/* Bulk Internal Approve button - shown when approvals are externally approved but internally pending */}
+            {pendingInternalCount > 0 && (drawerUserRole === 'admin' || drawerUserRole === 'ops') && (
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  onClick={handleBulkInternalApprove}
+                  disabled={bulkApproving}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {bulkApproving ? (
+                    <>
+                      <span className="animate-spin">⏳</span>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Approve All Internally ({pendingInternalCount})
+                    </>
+                  )}
+                </button>
+                <span className="text-xs text-[var(--ff-text-secondary)]">
+                  {pendingInternalCount} approval{pendingInternalCount !== 1 ? 's' : ''} externally approved but pending internal review
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -565,7 +621,7 @@ export function PipelineProjectDetail() {
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] flex items-center gap-2">
                         <Shield className="w-5 h-5 text-red-500" />
-                        Compulsory Approvals ({compulsoryApprovals.length})
+                        Required Approvals ({compulsoryApprovals.length})
                       </h2>
                     </div>
                     <div className="space-y-3">

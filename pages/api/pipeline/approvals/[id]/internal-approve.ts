@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { pipelineApprovalService } from '@/modules/pipeline/services/pipelineApprovalService';
+import { pipelineProjectService } from '@/modules/pipeline/services/pipelineProjectService';
 import type { InternalApproveInput } from '@/modules/pipeline/types';
 import { withAuth } from '@/lib/auth';
 
@@ -66,6 +67,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const approvalWithType = await pipelineApprovalService.getApprovalById(id);
 
+  // Auto-transition: check if all approvals are now complete
+  let autoTransitioned = false;
+  if (input.action !== 'reject') {
+    const status = await pipelineApprovalService.checkAllApprovalsComplete(
+      existing.pipeline_project_id
+    );
+    if (status.complete) {
+      const project = await pipelineProjectService.getProjectById(existing.pipeline_project_id);
+      if (project && project.pipeline_status === 'approvals_in_progress') {
+        await pipelineProjectService.updateStatus(
+          existing.pipeline_project_id,
+          'approvals_complete',
+          input.approved_by
+        );
+        autoTransitioned = true;
+      }
+    }
+  }
+
   const actionMessages = {
     pm_approve: 'Approved by Project Manager',
     ops_approve: 'Approved by Operations Manager. Ready for external submission.',
@@ -75,6 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.success(res, {
     message: actionMessages[input.action],
     approval: approvalWithType,
+    auto_transitioned: autoTransitioned,
   });
 }
 

@@ -529,7 +529,7 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig.bg} ${statusConfig.text}`}>
                       {statusConfig.label}
                     </span>
-                    {approval.approval_type_is_compulsory && (
+                    {approval.is_required && (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
                         Required
                       </span>
@@ -643,7 +643,7 @@ function ApprovalDetailDrawer({ approval, pipelineProjectId, onClose }: Approval
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusConfig.bg} ${statusConfig.text} border border-current/20`}>
               {statusConfig.label}
             </span>
-            {approval.approval_type_is_compulsory && (
+            {approval.is_required && (
               <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
                 Required
               </span>
