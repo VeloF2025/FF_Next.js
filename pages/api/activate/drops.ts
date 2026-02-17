@@ -467,20 +467,21 @@ async function calculateSummary(filters?: {
   `;
 
   const sumOesProjectCond = filters?.project && filters.project !== 'all'
-    ? `AND upr.project = $${activatedParams.indexOf(filters.project) + 1}` : '';
+    ? `AND upr2.project = $${activatedParams.indexOf(filters.project) + 1}` : '';
 
   const oesOnlyQuery = `
     SELECT COUNT(DISTINCT oes.drop_number) as oes_only
     FROM oes_activations oes
+    LEFT JOIN dr_photo_unified_reviews upr ON upr.drop_number = oes.drop_number
     LEFT JOIN drops d ON d.drop_number = oes.drop_number
     LEFT JOIN projects p ON p.id = d.project_id
     WHERE oes.activation_date >= $1::DATE
       AND oes.activation_date <= $2::DATE
       AND NOT EXISTS (
-        SELECT 1 FROM dr_photo_unified_reviews upr
-        WHERE upr.drop_number = oes.drop_number
-          AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
-          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+        SELECT 1 FROM dr_photo_unified_reviews upr2
+        WHERE upr2.drop_number = oes.drop_number
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr2.submitted_date, upr2.created_at::DATE) <= $2::DATE
           ${sumOesProjectCond}
       )
       ${sumProjectCond}
