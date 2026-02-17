@@ -21,6 +21,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
+  // Force connection close to prevent Cloudflare tunnel response buffering
+  res.setHeader('Connection', 'close');
+
   try {
     const form = formidable({ maxFileSize: 50 * 1024 * 1024 }); // 50MB
 

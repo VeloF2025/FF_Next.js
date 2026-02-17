@@ -270,43 +270,72 @@ export default function BOQUpload({
         formData.append('saveAsTemplate', JSON.stringify(saveTemplate));
       }
 
-      // Use AbortController with 2-minute timeout to handle Cloudflare 524 timeouts gracefully
+      // Use AbortController with 90s timeout to handle Cloudflare tunnel issues
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120_000);
+      const timeoutId = setTimeout(() => controller.abort(), 90_000);
 
-      let response: Response;
+      let result: any;
+      let fetchSucceeded = false;
+
       try {
-        response = await fetch('/api/procurement/boq/import-mapped', {
+        const response = await fetch('/api/procurement/boq/import-mapped', {
           method: 'POST',
           body: formData,
           signal: controller.signal,
         });
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 524) {
+            // Cloudflare timeout — fall through to polling
+          } else {
+            throw new Error(data.error?.message || 'Import failed');
+          }
+        } else {
+          result = data.data;
+          fetchSucceeded = true;
+        }
       } catch (fetchError) {
         clearTimeout(timeoutId);
-        if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
-          throw new Error(
-            'Import timed out. For large files (200+ rows), the import may still be processing in the background. ' +
-            'Check the BOQ list in a few minutes to see if it completed.'
-          );
+        // AbortError or network error — the server may have processed the import
+        // but Cloudflare tunnel didn't deliver the response. Fall through to polling.
+        if (!(fetchError instanceof DOMException && fetchError.name === 'AbortError') &&
+            !(fetchError instanceof TypeError)) {
+          throw fetchError;
         }
-        throw fetchError;
-      }
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Cloudflare 524 timeout
-        if (response.status === 524) {
-          throw new Error(
-            'Server processing timed out. The import may still be running in the background. ' +
-            'Check the BOQ list in a few minutes.'
-          );
-        }
-        throw new Error(data.error?.message || 'Import failed');
       }
 
-      const result = data.data;
+      // If fetch didn't return a result, poll to check if import completed server-side
+      if (!fetchSucceeded) {
+        setState(prev => ({ ...prev, progress: 60, message: 'Verifying import status...' }));
+        // Wait a moment then check if a BOQ was created recently
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        try {
+          const checkRes = await fetch(`/api/procurement/boq?projectId=${effectiveProjectId}`);
+          const checkData = await checkRes.json();
+          const boqs = checkData.data?.boqs || checkData.boqs || [];
+          const latestBoq = boqs[0]; // sorted by created_at DESC
+          if (latestBoq && latestBoq.title === propTitle) {
+            result = {
+              boqId: latestBoq.id,
+              itemsProcessed: latestBoq.itemCount || latestBoq.item_count || 0,
+              stockItemsMatched: 0,
+              budgetItemsCreated: 0,
+            };
+            fetchSucceeded = true;
+          }
+        } catch {
+          // Polling failed too
+        }
+      }
+
+      if (!fetchSucceeded) {
+        throw new Error(
+          'Import response not received, but the import may have completed. Check the BOQ list to verify.'
+        );
+      }
 
       // Build success message
       const details = [];

@@ -17,6 +17,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.error(res, 'Method not allowed', 405);
   }
 
+  // Force connection close to prevent Cloudflare tunnel response buffering
+  res.setHeader('Connection', 'close');
+
   try {
     // Parse the multipart form data
     const form = formidable({
