@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import toast from 'react-hot-toast';
 import type {
   PrereqsResponse,
   PrereqPhaseGroup,
@@ -342,7 +343,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
         return updated;
       });
     } catch {
-      // Revert on error
+      toast.error('Failed to update — please try again');
       fetchData();
     }
   };
