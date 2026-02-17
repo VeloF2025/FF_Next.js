@@ -66,7 +66,7 @@ async function getAutoDetectionResults(
   client: PoolClient,
   projectId: string
 ): Promise<Record<string, boolean>> {
-  const [po, boq, contractor, agreements, team, hs, budgetRow, dropsRow] =
+  const [po, boq, contractor, agreements, team, hs, budgetRow, dropsRow, sowUploaded] =
     await Promise.all([
       client.query<{ met: boolean }>(
         `SELECT EXISTS(SELECT 1 FROM client_purchase_orders
@@ -111,23 +111,38 @@ async function getAutoDetectionResults(
          WHERE cpo.project_id = $1 AND cpo.status = 'active' LIMIT 1`,
         [projectId]
       ),
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM drops WHERE project_id = $1) as met`,
+        [projectId]
+      ),
     ]);
 
   const agreementTypes = new Set(agreements.rows.map(r => r.agreement_type));
   const target = Number(dropsRow.rows[0]?.target || 0);
   const actual = Number(dropsRow.rows[0]?.actual || 0);
+  const hasPo = po.rows[0]?.met === true;
+  const hasContractor = contractor.rows[0]?.met === true;
+  const hasSow = agreementTypes.has('sow');
+  const hasMba = agreementTypes.has('mba');
+  const hasSowUploaded = sowUploaded.rows[0]?.met === true;
 
   return {
-    client_po: po.rows[0]?.met === true,
+    // Activation-check seed types
+    client_po: hasPo,
     boq_approved: boq.rows[0]?.met === true,
-    contractor_appointed: contractor.rows[0]?.met === true,
-    sow_signed: agreementTypes.has('sow'),
-    mba_signed: agreementTypes.has('mba'),
+    contractor_appointed: hasContractor,
+    sow_signed: hasSow,
+    mba_signed: hasMba,
     client_agreement: agreements.rows.length > 0,
     team_assigned: team.rows[0]?.met === true,
     hs_verified: hs.rows[0]?.met === true,
     budget_approved: Number(budgetRow.rows[0]?.budget || 0) > 0,
     drops_complete: target > 0 && actual >= target,
+    sow_uploaded: hasSowUploaded,
+    // VF Standard template equivalents (same checks, different type names)
+    po_received: hasPo,
+    contractor_sow_signed: hasSow,
+    contractor_mba_signed: hasMba,
   };
 }
 

@@ -38,6 +38,10 @@ const PREREQ_TAB_MAP: Record<string, string> = {
   sow_uploaded: 'sow',
   hs_compliance: 'hs',
   contractor_signed: 'agreements',
+  // --- Updated seed items ---
+  client_msa: 'agreements',
+  mss_signed: 'agreements',
+  sow_uploaded: 'sow',
   // --- VF Standard template items ---
   po_received: 'procurement',
   bss_signed: 'agreements',
