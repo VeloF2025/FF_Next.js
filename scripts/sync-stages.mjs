@@ -208,9 +208,9 @@ function log(msg) {
   console.log(`[${ts}] ${msg}`);
 }
 
-async function syncSite(site, projectId, cookieStr, pool) {
+async function syncSite(site, projectId, cookieStr, pool, projectName) {
   const startTime = Date.now();
-  log(`--- ${site} (${SITES[site].name}) ---`);
+  log(`--- ${site} (${projectName}) ---`);
 
   // Fetch from 1Map
   const records = await fetchAllRecords(cookieStr, site);
@@ -446,7 +446,7 @@ async function main() {
 
     for (const project of projects) {
       try {
-        const result = await syncSite(project.prefix, project.uuid, cookieStr, pool);
+        const result = await syncSite(project.prefix, project.uuid, cookieStr, pool, project.name);
         if (result) results.push(result);
       } catch (err) {
         log(`  ${project.prefix}: ERROR — ${err.message}`);
