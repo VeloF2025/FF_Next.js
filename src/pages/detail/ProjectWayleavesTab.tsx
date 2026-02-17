@@ -625,7 +625,7 @@ function ApprovalDetailDrawer({ approval, pipelineProjectId, onClose }: Approval
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-[var(--ff-card-bg)] shadow-xl overflow-y-auto">
+      <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-[var(--ff-bg-primary)] shadow-xl overflow-y-auto">
         {/* Header */}
         <div className={`px-6 py-4 ${statusConfig.bg} border-b border-[var(--ff-border-light)]`}>
           <div className="flex items-center justify-between">
