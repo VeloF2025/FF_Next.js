@@ -141,12 +141,41 @@ async function handler(
 
       log.info(`DR lookup loaded: ${drLookup.size} DRs with zone/pon`, { site }, 'SyncStages');
 
-      // Step 3: Aggregate by (zone_no, pon_no)
+      // Step 3: Get total drops per (zone_no, pon_no) — universal denominator for all stages
+      const dropsTotalResult = await dbClient.query<{
+        zone_no: number;
+        pon_no: number;
+        total: number;
+      }>(
+        `SELECT zone_no, pon_no, COUNT(DISTINCT drop_number)::int as total
+         FROM drops
+         WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+         GROUP BY zone_no, pon_no`,
+        [projectId]
+      );
+
       const ponMap = new Map<string, PonAggregation>();
+      for (const row of dropsTotalResult.rows) {
+        const key = `${row.zone_no}-${row.pon_no}`;
+        const total = Number(row.total);
+        ponMap.set(key, {
+          zone_no: row.zone_no,
+          pon_no: row.pon_no,
+          permissions: { total, complete: 0, firstDate: null, lastDate: null },
+          poles: { total, complete: 0, firstDate: null, lastDate: null },
+          cwc: { total, complete: 0, firstDate: null, lastDate: null },
+          optical: { total, complete: 0, firstDate: null, lastDate: null },
+          atp: { total, complete: 0, firstDate: null, lastDate: null },
+          activation: { total, complete: 0, firstDate: null, lastDate: null },
+        });
+      }
+
+      log.info(`Loaded ${ponMap.size} PONs with drops totals`, { site }, 'SyncStages');
+
+      // Step 4: Count completions from 1Map (numerators only — totals already set from drops)
       let unmappedCount = 0;
 
       for (const record of parsedRecords) {
-        // Try to get zone/pon from drops lookup first, then from pole label
         const lookup = drLookup.get(record.dr_number);
         const zoneNo = lookup?.zone_no ?? record.zone_no;
         const ponNo = lookup?.pon_no;
@@ -157,58 +186,39 @@ async function handler(
         }
 
         const key = `${zoneNo}-${ponNo}`;
-        let agg = ponMap.get(key);
-        if (!agg) {
-          agg = {
-            zone_no: zoneNo,
-            pon_no: ponNo,
-            permissions: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            poles: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            cwc: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            optical: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            atp: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            activation: { total: 0, complete: 0, firstDate: null, lastDate: null },
-          };
-          ponMap.set(key, agg);
-        }
+        const agg = ponMap.get(key);
+        if (!agg) continue; // PON not in drops table
 
-        // Count each stage
-        agg.permissions.total++;
         if (record.stages.permissions_complete) {
           agg.permissions.complete++;
           stagesUpdated.permissions++;
           updateDateRange(agg.permissions, record.stages.permissions_date);
         }
 
-        agg.poles.total++;
         if (record.stages.poles_complete) {
           agg.poles.complete++;
           stagesUpdated.poles++;
           updateDateRange(agg.poles, record.stages.poles_date);
         }
 
-        agg.cwc.total++;
         if (record.stages.cwc_complete) {
           agg.cwc.complete++;
           stagesUpdated.cwc++;
           updateDateRange(agg.cwc, record.stages.cwc_date);
         }
 
-        agg.optical.total++;
         if (record.stages.optical_complete) {
           agg.optical.complete++;
           stagesUpdated.optical++;
           updateDateRange(agg.optical, record.stages.optical_date);
         }
 
-        agg.atp.total++;
         if (record.stages.atp_complete) {
           agg.atp.complete++;
           stagesUpdated.atp++;
           updateDateRange(agg.atp, record.stages.atp_date);
         }
 
-        agg.activation.total++;
         if (record.stages.activation_complete) {
           agg.activation.complete++;
           stagesUpdated.activation++;
@@ -221,18 +231,16 @@ async function handler(
         errors.push(`${unmappedCount} records could not be mapped to zone/pon`);
       }
 
-      // Step 4: Merge activation data from oes_activations (already in FF DB)
+      // Step 5: Merge OES activation data (complete count + dates only — total already set)
       const oesResult = await dbClient.query<{
         zone_no: number;
         pon_no: number;
-        total: string;
         activated: string;
         first_date: string | null;
         last_date: string | null;
       }>(
         `SELECT
            d.zone_no, d.pon_no,
-           COUNT(DISTINCT d.drop_number)::text as total,
            COUNT(DISTINCT CASE WHEN oes.activation_date IS NOT NULL THEN d.drop_number END)::text as activated,
            MIN(oes.activation_date)::text as first_date,
            MAX(oes.activation_date)::text as last_date
@@ -245,31 +253,17 @@ async function handler(
         [projectId]
       );
 
-      // Merge OES activation data into aggregations
       for (const row of oesResult.rows) {
         const key = `${row.zone_no}-${row.pon_no}`;
-        let agg = ponMap.get(key);
-        if (!agg) {
-          agg = {
-            zone_no: row.zone_no,
-            pon_no: row.pon_no,
-            permissions: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            poles: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            cwc: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            optical: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            atp: { total: 0, complete: 0, firstDate: null, lastDate: null },
-            activation: { total: 0, complete: 0, firstDate: null, lastDate: null },
-          };
-          ponMap.set(key, agg);
-        }
+        const agg = ponMap.get(key);
+        if (!agg) continue;
 
-        // OES activation data is authoritative for activation stage
-        const total = Number(row.total);
         const activated = Number(row.activated);
-        agg.activation.total = total;
-        agg.activation.complete = activated;
-        agg.activation.firstDate = row.first_date;
-        agg.activation.lastDate = row.last_date;
+        if (activated > 0) {
+          agg.activation.complete = activated;
+          agg.activation.firstDate = row.first_date;
+          agg.activation.lastDate = row.last_date;
+        }
       }
 
       // Step 5: UPSERT into pon_stage_tracking
