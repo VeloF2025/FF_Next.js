@@ -178,7 +178,8 @@ async function handler(
         const key = `${row.zone_no}-${row.pon_no}`;
         const polesTotal = Number(row.poles);
         const dropsTotal = Number(row.drops);
-        const jointsTotal = jointsMap.get(key) || 0;
+        // Use joints count for optical/atp; fall back to poles if joints lack pon_no
+        const jointsTotal = jointsMap.get(key) || polesTotal;
         ponMap.set(key, {
           zone_no: row.zone_no,
           pon_no: row.pon_no,
