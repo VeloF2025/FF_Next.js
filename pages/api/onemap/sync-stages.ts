@@ -199,25 +199,15 @@ async function handler(
         const sets = counted.get(key)!;
         const dr = record.dr_number;
 
+        // Only count permissions, optical, atp from 1Map
+        // Poles planted → QField + OES (DB query below)
+        // CWC → QField audit_complete (DB query below)
+        // Activation → OES (DB query below)
         if (record.stages.permissions_complete && dr && !sets.permissions.has(dr)) {
           sets.permissions.add(dr);
           agg.permissions.complete++;
           stagesUpdated.permissions++;
           updateDateRange(agg.permissions, record.stages.permissions_date);
-        }
-
-        if (record.stages.poles_complete && dr && !sets.poles.has(dr)) {
-          sets.poles.add(dr);
-          agg.poles.complete++;
-          stagesUpdated.poles++;
-          updateDateRange(agg.poles, record.stages.poles_date);
-        }
-
-        if (record.stages.cwc_complete && dr && !sets.cwc.has(dr)) {
-          sets.cwc.add(dr);
-          agg.cwc.complete++;
-          stagesUpdated.cwc++;
-          updateDateRange(agg.cwc, record.stages.cwc_date);
         }
 
         if (record.stages.optical_complete && dr && !sets.optical.has(dr)) {
@@ -233,13 +223,6 @@ async function handler(
           stagesUpdated.atp++;
           updateDateRange(agg.atp, record.stages.atp_date);
         }
-
-        if (record.stages.activation_complete && dr && !sets.activation.has(dr)) {
-          sets.activation.add(dr);
-          agg.activation.complete++;
-          stagesUpdated.activation++;
-          updateDateRange(agg.activation, record.stages.activation_date);
-        }
       }
 
       if (unmappedCount > 0) {
@@ -247,20 +230,31 @@ async function handler(
         errors.push(`${unmappedCount} records could not be mapped to zone/pon`);
       }
 
-      // Step 5: Merge OES activation data (complete count + dates only — total already set)
-      const oesResult = await dbClient.query<{
+      // Step 5: Merge poles planted + CWC + activation from DB (QField + OES)
+      // Poles planted = QField pole_planted='Pole Planted' OR DR activated in OES
+      // CWC = QField audit_complete IS NOT NULL (pole passed QA)
+      // Activation = OES activation_date IS NOT NULL
+      const dbStagesResult = await dbClient.query<{
         zone_no: number;
         pon_no: number;
+        poles_planted: string;
+        cwc_complete: string;
+        cwc_first_date: string | null;
+        cwc_last_date: string | null;
         activated: string;
-        first_date: string | null;
-        last_date: string | null;
+        act_first_date: string | null;
+        act_last_date: string | null;
       }>(
-        `SELECT
-           d.zone_no, d.pon_no,
+        `SELECT d.zone_no, d.pon_no,
+           COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.drop_number END)::text as poles_planted,
+           COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.drop_number END)::text as cwc_complete,
+           MIN(p.audit_complete)::text as cwc_first_date,
+           MAX(p.audit_complete)::text as cwc_last_date,
            COUNT(DISTINCT CASE WHEN oes.activation_date IS NOT NULL THEN d.drop_number END)::text as activated,
-           MIN(oes.activation_date)::text as first_date,
-           MAX(oes.activation_date)::text as last_date
+           MIN(oes.activation_date)::text as act_first_date,
+           MAX(oes.activation_date)::text as act_last_date
          FROM drops d
+         LEFT JOIN poles p ON p.pole_number = d.pole_number AND p.project_id = d.project_id
          LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
          WHERE d.project_id = $1
            AND d.zone_no IS NOT NULL
@@ -269,16 +263,34 @@ async function handler(
         [projectId]
       );
 
-      for (const row of oesResult.rows) {
+      for (const row of dbStagesResult.rows) {
         const key = `${row.zone_no}-${row.pon_no}`;
         const agg = ponMap.get(key);
         if (!agg) continue;
 
+        // Poles planted (QField + OES activation implies planted)
+        const planted = Number(row.poles_planted);
+        if (planted > 0) {
+          agg.poles.complete = planted;
+          stagesUpdated.poles += planted;
+        }
+
+        // CWC (QField audit_complete)
+        const cwc = Number(row.cwc_complete);
+        if (cwc > 0) {
+          agg.cwc.complete = cwc;
+          agg.cwc.firstDate = row.cwc_first_date;
+          agg.cwc.lastDate = row.cwc_last_date;
+          stagesUpdated.cwc += cwc;
+        }
+
+        // Activation (OES)
         const activated = Number(row.activated);
         if (activated > 0) {
           agg.activation.complete = activated;
-          agg.activation.firstDate = row.first_date;
-          agg.activation.lastDate = row.last_date;
+          agg.activation.firstDate = row.act_first_date;
+          agg.activation.lastDate = row.act_last_date;
+          stagesUpdated.activation += activated;
         }
       }
 

@@ -292,7 +292,11 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       }
       const sets = counted.get(key);
 
-      for (const stage of ['permissions', 'poles', 'cwc', 'optical', 'atp', 'activation']) {
+      // Only count permissions, optical, atp from 1Map
+      // Poles planted → QField + OES (DB query below)
+      // CWC → QField audit_complete (DB query below)
+      // Activation → OES (DB query below)
+      for (const stage of ['permissions', 'optical', 'atp']) {
         if (rec.stages[stage] && rec.dr_number && !sets[stage].has(rec.dr_number)) {
           sets[stage].add(rec.dr_number);
           agg[stage].complete++;
@@ -301,33 +305,58 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       }
 
       updateDateRange(agg.permissions, rec.permissions_date);
-      updateDateRange(agg.poles, rec.permissions_date);
       updateDateRange(agg.optical, rec.optical_date);
-      updateDateRange(agg.activation, rec.activation_date);
     }
 
-    // Merge OES activation data
-    const oesResult = await client.query(
+    // Merge poles planted + CWC + activation from DB (QField + OES)
+    // Poles planted = QField pole_planted='Pole Planted' OR DR activated in OES
+    // CWC = QField audit_complete IS NOT NULL (pole passed QA)
+    // Activation = OES activation_date IS NOT NULL
+    const dbStagesResult = await client.query(
       `SELECT d.zone_no, d.pon_no,
+         COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.drop_number END)::int as poles_planted,
+         COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.drop_number END)::int as cwc_complete,
+         MIN(p.audit_complete)::text as cwc_first_date,
+         MAX(p.audit_complete)::text as cwc_last_date,
          COUNT(DISTINCT CASE WHEN oes.activation_date IS NOT NULL THEN d.drop_number END)::int as activated,
-         MIN(oes.activation_date)::text as first_date,
-         MAX(oes.activation_date)::text as last_date
+         MIN(oes.activation_date)::text as act_first_date,
+         MAX(oes.activation_date)::text as act_last_date
        FROM drops d
+       LEFT JOIN poles p ON p.pole_number = d.pole_number AND p.project_id = d.project_id
        LEFT JOIN oes_activations oes ON oes.drop_number = d.drop_number
        WHERE d.project_id = $1 AND d.zone_no IS NOT NULL AND d.pon_no IS NOT NULL
        GROUP BY d.zone_no, d.pon_no`,
       [projectId]
     );
 
-    for (const row of oesResult.rows) {
+    for (const row of dbStagesResult.rows) {
       const key = `${row.zone_no}-${row.pon_no}`;
       const agg = ponMap.get(key);
       if (!agg) continue;
+
+      // Poles planted (QField + OES activation implies planted)
+      const planted = Number(row.poles_planted);
+      if (planted > 0) {
+        agg.poles.complete = planted;
+        stageCounts.poles += planted;
+      }
+
+      // CWC (QField audit_complete)
+      const cwc = Number(row.cwc_complete);
+      if (cwc > 0) {
+        agg.cwc.complete = cwc;
+        agg.cwc.firstDate = row.cwc_first_date;
+        agg.cwc.lastDate = row.cwc_last_date;
+        stageCounts.cwc += cwc;
+      }
+
+      // Activation (OES)
       const activated = Number(row.activated);
       if (activated > 0) {
         agg.activation.complete = activated;
-        agg.activation.firstDate = row.first_date;
-        agg.activation.lastDate = row.last_date;
+        agg.activation.firstDate = row.act_first_date;
+        agg.activation.lastDate = row.act_last_date;
+        stageCounts.activation += activated;
       }
     }
 
@@ -394,7 +423,7 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
 
     const durationS = ((Date.now() - startTime) / 1000).toFixed(1);
     log(`  ${site}: ${upsertCount} PONs synced, ${unmapped} unmapped, ${durationS}s`);
-    log(`  ${site}: stages — perm:${stageCounts.permissions} poles:${stageCounts.poles} opt:${stageCounts.optical} act:${stageCounts.activation}`);
+    log(`  ${site}: stages — perm:${stageCounts.permissions} poles:${stageCounts.poles} cwc:${stageCounts.cwc} opt:${stageCounts.optical} act:${stageCounts.activation}`);
 
     return { site, records: records.length, pons: upsertCount, unmapped, duration: durationS, stageCounts };
   } finally {
