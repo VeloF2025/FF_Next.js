@@ -320,6 +320,17 @@ export class BOQImportEnhanced {
       await this.updateBudgetTotals(projectBudgetId, result.categoryBreakdown);
     }
 
+    // Update BOQ record with final item count and total value
+    if (!options.dryRun) {
+      await this.sql`
+        UPDATE boqs
+        SET item_count = ${validRows.length},
+            total_estimated_value = ${result.totalBudgetAmount},
+            updated_at = NOW()
+        WHERE id = ${boqId}
+      `;
+    }
+
     this.reportProgress(options, 'complete', validRows.length, validRows.length, 'Import complete');
     result.success = (result.errors?.length || 0) === 0;
 

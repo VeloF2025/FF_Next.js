@@ -310,24 +310,34 @@ export default function BOQUpload({
       // If fetch didn't return a result, poll to check if import completed server-side
       if (!fetchSucceeded) {
         setState(prev => ({ ...prev, progress: 60, message: 'Verifying import status...' }));
-        // Wait a moment then check if a BOQ was created recently
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        try {
-          const checkRes = await fetch(`/api/procurement/boq?projectId=${effectiveProjectId}`);
-          const checkData = await checkRes.json();
-          const boqs = checkData.data?.boqs || checkData.boqs || [];
-          const latestBoq = boqs[0]; // sorted by created_at DESC
-          if (latestBoq && latestBoq.title === propTitle) {
-            result = {
-              boqId: latestBoq.id,
-              itemsProcessed: latestBoq.itemCount || latestBoq.item_count || 0,
-              stockItemsMatched: 0,
-              budgetItemsCreated: 0,
-            };
-            fetchSucceeded = true;
+        // Wait for server to finish processing, then check if a BOQ was created
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Retry up to 3 times (import may still be running)
+        for (let attempt = 0; attempt < 3 && !fetchSucceeded; attempt++) {
+          try {
+            const checkRes = await fetch(`/api/procurement/boq?projectId=${effectiveProjectId}`);
+            const checkData = await checkRes.json();
+            const boqs = checkData.data?.boqs || checkData.boqs || [];
+            const latestBoq = boqs[0]; // sorted by created_at DESC
+            if (latestBoq && latestBoq.title === propTitle) {
+              const itemCount = Number(latestBoq.item_count) || Number(latestBoq.itemCount) || Number(latestBoq.items_count) || 0;
+              if (itemCount > 0 || attempt === 2) {
+                result = {
+                  boqId: latestBoq.id,
+                  itemsProcessed: itemCount,
+                  stockItemsMatched: 0,
+                  budgetItemsCreated: 0,
+                };
+                fetchSucceeded = true;
+              } else {
+                // BOQ exists but item_count not yet updated — wait and retry
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+            }
+          } catch {
+            // Polling failed — retry
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
-        } catch {
-          // Polling failed too
         }
       }
 
