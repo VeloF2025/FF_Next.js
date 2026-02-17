@@ -54,7 +54,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
     // Group name aliases (for direct URL navigation like ?tab=work)
     'work': 'sow',
     'contracts': 'agreements',
-    'planning': 'timeline',
+    'planning': 'prereqs',
     'operations': 'procurement',
     'finance': 'finance-dashboard',
     // Legacy/alternative URL aliases

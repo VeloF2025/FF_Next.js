@@ -127,9 +127,9 @@ export const getGroupedTabConfig = (): TabGroup[] => [
     id: 'planning',
     label: 'Planning',
     tabs: [
+      { id: 'prereqs', label: 'Pre-Reqs' },
       { id: 'timeline', label: 'Timeline' },
       { id: 'hierarchy', label: 'Hierarchy' },
-      { id: 'prereqs', label: 'Pre-Reqs' },
     ],
   },
   {
