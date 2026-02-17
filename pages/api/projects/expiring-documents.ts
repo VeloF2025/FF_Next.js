@@ -10,12 +10,10 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const getSql = () => neon(process.env.DATABASE_URL!);
 
 export type ExpiryUrgency = 'expired' | 'critical' | 'warning' | 'upcoming' | 'ok';
 
@@ -60,47 +58,74 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
-  const sql = getSql();
-
   // Query params
   const { days = '90', project_id, source } = req.query;
   const daysAhead = Math.min(365, Math.max(1, parseInt(String(days), 10) || 90));
+  const projectIdStr = project_id ? String(project_id) : null;
 
+  const client = await pool.connect();
   try {
     const documents: ExpiringDocument[] = [];
 
-    // 1. Pipeline Approvals (from pipeline_project_approvals)
+    // 1. Pipeline Approvals (via project_pipeline_links for project filtering)
     if (!source || source === 'pipeline_approval') {
       try {
-        const pipelineApprovals = await sql`
-          SELECT
-            pa.id::text,
-            'pipeline_approval' as source,
-            at.name as document_type,
-            CONCAT(at.name, ' - ', pp.project_name) as document_name,
-            pa.expiry_date,
-            (pa.expiry_date - CURRENT_DATE)::int as days_until_expiry,
-            COALESCE(ppl.project_id::text, pp.id::text) as project_id,
-            pp.project_name,
-            NULL as contractor_id,
-            NULL as contractor_name,
-            NULL as staff_id,
-            NULL as staff_name,
-            pa.document_url,
-            pa.status
-          FROM pipeline_project_approvals pa
-          JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
-          JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
-          LEFT JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
-          WHERE pa.expiry_date IS NOT NULL
-            AND pa.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-            AND (${project_id}::text IS NULL
-              OR ppl.project_id::text = ${project_id}::text)
-          ORDER BY pa.expiry_date ASC
-        `;
-        documents.push(...pipelineApprovals.map(row => ({
+        const result = projectIdStr
+          ? await client.query(
+              `SELECT
+                pa.id::text,
+                'pipeline_approval' as source,
+                at.name as document_type,
+                CONCAT(at.name, ' - ', pp.project_name) as document_name,
+                pa.expiry_date,
+                (pa.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                ppl.project_id::text as project_id,
+                pp.project_name,
+                NULL as contractor_id,
+                NULL as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                pa.document_url,
+                pa.status
+              FROM pipeline_project_approvals pa
+              JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
+              JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
+              JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
+              WHERE pa.expiry_date IS NOT NULL
+                AND pa.expiry_date <= CURRENT_DATE + $1::int
+                AND ppl.project_id = $2::uuid
+              ORDER BY pa.expiry_date ASC`,
+              [daysAhead, projectIdStr]
+            )
+          : await client.query(
+              `SELECT
+                pa.id::text,
+                'pipeline_approval' as source,
+                at.name as document_type,
+                CONCAT(at.name, ' - ', pp.project_name) as document_name,
+                pa.expiry_date,
+                (pa.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                COALESCE(ppl.project_id::text, pp.id::text) as project_id,
+                pp.project_name,
+                NULL as contractor_id,
+                NULL as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                pa.document_url,
+                pa.status
+              FROM pipeline_project_approvals pa
+              JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
+              JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
+              LEFT JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
+              WHERE pa.expiry_date IS NOT NULL
+                AND pa.expiry_date <= CURRENT_DATE + $1::int
+              ORDER BY pa.expiry_date ASC`,
+              [daysAhead]
+            );
+        documents.push(...result.rows.map(row => ({
           ...row,
-          urgency: calculateUrgency(row.days_until_expiry),
+          days_until_expiry: Number(row.days_until_expiry),
+          urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
         log.warn('ExpiringDocuments', { source: 'pipeline_approval', error: (err as Error).message });
@@ -110,8 +135,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 2. Contractor Documents
     if (!source || source === 'contractor_document') {
       try {
-        const contractorDocs = await sql`
-          SELECT
+        const result = await client.query(
+          `SELECT
             cd.id::text,
             'contractor_document' as source,
             cd.document_type,
@@ -129,12 +154,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM contractor_documents cd
           JOIN suppliers s ON cd.contractor_id = s.id
           WHERE cd.expiry_date IS NOT NULL
-            AND cd.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-          ORDER BY cd.expiry_date ASC
-        `;
-        documents.push(...contractorDocs.map(row => ({
+            AND cd.expiry_date <= CURRENT_DATE + $1::int
+          ORDER BY cd.expiry_date ASC`,
+          [daysAhead]
+        );
+        documents.push(...result.rows.map(row => ({
           ...row,
-          urgency: calculateUrgency(row.days_until_expiry),
+          days_until_expiry: Number(row.days_until_expiry),
+          urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
         log.warn('ExpiringDocuments', { source: 'contractor_document', error: (err as Error).message });
@@ -144,34 +171,62 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 3. Contractor Agreements (SOW/MBA)
     if (!source || source === 'agreement') {
       try {
-        const agreements = await sql`
-          SELECT
-            ca.id::text,
-            'agreement' as source,
-            UPPER(ca.agreement_type) as document_type,
-            CONCAT(UPPER(ca.agreement_type), ' - ', p.project_name) as document_name,
-            ca.expiry_date,
-            (ca.expiry_date - CURRENT_DATE)::int as days_until_expiry,
-            ca.project_id::text,
-            p.project_name,
-            ca.contractor_id::text,
-            COALESCE(c.company_name, c.name) as contractor_name,
-            NULL as staff_id,
-            NULL as staff_name,
-            ca.signed_document_url as document_url,
-            ca.status
-          FROM contractor_agreements ca
-          JOIN projects p ON ca.project_id = p.id
-          JOIN contractors c ON ca.contractor_id = c.id
-          WHERE ca.expiry_date IS NOT NULL
-            AND ca.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-            AND ca.status = 'active'
-            AND (${project_id}::text IS NULL OR ca.project_id::text = ${project_id}::text)
-          ORDER BY ca.expiry_date ASC
-        `;
-        documents.push(...agreements.map(row => ({
+        const result = projectIdStr
+          ? await client.query(
+              `SELECT
+                ca.id::text,
+                'agreement' as source,
+                UPPER(ca.agreement_type) as document_type,
+                CONCAT(UPPER(ca.agreement_type), ' - ', p.project_name) as document_name,
+                ca.expiry_date,
+                (ca.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                ca.project_id::text,
+                p.project_name,
+                ca.contractor_id::text,
+                COALESCE(c.company_name, c.name) as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                ca.signed_document_url as document_url,
+                ca.status
+              FROM contractor_agreements ca
+              JOIN projects p ON ca.project_id = p.id
+              JOIN contractors c ON ca.contractor_id = c.id
+              WHERE ca.expiry_date IS NOT NULL
+                AND ca.expiry_date <= CURRENT_DATE + $1::int
+                AND ca.status = 'active'
+                AND ca.project_id = $2::uuid
+              ORDER BY ca.expiry_date ASC`,
+              [daysAhead, projectIdStr]
+            )
+          : await client.query(
+              `SELECT
+                ca.id::text,
+                'agreement' as source,
+                UPPER(ca.agreement_type) as document_type,
+                CONCAT(UPPER(ca.agreement_type), ' - ', p.project_name) as document_name,
+                ca.expiry_date,
+                (ca.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                ca.project_id::text,
+                p.project_name,
+                ca.contractor_id::text,
+                COALESCE(c.company_name, c.name) as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                ca.signed_document_url as document_url,
+                ca.status
+              FROM contractor_agreements ca
+              JOIN projects p ON ca.project_id = p.id
+              JOIN contractors c ON ca.contractor_id = c.id
+              WHERE ca.expiry_date IS NOT NULL
+                AND ca.expiry_date <= CURRENT_DATE + $1::int
+                AND ca.status = 'active'
+              ORDER BY ca.expiry_date ASC`,
+              [daysAhead]
+            );
+        documents.push(...result.rows.map(row => ({
           ...row,
-          urgency: calculateUrgency(row.days_until_expiry),
+          days_until_expiry: Number(row.days_until_expiry),
+          urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
         log.warn('ExpiringDocuments', { source: 'agreement', error: (err as Error).message });
@@ -181,32 +236,58 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 4. Project Requirements with expiry
     if (!source || source === 'project_requirement') {
       try {
-        const requirements = await sql`
-          SELECT
-            pr.id::text,
-            'project_requirement' as source,
-            pr.requirement_type as document_type,
-            CONCAT(pr.requirement_name, ' - ', p.project_name) as document_name,
-            pr.expiry_date,
-            (pr.expiry_date - CURRENT_DATE)::int as days_until_expiry,
-            pr.project_id::text,
-            p.project_name,
-            NULL as contractor_id,
-            NULL as contractor_name,
-            NULL as staff_id,
-            NULL as staff_name,
-            pr.document_url,
-            CASE WHEN pr.is_completed THEN 'completed' ELSE 'pending' END as status
-          FROM project_requirements pr
-          JOIN projects p ON pr.project_id = p.id
-          WHERE pr.expiry_date IS NOT NULL
-            AND pr.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-            AND (${project_id}::text IS NULL OR pr.project_id::text = ${project_id}::text)
-          ORDER BY pr.expiry_date ASC
-        `;
-        documents.push(...requirements.map(row => ({
+        const result = projectIdStr
+          ? await client.query(
+              `SELECT
+                pr.id::text,
+                'project_requirement' as source,
+                pr.requirement_type as document_type,
+                CONCAT(pr.requirement_name, ' - ', p.project_name) as document_name,
+                pr.expiry_date,
+                (pr.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                pr.project_id::text,
+                p.project_name,
+                NULL as contractor_id,
+                NULL as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                pr.document_url,
+                CASE WHEN pr.is_completed THEN 'completed' ELSE 'pending' END as status
+              FROM project_requirements pr
+              JOIN projects p ON pr.project_id = p.id
+              WHERE pr.expiry_date IS NOT NULL
+                AND pr.expiry_date <= CURRENT_DATE + $1::int
+                AND pr.project_id = $2::uuid
+              ORDER BY pr.expiry_date ASC`,
+              [daysAhead, projectIdStr]
+            )
+          : await client.query(
+              `SELECT
+                pr.id::text,
+                'project_requirement' as source,
+                pr.requirement_type as document_type,
+                CONCAT(pr.requirement_name, ' - ', p.project_name) as document_name,
+                pr.expiry_date,
+                (pr.expiry_date - CURRENT_DATE)::int as days_until_expiry,
+                pr.project_id::text,
+                p.project_name,
+                NULL as contractor_id,
+                NULL as contractor_name,
+                NULL as staff_id,
+                NULL as staff_name,
+                pr.document_url,
+                CASE WHEN pr.is_completed THEN 'completed' ELSE 'pending' END as status
+              FROM project_requirements pr
+              JOIN projects p ON pr.project_id = p.id
+              WHERE pr.expiry_date IS NOT NULL
+                AND pr.expiry_date <= CURRENT_DATE + $1::int
+              ORDER BY pr.expiry_date ASC`,
+              [daysAhead]
+            );
+        documents.push(...result.rows.map(row => ({
           ...row,
-          urgency: calculateUrgency(row.days_until_expiry),
+          days_until_expiry: Number(row.days_until_expiry),
+          urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
         log.warn('ExpiringDocuments', { source: 'project_requirement', error: (err as Error).message });
@@ -216,8 +297,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // 5. Staff Documents
     if (!source || source === 'staff_document') {
       try {
-        const staffDocs = await sql`
-          SELECT
+        const result = await client.query(
+          `SELECT
             sd.id::text,
             'staff_document' as source,
             sd.document_type,
@@ -236,12 +317,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           LEFT JOIN staff s ON sd.staff_id = s.id
           LEFT JOIN users u ON sd.staff_id = u.id
           WHERE sd.expiry_date IS NOT NULL
-            AND sd.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-          ORDER BY sd.expiry_date ASC
-        `;
-        documents.push(...staffDocs.map(row => ({
+            AND sd.expiry_date <= CURRENT_DATE + $1::int
+          ORDER BY sd.expiry_date ASC`,
+          [daysAhead]
+        );
+        documents.push(...result.rows.map(row => ({
           ...row,
-          urgency: calculateUrgency(row.days_until_expiry),
+          days_until_expiry: Number(row.days_until_expiry),
+          urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
         log.warn('ExpiringDocuments', { source: 'staff_document', error: (err as Error).message });
@@ -293,6 +376,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } catch (error) {
     log.error('ExpiringDocuments', { error: (error as Error).message });
     return apiResponse.internalError(res, error as Error);
+  } finally {
+    client.release();
   }
 }
 
