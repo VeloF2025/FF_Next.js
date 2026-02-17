@@ -9,7 +9,7 @@
  * Color: green >75%, amber 25-75%, red <25%, gray 0%
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   PonStagesResponse,
   PonStageRow,
@@ -127,6 +127,7 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
+  const [hideInactive, setHideInactive] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -163,14 +164,35 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
   };
 
   const expandAll = () => {
-    if (data) {
-      setExpandedZones(new Set(data.hierarchy.map(z => z.zone_no)));
-    }
+    setExpandedZones(new Set(filteredHierarchy.map(z => z.zone_no)));
   };
 
   const collapseAll = () => {
     setExpandedZones(new Set());
   };
+
+  const isPonActive = (pon: PonStageRow) =>
+    BUILD_STAGES.some(s => pon[s].complete > 0);
+
+  const filteredHierarchy = useMemo(() => {
+    if (!data || !hideInactive) return data?.hierarchy ?? [];
+    return data.hierarchy
+      .map(zone => ({
+        ...zone,
+        pons: zone.pons.filter(isPonActive),
+        stages: zone.pons.filter(isPonActive).length > 0
+          ? zone.stages
+          : zone.stages,
+      }))
+      .filter(zone => zone.pons.length > 0);
+  }, [data, hideInactive]);
+
+  const activePonCount = useMemo(() => {
+    if (!data) return 0;
+    return data.hierarchy.reduce(
+      (sum, z) => sum + z.pons.filter(isPonActive).length, 0
+    );
+  }, [data]);
 
   if (loading) {
     return (
@@ -225,7 +247,16 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-[var(--ff-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={hideInactive}
+                onChange={(e) => setHideInactive(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+              />
+              Hide inactive ({data.summary.total_pons - activePonCount})
+            </label>
             <button
               onClick={expandAll}
               className="px-3 py-1.5 text-xs bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] rounded hover:bg-[var(--ff-bg-tertiary)]"
@@ -272,7 +303,7 @@ export function PonStageTracker({ projectId }: PonStageTrackerProps) {
             </tr>
           </thead>
           <tbody>
-            {data.hierarchy.map(zone => (
+            {filteredHierarchy.map(zone => (
               <ZoneSection
                 key={zone.zone_no}
                 zone={zone}
