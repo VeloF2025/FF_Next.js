@@ -111,7 +111,9 @@ export function ProjectOverviewKPICards({
         <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">Budget</h3>
         <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
           {budgetData?.totalBudget
-            ? formatCurrency(budgetData.actualSpent)
+            ? (budgetData.actualSpent > 0
+                ? `${formatCurrency(budgetData.actualSpent)} of ${formatCurrency(budgetData.totalBudget)}`
+                : formatCurrency(budgetData.totalBudget))
             : formatCurrency(project.actualCost || 0)
           }
         </p>

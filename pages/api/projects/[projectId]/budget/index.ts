@@ -43,8 +43,23 @@ export default withAuth(withErrorHandler(async (
       `;
 
       if (budgets.length === 0 || !budgets[0]) {
+        // No formal budget record — fall back to projects.budget field
+        const projectResult = await sql`
+          SELECT budget FROM projects WHERE id = ${projectId}
+        `;
+        const projectBudget = Number(projectResult[0]?.budget) || 0;
+
         return apiResponse.success(res, {
           exists: false,
+          summary: {
+            totalBudget: projectBudget,
+            committed: 0,
+            actual: 0,
+            available: projectBudget,
+            variance: 0,
+            variancePercent: 0,
+            utilizationPercent: 0,
+          },
         });
       }
 
