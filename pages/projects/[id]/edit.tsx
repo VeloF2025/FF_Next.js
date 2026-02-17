@@ -36,13 +36,26 @@ export default function EditProjectPage() {
   }, [id]);
 
   const handleSubmit = (projectData: any) => {
-    // Handle project update
+    // Map camelCase form fields to snake_case API fields
+    const apiData = {
+      project_name: projectData.name || projectData.project_name,
+      description: projectData.description,
+      client_id: projectData.clientId || projectData.client_id,
+      project_manager: projectData.projectManagerId || projectData.project_manager,
+      status: projectData.status,
+      priority: projectData.priority,
+      start_date: projectData.startDate || projectData.start_date,
+      end_date: projectData.endDate || projectData.end_date,
+      budget: projectData.budget,
+      location: projectData.location,
+    };
+
     fetch(`/api/projects/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(projectData),
+      body: JSON.stringify(apiData),
     })
       .then(res => res.json())
       .then(data => {
