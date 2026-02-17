@@ -267,9 +267,11 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       return null;
     }
 
-    // Count completions from 1Map
+    // Count completions from 1Map (deduplicate by DR — 1Map can have multiple records per DR)
     let unmapped = 0;
     const stageCounts = { permissions: 0, poles: 0, cwc: 0, optical: 0, atp: 0, activation: 0 };
+    // Track counted DRs per PON per stage to avoid double-counting
+    const counted = new Map(); // key -> { permissions: Set, poles: Set, ... }
 
     for (const rec of parsed) {
       const lookup = drLookup.get(rec.dr_number);
@@ -282,8 +284,20 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       const agg = ponMap.get(key);
       if (!agg) continue;
 
+      if (!counted.has(key)) {
+        counted.set(key, {
+          permissions: new Set(), poles: new Set(), cwc: new Set(),
+          optical: new Set(), atp: new Set(), activation: new Set(),
+        });
+      }
+      const sets = counted.get(key);
+
       for (const stage of ['permissions', 'poles', 'cwc', 'optical', 'atp', 'activation']) {
-        if (rec.stages[stage]) { agg[stage].complete++; stageCounts[stage]++; }
+        if (rec.stages[stage] && rec.dr_number && !sets[stage].has(rec.dr_number)) {
+          sets[stage].add(rec.dr_number);
+          agg[stage].complete++;
+          stageCounts[stage]++;
+        }
       }
 
       updateDateRange(agg.permissions, rec.permissions_date);

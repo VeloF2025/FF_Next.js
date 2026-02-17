@@ -172,8 +172,9 @@ async function handler(
 
       log.info(`Loaded ${ponMap.size} PONs with drops totals`, { site }, 'SyncStages');
 
-      // Step 4: Count completions from 1Map (numerators only — totals already set from drops)
+      // Step 4: Count completions from 1Map (deduplicate by DR — 1Map can have multiple records per DR)
       let unmappedCount = 0;
+      const counted = new Map<string, Record<string, Set<string>>>();
 
       for (const record of parsedRecords) {
         const lookup = drLookup.get(record.dr_number);
@@ -187,39 +188,54 @@ async function handler(
 
         const key = `${zoneNo}-${ponNo}`;
         const agg = ponMap.get(key);
-        if (!agg) continue; // PON not in drops table
+        if (!agg) continue;
 
-        if (record.stages.permissions_complete) {
+        if (!counted.has(key)) {
+          counted.set(key, {
+            permissions: new Set(), poles: new Set(), cwc: new Set(),
+            optical: new Set(), atp: new Set(), activation: new Set(),
+          });
+        }
+        const sets = counted.get(key)!;
+        const dr = record.dr_number;
+
+        if (record.stages.permissions_complete && dr && !sets.permissions.has(dr)) {
+          sets.permissions.add(dr);
           agg.permissions.complete++;
           stagesUpdated.permissions++;
           updateDateRange(agg.permissions, record.stages.permissions_date);
         }
 
-        if (record.stages.poles_complete) {
+        if (record.stages.poles_complete && dr && !sets.poles.has(dr)) {
+          sets.poles.add(dr);
           agg.poles.complete++;
           stagesUpdated.poles++;
           updateDateRange(agg.poles, record.stages.poles_date);
         }
 
-        if (record.stages.cwc_complete) {
+        if (record.stages.cwc_complete && dr && !sets.cwc.has(dr)) {
+          sets.cwc.add(dr);
           agg.cwc.complete++;
           stagesUpdated.cwc++;
           updateDateRange(agg.cwc, record.stages.cwc_date);
         }
 
-        if (record.stages.optical_complete) {
+        if (record.stages.optical_complete && dr && !sets.optical.has(dr)) {
+          sets.optical.add(dr);
           agg.optical.complete++;
           stagesUpdated.optical++;
           updateDateRange(agg.optical, record.stages.optical_date);
         }
 
-        if (record.stages.atp_complete) {
+        if (record.stages.atp_complete && dr && !sets.atp.has(dr)) {
+          sets.atp.add(dr);
           agg.atp.complete++;
           stagesUpdated.atp++;
           updateDateRange(agg.atp, record.stages.atp_date);
         }
 
-        if (record.stages.activation_complete) {
+        if (record.stages.activation_complete && dr && !sets.activation.has(dr)) {
+          sets.activation.add(dr);
           agg.activation.complete++;
           stagesUpdated.activation++;
           updateDateRange(agg.activation, record.stages.activation_date);
