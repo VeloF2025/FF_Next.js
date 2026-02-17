@@ -66,7 +66,7 @@ async function getAutoDetectionResults(
   client: PoolClient,
   projectId: string
 ): Promise<Record<string, boolean>> {
-  const [po, boq, contractor, agreements, team, hs, budgetRow, dropsRow, sowUploaded] =
+  const [po, boq, contractor, agreements, team, hs, budgetRow, dropsRow, sowUploaded, projectDocs] =
     await Promise.all([
       client.query<{ met: boolean }>(
         `SELECT EXISTS(SELECT 1 FROM client_purchase_orders
@@ -115,13 +115,19 @@ async function getAutoDetectionResults(
         `SELECT EXISTS(SELECT 1 FROM drops WHERE project_id = $1) as met`,
         [projectId]
       ),
+      client.query<{ document_type: string }>(
+        `SELECT DISTINCT document_type FROM project_documents
+         WHERE project_id = $1 AND is_active = true
+           AND document_type IN ('bss', 'mss')`,
+        [projectId]
+      ),
     ]);
 
   const agreementTypes = new Set(agreements.rows.map(r => r.agreement_type));
+  const docTypes = new Set(projectDocs.rows.map(r => r.document_type));
   const target = Number(dropsRow.rows[0]?.target || 0);
   const actual = Number(dropsRow.rows[0]?.actual || 0);
   const hasPo = po.rows[0]?.met === true;
-  const hasContractor = contractor.rows[0]?.met === true;
   const hasSow = agreementTypes.has('sow');
   const hasMba = agreementTypes.has('mba');
   const hasSowUploaded = sowUploaded.rows[0]?.met === true;
@@ -130,7 +136,7 @@ async function getAutoDetectionResults(
     // Activation-check seed types
     client_po: hasPo,
     boq_approved: boq.rows[0]?.met === true,
-    contractor_appointed: hasContractor,
+    contractor_appointed: contractor.rows[0]?.met === true,
     sow_signed: hasSow,
     mba_signed: hasMba,
     client_agreement: agreements.rows.length > 0,
@@ -139,10 +145,13 @@ async function getAutoDetectionResults(
     budget_approved: Number(budgetRow.rows[0]?.budget || 0) > 0,
     drops_complete: target > 0 && actual >= target,
     sow_uploaded: hasSowUploaded,
-    // VF Standard template equivalents (same checks, different type names)
+    // VF Standard template equivalents
     po_received: hasPo,
     contractor_sow_signed: hasSow,
     contractor_mba_signed: hasMba,
+    // Project documents (BSS/MSS)
+    bss_signed: docTypes.has('bss'),
+    mss_signed: docTypes.has('mss'),
   };
 }
 
