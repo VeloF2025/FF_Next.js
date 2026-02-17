@@ -238,27 +238,43 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
     }
     log(`  ${site}: DR lookup: ${drLookup.size} DRs`);
 
-    // Drops totals per PON (universal denominator)
-    const dropsTotalResult = await client.query(
-      `SELECT zone_no, pon_no, COUNT(DISTINCT drop_number)::int as total
+    // Per-PON totals: poles (for permissions/poles/cwc), joints (for optical), drops (for activation)
+    const polesTotalResult = await client.query(
+      `SELECT zone_no, pon_no,
+         COUNT(DISTINCT pole_number)::int as poles,
+         COUNT(DISTINCT drop_number)::int as drops
        FROM drops
        WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
        GROUP BY zone_no, pon_no`,
       [projectId]
     );
 
+    const jointsTotalResult = await client.query(
+      `SELECT zone_no, pon_no, COUNT(*)::int as joints
+       FROM joints
+       WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+       GROUP BY zone_no, pon_no`,
+      [projectId]
+    );
+    const jointsMap = new Map();
+    for (const row of jointsTotalResult.rows) {
+      jointsMap.set(`${row.zone_no}-${row.pon_no}`, Number(row.joints));
+    }
+
     const ponMap = new Map();
-    for (const row of dropsTotalResult.rows) {
+    for (const row of polesTotalResult.rows) {
       const key = `${row.zone_no}-${row.pon_no}`;
-      const total = Number(row.total);
+      const polesTotal = Number(row.poles);
+      const dropsTotal = Number(row.drops);
+      const jointsTotal = jointsMap.get(key) || 0;
       ponMap.set(key, {
         zone_no: row.zone_no, pon_no: row.pon_no,
-        permissions: { total, complete: 0, firstDate: null, lastDate: null },
-        poles: { total, complete: 0, firstDate: null, lastDate: null },
-        cwc: { total, complete: 0, firstDate: null, lastDate: null },
-        optical: { total, complete: 0, firstDate: null, lastDate: null },
-        atp: { total, complete: 0, firstDate: null, lastDate: null },
-        activation: { total, complete: 0, firstDate: null, lastDate: null },
+        permissions: { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+        poles:       { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+        cwc:         { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+        optical:     { total: jointsTotal, complete: 0, firstDate: null, lastDate: null },
+        atp:         { total: jointsTotal, complete: 0, firstDate: null, lastDate: null },
+        activation:  { total: dropsTotal, complete: 0, firstDate: null, lastDate: null },
       });
     }
 
@@ -267,11 +283,12 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       return null;
     }
 
-    // Count completions from 1Map (deduplicate by DR — 1Map can have multiple records per DR)
+    // Count 1Map stages (permissions only — poles/cwc/activation come from DB below)
+    // Collect permitted DRs to convert to pole count after loop
     let unmapped = 0;
     const stageCounts = { permissions: 0, poles: 0, cwc: 0, optical: 0, atp: 0, activation: 0 };
-    // Track counted DRs per PON per stage to avoid double-counting
-    const counted = new Map(); // key -> { permissions: Set, poles: Set, ... }
+    const permittedDRs = new Set(); // all DRs with permission approved
+    const counted = new Map(); // key -> { permissions: Set }
 
     for (const rec of parsed) {
       const lookup = drLookup.get(rec.dr_number);
@@ -285,37 +302,48 @@ async function syncSite(site, projectId, cookieStr, pool, projectName) {
       if (!agg) continue;
 
       if (!counted.has(key)) {
-        counted.set(key, {
-          permissions: new Set(), poles: new Set(), cwc: new Set(),
-          optical: new Set(), atp: new Set(), activation: new Set(),
-        });
+        counted.set(key, { permissions: new Set() });
       }
       const sets = counted.get(key);
 
-      // Only count permissions, optical, atp from 1Map
-      // Poles planted → QField + OES (DB query below)
-      // CWC → QField audit_complete (DB query below)
-      // Activation → OES (DB query below)
-      for (const stage of ['permissions', 'optical', 'atp']) {
-        if (rec.stages[stage] && rec.dr_number && !sets[stage].has(rec.dr_number)) {
-          sets[stage].add(rec.dr_number);
-          agg[stage].complete++;
-          stageCounts[stage]++;
-        }
+      // Permissions from 1Map: track DRs, convert to pole count below
+      if (rec.stages.permissions && rec.dr_number && !sets.permissions.has(rec.dr_number)) {
+        sets.permissions.add(rec.dr_number);
+        permittedDRs.add(rec.dr_number);
       }
 
       updateDateRange(agg.permissions, rec.permissions_date);
-      updateDateRange(agg.optical, rec.optical_date);
+    }
+
+    // Convert permitted DRs → distinct poles per PON
+    if (permittedDRs.size > 0) {
+      const permResult = await client.query(
+        `SELECT zone_no, pon_no, COUNT(DISTINCT pole_number)::int as permitted_poles
+         FROM drops
+         WHERE project_id = $1
+           AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+           AND drop_number = ANY($2::text[])
+         GROUP BY zone_no, pon_no`,
+        [projectId, [...permittedDRs]]
+      );
+      for (const row of permResult.rows) {
+        const key = `${row.zone_no}-${row.pon_no}`;
+        const agg = ponMap.get(key);
+        if (!agg) continue;
+        const poles = Number(row.permitted_poles);
+        agg.permissions.complete = poles;
+        stageCounts.permissions += poles;
+      }
     }
 
     // Merge poles planted + CWC + activation from DB (QField + OES)
-    // Poles planted = QField pole_planted='Pole Planted' OR DR activated in OES
-    // CWC = QField audit_complete IS NOT NULL (pole passed QA)
-    // Activation = OES activation_date IS NOT NULL
+    // Poles planted = distinct POLES where pole_planted='Pole Planted' OR any DR on pole activated
+    // CWC = distinct POLES where audit_complete IS NOT NULL (pole passed QA)
+    // Activation = distinct DROPS where OES activation_date IS NOT NULL
     const dbStagesResult = await client.query(
       `SELECT d.zone_no, d.pon_no,
-         COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.drop_number END)::int as poles_planted,
-         COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.drop_number END)::int as cwc_complete,
+         COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.pole_number END)::int as poles_planted,
+         COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.pole_number END)::int as cwc_complete,
          MIN(p.audit_complete)::text as cwc_first_date,
          MAX(p.audit_complete)::text as cwc_last_date,
          COUNT(DISTINCT CASE WHEN oes.activation_date IS NOT NULL THEN d.drop_number END)::int as activated,

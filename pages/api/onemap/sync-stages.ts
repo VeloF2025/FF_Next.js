@@ -141,40 +141,63 @@ async function handler(
 
       log.info(`DR lookup loaded: ${drLookup.size} DRs with zone/pon`, { site }, 'SyncStages');
 
-      // Step 3: Get total drops per (zone_no, pon_no) — universal denominator for all stages
-      const dropsTotalResult = await dbClient.query<{
+      // Step 3: Per-PON totals — poles (permissions/poles/cwc), joints (optical), drops (activation)
+      const polesTotalResult = await dbClient.query<{
         zone_no: number;
         pon_no: number;
-        total: number;
+        poles: string;
+        drops: string;
       }>(
-        `SELECT zone_no, pon_no, COUNT(DISTINCT drop_number)::int as total
+        `SELECT zone_no, pon_no,
+           COUNT(DISTINCT pole_number)::text as poles,
+           COUNT(DISTINCT drop_number)::text as drops
          FROM drops
          WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
          GROUP BY zone_no, pon_no`,
         [projectId]
       );
 
+      const jointsTotalResult = await dbClient.query<{
+        zone_no: number;
+        pon_no: number;
+        joints: string;
+      }>(
+        `SELECT zone_no, pon_no, COUNT(*)::text as joints
+         FROM joints
+         WHERE project_id = $1 AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+         GROUP BY zone_no, pon_no`,
+        [projectId]
+      );
+      const jointsMap = new Map<string, number>();
+      for (const row of jointsTotalResult.rows) {
+        jointsMap.set(`${row.zone_no}-${row.pon_no}`, Number(row.joints));
+      }
+
       const ponMap = new Map<string, PonAggregation>();
-      for (const row of dropsTotalResult.rows) {
+      for (const row of polesTotalResult.rows) {
         const key = `${row.zone_no}-${row.pon_no}`;
-        const total = Number(row.total);
+        const polesTotal = Number(row.poles);
+        const dropsTotal = Number(row.drops);
+        const jointsTotal = jointsMap.get(key) || 0;
         ponMap.set(key, {
           zone_no: row.zone_no,
           pon_no: row.pon_no,
-          permissions: { total, complete: 0, firstDate: null, lastDate: null },
-          poles: { total, complete: 0, firstDate: null, lastDate: null },
-          cwc: { total, complete: 0, firstDate: null, lastDate: null },
-          optical: { total, complete: 0, firstDate: null, lastDate: null },
-          atp: { total, complete: 0, firstDate: null, lastDate: null },
-          activation: { total, complete: 0, firstDate: null, lastDate: null },
+          permissions: { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+          poles:       { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+          cwc:         { total: polesTotal, complete: 0, firstDate: null, lastDate: null },
+          optical:     { total: jointsTotal, complete: 0, firstDate: null, lastDate: null },
+          atp:         { total: jointsTotal, complete: 0, firstDate: null, lastDate: null },
+          activation:  { total: dropsTotal, complete: 0, firstDate: null, lastDate: null },
         });
       }
 
-      log.info(`Loaded ${ponMap.size} PONs with drops totals`, { site }, 'SyncStages');
+      log.info(`Loaded ${ponMap.size} PONs with per-stage totals`, { site }, 'SyncStages');
 
-      // Step 4: Count completions from 1Map (deduplicate by DR — 1Map can have multiple records per DR)
+      // Step 4: Count 1Map stages (permissions only — poles/cwc/activation from DB below)
+      // Collect permitted DRs to convert to pole count after loop
       let unmappedCount = 0;
-      const counted = new Map<string, Record<string, Set<string>>>();
+      const permittedDRs = new Set<string>();
+      const counted = new Map<string, { permissions: Set<string> }>();
 
       for (const record of parsedRecords) {
         const lookup = drLookup.get(record.dr_number);
@@ -191,37 +214,41 @@ async function handler(
         if (!agg) continue;
 
         if (!counted.has(key)) {
-          counted.set(key, {
-            permissions: new Set(), poles: new Set(), cwc: new Set(),
-            optical: new Set(), atp: new Set(), activation: new Set(),
-          });
+          counted.set(key, { permissions: new Set() });
         }
         const sets = counted.get(key)!;
         const dr = record.dr_number;
 
-        // Only count permissions, optical, atp from 1Map
-        // Poles planted → QField + OES (DB query below)
-        // CWC → QField audit_complete (DB query below)
-        // Activation → OES (DB query below)
+        // Permissions from 1Map: track DRs, convert to pole count below
         if (record.stages.permissions_complete && dr && !sets.permissions.has(dr)) {
           sets.permissions.add(dr);
-          agg.permissions.complete++;
-          stagesUpdated.permissions++;
+          permittedDRs.add(dr);
           updateDateRange(agg.permissions, record.stages.permissions_date);
         }
+      }
 
-        if (record.stages.optical_complete && dr && !sets.optical.has(dr)) {
-          sets.optical.add(dr);
-          agg.optical.complete++;
-          stagesUpdated.optical++;
-          updateDateRange(agg.optical, record.stages.optical_date);
-        }
-
-        if (record.stages.atp_complete && dr && !sets.atp.has(dr)) {
-          sets.atp.add(dr);
-          agg.atp.complete++;
-          stagesUpdated.atp++;
-          updateDateRange(agg.atp, record.stages.atp_date);
+      // Convert permitted DRs → distinct poles per PON
+      if (permittedDRs.size > 0) {
+        const permResult = await dbClient.query<{
+          zone_no: number;
+          pon_no: number;
+          permitted_poles: string;
+        }>(
+          `SELECT zone_no, pon_no, COUNT(DISTINCT pole_number)::text as permitted_poles
+           FROM drops
+           WHERE project_id = $1
+             AND zone_no IS NOT NULL AND pon_no IS NOT NULL
+             AND drop_number = ANY($2::text[])
+           GROUP BY zone_no, pon_no`,
+          [projectId, [...permittedDRs]]
+        );
+        for (const row of permResult.rows) {
+          const key = `${row.zone_no}-${row.pon_no}`;
+          const agg = ponMap.get(key);
+          if (!agg) continue;
+          const poles = Number(row.permitted_poles);
+          agg.permissions.complete = poles;
+          stagesUpdated.permissions += poles;
         }
       }
 
@@ -246,8 +273,8 @@ async function handler(
         act_last_date: string | null;
       }>(
         `SELECT d.zone_no, d.pon_no,
-           COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.drop_number END)::text as poles_planted,
-           COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.drop_number END)::text as cwc_complete,
+           COUNT(DISTINCT CASE WHEN p.pole_planted = 'Pole Planted' OR oes.activation_date IS NOT NULL THEN d.pole_number END)::text as poles_planted,
+           COUNT(DISTINCT CASE WHEN p.audit_complete IS NOT NULL THEN d.pole_number END)::text as cwc_complete,
            MIN(p.audit_complete)::text as cwc_first_date,
            MAX(p.audit_complete)::text as cwc_last_date,
            COUNT(DISTINCT CASE WHEN oes.activation_date IS NOT NULL THEN d.drop_number END)::text as activated,
