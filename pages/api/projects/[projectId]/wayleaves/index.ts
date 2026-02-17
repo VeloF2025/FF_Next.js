@@ -87,15 +87,17 @@ async function handleGet(res: NextApiResponse, projectId: string) {
       const approved = required.filter(a =>
         ['approved', 'conditionally_approved', 'renewed'].includes(a.status)
       );
+      const expired = approved.filter(a => {
+        if (!a.expiry_date) return false;
+        return new Date(a.expiry_date) < new Date();
+      });
       const expiring = approved.filter(a => {
         if (!a.expiry_date) return false;
         const daysUntil = Math.ceil((new Date(a.expiry_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
         return daysUntil > 0 && daysUntil <= 90;
       });
-      const expired = approved.filter(a => {
-        if (!a.expiry_date) return false;
-        return new Date(a.expiry_date) < new Date();
-      });
+      // Valid = approved and not expired
+      const valid = approved.length - expired.length;
 
       return apiResponse.success(res, {
         approvals,
@@ -106,9 +108,10 @@ async function handleGet(res: NextApiResponse, projectId: string) {
           pending: required.length - approved.length,
           expiring_count: expiring.length,
           expired_count: expired.length,
-          progress: required.length > 0 ? Math.round((approved.length / required.length) * 100) : 0,
+          // Progress based on valid (non-expired) approvals
+          progress: required.length > 0 ? Math.round((valid / required.length) * 100) : 0,
         },
-        expiring_alerts: expiring.map(a => ({
+        expiring_alerts: [...expired, ...expiring].map(a => ({
           id: a.id,
           name: a.approval_type_name,
           expiry_date: a.expiry_date,

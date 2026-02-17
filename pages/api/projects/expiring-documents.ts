@@ -80,7 +80,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             CONCAT(at.name, ' - ', pp.project_name) as document_name,
             pa.expiry_date,
             (pa.expiry_date - CURRENT_DATE)::int as days_until_expiry,
-            pp.id::text as project_id,
+            COALESCE(ppl.project_id::text, pp.id::text) as project_id,
             pp.project_name,
             NULL as contractor_id,
             NULL as contractor_name,
@@ -91,9 +91,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM pipeline_project_approvals pa
           JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
           JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
+          LEFT JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
           WHERE pa.expiry_date IS NOT NULL
             AND pa.expiry_date <= CURRENT_DATE + ${daysAhead}::int
-            AND (${project_id}::text IS NULL OR pp.id::text = ${project_id}::text)
+            AND (${project_id}::text IS NULL
+              OR ppl.project_id::text = ${project_id}::text)
           ORDER BY pa.expiry_date ASC
         `;
         documents.push(...pipelineApprovals.map(row => ({

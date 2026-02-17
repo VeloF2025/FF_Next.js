@@ -444,13 +444,29 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
             <p className="text-sm text-amber-600 dark:text-amber-400">Pending</p>
             <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{status?.pending || 0}</p>
           </div>
-          <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20">
-            <p className="text-sm text-orange-600 dark:text-orange-400">Expiring</p>
-            <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{status?.expiring_count || 0}</p>
+          <div className={`p-3 rounded-lg ${
+            (status?.expired_count || 0) > 0
+              ? 'bg-red-50 dark:bg-red-900/20'
+              : 'bg-orange-50 dark:bg-orange-900/20'
+          }`}>
+            <p className={`text-sm ${
+              (status?.expired_count || 0) > 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-orange-600 dark:text-orange-400'
+            }`}>{(status?.expired_count || 0) > 0 ? 'Expired' : 'Expiring'}</p>
+            <p className={`text-2xl font-bold ${
+              (status?.expired_count || 0) > 0
+                ? 'text-red-700 dark:text-red-300'
+                : 'text-orange-700 dark:text-orange-300'
+            }`}>{(status?.expired_count || 0) > 0 ? status?.expired_count : (status?.expiring_count || 0)}</p>
           </div>
           <div className="p-3 rounded-lg bg-[var(--ff-bg-secondary)]">
             <p className="text-sm text-[var(--ff-text-secondary)]">Progress</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{status?.progress || 0}%</p>
+            <p className={`text-2xl font-bold ${
+              (status?.expired_count || 0) > 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-blue-600 dark:text-blue-400'
+            }`}>{status?.progress || 0}%</p>
           </div>
         </div>
 
@@ -458,7 +474,9 @@ export function ProjectWayleavesTab({ projectId, projectName = 'Project' }: Proj
         <div className="mt-4">
           <div className="h-2 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-green-500 rounded-full transition-all duration-300"
+              className={`h-full rounded-full transition-all duration-300 ${
+                (status?.expired_count || 0) > 0 ? 'bg-red-500' : 'bg-green-500'
+              }`}
               style={{ width: `${status?.progress || 0}%` }}
             />
           </div>
