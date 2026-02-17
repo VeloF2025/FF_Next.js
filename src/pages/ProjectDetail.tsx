@@ -192,6 +192,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
                   projectStatus={project.status}
                   onActivate={handleProjectActivated}
                   onRefresh={refetch}
+                  onNavigateToTab={(tab) => handleTabChange(tab as TabId)}
                 />
               )}
 

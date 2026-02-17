@@ -24,6 +24,7 @@ interface ActivationBlockersCardProps {
   projectStatus: string;
   onActivate?: () => void;
   onRefresh?: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 interface BlockerItemProps {
@@ -32,9 +33,10 @@ interface BlockerItemProps {
   message: string;
   icon: React.ReactNode;
   details?: string[];
+  onNavigate?: () => void;
 }
 
-function BlockerItem({ label, met, message, icon, details }: BlockerItemProps) {
+function BlockerItem({ label, met, message, icon, details, onNavigate }: BlockerItemProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -54,7 +56,16 @@ function BlockerItem({ label, met, message, icon, details }: BlockerItemProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[var(--ff-text-secondary)]">{icon}</span>
-              <span className="font-medium text-[var(--ff-text-primary)]">{label}</span>
+              {onNavigate ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onNavigate(); }}
+                  className="font-medium text-[var(--ff-text-primary)] hover:text-blue-400 hover:underline transition-colors text-left"
+                >
+                  {label}
+                </button>
+              ) : (
+                <span className="font-medium text-[var(--ff-text-primary)]">{label}</span>
+              )}
             </div>
             {details?.length ? (
               expanded ? (
@@ -88,6 +99,7 @@ export function ActivationBlockersCard({
   projectStatus,
   onActivate,
   onRefresh,
+  onNavigateToTab,
 }: ActivationBlockersCardProps) {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
@@ -265,6 +277,7 @@ export function ActivationBlockersCard({
           message={blockers.clientPO.message}
           icon={<FileText className="w-4 h-4" />}
           details={blockers.clientPO.activePOs?.map(po => `${po.poNumber}: R${po.totalValue.toLocaleString()}`)}
+          onNavigate={onNavigateToTab ? () => onNavigateToTab('procurement') : undefined}
         />
         <BlockerItem
           label="Wayleaves"
@@ -272,12 +285,14 @@ export function ActivationBlockersCard({
           message={blockers.wayleaves.message}
           icon={<FileText className="w-4 h-4" />}
           details={blockers.wayleaves.expired}
+          onNavigate={onNavigateToTab ? () => onNavigateToTab('wayleaves') : undefined}
         />
         <BlockerItem
           label="H&S Compliance"
           met={blockers.hsCompliance.met}
           message={blockers.hsCompliance.message}
           icon={<Shield className="w-4 h-4" />}
+          onNavigate={onNavigateToTab ? () => onNavigateToTab('hs') : undefined}
         />
         <BlockerItem
           label="Contractor Signed"
@@ -285,6 +300,7 @@ export function ActivationBlockersCard({
           message={blockers.contractorSigned.message}
           icon={<Users className="w-4 h-4" />}
           details={blockers.contractorSigned.signedAgreements}
+          onNavigate={onNavigateToTab ? () => onNavigateToTab('agreements') : undefined}
         />
       </div>
 

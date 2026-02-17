@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import type {
   PrereqsResponse,
   PrereqPhaseGroup,
@@ -16,6 +17,46 @@ import type {
 interface ProjectPrereqsProps {
   projectId: string;
 }
+
+/** Maps requirement_type to the project tab where it can be completed */
+const PREREQ_TAB_MAP: Record<string, string> = {
+  // Site Assignments → various tabs
+  boq_approved: 'boq',
+  po_received: 'procurement',
+  bss_signed: 'agreements',
+  budget_approved: 'budget',
+  survey_contractor: 'team',
+  // Prerequisites → wayleaves & H&S
+  wayleave_submitted: 'wayleaves',
+  wayleave_approved: 'wayleaves',
+  permits_obtained: 'wayleaves',
+  safety_file: 'hs',
+  risk_assessment: 'hs',
+  insurance_verified: 'hs',
+  // Contractor Engagements
+  contractor_sow_signed: 'agreements',
+  contractor_mba_signed: 'agreements',
+  teams_inducted: 'team',
+  ppe_issued: 'hs',
+  training_complete: 'team',
+  // Key Milestones → PON stages
+  first_pole_planted: 'pon-stages',
+  first_pon_strung: 'pon-stages',
+  first_splice_complete: 'pon-stages',
+  first_home_connected: 'pon-stages',
+  first_activation: 'pon-stages',
+  '25_pct_activation': 'pon-stages',
+  '50_pct_activation': 'pon-stages',
+  '75_pct_activation': 'pon-stages',
+  '90_pct_activation': 'pon-stages',
+  as_built_submitted: 'documents',
+  materials_staged: 'procurement',
+  // Activation check seeded items (from activationService seed)
+  client_po: 'procurement',
+  sow_uploaded: 'sow',
+  hs_compliance: 'hs',
+  contractor_signed: 'agreements',
+};
 
 const PARTY_COLORS: Record<string, string> = {
   velocity: 'bg-blue-500/20 text-blue-400',
@@ -30,13 +71,15 @@ function getProgressColor(pct: number): string {
   return 'bg-emerald-500';
 }
 
-function PrereqItemRow({ item, onToggle, onUpdateNotes }: {
+function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
   item: PrereqItem;
   onToggle: (id: string, completed: boolean) => void;
   onUpdateNotes: (id: string, notes: string) => void;
+  onNavigate?: (tab: string) => void;
 }) {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState(item.notes || '');
+  const targetTab = PREREQ_TAB_MAP[item.requirement_type];
 
   const partyColor = item.responsible_party
     ? PARTY_COLORS[item.responsible_party] || 'bg-gray-500/20 text-gray-400'
@@ -65,13 +108,22 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes }: {
 
         {/* Description */}
         <div className="flex-1 min-w-0">
-          <span className={`text-sm ${
-            item.is_completed
-              ? 'line-through text-[var(--ff-text-secondary)]'
-              : 'text-[var(--ff-text-primary)]'
-          }`}>
-            {item.requirement_name}
-          </span>
+          {targetTab && onNavigate && !item.is_completed ? (
+            <button
+              onClick={() => onNavigate(targetTab)}
+              className="text-sm text-[var(--ff-text-primary)] hover:text-blue-400 hover:underline transition-colors text-left"
+            >
+              {item.requirement_name}
+            </button>
+          ) : (
+            <span className={`text-sm ${
+              item.is_completed
+                ? 'line-through text-[var(--ff-text-secondary)]'
+                : 'text-[var(--ff-text-primary)]'
+            }`}>
+              {item.requirement_name}
+            </span>
+          )}
         </div>
 
         {/* Responsible party badge */}
@@ -120,12 +172,13 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes }: {
   );
 }
 
-function PhaseAccordion({ group, isExpanded, onToggle, onToggleItem, onUpdateNotes }: {
+function PhaseAccordion({ group, isExpanded, onToggle, onToggleItem, onUpdateNotes, onNavigate }: {
   group: PrereqPhaseGroup;
   isExpanded: boolean;
   onToggle: () => void;
   onToggleItem: (id: string, completed: boolean) => void;
   onUpdateNotes: (id: string, notes: string) => void;
+  onNavigate?: (tab: string) => void;
 }) {
   return (
     <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
@@ -171,6 +224,7 @@ function PhaseAccordion({ group, isExpanded, onToggle, onToggleItem, onUpdateNot
               item={item}
               onToggle={onToggleItem}
               onUpdateNotes={onUpdateNotes}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -180,11 +234,19 @@ function PhaseAccordion({ group, isExpanded, onToggle, onToggleItem, onUpdateNot
 }
 
 export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
+  const router = useRouter();
   const [data, setData] = useState<PrereqsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
+
+  const handleNavigateToTab = useCallback((tab: string) => {
+    router.push({
+      pathname: router.pathname,
+      query: { ...router.query, tab },
+    }, undefined, { shallow: true });
+  }, [router]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -368,6 +430,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
           onToggle={() => togglePhase(group.phase)}
           onToggleItem={handleToggleItem}
           onUpdateNotes={handleUpdateNotes}
+          onNavigate={handleNavigateToTab}
         />
       ))}
     </div>
