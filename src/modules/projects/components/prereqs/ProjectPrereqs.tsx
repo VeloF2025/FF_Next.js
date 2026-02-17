@@ -20,26 +20,42 @@ interface ProjectPrereqsProps {
 
 /** Maps requirement_type to the project tab where it can be completed */
 const PREREQ_TAB_MAP: Record<string, string> = {
-  // Site Assignments → various tabs
+  // --- Activation-check seeded items ---
+  client_po: 'procurement',
   boq_approved: 'boq',
+  budget_approved: 'budget',
+  contractor_appointed: 'team',
+  sow_signed: 'agreements',
+  mba_signed: 'agreements',
+  hs_verified: 'hs',
+  team_assigned: 'team',
+  wayleave: 'wayleaves',
+  permit: 'wayleaves',
+  client_agreement: 'agreements',
+  documentation: 'documents',
+  drops_complete: 'sow',
+  qa_passed: 'pon-stages',
+  sow_uploaded: 'sow',
+  hs_compliance: 'hs',
+  contractor_signed: 'agreements',
+  // --- VF Standard template items ---
   po_received: 'procurement',
   bss_signed: 'agreements',
-  budget_approved: 'budget',
   survey_contractor: 'team',
-  // Prerequisites → wayleaves & H&S
   wayleave_submitted: 'wayleaves',
   wayleave_approved: 'wayleaves',
   permits_obtained: 'wayleaves',
   safety_file: 'hs',
   risk_assessment: 'hs',
   insurance_verified: 'hs',
-  // Contractor Engagements
   contractor_sow_signed: 'agreements',
   contractor_mba_signed: 'agreements',
   teams_inducted: 'team',
   ppe_issued: 'hs',
   training_complete: 'team',
-  // Key Milestones → PON stages
+  materials_staged: 'procurement',
+  as_built_submitted: 'documents',
+  // Key milestones → PON stages
   first_pole_planted: 'pon-stages',
   first_pon_strung: 'pon-stages',
   first_splice_complete: 'pon-stages',
@@ -49,13 +65,6 @@ const PREREQ_TAB_MAP: Record<string, string> = {
   '50_pct_activation': 'pon-stages',
   '75_pct_activation': 'pon-stages',
   '90_pct_activation': 'pon-stages',
-  as_built_submitted: 'documents',
-  materials_staged: 'procurement',
-  // Activation check seeded items (from activationService seed)
-  client_po: 'procurement',
-  sow_uploaded: 'sow',
-  hs_compliance: 'hs',
-  contractor_signed: 'agreements',
 };
 
 const PARTY_COLORS: Record<string, string> = {
