@@ -139,6 +139,11 @@ export class BOQImportEnhanced {
     const boqId = options.boqId || await this.createBoq(options.projectId, options.userId, options.title);
     result.boqId = boqId;
 
+    // Supersede previous BOQ versions for this project (archive + clean up budget items)
+    if (!options.boqId) {
+      await this.supersedeExistingBoqs(options.projectId, boqId);
+    }
+
     // Get or create project budget
     let projectBudgetId: string | null = null;
     let budgetCategories: Map<string, string> = new Map(); // code -> id
@@ -411,6 +416,51 @@ export class BOQImportEnhanced {
       RETURNING id
     `;
     return result[0].id;
+  }
+
+  /**
+   * Supersede previous BOQ versions for this project.
+   * - Sets old BOQs to 'superseded' status
+   * - Deletes budget_items linked to old BOQ items (prevents double-counting)
+   * - Preserves the old BOQ + items for audit trail
+   */
+  private async supersedeExistingBoqs(projectId: string, newBoqId: string): Promise<void> {
+    // Find all previous BOQs for this project (excluding the one we just created)
+    const oldBoqs = await this.sql`
+      SELECT id FROM boqs
+      WHERE project_id = ${projectId}
+        AND id != ${newBoqId}
+        AND status != 'superseded'
+    `;
+
+    if (oldBoqs.length === 0) return;
+
+    const oldBoqIds = oldBoqs.map(b => b.id as string);
+
+    log.info('Superseding previous BOQ versions', {
+      data: { projectId, newBoqId, supersededCount: oldBoqIds.length, oldBoqIds }
+    }, 'boq-import');
+
+    for (const oldBoqId of oldBoqIds) {
+      // Delete budget_items linked to old BOQ items (FK: budget_items.boq_item_id -> boq_items.id)
+      await this.sql`
+        DELETE FROM budget_items
+        WHERE boq_item_id IN (
+          SELECT id FROM boq_items WHERE boq_id = ${oldBoqId}
+        )
+      `;
+
+      // Mark old BOQ as superseded
+      await this.sql`
+        UPDATE boqs
+        SET status = 'superseded', updated_at = NOW()
+        WHERE id = ${oldBoqId}
+      `;
+    }
+
+    log.info('Supersede complete', {
+      data: { supersededBoqs: oldBoqIds.length }
+    }, 'boq-import');
   }
 
   /**

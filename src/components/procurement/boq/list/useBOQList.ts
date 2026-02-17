@@ -89,6 +89,8 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
         }
       }
 
+      // Hide superseded BOQs unless explicitly filtered for
+      if (!filters.status && boq.status === 'superseded') return false;
       // Status filters
       if (filters.status && boq.status !== filters.status) return false;
       if (filters.mappingStatus && boq.mappingStatus !== filters.mappingStatus) return false;

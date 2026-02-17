@@ -6,10 +6,11 @@ export enum BOQStatus {
   DRAFT = 'draft',
   MAPPING_REVIEW = 'mapping_review',
   APPROVED = 'approved',
-  ARCHIVED = 'archived'
+  ARCHIVED = 'archived',
+  SUPERSEDED = 'superseded'
 }
 
-export type BOQStatusType = 'draft' | 'mapping_review' | 'approved' | 'archived';
+export type BOQStatusType = 'draft' | 'mapping_review' | 'approved' | 'archived' | 'superseded';
 
 // Mapping Status enumeration
 export enum MappingStatus {

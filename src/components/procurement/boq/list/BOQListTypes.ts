@@ -38,7 +38,8 @@ export const BOQ_STATUS_LABELS = {
   mapping: 'Mapping',
   mapped: 'Mapped',
   approved: 'Approved',
-  archived: 'Archived'
+  archived: 'Archived',
+  superseded: 'Superseded'
 };
 
 export const BOQ_STATUS_COLORS: Record<string, string> = {
@@ -48,7 +49,8 @@ export const BOQ_STATUS_COLORS: Record<string, string> = {
   mapped: 'bg-green-500/20 text-green-400',
   approved: 'bg-green-500/20 text-green-400',
   archived: 'bg-gray-500/20 text-gray-400',
-  mapping_review: 'bg-orange-500/20 text-orange-400'
+  mapping_review: 'bg-orange-500/20 text-orange-400',
+  superseded: 'bg-gray-500/10 text-gray-500'
 };
 
 export const MAPPING_STATUS_LABELS = {
