@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/useProjects';
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
@@ -48,6 +48,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
   const router = useRouter();
   const id = projectId;
   const [tabBadges, setTabBadges] = useState<Record<string, number>>({});
+  const expiringDocsRef = useRef<HTMLDivElement>(null);
 
   // Tab URL aliases - map group names and legacy URLs to actual tab IDs
   const TAB_ALIASES: Record<string, TabId> = {
@@ -164,7 +165,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
             project={project}
             onNavigateToTeam={() => handleTabChange('team')}
             onNavigateToBudget={() => router.push(`/projects/${id}/budget`)}
-            onNavigateToDocuments={() => handleTabChange('documents')}
+            onNavigateToDocuments={() => expiringDocsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -198,8 +199,8 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
               {/* Expiring Documents (PRD-058) */}
               <ProjectExpiringDocsList
+                ref={expiringDocsRef}
                 projectId={id!}
-                onNavigateToDocuments={() => handleTabChange('documents')}
               />
 
               <ProjectKeyDetails project={project} />
