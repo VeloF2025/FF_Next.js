@@ -8,6 +8,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
@@ -57,6 +58,79 @@ async function handler(
   return res.status(405).json({ success: false, error: 'Method not allowed' });
 }
 
+/**
+ * Run auto-detection queries in parallel.
+ * Returns a map of requirement_type → boolean (met or not).
+ */
+async function getAutoDetectionResults(
+  client: PoolClient,
+  projectId: string
+): Promise<Record<string, boolean>> {
+  const [po, boq, contractor, agreements, team, hs, budgetRow, dropsRow] =
+    await Promise.all([
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM client_purchase_orders
+         WHERE project_id = $1 AND status IN ('active','completed')) as met`,
+        [projectId]
+      ),
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM boqs WHERE project_id = $1) as met`,
+        [projectId]
+      ),
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM contractor_projects
+         WHERE project_id = $1 AND is_active = true) as met`,
+        [projectId]
+      ),
+      client.query<{ agreement_type: string }>(
+        `SELECT DISTINCT agreement_type FROM contractor_agreements
+         WHERE project_id = $1 AND status IN ('signed','active')`,
+        [projectId]
+      ),
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(
+           SELECT 1 FROM staff_projects WHERE project_id = $1 AND is_active = true
+           UNION ALL
+           SELECT 1 FROM contractor_projects WHERE project_id = $1 AND is_active = true
+         ) as met`,
+        [projectId]
+      ),
+      client.query<{ met: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM hs_project_config
+         WHERE project_id = $1 AND template_id IS NOT NULL) as met`,
+        [projectId]
+      ),
+      client.query<{ budget: string | null }>(
+        `SELECT budget FROM projects WHERE id = $1`,
+        [projectId]
+      ),
+      client.query<{ target: string; actual: string }>(
+        `SELECT COALESCE(cpo.contracted_drops, 0)::text as target,
+                (SELECT COUNT(*)::text FROM drops WHERE project_id = $1) as actual
+         FROM client_purchase_orders cpo
+         WHERE cpo.project_id = $1 AND cpo.status = 'active' LIMIT 1`,
+        [projectId]
+      ),
+    ]);
+
+  const agreementTypes = new Set(agreements.rows.map(r => r.agreement_type));
+  const target = Number(dropsRow.rows[0]?.target || 0);
+  const actual = Number(dropsRow.rows[0]?.actual || 0);
+
+  return {
+    client_po: po.rows[0]?.met === true,
+    boq_approved: boq.rows[0]?.met === true,
+    contractor_appointed: contractor.rows[0]?.met === true,
+    sow_signed: agreementTypes.has('sow'),
+    mba_signed: agreementTypes.has('mba'),
+    client_agreement: agreements.rows.length > 0,
+    team_assigned: team.rows[0]?.met === true,
+    hs_verified: hs.rows[0]?.met === true,
+    budget_approved: Number(budgetRow.rows[0]?.budget || 0) > 0,
+    drops_complete: target > 0 && actual >= target,
+  };
+}
+
 async function handleGet(
   _req: NextApiRequest,
   res: NextApiResponse<PrereqsResponse | { success: boolean; error: string }>,
@@ -77,42 +151,59 @@ async function handleGet(
 
       const projectName = projectResult.rows[0]!.project_name;
 
-      // Fetch all requirements for this project
-      const reqResult = await client.query<{
-        id: string;
-        requirement_type: string;
-        requirement_name: string;
-        description: string | null;
-        stage: string;
-        sort_order: number;
-        is_completed: boolean;
-        completed_at: string | null;
-        completed_by: string | null;
-        responsible_party: string | null;
-        document_url: string | null;
-        notes: string | null;
-        template_id: string | null;
-        template_phase: string | null;
-      }>(
-        `SELECT
-           r.id, r.requirement_type, r.requirement_name, r.description,
-           r.stage, r.sort_order, r.is_completed,
-           r.completed_at::text, r.completed_by,
-           r.responsible_party, r.document_url, r.notes,
-           r.template_id::text,
-           t.phase as template_phase
-         FROM project_requirements r
-         LEFT JOIN project_prereq_templates t ON t.id = r.template_id
-         WHERE r.project_id = $1
-         ORDER BY r.sort_order, r.created_at`,
-        [projectId]
-      );
+      // Fetch requirements + auto-detection in parallel
+      const [reqResult, autoResults] = await Promise.all([
+        client.query<{
+          id: string;
+          requirement_type: string;
+          requirement_name: string;
+          description: string | null;
+          stage: string;
+          sort_order: number;
+          is_completed: boolean;
+          completed_at: string | null;
+          completed_by: string | null;
+          responsible_party: string | null;
+          document_url: string | null;
+          notes: string | null;
+          template_id: string | null;
+          template_phase: string | null;
+        }>(
+          `SELECT
+             r.id, r.requirement_type, r.requirement_name, r.description,
+             r.stage, r.sort_order, r.is_completed,
+             r.completed_at::text, r.completed_by,
+             r.responsible_party, r.document_url, r.notes,
+             r.template_id::text,
+             t.phase as template_phase
+           FROM project_requirements r
+           LEFT JOIN project_prereq_templates t ON t.id = r.template_id
+           WHERE r.project_id = $1
+           ORDER BY r.sort_order, r.created_at`,
+          [projectId]
+        ),
+        getAutoDetectionResults(client, projectId),
+      ]);
 
       // Group by phase
       const phaseMap = new Map<PrereqPhase, PrereqItem[]>();
 
       for (const row of reqResult.rows) {
         const phase = resolvePhase(row.stage, row.template_phase);
+
+        // Determine auto_status overlay
+        let autoStatus: PrereqItem['auto_status'] = null;
+        let isCompleted = row.is_completed;
+
+        if (row.requirement_type in autoResults) {
+          const autoMet = autoResults[row.requirement_type];
+          if (autoMet) {
+            isCompleted = true;
+            autoStatus = 'auto';
+          } else if (row.is_completed) {
+            autoStatus = 'manual';
+          }
+        }
 
         const item: PrereqItem = {
           id: row.id,
@@ -121,13 +212,14 @@ async function handleGet(
           description: row.description,
           stage: row.stage,
           sort_order: row.sort_order,
-          is_completed: row.is_completed,
+          is_completed: isCompleted,
           completed_at: row.completed_at,
           completed_by: row.completed_by,
           responsible_party: row.responsible_party,
           document_url: row.document_url,
           notes: row.notes,
           template_id: row.template_id,
+          auto_status: autoStatus,
         };
 
         const existing = phaseMap.get(phase);

@@ -99,14 +99,17 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
       item.is_completed ? 'opacity-70' : ''
     }`}>
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Checkbox */}
+        {/* Checkbox — read-only for auto-detected items */}
         <button
-          onClick={() => onToggle(item.id, !item.is_completed)}
+          onClick={() => item.auto_status !== 'auto' && onToggle(item.id, !item.is_completed)}
           className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
             item.is_completed
-              ? 'bg-emerald-500 border-emerald-500'
+              ? item.auto_status === 'auto'
+                ? 'bg-emerald-500 border-emerald-500 cursor-default'
+                : 'bg-emerald-500 border-emerald-500'
               : 'border-gray-500 hover:border-blue-400'
           }`}
+          title={item.auto_status === 'auto' ? 'Auto-detected from project data' : undefined}
         >
           {item.is_completed && (
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -115,9 +118,9 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
           )}
         </button>
 
-        {/* Description */}
-        <div className="flex-1 min-w-0">
-          {targetTab && onNavigate && !item.is_completed ? (
+        {/* Description — keep link for auto-completed items so user can verify */}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {targetTab && onNavigate && (!item.is_completed || item.auto_status === 'auto') ? (
             <button
               onClick={() => onNavigate(targetTab)}
               className="text-sm text-[var(--ff-text-primary)] hover:text-blue-400 hover:underline transition-colors text-left"
@@ -131,6 +134,14 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
                 : 'text-[var(--ff-text-primary)]'
             }`}>
               {item.requirement_name}
+            </span>
+          )}
+          {item.auto_status === 'auto' && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap"
+              title="Auto-detected from project data"
+            >
+              Auto
             </span>
           )}
         </div>

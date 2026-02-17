@@ -134,6 +134,8 @@ export interface PrereqItem {
   document_url: string | null;
   notes: string | null;
   template_id: string | null;
+  /** 'auto' = detected from data, 'manual' = user override, null = not auto-detectable */
+  auto_status: 'auto' | 'manual' | null;
 }
 
 /** Pre-req items grouped by phase */
