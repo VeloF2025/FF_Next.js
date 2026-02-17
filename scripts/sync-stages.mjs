@@ -11,8 +11,7 @@
  * New projects: Set metadata.onemap_prefix on the project to include it.
  *   UPDATE projects SET metadata = metadata || '{"onemap_prefix": "TEM"}' WHERE id = '...';
  *
- * Cron (every 4 hours):
- *   0 */4 * * * cd /home/velo/fibreflow-production && node scripts/sync-stages.mjs >> /var/log/ff-stage-sync.log 2>&1
+ * Cron (every 4 hours): see crontab on Velocity (velo user)
  */
 
 import pg from 'pg';
