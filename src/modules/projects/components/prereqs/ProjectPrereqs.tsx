@@ -21,7 +21,7 @@ interface ProjectPrereqsProps {
 /** Maps requirement_type to the project tab where it can be completed */
 const PREREQ_TAB_MAP: Record<string, string> = {
   // --- Activation-check seeded items ---
-  client_po: 'procurement',
+  client_po: 'documents',
   boq_approved: 'boq',
   budget_approved: 'budget',
   contractor_appointed: 'team',
@@ -38,16 +38,17 @@ const PREREQ_TAB_MAP: Record<string, string> = {
   sow_uploaded: 'sow',
   hs_compliance: 'hs',
   contractor_signed: 'agreements',
-  // --- Updated seed items ---
-  client_msa: 'agreements',
-  mss_signed: 'agreements',
-  sow_uploaded: 'sow',
   // --- VF Standard template items ---
-  po_received: 'procurement',
-  bss_signed: 'agreements',
+  po_received: 'documents',
+  bss_signed: 'documents',
+  mss_signed: 'documents',
+  hld_complete: 'documents',
+  lld_complete: 'documents',
   survey_contractor: 'team',
   wayleave_submitted: 'wayleaves',
   wayleave_approved: 'wayleaves',
+  environmental_assessment: 'wayleaves',
+  traffic_management: 'wayleaves',
   permits_obtained: 'wayleaves',
   safety_file: 'hs',
   risk_assessment: 'hs',
