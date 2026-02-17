@@ -59,9 +59,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Query params
-  const { days = '90', project_id, source } = req.query;
+  const { days = '90', project_id, source, max_expired } = req.query;
   const daysAhead = Math.min(365, Math.max(1, parseInt(String(days), 10) || 90));
   const projectIdStr = project_id ? String(project_id) : null;
+  // max_expired: only show docs expired within this many days (default 90, 0 = no limit)
+  // Uses 36500 (100 years) as effective "no limit" to avoid branching queries
+  const maxExpiredDays = max_expired === '0'
+    ? 36500
+    : Math.max(1, parseInt(String(max_expired || '90'), 10));
 
   const client = await pool.connect();
   try {
@@ -92,10 +97,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
               JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
               WHERE pa.expiry_date IS NOT NULL
+                AND pa.expiry_date >= CURRENT_DATE - $3::int
                 AND pa.expiry_date <= CURRENT_DATE + $1::int
                 AND ppl.project_id = $2::uuid
               ORDER BY pa.expiry_date ASC`,
-              [daysAhead, projectIdStr]
+              [daysAhead, projectIdStr, maxExpiredDays]
             )
           : await client.query(
               `SELECT
@@ -118,9 +124,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               JOIN pipeline_approval_types at ON pa.approval_type_id = at.id
               LEFT JOIN project_pipeline_links ppl ON ppl.pipeline_project_id = pp.id
               WHERE pa.expiry_date IS NOT NULL
+                AND pa.expiry_date >= CURRENT_DATE - $2::int
                 AND pa.expiry_date <= CURRENT_DATE + $1::int
               ORDER BY pa.expiry_date ASC`,
-              [daysAhead]
+              [daysAhead, maxExpiredDays]
             );
         documents.push(...result.rows.map(row => ({
           ...row,
@@ -154,9 +161,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM contractor_documents cd
           JOIN contractors c ON cd.contractor_id = c.id
           WHERE cd.expiry_date IS NOT NULL
+            AND cd.expiry_date >= CURRENT_DATE - $2::int
             AND cd.expiry_date <= CURRENT_DATE + $1::int
           ORDER BY cd.expiry_date ASC`,
-          [daysAhead]
+          [daysAhead, maxExpiredDays]
         );
         documents.push(...result.rows.map(row => ({
           ...row,
@@ -192,11 +200,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               JOIN projects p ON ca.project_id = p.id
               JOIN contractors c ON ca.contractor_id = c.id
               WHERE ca.expiry_date IS NOT NULL
+                AND ca.expiry_date >= CURRENT_DATE - $3::int
                 AND ca.expiry_date <= CURRENT_DATE + $1::int
                 AND ca.status = 'active'
                 AND ca.project_id = $2::uuid
               ORDER BY ca.expiry_date ASC`,
-              [daysAhead, projectIdStr]
+              [daysAhead, projectIdStr, maxExpiredDays]
             )
           : await client.query(
               `SELECT
@@ -218,10 +227,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               JOIN projects p ON ca.project_id = p.id
               JOIN contractors c ON ca.contractor_id = c.id
               WHERE ca.expiry_date IS NOT NULL
+                AND ca.expiry_date >= CURRENT_DATE - $2::int
                 AND ca.expiry_date <= CURRENT_DATE + $1::int
                 AND ca.status = 'active'
               ORDER BY ca.expiry_date ASC`,
-              [daysAhead]
+              [daysAhead, maxExpiredDays]
             );
         documents.push(...result.rows.map(row => ({
           ...row,
@@ -256,10 +266,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               FROM project_requirements pr
               JOIN projects p ON pr.project_id = p.id
               WHERE pr.expiry_date IS NOT NULL
+                AND pr.expiry_date >= CURRENT_DATE - $3::int
                 AND pr.expiry_date <= CURRENT_DATE + $1::int
                 AND pr.project_id = $2::uuid
               ORDER BY pr.expiry_date ASC`,
-              [daysAhead, projectIdStr]
+              [daysAhead, projectIdStr, maxExpiredDays]
             )
           : await client.query(
               `SELECT
@@ -280,9 +291,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               FROM project_requirements pr
               JOIN projects p ON pr.project_id = p.id
               WHERE pr.expiry_date IS NOT NULL
+                AND pr.expiry_date >= CURRENT_DATE - $2::int
                 AND pr.expiry_date <= CURRENT_DATE + $1::int
               ORDER BY pr.expiry_date ASC`,
-              [daysAhead]
+              [daysAhead, maxExpiredDays]
             );
         documents.push(...result.rows.map(row => ({
           ...row,
@@ -317,9 +329,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           LEFT JOIN staff s ON sd.staff_id = s.id
           LEFT JOIN users u ON sd.staff_id = u.id
           WHERE sd.expiry_date IS NOT NULL
+            AND sd.expiry_date >= CURRENT_DATE - $2::int
             AND sd.expiry_date <= CURRENT_DATE + $1::int
           ORDER BY sd.expiry_date ASC`,
-          [daysAhead]
+          [daysAhead, maxExpiredDays]
         );
         documents.push(...result.rows.map(row => ({
           ...row,

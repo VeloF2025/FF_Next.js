@@ -94,6 +94,10 @@ export const ProjectExpiringDocsList = forwardRef<HTMLDivElement, ProjectExpirin
       return null;
     }
 
+    const expiredCount = data.by_urgency.expired.length;
+    const criticalCount = data.by_urgency.critical.length;
+    const warningCount = data.by_urgency.warning.length;
+
     const urgentDocs = [
       ...data.by_urgency.expired,
       ...data.by_urgency.critical,
@@ -129,9 +133,18 @@ export const ProjectExpiringDocsList = forwardRef<HTMLDivElement, ProjectExpirin
         <div className="px-4 py-3 border-b border-[var(--ff-border-light)] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-yellow-500" />
-            <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">
-              Expiring Documents (30 days)
-            </h3>
+            <div>
+              <h3 className="text-sm font-medium text-[var(--ff-text-primary)]">
+                Document Alerts
+              </h3>
+              <p className="text-xs text-[var(--ff-text-tertiary)]">
+                {expiredCount > 0 && <span className="text-red-500">{expiredCount} expired</span>}
+                {expiredCount > 0 && (criticalCount + warningCount > 0) && ' · '}
+                {criticalCount > 0 && <span className="text-red-400">{criticalCount} critical</span>}
+                {criticalCount > 0 && warningCount > 0 && ' · '}
+                {warningCount > 0 && <span className="text-yellow-500">{warningCount} expiring</span>}
+              </p>
+            </div>
           </div>
           {remaining > 0 && (
             <button
