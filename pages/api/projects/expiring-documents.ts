@@ -66,6 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const client = await pool.connect();
   try {
     const documents: ExpiringDocument[] = [];
+    const queryErrors: string[] = [];
 
     // 1. Pipeline Approvals (via project_pipeline_links for project filtering)
     if (!source || source === 'pipeline_approval') {
@@ -128,6 +129,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
+        queryErrors.push(`pipeline_approval: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'pipeline_approval', error: (err as Error).message });
       }
     }
@@ -164,6 +166,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
+        queryErrors.push(`contractor_document: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'contractor_document', error: (err as Error).message });
       }
     }
@@ -229,6 +232,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
+        queryErrors.push(`agreement: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'agreement', error: (err as Error).message });
       }
     }
@@ -290,6 +294,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
+        queryErrors.push(`project_requirement: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'project_requirement', error: (err as Error).message });
       }
     }
@@ -327,6 +332,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
+        queryErrors.push(`staff_document: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'staff_document', error: (err as Error).message });
       }
     }
@@ -372,6 +378,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       by_urgency: byUrgency,
       by_source: bySource,
       all: documents,
+      _debug: { queryErrors, daysAhead, projectIdStr, sourceFilter: source || null },
     });
   } catch (error) {
     log.error('ExpiringDocuments', { error: (error as Error).message });
