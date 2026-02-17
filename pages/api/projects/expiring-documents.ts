@@ -66,7 +66,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const client = await pool.connect();
   try {
     const documents: ExpiringDocument[] = [];
-    const queryErrors: string[] = [];
 
     // 1. Pipeline Approvals (via project_pipeline_links for project filtering)
     if (!source || source === 'pipeline_approval') {
@@ -86,7 +85,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 NULL as contractor_name,
                 NULL as staff_id,
                 NULL as staff_name,
-                pa.document_url,
+                COALESCE(pa.approval_document_url, pa.application_document_url) as document_url,
                 pa.status
               FROM pipeline_project_approvals pa
               JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
@@ -112,7 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 NULL as contractor_name,
                 NULL as staff_id,
                 NULL as staff_name,
-                pa.document_url,
+                COALESCE(pa.approval_document_url, pa.application_document_url) as document_url,
                 pa.status
               FROM pipeline_project_approvals pa
               JOIN pipeline_projects pp ON pa.pipeline_project_id = pp.id
@@ -129,7 +128,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
-        queryErrors.push(`pipeline_approval: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'pipeline_approval', error: (err as Error).message });
       }
     }
@@ -142,19 +140,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             cd.id::text,
             'contractor_document' as source,
             cd.document_type,
-            CONCAT(cd.document_type, ' - ', COALESCE(s.company_name, s.name)) as document_name,
+            CONCAT(cd.document_type, ' - ', COALESCE(c.company_name, c.contact_person)) as document_name,
             cd.expiry_date,
             (cd.expiry_date::date - CURRENT_DATE)::int as days_until_expiry,
             NULL as project_id,
             NULL as project_name,
             cd.contractor_id::text,
-            COALESCE(s.company_name, s.name) as contractor_name,
+            COALESCE(c.company_name, c.contact_person) as contractor_name,
             NULL as staff_id,
             NULL as staff_name,
             cd.file_url as document_url,
             cd.status
           FROM contractor_documents cd
-          JOIN suppliers s ON cd.contractor_id = s.id
+          JOIN contractors c ON cd.contractor_id = c.id
           WHERE cd.expiry_date IS NOT NULL
             AND cd.expiry_date <= CURRENT_DATE + $1::int
           ORDER BY cd.expiry_date ASC`,
@@ -166,7 +164,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
-        queryErrors.push(`contractor_document: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'contractor_document', error: (err as Error).message });
       }
     }
@@ -186,7 +183,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 ca.project_id::text,
                 p.project_name,
                 ca.contractor_id::text,
-                COALESCE(c.company_name, c.name) as contractor_name,
+                COALESCE(c.company_name, c.contact_person) as contractor_name,
                 NULL as staff_id,
                 NULL as staff_name,
                 ca.signed_document_url as document_url,
@@ -212,7 +209,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 ca.project_id::text,
                 p.project_name,
                 ca.contractor_id::text,
-                COALESCE(c.company_name, c.name) as contractor_name,
+                COALESCE(c.company_name, c.contact_person) as contractor_name,
                 NULL as staff_id,
                 NULL as staff_name,
                 ca.signed_document_url as document_url,
@@ -232,7 +229,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
-        queryErrors.push(`agreement: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'agreement', error: (err as Error).message });
       }
     }
@@ -294,7 +290,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
-        queryErrors.push(`project_requirement: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'project_requirement', error: (err as Error).message });
       }
     }
@@ -307,7 +302,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             sd.id::text,
             'staff_document' as source,
             sd.document_type,
-            CONCAT(sd.document_type, ' - ', COALESCE(s.first_name || ' ' || s.last_name, u.name)) as document_name,
+            CONCAT(sd.document_type, ' - ', COALESCE(s.first_name || ' ' || s.last_name, u.first_name || ' ' || u.last_name)) as document_name,
             sd.expiry_date,
             (sd.expiry_date::date - CURRENT_DATE)::int as days_until_expiry,
             NULL as project_id,
@@ -315,7 +310,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             NULL as contractor_id,
             NULL as contractor_name,
             sd.staff_id::text,
-            COALESCE(s.first_name || ' ' || s.last_name, u.name) as staff_name,
+            COALESCE(s.first_name || ' ' || s.last_name, u.first_name || ' ' || u.last_name) as staff_name,
             sd.file_url as document_url,
             sd.verification_status as status
           FROM staff_documents sd
@@ -332,7 +327,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           urgency: calculateUrgency(Number(row.days_until_expiry)),
         })) as ExpiringDocument[]);
       } catch (err) {
-        queryErrors.push(`staff_document: ${(err as Error).message}`);
         log.warn('ExpiringDocuments', { source: 'staff_document', error: (err as Error).message });
       }
     }
@@ -378,7 +372,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       by_urgency: byUrgency,
       by_source: bySource,
       all: documents,
-      _debug: { queryErrors, daysAhead, projectIdStr, sourceFilter: source || null },
     });
   } catch (error) {
     log.error('ExpiringDocuments', { error: (error as Error).message });
