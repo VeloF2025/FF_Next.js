@@ -91,7 +91,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       subtext: `${data.boqsApproved} approved, ${data.boqsDraft} draft`,
       icon: 'document',
       color: 'blue',
-      link: `/procurement/boq?project=${projectId}`,
+      link: `/app/procurement/boq?project=${projectId}`,
     },
     {
       id: 'rfq',
@@ -101,7 +101,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       badge: data.pendingRFQs > 0 ? data.pendingRFQs : undefined,
       icon: 'mail',
       color: 'purple',
-      link: `/procurement/rfq?project=${projectId}`,
+      link: `/app/procurement/rfq?project=${projectId}`,
     },
     {
       id: 'po',
@@ -111,7 +111,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       badge: data.pendingPOs > 0 ? data.pendingPOs : undefined,
       icon: 'shopping-cart',
       color: 'green',
-      link: `/procurement/purchase-orders?project=${projectId}`,
+      link: `/app/procurement/orders?project=${projectId}`,
     },
     {
       id: 'grn',
@@ -121,7 +121,7 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       badge: data.pendingGRNs > 0 ? data.pendingGRNs : undefined,
       icon: 'truck',
       color: 'orange',
-      link: `/procurement/grn?project=${projectId}`,
+      link: `/app/procurement/stock/goods-receipt?project=${projectId}`,
     },
   ];
 
@@ -188,19 +188,19 @@ export function ProjectProcurementTab({ projectId }: ProjectProcurementTabProps)
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-4">
         <button
-          onClick={() => router.push(`/procurement/boq/new?project=${projectId}`)}
+          onClick={() => router.push(`/app/procurement/boq/create?project=${projectId}`)}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
         >
           Create BOQ
         </button>
         <button
-          onClick={() => router.push(`/procurement/rfq/new?project=${projectId}`)}
+          onClick={() => router.push(`/app/procurement/rfq/create?project=${projectId}`)}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
         >
           Create RFQ
         </button>
         <button
-          onClick={() => router.push(`/procurement?project=${projectId}`)}
+          onClick={() => router.push(`/app/procurement?project=${projectId}`)}
           className="px-4 py-2 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg text-sm font-medium transition-colors"
         >
           View All Procurement

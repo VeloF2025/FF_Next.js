@@ -63,7 +63,7 @@ export function getAllowedTransitions(from: SerialStatusValue): SerialStatusValu
 // ── Core transition ─────────────────────────────────────────────────────────
 
 export async function transitionSerial(params: SerialTransitionParams): Promise<SerialTransitionResult> {
-  const { serialId, toStatus, performedBy, performedByName, reason, locationId, faultReportId } = params;
+  const { serialId, toStatus, performedBy, performedByName, reason, locationId, faultReportId, pickingId } = params;
 
   try {
     // 1. Fetch current status
@@ -71,7 +71,6 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
       SELECT id, serial_number AS "serialNumber", status, current_location_id AS "currentLocationId"
       FROM stock_serials
       WHERE id = ${serialId}
-      FOR UPDATE
     `;
 
     if (rows.length === 0) {
@@ -94,11 +93,11 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
       };
     }
 
-    // 3. Update serial
+    // 3. Atomic UPDATE with WHERE status check (prevents race conditions without transaction)
     const newLocationId = locationId ?? current.currentLocationId;
     const newFaultReportId = toStatus === 'faulty' ? (faultReportId ?? null) : null;
 
-    await sql`
+    const updated = await sql`
       UPDATE stock_serials
       SET
         previous_status     = status,
@@ -109,9 +108,16 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
         fault_report_id     = ${newFaultReportId},
         updated_at          = NOW()
       WHERE id = ${serialId}
+        AND status = ${current.status}
+      RETURNING id
     `;
 
+    if (updated.length === 0) {
+      return { success: false, error: 'Concurrent modification detected — serial status changed between read and update. Please retry.' };
+    }
+
     // 4. Insert audit log
+    const changedFields = ['status', 'current_location_id'];
     await sql`
       INSERT INTO audit_logs (
         entity_type, entity_id, action,
@@ -123,7 +129,7 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
         'update',
         ${JSON.stringify({ status: current.status, currentLocationId: current.currentLocationId })}::jsonb,
         ${JSON.stringify({ status: toStatus, currentLocationId: newLocationId })}::jsonb,
-        ${`{status,current_location_id}`},
+        ${changedFields},
         ${performedBy}::uuid,
         ${performedByName},
         ${reason ?? null}
@@ -131,6 +137,7 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
     `;
 
     // 5. Insert movement record
+    const movementType = `status_transition:${current.status}->${toStatus}`;
     await sql`
       INSERT INTO field_stock_movements (
         serial_id, movement_type,
@@ -139,10 +146,10 @@ export async function transitionSerial(params: SerialTransitionParams): Promise<
         performed_by, performed_at
       ) VALUES (
         ${serialId}::uuid,
-        ${`status_transition:${current.status}->${toStatus}`},
+        ${movementType},
         ${current.currentLocationId},
         ${newLocationId},
-        ${params.pickingId ?? null},
+        ${pickingId ?? null},
         ${reason ?? null},
         ${performedBy},
         NOW()

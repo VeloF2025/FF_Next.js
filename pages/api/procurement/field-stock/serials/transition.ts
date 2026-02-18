@@ -7,7 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import {
   transitionSerial,
   isTransitionAllowed,
@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
-  const user = (req as NextApiRequest & { user: { id: string; name: string; role: string } }).user;
+  const user = (req as AuthenticatedNextApiRequest).user;
   const { serialId, toStatus, reason, locationId, faultReportId, pickingId } = req.body;
 
   // Validate required fields

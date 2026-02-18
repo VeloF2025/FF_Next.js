@@ -209,7 +209,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
               ON CONFLICT (rfq_id, supplier_id) DO NOTHING
             `;
           } catch (e) {
-            // Skip invalid supplier IDs
+            log.warn('Skipping invalid supplier ID during RFQ update', { data: { rfqId: id, error: String(e) } }, 'rfq');
           }
         }
       }

@@ -15,14 +15,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const { projectId } = req.query;
+    const pid = typeof projectId === 'string' ? projectId : undefined;
 
-    const [boqCount, rfqCount, quoteCount, poCount, stockAlerts] = await Promise.all([
-      sql`SELECT COUNT(*)::int as count FROM boqs WHERE status IN ('draft', 'review') ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,
-      sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'open' ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,
-      sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'closed' ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,
-      sql`SELECT COUNT(*)::int as count FROM purchase_orders WHERE status = 'pending' ${projectId ? sql`AND project_id = ${projectId as string}` : sql``}`,
-      sql`SELECT COUNT(*)::int as count FROM stock_items WHERE quantity <= min_stock_level AND min_stock_level > 0`,
-    ]);
+    const [boqCount, rfqCount, quoteCount, poCount, stockAlerts] = pid
+      ? await Promise.all([
+          sql`SELECT COUNT(*)::int as count FROM boqs WHERE status IN ('draft', 'review') AND project_id = ${pid}`,
+          sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'open' AND project_id = ${pid}`,
+          sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'closed' AND project_id = ${pid}`,
+          sql`SELECT COUNT(*)::int as count FROM purchase_orders WHERE status = 'pending' AND project_id = ${pid}`,
+          sql`SELECT COUNT(*)::int as count FROM stock_items WHERE qty_available <= min_stock_level AND min_stock_level > 0`,
+        ])
+      : await Promise.all([
+          sql`SELECT COUNT(*)::int as count FROM boqs WHERE status IN ('draft', 'review')`,
+          sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'open'`,
+          sql`SELECT COUNT(*)::int as count FROM rfqs WHERE status = 'closed'`,
+          sql`SELECT COUNT(*)::int as count FROM purchase_orders WHERE status = 'pending'`,
+          sql`SELECT COUNT(*)::int as count FROM stock_items WHERE qty_available <= min_stock_level AND min_stock_level > 0`,
+        ]);
 
     const badges: Record<string, { count: number; type: string }> = {};
 
@@ -44,7 +53,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.success(res, badges);
   } catch (error) {
     log.error('Failed to fetch tab badges', { data: error }, 'procurement/tab-badges');
-    return apiResponse.error(res, 'Failed to fetch tab badges');
+    return apiResponse.internalError(res, error);
   }
 }
 

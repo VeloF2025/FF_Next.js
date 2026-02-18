@@ -8,15 +8,16 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { createStockMatcher } from '@/services/procurement/import/stockMatcher';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return apiResponse.error(res, 'METHOD_NOT_ALLOWED', 'POST only');
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { boqId } = req.body;
   if (!boqId) {
-    return apiResponse.error(res, 'BAD_REQUEST', 'boqId is required');
+    return apiResponse.badRequest(res, 'boqId is required');
   }
 
   try {
@@ -75,6 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   } catch (error) {
     log.error('Stock rematch failed', { error, boqId });
-    return apiResponse.error(res, 'INTERNAL_ERROR', 'Failed to rematch stock items');
+    return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import type { RFQStatusType } from '../../../../src/types/procurement/rfq.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';
+import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '../../../../src/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 
@@ -276,7 +277,7 @@ export default withAuth(withErrorHandler(async (
               insertedSuppliers.push(result[0]);
             }
           } catch (e) {
-            // Skip invalid supplier IDs
+            log.warn('Skipping invalid supplier ID during RFQ creation', { data: { supplierId, error: String(e) } }, 'rfq');
           }
         }
       }
@@ -310,7 +311,7 @@ export default withAuth(withErrorHandler(async (
             ON CONFLICT DO NOTHING
           `;
         } catch (e) {
-          // Non-critical - don't fail if link creation fails
+          log.warn('Non-critical: boq_rfq_links creation failed', { data: { sourceBoqId, rfqId, error: String(e) } }, 'rfq');
         }
       }
 

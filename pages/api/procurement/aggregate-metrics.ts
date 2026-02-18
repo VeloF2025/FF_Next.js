@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Stock metrics
       sql`SELECT
         COUNT(*)::int as total_stock_items,
-        COUNT(*) FILTER (WHERE quantity <= min_stock_level AND min_stock_level > 0)::int as low_stock_items
+        COUNT(*) FILTER (WHERE qty_available <= min_stock_level AND min_stock_level > 0)::int as low_stock_items
         FROM stock_items`,
 
       // Supplier metrics
@@ -95,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ) po ON true
       LEFT JOIN LATERAL (
         SELECT COUNT(*) as low_count
-        FROM stock_items WHERE quantity <= min_stock_level AND min_stock_level > 0
+        FROM stock_items WHERE qty_available <= min_stock_level AND min_stock_level > 0
       ) stock_alerts ON true
       WHERE p.status = 'active'
       ORDER BY p.project_name
@@ -139,7 +139,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     log.error('Failed to fetch aggregate metrics', { data: error }, 'procurement/aggregate-metrics');
-    return apiResponse.error(res, 'Failed to fetch aggregate metrics');
+    return apiResponse.internalError(res, error);
   }
 }
 
