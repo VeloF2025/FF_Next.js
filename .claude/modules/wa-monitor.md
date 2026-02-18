@@ -37,9 +37,10 @@ wa-feedback:8092    │  • /send-message         │  • DR submissions      
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| `whatsapp-bridge` | 8083 | **UNIFIED** - Send + Receive + Groups from DB |
-| `whatsapp-sender` | 8081 | **ACTIVE** - Direct message sending (used for manual acks) |
+| `whatsapp-bridge` | 8083 | **UNIFIED** - Send + Receive + Groups from DB (direct-send via whatsmeow client) |
 | `wa-command-bot` | 8086 | **COMMANDS** - `!status`, `!restart` from admin groups |
+
+> **Note:** `whatsapp-sender` (port 8081) was **permanently disabled** on 2026-02-18. ACKs are now sent directly through the bridge's own WhatsApp client — no external sender needed. This eliminates WebSocket session conflicts and the single-point-of-failure sender dependency.
 
 ```bash
 ssh root@72.61.197.178
@@ -126,7 +127,7 @@ Infrastructure management via WhatsApp commands from admin groups.
 | `!pending` | Show pending approvals |
 | `!approve <token>` | Approve dangerous action |
 
-**Service Aliases:** `vlm`, `qfield`, `production`, `staging`, `dev`, `grafana`, `portainer`, `pdfcraft`, `wa-feedback`, `wa-bridge`, `wa-sender`
+**Service Aliases:** `vlm`, `qfield`, `production`, `staging`, `dev`, `grafana`, `portainer`, `pdfcraft`, `wa-feedback`, `wa-bridge`
 
 **How it works:**
 1. Bot polls SQLite (`/opt/whatsapp-bridge/store/messages.db`) every 2 seconds
@@ -258,12 +259,12 @@ systemctl start whatsapp-bridge
 
 # Bridge source on Velocity (100.96.203.105)
 sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
-cd /home/louis/whatsapp-bridge-go
+cd /home/velo/whatsapp-bridge
 # Edit main.go or sender_proxy.go, then compile:
 go build -o whatsapp-bridge-new .
 
 # Deploy binary (relay via local machine — servers can't SSH to each other)
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/velo/whatsapp-bridge/whatsapp-bridge-new /tmp/
 scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
 
 # Deploy on VPS (MUST stop service first)
@@ -293,12 +294,12 @@ ACK_DATA=$(curl -s -X POST "https://app.fibreflow.app/api/activate/dr-acknowledg
 MESSAGE=$(echo "$ACK_DATA" | jq -r '.data.message')
 echo "$MESSAGE"
 
-# 3. Send to correct group (use JID from Monitored Groups above)
-curl -s -X POST http://72.61.197.178:8081/send-message \
+# 3. Send to correct group via bridge (use JID from Monitored Groups above)
+curl -s -X POST http://72.61.197.178:8083/send-message \
   -H "Content-Type: application/json" \
   -d "{
     \"group_jid\": \"120363418298130331@g.us\",
-    \"recipient_jid\": \"0@s.whatsapp.net\",
+    \"mention_jid\": \"0@s.whatsapp.net\",
     \"message\": $(echo "$MESSAGE" | jq -Rs .)
   }"
 ```
@@ -350,16 +351,16 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": 
 \		\"project_name\":       \"Project\",\\
 \		\"group_description\": \"Description\",\\
 \	},
-' /home/louis/whatsapp-bridge-go/main.go"
+' /home/velo/whatsapp-bridge/main.go"
 ```
 
 **Step 4: Compile and Deploy**
 ```bash
 # Compile on Velocity
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && echo '$VELO_SSH_PASSWORD' | sudo -S go build -o whatsapp-bridge-new ."
+sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/whatsapp-bridge && echo '$VELO_SSH_PASSWORD' | sudo -S go build -o whatsapp-bridge-new ."
 
 # Copy via local machine (servers can't SSH to each other)
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge-new /tmp/
+sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/velo/whatsapp-bridge/whatsapp-bridge-new /tmp/
 scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
 
 # Deploy and restart on VPS
@@ -448,18 +449,18 @@ All components use semi-transparent dark-compatible colors:
 - Root cause of DR474666: Sheets error (no tab configured) → API 500 → no ack
 - Functions still exist as dead code, just not called
 
-**3. Dedup TTL Reduction** (`sender_proxy.go`)
-- Changed `msgCacheTTL` from 10 minutes → 90 seconds
-- Fixes: Legitimate resubmission acks blocked (e.g., DR1730948 blocked after 2m20s)
-- Still prevents infinite loops while allowing genuine resubmissions
+**3. Direct-Send via Bridge Client** (`sender_proxy.go`)
+- ACKs sent directly through the bridge's own whatsmeow WhatsApp client (2026-02-18)
+- No external sender service needed — eliminates WebSocket session conflicts
+- Dedup TTL = 90 seconds to prevent duplicate sends while allowing genuine resubmissions
 
 ### Bridge Log Notes
 - **No date stamps** - cross-reference with `qa_photo_reviews.created_at` for date ranges
 - Logs at `/opt/whatsapp-bridge/bridge.log` on VPS
 
 ### Key Bridge Files
-- Source: `/home/louis/whatsapp-bridge-go/main.go` (Velocity)
-- Sender proxy: `/home/louis/whatsapp-bridge-go/sender_proxy.go` (Velocity)
+- Source: `/home/velo/whatsapp-bridge/main.go` (Velocity)
+- Direct-send: `/home/velo/whatsapp-bridge/sender_proxy.go` (Velocity) — sends ACKs via bridge's own whatsmeow client
 - Binary: `/opt/whatsapp-bridge/whatsapp-bridge` (VPS)
 
 ## Troubleshooting Quick Reference
@@ -467,20 +468,12 @@ All components use semi-transparent dark-compatible colors:
 ### Error Code 1033 (Neon Timeout)
 When logs show `[ACK WARN] Acknowledgment API returned 530: error code: 1033`:
 1. **Cause**: Transient Neon PostgreSQL timeout
-2. **Fix**: Restart services: `ssh root@72.61.197.178 "systemctl restart whatsapp-sender whatsapp-bridge"`
+2. **Fix**: Restart bridge: `ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"`
 3. **Manual acks**: See `.claude/knowledge-base/wa-monitor/troubleshooting-acks.md`
 4. **Now auto-retries**: Bridge now retries 3 times with exponential backoff (Feb 2026)
 
-### WA Sender Endpoint (Port 8081)
-```bash
-curl -s http://72.61.197.178:8081/send-message -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"group_jid":"GROUP@g.us","recipient_jid":"USER@lid","message":"text"}'
-```
-**Required**: `group_jid`, `recipient_jid`, `message`
-
 ### WebSocket EOF Errors
-Normal behavior - auto-reconnect handles these. Only worry if constant or messages not delivering.
+Since sender was disabled (2026-02-18), WebSocket EOFs should be rare. If they return constantly, check if another service is using the same WhatsApp session.
 
 ## Related Documentation
 - `src/modules/wa-monitor/README.md` - Full module documentation
