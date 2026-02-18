@@ -16,7 +16,8 @@ Update the FibreFlow knowledge base by scanning modules and refreshing context f
 2. **Check Coverage** - Identify modules missing `.claude.md`
 3. **Generate Context** - Create `.claude.md` for missing modules
 4. **Consolidate Learnings** - Move `.claude-learnings.md` entries to permanent KB
-5. **Update Session** - Record KB update in session state
+5. **Qdrant Ingestion** - Push all KB sources into Qdrant vector DB on Velocity
+6. **Update Session** - Record KB update in session state
 
 ## Execution Steps
 
@@ -64,7 +65,26 @@ Update `.claude/session/current.json`:
 }
 ```
 
-### Step 5: Report Results
+### Step 5: Qdrant Vector DB Ingestion
+Push all KB markdown sources + DB schema into the Qdrant vector database on Velocity.
+This keeps the vector search in sync with local knowledge files.
+
+```bash
+# Full re-ingestion (recommended during /kb)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && python3 scripts/ingest-qdrant.py --force 2>&1"
+```
+
+The script:
+- Scans `docs/*.md`, `.claude/modules/*.md`, `.claude/knowledge-base/**/*.md`, `src/modules/*/.claude.md`
+- Chunks by `##` headings (~800 word chunks with paragraph overlap)
+- Embeds with OpenAI `text-embedding-3-small` (1536-dim)
+- Upserts into Qdrant collection `fibreflow_kb` at `localhost:6333`
+- Also ingests DB schema from `information_schema`
+- Uses deterministic point IDs (source + chunk_index hash) so re-runs replace, not duplicate
+
+Flags: `--force` (re-ingest all), `--source <path>` (single file), `--dry-run` (count only).
+
+### Step 6: Report Results
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║                    KB UPDATE COMPLETE                        ║
@@ -72,6 +92,8 @@ Update `.claude/session/current.json`:
 ║ Modules scanned:        41                                   ║
 ║ With .claude.md:        41 (100%)                            ║
 ║ Learnings consolidated: 0                                    ║
+║ Qdrant chunks ingested: 8761                                 ║
+║ Qdrant collection:      fibreflow_kb (green)                 ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
@@ -83,3 +105,4 @@ Update `.claude/session/current.json`:
 | `.claude/templates/module-claude-md.template` | Template |
 | `src/modules/*/.claude.md` | Module context |
 | `src/modules/*/.claude-learnings.md` | Auto-captured learnings |
+| `scripts/ingest-qdrant.py` | Qdrant vector DB ingestion script |
