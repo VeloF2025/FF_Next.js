@@ -358,11 +358,10 @@ export class DashboardStatsService {
       const stats = await this.getDashboardStats();
       
       // Map trends from API response
+      // Note: analyticsApi.fetch() unwraps data.data, so trendsData is already
+      // the flat trend object { activeProjects: {value,direction,percentage}, ... }
       Object.entries(stats).forEach(([key, value]) => {
-        const trendObj = trendsData.data?.[key] ||
-                        trendsData.projects?.trends?.[key] ||
-                        trendsData.revenue?.trends?.[key] ||
-                        trendsData.staff?.trends?.[key];
+        const trendObj = trendsData?.[key];
 
         trends[key] = {
           value: typeof value === 'number' ? value : 0,
