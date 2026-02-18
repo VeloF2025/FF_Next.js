@@ -9,7 +9,7 @@
  * - OneMap API (photo storage)
  * - VLM Server (Qwen3 for categorization)
  * - WhatsApp Bridge (via recent activity)
- * - WhatsApp Sender (for Send Feedback feature)
+ * - WhatsApp Feedback (wa-feedback proxy to bridge)
  * - SharePoint (DR photo sync to SharePoint)
  */
 

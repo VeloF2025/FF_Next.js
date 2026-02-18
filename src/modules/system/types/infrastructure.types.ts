@@ -77,7 +77,6 @@ export interface SystemHealthResponse {
 
   messaging: {
     waFeedback: ServiceStatus;
-    waSenderVPS: ServiceStatus;
     waBridgeVPS: ServiceStatus;
   };
 

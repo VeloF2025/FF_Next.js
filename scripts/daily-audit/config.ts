@@ -24,7 +24,6 @@ export interface AuditConfig {
   services: {
     vlm: { url: string; healthPath: string };
     waBridge: { url: string; healthPath: string };
-    waSender: { url: string; healthPath: string };
     vfStorage: { url: string; healthPath: string };
     qfieldSync: { url: string; healthPath: string };
     oneMap: { baseUrl: string; testEndpoint: string };
@@ -115,10 +114,6 @@ export const config: AuditConfig = {
     },
     waBridge: {
       url: 'http://72.61.197.178:8083',
-      healthPath: '/health',
-    },
-    waSender: {
-      url: 'http://72.61.197.178:8081',
       healthPath: '/health',
     },
     vfStorage: {

@@ -254,9 +254,8 @@ export function InfrastructureHealthDashboard() {
               <MessageSquare className="w-5 h-5 text-green-400" />
               <h3 className="text-lg font-semibold text-white">Messaging Services</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ServiceStatusCard name="WA Feedback" status={health.messaging.waFeedback} isCritical />
-              <ServiceStatusCard name="WA Sender (VPS)" status={health.messaging.waSenderVPS} isCritical />
               <ServiceStatusCard name="WA Bridge (VPS)" status={health.messaging.waBridgeVPS} isCritical />
             </div>
           </section>

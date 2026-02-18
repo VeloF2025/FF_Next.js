@@ -46,12 +46,6 @@ const services: ServiceConfig[] = [
     priority: 'P0',
   },
   {
-    name: 'WhatsApp Sender',
-    url: config.services.waSender.url,
-    healthPath: config.services.waSender.healthPath,
-    priority: 'P0',
-  },
-  {
     name: 'VF Storage',
     url: config.services.vfStorage.url,
     healthPath: config.services.vfStorage.healthPath,

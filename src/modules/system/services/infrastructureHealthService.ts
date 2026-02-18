@@ -38,7 +38,6 @@ const SERVICE_ENDPOINTS = {
   },
   messaging: {
     waFeedback: { url: `http://${VELOCITY_HOST}:8092/health`, timeout: 10000 },
-    waSenderVPS: { url: `http://${VPS_HOST}:8081/health`, timeout: 15000 },
     waBridgeVPS: { url: `http://${VPS_HOST}:8083/health`, timeout: 15000 },
   },
   infrastructure: {
@@ -396,7 +395,6 @@ export async function performHealthCheck(
     qdrantStatus,
     // Messaging
     waFeedbackStatus,
-    waSenderVPSStatus,
     waBridgeVPSStatus,
     // Infrastructure
     pdfcraftStatus,
@@ -420,7 +418,6 @@ export async function performHealthCheck(
     checkHttpEndpoint(SERVICE_ENDPOINTS.ai.qdrant.url, SERVICE_ENDPOINTS.ai.qdrant.timeout),
     // Messaging
     checkHttpEndpoint(SERVICE_ENDPOINTS.messaging.waFeedback.url, SERVICE_ENDPOINTS.messaging.waFeedback.timeout),
-    checkHttpEndpoint(SERVICE_ENDPOINTS.messaging.waSenderVPS.url, SERVICE_ENDPOINTS.messaging.waSenderVPS.timeout),
     checkHttpEndpoint(SERVICE_ENDPOINTS.messaging.waBridgeVPS.url, SERVICE_ENDPOINTS.messaging.waBridgeVPS.timeout),
     // Infrastructure
     checkHttpEndpoint(SERVICE_ENDPOINTS.infrastructure.pdfcraft.url, SERVICE_ENDPOINTS.infrastructure.pdfcraft.timeout),
@@ -466,7 +463,6 @@ export async function performHealthCheck(
     ollamaStatus,
     qdrantStatus,
     waFeedbackStatus,
-    waSenderVPSStatus,
     waBridgeVPSStatus,
     pdfcraftStatus,
     grafanaStatus,
@@ -516,7 +512,6 @@ export async function performHealthCheck(
 
     messaging: {
       waFeedback: waFeedbackStatus,
-      waSenderVPS: waSenderVPSStatus,
       waBridgeVPS: waBridgeVPSStatus,
     },
 

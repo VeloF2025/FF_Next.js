@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/modules/dashboard/Dashboard';
 import { RefreshCw } from 'lucide-react';
@@ -78,6 +79,9 @@ function ClientDashboard() {
 export default function DashboardPage() {
   return (
     <AppLayout>
+      <Head>
+        <title>Dashboard | FibreFlow</title>
+      </Head>
       <ClientDashboard />
     </AppLayout>
   );
