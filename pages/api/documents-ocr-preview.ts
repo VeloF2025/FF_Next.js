@@ -654,9 +654,10 @@ async function handler(
       storagePaths.push(uploadResult.path);
 
       // Convert to internal URL for OCR service
+      // Public URLs use /storage/ prefix (nginx proxy), but internal VF Storage serves without it
       let fileUrl = uploadResult.url;
       if (fileUrl.includes('vf.fibreflow.app')) {
-        const urlPath = new URL(fileUrl).pathname;
+        const urlPath = new URL(fileUrl).pathname.replace(/^\/storage/, '');
         fileUrl = `${VF_STORAGE_INTERNAL_URL}${urlPath}`;
         log.info('Converted public URL to internal for OCR', { original: uploadResult.url, internal: fileUrl });
       }
