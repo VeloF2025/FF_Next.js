@@ -2,7 +2,7 @@
  * Stock Core Types - Main stock position and movement definitions
  */
 
-import { StockStatusType, MovementTypeType, MovementStatusType, ItemStatusType, QualityCheckStatusType } from './enums.types';
+import { StockStatusType, MovementTypeType, MovementStatusType, ItemStatusType, QualityCheckStatusType, SerialStatusValue, BinTypeValue } from './enums.types';
 
 // Stock Position interface matching database schema
 export interface StockPosition {
@@ -118,8 +118,68 @@ export interface StockMovementItem {
   qualityCheckRequired: boolean;
   qualityCheckStatus?: QualityCheckStatusType;
   qualityNotes?: string;
-  
+
   // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============= Serial & Bin Types =============
+
+/** Represents a state transition for a serialized item */
+export interface SerialStateTransition {
+  fromStatus: SerialStatusValue;
+  toStatus: SerialStatusValue;
+  triggeredBy: string;
+  reason?: string;
+  faultReportId?: string;
+}
+
+/** Stock serial record — individual serialized unit */
+export interface StockSerial {
+  id: string;
+  stockPositionId: string;
+  projectId: string;
+
+  // Serial Details
+  serialNumber: string;
+  itemCode: string;
+  itemName?: string;
+
+  // Status
+  status: SerialStatusValue;
+
+  // Location
+  binId?: string;
+  binType?: BinTypeValue;
+  assignedTo?: string;
+
+  // Provenance
+  purchaseOrderId?: string;
+  grnId?: string;
+  batchNumber?: string;
+  supplierId?: string;
+
+  // Installation
+  installedAt?: Date;
+  installedBy?: string;
+  installedLocation?: string;
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage bin / location record */
+export interface StockBin {
+  id: string;
+  projectId: string;
+  binCode: string;
+  binName: string;
+  binType: BinTypeValue;
+  parentBinId?: string;
+  assignedTo?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

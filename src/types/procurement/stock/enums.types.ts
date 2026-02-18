@@ -83,3 +83,47 @@ export type CurrencyType = 'USD' | 'EUR' | 'GBP' | 'ZAR';
 
 // Unit of Measure (legacy compatibility)
 export type UnitOfMeasure = string;
+
+// ============= Serial Tracking Enums =============
+
+// Serial item lifecycle status
+export enum SerialStatus {
+  AVAILABLE = 'available',
+  RESERVED = 'reserved',
+  ISSUED = 'issued',
+  IN_TRANSIT = 'in_transit',
+  INSTALLED = 'installed',
+  FAULTY = 'faulty',
+  RETURNED = 'returned',
+  SCRAPPED = 'scrapped',
+}
+
+export type SerialStatusValue =
+  | 'available'
+  | 'reserved'
+  | 'issued'
+  | 'in_transit'
+  | 'installed'
+  | 'faulty'
+  | 'returned'
+  | 'scrapped';
+
+// Storage bin / location type
+export enum BinType {
+  MAIN = 'main',
+  DEPARTMENT = 'department',
+  PROJECT = 'project',
+  TECHNICIAN = 'technician',
+  IN_TRANSIT = 'in_transit',
+  FAULTY = 'faulty',
+  QUARANTINE = 'quarantine',
+}
+
+export type BinTypeValue =
+  | 'main'
+  | 'department'
+  | 'project'
+  | 'technician'
+  | 'in_transit'
+  | 'faulty'
+  | 'quarantine';
