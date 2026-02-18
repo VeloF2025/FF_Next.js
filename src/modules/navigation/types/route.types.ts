@@ -20,7 +20,8 @@ export type ModuleId =
   | 'people'
   | 'analytics'
   | 'communications'
-  | 'system';
+  | 'system'
+  | 'construction-qa';
 
 /**
  * Badge types for tabs

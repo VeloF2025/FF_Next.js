@@ -2,7 +2,7 @@
  * Field Operations section configuration
  */
 
-import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck, CheckSquare } from 'lucide-react';
+import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck, CheckSquare, HardHat } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
@@ -10,6 +10,14 @@ export const fieldOperationsSection: NavSection = {
   sectionId: 'field-ops',
   isCollapsible: true,
   items: [
+    {
+      to: '/construction-qa',
+      icon: HardHat,
+      label: 'Construction QA',
+      shortLabel: 'CQA',
+      permissions: [],
+      rbacKey: 'field',
+    },
     {
       to: '/qfield/qa',
       icon: CheckSquare,

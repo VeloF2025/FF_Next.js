@@ -11,6 +11,7 @@ import { procurementConfig } from './modules/procurement.config';
 import { activateConfig } from './modules/activate.config';
 import { staffConfig } from './modules/staff.config';
 import { projectsConfig } from './modules/projects.config';
+import { constructionQaConfig } from './modules/construction-qa.config';
 
 // Register all module configs
 registerModuleConfig(maintenanceConfig);
@@ -20,6 +21,7 @@ registerModuleConfig(procurementConfig);
 registerModuleConfig(activateConfig);
 registerModuleConfig(staffConfig);
 registerModuleConfig(projectsConfig);
+registerModuleConfig(constructionQaConfig);
 
 // Re-export everything
 export {
@@ -38,3 +40,4 @@ export { procurementConfig };
 export { activateConfig };
 export { staffConfig };
 export { projectsConfig };
+export { constructionQaConfig };
