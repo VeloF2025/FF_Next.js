@@ -266,7 +266,10 @@ def main():
         sys.exit(1)
 
     from qdrant_client import QdrantClient
-    from qdrant_client.models import PointStruct, Distance, VectorParams
+    from qdrant_client.models import (
+        PointStruct, Distance, VectorParams,
+        FilterSelector, Filter, FieldCondition, MatchValue,
+    )
 
     client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
@@ -329,9 +332,11 @@ def main():
         if args.force:
             client.delete(
                 collection_name=COLLECTION,
-                points_selector={
-                    "filter": {"must": [{"key": "source", "match": {"value": source_id}}]}
-                },
+                points_selector=FilterSelector(
+                    filter=Filter(
+                        must=[FieldCondition(key="source", match=MatchValue(value=source_id))]
+                    )
+                ),
             )
 
         # Embed
@@ -373,9 +378,11 @@ def main():
                 if args.force:
                     client.delete(
                         collection_name=COLLECTION,
-                        points_selector={
-                            "filter": {"must": [{"key": "source", "match": {"value": "db-schema"}}]}
-                        },
+                        points_selector=FilterSelector(
+                            filter=Filter(
+                                must=[FieldCondition(key="source", match=MatchValue(value="db-schema"))]
+                            )
+                        ),
                     )
 
                 texts = [c["content"] for c in schema_chunks]
