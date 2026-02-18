@@ -1,6 +1,6 @@
 # FibreFlow Infrastructure Documentation
 
-> Last updated: 13 Feb 2026
+> Last updated: 18 Feb 2026
 
 ## Velocity Server
 
@@ -154,12 +154,14 @@ Automated health monitoring runs every 5 minutes on Velocity:
 
 ### WhatsApp Services
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `whatsapp-bridge.service` | - | Go bridge for WA messages |
-| `whatsapp-sender.service` | - | WA sender (082 418 9511) |
-| `wa-feedback.service` | 8090 | QA feedback microservice |
-| `bridge-proxy.service` | - | WA bridge DB proxy |
+| Service | Location | Port | Description |
+|---------|----------|------|-------------|
+| `whatsapp-bridge.service` | VPS | 8083 | Go bridge — inbound + outbound WA (direct-send, 063 841 2276) |
+| `wa-command-bot.service` | VPS | 8086 | Python admin bot for WA queries |
+| `wa-feedback.service` | Velocity | 8092 | QA feedback proxy → VPS bridge |
+
+**WA Sender (8081) was REMOVED Feb 2026** — bridge handles all sending directly via its own WhatsApp client.
+Legacy `whatsapp-sender.service` on Velocity (`/home/louis/whatsapp-sender/`) is orphaned and not used.
 
 ### Monitoring & Infrastructure
 
@@ -261,7 +263,7 @@ QFIELD_API_KEY=your_api_key
 | 6333 | Qdrant HTTP | Active |
 | 6334 | Qdrant gRPC | Active |
 | 8082 | QFieldCloud | Active |
-| 8090 | WA Feedback | Active |
+| 8092 | WA Feedback (proxy to VPS bridge) | Active |
 | 8091 | FibreFlow Storage | Active |
 | 8100 | VLM (Qwen3) | Active |
 | 9091 | Prometheus | Active |

@@ -159,5 +159,19 @@ All contractor modals/forms use FF design system CSS variables:
 - Detail/Edit pages: Full width with `p-6` (no `max-w-4xl`)
 - Back buttons: `inline-flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] px-3 py-1.5 -ml-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors`
 
+## Recent Changes (Feb 2026)
+
+### Agreement Generation Modal
+- Generate contractor agreements with configurable dates (`ecf961dd`)
+- Modal component for agreement parameters before PDF generation
+
+### Company Verification System
+- Added verification panel for onboarding Stage 2 (`b4e89f17`)
+- SearchWorks/CIPC automated checks
+
+### Security Hardening
+- CSP headers, magic byte validation, logger replacement (`2d6c206c`)
+- Cache revalidation + suspend/delete separation cleanup (`cdd6b164`)
+
 ## Related Modules
 - `contractor-documents-report.md` - Document compliance reporting

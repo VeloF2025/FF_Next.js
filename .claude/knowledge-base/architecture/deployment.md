@@ -101,10 +101,10 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 | Production | 3000 | `fibreflow-production.service` | Live app |
 | Staging | 3006 | `fibreflow.service` | Testing |
 | Dev | 3005 | `fibreflow-dev.service` | Development |
-| VLM | 8100 | `vlm.service` | AI analysis |
+| VLM | 8100 | `vllm-qwen.service` | AI analysis (Qwen3-VL-8B) |
 | QField Sync | 8095 | `qfield-sync.service` | GIS sync |
-| WA Proxy | 8092 | `wa-proxy.service` | WA routing |
-| VF Storage | 8091 | `vf-storage.service` | File proxy |
+| WA Feedback | 8092 | `wa-feedback.service` | WA message proxy → VPS bridge |
+| VF Storage | 8091 | `fibreflow-storage.service` | Fleet photo storage |
 
 **Access:**
 - `ssh velo@100.96.203.105` — SSH key auth from hein's workstation, sudo/root, ALL deploys
@@ -118,9 +118,10 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 | Service | Port | Systemd Unit | Purpose |
 |---------|------|--------------|---------|
 | Backup | 3005 | `fibreflow-backup.service` | Failover |
-| WA Sender | 8081 | `wa-sender.service` | Outbound WA |
-| WA Bridge | 8083 | `wa-bridge.service` | Inbound WA |
-| WA Bot | 8086 | `wa-bot.service` | Admin commands |
+| WA Bridge | 8083 | `whatsapp-bridge.service` | Inbound + outbound WA (direct-send, 063 841 2276) |
+| WA Command Bot | 8086 | `wa-command-bot.service` | Admin commands (Python) |
+
+**WA Sender (8081) was REMOVED Feb 2026** — bridge now sends directly via its own WhatsApp client.
 
 **Access**: `ssh root@72.61.197.178`
 
@@ -286,8 +287,8 @@ systemctl status fibreflow.service
 systemctl status fibreflow-dev.service
 
 # Check support services
-systemctl status vlm.service
-systemctl status wa-sender.service
+systemctl status vllm-qwen.service
+systemctl status wa-feedback.service
 ```
 
 ### Log Access
@@ -309,9 +310,11 @@ curl https://app.fibreflow.app/api/health
 # VLM health
 curl http://100.96.203.105:8100/health
 
-# WA services
-curl http://72.61.197.178:8081/health
+# WA Bridge (handles both inbound + outbound since Feb 2026)
 curl http://72.61.197.178:8083/health
+
+# WA Feedback proxy (Velocity)
+curl http://100.96.203.105:8092/health
 ```
 
 ## Build IDs
@@ -360,7 +363,7 @@ FIREBASE_CLIENT_EMAIL=...
 
 # External Services
 VLM_URL=http://100.96.203.105:8100
-WA_SENDER_URL=http://72.61.197.178:8081
+WA_BRIDGE_URL=http://72.61.197.178:8083
 ONEMAP_API_KEY=...
 RESEND_API_KEY=...
 
