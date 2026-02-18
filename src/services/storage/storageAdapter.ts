@@ -92,13 +92,8 @@ export class StorageAdapter {
     const path = `${type}/${category}/${actualFileName}`;
 
     // Always return public HTTPS URL for browser access
-    let url = result.url || result.publicUrl || `${VF_STORAGE_URL}/${path}`;
-    if (url.includes('100.96.203.105:8091')) {
-      url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
-    }
-    if (!url.startsWith('https://vf.fibreflow.app')) {
-      url = `https://vf.fibreflow.app/${path}`;
-    }
+    // Public URLs need /storage/ prefix (nginx proxy routes /storage/ → port 8091)
+    const url = `https://vf.fibreflow.app/storage/${path}`;
 
     return {
       success: true,

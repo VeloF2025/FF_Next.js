@@ -214,11 +214,10 @@ async function uploadToStorage(
 
   const result = await response.json() as { url: string; path: string };
 
-  // Convert internal IP URL to public HTTPS URL for browser access
-  let url = result.url;
-  if (url && url.includes('100.96.203.105:8091')) {
-    url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
-  }
+  // Build public HTTPS URL from storage path
+  // Public URLs need /storage/ prefix (nginx proxy routes /storage/ → port 8091)
+  const storagePath = result.path || result.url?.replace(/^https?:\/\/[^/]+\//, '');
+  const url = `https://vf.fibreflow.app/storage/${storagePath}`;
 
   return {
     url,

@@ -97,7 +97,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       }
 
       const uploadResult = await uploadResponse.json();
-      const fileUrl = uploadResult.url || uploadResult.path;
+      // Build public HTTPS URL from storage path
+      // Public URLs need /storage/ prefix (nginx proxy routes /storage/ → port 8091)
+      const storagePath = uploadResult.path || `devQueue/${itemId}/${file.name}`;
+      const fileUrl = `https://vf.fibreflow.app/storage/${storagePath}`;
 
       // Determine type based on mime type
       const mimeType = file.type;
