@@ -15,16 +15,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // Run all metric queries in parallel
-    const [
-      projectCounts,
-      boqMetrics,
-      rfqMetrics,
-      poMetrics,
-      stockMetrics,
-      supplierMetrics,
-      approvalMetrics,
-      projectSummaries
-    ] = await Promise.all([
+    // Use Promise.allSettled to identify which query fails
+    const results = await Promise.allSettled([
       // Total active projects
       sql`SELECT
         COUNT(*)::int as total_projects,
@@ -101,6 +93,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY p.project_name
       LIMIT 20`
     ]);
+
+    // Check for failures and log them
+    const failedQueries = results
+      .map((r, i) => r.status === 'rejected' ? { index: i, reason: String(r.reason) } : null)
+      .filter(Boolean);
+
+    if (failedQueries.length > 0) {
+      log.error('Aggregate metrics: some queries failed', { data: failedQueries }, 'procurement/aggregate-metrics');
+    }
+
+    // Extract values (default to empty array on failure)
+    const getValue = (idx: number) => results[idx]?.status === 'fulfilled' ? results[idx].value : [];
+    const projectCounts = getValue(0);
+    const boqMetrics = getValue(1);
+    const rfqMetrics = getValue(2);
+    const poMetrics = getValue(3);
+    const stockMetrics = getValue(4);
+    const supplierMetrics = getValue(5);
+    const approvalMetrics = getValue(6);
+    const projectSummaries = getValue(7);
 
     const metrics = {
       totalProjects: projectCounts[0]?.total_projects || 0,

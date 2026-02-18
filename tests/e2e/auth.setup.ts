@@ -1,68 +1,32 @@
 import { test as setup } from '@playwright/test';
 
 /**
- * Mock Authentication Setup for E2E Tests
- * Bypasses Clerk authentication by setting mock session data
+ * Authentication Setup for E2E Tests
+ * Logs in via the real /api/auth/login endpoint and saves the session cookie
  */
 
 const authFile = 'tests/e2e/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
-  // Navigate to the base URL
-  await page.goto('/');
+  // Login via API to get the auth cookie
+  const baseURL = setup.info().project.use?.baseURL || 'https://dev.fibreflow.app';
 
-  // Mock Clerk session by setting localStorage and cookies
-  await page.evaluate(() => {
-    // Mock Clerk session in localStorage
-    const mockClerkSession = {
-      id: 'test-session-id',
-      userId: 'test-user-id',
-      status: 'active',
-      lastActiveAt: Date.now(),
-      expireAt: Date.now() + 86400000, // 24 hours
-    };
-
-    const mockUser = {
-      id: 'test-user-id',
-      firstName: 'Test',
-      lastName: 'User',
-      emailAddresses: [
-        {
-          emailAddress: 'test@fibreflow.test',
-          id: 'test-email-id',
-        },
-      ],
-      primaryEmailAddressId: 'test-email-id',
-    };
-
-    // Store mock data in localStorage (Clerk uses __clerk prefix)
-    localStorage.setItem('__clerk_db_jwt', JSON.stringify({
-      jwt: 'mock-jwt-token',
-    }));
-
-    localStorage.setItem('__clerk_client', JSON.stringify({
-      sessions: [mockClerkSession],
-      activeSessionId: mockClerkSession.id,
-      signInAttempt: null,
-      signUpAttempt: null,
-    }));
-
-    localStorage.setItem('__clerk_user', JSON.stringify(mockUser));
+  const response = await page.request.post(`${baseURL}/api/auth/login`, {
+    data: {
+      email: process.env.E2E_EMAIL || 'hein@velocityfibre.co.za',
+      password: process.env.E2E_PASSWORD || 'Mitzi@0203',
+    },
   });
 
-  // Set a mock authentication cookie
-  await page.context().addCookies([
-    {
-      name: '__session',
-      value: 'mock-session-token',
-      domain: 'localhost',
-      path: '/',
-      httpOnly: true,
-      secure: false,
-      sameSite: 'Lax',
-    },
-  ]);
+  if (!response.ok()) {
+    throw new Error(`Login failed: ${response.status()} ${await response.text()}`);
+  }
 
-  // Save signed-in state
+  // Navigate to app to ensure cookies are set in the browser context
+  // Use domcontentloaded instead of networkidle to avoid timeout from persistent connections
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+
+  // Save signed-in state (includes the ff_auth_token cookie)
   await page.context().storageState({ path: authFile });
 });

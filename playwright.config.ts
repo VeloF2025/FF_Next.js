@@ -9,7 +9,7 @@ export default defineConfig({
   testDir: './tests/e2e',
 
   // Run tests in files in parallel
-  fullyParallel: false, // Run sequentially for contractors tests to avoid conflicts
+  fullyParallel: false,
 
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
@@ -17,8 +17,8 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
-  // Opt out of parallel tests on CI
-  workers: 1, // Single worker to avoid database conflicts
+  // Single worker to avoid database conflicts
+  workers: 1,
 
   // Reporter to use
   reporter: [
@@ -28,23 +28,26 @@ export default defineConfig({
 
   // Shared settings for all the projects below
   use: {
-    // Base URL to use in actions like `await page.goto('/')`
-    baseURL: 'http://localhost:3005',
-    
+    // Target dev server by default, override with E2E_BASE_URL env var
+    baseURL: process.env.E2E_BASE_URL || 'https://dev.fibreflow.app',
+
     // Collect trace when retrying the failed test
     trace: 'on-first-retry',
-    
+
     // Record video on failure
     video: 'retain-on-failure',
-    
+
     // Take screenshot on failure
     screenshot: 'only-on-failure',
-    
+
     // Viewport size
     viewport: { width: 1280, height: 720 },
 
-    // Run in headless mode for faster tests (set to false for debugging)
+    // Headless mode
     headless: true,
+
+    // Ignore HTTPS errors for dev/staging
+    ignoreHTTPSErrors: true,
   },
 
   // Configure projects for major browsers
@@ -66,14 +69,14 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  // Note: Use PORT=3005 npm start (production mode) as recommended in CLAUDE.md
-  webServer: {
-    command: 'PORT=3005 npm start',
-    url: 'http://localhost:3005',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes
-  },
+  // No local webServer needed when testing against dev.fibreflow.app
+  // Uncomment below for local testing:
+  // webServer: {
+  //   command: 'PORT=3005 npm start',
+  //   url: 'http://localhost:3005',
+  //   reuseExistingServer: true,
+  //   timeout: 120 * 1000,
+  // },
 
   // Test timeout
   timeout: 60 * 1000, // 60 seconds for E2E tests
