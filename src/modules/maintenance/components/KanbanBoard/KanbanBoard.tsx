@@ -37,14 +37,28 @@ const COLUMN_CONFIG: ColumnConfig[] = [
   { status: 'closed' },
 ];
 
+// Active vs Completed column groups for sub-tab filtering
+const ACTIVE_STATUSES: DatabaseStatus[] = ['new', 'triaged', 'assigned', 'in_progress', 'blocked'];
+const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'closed'];
+
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Strip meta status filter (active/completed) — Kanban needs all statuses for columns
+  const { status: metaStatus, ...apiFilters } = filters || {};
+
   // Fetch all tickets (no status filter for Kanban view)
   const { tickets, isLoading, isError, error, refetch } = useTickets({
-    ...filters,
+    ...apiFilters,
     pageSize: 500, // Load more tickets for Kanban
   });
+
+  // Determine which columns to show based on sub-tab filter
+  const visibleColumns = useMemo(() => {
+    if (metaStatus === 'completed') return COLUMN_CONFIG.filter(c => COMPLETED_STATUSES.includes(c.status));
+    if (metaStatus === 'active') return COLUMN_CONFIG.filter(c => ACTIVE_STATUSES.includes(c.status));
+    return COLUMN_CONFIG;
+  }, [metaStatus]);
 
   const updateTicket = useUpdateTicket();
 
@@ -166,7 +180,11 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       {/* Stats Bar */}
       <div className="mb-4 flex items-center gap-4 text-sm">
         <span className="text-[var(--ff-text-secondary)]">
-          <span className="font-medium text-[var(--ff-text-primary)]">{tickets.length}</span> tickets total
+          <span className="font-medium text-[var(--ff-text-primary)]">
+            {metaStatus
+              ? tickets.filter(t => visibleColumns.some(c => c.status === t.status)).length
+              : tickets.length}
+          </span> tickets total
         </span>
         <span className="text-[var(--ff-text-muted)]">|</span>
         <span className="text-[var(--ff-text-secondary)]">
@@ -184,7 +202,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto pb-4">
           <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-            {COLUMN_CONFIG.map(({ status }) => (
+            {visibleColumns.map(({ status }) => (
               <Droppable key={status} droppableId={status}>
                 {(provided, snapshot) => (
                   <div

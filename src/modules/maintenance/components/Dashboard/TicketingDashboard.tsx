@@ -90,13 +90,13 @@ export function TicketingDashboard({
       }
 
       // Fetch recent tickets (using tickets API with filters)
-      const recentResponse = await fetch('/api/maintenance/tickets?limit=10&sort=created_at:desc');
+      const recentResponse = await fetch('/api/maintenance/tickets?pageSize=10');
       if (!recentResponse.ok) {
         throw new Error('Failed to fetch recent tickets');
       }
       const recentResult = await recentResponse.json();
       if (recentResult.success) {
-        setRecentTickets(recentResult.data?.tickets || []);
+        setRecentTickets(recentResult.data || []);
       }
 
       setLastRefresh(new Date());

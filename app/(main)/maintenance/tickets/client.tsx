@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ModulePage } from '@/components/module-page';
 import { maintenanceConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/maintenance/components/TicketList/TicketList';
@@ -40,8 +41,12 @@ const KanbanIcon = () => (
 );
 
 export default function TicketsListPageClient() {
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Read status filter from URL params (Active/Completed sub-tabs)
+  const statusFilter = searchParams?.get('status') || undefined;
 
   // Load saved preference from localStorage
   useEffect(() => {
@@ -57,10 +62,11 @@ export default function TicketsListPageClient() {
     localStorage.setItem('ticketsViewMode', mode);
   };
 
-  // Create filters object for components
+  // Create filters object for components (include status from URL sub-tabs)
   const filters: TicketFilters = useMemo(() => ({
     search: searchTerm || undefined,
-  }), [searchTerm]);
+    status: statusFilter as any,
+  }), [searchTerm, statusFilter]);
 
   // Header actions for ModulePage
   const headerActions = (

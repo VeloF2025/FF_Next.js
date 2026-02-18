@@ -47,8 +47,9 @@ export function WorkloadChart({ data, compact = false, maxItems = 10 }: Workload
     );
   }
 
-  // 🟢 WORKING: Sort and limit data
+  // 🟢 WORKING: Sort and limit data (Number() to handle Neon string returns)
   const sortedData = [...data]
+    .map((item) => ({ ...item, ticket_count: Number(item.ticket_count), overdue_count: Number(item.overdue_count || 0) }))
     .sort((a, b) => b.ticket_count - a.ticket_count)
     .slice(0, maxItems);
 
@@ -68,7 +69,7 @@ export function WorkloadChart({ data, compact = false, maxItems = 10 }: Workload
 
       {/* Chart */}
       <div className="space-y-3">
-        {sortedData.map((item, index) => {
+        {sortedData.map((item) => {
           const barWidth = (item.ticket_count / maxCount) * 100;
           const hasOverdue = item.overdue_count > 0;
 
