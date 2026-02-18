@@ -20,21 +20,21 @@ interface KanbanColumnProps {
   isUpdating?: boolean;
 }
 
-// Status display configuration (matching database values)
-const statusConfig: Record<DatabaseStatus, { label: string; color: string; bgColor: string; borderColor: string; glowColor: string }> = {
-  'new': { label: 'New', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/40', glowColor: 'ring-gray-500/30' },
-  'triaged': { label: 'Triaged', color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', borderColor: 'border-cyan-500/40', glowColor: 'ring-cyan-500/30' },
+// Status display configuration — aligned with TicketStatus enum
+const statusConfig: Partial<Record<DatabaseStatus, { label: string; color: string; bgColor: string; borderColor: string; glowColor: string }>> = {
+  'open': { label: 'Open', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/40', glowColor: 'ring-gray-500/30' },
   'assigned': { label: 'Assigned', color: 'text-blue-400', bgColor: 'bg-blue-500/20', borderColor: 'border-blue-500/40', glowColor: 'ring-blue-500/30' },
   'in_progress': { label: 'In Progress', color: 'text-indigo-400', bgColor: 'bg-indigo-500/20', borderColor: 'border-indigo-500/40', glowColor: 'ring-indigo-500/30' },
-  'blocked': { label: 'Blocked', color: 'text-red-400', bgColor: 'bg-red-500/20', borderColor: 'border-red-500/40', glowColor: 'ring-red-500/30' },
+  'pending_qa': { label: 'Pending QA', color: 'text-amber-400', bgColor: 'bg-amber-500/20', borderColor: 'border-amber-500/40', glowColor: 'ring-amber-500/30' },
   'resolved': { label: 'Resolved', color: 'text-green-400', bgColor: 'bg-green-500/20', borderColor: 'border-green-500/40', glowColor: 'ring-green-500/30' },
   'closed': { label: 'Closed', color: 'text-slate-400', bgColor: 'bg-slate-500/20', borderColor: 'border-slate-500/40', glowColor: 'ring-slate-500/30' },
   'cancelled': { label: 'Cancelled', color: 'text-red-400', bgColor: 'bg-red-500/10', borderColor: 'border-red-500/30', glowColor: 'ring-red-500/20' },
-  'pending_approval': { label: 'Pending Approval', color: 'text-amber-400', bgColor: 'bg-amber-500/20', borderColor: 'border-amber-500/40', glowColor: 'ring-amber-500/30' },
 };
 
+const defaultConfig = { label: 'Unknown', color: 'text-gray-400', bgColor: 'bg-gray-500/20', borderColor: 'border-gray-500/40', glowColor: 'ring-gray-500/30' };
+
 export function KanbanColumn({ status, tickets, isDraggingOver, isUpdating }: KanbanColumnProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] || defaultConfig;
 
   return (
     <motion.div

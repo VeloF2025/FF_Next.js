@@ -359,14 +359,15 @@ export class DashboardStatsService {
       
       // Map trends from API response
       Object.entries(stats).forEach(([key, value]) => {
-        const trend = trendsData.projects?.trends?.[key] || 
-                     trendsData.revenue?.trends?.[key] || 
-                     trendsData.staff?.trends?.[key];
-        
+        const trendObj = trendsData.data?.[key] ||
+                        trendsData.projects?.trends?.[key] ||
+                        trendsData.revenue?.trends?.[key] ||
+                        trendsData.staff?.trends?.[key];
+
         trends[key] = {
           value: typeof value === 'number' ? value : 0,
-          direction: trend || 'stable',
-          percentage: 0, // Calculate from trend data if available
+          direction: trendObj?.direction || 'stable',
+          percentage: trendObj?.percentage || 0,
         };
       });
       

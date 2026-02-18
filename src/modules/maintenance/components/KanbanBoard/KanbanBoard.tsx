@@ -19,8 +19,8 @@ interface KanbanBoardProps {
   filters?: TicketFilters;
 }
 
-// Database status values (from tickets_status_check constraint)
-export type DatabaseStatus = 'new' | 'triaged' | 'assigned' | 'in_progress' | 'blocked' | 'resolved' | 'closed' | 'cancelled' | 'pending_approval';
+// Database status values — aligned with TicketStatus enum
+export type DatabaseStatus = 'new' | 'open' | 'assigned' | 'in_progress' | 'pending_qa' | 'qa_in_progress' | 'qa_rejected' | 'qa_approved' | 'pending_handover' | 'handed_to_ops' | 'resolved' | 'closed' | 'cancelled';
 
 // Define visible columns and their order
 interface ColumnConfig {
@@ -28,17 +28,26 @@ interface ColumnConfig {
 }
 
 const COLUMN_CONFIG: ColumnConfig[] = [
-  { status: 'new' },
-  { status: 'triaged' },
+  { status: 'open' },
   { status: 'assigned' },
   { status: 'in_progress' },
-  { status: 'blocked' },
+  { status: 'pending_qa' },
   { status: 'resolved' },
   { status: 'closed' },
 ];
 
+// Map legacy/unmapped statuses to a visible column
+const STATUS_COLUMN_MAP: Record<string, DatabaseStatus> = {
+  new: 'open',            // legacy 'new' → 'open'
+  qa_in_progress: 'pending_qa',
+  qa_rejected: 'in_progress',
+  qa_approved: 'resolved',
+  pending_handover: 'resolved',
+  handed_to_ops: 'resolved',
+};
+
 // Active vs Completed column groups for sub-tab filtering
-const ACTIVE_STATUSES: DatabaseStatus[] = ['new', 'triaged', 'assigned', 'in_progress', 'blocked'];
+const ACTIVE_STATUSES: DatabaseStatus[] = ['open', 'assigned', 'in_progress', 'pending_qa'];
 const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'closed'];
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
@@ -71,11 +80,12 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
       grouped[status] = [];
     });
 
-    // Sort tickets into their status buckets
+    // Sort tickets into their status buckets (with fallback mapping)
     tickets.forEach((ticket) => {
-      const status = ticket.status as unknown as DatabaseStatus;
-      if (grouped[status]) {
-        grouped[status].push(ticket);
+      const rawStatus = ticket.status as string;
+      const mappedStatus = (STATUS_COLUMN_MAP[rawStatus] || rawStatus) as DatabaseStatus;
+      if (grouped[mappedStatus]) {
+        grouped[mappedStatus].push(ticket);
       }
     });
 
