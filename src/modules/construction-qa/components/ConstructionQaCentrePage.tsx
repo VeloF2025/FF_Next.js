@@ -8,7 +8,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import {
   RefreshCw,
@@ -206,7 +206,19 @@ export function ConstructionQaCentrePage() {
     router.push(`/construction-qa/${feature.id}`);
   };
 
+  // Debounced search
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+
   const updateFilter = (key: keyof Filters, value: string | number) => {
+    if (key === 'search') {
+      setSearchInput(value as string);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = setTimeout(() => {
+        setFilters(prev => ({ ...prev, search: value as string, page: 1 }));
+      }, 300);
+      return;
+    }
     setFilters(prev => ({ ...prev, [key]: value, page: key === 'page' ? value as number : 1 }));
   };
 
@@ -235,14 +247,8 @@ export function ConstructionQaCentrePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Construction QA Centre</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Civil, optical, and splicing quality assurance
-          </p>
-        </div>
+      {/* Header — timestamp + refresh only (module header provided by ModulePage) */}
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-3">
           {lastRefresh && (
             <span className="text-xs text-gray-500">
@@ -305,7 +311,7 @@ export function ConstructionQaCentrePage() {
           <input
             type="text"
             placeholder="Search by feature ID, pole number..."
-            value={filters.search}
+            value={searchInput}
             onChange={e => updateFilter('search', e.target.value)}
             className="w-full pl-9 pr-3 py-2 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg text-sm text-gray-300 placeholder-gray-500"
           />

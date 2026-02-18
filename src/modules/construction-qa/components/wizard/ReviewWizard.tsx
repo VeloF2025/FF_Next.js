@@ -120,7 +120,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
       const res = await fetch(`/api/construction-qa/review?id=${reviewId}`, {
         credentials: 'include',
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(res.status === 404 ? 'Review not found' : `Failed to load review (${res.status})`);
       const data = await res.json();
 
       const rv = data.data?.review;
