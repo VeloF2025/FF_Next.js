@@ -1969,6 +1969,211 @@ Every action in Field Stock Control is logged:
 
 > **Important:** Digital signatures captured via mobile signature forms are legally binding and satisfy audit requirements for contractor accountability.
 
+### 7.10 Audit Trail **(NEW)**
+
+The Procurement Audit Trail provides a unified, immutable log of every change made across all procurement entities — purchase orders, BOQs, RFQs, stock movements, serial transitions, and fault reports.
+
+**Navigation:** Procurement → **Reports** tab → **Audit Logs** section
+
+**Route:** `/procurement/reports` (Audit Logs tab)
+
+#### What Gets Logged
+
+Every procurement mutation is automatically recorded:
+
+| Entity Type | Tracked Actions |
+|-------------|----------------|
+| **Purchase Orders** | Created, approved, rejected, sent, received, cancelled, modified |
+| **BOQs** | Created, imported, items mapped, approved, revised |
+| **RFQs** | Created, sent to suppliers, responses received, awarded |
+| **Stock Movements** | Receipts, issues, transfers, adjustments, returns |
+| **Serial Numbers** | State transitions (available → in_transit → assigned → faulty) |
+| **Fault Reports** | Created, updated, resolved, linked to serials |
+| **GRNs** | Created, confirmed, line items verified |
+| **Requisitions** | Created, submitted, approved, fulfilled |
+
+#### Audit Log Fields
+
+Each audit log entry contains:
+
+| Field | Description |
+|-------|-------------|
+| **Timestamp** | Exact date and time of the action |
+| **User** | Who performed the action (name and email) |
+| **Entity Type** | Which procurement object was changed |
+| **Entity ID** | Unique identifier of the affected record |
+| **Action** | What was done (create, update, delete, transition, approve, reject) |
+| **Changes** | Old value and new value (JSON diff) |
+| **Reason** | Mandatory for overrides and reversals |
+| **IP Address** | Source of the action for security tracking |
+
+#### Viewing Audit Logs
+
+1. Navigate to **Reports** tab
+2. Select **Audit Logs** section
+3. Filter by:
+   - **Date Range** — Start and end dates
+   - **Entity Type** — Purchase Order, BOQ, Serial, etc.
+   - **User** — Who made the change
+   - **Action** — Create, update, approve, etc.
+4. Results display in reverse chronological order
+
+#### API Access
+
+- **GET** `/api/procurement/audit-logs` — Retrieve audit logs with optional filters
+- Supports pagination (`page`, `limit` parameters)
+- Filter by `entityType`, `entityId`, `action`, `userId`, date range
+
+> **Important:** Audit log entries are immutable — they cannot be edited or deleted, even by administrators. This ensures a trustworthy compliance record.
+
+### 7.11 Fault Reports **(NEW)**
+
+The Fault Reports system enables tracking of defective equipment and materials across the procurement lifecycle. When a serial item or stock item is found to be faulty, a fault report creates a formal record linking the item to the reporter, supplier, and project.
+
+**Navigation:** Procurement → **Reports** tab → **Fault Reports** section
+
+**Route:** `/procurement/reports` (Fault Reports tab)
+
+#### Creating a Fault Report
+
+1. Navigate to **Reports** → **Fault Reports**
+2. Click **+ Report Fault**
+3. Fill in:
+   - **Item** — Select the stock item or serial number
+   - **Serial Number** — For serialized items (auto-populated if selected from serials)
+   - **Fault Type** — Dead on Arrival, Field Failure, Physical Damage, Configuration Error, Intermittent Fault, Other
+   - **Severity** — Critical, High, Medium, Low
+   - **Description** — Detailed description of the fault
+   - **Reporter** — Auto-filled with current user
+   - **Project** — Associated project (if applicable)
+   - **Supplier** — Original supplier for warranty/RMA tracking
+4. Optionally attach **Photos** — Evidence of the fault
+5. Click **Submit Fault Report**
+
+#### Fault Report Statuses
+
+| Status | Description |
+|--------|-------------|
+| **Open** | Fault reported, awaiting investigation |
+| **Investigating** | Under review by procurement or technical team |
+| **Confirmed** | Fault verified, awaiting resolution |
+| **RMA Submitted** | Return Merchandise Authorization sent to supplier |
+| **Resolved** | Fault addressed (replaced, repaired, or credited) |
+| **Closed** | Fault process complete |
+
+#### Fault Analytics
+
+The analytics dashboard provides insights into fault patterns:
+
+- **Faults by Supplier** — Identify suppliers with high defect rates
+- **Faults by Item Category** — Which product types have the most issues
+- **Faults by Project** — Project-level fault exposure
+- **Faults by Reporter** — Track reporting patterns per technician
+- **Fault Rate Trends** — Monthly fault rates over time
+- **Mean Time to Resolution** — Average time from report to resolution
+
+**API Access:**
+- **GET** `/api/procurement/fault-reports` — List fault reports with filters
+- **POST** `/api/procurement/fault-reports` — Create a new fault report
+- **GET** `/api/procurement/fault-reports/analytics` — Fault analytics data
+
+> **Tip:** Regular review of fault analytics helps identify problematic suppliers early and supports warranty claim negotiations.
+
+### 7.12 Serial State Machine **(NEW)**
+
+Serialized items (ONTs, Routers, UPS devices) follow a formal state machine that governs their lifecycle. Each transition is validated and logged in the audit trail.
+
+**Navigation:** Procurement → **Field Stock** → **Serials** tab
+
+#### State Diagram
+
+```
+                    ┌──────────┐
+         ┌─────────│ available │──────────┐
+         │         └──────────┘           │
+         │              │                 │
+         │              ▼                 ▼
+         │        ┌────────────┐    ┌─────────┐
+         │        │ in_transit │    │  faulty  │
+         │        └────────────┘    └─────────┘
+         │              │                 ▲
+         │              ▼                 │
+         │        ┌──────────┐            │
+         └───────▶│ assigned │────────────┘
+                  └──────────┘
+```
+
+#### Valid State Transitions
+
+| From | To | Triggered By |
+|------|----|-------------|
+| **available** | **in_transit** | Storeman issues stock to technician |
+| **available** | **assigned** | Direct assignment (warehouse to project) |
+| **available** | **faulty** | Fault detected during warehouse inspection |
+| **in_transit** | **assigned** | Technician accepts and signs for item |
+| **in_transit** | **available** | Delivery cancelled, item returned to warehouse |
+| **assigned** | **available** | Technician returns unused item |
+| **assigned** | **faulty** | Item fails during use, fault report filed |
+| **faulty** | **available** | Item repaired and returned to stock |
+
+#### Transitioning a Serial
+
+Transitions happen automatically through normal workflows (allocations, returns, fault reports). Manual transitions are available for administrators:
+
+1. Navigate to **Field Stock** → **Serials**
+2. Find the serial number
+3. Click the **status badge** to open transition options
+4. Select the new status
+5. Enter a **reason** (mandatory for all transitions)
+6. Click **Confirm Transition**
+
+**API Access:**
+- **POST** `/api/procurement/field-stock/serials/transition` — Transition a serial to a new state
+  - Required: `serialId`, `toStatus`
+  - Optional: `reason`, `notes`
+  - Returns: Updated serial with transition logged in audit trail
+
+> **Important:** Invalid transitions are rejected by the system. For example, an item cannot move from `faulty` to `assigned` without first being repaired (transitioned to `available`).
+
+### 7.13 Reports & Export **(ENHANCED)**
+
+The Reports tab provides comprehensive procurement analytics with export capabilities.
+
+**Navigation:** Procurement → **Reports** tab
+
+**Route:** `/procurement/reports`
+
+#### Available Reports
+
+| Report | Description |
+|--------|-------------|
+| **Procurement Overview** | Dashboard KPIs — total spend, PO counts, stock levels |
+| **Audit Logs** | Unified change history across all procurement entities |
+| **Fault Reports** | Defective item tracking and supplier quality metrics |
+| **Budget vs Actual** | Compare budgeted amounts to actual procurement spend |
+| **Stock Valuation** | Current inventory value by category and location |
+| **Supplier Performance** | On-time delivery, quality rates, pricing trends |
+
+#### Export Formats
+
+Reports can be exported in multiple formats:
+
+| Format | Description | Use Case |
+|--------|-------------|----------|
+| **PDF** | Formatted document with charts and tables | Management reports, compliance records |
+| **Excel (.xlsx)** | Spreadsheet with raw data and formulas | Financial analysis, further processing |
+| **CSV** | Plain comma-separated values | Data import to other systems |
+
+**Exporting a Report:**
+
+1. Navigate to the desired report
+2. Apply any **filters** (date range, project, supplier, etc.)
+3. Click the **Export** button (top right)
+4. Select format: **PDF**, **Excel**, or **CSV**
+5. File downloads to your browser's default download location
+
+> **Note:** Large exports (10,000+ rows) may take a few seconds to generate. A progress indicator shows export status.
+
 ---
 
 ## 8. Assets

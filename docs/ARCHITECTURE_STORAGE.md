@@ -66,17 +66,23 @@ An audit revealed **critical fragmentation** in file storage:
 
 | Context | URL Format | Example |
 |---------|------------|---------|
-| **Server-to-server** (uploads) | Internal HTTP IP | `http://100.96.203.105:8091/upload/...` |
-| **Browser-facing** (stored in DB) | Public HTTPS | `https://vf.fibreflow.app/staff/documents/file.pdf` |
+| **Server-to-server** (uploads/fetches) | Internal HTTP IP (no `/storage/`) | `http://100.96.203.105:8091/staff/documents/file.pdf` |
+| **Browser-facing** (stored in DB) | Public HTTPS (with `/storage/`) | `https://vf.fibreflow.app/storage/staff/documents/file.pdf` |
+| **VLM image URLs** | Internal HTTP IP (no `/storage/`) | `http://100.96.203.105:8091/staff/documents/file.pdf` |
 
 ⚠️ **NEVER store internal IP URLs in the database** - they cause mixed content errors when pages are served over HTTPS.
 
+⚠️ **NEVER do naive domain replacement** between public and internal URLs. The `/storage/` prefix only exists on the nginx proxy side. Always build URLs from `result.path`:
+
 ```typescript
-// All storage services MUST convert URLs before returning/storing:
-let url = result.url;
-if (url.includes('100.96.203.105:8091')) {
-  url = url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app');
-}
+// CORRECT - build from path:
+const storagePath = uploadResult.path; // e.g. "staff/documents/file.pdf"
+const publicUrl = `https://vf.fibreflow.app/storage/${storagePath}`;
+const internalUrl = `http://100.96.203.105:8091/${storagePath}`;
+
+// WRONG - naive replacement loses/keeps /storage/ incorrectly:
+url.replace('http://100.96.203.105:8091', 'https://vf.fibreflow.app'); // Missing /storage/
+url.replace('https://vf.fibreflow.app', 'http://100.96.203.105:8091'); // Keeps /storage/
 ```
 
 ### API Endpoints

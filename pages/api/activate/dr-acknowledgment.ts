@@ -801,8 +801,23 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         await updateOneMapStatus(dropNumber, 'not_found');
       } else {
         // DR not in 1Map AND not in drops - truly unknown
-        ackResult = generateAckMessage(dropNumber, false, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult, duplicates);
-        log.info('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - no ack`);
+        // Send a "not found" notification so the tech knows to correct it
+        ackResult = {
+          message: [
+            `❌ *${dropNumber} - Not Found*`,
+            '',
+            'This DR number was not found in the system.',
+            'Please check for typos and resubmit with the correct DR number.',
+            '',
+            '💡 _Common issues:_',
+            '• Missing "R" — e.g. D1234 instead of DR1234',
+            '• Extra/missing digits',
+            '• Wrong project group',
+          ].join('\n'),
+          swapped: false,
+          swapDetails: null,
+        };
+        log.warn('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - notifying tech`);
       }
     } else {
       // Normal first submission found in 1Map
@@ -814,7 +829,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const duration = Date.now() - startTime;
 
     if (!found && !notOnOneMap) {
-      log.info('DrAcknowledgment', `DR ${dropNumber} not found anywhere - no ack sent`);
+      log.info('DrAcknowledgment', `DR ${dropNumber} not found anywhere - sending "not found" notification`);
     } else if (notOnOneMap) {
       log.info('DrAcknowledgment', `DR ${dropNumber} NOT ON 1MAP - warning ack sent in ${duration}ms`);
     } else if (isResubmission) {
