@@ -139,26 +139,28 @@ export default function ProcurementReportsPage() {
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      // Fetch from multiple endpoints
-      const [metricsRes, stockRes] = await Promise.all([
+      // Fetch from real endpoints
+      const [metricsRes, stockRes, suppliersRes] = await Promise.all([
         fetch('/api/procurement/metrics/aggregate'),
         fetch('/api/procurement/stock?status=low_stock'),
+        fetch('/api/suppliers'),
       ]);
 
       const metrics = await metricsRes.json();
       const stockData = await stockRes.json();
+      const suppliersData = await suppliersRes.json();
 
-      // Build report data from available sources
-      // In production, these would come from dedicated report APIs
+      // Build report data from real sources
+      const supplierList = suppliersData?.data || suppliersData || [];
       setData({
-        supplierMetrics: generateSupplierMetrics(),
+        supplierMetrics: formatSupplierMetrics(supplierList),
         spendByCategory: generateSpendCategories(metrics?.data),
-        inventoryAlerts: formatStockAlerts(stockData?.data || []),
+        inventoryAlerts: formatStockAlerts(stockData?.data || stockData?.items || []),
         cycleMetrics: generateCycleMetrics(metrics?.data),
         summary: {
           totalSpend: metrics?.data?.totalBOQValue || 0,
-          avgOtif: metrics?.data?.supplierOTIF || 92,
-          stockAlerts: stockData?.data?.length || 0,
+          avgOtif: calculateAvgOtif(supplierList),
+          stockAlerts: (stockData?.data || stockData?.items || []).length,
           avgCycleTime: metrics?.data?.avgProcurementCycleTime || 14,
         },
       });
@@ -169,25 +171,57 @@ export default function ProcurementReportsPage() {
     }
   };
 
-  // Generate sample supplier metrics (would come from API)
-  const generateSupplierMetrics = (): SupplierMetrics[] => [
-    { supplierId: '1', supplierName: 'FibreTech Solutions', otifRate: 94, qualityScore: 4.5, deliveryRate: 96, avgLeadTime: 7, totalOrders: 45, totalValue: 1250000 },
-    { supplierId: '2', supplierName: 'Cable Connect SA', otifRate: 88, qualityScore: 4.2, deliveryRate: 90, avgLeadTime: 10, totalOrders: 32, totalValue: 890000 },
-    { supplierId: '3', supplierName: 'Network Supplies', otifRate: 91, qualityScore: 4.0, deliveryRate: 93, avgLeadTime: 8, totalOrders: 28, totalValue: 650000 },
-    { supplierId: '4', supplierName: 'Optical Wholesalers', otifRate: 85, qualityScore: 3.8, deliveryRate: 87, avgLeadTime: 12, totalOrders: 21, totalValue: 420000 },
-    { supplierId: '5', supplierName: 'SA Fibre Depot', otifRate: 97, qualityScore: 4.8, deliveryRate: 98, avgLeadTime: 5, totalOrders: 18, totalValue: 380000 },
-  ];
+  // Format real supplier data from /api/suppliers
+  const formatSupplierMetrics = (suppliers: any[]): SupplierMetrics[] => {
+    return suppliers
+      .filter((s: any) => s.status === 'ACTIVE')
+      .map((s: any) => {
+        const rating = typeof s.rating === 'object' ? s.rating : null;
+        const overall = rating?.overall ?? (typeof s.ratingOverall === 'number' ? s.ratingOverall : 0);
+        const delivery = rating?.delivery ?? (typeof s.ratingDelivery === 'number' ? s.ratingDelivery : 0);
+        return {
+          supplierId: s.id,
+          supplierName: s.name,
+          otifRate: delivery > 0 ? Math.round(delivery * 20) : 0,
+          qualityScore: overall > 0 ? Number(overall.toFixed(1)) : 0,
+          deliveryRate: delivery > 0 ? Math.round(delivery * 20) : 0,
+          avgLeadTime: s.leadTimeDays || s.lead_time_days || 0,
+          totalOrders: s.totalOrders || s.total_orders || 0,
+          totalValue: s.totalValue || s.total_value || 0,
+        };
+      })
+      .sort((a: SupplierMetrics, b: SupplierMetrics) => b.qualityScore - a.qualityScore);
+  };
 
-  // Generate spend categories from metrics
+  // Calculate real average OTIF from supplier data
+  const calculateAvgOtif = (suppliers: any[]): number => {
+    const active = suppliers.filter((s: any) => s.status === 'ACTIVE');
+    if (active.length === 0) return 0;
+    const totalDelivery = active.reduce((sum: number, s: any) => {
+      const rating = typeof s.rating === 'object' ? s.rating : null;
+      const delivery = rating?.delivery ?? (typeof s.ratingDelivery === 'number' ? s.ratingDelivery : 0);
+      return sum + (delivery > 0 ? delivery * 20 : 0);
+    }, 0);
+    const rated = active.filter((s: any) => {
+      const rating = typeof s.rating === 'object' ? s.rating : null;
+      const delivery = rating?.delivery ?? s.ratingDelivery ?? 0;
+      return delivery > 0;
+    });
+    return rated.length > 0 ? Math.round(totalDelivery / rated.length) : 0;
+  };
+
+  // PARTIAL: Spend categories derived from BOQ value with estimated breakdowns
+  // TODO: Replace with real category-level spend API when purchase_order_items tracks categories
   const generateSpendCategories = (metrics: any): SpendCategory[] => {
-    const total = metrics?.totalBOQValue || 1000000;
+    const total = metrics?.totalBOQValue || 0;
+    if (total === 0) return [];
     return [
-      { category: 'Fiber Cables', amount: total * 0.35, percentage: 35, change: 5.2, itemCount: 45 },
-      { category: 'Connectors', amount: total * 0.20, percentage: 20, change: -2.1, itemCount: 120 },
-      { category: 'Equipment', amount: total * 0.18, percentage: 18, change: 8.5, itemCount: 32 },
-      { category: 'Tools', amount: total * 0.12, percentage: 12, change: 1.3, itemCount: 65 },
-      { category: 'Safety Gear', amount: total * 0.08, percentage: 8, change: 0.5, itemCount: 28 },
-      { category: 'Other', amount: total * 0.07, percentage: 7, change: -1.2, itemCount: 40 },
+      { category: 'Fiber Cables', amount: total * 0.35, percentage: 35, change: 0, itemCount: 0 },
+      { category: 'Connectors', amount: total * 0.20, percentage: 20, change: 0, itemCount: 0 },
+      { category: 'Equipment', amount: total * 0.18, percentage: 18, change: 0, itemCount: 0 },
+      { category: 'Tools', amount: total * 0.12, percentage: 12, change: 0, itemCount: 0 },
+      { category: 'Safety Gear', amount: total * 0.08, percentage: 8, change: 0, itemCount: 0 },
+      { category: 'Other', amount: total * 0.07, percentage: 7, change: 0, itemCount: 0 },
     ];
   };
 
@@ -204,15 +238,17 @@ export default function ProcurementReportsPage() {
     }));
   };
 
-  // Generate cycle metrics
+  // PARTIAL: Cycle metrics derived from aggregate avg cycle time with estimated stage breakdowns
+  // TODO: Replace with real per-stage timing from purchase_orders timestamps
   const generateCycleMetrics = (metrics: any): CycleMetric[] => {
-    const avgCycle = metrics?.avgProcurementCycleTime || 14;
+    const avgCycle = metrics?.avgProcurementCycleTime || 0;
+    if (avgCycle === 0) return [];
     return [
-      { stage: 'Requisition to RFQ', avgDays: Math.round(avgCycle * 0.15), minDays: 1, maxDays: 5, trend: 'stable' },
-      { stage: 'RFQ to Quotes', avgDays: Math.round(avgCycle * 0.25), minDays: 2, maxDays: 10, trend: 'down' },
-      { stage: 'Quote to PO', avgDays: Math.round(avgCycle * 0.20), minDays: 1, maxDays: 7, trend: 'stable' },
-      { stage: 'PO to Delivery', avgDays: Math.round(avgCycle * 0.30), minDays: 3, maxDays: 21, trend: 'up' },
-      { stage: 'GRN Processing', avgDays: Math.round(avgCycle * 0.10), minDays: 1, maxDays: 3, trend: 'down' },
+      { stage: 'Requisition to RFQ', avgDays: Math.round(avgCycle * 0.15), minDays: 0, maxDays: 0, trend: 'stable' },
+      { stage: 'RFQ to Quotes', avgDays: Math.round(avgCycle * 0.25), minDays: 0, maxDays: 0, trend: 'stable' },
+      { stage: 'Quote to PO', avgDays: Math.round(avgCycle * 0.20), minDays: 0, maxDays: 0, trend: 'stable' },
+      { stage: 'PO to Delivery', avgDays: Math.round(avgCycle * 0.30), minDays: 0, maxDays: 0, trend: 'stable' },
+      { stage: 'GRN Processing', avgDays: Math.round(avgCycle * 0.10), minDays: 0, maxDays: 0, trend: 'stable' },
     ];
   };
 
@@ -440,8 +476,8 @@ export default function ProcurementReportsPage() {
                               <span className="font-medium text-[var(--ff-text-primary)]">
                                 {formatCurrency(category.amount)}
                               </span>
-                              <span className={`text-xs ${category.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                {category.change >= 0 ? '+' : ''}{category.change}%
+                              <span className={`text-xs ${category.change === 0 ? 'text-gray-500' : category.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {category.change === 0 ? '' : `${category.change >= 0 ? '+' : ''}${category.change}%`}
                               </span>
                             </div>
                           </div>
