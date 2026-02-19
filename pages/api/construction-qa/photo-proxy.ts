@@ -2,10 +2,9 @@
  * GET /api/construction-qa/photo-proxy?key={storage_key}&source={source}
  *
  * Proxies construction QA photos from multiple storage backends:
- *   - qfield: MinIO via docker exec mc cat (same as /api/qfield/photo-proxy)
+ *   - qfield: MinIO via docker exec mc cat
+ *   - sharepoint: MS Graph API with client-credentials token
  *   - upload: Local filesystem or VF server
- *
- * SharePoint and WhatsApp sources will be added in Phase 2/3.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,6 +14,14 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
+
+// SharePoint Graph API config
+const SP_TENANT_ID = 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
+const SP_CLIENT_ID = '075bd672-bffa-45ba-9fd0-724535e612db';
+const SP_CLIENT_SECRET = 'Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF';
+
+// Token cache (tokens last ~3600s, cache for 3000s)
+let spTokenCache: { token: string; expiresAt: number } | null = null;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -32,10 +39,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return await proxyMinioPhoto(key, res);
     }
 
-    // Future sources: sharepoint, whatsapp, upload
+    if (source === 'sharepoint') {
+      return await proxySharePointPhoto(key, res);
+    }
+
     return res.status(400).json({ error: `Unsupported photo source: ${source}` });
   } catch (error) {
-    log.error('Proxy error', { module: 'cqa-photo-proxy', error: (error as Error).message }, 'cqa-photo-proxy');
+    log.error('Proxy error', { module: 'cqa-photo-proxy', error: (error as Error).message, source, key }, 'cqa-photo-proxy');
     return res.status(500).json({ error: 'Failed to proxy photo' });
   }
 }
@@ -99,4 +109,84 @@ async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void>
 
     throw execError;
   }
+}
+
+/**
+ * Proxy a photo from SharePoint via MS Graph API.
+ * storage_key format: "sharepoint:{driveId}:{itemId}"
+ */
+async function proxySharePointPhoto(storageKey: string, res: NextApiResponse): Promise<void> {
+  // Parse key: "sharepoint:{driveId}:{itemId}"
+  const parts = storageKey.split(':');
+  if (parts.length < 3 || parts[0] !== 'sharepoint') {
+    res.status(400).json({ error: 'Invalid SharePoint storage key format', key: storageKey });
+    return;
+  }
+  const driveId = parts[1];
+  const itemId = parts.slice(2).join(':'); // item IDs don't contain colons, but be safe
+
+  const token = await getSharePointToken();
+
+  const graphUrl = `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/content`;
+  const graphRes = await fetch(graphUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+    redirect: 'follow',
+  });
+
+  if (!graphRes.ok) {
+    if (graphRes.status === 404) {
+      res.status(404).json({ error: 'SharePoint photo not found', key: storageKey });
+      return;
+    }
+    const errText = await graphRes.text().catch(() => '');
+    log.error('SharePoint proxy error', {
+      module: 'cqa-photo-proxy',
+      status: graphRes.status,
+      error: errText.slice(0, 200),
+    }, 'cqa-photo-proxy');
+    res.status(502).json({ error: `SharePoint returned ${graphRes.status}` });
+    return;
+  }
+
+  const contentType = graphRes.headers.get('content-type') || 'image/jpeg';
+  const contentLength = graphRes.headers.get('content-length');
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  if (contentLength) res.setHeader('Content-Length', contentLength);
+
+  // Stream the response body
+  const arrayBuffer = await graphRes.arrayBuffer();
+  res.send(Buffer.from(arrayBuffer));
+}
+
+/** Get a cached MS Graph API token for SharePoint access. */
+async function getSharePointToken(): Promise<string> {
+  if (spTokenCache && Date.now() < spTokenCache.expiresAt) {
+    return spTokenCache.token;
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${SP_TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: SP_CLIENT_ID,
+    client_secret: SP_CLIENT_SECRET,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials',
+  });
+
+  const tokenRes = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  if (!tokenRes.ok) {
+    throw new Error(`SharePoint token request failed: ${tokenRes.status}`);
+  }
+
+  const data = await tokenRes.json();
+  const token = data.access_token;
+  // Cache for 50 minutes (tokens last 60 min)
+  spTokenCache = { token, expiresAt: Date.now() + 50 * 60 * 1000 };
+  return token;
 }

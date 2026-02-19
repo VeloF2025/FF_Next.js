@@ -158,6 +158,79 @@ def extract_pole_number(filename):
     return None
 
 
+def extract_pole_from_path(path):
+    """Extract pole number from parent folder name in the path.
+    E.g. 'Poles Planted/Lawley Poles/Poles With Numbers/LAW.P.A001/Before 1.jpg'
+    -> parent folder = 'LAW.P.A001' -> 'LAW.P.A001'
+    """
+    parts = path.rsplit("/", 1)
+    if len(parts) < 2:
+        return None
+    parent = parts[0].rsplit("/", 1)[-1]
+    m = POLE_RE_BROAD.search(parent)
+    if m:
+        return m.group(1).upper()
+    return None
+
+
+def classify_civil_step(filename):
+    """Map a SharePoint photo filename to a civil checklist step number.
+    Returns step number (1-7) or None if unclear.
+
+    Civil steps:
+      1 = Foundation/Base (Before, Depth, Compaction, Concrete)
+      2 = Full Pole Visible (After)
+      3 = Pole Label (Label, Tag, Number)
+      4 = CCA H4 Tag (CCA, H4, Treatment)
+      5 = Vertical Alignment (Vertical, Alignment, Plumb)
+      6 = Guy Wires / Stays (Guy, Wire, Stay)
+      7 = Slack Bracket (Slack, Bracket)
+    """
+    name = filename.lower().rsplit(".", 1)[0]  # strip extension
+
+    # Step 1 — Foundation / Base
+    if any(kw in name for kw in ("before", "depth", "compaction", "comapction", "compactiion", "commpaction",
+                                  "beforre", "concrete", "foundation", "base", "hole", "backfill")):
+        return 1
+
+    # Step 2 — Full Pole Visible
+    if any(kw in name for kw in ("after", "front", "side", "full pole", "installed", "erected", "complete")):
+        return 2
+
+    # Step 3 — Pole Label
+    if any(kw in name for kw in ("label", "number", "tag number", "pole tag", "pole label")):
+        return 3
+
+    # Step 4 — CCA H4 Tag
+    if any(kw in name for kw in ("cca", "h4", "treatment")):
+        return 4
+
+    # Step 5 — Vertical Alignment
+    if any(kw in name for kw in ("vertical", "alignment", "plumb", "lean")):
+        return 5
+
+    # Step 6 — Guy Wires
+    if any(kw in name for kw in ("guy", "wire", "stay")):
+        return 6
+
+    # Step 7 — Slack Bracket
+    if any(kw in name for kw in ("slack", "bracket")):
+        return 7
+
+    return None
+
+
+CIVIL_STEP_LABELS = {
+    1: "Foundation / Base",
+    2: "Full Pole Visible",
+    3: "Pole Label",
+    4: "CCA H4 Tag",
+    5: "Vertical Alignment",
+    6: "Guy Wires / Stays",
+    7: "Slack Bracket",
+}
+
+
 def deterministic_uuid(namespace, key):
     """Generate a deterministic UUID from namespace + key for idempotent inserts."""
     return str(uuid.uuid5(uuid.UUID(namespace), key))
@@ -244,11 +317,24 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
     # ── Step 4: Match photos to poles ────────────────────────────────────
     print("  [4/5] Matching photos to poles...")
     matched = {}  # pole_number -> [photo, ...]
+    add_to_existing = {}  # pole_number -> [photo, ...] for poles with existing reviews
     unmatched = []
-    skipped_existing = 0
+    skipped_duplicate = 0
+
+    # Load existing photo storage_keys to avoid duplicate photo inserts
+    cur.execute(
+        "SELECT storage_key FROM construction_qa_photos WHERE project_id = %s::uuid",
+        (project_id,),
+    )
+    existing_photo_keys = {row["storage_key"] for row in cur.fetchall()}
+    print(f"    ✓ {len(existing_photo_keys)} existing photos in DB\n")
 
     for photo in photos:
+        # Try filename first, then parent folder
         pole_num = extract_pole_number(photo["name"])
+        if not pole_num:
+            pole_num = extract_pole_from_path(photo["path"])
+
         if not pole_num:
             unmatched.append(photo)
             continue
@@ -257,25 +343,39 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
             unmatched.append(photo)
             continue
 
-        if pole_num in existing_reviews:
-            skipped_existing += 1
+        # Check if this specific photo already exists
+        storage_key = f"sharepoint:{SP_DRIVE_ID}:{photo['id']}"
+        if storage_key in existing_photo_keys:
+            skipped_duplicate += 1
             continue
 
-        if pole_num not in matched:
-            matched[pole_num] = []
-        matched[pole_num].append(photo)
+        if pole_num in existing_reviews:
+            # Review exists but this is a NEW photo for it
+            add_to_existing.setdefault(pole_num, []).append(photo)
+        else:
+            matched.setdefault(pole_num, []).append(photo)
 
-    print(f"    ✓ Matched: {len(matched)} poles with photos")
-    print(f"    ✓ Photos for matched poles: {sum(len(v) for v in matched.values())}")
+    new_review_photos = sum(len(v) for v in matched.values())
+    add_photos = sum(len(v) for v in add_to_existing.values())
+    print(f"    ✓ New reviews: {len(matched)} poles ({new_review_photos} photos)")
+    print(f"    ✓ Add to existing reviews: {len(add_to_existing)} poles ({add_photos} photos)")
     print(f"    ✗ Unmatched files: {len(unmatched)}")
-    print(f"    ↻ Skipped (already reviewed): {skipped_existing}\n")
+    print(f"    ↻ Skipped (duplicate photos): {skipped_duplicate}\n")
 
-    # Show sample matches
+    # Show sample new matches
     sample = list(matched.items())[:5]
     if sample:
-        print("    Sample matches:")
+        print("    Sample NEW review matches:")
         for pn, phs in sample:
             print(f"      {pn}: {len(phs)} photo(s) — {phs[0]['name']}")
+        print()
+
+    # Show sample add-to-existing
+    sample2 = list(add_to_existing.items())[:5]
+    if sample2:
+        print("    Sample ADD to existing reviews:")
+        for pn, phs in sample2:
+            print(f"      {pn}: +{len(phs)} photo(s) — {[p['name'] for p in phs[:3]]}")
         print()
 
     # Show sample unmatched
@@ -283,33 +383,62 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
         print(f"    Sample unmatched ({min(10, len(unmatched))} of {len(unmatched)}):")
         for photo in unmatched[:10]:
             pn = extract_pole_number(photo["name"])
-            reason = "no match in DB" if pn else "no pole number in filename"
-            print(f"      {photo['name']} — {reason}")
+            pfn = extract_pole_from_path(photo["path"])
+            reason = f"pole {pn or pfn} not in DB" if (pn or pfn) else "no pole ref in filename or parent folder"
+            print(f"      {photo['path'].rsplit('/',1)[-1]} (in {photo['path'].rsplit('/',2)[-2] if '/' in photo['path'] else 'root'}) — {reason}")
         print()
 
     # ── Step 5: Insert records ───────────────────────────────────────────
     if dry_run:
         print("  [5/5] DRY RUN — no records inserted\n")
     else:
-        print(f"  [5/5] Inserting {len(matched)} reviews + {sum(len(v) for v in matched.values())} photos...")
+        total_new_photos = new_review_photos + add_photos
+        print(f"  [5/5] Inserting {len(matched)} new reviews + {total_new_photos} photos...")
         reviews_inserted = 0
         photos_inserted = 0
+        reviews_updated = 0
 
+        def insert_photos_for_review(review_id, pole_photos):
+            """Insert photo records for a review. Returns count inserted."""
+            count = 0
+            for p in pole_photos:
+                photo_id = deterministic_uuid(QA_NAMESPACE, f"{review_id}:photo:{p['id']}")
+                step = classify_civil_step(p["name"])
+                step_label = CIVIL_STEP_LABELS.get(step) if step else None
+                try:
+                    cur.execute("""
+                        INSERT INTO construction_qa_photos (
+                            id, review_id, project_id, source, storage_key,
+                            storage_url, filename, file_size_bytes, mime_type,
+                            captured_at, checklist_step, step_label
+                        ) VALUES (
+                            %s::uuid, %s::uuid, %s::uuid, 'sharepoint', %s,
+                            %s, %s, %s, %s,
+                            %s, %s, %s
+                        )
+                        ON CONFLICT DO NOTHING
+                    """, (
+                        photo_id, review_id, project_id,
+                        f"sharepoint:{SP_DRIVE_ID}:{p['id']}",
+                        f"https://graph.microsoft.com/v1.0/drives/{SP_DRIVE_ID}/items/{p['id']}/content",
+                        p["name"], p["size"], p.get("mime", "image/jpeg"),
+                        p.get("modified"), step, step_label,
+                    ))
+                    count += 1
+                except Exception as e:
+                    print(f"    ERROR inserting photo {p['name']}: {e}")
+            return count
+
+        # ── Insert NEW reviews ───────────────────────────────────────────
         for pole_num, pole_photos in matched.items():
             pole = poles_by_number[pole_num]
             review_id = deterministic_uuid(QA_NAMESPACE, f"{project_id}:civil:{pole_num}")
 
-            # Build photos_json for the review record
-            photos_json = []
-            for p in pole_photos:
-                photos_json.append({
-                    "filename": p["name"],
-                    "storage_key": f"sharepoint:{SP_DRIVE_ID}:{p['id']}",
-                    "source": "sharepoint",
-                    "size": p["size"],
-                })
+            photos_json = [{
+                "filename": p["name"], "storage_key": f"sharepoint:{SP_DRIVE_ID}:{p['id']}",
+                "source": "sharepoint", "size": p["size"],
+            } for p in pole_photos]
 
-            # Insert review
             try:
                 cur.execute("""
                     INSERT INTO construction_qa_reviews (
@@ -340,51 +469,63 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
                 conn.rollback()
                 continue
 
-            # Insert individual photo records
-            for i, p in enumerate(pole_photos):
-                photo_id = deterministic_uuid(QA_NAMESPACE, f"{review_id}:photo:{p['id']}")
-                try:
-                    cur.execute("""
-                        INSERT INTO construction_qa_photos (
-                            id, review_id, project_id, source, storage_key,
-                            storage_url, filename, file_size_bytes, mime_type,
-                            captured_at
-                        ) VALUES (
-                            %s::uuid, %s::uuid, %s::uuid, 'sharepoint', %s,
-                            %s, %s, %s, %s,
-                            %s
-                        )
-                        ON CONFLICT DO NOTHING
-                    """, (
-                        photo_id, review_id, project_id,
-                        f"sharepoint:{SP_DRIVE_ID}:{p['id']}",
-                        f"https://graph.microsoft.com/v1.0/drives/{SP_DRIVE_ID}/items/{p['id']}/content",
-                        p["name"], p["size"], p.get("mime", "image/jpeg"),
-                        p.get("modified"),
-                    ))
-                    photos_inserted += 1
-                except Exception as e:
-                    print(f"    ERROR inserting photo {p['name']}: {e}")
+            photos_inserted += insert_photos_for_review(review_id, pole_photos)
 
-            # Commit every 100 reviews
             if reviews_inserted % 100 == 0:
                 conn.commit()
 
         conn.commit()
-        print(f"    ✓ Inserted {reviews_inserted} reviews")
-        print(f"    ✓ Inserted {photos_inserted} photos\n")
+        print(f"    ✓ Inserted {reviews_inserted} new reviews")
+        print(f"    ✓ Inserted {photos_inserted} photos for new reviews")
+
+        # ── Add photos to EXISTING reviews ───────────────────────────────
+        if add_to_existing:
+            print(f"\n    Adding photos to {len(add_to_existing)} existing reviews...")
+            added_photos = 0
+
+            for pole_num, new_photos in add_to_existing.items():
+                review_id = deterministic_uuid(QA_NAMESPACE, f"{project_id}:civil:{pole_num}")
+                added_photos += insert_photos_for_review(review_id, new_photos)
+
+                # Update review photo_count and photos_json
+                new_json_entries = [{
+                    "filename": p["name"], "storage_key": f"sharepoint:{SP_DRIVE_ID}:{p['id']}",
+                    "source": "sharepoint", "size": p["size"],
+                } for p in new_photos]
+
+                try:
+                    cur.execute("""
+                        UPDATE construction_qa_reviews
+                        SET photo_count = photo_count + %s,
+                            photos_json = photos_json || %s::jsonb,
+                            updated_at = now()
+                        WHERE id = %s::uuid
+                    """, (len(new_photos), json.dumps(new_json_entries), review_id))
+                    reviews_updated += 1
+                except Exception as e:
+                    print(f"    ERROR updating review for {pole_num}: {e}")
+
+                if reviews_updated % 100 == 0:
+                    conn.commit()
+
+            conn.commit()
+            photos_inserted += added_photos
+            print(f"    ✓ Added {added_photos} photos to {reviews_updated} existing reviews\n")
 
     # ── Summary ──────────────────────────────────────────────────────────
+    total_matched_poles = len(matched) + len(add_to_existing)
+    total_matched_photos = sum(len(v) for v in matched.values()) + sum(len(v) for v in add_to_existing.values())
     print("=" * 70)
     print(f"  INGESTION {'(DRY RUN) ' if dry_run else ''}COMPLETE — {project_name}")
     print(f"  Poles in DB:         {len(poles_by_number)}")
     print(f"  Photos scanned:      {len(photos)}")
-    print(f"  Poles matched:       {len(matched)}")
-    print(f"  Photos matched:      {sum(len(v) for v in matched.values())}")
+    print(f"  Poles matched:       {total_matched_poles} ({len(matched)} new + {len(add_to_existing)} existing)")
+    print(f"  Photos matched:      {total_matched_photos}")
     print(f"  Unmatched files:     {len(unmatched)}")
-    print(f"  Already existing:    {skipped_existing}")
+    print(f"  Skipped duplicates:  {skipped_duplicate}")
     if not dry_run:
         print(f"  Reviews inserted:    {reviews_inserted}")
+        print(f"  Reviews updated:     {reviews_updated}")
         print(f"  Photos inserted:     {photos_inserted}")
     print("=" * 70)
 
