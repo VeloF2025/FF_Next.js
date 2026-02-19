@@ -34,6 +34,9 @@ export enum AuditEntityType {
   RFQ = 'rfq',
   PICKING = 'picking',
   REQUISITION = 'requisition',
+  STOCK_RETURN = 'stock_return',
+  STOCK_TAKE = 'stock_take',
+  CONTRACTOR_ACCOUNTABILITY = 'contractor_accountability',
 }
 
 export type AuditEntityTypeValue =
@@ -45,7 +48,10 @@ export type AuditEntityTypeValue =
   | 'boq'
   | 'rfq'
   | 'picking'
-  | 'requisition';
+  | 'requisition'
+  | 'stock_return'
+  | 'stock_take'
+  | 'contractor_accountability';
 
 // ============= Core Interfaces =============
 

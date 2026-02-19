@@ -5,6 +5,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 import { poApprovalService } from '@/services/procurement/approval';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -218,6 +219,16 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
 
         log.info('PO submitted for approval', { id, autoApproved: result.autoApproved });
 
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: result.autoApproved ? 'approved' : 'pending_approval' },
+        });
+
         return apiResponse.success(res, {
           id,
           status: result.autoApproved ? 'approved' : 'pending_approval',
@@ -235,6 +246,16 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
         await poApprovalService.approvePO(id, userId, userName, notes);
 
         log.info('PO approved', { id, approver: userName });
+
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'approve',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'approved' },
+        });
 
         return apiResponse.success(res, {
           id,
@@ -256,6 +277,17 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
 
         log.info('PO rejected', { id, rejecter: userName, newVersion: result.newVersion });
 
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'reject',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'draft' },
+          reason: reason || notes,
+        });
+
         return apiResponse.success(res, {
           id,
           status: 'draft',
@@ -270,6 +302,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Only approved POs can be sent');
         }
         await updatePOStatusSimple(id, 'sent', userId, notes);
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'sent' },
+        });
         return apiResponse.success(res, { id, status: 'sent', action: 'sent' });
       }
 
@@ -278,6 +319,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Only sent POs can be acknowledged');
         }
         await updatePOStatusSimple(id, 'acknowledged', userId, notes);
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'acknowledged' },
+        });
         return apiResponse.success(res, { id, status: 'acknowledged', action: 'acknowledged' });
       }
 
@@ -286,6 +336,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Cannot complete PO in current status');
         }
         await updatePOStatusSimple(id, 'completed', userId, notes);
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'completed' },
+        });
         return apiResponse.success(res, { id, status: 'completed', action: 'completed' });
       }
 
@@ -294,6 +353,15 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           return apiResponse.badRequest(res, 'Cannot cancel PO in current status');
         }
         await updatePOStatusSimple(id, 'cancelled', userId, notes);
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          oldValues: { status: currentStatus },
+          newValues: { status: 'cancelled' },
+        });
         return apiResponse.success(res, { id, status: 'cancelled', action: 'cancelled' });
       }
 

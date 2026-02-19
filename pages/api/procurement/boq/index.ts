@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -152,6 +153,14 @@ export default withAuth(withErrorHandler(async (
           title: boq.title,
           item_count: body.items.length,
           total_value: totalValue
+        });
+
+        createAuditLog({
+          entityType: 'boq',
+          entityId: boq.id,
+          action: 'create',
+          performedBy: 'system',
+          newValues: { projectId: boq.project_id, title: boq.title, itemCount: body.items.length, totalValue },
         });
 
         // Now insert all items with the boq_id

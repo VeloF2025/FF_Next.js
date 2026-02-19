@@ -6,6 +6,7 @@ import { logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -170,6 +171,14 @@ export default withAuth(withErrorHandler(async (
         grn_number: grn!.grn_number,
         supplier_id: grn!.supplier_id,
         items_count: body.items.length,
+      });
+
+      createAuditLog({
+        entityType: 'goods_receipt',
+        entityId: grn!.id as string,
+        action: 'create',
+        performedBy: userId,
+        newValues: { grnNumber: grn!.grn_number, supplierId: body.supplierId },
       });
 
       return apiResponse.created(res, grn!, 'Goods receipt note created successfully');

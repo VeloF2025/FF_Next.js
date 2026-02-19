@@ -141,6 +141,19 @@ export async function listAuditLogs(
       WHERE entity_type = ${filter.entityType}
         AND entity_id = ${filter.entityId}::uuid
     `;
+  } else if (filter.entityType && filter.action) {
+    rows = await sql`
+      SELECT * FROM audit_logs
+      WHERE entity_type = ${filter.entityType}
+        AND action = ${filter.action}
+      ORDER BY created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
+    countRows = await sql`
+      SELECT COUNT(*)::int AS total FROM audit_logs
+      WHERE entity_type = ${filter.entityType}
+        AND action = ${filter.action}
+    `;
   } else if (filter.entityType) {
     rows = await sql`
       SELECT * FROM audit_logs
@@ -151,6 +164,17 @@ export async function listAuditLogs(
     countRows = await sql`
       SELECT COUNT(*)::int AS total FROM audit_logs
       WHERE entity_type = ${filter.entityType}
+    `;
+  } else if (filter.action) {
+    rows = await sql`
+      SELECT * FROM audit_logs
+      WHERE action = ${filter.action}
+      ORDER BY created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `;
+    countRows = await sql`
+      SELECT COUNT(*)::int AS total FROM audit_logs
+      WHERE action = ${filter.action}
     `;
   } else if (filter.performedBy) {
     rows = await sql`

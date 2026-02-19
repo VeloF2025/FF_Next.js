@@ -4,6 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -135,6 +136,16 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     `;
 
     log.info('BOQ items updated', { boqId, count: updatedCount, changes: allChanges.length, user: userName });
+
+    createAuditLog({
+      entityType: 'boq',
+      entityId: boqId,
+      action: 'update',
+      performedBy: userId ?? 'system',
+      performedByName: userName,
+      newValues: { itemsUpdated: updatedCount, changesLogged: allChanges.length },
+    });
+
     return apiResponse.success(res, {
       message: `${updatedCount} items updated`,
       changesLogged: allChanges.length,

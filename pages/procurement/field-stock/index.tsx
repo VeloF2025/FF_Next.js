@@ -23,9 +23,11 @@ import {
   Users,
   FileText,
   ShoppingCart,
+  AlertTriangle,
 } from 'lucide-react';
+import { FaultReportList } from '@/modules/procurement/field-stock/components/faults';
 
-type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability';
+type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults';
 
 interface TabConfig {
   id: TabType;
@@ -76,6 +78,12 @@ const tabs: TabConfig[] = [
     label: 'Accountability',
     icon: <Users className="h-5 w-5" />,
     description: 'Contractor stock accountability'
+  },
+  {
+    id: 'faults',
+    label: 'Faults',
+    icon: <AlertTriangle className="h-5 w-5" />,
+    description: 'Equipment fault reports and analytics'
   },
 ];
 
@@ -225,6 +233,8 @@ export default function FieldStockPage() {
             </div>
           </div>
         );
+      case 'faults':
+        return <FaultReportList />;
       default:
         return <FieldStockDashboard />;
     }

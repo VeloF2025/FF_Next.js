@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -82,6 +83,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     log.info('Contractor unblocked', { contractorId, unblockedBy }, 'field-stock');
+
+    createAuditLog({
+      entityType: 'contractor_accountability',
+      entityId: contractorId,
+      action: 'update',
+      performedBy: 'system',
+      performedByName: unblockedBy,
+      newValues: { isBlocked: false, reason: reason || 'Contractor unblocked' },
+    });
+
     return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
     log.error('Error unblocking contractor', { error, contractorId }, 'field-stock');

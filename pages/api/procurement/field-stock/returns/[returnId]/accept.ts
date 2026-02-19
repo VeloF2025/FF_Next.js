@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -149,6 +150,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     log.info('Return accepted and restocked', { returnId, linesProcessed: lines.length }, 'field-stock');
+
+    createAuditLog({
+      entityType: 'stock_return',
+      entityId: returnId,
+      action: 'update',
+      performedBy: 'system',
+      newValues: { status: 'restocked', linesProcessed: lines.length },
+    });
+
     return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
     log.error('Error accepting return', { error, returnId }, 'field-stock');

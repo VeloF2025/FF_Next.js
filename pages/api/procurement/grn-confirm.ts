@@ -17,6 +17,7 @@ import { createLoggedSql, logUpdate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -212,6 +213,14 @@ export default withAuth(withErrorHandler(async (
       status: 'completed',
       total_quantity_received: totalQuantityReceived,
       movement_id: movement.id,
+    });
+
+    createAuditLog({
+      entityType: 'goods_receipt',
+      entityId: grnId,
+      action: 'update',
+      performedBy: userId,
+      newValues: { status: 'completed', totalQuantityReceived, movementId: movement.id },
     });
 
     log.info('GRN confirmed successfully', {

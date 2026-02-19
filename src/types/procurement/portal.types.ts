@@ -79,6 +79,7 @@ export interface ProcurementPermissions {
   canViewSuppliers: boolean;
   canEditSuppliers: boolean;
   canManageSuppliers: boolean;
+  canOverrideMovements: boolean;
   role: 'admin' | 'manager' | 'user' | 'viewer';
   approvalLimit: number;
 }

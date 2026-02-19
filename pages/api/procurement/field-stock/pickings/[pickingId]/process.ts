@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -156,6 +157,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     log.info('Picking processed', { pickingId, linesProcessed: lines.length }, 'field-stock');
+
+    createAuditLog({
+      entityType: 'picking',
+      entityId: pickingId,
+      action: 'update',
+      performedBy: 'system',
+      newValues: { status: 'done', linesProcessed: lines.length },
+    });
+
     return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
     // Rollback status on error

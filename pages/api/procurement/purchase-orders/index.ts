@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { createAuditLog } from '@/services/procurement/auditService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -271,6 +272,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     }
 
     log.info('Purchase order created', { poId, poNumber, totalAmount });
+
+    createAuditLog({
+      entityType: 'purchase_order',
+      entityId: poId,
+      action: 'create',
+      performedBy: createdBy,
+      performedByName: createdBy,
+      newValues: { poNumber, totalAmount, supplierId },
+    });
 
     return apiResponse.created(res, {
       id: poId,
