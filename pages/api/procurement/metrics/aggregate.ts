@@ -81,11 +81,9 @@ async function handler(
       // Calculate average cycle time (days from RFQ creation to PO creation)
       sql`SELECT
         COALESCE(
-          AVG(
-            EXTRACT(DAY FROM (po.created_at - r.created_at))
-          ),
-          14
-        ) as avg_days
+          AVG(EXTRACT(DAY FROM (po.created_at - r.created_at))),
+          0
+        )::numeric as avg_days
       FROM rfqs r
       JOIN purchase_orders po ON po.rfq_id = r.id
       WHERE r.status = 'awarded'`,
@@ -102,7 +100,7 @@ async function handler(
               END)::NUMERIC / COUNT(*)::NUMERIC * 100,
               0
             )
-          ELSE 92
+          ELSE 0
         END as otif_percent
       FROM goods_receipt_notes grn
       JOIN purchase_orders po ON grn.purchase_order_id = po.id
@@ -123,8 +121,8 @@ async function handler(
       totalStockItems: parseInt(stockItemCount[0]?.total) || 0,
       totalSuppliers: parseInt(supplierCount[0]?.total) || 0,
       averageCostSavings: parseFloat(costSavings[0]?.savings_percent) || 0,
-      averageCycleDays: parseFloat(cycleTime[0]?.avg_days) || 14,
-      averageSupplierOTIF: parseInt(supplierOTIF[0]?.otif_percent) || 92,
+      averageCycleDays: parseFloat(cycleTime[0]?.avg_days) || 0,
+      averageSupplierOTIF: parseInt(supplierOTIF[0]?.otif_percent) || 0,
       monthlyProcurementVolume: {
         currency: 'ZAR',
         value: parseFloat(monthlyVolume[0]?.volume) || 0,
