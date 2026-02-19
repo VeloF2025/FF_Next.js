@@ -188,13 +188,15 @@ async function handlePost(
       return apiResponse.badRequest(res, 'File content does not match declared type');
     }
 
-    // Upload to VF Storage: procurement/{entity_type}/{entity_id}/{filename}
+    // Upload to VF Storage: procurement/{entity_type}/{entityId}_{filename}
+    // VF Storage supports 2-level paths (/upload/:type/:category), so entityId goes in filename
     const fileName = file.originalFilename || `document_${Date.now()}`;
+    const storageName = `${entityId}_${fileName}`;
     const result = await vfStorage.uploadFile(
       buffer,
       'procurement',
-      `${entityType}/${entityId}`,
-      fileName
+      entityType,
+      storageName
     );
 
     // Insert DB record
