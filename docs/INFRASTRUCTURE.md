@@ -1,12 +1,24 @@
 # FibreFlow Infrastructure Documentation
 
-> Last updated: 18 Feb 2026
+> Last updated: 19 Feb 2026
 
 ## Velocity Server
 
 **Server:** 100.96.203.105 (Tailscale) / 192.168.1.150 (LAN)
 **Access:** `ssh velo@100.96.203.105` (use SSH key or stored credentials)
 **Specs:** RTX 5090 GPU, 128GB RAM, Ubuntu Server
+
+### Storage
+
+| Drive | Mount | Size | Used | Free | % |
+|-------|-------|------|------|------|---|
+| `nvme0n1` (LVM root) | `/` | 1.9 TB | 629 GB | **1.2 TB** | 35% |
+| `nvme0n1p2` | `/boot` | 2.0 GB | 238 MB | 1.6 GB | 13% |
+| `nvme1n1p1` | `/srv/data` | 1.0 TB | 22 GB | **912 GB** | 3% |
+| `nvme1n1p2` | `/srv/ml` | 500 GB | 72 GB | **395 GB** | 16% |
+
+> Root LVM (`ubuntu-vg/ubuntu-lv`) expanded 1 TB → 1.9 TB on 2026-02-19 by claiming
+> 905 GB of unallocated space in the volume group. No downtime required.
 
 ---
 
