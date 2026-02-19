@@ -9,6 +9,7 @@ export {
   SageClient,
   createSageClient,
   createSageClientFromConfig,
+  getSageClientFromDb,
   type SageClientConfig,
   type SageSupplier,
   type SageSupplierInvoice,
@@ -19,23 +20,43 @@ export {
   type SageCompany,
   type SageApiResponse,
   type SageApiError,
+  type SageAnalysisType,
+  type SageAnalysisCategory,
+  type SageAccountCategory,
+  type SageReportingGroup,
+  type SageDetailedLedgerTransaction,
+  type SageTrialBalanceEntry,
+  type SageAccountBudget,
 } from './sageClient';
 
-// Sync services (if they exist)
-// export {
-//   pullSuppliersFromSage,
-//   getUnmatchedSuppliers,
-//   manuallyMapSupplier,
-//   getSupplierMapping,
-// } from './entities/supplierSync';
+export {
+  pullSuppliersFromSage,
+  getUnmatchedSuppliers,
+  manuallyMapSupplier,
+  getSupplierMapping,
+} from './entities/supplierSync';
 
-// export {
-//   pullInvoicesFromSage,
-//   getUnmatchedInvoices,
-//   manuallyMatchInvoice,
-// } from './entities/invoiceSync';
+export {
+  pullInvoicesFromSage,
+  getUnmatchedInvoices,
+  manuallyMatchInvoice,
+} from './entities/invoiceSync';
 
-// export {
-//   pullPaymentsFromSage,
-//   getPOPaymentSummary,
-// } from './entities/paymentSync';
+export {
+  pullPaymentsFromSage,
+  getPOPaymentSummary,
+} from './entities/paymentSync';
+
+export {
+  pullAnalysisData,
+  getAnalysisSyncStatus,
+} from './entities/analysisSync';
+
+export {
+  pullLedgerTransactions,
+  getLedgerSyncStatus,
+} from './entities/ledgerSync';
+
+export {
+  pullChartOfAccounts,
+} from './entities/chartOfAccountsSync';

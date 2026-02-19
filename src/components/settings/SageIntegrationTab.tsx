@@ -26,8 +26,11 @@ import {
   Key,
   ExternalLink,
   User,
-  Lock
+  Lock,
+  Database,
+  MapPin,
 } from 'lucide-react';
+import { SageMappingTab } from './SageMappingTab';
 
 interface SageConfig {
   api_key_masked: string | null;
@@ -60,6 +63,8 @@ export function SageIntegrationTab() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [activeSection, setActiveSection] = useState<'credentials' | 'mappings'>('credentials');
+  const [syncingData, setSyncingData] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -133,6 +138,38 @@ export function SageIntegrationTab() {
     }
   };
 
+  const handleSyncAllData = async () => {
+    try {
+      setSyncingData(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      // Sync in sequence: chart of accounts → analysis → done
+      const coaRes = await fetch('/api/sage/sync/chart-of-accounts', { method: 'POST' });
+      const coaData = await coaRes.json();
+
+      const analysisRes = await fetch('/api/sage/sync/analysis', { method: 'POST' });
+      const analysisData = await analysisRes.json();
+
+      if (coaData.success && analysisData.success) {
+        const coaCount = coaData.data?.accounts?.total || 0;
+        const typesCount = analysisData.data?.types?.total || 0;
+        const catsCount = analysisData.data?.categories?.total || 0;
+        setSuccessMessage(
+          `Synced ${coaCount} accounts, ${typesCount} analysis types, ${catsCount} categories`
+        );
+      } else {
+        setError('Partial sync failure. Check individual sync status.');
+      }
+
+      await fetchConfig();
+    } catch (err) {
+      setError('Data sync failed');
+    } finally {
+      setSyncingData(false);
+    }
+  };
+
   const handleTestConnection = async () => {
     try {
       setTesting(true);
@@ -167,45 +204,12 @@ export function SageIntegrationTab() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Header Card */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border)]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center">
-            <Cloud className="w-6 h-6 text-[var(--ff-accent)] mr-3" />
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
-                Sage Business Cloud Accounting
-              </h3>
-              <p className="text-sm text-[var(--ff-text-tertiary)]">
-                South Africa - Sync invoices, payments, and suppliers
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center">
-            {config?.is_connected ? (
-              <span className="flex items-center text-green-500 text-sm">
-                <CheckCircle2 className="w-4 h-4 mr-1" />
-                Connected
-              </span>
-            ) : config?.username ? (
-              <span className="flex items-center text-yellow-500 text-sm">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                Not Tested
-              </span>
-            ) : (
-              <span className="flex items-center text-[var(--ff-text-tertiary)] text-sm">
-                <X className="w-4 h-4 mr-1" />
-                Not Configured
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Connection Status */}
-        {config && (
-          <div className="grid grid-cols-2 gap-4 p-4 bg-[var(--ff-bg-tertiary)] rounded-lg text-sm">
+  const renderCredentials = () => (
+    <>
+      {/* Connection Status */}
+      {config && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-4 border border-[var(--ff-border)]">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-[var(--ff-text-tertiary)]">Last Connection Test:</span>
               <span className="ml-2 text-[var(--ff-text-secondary)]">
@@ -223,8 +227,8 @@ export function SageIntegrationTab() {
               </span>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Success Message */}
       {successMessage && (
@@ -448,6 +452,90 @@ export function SageIntegrationTab() {
           </p>
         </div>
       </div>
+    </>
+  );
+
+  const renderMappings = () => <SageMappingTab />;
+
+  return (
+    <div className="space-y-6">
+      {/* Header Card */}
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6 border border-[var(--ff-border)]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Cloud className="w-6 h-6 text-[var(--ff-accent)] mr-3" />
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                Sage Business Cloud Accounting
+              </h3>
+              <p className="text-sm text-[var(--ff-text-tertiary)]">
+                South Africa - Sync invoices, payments, suppliers, and analysis data
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            {config?.is_connected && (
+              <button
+                onClick={handleSyncAllData}
+                disabled={syncingData}
+                className="bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-border)] disabled:opacity-50 text-[var(--ff-text-primary)] px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center"
+              >
+                {syncingData ? (
+                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4 mr-1.5" />
+                )}
+                Sync All Data
+              </button>
+            )}
+            {config?.is_connected ? (
+              <span className="flex items-center text-green-500 text-sm">
+                <CheckCircle2 className="w-4 h-4 mr-1" />
+                Connected
+              </span>
+            ) : config?.username ? (
+              <span className="flex items-center text-yellow-500 text-sm">
+                <AlertCircle className="w-4 h-4 mr-1" />
+                Not Tested
+              </span>
+            ) : (
+              <span className="flex items-center text-[var(--ff-text-tertiary)] text-sm">
+                <X className="w-4 h-4 mr-1" />
+                Not Configured
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Section Tabs */}
+        <div className="flex space-x-1 border-b border-[var(--ff-border)]">
+          <button
+            onClick={() => setActiveSection('credentials')}
+            className={`px-4 py-2 text-sm font-medium transition-colors flex items-center ${
+              activeSection === 'credentials'
+                ? 'text-[var(--ff-accent)] border-b-2 border-[var(--ff-accent)]'
+                : 'text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
+            }`}
+          >
+            <Key className="w-4 h-4 mr-1.5" />
+            Credentials
+          </button>
+          <button
+            onClick={() => setActiveSection('mappings')}
+            className={`px-4 py-2 text-sm font-medium transition-colors flex items-center ${
+              activeSection === 'mappings'
+                ? 'text-[var(--ff-accent)] border-b-2 border-[var(--ff-accent)]'
+                : 'text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
+            }`}
+          >
+            <MapPin className="w-4 h-4 mr-1.5" />
+            Site & BU Mapping
+          </button>
+        </div>
+      </div>
+
+      {/* Section Content */}
+      {activeSection === 'credentials' ? renderCredentials() : renderMappings()}
     </div>
   );
 }

@@ -5,13 +5,15 @@
  * - Matches to POs in FibreFlow
  * - Creates budget_transaction records for invoice amounts
  * - Tracks invoice status and payment progress
+ *
+ * NOTE: Sage API returns PascalCase properties (ID, SupplierID, Total, etc.)
  */
 
 import { NeonQueryFunction } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageSupplierInvoice } from '../sageClient';
 
-const logger = createLogger({ module: 'sage:invoice-sync' });
+const logger = createLogger('sage:invoice-sync');
 
 export interface InvoiceSyncResult {
   success: boolean;
@@ -46,31 +48,31 @@ export async function pullInvoicesFromSage(
   try {
     logger.info('Starting invoice pull from Sage', options);
 
-    // Build filter options
-    const filterDate = options?.sinceDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Last 30 days default
+    // Fetch invoices - use sinceDate if provided, else last 30 days
+    let sageResponse;
+    if (options?.sinceDate) {
+      sageResponse = await client.getSupplierInvoicesSince(options.sinceDate);
+    } else {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      sageResponse = await client.getSupplierInvoicesSince(thirtyDaysAgo);
+    }
 
-    // Fetch invoices from Sage
-    const sageResponse = await client.getSupplierInvoices({
-      pageSize: 200,
-      fromDate: filterDate.toISOString().split('T')[0],
-    });
-
-    const invoices = sageResponse.results || [];
+    const invoices = sageResponse.Results || [];
     logger.info(`Fetched ${invoices.length} invoices from Sage`);
 
     for (const invoice of invoices) {
       result.totalProcessed++;
 
       try {
-        // Check if invoice already exists
+        // Check if invoice already exists (use PascalCase .ID from Sage)
         const existing = await sql`
           SELECT id, status FROM sage_supplier_invoices
-          WHERE sage_invoice_id = ${invoice.id}
+          WHERE sage_invoice_id = ${invoice.ID}
         `;
 
         if (existing.length > 0) {
           // Update existing invoice
-          await updateExistingInvoice(sql, existing[0].id, invoice);
+          await updateExistingInvoice(sql, existing[0].id as string, invoice);
           result.updated++;
           continue;
         }
@@ -93,10 +95,10 @@ export async function pullInvoicesFromSage(
       } catch (error) {
         result.failed++;
         result.errors.push({
-          invoiceId: invoice.id,
+          invoiceId: invoice.ID,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        logger.error(`Failed to process invoice ${invoice.id}`, { error });
+        logger.error(`Failed to process invoice ${invoice.ID}`, { error });
       }
     }
 
@@ -156,11 +158,15 @@ export async function pullInvoicesFromSage(
 
 /**
  * Create invoice record in local database
+ * Maps Sage PascalCase → DB snake_case
  */
 async function createInvoiceRecord(
   sql: NeonQueryFunction<false, false>,
   invoice: SageSupplierInvoice
 ): Promise<{ id: string }> {
+  const totalAmount = invoice.Total ?? 0;
+  const amountDue = invoice.AmountDue ?? totalAmount;
+
   const result = await sql`
     INSERT INTO sage_supplier_invoices (
       sage_invoice_id,
@@ -168,27 +174,33 @@ async function createInvoiceRecord(
       invoice_number,
       invoice_date,
       due_date,
+      reference,
+      subtotal,
+      tax_amount,
       total_amount,
       outstanding_amount,
       currency,
       status,
       raw_data
     ) VALUES (
-      ${invoice.id},
-      ${invoice.supplierId},
-      ${invoice.invoiceNumber},
-      ${invoice.invoiceDate},
-      ${invoice.dueDate || null},
-      ${invoice.totalAmount},
-      ${invoice.outstandingAmount || invoice.totalAmount},
-      ${invoice.currency || 'ZAR'},
-      ${invoice.status || 'pending'},
+      ${invoice.ID},
+      ${invoice.SupplierID},
+      ${invoice.DocumentNumber || null},
+      ${invoice.Date},
+      ${invoice.DueDate || null},
+      ${invoice.Reference || null},
+      ${invoice.Exclusive ?? 0},
+      ${invoice.Tax ?? 0},
+      ${totalAmount},
+      ${amountDue},
+      ${'ZAR'},
+      ${invoice.Paid ? 'paid' : 'pending'},
       ${JSON.stringify(invoice)}
     )
     RETURNING id
   `;
 
-  return { id: result[0].id };
+  return { id: result[0].id as string };
 }
 
 /**
@@ -199,12 +211,17 @@ async function updateExistingInvoice(
   localId: string,
   invoice: SageSupplierInvoice
 ): Promise<void> {
+  const totalAmount = invoice.Total ?? 0;
+  const amountDue = invoice.AmountDue ?? totalAmount;
+
   await sql`
     UPDATE sage_supplier_invoices
     SET
-      outstanding_amount = ${invoice.outstandingAmount || invoice.totalAmount},
-      status = ${invoice.status || 'pending'},
+      outstanding_amount = ${amountDue},
+      total_amount = ${totalAmount},
+      status = ${invoice.Paid ? 'paid' : 'pending'},
       raw_data = ${JSON.stringify(invoice)},
+      last_synced_at = NOW(),
       updated_at = NOW()
     WHERE id = ${localId}
   `;
@@ -223,44 +240,46 @@ async function matchInvoiceToPO(
     SELECT ff_entity_id
     FROM sage_entity_mappings
     WHERE sage_entity_type = 'supplier'
-      AND sage_entity_id = ${invoice.supplierId}
+      AND sage_entity_id = ${invoice.SupplierID}
       AND sync_status = 'synced'
     LIMIT 1
   `;
 
   if (supplierMapping.length === 0) {
-    logger.info(`No FF supplier mapping for Sage supplier ${invoice.supplierId}`);
+    logger.info(`No FF supplier mapping for Sage supplier ${invoice.SupplierID}`);
     return null;
   }
 
   const ffSupplierId = supplierMapping[0].ff_entity_id;
+  const invoiceRef = invoice.Reference || '';
 
   // Try to match by PO number in invoice reference
-  if (invoice.reference) {
+  if (invoiceRef) {
     const poMatch = await sql`
       SELECT id, project_id
       FROM purchase_orders
       WHERE supplier_id = ${ffSupplierId}
         AND (
-          po_number = ${invoice.reference}
-          OR po_number ILIKE ${`%${invoice.reference}%`}
+          po_number = ${invoiceRef}
+          OR po_number ILIKE ${`%${invoiceRef}%`}
         )
         AND status IN ('approved', 'sent', 'acknowledged')
       LIMIT 1
     `;
 
     if (poMatch.length > 0) {
-      await linkInvoiceToPO(sql, localInvoiceId, poMatch[0].id);
-      return { poId: poMatch[0].id, projectId: poMatch[0].project_id };
+      await linkInvoiceToPO(sql, localInvoiceId, poMatch[0].id as string);
+      return { poId: poMatch[0].id as string, projectId: poMatch[0].project_id as string };
     }
   }
 
   // Try to match by amount and supplier (approximate match)
+  const totalAmount = invoice.Total ?? 0;
   const amountMatch = await sql`
     SELECT id, project_id
     FROM purchase_orders
     WHERE supplier_id = ${ffSupplierId}
-      AND ABS(total_amount - ${invoice.totalAmount}) < 0.01
+      AND ABS(total_amount - ${totalAmount}) < 0.01
       AND status IN ('approved', 'sent', 'acknowledged')
       AND sage_invoice_linked = false
     ORDER BY created_at DESC
@@ -268,8 +287,8 @@ async function matchInvoiceToPO(
   `;
 
   if (amountMatch.length > 0) {
-    await linkInvoiceToPO(sql, localInvoiceId, amountMatch[0].id);
-    return { poId: amountMatch[0].id, projectId: amountMatch[0].project_id };
+    await linkInvoiceToPO(sql, localInvoiceId, amountMatch[0].id as string);
+    return { poId: amountMatch[0].id as string, projectId: amountMatch[0].project_id as string };
   }
 
   return null;
@@ -322,6 +341,8 @@ async function createBudgetTransaction(
 
   const budgetItemId = poDetails[0]?.budget_item_id;
   const category = poDetails[0]?.budget_category || 'MATERIALS';
+  const totalAmount = invoice.Total ?? 0;
+  const docNumber = invoice.DocumentNumber || invoice.Reference || invoice.ID;
 
   // Create budget transaction
   await sql`
@@ -342,21 +363,21 @@ async function createBudgetTransaction(
       ${budgetItemId},
       ${category},
       'invoice',
-      ${invoice.totalAmount},
-      ${`Sage Invoice: ${invoice.invoiceNumber}`},
+      ${totalAmount},
+      ${`Sage Invoice: ${docNumber}`},
       'purchase_order',
       ${poId},
       ${invoiceId},
-      ${invoice.invoiceDate},
+      ${invoice.Date},
       'pending'
     )
     ON CONFLICT (reference_type, reference_id, transaction_type, sage_invoice_id)
     DO UPDATE SET
-      amount = ${invoice.totalAmount},
+      amount = ${totalAmount},
       updated_at = NOW()
   `;
 
-  logger.info(`Created budget transaction for invoice ${invoice.invoiceNumber}`);
+  logger.info(`Created budget transaction for invoice ${docNumber}`);
 }
 
 /**
@@ -391,11 +412,11 @@ export async function getUnmatchedInvoices(
   `;
 
   return unmatched.map((inv) => ({
-    id: inv.id,
-    invoiceNumber: inv.invoice_number,
-    supplierName: inv.supplier_name || 'Unknown',
-    amount: parseFloat(inv.total_amount),
-    date: inv.invoice_date,
+    id: inv.id as string,
+    invoiceNumber: inv.invoice_number as string,
+    supplierName: (inv.supplier_name as string) || 'Unknown',
+    amount: parseFloat(inv.total_amount as string),
+    date: inv.invoice_date as string,
   }));
 }
 
@@ -423,20 +444,30 @@ export async function manuallyMatchInvoice(
 
     await linkInvoiceToPO(sql, invoiceId, poId);
 
-    // Create budget transaction
+    // Create budget transaction using DB values (already snake_case)
+    const inv = invoice[0];
+    const sageInvoice: SageSupplierInvoice = {
+      ID: inv.sage_invoice_id as string,
+      SupplierID: inv.sage_supplier_id as string,
+      Date: inv.invoice_date as string,
+      DueDate: inv.due_date as string,
+      DocumentNumber: inv.invoice_number as string,
+      Total: parseFloat(inv.total_amount as string),
+      AmountDue: parseFloat(inv.outstanding_amount as string),
+      Paid: inv.status === 'paid',
+      Status: inv.status as string,
+      Locked: false,
+      HasAdditionalCost: false,
+      SupplierName: '',
+      Inclusive: false,
+    };
+
     await createBudgetTransaction(
       sql,
       invoiceId,
-      {
-        id: invoice[0].sage_invoice_id,
-        supplierId: invoice[0].sage_supplier_id,
-        invoiceNumber: invoice[0].invoice_number,
-        invoiceDate: invoice[0].invoice_date,
-        totalAmount: parseFloat(invoice[0].total_amount),
-        outstandingAmount: parseFloat(invoice[0].outstanding_amount),
-      } as SageSupplierInvoice,
+      sageInvoice,
       poId,
-      po[0].project_id
+      po[0].project_id as string
     );
 
     return true;

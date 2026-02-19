@@ -5,13 +5,15 @@
  * - Matches to invoices
  * - Creates budget_transaction records for payments
  * - Updates PO status when fully paid
+ *
+ * NOTE: Sage API returns PascalCase properties (ID, SupplierID, Total, etc.)
  */
 
 import { NeonQueryFunction } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageSupplierPayment } from '../sageClient';
 
-const logger = createLogger({ module: 'sage:payment-sync' });
+const logger = createLogger('sage:payment-sync');
 
 export interface PaymentSyncResult {
   success: boolean;
@@ -48,26 +50,26 @@ export async function pullPaymentsFromSage(
   try {
     logger.info('Starting payment pull from Sage', options);
 
-    // Build filter options
-    const filterDate = options?.sinceDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // Fetch payments - use sinceDate if provided, else last 30 days
+    let sageResponse;
+    if (options?.sinceDate) {
+      sageResponse = await client.getSupplierPaymentsSince(options.sinceDate);
+    } else {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      sageResponse = await client.getSupplierPaymentsSince(thirtyDaysAgo);
+    }
 
-    // Fetch payments from Sage
-    const sageResponse = await client.getSupplierPayments({
-      pageSize: 200,
-      fromDate: filterDate.toISOString().split('T')[0],
-    });
-
-    const payments = sageResponse.results || [];
+    const payments = sageResponse.Results || [];
     logger.info(`Fetched ${payments.length} payments from Sage`);
 
     for (const payment of payments) {
       result.totalProcessed++;
 
       try {
-        // Check if payment already exists
+        // Check if payment already exists (PascalCase .ID)
         const existing = await sql`
           SELECT id FROM sage_supplier_payments
-          WHERE sage_payment_id = ${payment.id}
+          WHERE sage_payment_id = ${payment.ID}
         `;
 
         if (existing.length > 0) {
@@ -101,10 +103,10 @@ export async function pullPaymentsFromSage(
       } catch (error) {
         result.failed++;
         result.errors.push({
-          paymentId: payment.id,
+          paymentId: payment.ID,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        logger.error(`Failed to process payment ${payment.id}`, { error });
+        logger.error(`Failed to process payment ${payment.ID}`, { error });
       }
     }
 
@@ -165,6 +167,7 @@ export async function pullPaymentsFromSage(
 
 /**
  * Create payment record in local database
+ * Maps Sage PascalCase → DB snake_case
  */
 async function createPaymentRecord(
   sql: NeonQueryFunction<false, false>,
@@ -181,19 +184,19 @@ async function createPaymentRecord(
       payment_method,
       raw_data
     ) VALUES (
-      ${payment.id},
-      ${payment.supplierId},
-      ${payment.paymentDate},
-      ${payment.amount},
-      ${payment.currency || 'ZAR'},
-      ${payment.reference || null},
-      ${payment.paymentMethod || null},
+      ${payment.ID},
+      ${payment.SupplierID},
+      ${payment.Date},
+      ${payment.Total ?? 0},
+      ${'ZAR'},
+      ${payment.Reference || null},
+      ${payment.PaymentMethod != null ? String(payment.PaymentMethod) : null},
       ${JSON.stringify(payment)}
     )
     RETURNING id
   `;
 
-  return { id: result[0].id };
+  return { id: result[0].id as string };
 }
 
 /**
@@ -204,30 +207,9 @@ async function matchPaymentToInvoice(
   localPaymentId: string,
   payment: SageSupplierPayment
 ): Promise<{ invoiceId: string; poId: string; projectId: string } | null> {
-  // If payment has invoice ID, use direct match
-  if (payment.invoiceId) {
-    const invoice = await sql`
-      SELECT
-        ssi.id,
-        ssi.ff_purchase_order_id,
-        po.project_id
-      FROM sage_supplier_invoices ssi
-      LEFT JOIN purchase_orders po ON po.id = ssi.ff_purchase_order_id
-      WHERE ssi.sage_invoice_id = ${payment.invoiceId}
-    `;
-
-    if (invoice.length > 0 && invoice[0].ff_purchase_order_id) {
-      await linkPaymentToInvoice(sql, localPaymentId, invoice[0].id);
-      return {
-        invoiceId: invoice[0].id,
-        poId: invoice[0].ff_purchase_order_id,
-        projectId: invoice[0].project_id,
-      };
-    }
-  }
-
   // Try to match by reference to invoice number
-  if (payment.reference) {
+  const paymentRef = payment.Reference || '';
+  if (paymentRef) {
     const invoiceMatch = await sql`
       SELECT
         ssi.id,
@@ -235,16 +217,53 @@ async function matchPaymentToInvoice(
         po.project_id
       FROM sage_supplier_invoices ssi
       LEFT JOIN purchase_orders po ON po.id = ssi.ff_purchase_order_id
-      WHERE ssi.invoice_number = ${payment.reference}
-        OR ssi.sage_invoice_id = ${payment.reference}
+      WHERE (ssi.invoice_number = ${paymentRef}
+        OR ssi.sage_invoice_id = ${paymentRef})
+        AND ssi.ff_purchase_order_id IS NOT NULL
     `;
 
     if (invoiceMatch.length > 0 && invoiceMatch[0].ff_purchase_order_id) {
-      await linkPaymentToInvoice(sql, localPaymentId, invoiceMatch[0].id);
+      await linkPaymentToInvoice(sql, localPaymentId, invoiceMatch[0].id as string);
       return {
-        invoiceId: invoiceMatch[0].id,
-        poId: invoiceMatch[0].ff_purchase_order_id,
-        projectId: invoiceMatch[0].project_id,
+        invoiceId: invoiceMatch[0].id as string,
+        poId: invoiceMatch[0].ff_purchase_order_id as string,
+        projectId: invoiceMatch[0].project_id as string,
+      };
+    }
+  }
+
+  // Try to match by supplier + amount (approximate)
+  const supplierMapping = await sql`
+    SELECT ff_entity_id FROM sage_entity_mappings
+    WHERE sage_entity_type = 'supplier'
+      AND sage_entity_id = ${payment.SupplierID}
+      AND sync_status = 'synced'
+    LIMIT 1
+  `;
+
+  if (supplierMapping.length > 0) {
+    const paymentAmount = payment.Total ?? 0;
+    const amountMatch = await sql`
+      SELECT
+        ssi.id,
+        ssi.ff_purchase_order_id,
+        po.project_id
+      FROM sage_supplier_invoices ssi
+      LEFT JOIN purchase_orders po ON po.id = ssi.ff_purchase_order_id
+      WHERE ssi.sage_supplier_id = ${payment.SupplierID}
+        AND ABS(ssi.outstanding_amount - ${paymentAmount}) < 0.01
+        AND ssi.status != 'paid'
+        AND ssi.ff_purchase_order_id IS NOT NULL
+      ORDER BY ssi.invoice_date DESC
+      LIMIT 1
+    `;
+
+    if (amountMatch.length > 0) {
+      await linkPaymentToInvoice(sql, localPaymentId, amountMatch[0].id as string);
+      return {
+        invoiceId: amountMatch[0].id as string,
+        poId: amountMatch[0].ff_purchase_order_id as string,
+        projectId: amountMatch[0].project_id as string,
       };
     }
   }
@@ -274,12 +293,14 @@ async function linkPaymentToInvoice(
     SELECT amount FROM sage_supplier_payments WHERE id = ${paymentId}
   `;
 
+  const paymentAmount = parseFloat(payment[0].amount as string);
+
   await sql`
     UPDATE sage_supplier_invoices
     SET
-      outstanding_amount = GREATEST(0, outstanding_amount - ${payment[0].amount}),
+      outstanding_amount = GREATEST(0, outstanding_amount - ${paymentAmount}),
       status = CASE
-        WHEN outstanding_amount - ${payment[0].amount} <= 0 THEN 'paid'
+        WHEN outstanding_amount - ${paymentAmount} <= 0 THEN 'paid'
         ELSE 'partial'
       END,
       updated_at = NOW()
@@ -307,6 +328,8 @@ async function createPaymentBudgetTransaction(
 
   const budgetItemId = poDetails[0]?.budget_item_id;
   const category = poDetails[0]?.budget_category || 'MATERIALS';
+  const paymentAmount = payment.Total ?? 0;
+  const paymentRef = payment.Reference || payment.DocumentNumber || payment.ID;
 
   // Create budget transaction
   await sql`
@@ -327,21 +350,21 @@ async function createPaymentBudgetTransaction(
       ${budgetItemId},
       ${category},
       'payment',
-      ${payment.amount},
-      ${`Sage Payment: ${payment.reference || payment.id}`},
+      ${paymentAmount},
+      ${`Sage Payment: ${paymentRef}`},
       'purchase_order',
       ${match.poId},
       ${paymentId},
-      ${payment.paymentDate},
+      ${payment.Date},
       'completed'
     )
     ON CONFLICT (reference_type, reference_id, transaction_type, sage_payment_id)
     DO UPDATE SET
-      amount = ${payment.amount},
+      amount = ${paymentAmount},
       updated_at = NOW()
   `;
 
-  logger.info(`Created budget transaction for payment ${payment.reference || payment.id}`);
+  logger.info(`Created budget transaction for payment ${paymentRef}`);
 }
 
 /**
@@ -364,8 +387,8 @@ async function checkAndUpdatePOStatus(
       AND bt.transaction_type = 'payment'
   `;
 
-  const totalAmount = parseFloat(po[0]?.total_amount || '0');
-  const totalPaid = parseFloat(payments[0]?.total_paid || '0');
+  const totalAmount = parseFloat(po[0]?.total_amount as string || '0');
+  const totalPaid = parseFloat(payments[0]?.total_paid as string || '0');
 
   if (totalPaid >= totalAmount) {
     await sql`
@@ -426,15 +449,15 @@ export async function getPOPaymentSummary(
       AND transaction_type = 'payment'
   `;
 
-  const totalAmount = parseFloat(po[0]?.total_amount || '0');
-  const invoicedAmount = parseFloat(invoices[0]?.invoiced || '0');
-  const paidAmount = parseFloat(payments[0]?.paid || '0');
+  const totalAmount = parseFloat(po[0]?.total_amount as string || '0');
+  const invoicedAmount = parseFloat(invoices[0]?.invoiced as string || '0');
+  const paidAmount = parseFloat(payments[0]?.paid as string || '0');
 
   return {
     totalAmount,
     invoicedAmount,
     paidAmount,
     outstandingAmount: totalAmount - paidAmount,
-    status: po[0]?.payment_status || 'pending',
+    status: (po[0]?.payment_status as string) || 'pending',
   };
 }

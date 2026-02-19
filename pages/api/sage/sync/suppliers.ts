@@ -10,14 +10,14 @@ import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
-import { createSageClientFromConfig } from '@/services/sage';
+import { getSageClientFromDb } from '@/services/sage/sageClient';
 import {
   pullSuppliersFromSage,
   getUnmatchedSuppliers,
   manuallyMapSupplier,
 } from '@/services/sage/entities/supplierSync';
 
-const logger = createLogger({ module: 'api:sage:sync:suppliers' });
+const logger = createLogger('api:sage:sync:suppliers');
 
 async function handler(
   req: NextApiRequest,
@@ -58,12 +58,12 @@ async function handler(
       return apiResponse.success(res, {
         lastSync: lastSync[0] || null,
         mappingStats: {
-          synced: parseInt(stats[0]?.synced || '0'),
-          pendingReview: parseInt(stats[0]?.pending_review || '0'),
-          failed: parseInt(stats[0]?.failed || '0'),
-          total: parseInt(stats[0]?.total || '0'),
+          synced: parseInt(stats[0]?.synced as string || '0'),
+          pendingReview: parseInt(stats[0]?.pending_review as string || '0'),
+          failed: parseInt(stats[0]?.failed as string || '0'),
+          total: parseInt(stats[0]?.total as string || '0'),
         },
-        unmappedFFSuppliers: parseInt(unmapped[0]?.count || '0'),
+        unmappedFFSuppliers: parseInt(unmapped[0]?.count as string || '0'),
       });
     } catch (error) {
       logger.error('Failed to get supplier sync status', { error });
@@ -96,54 +96,15 @@ async function handler(
 
     // Default: Pull suppliers from Sage
     try {
-      // Get Sage config
-      const configResult = await sql`
-        SELECT
-          client_id,
-          client_secret,
-          company_id,
-          base_url,
-          access_token,
-          refresh_token,
-          token_expires_at
-        FROM sage_api_config
-        WHERE is_active = true AND is_connected = true
-        LIMIT 1
-      `;
-
-      if (configResult.length === 0) {
-        return apiResponse.badRequest(res, 'Sage is not configured or not connected');
-      }
-
-      const config = configResult[0];
-
-      // Create Sage client
-      const client = createSageClientFromConfig({
-        clientId: config.client_id,
-        clientSecret: config.client_secret,
-        companyId: config.company_id,
-        baseUrl: config.base_url,
-        accessToken: config.access_token,
-        refreshToken: config.refresh_token,
-        expiresAt: config.token_expires_at ? new Date(config.token_expires_at) : undefined,
-      });
-
-      // Run sync
+      const client = await getSageClientFromDb(sql);
       const result = await pullSuppliersFromSage(client, sql);
 
-      // Update tokens if refreshed
-      const tokens = client.getTokens();
-      if (tokens && tokens.accessToken !== config.access_token) {
-        await sql`
-          UPDATE sage_api_config
-          SET
-            access_token = ${tokens.accessToken},
-            refresh_token = ${tokens.refreshToken},
-            token_expires_at = ${tokens.expiresAt.toISOString()},
-            updated_at = NOW()
-          WHERE is_active = true
-        `;
-      }
+      // Update last_sync_at
+      await sql`
+        UPDATE sage_api_config
+        SET last_sync_at = NOW(), updated_at = NOW()
+        WHERE is_active = true
+      `;
 
       return apiResponse.success(res, result);
     } catch (error) {
@@ -152,7 +113,7 @@ async function handler(
     }
   }
 
-  return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 
 export default withAuth(handler);

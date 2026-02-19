@@ -12,7 +12,7 @@
 
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger({ module: 'sageClient' });
+const logger = createLogger('sageClient');
 
 // ============================================================================
 // Constants
@@ -238,6 +238,96 @@ export interface SageApiError {
   ErrorCode?: string;
   Details?: string;
   message?: string;
+}
+
+// ============================================================================
+// Analysis & Reporting Types
+// ============================================================================
+
+export interface SageAnalysisType {
+  ID: string;
+  Description: string;
+  Active: boolean;
+  SystemDefined?: boolean;
+  Created?: string;
+  Modified?: string;
+}
+
+export interface SageAnalysisCategory {
+  ID: string;
+  AnalysisTypeId: string;
+  Description: string;
+  Active: boolean;
+  Order?: number;
+  Created?: string;
+  Modified?: string;
+}
+
+export interface SageAccountCategory {
+  ID: string;
+  Description: string;
+  Comment?: string;
+  Order?: number;
+  Created?: string;
+  Modified?: string;
+}
+
+export interface SageReportingGroup {
+  ID: string;
+  Description: string;
+  AccountCategoryId?: string;
+  Order?: number;
+  Active: boolean;
+  Created?: string;
+  Modified?: string;
+}
+
+export interface SageDetailedLedgerTransaction {
+  ID?: string;
+  Date: string;
+  Description?: string;
+  DocumentNumber?: string;
+  Reference?: string;
+  AccountId: string;
+  AccountName?: string;
+  Debit: number;
+  Credit: number;
+  Tax?: number;
+  TaxTypeId?: string;
+  AnalysisCategoryId1?: string;
+  AnalysisCategoryId2?: string;
+  AnalysisCategoryId3?: string;
+  AnalysisTypeId1?: string;
+  AnalysisTypeId2?: string;
+  AnalysisTypeId3?: string;
+  SourceModule?: string;
+  SourceDocumentId?: string;
+  Created?: string;
+  Modified?: string;
+}
+
+export interface SageTrialBalanceEntry {
+  AccountId: string;
+  AccountName?: string;
+  AccountCategoryId?: string;
+  AccountCategoryDescription?: string;
+  ReportingGroupId?: string;
+  ReportingGroupDescription?: string;
+  Debit: number;
+  Credit: number;
+  OpeningBalance?: number;
+  ClosingBalance?: number;
+  TotalMovement?: number;
+}
+
+export interface SageAccountBudget {
+  AccountId: string;
+  AccountName?: string;
+  BudgetItems?: Array<{
+    Month: number;
+    Year: number;
+    Amount: number;
+  }>;
 }
 
 // ============================================================================
@@ -566,6 +656,178 @@ export class SageClient {
   }
 
   // ==========================================================================
+  // Analysis Types & Categories (Business Units / Sites)
+  // ==========================================================================
+
+  /**
+   * Get analysis type definitions (e.g., "Site", "BU")
+   */
+  async getAnalysisTypes(): Promise<SageApiResponse<SageAnalysisType>> {
+    return this.get<SageApiResponse<SageAnalysisType>>('AnalysisType/Get');
+  }
+
+  /**
+   * Get analysis categories (individual sites/BUs under a type)
+   */
+  async getAnalysisCategories(options?: {
+    skip?: number;
+    take?: number;
+    filter?: string;
+  }): Promise<SageApiResponse<SageAnalysisCategory>> {
+    const params = new URLSearchParams();
+    if (options?.skip) params.append('$skip', String(options.skip));
+    if (options?.take) params.append('$top', String(options.take));
+    if (options?.filter) params.append('$filter', options.filter);
+
+    const query = params.toString();
+    const endpoint = `AnalysisCategory/Get${query ? `?${query}` : ''}`;
+
+    return this.get<SageApiResponse<SageAnalysisCategory>>(endpoint);
+  }
+
+  /**
+   * Get categories for a specific analysis type
+   */
+  async getAnalysisCategoriesByType(
+    typeId: string
+  ): Promise<SageApiResponse<SageAnalysisCategory>> {
+    return this.getAnalysisCategories({
+      filter: `AnalysisTypeId eq guid'${typeId}'`,
+    });
+  }
+
+  // ==========================================================================
+  // Account Categories & Reporting Groups
+  // ==========================================================================
+
+  /**
+   * Get account categories (Sales, COS, Expenses, etc.)
+   */
+  async getAccountCategories(): Promise<SageApiResponse<SageAccountCategory>> {
+    return this.get<SageApiResponse<SageAccountCategory>>('AccountCategory/Get');
+  }
+
+  /**
+   * Get reporting groups (hierarchy under account categories)
+   */
+  async getReportingGroups(): Promise<SageApiResponse<SageReportingGroup>> {
+    return this.get<SageApiResponse<SageReportingGroup>>('ReportingGroup/Get');
+  }
+
+  /**
+   * Get full chart of accounts with categories
+   */
+  async getChartOfAccounts(): Promise<SageApiResponse<SageAccount>> {
+    return this.getAccounts({ take: 1000 });
+  }
+
+  // ==========================================================================
+  // Detailed Ledger Transactions
+  // ==========================================================================
+
+  /**
+   * Get detailed ledger transactions with analysis codes.
+   * Supports pagination. Sage returns max 200 per page.
+   */
+  async getDetailedLedgerTransactions(options?: {
+    skip?: number;
+    take?: number;
+    filter?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<SageApiResponse<SageDetailedLedgerTransaction>> {
+    const filters: string[] = [];
+    if (options?.filter) filters.push(options.filter);
+    if (options?.fromDate) {
+      filters.push(`Date ge datetime'${options.fromDate}'`);
+    }
+    if (options?.toDate) {
+      filters.push(`Date le datetime'${options.toDate}'`);
+    }
+
+    const params = new URLSearchParams();
+    if (options?.skip) params.append('$skip', String(options.skip));
+    params.append('$top', String(options?.take || 200));
+    if (filters.length > 0) {
+      params.append('$filter', filters.join(' and '));
+    }
+
+    const query = params.toString();
+    const endpoint = `DetailedLedgerTransaction/Get?${query}`;
+
+    return this.get<SageApiResponse<SageDetailedLedgerTransaction>>(endpoint);
+  }
+
+  /**
+   * Get all ledger transactions for a date range with automatic pagination.
+   * Handles Sage's 200-per-page limit.
+   */
+  async getAllLedgerTransactions(
+    fromDate: string,
+    toDate: string
+  ): Promise<SageDetailedLedgerTransaction[]> {
+    const pageSize = 200;
+    let skip = 0;
+    const allTransactions: SageDetailedLedgerTransaction[] = [];
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const response = await this.getDetailedLedgerTransactions({
+        skip,
+        take: pageSize,
+        fromDate,
+        toDate,
+      });
+
+      const batch = response.Results || [];
+      allTransactions.push(...batch);
+
+      if (batch.length < pageSize) break;
+      skip += pageSize;
+
+      // Safety limit: max 50 pages (10,000 transactions)
+      if (skip >= 10000) {
+        logger.warn('Ledger transaction pagination hit safety limit', {
+          totalFetched: allTransactions.length,
+        });
+        break;
+      }
+    }
+
+    return allTransactions;
+  }
+
+  // ==========================================================================
+  // Trial Balance & Budgets
+  // ==========================================================================
+
+  /**
+   * Get trial balance for a period
+   */
+  async getTrialBalance(options?: {
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<SageApiResponse<SageTrialBalanceEntry>> {
+    const params = new URLSearchParams();
+    if (options?.fromDate) params.append('FromDate', options.fromDate);
+    if (options?.toDate) params.append('ToDate', options.toDate);
+
+    const query = params.toString();
+    const endpoint = `TrialBalance/Get${query ? `?${query}` : ''}`;
+
+    return this.get<SageApiResponse<SageTrialBalanceEntry>>(endpoint);
+  }
+
+  /**
+   * Get account budgets from Sage
+   */
+  async getAccountBudgets(): Promise<SageApiResponse<SageAccountBudget>> {
+    return this.get<SageApiResponse<SageAccountBudget>>(
+      'AccountBalance/GetAccountBudgets'
+    );
+  }
+
+  // ==========================================================================
   // Utility Methods
   // ==========================================================================
 
@@ -604,6 +866,50 @@ export class SageClient {
       authType: 'Basic',
     };
   }
+}
+
+// ============================================================================
+// Database Helper - Shared Sage Client from DB Config
+// ============================================================================
+
+/**
+ * Get a SageClient using credentials stored in sage_api_config table.
+ * Shared helper used by all sync API routes.
+ */
+export async function getSageClientFromDb(
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => Promise<Record<string, unknown>[]>
+): Promise<SageClient> {
+  const configResult = await sql`
+    SELECT
+      api_key,
+      username,
+      password,
+      company_id,
+      base_url,
+      api_version
+    FROM sage_api_config
+    WHERE is_active = true AND is_connected = true
+    LIMIT 1
+  `;
+
+  if (configResult.length === 0) {
+    throw new Error('Sage is not configured or not connected. Please configure Sage credentials in Settings.');
+  }
+
+  const config = configResult[0];
+
+  if (!config.api_key || !config.username || !config.password) {
+    throw new Error('Sage credentials incomplete. Please check API Key, Username, and Password in Settings.');
+  }
+
+  return createSageClientFromConfig({
+    apiKey: config.api_key as string,
+    username: config.username as string,
+    password: config.password as string,
+    companyId: config.company_id as string | undefined,
+    baseUrl: config.base_url as string | undefined,
+    apiVersion: config.api_version as string | undefined,
+  });
 }
 
 // ============================================================================

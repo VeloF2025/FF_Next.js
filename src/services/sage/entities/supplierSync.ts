@@ -10,7 +10,7 @@ import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageSupplier } from '../sageClient';
 
-const logger = createLogger({ module: 'sage:supplier-sync' });
+const logger = createLogger('sage:supplier-sync');
 
 export interface FFSupplier {
   id: string;
@@ -66,8 +66,8 @@ export async function pullSuppliersFromSage(
     logger.info('Starting supplier pull from Sage');
 
     // Fetch all suppliers from Sage
-    const sageResponse = await client.getSuppliers({ pageSize: 200 });
-    const sageSuppliers = sageResponse.results || [];
+    const sageResponse = await client.getSuppliers({ take: 200 });
+    const sageSuppliers = sageResponse.Results || [];
 
     logger.info(`Fetched ${sageSuppliers.length} suppliers from Sage`);
 
@@ -75,11 +75,16 @@ export async function pullSuppliersFromSage(
       result.totalProcessed++;
 
       try {
+        // Sage returns PascalCase properties
+        const sageId = sageSupplier.ID;
+        const sageName = sageSupplier.Name;
+        const sageTaxRef = sageSupplier.TaxReference;
+
         // Check if supplier already mapped
         const existingMapping = await sql`
           SELECT * FROM sage_entity_mappings
           WHERE sage_entity_type = 'supplier'
-            AND sage_entity_id = ${sageSupplier.id}
+            AND sage_entity_id = ${sageId}
         `;
 
         if (existingMapping.length > 0) {
@@ -96,8 +101,8 @@ export async function pullSuppliersFromSage(
         // Try to find matching FF supplier by name or tax number
         const matchedSupplier = await findMatchingFFSupplier(
           sql,
-          sageSupplier.name,
-          sageSupplier.taxNumber
+          sageName,
+          sageTaxRef
         );
 
         if (matchedSupplier) {
@@ -115,7 +120,7 @@ export async function pullSuppliersFromSage(
               'supplier',
               ${matchedSupplier.id},
               'supplier',
-              ${sageSupplier.id},
+              ${sageId},
               ${matchedSupplier.matchType},
               ${matchedSupplier.matchConfidence},
               NOW()
@@ -126,14 +131,14 @@ export async function pullSuppliersFromSage(
           await sql`
             UPDATE suppliers
             SET
-              sage_supplier_id = ${sageSupplier.id},
+              sage_supplier_id = ${sageId},
               sage_synced_at = NOW(),
               sage_sync_status = 'synced'
             WHERE id = ${matchedSupplier.id}
           `;
 
           result.created++;
-          logger.info(`Mapped Sage supplier ${sageSupplier.name} to FF supplier ${matchedSupplier.name}`);
+          logger.info(`Mapped Sage supplier ${sageName} to FF supplier ${matchedSupplier.name}`);
         } else {
           // No match found, create unmatched record for manual review
           await sql`
@@ -149,22 +154,22 @@ export async function pullSuppliersFromSage(
               'supplier',
               NULL,
               'supplier',
-              ${sageSupplier.id},
+              ${sageId},
               'unmatched',
               0,
               'pending_review'
             )
           `;
 
-          logger.info(`Sage supplier ${sageSupplier.name} has no FF match - pending review`);
+          logger.info(`Sage supplier ${sageName} has no FF match - pending review`);
         }
       } catch (error) {
         result.failed++;
         result.errors.push({
-          supplierId: sageSupplier.id,
+          supplierId: sageSupplier.ID,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        logger.error(`Failed to process Sage supplier ${sageSupplier.id}`, { error });
+        logger.error(`Failed to process Sage supplier ${sageSupplier.ID}`, { error });
       }
     }
 
