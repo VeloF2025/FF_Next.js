@@ -20,6 +20,7 @@ import {
 import type { GoodsReceiptNote, GRNStatus, InspectionStatus } from '@/types/procurement/grn.types';
 import { log } from '@/lib/logger';
 import { GRNAssetRegistration } from '@/modules/procurement/components/GRNAssetRegistration';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
 
 const statusConfig: Record<GRNStatus, { label: string; color: string; bgColor: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'text-gray-400', bgColor: 'bg-gray-500/20', icon: Clock },
@@ -409,6 +410,21 @@ export default function GRNDetailPage() {
                   <h3 className="text-sm font-medium text-[var(--ff-text-primary)] mb-2">Notes</h3>
                   <p className="text-sm text-[var(--ff-text-secondary)]">{grn.notes}</p>
                 </div>
+              )}
+
+              {/* Documents */}
+              {id && typeof id === 'string' && (
+                <ProcurementDocumentPanel
+                  entityType="goods_receipt_note"
+                  entityId={id}
+                  allowedTypes={[
+                    { value: 'delivery_note', label: 'Delivery Note' },
+                    { value: 'grv', label: 'GRV (Goods Return)' },
+                    { value: 'receipt', label: 'Receipt' },
+                    { value: 'image', label: 'Photo/Image' },
+                    { value: 'other', label: 'Other' },
+                  ]}
+                />
               )}
             </div>
 

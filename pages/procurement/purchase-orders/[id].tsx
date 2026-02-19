@@ -23,6 +23,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
 
 // Types
 type POStatus =
@@ -35,7 +36,7 @@ type POStatus =
   | 'completed'
   | 'cancelled';
 
-type TabId = 'details' | 'items' | 'receipts' | 'history';
+type TabId = 'details' | 'items' | 'receipts' | 'history' | 'documents';
 
 interface POLineItem {
   id: string;
@@ -439,6 +440,7 @@ export default function PurchaseOrderDetailPage() {
     { id: 'items' as TabId, label: `Items (${purchaseOrder.items.length})`, icon: Package },
     { id: 'receipts' as TabId, label: `Receipts (${purchaseOrder.receipts.length})`, icon: Truck },
     { id: 'history' as TabId, label: 'History', icon: Clock },
+    { id: 'documents' as TabId, label: 'Documents', icon: FileText },
   ];
 
   return (
@@ -719,6 +721,20 @@ export default function PurchaseOrderDetailPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <ProcurementDocumentPanel
+              entityType="purchase_order"
+              entityId={purchaseOrder.id}
+              allowedTypes={[
+                { value: 'quote_pdf', label: 'Supplier Quote' },
+                { value: 'invoice', label: 'Invoice' },
+                { value: 'delivery_note', label: 'Delivery Note' },
+                { value: 'contract', label: 'Contract' },
+                { value: 'other', label: 'Other' },
+              ]}
+            />
           )}
         </div>
       </div>

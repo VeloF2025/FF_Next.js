@@ -32,6 +32,7 @@ import { QuoteScannerModal } from '@/modules/procurement/quote-scanner';
 import SupplierCodeMapper from '@/components/procurement/rfq/SupplierCodeMapper';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
 
 interface RFQItem {
   id: string;
@@ -664,6 +665,17 @@ export default function RFQDetailPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Documents */}
+              <ProcurementDocumentPanel
+                entityType="rfq_response"
+                entityId={rfq.id}
+                allowedTypes={[
+                  { value: 'quote_pdf', label: 'Supplier Quote' },
+                  { value: 'contract', label: 'Contract' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </div>
           </div>
         </div>
