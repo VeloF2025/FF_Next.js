@@ -81,55 +81,8 @@ const priorityConfig = {
   urgent: { color: 'bg-red-100 text-red-800', badge: '●' }
 };
 
-// Mock RFQ data
-const mockRFQs: RFQInvite[] = [
-  {
-    id: 'rfq-001',
-    title: 'Network Security Equipment',
-    description: 'Request for enterprise-grade firewall and security appliances',
-    supplierId: 'supplier-001',
-    supplierName: 'TechFlow Solutions',
-    status: 'responded',
-    sentDate: '2024-01-15',
-    dueDate: '2024-01-30',
-    responseDate: '2024-01-20',
-    estimatedValue: 125000,
-    category: 'Technology',
-    priority: 'high',
-    requirements: ['ISO 27001 Certified', '24/7 Support', '2-year Warranty'],
-    attachments: 3
-  },
-  {
-    id: 'rfq-002',
-    title: 'Steel Construction Materials',
-    description: 'Structural steel and reinforcement bars for Project Phoenix',
-    supplierId: 'supplier-002',
-    supplierName: 'Global Materials Inc',
-    status: 'viewed',
-    sentDate: '2024-01-18',
-    dueDate: '2024-02-05',
-    estimatedValue: 75000,
-    category: 'Materials',
-    priority: 'medium',
-    requirements: ['ASTM Compliance', 'Mill Certificates', 'On-site Delivery'],
-    attachments: 2
-  },
-  {
-    id: 'rfq-003',
-    title: 'Consulting Services Package',
-    description: 'Strategic consulting and implementation services',
-    supplierId: 'supplier-003',
-    supplierName: 'Premium Services Ltd',
-    status: 'sent',
-    sentDate: '2024-01-22',
-    dueDate: '2024-02-10',
-    estimatedValue: 95000,
-    category: 'Services',
-    priority: 'urgent',
-    requirements: ['Certified Consultants', 'Case Studies', 'References'],
-    attachments: 1
-  }
-];
+// TODO: Wire to real RFQ invites API
+const mockRFQs: RFQInvite[] = [];
 
 // RFQ Card Component
 interface RFQCardProps {

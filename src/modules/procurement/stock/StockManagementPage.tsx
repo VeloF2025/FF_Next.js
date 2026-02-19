@@ -11,8 +11,7 @@ import {
   TransfersTab
 } from './components';
 import { useStockManagement } from './hooks/useStockManagement';
-import { mockStockItems, mockStockMovements } from './data/mockData';
-import type { StockTab } from './types/stock.types';
+import type { StockTab, StockItemData, StockMovement } from './types/stock.types';
 
 export default function StockManagementPage() {
   const navigate = useNavigate();
@@ -33,10 +32,10 @@ export default function StockManagementPage() {
     handleToggleSelect,
     handleBulkAction,
     handleStockAction
-  } = useStockManagement(mockStockItems);
+  } = useStockManagement([] as StockItemData[]);
 
-  // Filter transfers from movements
-  const transferMovements = mockStockMovements.filter(m => m.type === 'transfer');
+  // Filter transfers from movements — requires real API data
+  const transferMovements: StockMovement[] = [];
 
   if (!selectedProject) {
     return (

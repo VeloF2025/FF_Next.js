@@ -5,7 +5,7 @@ import { Upload } from 'lucide-react';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { log } from '@/lib/logger';
 import { useDocumentFilters } from './documents-tab/hooks/useDocumentFilters';
-import { mockDocuments } from './documents-tab/data/mockDocuments';
+import type { SupplierDocument } from './documents-tab/types/documents.types';
 import {
   DocumentCard,
   DocumentSummary,
@@ -14,7 +14,6 @@ import {
   NoDocumentsState,
   ComplianceAlert
 } from './documents-tab/components';
-import type { SupplierDocument } from './documents-tab/types/documents.types';
 
 export function DocumentsTab() {
   const { selectedSupplier } = useSuppliersPortal();
@@ -31,7 +30,7 @@ export function DocumentsTab() {
     setRequirementFilter,
     filteredDocuments
   } = useDocumentFilters({
-    documents: mockDocuments,
+    documents: [] as SupplierDocument[],
     selectedSupplier
   });
 

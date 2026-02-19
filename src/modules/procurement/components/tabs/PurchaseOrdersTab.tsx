@@ -14,12 +14,8 @@ export function PurchaseOrdersTab() {
   // Update tab badge with active PO count
   useEffect(() => {
     if (selectedProject) {
-      // TODO: Replace with actual API call
-      const mockActivePOs = 4;
-      updateTabBadge('purchase-orders', { 
-        count: mockActivePOs, 
-        type: 'info'
-      });
+      // TODO: Wire to real API
+      updateTabBadge('purchase-orders', { count: 0, type: 'info' });
     }
   }, [selectedProject, updateTabBadge]);
 

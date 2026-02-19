@@ -13,12 +13,8 @@ export function StockMovementTab() {
   // Update tab badge with critical stock items
   useEffect(() => {
     if (selectedProject) {
-      // TODO: Replace with actual API call
-      const mockCriticalItems = 5;
-      updateTabBadge('stock', { 
-        count: mockCriticalItems, 
-        type: mockCriticalItems > 3 ? 'error' : 'warning'
-      });
+      // TODO: Wire to real API
+      updateTabBadge('stock', { count: 0, type: 'info' });
     }
   }, [selectedProject, updateTabBadge]);
 

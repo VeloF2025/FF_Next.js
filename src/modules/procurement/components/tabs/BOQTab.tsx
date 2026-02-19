@@ -19,9 +19,8 @@ export function BOQTab() {
   // Update tab badge with BOQ count for selected project
   useEffect(() => {
     if (selectedProject) {
-      // TODO: Replace with actual API call to get BOQ count
-      const mockBOQCount = 3;
-      updateTabBadge('boq', { count: mockBOQCount, type: 'info' });
+      // TODO: Wire to real API to get BOQ count
+      updateTabBadge('boq', { count: 0, type: 'info' });
     }
   }, [selectedProject, updateTabBadge]);
 

@@ -15,42 +15,8 @@ interface BOQDashboardProps {
 }
 
 export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, onEdit: _onEdit, onCreate: _onCreate }: BOQDashboardProps) {
-  // Mock data - will be replaced with real BOQ data
-  const mockBOQs = [
-    {
-      id: '1',
-      name: 'Project Alpha BOQ v2.1',
-      project: 'Project Alpha',
-      status: 'APPROVED',
-      version: '2.1',
-      uploadedAt: '2024-01-15',
-      items: 245,
-      mappedItems: 240,
-      exceptions: 5
-    },
-    {
-      id: '2',
-      name: 'Beta Phase 1 BOQ',
-      project: 'Project Beta',
-      status: 'MAPPING_REVIEW',
-      version: '1.0',
-      uploadedAt: '2024-01-18',
-      items: 189,
-      mappedItems: 150,
-      exceptions: 39
-    },
-    {
-      id: '3',
-      name: 'Gamma Project BOQ',
-      project: 'Project Gamma',
-      status: 'DRAFT',
-      version: '1.0',
-      uploadedAt: '2024-01-20',
-      items: 98,
-      mappedItems: 0,
-      exceptions: 98
-    }
-  ];
+  // TODO: Wire to real /api/procurement/boq endpoint
+  const mockBOQs: { id: string; name: string; project: string; status: string; version: string; uploadedAt: string; items: number; mappedItems: number; exceptions: number }[] = [];
 
   const getStatusColor = (status: string) => {
     switch (status) {

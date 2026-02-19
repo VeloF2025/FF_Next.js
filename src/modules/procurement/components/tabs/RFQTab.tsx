@@ -14,12 +14,8 @@ export function RFQTab() {
   // Update tab badge with active RFQ count
   useEffect(() => {
     if (selectedProject) {
-      // TODO: Replace with actual API call
-      const mockActiveRFQs = 2;
-      updateTabBadge('rfq', { 
-        count: mockActiveRFQs, 
-        type: mockActiveRFQs > 0 ? 'warning' : 'success' 
-      });
+      // TODO: Wire to real API
+      updateTabBadge('rfq', { count: 0, type: 'info' });
     }
   }, [selectedProject, updateTabBadge]);
 

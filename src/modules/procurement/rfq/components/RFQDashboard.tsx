@@ -137,7 +137,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
             [RFQStatus.AWARDED, RFQStatus.CANCELLED].includes(rfq.status)
           ).length,
           overdueRFQs: transformedRFQs.filter(rfq => rfq.isOverdue).length,
-          averageResponseTime: 7.5, // Mock data - calculate from actual response times
+          averageResponseTime: 0, // TODO: calculate from actual response times
           totalValue: rfqs.reduce((sum: number, rfq: any) => sum + (rfq.totalBudgetEstimate || 0), 0),
           suppliersEngaged: new Set(
             rfqs.flatMap((rfq: any) => rfq.invitedSuppliers || [])
@@ -146,82 +146,17 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
 
         setRFQStats(stats);
       } else {
-        // Use mock data as fallback
-        setMockData();
+        setRecentRFQs([]);
       }
     } catch (err) {
       log.error('Error loading RFQ data:', { data: err }, 'RFQDashboard');
-      setError('Failed to load RFQ data. Using mock data for demonstration.');
-      setMockData();
+      setError('Failed to load RFQ data.');
+      setRecentRFQs([]);
     } finally {
       setLoading(false);
     }
   }, [rfqOperations]);
 
-  const setMockData = () => {
-    const mockRFQs: RFQListItem[] = [
-      {
-        id: '1',
-        rfqNumber: 'RFQ-2024-001',
-        title: 'Fiber Optic Cables - Project Alpha',
-        status: RFQStatus.ISSUED,
-        responseDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-        invitedSuppliersCount: 5,
-        respondedSuppliersCount: 2,
-        totalBudgetEstimate: 75000,
-        isOverdue: false,
-        daysRemaining: 5
-      },
-      {
-        id: '2',
-        rfqNumber: 'RFQ-2024-002',
-        title: 'Network Equipment - Project Beta',
-        status: RFQStatus.RESPONSES_RECEIVED,
-        responseDeadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        invitedSuppliersCount: 3,
-        respondedSuppliersCount: 3,
-        totalBudgetEstimate: 125000,
-        isOverdue: false,
-        daysRemaining: -2
-      },
-      {
-        id: '3',
-        rfqNumber: 'RFQ-2024-003',
-        title: 'Installation Materials - Project Gamma',
-        status: RFQStatus.AWARDED,
-        responseDeadline: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        invitedSuppliersCount: 4,
-        respondedSuppliersCount: 4,
-        totalBudgetEstimate: 89000,
-        isOverdue: false,
-        daysRemaining: -10
-      },
-      {
-        id: '4',
-        rfqNumber: 'RFQ-2024-004',
-        title: 'Testing Equipment - Project Delta',
-        status: RFQStatus.ISSUED,
-        responseDeadline: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        invitedSuppliersCount: 6,
-        respondedSuppliersCount: 1,
-        totalBudgetEstimate: 95000,
-        isOverdue: true,
-        daysRemaining: -1
-      }
-    ];
-
-    setRecentRFQs(mockRFQs);
-    setRFQStats({
-      totalRFQs: 15,
-      activeRFQs: 8,
-      awaitingResponses: 5,
-      completedRFQs: 7,
-      overdueRFQs: 2,
-      averageResponseTime: 7.5,
-      totalValue: 850000,
-      suppliersEngaged: 24
-    });
-  };
 
   useEffect(() => {
     loadRFQData();

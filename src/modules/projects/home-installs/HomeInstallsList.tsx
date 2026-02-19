@@ -12,10 +12,9 @@ import { HomeInstallsHeader } from './components/HomeInstallsHeader';
 import { HomeInstallsTable } from './components/HomeInstallsTable';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
-import { 
-  filterHomeInstalls, 
-  exportInstallsToCSV, 
-  generateMockInstalls 
+import {
+  filterHomeInstalls,
+  exportInstallsToCSV
 } from './utils/homeInstallsHelpers';
 
 export function HomeInstallsList() {
@@ -43,9 +42,8 @@ export function HomeInstallsList() {
     try {
       setLoading(true);
       // TODO: Replace with actual API call
-      const mockInstalls = generateMockInstalls();
-      setInstalls(mockInstalls);
-      setFilteredInstalls(mockInstalls);
+      setInstalls([]);
+      setFilteredInstalls([]);
     } catch (error) {
       log.error('Error loading installations:', { data: error }, 'HomeInstallsList');
     } finally {

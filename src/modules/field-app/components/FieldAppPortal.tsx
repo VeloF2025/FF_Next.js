@@ -5,19 +5,13 @@ import { OfflineStatus } from './OfflineStatus';
 import { DeviceStatus } from './DeviceStatus';
 import { TaskDialog } from './TaskDialog';
 import { TechnicianCard } from './TechnicianCard';
-import { 
-  mockTasks, 
-  mockTechnicians, 
-  mockOfflineData, 
-  mockDeviceStatus 
-} from '../data/mockData';
 import type { FieldTask, FieldTechnician } from '../types/field-app.types';
 
 export function FieldAppPortal() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [tasks, setTasks] = useState<FieldTask[]>(mockTasks);
+  const [tasks, setTasks] = useState<FieldTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<FieldTask | null>(null);
-  const [technicians] = useState<FieldTechnician[]>(mockTechnicians);
+  const [technicians] = useState<FieldTechnician[]>([]);
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'technicians' | 'overview'>('tasks');
@@ -100,12 +94,12 @@ export function FieldAppPortal() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <OfflineStatus
             isOffline={!isOnline}
-            offlineData={mockOfflineData}
+            offlineData={{ tasks: 0, photos: 0, forms: 0, lastSync: '', dataSize: '0 KB' }}
             onSync={syncOfflineData}
             isSyncing={syncInProgress}
           />
 
-          <DeviceStatus {...mockDeviceStatus} />
+          <DeviceStatus battery={0} signal="fair" gpsAccuracy={0} storage={{ used: 0, total: 0 }} />
 
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
             <h3 className="font-medium text-[var(--ff-text-primary)] mb-4">Today's Progress</h3>

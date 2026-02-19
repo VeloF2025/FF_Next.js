@@ -68,10 +68,10 @@ export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction):
     targetTab: 'quotes',
     permission: 'buyer',
     metrics: [
-      { label: 'Received', value: 15, format: 'number' },
-      { label: 'Under Review', value: 8, format: 'number', status: 'warning' },
-      { label: 'Approved', value: 5, format: 'number', status: 'success' },
-      { label: 'Avg Savings', value: 12.5, format: 'percentage', status: 'success' }
+      { label: 'Received', value: 0, format: 'number' },
+      { label: 'Under Review', value: 0, format: 'number', status: 'warning' },
+      { label: 'Approved', value: 0, format: 'number', status: 'success' },
+      { label: 'Avg Savings', value: 0, format: 'percentage', status: 'success' }
     ],
     quickActions: [
       { label: 'Compare Quotes', icon: TrendingUp, onClick: () => navigate('/app/procurement/quotes/compare') },
@@ -88,10 +88,10 @@ export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction):
     targetTab: 'purchase-orders',
     permission: 'buyer',
     metrics: [
-      { label: 'Active POs', value: 24, format: 'number' },
-      { label: 'Pending Approval', value: 6, format: 'number', status: 'warning' },
-      { label: 'This Month', value: 450000, format: 'currency' },
-      { label: 'Budget Used', value: 67, format: 'percentage', status: 'info' }
+      { label: 'Active POs', value: 0, format: 'number' },
+      { label: 'Pending Approval', value: 0, format: 'number', status: 'warning' },
+      { label: 'This Month', value: 0, format: 'currency' },
+      { label: 'Budget Used', value: 0, format: 'percentage', status: 'info' }
     ],
     quickActions: [
       { label: 'Create PO', icon: ShoppingCart, onClick: () => navigate('/app/procurement/orders/new') },
@@ -108,10 +108,10 @@ export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction):
     targetTab: 'stock',
     permission: 'store-controller',
     metrics: [
-      { label: 'Total Items', value: 1250, format: 'number' },
-      { label: 'Low Stock', value: 15, format: 'number', status: 'error' },
-      { label: 'Cable Drums', value: 45, format: 'number' },
-      { label: 'Pending GRN', value: 8, format: 'number', status: 'warning' }
+      { label: 'Total Items', value: 0, format: 'number' },
+      { label: 'Low Stock', value: 0, format: 'number', status: 'error' },
+      { label: 'Cable Drums', value: 0, format: 'number' },
+      { label: 'Pending GRN', value: 0, format: 'number', status: 'warning' }
     ],
     quickActions: [
       { label: 'Receive Stock', icon: Package, onClick: () => navigate('/app/procurement/stock/receive') },
@@ -128,10 +128,10 @@ export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction):
     targetTab: 'suppliers',
     permission: 'buyer',
     metrics: [
-      { label: 'Active Suppliers', value: 28, format: 'number' },
-      { label: 'OTIF Score', value: 92, format: 'percentage', status: 'success' },
-      { label: 'New This Month', value: 3, format: 'number', status: 'info' },
-      { label: 'Performance Issues', value: 2, format: 'number', status: 'warning' }
+      { label: 'Active Suppliers', value: 0, format: 'number' },
+      { label: 'OTIF Score', value: 0, format: 'percentage', status: 'success' },
+      { label: 'New This Month', value: 0, format: 'number', status: 'info' },
+      { label: 'Performance Issues', value: 0, format: 'number', status: 'warning' }
     ],
     quickActions: [
       { label: 'Invite Supplier', icon: Users, onClick: () => navigate('/app/procurement/suppliers/invite') },
@@ -148,10 +148,10 @@ export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction):
     targetTab: 'reports',
     permission: 'viewer',
     metrics: [
-      { label: 'Reports Generated', value: 42, format: 'number' },
-      { label: 'Cost Savings', value: 125000, format: 'currency', status: 'success' },
-      { label: 'Cycle Time', value: 14.5, format: 'number', status: 'info' },
-      { label: 'Budget Variance', value: -3.2, format: 'percentage', status: 'success' }
+      { label: 'Reports Generated', value: 0, format: 'number' },
+      { label: 'Cost Savings', value: 0, format: 'currency', status: 'success' },
+      { label: 'Cycle Time', value: 0, format: 'number', status: 'info' },
+      { label: 'Budget Variance', value: 0, format: 'percentage', status: 'success' }
     ],
     quickActions: [
       { label: 'Generate Report', icon: ClipboardList, onClick: () => navigate('/app/procurement/reports/generate') },

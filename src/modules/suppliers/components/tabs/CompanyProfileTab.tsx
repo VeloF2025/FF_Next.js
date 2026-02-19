@@ -5,14 +5,13 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { useSupplierFilters } from './company-profile/hooks/useSupplierFilters';
-import { mockExtendedSuppliers } from './company-profile/data/mockSuppliers';
+import type { ExtendedSupplier } from './company-profile/types/company-profile.types';
 import {
   FilterBar,
   EmptyState,
   SupplierCard,
   SupplierDetailPanel
 } from './company-profile/components';
-import type { ExtendedSupplier } from './company-profile/types/company-profile.types';
 
 export function CompanyProfileTab() {
   const { selectedSupplier, setSupplier } = useSuppliersPortal();
@@ -30,7 +29,7 @@ export function CompanyProfileTab() {
     setViewMode,
     categories,
     filteredSuppliers
-  } = useSupplierFilters({ suppliers: mockExtendedSuppliers });
+  } = useSupplierFilters({ suppliers: [] as ExtendedSupplier[] });
 
   const handleSupplierSelect = (supplier: ExtendedSupplier) => {
     setSupplier(supplier);

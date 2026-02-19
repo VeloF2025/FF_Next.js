@@ -13,12 +13,8 @@ export function QuoteEvaluationTab() {
   // Update tab badge with pending evaluations
   useEffect(() => {
     if (selectedProject) {
-      // TODO: Replace with actual API call
-      const mockPendingEvaluations = 1;
-      updateTabBadge('quotes', { 
-        count: mockPendingEvaluations, 
-        type: mockPendingEvaluations > 0 ? 'success' : 'info' 
-      });
+      // TODO: Wire to real API
+      updateTabBadge('quotes', { count: 0, type: 'info' });
     }
   }, [selectedProject, updateTabBadge]);
 

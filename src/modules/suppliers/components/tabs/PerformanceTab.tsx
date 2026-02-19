@@ -34,81 +34,8 @@ interface PerformancePeriod {
   metrics: PerformanceMetric[];
 }
 
-// Mock performance data
-const mockPerformanceData: PerformancePeriod[] = [
-  {
-    period: '2024-q1',
-    label: 'Q1 2024',
-    metrics: [
-      {
-        id: 'delivery_time',
-        name: 'Average Delivery Time',
-        value: 3.2,
-        target: 5.0,
-        unit: 'days',
-        trend: 'up',
-        trendValue: 12,
-        status: 'excellent',
-        description: 'Time from order confirmation to delivery'
-      },
-      {
-        id: 'quality_score',
-        name: 'Quality Score',
-        value: 94.5,
-        target: 90.0,
-        unit: '%',
-        trend: 'up',
-        trendValue: 2.3,
-        status: 'excellent',
-        description: 'Product quality assessment score'
-      },
-      {
-        id: 'cost_efficiency',
-        name: 'Cost Efficiency',
-        value: 87.2,
-        target: 85.0,
-        unit: '%',
-        trend: 'down',
-        trendValue: 1.5,
-        status: 'good',
-        description: 'Cost performance vs market benchmark'
-      },
-      {
-        id: 'response_time',
-        name: 'Response Time',
-        value: 2.1,
-        target: 4.0,
-        unit: 'hours',
-        trend: 'up',
-        trendValue: 8.5,
-        status: 'excellent',
-        description: 'Average time to respond to inquiries'
-      },
-      {
-        id: 'compliance_rate',
-        name: 'Compliance Rate',
-        value: 95.0,
-        target: 95.0,
-        unit: '%',
-        trend: 'stable',
-        trendValue: 0.0,
-        status: 'excellent',
-        description: 'Regulatory and policy compliance score'
-      },
-      {
-        id: 'order_accuracy',
-        name: 'Order Accuracy',
-        value: 98.5,
-        target: 95.0,
-        unit: '%',
-        trend: 'up',
-        trendValue: 1.2,
-        status: 'excellent',
-        description: 'Percentage of orders fulfilled correctly'
-      }
-    ]
-  }
-];
+// TODO: Wire to real supplier performance API
+const mockPerformanceData: PerformancePeriod[] = [];
 
 // KPI card component
 interface KPICardProps {

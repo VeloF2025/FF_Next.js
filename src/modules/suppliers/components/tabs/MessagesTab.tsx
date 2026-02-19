@@ -6,7 +6,7 @@ import { MessageSquare, Send, Search } from 'lucide-react';
 import { useSuppliersPortal } from '../../context/SuppliersPortalContext';
 import { useMessageFilters } from './messages-tab/hooks/useMessageFilters';
 import { messagesToThreads } from './messages-tab/utils/messageHelpers';
-import { mockMessages } from './messages-tab/data/mockMessages';
+import type { Message, MessageThread } from './messages-tab/types/messages.types';
 import {
   MessageThreadItem,
   MessageDetailView,
@@ -14,14 +14,13 @@ import {
   NoSupplierState,
   NoMessagesState
 } from './messages-tab/components';
-import type { MessageThread } from './messages-tab/types/messages.types';
 
 export function MessagesTab() {
   const { selectedSupplier } = useSuppliersPortal();
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null);
 
   // Convert messages to threads
-  const messageThreads = useMemo(() => messagesToThreads(mockMessages), []);
+  const messageThreads = useMemo(() => messagesToThreads([] as Message[]), []);
 
   // Filter management
   const {

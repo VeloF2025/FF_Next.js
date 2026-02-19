@@ -88,62 +88,15 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
   const loadAggregateMetrics = async (): Promise<void> => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const mockAggregateMetrics: AggregateProjectMetrics = {
-        totalProjects: 12,
-        totalBOQValue: 2450000,
-        totalActiveRFQs: 18,
-        totalPurchaseOrders: 42,
-        totalStockItems: 1250,
-        totalSuppliers: 28,
-        averageCostSavings: 12.5,
-        averageCycleDays: 14.5,
-        averageSupplierOTIF: 92,
-        criticalAlerts: 8,
-        pendingApprovals: 15
-      };
-
-      const mockProjectSummaries: ProjectSummary[] = [
-        {
-          id: '1',
-          name: 'Johannesburg Fiber Rollout',
-          code: 'JHB-2024-001',
-          status: 'active',
-          boqValue: 850000,
-          activeRFQs: 5,
-          completionPercentage: 68,
-          lastActivity: '2 hours ago',
-          alertCount: 2
-        },
-        {
-          id: '2',
-          name: 'Cape Town Metro Network',
-          code: 'CPT-2024-002',
-          status: 'active',
-          boqValue: 720000,
-          activeRFQs: 3,
-          completionPercentage: 45,
-          lastActivity: '4 hours ago',
-          alertCount: 1
-        },
-        {
-          id: '3',
-          name: 'Durban Coastal Installation',
-          code: 'DBN-2024-003',
-          status: 'active',
-          boqValue: 450000,
-          activeRFQs: 2,
-          completionPercentage: 78,
-          lastActivity: '1 day ago',
-          alertCount: 0
+      // TODO: Wire to real /api/procurement/aggregate-metrics endpoint
+      const res = await fetch('/api/procurement/aggregate-metrics');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success) {
+          setAggregateMetrics(json.data);
         }
-      ];
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      setAggregateMetrics(mockAggregateMetrics);
-      setProjectSummaries(mockProjectSummaries);
+      }
+      setProjectSummaries([]);
     } catch (error) {
       log.error('Error loading aggregate metrics:', { data: error }, 'ProcurementPortalPage');
       setError('Failed to load aggregate data');
@@ -158,22 +111,14 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
   const loadProjectData = async (_projectId: string): Promise<void> => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API calls
-      // Simulate loading project-specific data
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      // Update tab badges with project-specific counts
-      setTabBadges({
-        overview: {},
-        boq: { count: 3, type: 'info' },
-        rfq: { count: 2, type: 'warning' },
-        quotes: { count: 1, type: 'success' },
-        'purchase-orders': { count: 4, type: 'info' },
-        stock: { count: 5, type: 'error' },
-        'field-stock': {},
-        suppliers: { count: 12, type: 'info' },
-        reports: {}
-      });
+      // TODO: Wire to real /api/procurement/tab-badges endpoint
+      const res = await fetch(`/api/procurement/tab-badges?projectId=${_projectId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          setTabBadges(json.data);
+        }
+      }
     } catch (error) {
       log.error('Error loading project data:', { data: error }, 'ProcurementPortalPage');
       setError('Failed to load project data');

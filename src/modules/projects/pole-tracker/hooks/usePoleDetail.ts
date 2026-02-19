@@ -11,15 +11,13 @@ import {
   FileText 
 } from 'lucide-react';
 import { TabConfig, PoleDetail } from '../types/pole-detail.types';
-import { mockPoleDetail } from '../data/pole-mock-data';
 
 export function usePoleDetail(poleId?: string) {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
-  // Mock data for demonstration - replace with actual data fetching
-  const pole: PoleDetail = useMemo(() => {
-    // In a real app, fetch pole data based on poleId
-    return mockPoleDetail;
+  const pole: PoleDetail | null = useMemo(() => {
+    // TODO: Fetch pole data from API based on poleId
+    return null;
   }, [poleId]);
 
   const tabs: TabConfig[] = useMemo(() => [
