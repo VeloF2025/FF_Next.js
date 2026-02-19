@@ -356,8 +356,8 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
         )}
       </div>
 
-      {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
+      {/* Navigation Buttons — pr-20 clears the Velo chatbot FAB */}
+      <div className="flex items-center justify-between pr-20">
         <button
           onClick={goPrev}
           disabled={phaseIdx === 0}

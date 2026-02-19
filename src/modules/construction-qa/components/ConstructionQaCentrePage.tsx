@@ -297,7 +297,7 @@ export function ConstructionQaCentrePage() {
         <select
           value={filters.projectId}
           onChange={e => updateFilter('projectId', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300"
+          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
         >
           <option value="">All Projects</option>
           {projects.map(p => (
@@ -321,7 +321,7 @@ export function ConstructionQaCentrePage() {
         <select
           value={filters.workflowStatus}
           onChange={e => updateFilter('workflowStatus', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300"
+          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -336,7 +336,7 @@ export function ConstructionQaCentrePage() {
         <select
           value={filters.priority}
           onChange={e => updateFilter('priority', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300"
+          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
         >
           <option value="">All Priorities</option>
           <option value="urgent">Urgent</option>
