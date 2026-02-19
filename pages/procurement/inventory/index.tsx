@@ -241,7 +241,7 @@ function CategoriesTabContent() {
 
   const totalCategories = categories.length;
   const activeCategories = categories.filter(c => c.is_active).length;
-  const totalItems = categories.reduce((sum, c) => sum + (c.item_count || 0), 0);
+  const totalItems = categories.reduce((sum, c) => sum + Number(c.item_count || 0), 0);
 
   if (isLoading) return <LoadingState message="Loading categories..." />;
 
@@ -307,7 +307,7 @@ function CategoriesTabContent() {
                 <span className={`px-2 py-1 rounded text-xs ${cat.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
                   {cat.is_active ? 'Active' : 'Inactive'}
                 </span>
-                <span className="text-sm text-[var(--ff-text-secondary)]">{cat.item_count || 0} items</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">{Number(cat.item_count || 0)} items</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(cat); }}
                   className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"
@@ -610,7 +610,7 @@ function BundlesTabContent() {
                 <span className={`px-2 py-1 rounded text-xs ${bundle.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
                   {bundle.is_active ? 'Active' : 'Inactive'}
                 </span>
-                <span className="text-sm text-[var(--ff-text-secondary)]">{bundle.item_count || 0} items</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">{Number(bundle.item_count || 0)} items</span>
                 <span className="font-medium text-[var(--ff-text-primary)]">R {Number(bundle.calculated_price || 0).toFixed(2)}</span>
                 <button
                   onClick={(e) => openItemsModal(bundle, e)}
@@ -903,7 +903,7 @@ function StockTakesTabContent() {
                 <span className={`px-2 py-1 rounded text-xs ${statusColors[take.status] || 'bg-gray-500/20 text-gray-400'}`}>
                   {take.status.replace('_', ' ')}
                 </span>
-                <span className="text-sm text-[var(--ff-text-secondary)]">{take.item_count || 0} items</span>
+                <span className="text-sm text-[var(--ff-text-secondary)]">{Number(take.item_count || 0)} items</span>
                 {take.status === 'draft' && (
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(take); }}

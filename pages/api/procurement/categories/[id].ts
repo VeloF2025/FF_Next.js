@@ -47,8 +47,8 @@ async function handleGet(id: string, res: NextApiResponse) {
       sc.*,
       pc.name as parent_name,
       pc.code as parent_code,
-      (SELECT COUNT(*) FROM stock_items WHERE category_id = sc.id) as item_count,
-      (SELECT COUNT(*) FROM stock_categories WHERE parent_id = sc.id) as child_count
+      (SELECT COUNT(*)::int FROM stock_items WHERE category_id = sc.id) as item_count,
+      (SELECT COUNT(*)::int FROM stock_categories WHERE parent_id = sc.id) as child_count
     FROM stock_categories sc
     LEFT JOIN stock_categories pc ON sc.parent_id = pc.id
     WHERE sc.id = ${id}

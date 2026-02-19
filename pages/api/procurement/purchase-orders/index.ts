@@ -82,7 +82,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.tax_amount as vat_amount,
         po.total_amount as total,
         COALESCE(po.version, 1) as version,
-        (SELECT COUNT(*) FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count,
+        (SELECT COUNT(*)::int FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count,
         po.created_by as created_by_name,
         po.created_at
       FROM purchase_orders po

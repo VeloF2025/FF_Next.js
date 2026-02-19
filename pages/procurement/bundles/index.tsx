@@ -58,8 +58,8 @@ export default function BundlesPage() {
   // Stats
   const totalBundles = bundles.length;
   const activeBundles = bundles.filter(b => b.is_active).length;
-  const totalItems = bundles.reduce((sum, b) => sum + (b.item_count || 0), 0);
-  const totalValue = bundles.reduce((sum, b) => sum + (b.effective_price || 0), 0);
+  const totalItems = bundles.reduce((sum, b) => sum + Number(b.item_count || 0), 0);
+  const totalValue = bundles.reduce((sum, b) => sum + Number(b.effective_price || 0), 0);
 
   const fetchBundles = useCallback(async () => {
     setIsLoading(true);

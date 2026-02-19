@@ -21,6 +21,7 @@ import {
   FolderTree,
   AlertCircle,
 } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type {
   StockCategory,
   StockCategoryFormData,
@@ -46,7 +47,7 @@ export default function StockCategoriesPage() {
   const totalCategories = categories.length;
   const activeCategories = categories.filter(c => c.is_active).length;
   const rootCategories = categories.filter(c => !c.parent_id).length;
-  const totalItems = categories.reduce((sum, c) => sum + (c.item_count || 0), 0);
+  const totalItems = categories.reduce((sum, c) => sum + Number(c.item_count || 0), 0);
 
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
@@ -69,7 +70,7 @@ export default function StockCategoriesPage() {
         notificationService.error(data.error || 'Failed to load categories');
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      log.error('Error fetching categories', { data: error }, 'procurement/categories');
       notificationService.error('Failed to load categories');
     } finally {
       setIsLoading(false);
@@ -118,7 +119,7 @@ export default function StockCategoriesPage() {
         notificationService.error(data.error || 'Failed to delete category');
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
+      log.error('Error deleting category', { data: error }, 'procurement/categories');
       notificationService.error('Failed to delete category');
     }
   };
@@ -146,7 +147,7 @@ export default function StockCategoriesPage() {
         notificationService.error(data.error || 'Failed to save category');
       }
     } catch (error) {
-      console.error('Error saving category:', error);
+      log.error('Error saving category', { data: error }, 'procurement/categories');
       notificationService.error('Failed to save category');
     }
   };
@@ -217,7 +218,7 @@ export default function StockCategoriesPage() {
 
           {/* Item Count */}
           <span className="text-sm text-gray-300 w-16 text-right">
-            {category.item_count || 0} items
+            {Number(category.item_count || 0)} items
           </span>
 
           {/* Actions */}
