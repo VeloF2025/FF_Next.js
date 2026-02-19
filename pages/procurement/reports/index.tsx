@@ -139,29 +139,31 @@ export default function ProcurementReportsPage() {
   const fetchReportData = async () => {
     setIsLoading(true);
     try {
-      // Fetch from real endpoints
-      const [metricsRes, stockRes, suppliersRes] = await Promise.all([
+      const [metricsRes, stockRes, suppliersRes, reportsRes] = await Promise.all([
         fetch('/api/procurement/metrics/aggregate'),
         fetch('/api/procurement/stock?status=low_stock'),
         fetch('/api/suppliers'),
+        fetch('/api/procurement/reports-data'),
       ]);
 
       const metrics = await metricsRes.json();
       const stockData = await stockRes.json();
       const suppliersData = await suppliersRes.json();
+      const reportsData = await reportsRes.json();
 
-      // Build report data from real sources
       const supplierList = suppliersData?.data || suppliersData || [];
+      const reports = reportsData?.data || {};
+
       setData({
         supplierMetrics: formatSupplierMetrics(supplierList),
-        spendByCategory: generateSpendCategories(metrics?.data),
+        spendByCategory: formatSpendCategories(reports.spendByCategory || []),
         inventoryAlerts: formatStockAlerts(stockData?.data || stockData?.items || []),
-        cycleMetrics: generateCycleMetrics(metrics?.data),
+        cycleMetrics: formatCycleMetrics(reports.cycleMetrics || []),
         summary: {
           totalSpend: metrics?.data?.totalBOQValue || 0,
           avgOtif: calculateAvgOtif(supplierList),
           stockAlerts: (stockData?.data || stockData?.items || []).length,
-          avgCycleTime: metrics?.data?.avgProcurementCycleTime || 14,
+          avgCycleTime: reports.avgTotalCycleDays || Number(metrics?.data?.averageCycleDays) || 0,
         },
       });
     } catch (error) {
@@ -210,19 +212,15 @@ export default function ProcurementReportsPage() {
     return rated.length > 0 ? Math.round(totalDelivery / rated.length) : 0;
   };
 
-  // PARTIAL: Spend categories derived from BOQ value with estimated breakdowns
-  // TODO: Replace with real category-level spend API when purchase_order_items tracks categories
-  const generateSpendCategories = (metrics: any): SpendCategory[] => {
-    const total = metrics?.totalBOQValue || 0;
-    if (total === 0) return [];
-    return [
-      { category: 'Fiber Cables', amount: total * 0.35, percentage: 35, change: 0, itemCount: 0 },
-      { category: 'Connectors', amount: total * 0.20, percentage: 20, change: 0, itemCount: 0 },
-      { category: 'Equipment', amount: total * 0.18, percentage: 18, change: 0, itemCount: 0 },
-      { category: 'Tools', amount: total * 0.12, percentage: 12, change: 0, itemCount: 0 },
-      { category: 'Safety Gear', amount: total * 0.08, percentage: 8, change: 0, itemCount: 0 },
-      { category: 'Other', amount: total * 0.07, percentage: 7, change: 0, itemCount: 0 },
-    ];
+  // Format spend categories from real BOQ item data grouped by category
+  const formatSpendCategories = (rows: any[]): SpendCategory[] => {
+    return rows.map((row: any) => ({
+      category: row.category || 'Uncategorized',
+      amount: Number(row.amount || 0),
+      percentage: Number(row.percentage || 0),
+      change: 0,
+      itemCount: Number(row.itemCount || 0),
+    }));
   };
 
   // Format stock alerts
@@ -238,18 +236,15 @@ export default function ProcurementReportsPage() {
     }));
   };
 
-  // PARTIAL: Cycle metrics derived from aggregate avg cycle time with estimated stage breakdowns
-  // TODO: Replace with real per-stage timing from purchase_orders timestamps
-  const generateCycleMetrics = (metrics: any): CycleMetric[] => {
-    const avgCycle = metrics?.avgProcurementCycleTime || 0;
-    if (avgCycle === 0) return [];
-    return [
-      { stage: 'Requisition to RFQ', avgDays: Math.round(avgCycle * 0.15), minDays: 0, maxDays: 0, trend: 'stable' },
-      { stage: 'RFQ to Quotes', avgDays: Math.round(avgCycle * 0.25), minDays: 0, maxDays: 0, trend: 'stable' },
-      { stage: 'Quote to PO', avgDays: Math.round(avgCycle * 0.20), minDays: 0, maxDays: 0, trend: 'stable' },
-      { stage: 'PO to Delivery', avgDays: Math.round(avgCycle * 0.30), minDays: 0, maxDays: 0, trend: 'stable' },
-      { stage: 'GRN Processing', avgDays: Math.round(avgCycle * 0.10), minDays: 0, maxDays: 0, trend: 'stable' },
-    ];
+  // Format cycle metrics from real per-stage timestamp diffs
+  const formatCycleMetrics = (rows: any[]): CycleMetric[] => {
+    return rows.map((row: any) => ({
+      stage: row.stage || 'Unknown',
+      avgDays: Number(row.avgDays || 0),
+      minDays: Number(row.minDays || 0),
+      maxDays: Number(row.maxDays || 0),
+      trend: 'stable' as const,
+    }));
   };
 
   const formatCurrency = (amount: number) => {
