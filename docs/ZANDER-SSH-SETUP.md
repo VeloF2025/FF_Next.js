@@ -196,6 +196,36 @@ This gives Zander full file browsing, syntax highlighting, and Claude Code all i
 
 ---
 
+## GitHub Repository Access
+
+Zander has been added as a **write** collaborator on the FibreFlow repository.
+
+| Item | Value |
+|------|-------|
+| GitHub username | `Zander1798` |
+| Repository | `VelocityFibre/FF_Next.js` |
+| Permission | `write` (push to branches, create PRs) |
+
+**Accept the invitation:**
+- Check the email sent to `zandervv0610@icloud.com`, or
+- Accept directly at: `https://github.com/VelocityFibre/FF_Next.js/invitations`
+
+Once accepted, clone the repo on Velocity:
+
+```bash
+# On Velocity, after SSH-ing in
+git clone git@github.com:VelocityFibre/FF_Next.js.git
+```
+
+Or pull latest changes in an existing checkout:
+
+```bash
+cd /home/velo/fibreflow-dev
+git pull
+```
+
+---
+
 ## Server Credentials Summary
 
 | Item | Value |
@@ -205,6 +235,8 @@ This gives Zander full file browsing, syntax highlighting, and Claude Code all i
 | SSH password | `zander2026` |
 | Sudo password | `zander2026` |
 | Service sudo password | `velo2026` (used in deploy scripts) |
+| GitHub username | `Zander1798` |
+| GitHub repo | `VelocityFibre/FF_Next.js` |
 
 > **Do not commit these credentials to any repository.**
 > Production serves live users — always test on dev/staging first.
