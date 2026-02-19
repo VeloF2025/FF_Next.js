@@ -48,7 +48,26 @@ export enum ProcurementPermission {
   // Reporting Permissions
   PROCUREMENT_REPORTS = 'procurement:reports',
   PROCUREMENT_ANALYTICS = 'procurement:analytics',
-  PROCUREMENT_AUDIT = 'procurement:audit'
+  PROCUREMENT_AUDIT = 'procurement:audit',
+
+  // Field Stock Sub-Permissions
+  FIELD_STOCK_PICKING_MANAGE = 'field_stock:picking:manage',    // process, confirm, sign
+  FIELD_STOCK_PICKING_CANCEL = 'field_stock:picking:cancel',
+  FIELD_STOCK_RETURN_MANAGE = 'field_stock:return:manage',      // inspect, accept
+  FIELD_STOCK_MOVEMENT_REVERSE = 'field_stock:movement:reverse',
+  FIELD_STOCK_ACCOUNTABILITY_MANAGE = 'field_stock:accountability:manage', // block/unblock/reconcile
+  FIELD_STOCK_FAULT_READ = 'field_stock:fault:read',
+  FIELD_STOCK_FAULT_MANAGE = 'field_stock:fault:manage',
+  FIELD_STOCK_SERIAL_MANAGE = 'field_stock:serial:manage',
+  FIELD_STOCK_LOCATION_MANAGE = 'field_stock:location:manage',
+
+  // Audit Permissions
+  AUDIT_READ = 'audit:read',
+  AUDIT_EXPORT = 'audit:export',
+
+  // GRN Extended
+  GRN_CONFIRM = 'grn:confirm',
+  GRN_REGISTER_ASSETS = 'grn:register_assets'
 }
 
 // Role definitions for procurement module
@@ -87,7 +106,20 @@ export const ProcurementRoles = {
       ProcurementPermission.STOCK_COUNT,
       ProcurementPermission.PROCUREMENT_REPORTS,
       ProcurementPermission.PROCUREMENT_ANALYTICS,
-      ProcurementPermission.PROCUREMENT_AUDIT
+      ProcurementPermission.PROCUREMENT_AUDIT,
+      ProcurementPermission.FIELD_STOCK_PICKING_MANAGE,
+      ProcurementPermission.FIELD_STOCK_PICKING_CANCEL,
+      ProcurementPermission.FIELD_STOCK_RETURN_MANAGE,
+      ProcurementPermission.FIELD_STOCK_MOVEMENT_REVERSE,
+      ProcurementPermission.FIELD_STOCK_ACCOUNTABILITY_MANAGE,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.FIELD_STOCK_FAULT_MANAGE,
+      ProcurementPermission.FIELD_STOCK_SERIAL_MANAGE,
+      ProcurementPermission.FIELD_STOCK_LOCATION_MANAGE,
+      ProcurementPermission.AUDIT_READ,
+      ProcurementPermission.AUDIT_EXPORT,
+      ProcurementPermission.GRN_CONFIRM,
+      ProcurementPermission.GRN_REGISTER_ASSETS
     ]
   },
 
@@ -110,7 +142,14 @@ export const ProcurementRoles = {
       ProcurementPermission.SUPPLIER_INVITE,
       ProcurementPermission.STOCK_READ,
       ProcurementPermission.STOCK_ACCESS,
-      ProcurementPermission.PROCUREMENT_REPORTS
+      ProcurementPermission.PROCUREMENT_REPORTS,
+      ProcurementPermission.FIELD_STOCK_PICKING_MANAGE,
+      ProcurementPermission.FIELD_STOCK_RETURN_MANAGE,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.FIELD_STOCK_FAULT_MANAGE,
+      ProcurementPermission.FIELD_STOCK_SERIAL_MANAGE,
+      ProcurementPermission.AUDIT_READ,
+      ProcurementPermission.GRN_CONFIRM
     ]
   },
 
@@ -127,7 +166,19 @@ export const ProcurementRoles = {
       ProcurementPermission.STOCK_MOVE,
       ProcurementPermission.STOCK_ADJUST,
       ProcurementPermission.STOCK_COUNT,
-      ProcurementPermission.PROCUREMENT_REPORTS
+      ProcurementPermission.PROCUREMENT_REPORTS,
+      ProcurementPermission.FIELD_STOCK_PICKING_MANAGE,
+      ProcurementPermission.FIELD_STOCK_PICKING_CANCEL,
+      ProcurementPermission.FIELD_STOCK_RETURN_MANAGE,
+      ProcurementPermission.FIELD_STOCK_MOVEMENT_REVERSE,
+      ProcurementPermission.FIELD_STOCK_ACCOUNTABILITY_MANAGE,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.FIELD_STOCK_FAULT_MANAGE,
+      ProcurementPermission.FIELD_STOCK_SERIAL_MANAGE,
+      ProcurementPermission.FIELD_STOCK_LOCATION_MANAGE,
+      ProcurementPermission.AUDIT_READ,
+      ProcurementPermission.GRN_CONFIRM,
+      ProcurementPermission.GRN_REGISTER_ASSETS
     ]
   },
 
@@ -143,7 +194,10 @@ export const ProcurementRoles = {
       ProcurementPermission.QUOTE_AWARD,
       ProcurementPermission.STOCK_READ,
       ProcurementPermission.PROCUREMENT_REPORTS,
-      ProcurementPermission.PROCUREMENT_ANALYTICS
+      ProcurementPermission.PROCUREMENT_ANALYTICS,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.AUDIT_READ,
+      ProcurementPermission.AUDIT_EXPORT
     ]
   },
 
@@ -159,7 +213,9 @@ export const ProcurementRoles = {
       ProcurementPermission.RFQ_READ,
       ProcurementPermission.QUOTE_READ,
       ProcurementPermission.STOCK_READ,
-      ProcurementPermission.PROCUREMENT_REPORTS
+      ProcurementPermission.PROCUREMENT_REPORTS,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.AUDIT_READ
     ]
   },
 
@@ -170,7 +226,9 @@ export const ProcurementRoles = {
       ProcurementPermission.RFQ_READ,
       ProcurementPermission.QUOTE_READ,
       ProcurementPermission.STOCK_READ,
-      ProcurementPermission.PROCUREMENT_REPORTS
+      ProcurementPermission.PROCUREMENT_REPORTS,
+      ProcurementPermission.FIELD_STOCK_FAULT_READ,
+      ProcurementPermission.AUDIT_READ
     ]
   }
 } as const;

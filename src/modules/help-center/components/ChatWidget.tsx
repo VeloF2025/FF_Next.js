@@ -376,15 +376,29 @@ function getQuickQuestions(topicId: string): string[] {
     'dashboard': ['What do the dashboard cards show?', 'How do I view meetings?', 'How do action items work?'],
     'projects': ['How do I create a new project?', 'What tabs are in project detail?', 'How does the pipeline work?'],
     'activate': ['What is the QA wizard?', 'How does the 5-phase review work?', 'What is PP Data?'],
-    'field-ops': ['How does QField QA work?', 'How are photos validated?', 'What is the QField plugin?'],
+    'field-ops': ['How does QField QA work?', 'How are photos validated?', 'What is the Construction QA wizard?'],
     'maintenance': ['How do I create a ticket?', 'What are the SLA targets?', 'How does the Kanban board work?'],
-    'procurement': ['How do I create a BOQ?', 'What is the PO approval workflow?', 'How do I manage inventory?'],
+    'procurement': [
+      'How do I create a BOQ?',
+      'How do I process a field stock picking?',
+      'How do I report a faulty item?',
+      'How do I view the procurement audit trail?',
+    ],
     'assets': ['How do I check out an asset?', 'How does calibration tracking work?', 'How do I create an asset?'],
     'fleet': ['How do vehicle check-ins work?', 'How is fuel managed?', 'What is GPS investigation?'],
     'hr': ['How do I add a staff member?', 'How does compliance tracking work?', 'How do departments work?'],
     'analytics': ['What KPIs are available?', 'How do I generate reports?', 'What is technician performance?'],
-    'communications': ['How does WhatsApp admin work?', 'How are meetings synced?', 'What PDF tools are available?'],
-    'system': ['What is the System Health Hub?', 'How does Data Sync work?', 'What is VLM Learning?'],
+    'communications': [
+      'How does WhatsApp admin work?',
+      'How do I use Mission Control?',
+      'What PDF tools are available?',
+    ],
+    'system': [
+      'What is the System Health Hub?',
+      'How does Data Sync work?',
+      'How do I use Mission Control to manage AI agents?',
+      'What is VLM Learning?',
+    ],
   };
   return questions[topicId] || ['How does this module work?'];
 }

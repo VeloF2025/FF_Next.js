@@ -80,6 +80,20 @@ export interface ProcurementPermissions {
   canEditSuppliers: boolean;
   canManageSuppliers: boolean;
   canOverrideMovements: boolean;
+  // Field Stock granular permissions
+  canManagePickings: boolean;        // process, confirm, sign pickings
+  canCancelPickings: boolean;
+  canManageReturns: boolean;         // inspect, accept returns
+  canReverseMovements: boolean;      // reverse stock movements
+  canManageAccountability: boolean;  // block/unblock/reconcile contractor stock
+  canViewFaultReports: boolean;
+  canManageFaultReports: boolean;
+  // Audit
+  canViewAuditLog: boolean;
+  canExportAuditLog: boolean;
+  // GRN extended
+  canConfirmGRN: boolean;
+  canRegisterGRNAssets: boolean;
   role: 'admin' | 'manager' | 'user' | 'viewer';
   approvalLimit: number;
 }
