@@ -217,8 +217,9 @@ async function handlePost(
 
     return apiResponse.created(res, mapRow(row as Record<string, unknown>));
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
     log.error('Procurement document upload error', { error }, 'procurement-docs');
-    return apiResponse.internalError(res, error, 'Failed to upload document');
+    return apiResponse.internalError(res, error, `Failed to upload document: ${errMsg}`);
   } finally {
     if (tempFilePath) {
       await fs.promises.unlink(tempFilePath).catch(() => {});
