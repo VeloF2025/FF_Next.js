@@ -20,11 +20,10 @@ import {
   Cable,
   CircleDot,
   Search,
-  Filter,
-  Download,
 } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { log } from '@/lib/logger';
 
 type Discipline = 'civil' | 'optical' | 'splicing';
@@ -294,16 +293,17 @@ export function ConstructionQaCentrePage() {
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Project Selector */}
-        <select
-          value={filters.projectId}
-          onChange={e => updateFilter('projectId', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
-        >
-          <option value="">All Projects</option>
-          {projects.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        <Select value={filters.projectId || '__all__'} onValueChange={v => updateFilter('projectId', v === '__all__' ? '' : v)}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="All Projects" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Projects</SelectItem>
+            {projects.map(p => (
+              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -318,32 +318,34 @@ export function ConstructionQaCentrePage() {
         </div>
 
         {/* Status Filter */}
-        <select
-          value={filters.workflowStatus}
-          onChange={e => updateFilter('workflowStatus', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="in_review">In Review</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="rework_needed">Rework Needed</option>
-          <option value="escalated">Escalated</option>
-        </select>
+        <Select value={filters.workflowStatus || '__all__'} onValueChange={v => updateFilter('workflowStatus', v === '__all__' ? '' : v)}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Statuses</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="in_review">In Review</SelectItem>
+            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
+            <SelectItem value="rework_needed">Rework Needed</SelectItem>
+            <SelectItem value="escalated">Escalated</SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Priority Filter */}
-        <select
-          value={filters.priority}
-          onChange={e => updateFilter('priority', e.target.value)}
-          className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-gray-300 [color-scheme:dark]"
-        >
-          <option value="">All Priorities</option>
-          <option value="urgent">Urgent</option>
-          <option value="high">High</option>
-          <option value="normal">Normal</option>
-          <option value="low">Low</option>
-        </select>
+        <Select value={filters.priority || '__all__'} onValueChange={v => updateFilter('priority', v === '__all__' ? '' : v)}>
+          <SelectTrigger className="w-[160px] h-9">
+            <SelectValue placeholder="All Priorities" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Priorities</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Results Count */}
