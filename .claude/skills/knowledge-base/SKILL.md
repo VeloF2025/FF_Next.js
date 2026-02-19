@@ -164,7 +164,29 @@ When generating new `.claude.md` files, use this template (max 50 lines):
 6. **Update session:**
    - `.claude/session/current.json`
 
-7. **Report results**
+7. **Update user stories (Browser QA):**
+   ```bash
+   # Auto-generate smoke stories for new/uncovered page routes
+   node scripts/playwright-qa/generate-stories.mjs
+   ```
+
+   This step:
+   - Scans `pages/**/*.tsx` for all UI routes
+   - Compares against existing stories in `.claude/user-stories/`
+   - Auto-generates smoke stories for uncovered routes
+   - Detects **stale stories** (module pages changed since story last updated)
+   - Updates `_manifest.json` with metadata and timestamps
+   - Reports coverage stats by priority
+
+   **Staleness detection:** If a page file (`pages/{module}/*.tsx`) has been
+   modified more recently than its corresponding story, the story is flagged
+   as stale and reported in the KB update output.
+
+   **Story types:**
+   - `*-smoke.md` — Auto-generated, basic page-loads check (4 steps)
+   - Other `.md` — Manually authored workflow stories (kept as-is)
+
+8. **Report results**
 
 ---
 
@@ -179,3 +201,8 @@ When generating new `.claude.md` files, use this template (max 50 lines):
 | `.claude/templates/module-claude-md.template` | Template for new modules |
 | `src/modules/*/.claude.md` | Module context files |
 | `src/modules/*/.claude-learnings.md` | Module learnings |
+| `.claude/user-stories/*.md` | Browser QA user stories |
+| `.claude/user-stories/_manifest.json` | Story metadata & staleness tracking |
+| `scripts/playwright-qa/generate-stories.mjs` | Auto-generates smoke stories |
+| `scripts/playwright-qa/setup-auth.mjs` | Playwright auth state setup |
+| `scripts/playwright-qa/qa-screenshot.mjs` | Quick authenticated screenshots |

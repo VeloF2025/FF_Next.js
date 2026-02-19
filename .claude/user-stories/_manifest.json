@@ -1,0 +1,702 @@
+{
+  "action-items-smoke": {
+    "routes": [
+      "/action-items"
+    ],
+    "type": "smoke",
+    "module": "action-items",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "admin-poles-sync-smoke": {
+    "routes": [
+      "/admin/poles-sync"
+    ],
+    "type": "smoke",
+    "module": "admin",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "analytics-smoke": {
+    "routes": [
+      "/analytics"
+    ],
+    "type": "smoke",
+    "module": "analytics",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "clients-smoke": {
+    "routes": [
+      "/clients"
+    ],
+    "type": "smoke",
+    "module": "clients",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "clients-new-smoke": {
+    "routes": [
+      "/clients/new"
+    ],
+    "type": "smoke",
+    "module": "clients",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "communications-help-center-smoke": {
+    "routes": [
+      "/communications/help-center"
+    ],
+    "type": "smoke",
+    "module": "communications",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "communications-mission-control-smoke": {
+    "routes": [
+      "/communications/mission-control"
+    ],
+    "type": "smoke",
+    "module": "communications",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "communications-whatsapp-smoke": {
+    "routes": [
+      "/communications/whatsapp"
+    ],
+    "type": "smoke",
+    "module": "communications",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "communications-smoke": {
+    "routes": [
+      "/communications"
+    ],
+    "type": "smoke",
+    "module": "communications",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "daily-progress-smoke": {
+    "routes": [
+      "/daily-progress"
+    ],
+    "type": "smoke",
+    "module": "daily-progress",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "dr-review-smoke": {
+    "routes": [
+      "/dr-review"
+    ],
+    "type": "smoke",
+    "module": "dr-review",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "drops-smoke": {
+    "routes": [
+      "/drops"
+    ],
+    "type": "smoke",
+    "module": "drops",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "enhanced-kpis-smoke": {
+    "routes": [
+      "/enhanced-kpis"
+    ],
+    "type": "smoke",
+    "module": "enhanced-kpis",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "fiber-stringing-smoke": {
+    "routes": [
+      "/fiber-stringing"
+    ],
+    "type": "smoke",
+    "module": "fiber-stringing",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "field-smoke": {
+    "routes": [
+      "/field"
+    ],
+    "type": "smoke",
+    "module": "field",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "health-safety-checklists-smoke": {
+    "routes": [
+      "/health-safety/checklists"
+    ],
+    "type": "smoke",
+    "module": "health-safety",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "health-safety-incidents-smoke": {
+    "routes": [
+      "/health-safety/incidents"
+    ],
+    "type": "smoke",
+    "module": "health-safety",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "health-safety-incidents-new-smoke": {
+    "routes": [
+      "/health-safety/incidents/new"
+    ],
+    "type": "smoke",
+    "module": "health-safety",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "health-safety-smoke": {
+    "routes": [
+      "/health-safety"
+    ],
+    "type": "smoke",
+    "module": "health-safety",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "imports-smoke": {
+    "routes": [
+      "/imports"
+    ],
+    "type": "smoke",
+    "module": "imports",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "installations-smoke": {
+    "routes": [
+      "/installations"
+    ],
+    "type": "smoke",
+    "module": "installations",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "kpi-dashboard-smoke": {
+    "routes": [
+      "/kpi-dashboard"
+    ],
+    "type": "smoke",
+    "module": "kpi-dashboard",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "marketing-activations-smoke": {
+    "routes": [
+      "/marketing-activations"
+    ],
+    "type": "smoke",
+    "module": "marketing-activations",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "meetings-smoke": {
+    "routes": [
+      "/meetings"
+    ],
+    "type": "smoke",
+    "module": "meetings",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "nokia-equipment-smoke": {
+    "routes": [
+      "/nokia-equipment"
+    ],
+    "type": "smoke",
+    "module": "nokia-equipment",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-export-smoke": {
+    "routes": [
+      "/onemap/export"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-grid-smoke": {
+    "routes": [
+      "/onemap/grid"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-import-smoke": {
+    "routes": [
+      "/onemap/import"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-layers-smoke": {
+    "routes": [
+      "/onemap/layers"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-map-smoke": {
+    "routes": [
+      "/onemap/map"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-search-smoke": {
+    "routes": [
+      "/onemap/search"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "onemap-smoke": {
+    "routes": [
+      "/onemap"
+    ],
+    "type": "smoke",
+    "module": "onemap",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "photo-review-smoke": {
+    "routes": [
+      "/photo-review"
+    ],
+    "type": "smoke",
+    "module": "photo-review",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pipeline-alerts-smoke": {
+    "routes": [
+      "/pipeline/alerts"
+    ],
+    "type": "smoke",
+    "module": "pipeline",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pipeline-authorities-smoke": {
+    "routes": [
+      "/pipeline/authorities"
+    ],
+    "type": "smoke",
+    "module": "pipeline",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pipeline-smoke": {
+    "routes": [
+      "/pipeline"
+    ],
+    "type": "smoke",
+    "module": "pipeline",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pipeline-new-smoke": {
+    "routes": [
+      "/pipeline/new"
+    ],
+    "type": "smoke",
+    "module": "pipeline",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pole-capture-smoke": {
+    "routes": [
+      "/pole-capture"
+    ],
+    "type": "smoke",
+    "module": "pole-capture",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "pole-tracker-smoke": {
+    "routes": [
+      "/pole-tracker"
+    ],
+    "type": "smoke",
+    "module": "pole-tracker",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "profile-smoke": {
+    "routes": [
+      "/profile"
+    ],
+    "type": "smoke",
+    "module": "profile",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "recordings-smoke": {
+    "routes": [
+      "/recordings"
+    ],
+    "type": "smoke",
+    "module": "recordings",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "reports-smoke": {
+    "routes": [
+      "/reports"
+    ],
+    "type": "smoke",
+    "module": "reports",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "settings-pipeline-authorities-smoke": {
+    "routes": [
+      "/settings/pipeline-authorities"
+    ],
+    "type": "smoke",
+    "module": "settings",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "settings-smoke": {
+    "routes": [
+      "/settings"
+    ],
+    "type": "smoke",
+    "module": "settings",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "sow-grid-smoke": {
+    "routes": [
+      "/sow/grid"
+    ],
+    "type": "smoke",
+    "module": "sow",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "sow-import-smoke": {
+    "routes": [
+      "/sow/import"
+    ],
+    "type": "smoke",
+    "module": "sow",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "sow-smoke": {
+    "routes": [
+      "/sow"
+    ],
+    "type": "smoke",
+    "module": "sow",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "sow-list-smoke": {
+    "routes": [
+      "/sow/list"
+    ],
+    "type": "smoke",
+    "module": "sow",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "sow-management-smoke": {
+    "routes": [
+      "/sow-management"
+    ],
+    "type": "smoke",
+    "module": "sow-management",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "stock-items-smoke": {
+    "routes": [
+      "/stock-items"
+    ],
+    "type": "smoke",
+    "module": "stock-items",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "suppliers-new-smoke": {
+    "routes": [
+      "/suppliers/new"
+    ],
+    "type": "smoke",
+    "module": "suppliers",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "suppliers-smoke": {
+    "routes": [
+      "/suppliers"
+    ],
+    "type": "smoke",
+    "module": "suppliers",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-data-management-document-expiry-smoke": {
+    "routes": [
+      "/system/data-management/document-expiry"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-data-management-olt-report-smoke": {
+    "routes": [
+      "/system/data-management/olt-report"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-data-sync-smoke": {
+    "routes": [
+      "/system/data-sync"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-health-smoke": {
+    "routes": [
+      "/system/health"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-infrastructure-smoke": {
+    "routes": [
+      "/system/infrastructure"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "system-vlm-learning-smoke": {
+    "routes": [
+      "/system/vlm-learning"
+    ],
+    "type": "smoke",
+    "module": "system",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "tasks-smoke": {
+    "routes": [
+      "/tasks"
+    ],
+    "type": "smoke",
+    "module": "tasks",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "workflow-portal-smoke": {
+    "routes": [
+      "/workflow-portal"
+    ],
+    "type": "smoke",
+    "module": "workflow-portal",
+    "priority": "Low",
+    "last_updated": "2026-02-19",
+    "auto_generated": true
+  },
+  "activate-overview": {
+    "routes": [
+      "/activate"
+    ],
+    "type": "workflow",
+    "module": "activate",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "construction-qa-list": {
+    "routes": [
+      "/construction-qa"
+    ],
+    "type": "workflow",
+    "module": "construction qa",
+    "priority": "High",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "dashboard-load": {
+    "routes": [
+      "/"
+    ],
+    "type": "workflow",
+    "module": "dashboard",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "fleet-checkin": {
+    "routes": [
+      "/fleet"
+    ],
+    "type": "workflow",
+    "module": "fleet",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "maintenance-tickets": {
+    "routes": [
+      "/maintenance"
+    ],
+    "type": "workflow",
+    "module": "maintenance",
+    "priority": "Medium",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "navigation-sidebar": {
+    "routes": [
+      "/"
+    ],
+    "type": "workflow",
+    "module": "navigation",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "procurement-overview": {
+    "routes": [
+      "/procurement"
+    ],
+    "type": "workflow",
+    "module": "procurement",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "projects-list": {
+    "routes": [
+      "/projects"
+    ],
+    "type": "workflow",
+    "module": "projects",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "staff-create": {
+    "routes": [
+      "/staff"
+    ],
+    "type": "workflow",
+    "module": "staff",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  },
+  "staff-list": {
+    "routes": [
+      "/staff"
+    ],
+    "type": "workflow",
+    "module": "staff",
+    "priority": "Critical",
+    "last_updated": "2026-02-19",
+    "auto_generated": false
+  }
+}
