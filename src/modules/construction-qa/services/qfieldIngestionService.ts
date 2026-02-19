@@ -14,7 +14,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
-import type { Discipline, FeatureType, PhotoSource } from '../types';
+import type { Discipline, FeatureType } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -27,6 +27,24 @@ const WORK_TYPE_MAP: Record<string, { discipline: Discipline; featureType: Featu
   dome_joint: { discipline: 'splicing', featureType: 'joint' },
 };
 
+/**
+ * QFieldCloud project UUID → FibreFlow project UUID mapping.
+ * QFieldCloud uses its own project UUIDs which differ from FibreFlow's.
+ */
+const QFIELD_TO_FIBREFLOW: Record<string, string> = {
+  '07b7109f-479b-4a7b-b33c-13e2af0c6bd3': '4eb13426-b2a1-472d-9b3c-277082ae9b55', // LAW Pole Audit → Lawley
+  '137eb5ec-4c0b-4eab-8a5c-de046eb06349': 'bf9a90db-e758-4c05-b999-694cd63c451f', // MOA Pole Audit → Mohadin
+  '04900ce2-1f2e-45bf-b3c8-8c78bc6540db': 'c7255076-1d2f-41ce-97bb-858b8c87ee27', // ETW Pole Audit → Etwatwa
+  'c1e14ea2-489c-4376-a59a-1253df404dde': '7003dc06-9af7-4a7c-bc6c-a177d77784f2', // MAM Pole Audit → Mamelodi
+};
+
+/** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
+const FIBREFLOW_TO_QFIELD: Record<string, string[]> = {};
+for (const [qfId, ffId] of Object.entries(QFIELD_TO_FIBREFLOW)) {
+  if (!FIBREFLOW_TO_QFIELD[ffId]) FIBREFLOW_TO_QFIELD[ffId] = [];
+  FIBREFLOW_TO_QFIELD[ffId].push(qfId);
+}
+
 interface IngestOptions {
   projectId: string;
   discipline?: Discipline | 'all';
@@ -35,6 +53,8 @@ interface IngestOptions {
 }
 
 interface IngestResult {
+  projectId: string;
+  projectName?: string;
   photosFound: number;
   photosIngested: number;
   reviewsCreated: number;
@@ -42,8 +62,38 @@ interface IngestResult {
   errors: string[];
 }
 
+interface IngestAllResult {
+  projects: IngestResult[];
+  totalPhotosIngested: number;
+  totalReviewsCreated: number;
+  totalReviewsUpdated: number;
+  totalErrors: number;
+}
+
 /**
- * Ingest QField photos into the Construction QA system.
+ * Ingest QField photos for ALL mapped projects.
+ */
+export async function ingestAllQFieldPhotos(opts: { dryRun?: boolean; discipline?: Discipline | 'all' }): Promise<IngestAllResult> {
+  const ffProjectIds = Object.values(QFIELD_TO_FIBREFLOW);
+  const unique = [...new Set(ffProjectIds)];
+
+  const results: IngestResult[] = [];
+  for (const projectId of unique) {
+    const r = await ingestQFieldPhotos({ projectId, discipline: opts.discipline, dryRun: opts.dryRun });
+    results.push(r);
+  }
+
+  return {
+    projects: results,
+    totalPhotosIngested: results.reduce((s, r) => s + r.photosIngested, 0),
+    totalReviewsCreated: results.reduce((s, r) => s + r.reviewsCreated, 0),
+    totalReviewsUpdated: results.reduce((s, r) => s + r.reviewsUpdated, 0),
+    totalErrors: results.reduce((s, r) => s + r.errors.length, 0),
+  };
+}
+
+/**
+ * Ingest QField photos into the Construction QA system for a single project.
  *
  * Reads from qfield_photo_validations and creates/updates
  * construction_qa_reviews and construction_qa_photos records.
@@ -51,6 +101,7 @@ interface IngestResult {
 export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestResult> {
   const { projectId, discipline = 'all', sinceDate, dryRun = false } = opts;
   const result: IngestResult = {
+    projectId,
     photosFound: 0,
     photosIngested: 0,
     reviewsCreated: 0,
@@ -58,7 +109,14 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
     errors: [],
   };
 
-  log.info('Starting QField ingestion', { projectId, discipline, sinceDate, dryRun }, MODULE);
+  // Look up QField project IDs for this FibreFlow project
+  const qfProjectIds = FIBREFLOW_TO_QFIELD[projectId];
+  if (!qfProjectIds || qfProjectIds.length === 0) {
+    result.errors.push(`No QField project mapping for FibreFlow project ${projectId}`);
+    return result;
+  }
+
+  log.info('Starting QField ingestion', { projectId, qfProjectIds, discipline, sinceDate, dryRun }, MODULE);
 
   try {
     // Build work_type filter
@@ -71,9 +129,12 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
       return result;
     }
 
-    // Fetch unprocessed QField photos
-    // Photos that have a feature_id and work_type but no matching construction_qa_photos row
-    const workTypePlaceholders = workTypes.map((_, i) => `$${i + 2}`).join(', ');
+    // Build parameterized query
+    // $1..$N = qfProjectIds, then workTypes, then optional sinceDate
+    let paramIdx = 1;
+    const qfPlaceholders = qfProjectIds.map(() => `$${paramIdx++}`).join(', ');
+    const wtPlaceholders = workTypes.map(() => `$${paramIdx++}`).join(', ');
+    const params: (string | number)[] = [...qfProjectIds, ...workTypes];
 
     let query = `
       SELECT
@@ -91,7 +152,8 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
         qpv.created_at
       FROM qfield_photo_validations qpv
       WHERE qpv.feature_id IS NOT NULL
-        AND qpv.work_type IN (${workTypePlaceholders})
+        AND qpv.project_id IN (${qfPlaceholders})
+        AND qpv.work_type IN (${wtPlaceholders})
         AND NOT EXISTS (
           SELECT 1 FROM construction_qa_photos cqp
           WHERE cqp.storage_key = qpv.photo_key
@@ -99,25 +161,23 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
         )
     `;
 
-    const params: (string | number)[] = [projectId, ...workTypes];
-
     if (sinceDate) {
-      query += ` AND qpv.created_at >= $${params.length + 1}`;
+      query += ` AND qpv.created_at >= $${paramIdx++}`;
       params.push(sinceDate);
     }
 
-    query += ' ORDER BY qpv.created_at ASC LIMIT 500';
+    query += ' ORDER BY qpv.created_at ASC';
 
     const photos = await sql.query(query, params);
     result.photosFound = photos.length;
 
     if (photos.length === 0) {
-      log.info('No new photos to ingest', undefined, MODULE);
+      log.info('No new photos to ingest', { projectId }, MODULE);
       return result;
     }
 
     if (dryRun) {
-      log.info('Dry run — skipping writes', { photosFound: photos.length }, MODULE);
+      log.info('Dry run — skipping writes', { projectId, photosFound: photos.length }, MODULE);
       return result;
     }
 
@@ -132,8 +192,8 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
     // Process each feature group
     for (const [featureKey, featurePhotos] of byFeature) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const sample = featurePhotos[0]!;
+        const sample = featurePhotos[0];
+        if (!sample) continue;
         const mapping = WORK_TYPE_MAP[sample.work_type as string];
         if (!mapping) continue;
 
