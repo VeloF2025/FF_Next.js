@@ -84,6 +84,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.total_amount as total,
         COALESCE(po.version, 1) as version,
         (SELECT COUNT(*)::int FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count,
+        po.department,
         po.created_by as created_by_name,
         po.created_at
       FROM purchase_orders po
@@ -109,6 +110,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       total: parseFloat(row.total as string) || 0,
       version: row.version || 1,
       itemCount: row.item_count || 0,
+      department: row.department || null,
       createdByName: row.created_by_name || 'System',
       createdAt: row.created_at,
     }));
@@ -142,6 +144,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     // Accept both note field names
     const internalNotes = body.internalNotes || body.notes;
     const supplierNotes = body.supplierNotes;
+    const department = body.department;
     const items = body.items;
     const createdBy = body.createdBy || 'system';
 
@@ -220,14 +223,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const insertQuery = `
       INSERT INTO purchase_orders (
         po_number, status, supplier_id, supplier_contact, supplier_reference,
-        project_id, delivery_address, expected_delivery_date, shipping_method,
+        project_id, department, delivery_address, expected_delivery_date, shipping_method,
         payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
         internal_notes, supplier_notes, created_by, created_at, updated_at
       ) VALUES (
         $1, 'draft', $2, $3, $4,
-        $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14,
-        $15, $16, $17, NOW(), NOW()
+        $5, $6, $7, $8, $9,
+        $10, $11, $12, $13, $14, $15,
+        $16, $17, $18, NOW(), NOW()
       )
       RETURNING id, po_number
     `;
@@ -238,6 +241,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       supplierContact || null,
       supplierReference || null,
       projectId || null,
+      department || null,
       deliveryAddress,
       expectedDeliveryDate || null,
       shippingMethod || null,

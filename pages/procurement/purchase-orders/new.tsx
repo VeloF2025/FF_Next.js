@@ -47,6 +47,14 @@ const UOM_OPTIONS = [
   { value: 'kg', label: 'Kilograms' },
 ];
 
+const DEPARTMENTS = [
+  { value: 'activations', label: 'Activations' },
+  { value: 'optical', label: 'Optical' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'civils', label: 'Civils' },
+  { value: 'finance', label: 'Finance' },
+];
+
 const PAYMENT_TERMS = [
   { value: 'cod', label: 'Cash on Delivery (COD)' },
   { value: 'net7', label: 'Net 7 Days' },
@@ -81,6 +89,7 @@ export default function NewPurchaseOrderPage() {
   // Form state
   const [supplierId, setSupplierId] = useState<number | null>(null);
   const [projectId, setProjectId] = useState<string>('');
+  const [department, setDepartment] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [paymentTerms, setPaymentTerms] = useState('net30');
@@ -182,6 +191,7 @@ export default function NewPurchaseOrderPage() {
         body: JSON.stringify({
           supplierId,
           projectId: projectId || null,
+          department: department || null,
           deliveryAddress,
           deliveryDate: deliveryDate || null,
           paymentTerms,
@@ -262,7 +272,7 @@ export default function NewPurchaseOrderPage() {
               <h2 className="text-lg font-medium text-[var(--ff-text-primary)]">Supplier & Project</h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Supplier <span className="text-red-400">*</span>
@@ -277,6 +287,24 @@ export default function NewPurchaseOrderPage() {
                   {suppliers.map((supplier) => (
                     <option key={supplier.id} value={supplier.id}>
                       {supplier.companyName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Department
+                </label>
+                <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">Select department</option>
+                  {DEPARTMENTS.map((dept) => (
+                    <option key={dept.value} value={dept.value}>
+                      {dept.label}
                     </option>
                   ))}
                 </select>
