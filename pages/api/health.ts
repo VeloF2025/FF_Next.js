@@ -154,10 +154,10 @@ export default async function handler(
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    // Strip internal details from public response - only expose status and checks
     return res.status(statusCode).json({
       status: health.status,
       timestamp: health.timestamp,
+      version: health.version,
       checks: health.checks,
     } as HealthCheck);
   } catch (error) {
@@ -172,6 +172,7 @@ export default async function handler(
     return res.status(503).json({
       status: health.status,
       timestamp: health.timestamp,
+      version: health.version,
       checks: health.checks,
     } as HealthCheck);
   }
