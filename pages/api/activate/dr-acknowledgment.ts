@@ -213,24 +213,27 @@ async function checkDuplicateSerials(
 function buildSerialWarningLines(
   ontSerial: string | null,
   upsSerial: string | null,
-  vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number } | undefined,
+  vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number; ontConfidence?: number; upsConfidence?: number } | undefined,
   duplicates: DuplicateSerialResult
 ): string[] {
   const lines: string[] = [];
 
-  // Only trust VLM serial comparison if confidence >= 95%
-  // Below that, prompt the tech to double-check rather than showing a wrong mismatch
+  // Use per-serial confidence when available, fall back to overall confidence
+  // This prevents barcode ONT confidence (0.98) from inflating UPS VLM trust
   const MIN_VLM_CONFIDENCE = 0.95;
-  const trustVlm = vlmResult && vlmResult.confidence >= MIN_VLM_CONFIDENCE;
+  const ontConfidence = vlmResult?.ontConfidence ?? vlmResult?.confidence ?? 0;
+  const upsConfidence = vlmResult?.upsConfidence ?? vlmResult?.confidence ?? 0;
+  const trustOntVlm = vlmResult && ontConfidence >= MIN_VLM_CONFIDENCE;
+  const trustUpsVlm = vlmResult && upsConfidence >= MIN_VLM_CONFIDENCE;
 
   // --- ONT Serial ---
   if (ontSerial) {
-    if (trustVlm && vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
-      lines.push(`🔴 *ONT Serial MISMATCH:*`);
+    if (trustOntVlm && vlmResult?.ontSerial && normalizeForCompare(ontSerial) !== normalizeForCompare(vlmResult.ontSerial)) {
+      lines.push(`🟡 *ONT Serial MISMATCH:*`);
       lines.push(`   1Map: ${ontSerial}`);
       lines.push(`   Sticker: ${vlmResult.ontSerial}`);
-      lines.push(`   ⚠️ *Please correct in 1Map!*`);
-    } else if (trustVlm && vlmResult?.ontSerial) {
+      lines.push(`   ⚠️ *Please double-check in 1Map*`);
+    } else if (trustOntVlm && vlmResult?.ontSerial) {
       lines.push(`🔌 ONT Serial: ${ontSerial} ✅`);
     } else {
       lines.push(`🔌 ONT Serial: ${ontSerial}`);
@@ -239,7 +242,7 @@ function buildSerialWarningLines(
   } else {
     lines.push(`🔴 *ONT Serial: NOT SCANNED*`);
     lines.push(`   ⚠️ *Please scan ONT barcode in 1Map!*`);
-    if (trustVlm && vlmResult?.ontSerial) {
+    if (trustOntVlm && vlmResult?.ontSerial) {
       lines.push(`   📷 Photo shows: ${vlmResult.ontSerial}`);
     }
   }
@@ -253,12 +256,12 @@ function buildSerialWarningLines(
 
   // --- UPS Serial ---
   if (upsSerial) {
-    if (trustVlm && vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
-      lines.push(`🔴 *UPS Serial MISMATCH:*`);
+    if (trustUpsVlm && vlmResult?.upsSerial && normalizeForCompare(upsSerial) !== normalizeForCompare(vlmResult.upsSerial)) {
+      lines.push(`🟡 *UPS Serial MISMATCH:*`);
       lines.push(`   1Map: ${upsSerial}`);
       lines.push(`   Sticker: ${vlmResult.upsSerial}`);
-      lines.push(`   ⚠️ *Please correct in 1Map!*`);
-    } else if (trustVlm && vlmResult?.upsSerial) {
+      lines.push(`   ⚠️ *Please double-check in 1Map*`);
+    } else if (trustUpsVlm && vlmResult?.upsSerial) {
       lines.push(`🔋 UPS Serial: ${upsSerial} ✅`);
     } else {
       lines.push(`🔋 UPS Serial: ${upsSerial}`);
@@ -267,7 +270,7 @@ function buildSerialWarningLines(
   } else {
     lines.push(`🔴 *UPS Serial: NOT SCANNED*`);
     lines.push(`   ⚠️ *Please scan UPS barcode in 1Map!*`);
-    if (trustVlm && vlmResult?.upsSerial) {
+    if (trustUpsVlm && vlmResult?.upsSerial) {
       lines.push(`   📷 Photo shows: ${vlmResult.upsSerial}`);
     }
   }
@@ -456,7 +459,7 @@ function generateResubmissionAckMessage(
   submissionNumber: number,
   ontSerial: string | null,
   upsSerial: string | null,
-  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number },
+  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number; ontConfidence?: number; upsConfidence?: number },
   duplicates: DuplicateSerialResult = { ontDuplicates: [], upsDuplicates: [] }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   const swapCheck = detectSwappedSerials(ontSerial, upsSerial);
@@ -534,7 +537,7 @@ function generateAckMessage(
   ontSerial: string | null,
   upsSerial: string | null,
   waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 },
-  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number },
+  vlmResult?: { ontSerial: string | null; upsSerial: string | null; confidence: number; ontConfidence?: number; upsConfidence?: number },
   duplicates: DuplicateSerialResult = { ontDuplicates: [], upsDuplicates: [] }
 ): { message: string; swapped: boolean; swapDetails: string | null } {
   // If DR not found in 1Map, return empty string
@@ -706,7 +709,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Poll for WhatsApp serial photos and run VLM serial extraction
     // Race condition: Go Bridge creates wa_photos records asynchronously
     let waPhotoCheck: WAPhotoCheck = { hasPhoto: false, photoCount: 0 };
-    let vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number } | undefined;
+    let vlmResult: { ontSerial: string | null; upsSerial: string | null; confidence: number; ontConfidence?: number; upsConfidence?: number } | undefined;
 
     try {
       // Poll for wa_photos (Go Bridge creates them in parallel with this call)
@@ -725,13 +728,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         });
 
         if (extraction.bestOnt || extraction.bestUps) {
+          const ontConf = extraction.bestOnt?.confidence || 0;
+          const upsConf = extraction.bestUps?.confidence || 0;
           vlmResult = {
             ontSerial: extraction.bestOnt?.serial || null,
             upsSerial: extraction.bestUps?.serial || null,
-            confidence: Math.max(
-              extraction.bestOnt?.confidence || 0,
-              extraction.bestUps?.confidence || 0
-            ),
+            confidence: Math.max(ontConf, upsConf),
+            ontConfidence: ontConf,
+            upsConfidence: upsConf,
           };
           log.info('DrAcknowledgment', `VLM serial extraction completed for ${dropNumber}`, {
             ontExtracted: vlmResult.ontSerial,

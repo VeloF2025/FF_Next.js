@@ -366,12 +366,14 @@ export async function extractWaPhotoSerials(
         WHERE id = ${photo.id}
       `;
 
-      // Track best extractions
-      if (extraction.ontSerial && extraction.confidence > (bestOnt?.confidence || 0)) {
-        bestOnt = { serial: extraction.ontSerial, confidence: extraction.confidence };
+      // Track best extractions using per-serial confidence (not overall)
+      const ontConf = extraction.ontConfidence ?? extraction.confidence;
+      const upsConf = extraction.upsConfidence ?? extraction.confidence;
+      if (extraction.ontSerial && ontConf > (bestOnt?.confidence || 0)) {
+        bestOnt = { serial: extraction.ontSerial, confidence: ontConf };
       }
-      if (extraction.upsSerial && extraction.confidence > (bestUps?.confidence || 0)) {
-        bestUps = { serial: extraction.upsSerial, confidence: extraction.confidence };
+      if (extraction.upsSerial && upsConf > (bestUps?.confidence || 0)) {
+        bestUps = { serial: extraction.upsSerial, confidence: upsConf };
       }
 
       // Log to activity

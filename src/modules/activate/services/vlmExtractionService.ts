@@ -1309,6 +1309,8 @@ export interface WaPhotoExtractionResult {
   ontSerial: string | null;
   upsSerial: string | null;
   confidence: number;
+  ontConfidence: number;
+  upsConfidence: number;
   processingTimeMs: number;
   error?: string;
 }
@@ -1464,6 +1466,8 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
         ontSerial: ontFromBarcode,
         upsSerial: null,
         confidence: ontFromBarcode ? 0.95 : 0,
+        ontConfidence: ontFromBarcode ? 0.95 : 0,
+        upsConfidence: 0,
         processingTimeMs,
         error: result.error || 'VLM extraction failed',
       };
@@ -1519,6 +1523,8 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
       ontSerial: finalOnt,
       upsSerial: finalUps,
       confidence: overallConfidence,
+      ontConfidence,
+      upsConfidence,
       processingTimeMs,
     };
   } catch (error) {
@@ -1530,6 +1536,8 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
       ontSerial: null,
       upsSerial: null,
       confidence: 0,
+      ontConfidence: 0,
+      upsConfidence: 0,
       processingTimeMs: Date.now() - startTime,
       error: message,
     };
