@@ -81,7 +81,7 @@ export function useAdjustments(options: UseAdjustmentsOptions = {}): UseAdjustme
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch adjustments');
+        throw new Error(data.error?.message || data.error || 'Failed to fetch adjustments');
       }
 
       const data = await response.json();
@@ -103,7 +103,7 @@ export function useAdjustments(options: UseAdjustmentsOptions = {}): UseAdjustme
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || 'Failed to create adjustment');
+      throw new Error(data.error?.message || data.error || 'Failed to create adjustment');
     }
 
     const data = await response.json();

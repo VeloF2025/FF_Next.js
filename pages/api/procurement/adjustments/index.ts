@@ -52,7 +52,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         si.name as item_name,
         fl.name as from_location_name,
         tl.name as to_location_name
-      FROM stock_movements sm
+      FROM field_stock_movements sm
       JOIN stock_items si ON si.id = sm.stock_item_id
       LEFT JOIN stock_locations fl ON fl.id = sm.from_location_id
       LEFT JOIN stock_locations tl ON tl.id = sm.to_location_id
@@ -68,8 +68,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (reason_code) {
-      query += ` AND sm.reference LIKE $${paramIndex}`;
-      params.push(`%${reason_code}%`);
+      query += ` AND sm.notes LIKE $${paramIndex}`;
+      params.push(`%[${reason_code}]%`);
       paramIndex++;
     }
 
@@ -130,7 +130,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const now = new Date();
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const seqResult = await sql`
-      SELECT COUNT(*) as cnt FROM stock_movements
+      SELECT COUNT(*) as cnt FROM field_stock_movements
       WHERE movement_type = 'adjustment'
         AND performed_at >= date_trunc('month', NOW())
     `;
@@ -171,13 +171,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       `;
     }
 
-    // Insert stock_movements record
+    // Insert field_stock_movements record
     const noteText = data.notes
       ? `[${data.reason_code}] ${data.notes}`
       : `[${data.reason_code}]`;
 
     const movement = await sql`
-      INSERT INTO stock_movements (
+      INSERT INTO field_stock_movements (
         stock_item_id,
         movement_type,
         from_location_id,

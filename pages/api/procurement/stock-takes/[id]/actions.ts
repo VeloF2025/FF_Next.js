@@ -198,11 +198,11 @@ async function handleApprove(
       `;
     }
 
-    // Record stock movement
+    // Record stock movement in field_stock_movements
     const fromLoc = variance > 0 ? adjustLocationId : lineLocationId;
     const toLoc = variance > 0 ? lineLocationId : adjustLocationId;
     await sql`
-      INSERT INTO stock_movements (
+      INSERT INTO field_stock_movements (
         stock_item_id, movement_type, from_location_id, to_location_id,
         quantity, reference, notes, performed_by, performed_at
       ) VALUES (
