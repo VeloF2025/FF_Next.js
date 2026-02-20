@@ -3,7 +3,7 @@
  * Manage stock picking operations (issue, receipt, transfer, return, scrap)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   StockPicking,
   StockPickingLine,
@@ -37,7 +37,7 @@ const API_BASE = '/api/procurement/field-stock/pickings';
 export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn {
   const { autoFetch = false, defaultFilters = {} } = options;
   const [pickings, setPickings] = useState<StockPicking[]>([]);
-  const [loading, setLoading] = useState(autoFetch);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -187,9 +187,12 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
   }, []);
 
   // Auto-fetch on mount if enabled
-  if (autoFetch && pickings.length === 0 && !loading && !error) {
-    fetchPickings();
-  }
+  useEffect(() => {
+    if (autoFetch) {
+      fetchPickings();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch]);
 
   return {
     pickings,
