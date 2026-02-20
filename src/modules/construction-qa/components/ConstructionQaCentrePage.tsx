@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { log } from '@/lib/logger';
 
 type Discipline = 'civil' | 'optical' | 'splicing';
-type WorkflowStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'rework_needed' | 'escalated';
+type WorkflowStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'rework_needed' | 'escalated' | 'unidentified';
 
 interface FeatureRow {
   id: string;
@@ -55,6 +55,7 @@ interface Stats {
   rejected: number;
   rework_needed: number;
   escalated: number;
+  unidentified: number;
 }
 
 interface Filters {
@@ -92,7 +93,7 @@ export function ConstructionQaCentrePage() {
   });
   const [features, setFeatures] = useState<FeatureRow[]>([]);
   const [stats, setStats] = useState<Stats>({
-    total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0,
+    total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0, unidentified: 0,
   });
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -141,7 +142,7 @@ export function ConstructionQaCentrePage() {
       if (res.ok) {
         const data = await res.json();
         setFeatures(data.data?.features || []);
-        setStats(data.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0 });
+        setStats(data.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0, unidentified: 0 });
         setTotalCount(data.data?.pagination?.total || 0);
         setTotalPages(data.data?.pagination?.totalPages || 0);
         setLastRefresh(new Date());
@@ -199,6 +200,14 @@ export function ConstructionQaCentrePage() {
       icon: AlertTriangle,
       color: '#f97316',
     },
+    ...(stats.unidentified > 0 ? [{
+      title: 'Unidentified',
+      subtitle: 'Unknown features',
+      value: stats.unidentified,
+      description: 'Features with non-standard IDs (filenames, not pole numbers)',
+      icon: AlertTriangle,
+      color: '#6b7280',
+    }] : []),
   ], [stats, filters.discipline]);
 
   const handleRowClick = (feature: FeatureRow) => {
@@ -229,6 +238,7 @@ export function ConstructionQaCentrePage() {
       rejected: 'bg-red-500/20 text-red-400',
       rework_needed: 'bg-orange-500/20 text-orange-400',
       escalated: 'bg-purple-500/20 text-purple-400',
+      unidentified: 'bg-gray-500/20 text-gray-400',
     };
     return (
       <span className={`px-2 py-0.5 rounded text-xs font-medium ${colors[status] || 'bg-gray-500/20 text-gray-400'}`}>
@@ -266,7 +276,7 @@ export function ConstructionQaCentrePage() {
       </div>
 
       {/* Stats Cards */}
-      <StatsGrid cards={statCards} columns={5} />
+      <StatsGrid cards={statCards} columns={statCards.length} />
 
       {/* Discipline Tabs */}
       <div className="flex gap-1 bg-[var(--card-bg)] p-1 rounded-lg border border-[var(--border-color)]">
@@ -330,6 +340,7 @@ export function ConstructionQaCentrePage() {
             <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="rework_needed">Rework Needed</SelectItem>
             <SelectItem value="escalated">Escalated</SelectItem>
+            <SelectItem value="unidentified">Unidentified</SelectItem>
           </SelectContent>
         </Select>
 

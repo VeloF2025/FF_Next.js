@@ -35,7 +35,8 @@ export type WorkflowStatus =
   | 'approved'
   | 'rejected'
   | 'rework_needed'
-  | 'escalated';
+  | 'escalated'
+  | 'unidentified';
 
 /** Processing state of the VLM validation pipeline for a review. */
 export type VlmStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -761,6 +762,7 @@ export interface FeaturesListSummary {
   rejected: number;
   rework_needed: number;
   escalated: number;
+  unidentified: number;
 }
 
 /** Response shape for GET /api/construction-qa/features. */

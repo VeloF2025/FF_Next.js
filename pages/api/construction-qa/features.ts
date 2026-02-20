@@ -155,7 +155,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         COUNT(*) FILTER (WHERE workflow_status = 'approved') AS approved,
         COUNT(*) FILTER (WHERE workflow_status = 'rejected') AS rejected,
         COUNT(*) FILTER (WHERE workflow_status = 'rework_needed') AS rework_needed,
-        COUNT(*) FILTER (WHERE workflow_status = 'escalated') AS escalated
+        COUNT(*) FILTER (WHERE workflow_status = 'escalated') AS escalated,
+        COUNT(*) FILTER (WHERE workflow_status = 'unidentified') AS unidentified
       FROM construction_qa_reviews
       WHERE ${statsWhere}
     `;
@@ -179,6 +180,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         rejected: Number(statsRow.rejected || 0),
         rework_needed: Number(statsRow.rework_needed || 0),
         escalated: Number(statsRow.escalated || 0),
+        unidentified: Number(statsRow.unidentified || 0),
       },
       pagination: {
         page,
@@ -194,7 +196,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if ((error as Error).message?.includes('does not exist')) {
       return apiResponse.success(res, {
         features: [],
-        stats: { total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0 },
+        stats: { total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0, escalated: 0, unidentified: 0 },
         pagination: { page: 1, pageSize: 50, total: 0, totalPages: 0 },
       });
     }
