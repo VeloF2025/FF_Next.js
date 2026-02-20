@@ -11,8 +11,19 @@ import {
   FieldStockDashboard,
   LocationList,
   SerialScanner,
-  ConsumptionRecorder
+  PickingList,
+  CreatePickingForm,
+  ReturnList,
+  CreateReturnModal,
+  ContractorAccountabilityList,
 } from '@/modules/procurement/field-stock/components';
+import {
+  useReturns,
+  useContractorAccountability,
+  useLocations,
+  useStockItems,
+  useConsumptions,
+} from '@/modules/procurement/field-stock/hooks';
 import {
   LayoutDashboard,
   MapPin,
@@ -21,7 +32,8 @@ import {
   ArrowRightLeft,
   RotateCcw,
   Users,
-  FileText,
+  Plus,
+  Loader2,
   ShoppingCart,
   AlertTriangle,
 } from 'lucide-react';
@@ -87,6 +99,120 @@ const tabs: TabConfig[] = [
   },
 ];
 
+/** Pickings tab with list/create toggle */
+function PickingsTab() {
+  const [view, setView] = useState<'list' | 'create'>('list');
+  if (view === 'create') {
+    return <CreatePickingForm onSuccess={() => setView('list')} onCancel={() => setView('list')} />;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setView('create')}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Plus className="h-4 w-4" /> New Picking
+        </button>
+      </div>
+      <PickingList />
+    </div>
+  );
+}
+
+/** Returns tab with create modal */
+function ReturnsTabContent() {
+  const { returns, loading, createReturn } = useReturns();
+  const { locations } = useLocations({ autoFetch: true });
+  const { items: stockItems } = useStockItems({ autoFetch: true });
+  const [showCreate, setShowCreate] = useState(false);
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          <Plus className="h-4 w-4" /> Create Return
+        </button>
+      </div>
+      <ReturnList returns={returns} loading={loading} />
+      <CreateReturnModal
+        isOpen={showCreate}
+        onClose={() => setShowCreate(false)}
+        onSubmit={async (data) => { await createReturn(data); setShowCreate(false); }}
+        locations={locations}
+        stockItems={stockItems}
+      />
+    </div>
+  );
+}
+
+/** Accountability tab */
+function AccountabilityTabContent() {
+  const { contractors, loading } = useContractorAccountability({ autoFetch: true });
+  return <ContractorAccountabilityList contractors={contractors} loading={loading} />;
+}
+
+/** Consumptions tab with recent list */
+function ConsumptionsTabContent() {
+  const router = useRouter();
+  const { consumptions, loading } = useConsumptions({ autoFetch: true });
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Consumptions</h2>
+        <button
+          onClick={() => router.push('/projects/drops')}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Record via Drops
+        </button>
+      </div>
+      {loading ? (
+        <div className="flex h-32 items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+        </div>
+      ) : consumptions.length === 0 ? (
+        <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-8 text-center">
+          <p className="text-[var(--ff-text-secondary)]">No consumptions recorded yet.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-[var(--ff-border-light)]">
+          <table className="w-full text-sm">
+            <thead className="bg-[var(--ff-bg-tertiary)]">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Drop/Job</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Serial</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Qty</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">By</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--ff-border-light)]">
+              {consumptions.slice(0, 25).map((c) => (
+                <tr key={c.id}>
+                  <td className="px-4 py-3 text-[var(--ff-text-primary)]">{new Date(c.consumptionDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{c.dropNumber || c.homeInstallId || '—'}</td>
+                  <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{c.serialNumber || '—'}</td>
+                  <td className="px-4 py-3 text-[var(--ff-text-primary)]">{c.quantity}</td>
+                  <td className="px-4 py-3 text-[var(--ff-text-primary)]">{c.consumedByName || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${c.verified ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                      {c.verified ? 'Verified' : 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FieldStockPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -94,7 +220,7 @@ export default function FieldStockPage() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <FieldStockDashboard />;
+        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
       case 'locations':
         return <LocationList />;
       case 'serials':
@@ -122,121 +248,17 @@ export default function FieldStockPage() {
           </div>
         );
       case 'consumptions':
-        return (
-          <div className="space-y-6">
-            <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                Record Consumption
-              </h2>
-              <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-                To record material consumption, navigate to a Drop or Home Install and use the
-                "Record Materials" feature.
-              </p>
-              <button
-                onClick={() => router.push('/projects/drops')}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Go to Drops Management
-              </button>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-              <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-                Recent Consumptions
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Consumption history and verification workflow coming soon.
-              </p>
-            </div>
-          </div>
-        );
+        return <ConsumptionsTabContent />;
       case 'pickings':
-        return (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-              Stock Pickings
-            </h2>
-            <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Issue stock to technicians, process transfers, and manage allocations.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => router.push('/procurement/field-stock/pickings/new?type=issue')}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Create Issue Order
-              </button>
-              <button
-                onClick={() => router.push('/procurement/field-stock/pickings/new?type=transfer')}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                Create Transfer
-              </button>
-            </div>
-            <div className="mt-6">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Picking list, workflow, and signature capture coming in Phase 4.
-              </p>
-            </div>
-          </div>
-        );
+        return <PickingsTab />;
       case 'returns':
-        return (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-              Stock Returns
-            </h2>
-            <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Process returns from field, inspect condition, and restock or dispose.
-            </p>
-            <button
-              onClick={() => router.push('/procurement/field-stock/returns/new')}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-            >
-              Create Return Order
-            </button>
-            <div className="mt-6">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Return processing workflow coming in Phase 6.
-              </p>
-            </div>
-          </div>
-        );
+        return <ReturnsTabContent />;
       case 'accountability':
-        return (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-              Contractor Accountability
-            </h2>
-            <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Track stock issued vs consumed vs returned per contractor. Identify unaccounted
-              stock and manage liability.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => router.push('/procurement/field-stock/accountability/report')}
-                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-              >
-                <FileText className="h-4 w-4" />
-                Accountability Report
-              </button>
-              <button
-                onClick={() => router.push('/procurement/field-stock/accountability/reconcile')}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-              >
-                Run Reconciliation
-              </button>
-            </div>
-            <div className="mt-6">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Full accountability module coming in Phase 7.
-              </p>
-            </div>
-          </div>
-        );
+        return <AccountabilityTabContent />;
       case 'faults':
         return <FaultReportList />;
       default:
-        return <FieldStockDashboard />;
+        return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
     }
   };
 
@@ -261,7 +283,7 @@ export default function FieldStockPage() {
 
           {/* Main Category Tab Navigation - Constant Position */}
           <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="inventory" categoriesOnly />
+            <ProcurementTabs activeTab="field-stock" categoriesOnly />
           </div>
         </div>
 

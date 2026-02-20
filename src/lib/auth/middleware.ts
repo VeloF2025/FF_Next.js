@@ -17,6 +17,55 @@ import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+/**
+ * HMAC-sign a portal session token
+ * Format: base64(payload).hmac_signature
+ */
+export function signPortalToken(sessionData: Record<string, unknown>): string {
+  const crypto = require('crypto');
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET required for portal token signing');
+
+  const payload = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+  const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return `${payload}.${signature}`;
+}
+
+/**
+ * Verify and decode an HMAC-signed portal token
+ * Returns null if signature is invalid or token is malformed
+ * Also accepts legacy unsigned base64 tokens for backward compatibility (logged as warning)
+ */
+function verifyPortalToken(token: string): Record<string, unknown> | null {
+  const crypto = require('crypto');
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
+
+  const parts = token.split('.');
+  if (parts.length === 2) {
+    // Signed token: payload.signature
+    const [payload, signature] = parts;
+    const expected = crypto.createHmac('sha256', secret).update(payload!).digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(signature!, 'hex'), Buffer.from(expected, 'hex'))) {
+      return null; // Tampered
+    }
+    try {
+      return JSON.parse(Buffer.from(payload!, 'base64').toString('utf-8'));
+    } catch {
+      return null;
+    }
+  }
+
+  // Legacy: plain base64 token (backward compat — will be phased out)
+  try {
+    const data = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+    log.warn('Legacy unsigned portal token used — should be migrated to signed tokens', {}, 'FleetAuthMiddleware');
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // Cookie name for JWT token
 export const AUTH_COOKIE_NAME = 'ff_auth_token';
 
@@ -342,9 +391,14 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
 
       if (portalToken) {
         try {
-          const sessionData = JSON.parse(
-            Buffer.from(portalToken, 'base64').toString('utf-8')
-          );
+          // Portal tokens are HMAC-signed: base64(payload).signature
+          const sessionData = verifyPortalToken(portalToken);
+          if (!sessionData) {
+            return res.status(401).json({
+              success: false,
+              error: { code: 'INVALID_PORTAL_TOKEN', message: 'Invalid or tampered portal session' },
+            });
+          }
 
           // Check expiry
           if (new Date() < new Date(sessionData.expiresAt)) {

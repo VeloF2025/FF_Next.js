@@ -46,48 +46,72 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
       return apiResponse.notFound(res, 'Cost center', id);
     }
 
-    let query = `
-      SELECT
-        a.*,
-        bc.category_code,
-        bc.category_name,
-        bi.item_code,
-        bi.description as item_description
-      FROM cost_center_allocations a
-      LEFT JOIN budget_categories bc ON a.budget_category_id = bc.id
-      LEFT JOIN budget_items bi ON a.budget_item_id = bi.id
-      WHERE a.cost_center_id = $1::UUID
-    `;
-    const params: (string | number)[] = [id];
-    let paramIndex = 2;
-
-    if (allocation_type) {
-      query += ` AND a.allocation_type = $${paramIndex}`;
-      params.push(allocation_type as string);
-      paramIndex++;
-    }
-
-    if (fiscal_year) {
-      query += ` AND a.fiscal_year = $${paramIndex}`;
-      params.push(parseInt(fiscal_year as string));
-      paramIndex++;
-    }
-
-    // Count
-    const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) FROM');
-    const countResult = await sql.query(countQuery, params);
-    const total = parseInt(countResult[0]!.count as string) || 0;
-
-    // Pagination
+    // Pagination params
     const pageNum = parseInt(page as string) || 1;
     const limitNum = Math.min(parseInt(limit as string) || 50, 100);
     const offset = (pageNum - 1) * limitNum;
 
-    query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limitNum);
-    params.push(offset);
+    // Use explicit query branches instead of string concatenation (Neon tagged template pattern)
+    let allocations;
+    let countResult;
 
-    const allocations = await sql.query(query, params);
+    if (allocation_type && fiscal_year) {
+      const fy = parseInt(fiscal_year as string);
+      countResult = await sql`
+        SELECT COUNT(*) FROM cost_center_allocations
+        WHERE cost_center_id = ${id}::UUID AND allocation_type = ${allocation_type as string} AND fiscal_year = ${fy}
+      `;
+      allocations = await sql`
+        SELECT a.*, bc.category_code, bc.category_name, bi.item_code, bi.description as item_description
+        FROM cost_center_allocations a
+        LEFT JOIN budget_categories bc ON a.budget_category_id = bc.id
+        LEFT JOIN budget_items bi ON a.budget_item_id = bi.id
+        WHERE a.cost_center_id = ${id}::UUID AND a.allocation_type = ${allocation_type as string} AND a.fiscal_year = ${fy}
+        ORDER BY a.created_at DESC LIMIT ${limitNum} OFFSET ${offset}
+      `;
+    } else if (allocation_type) {
+      countResult = await sql`
+        SELECT COUNT(*) FROM cost_center_allocations
+        WHERE cost_center_id = ${id}::UUID AND allocation_type = ${allocation_type as string}
+      `;
+      allocations = await sql`
+        SELECT a.*, bc.category_code, bc.category_name, bi.item_code, bi.description as item_description
+        FROM cost_center_allocations a
+        LEFT JOIN budget_categories bc ON a.budget_category_id = bc.id
+        LEFT JOIN budget_items bi ON a.budget_item_id = bi.id
+        WHERE a.cost_center_id = ${id}::UUID AND a.allocation_type = ${allocation_type as string}
+        ORDER BY a.created_at DESC LIMIT ${limitNum} OFFSET ${offset}
+      `;
+    } else if (fiscal_year) {
+      const fy = parseInt(fiscal_year as string);
+      countResult = await sql`
+        SELECT COUNT(*) FROM cost_center_allocations
+        WHERE cost_center_id = ${id}::UUID AND fiscal_year = ${fy}
+      `;
+      allocations = await sql`
+        SELECT a.*, bc.category_code, bc.category_name, bi.item_code, bi.description as item_description
+        FROM cost_center_allocations a
+        LEFT JOIN budget_categories bc ON a.budget_category_id = bc.id
+        LEFT JOIN budget_items bi ON a.budget_item_id = bi.id
+        WHERE a.cost_center_id = ${id}::UUID AND a.fiscal_year = ${fy}
+        ORDER BY a.created_at DESC LIMIT ${limitNum} OFFSET ${offset}
+      `;
+    } else {
+      countResult = await sql`
+        SELECT COUNT(*) FROM cost_center_allocations
+        WHERE cost_center_id = ${id}::UUID
+      `;
+      allocations = await sql`
+        SELECT a.*, bc.category_code, bc.category_name, bi.item_code, bi.description as item_description
+        FROM cost_center_allocations a
+        LEFT JOIN budget_categories bc ON a.budget_category_id = bc.id
+        LEFT JOIN budget_items bi ON a.budget_item_id = bi.id
+        WHERE a.cost_center_id = ${id}::UUID
+        ORDER BY a.created_at DESC LIMIT ${limitNum} OFFSET ${offset}
+      `;
+    }
+
+    const total = parseInt(countResult[0]!.count as string) || 0;
 
     // Calculate totals by type
     const totals = await sql`

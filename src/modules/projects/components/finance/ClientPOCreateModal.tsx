@@ -164,7 +164,7 @@ export function ClientPOCreateModal({ projectId, onClose, onCreated }: ClientPOC
               vlmConfidence: extractionResult.confidence,
             },
           }),
-        }).catch(() => {}); // Non-blocking
+        }).catch((e) => log.debug('Non-blocking operation failed', { error: e instanceof Error ? e.message : 'unknown' }, 'projects')); // Non-blocking
       }
 
       onCreated();

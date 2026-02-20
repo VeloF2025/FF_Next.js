@@ -5,8 +5,9 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useId, useEffect } from 'react';
 import { ScanLine, Check, X, Loader2, AlertCircle, Camera } from 'lucide-react';
+import { useBarcodeScanner } from '@/modules/barcode-scanner/hooks/useBarcodeScanner';
 import { useSerials } from '../../hooks';
 import type { StockSerial } from '../../types';
 
@@ -69,6 +70,26 @@ export function SerialScanner({
       setSearching(false);
     }
   }, [getSerial, allowedStatuses, locationId]);
+
+  const scannerId = useId().replace(/:/g, '-') + '-scanner';
+
+  const { start: startScanner, stop: stopScanner, toggleTorch, state: scannerState, isTorchOn } = useBarcodeScanner({
+    elementId: scannerId,
+    onScan: (result) => {
+      handleSearch(result.decodedText);
+      stopScanner();
+      setShowCamera(false);
+    },
+  });
+
+  useEffect(() => {
+    if (showCamera) {
+      const timer = setTimeout(() => { startScanner(); }, 150);
+      return () => clearTimeout(timer);
+    }
+    return () => { stopScanner(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCamera]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,20 +165,27 @@ export function SerialScanner({
 
       {/* Camera Placeholder */}
       {showCamera && (
-        <div className="rounded-lg border-2 border-dashed border-border bg-background p-8 text-center dark:border-gray-600 dark:bg-gray-800">
-          <Camera className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Camera barcode scanning coming soon
-          </p>
-          <p className="text-xs text-muted-foreground">
-            For now, please enter the serial number manually
-          </p>
-          <button
-            onClick={() => setShowCamera(false)}
-            className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
-          >
-            Close camera
-          </button>
+        <div className="space-y-3">
+          <div id={scannerId} className="overflow-hidden rounded-lg" style={{ minHeight: 280 }} />
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={toggleTorch}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground hover:bg-background dark:border-gray-600 dark:bg-gray-700"
+            >
+              {isTorchOn ? 'Torch Off' : 'Torch On'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { stopScanner(); setShowCamera(false); }}
+              className="text-sm font-medium text-red-600 hover:text-red-500 dark:text-red-400"
+            >
+              Close Camera
+            </button>
+          </div>
+          {scannerState === 'error' && (
+            <p className="text-sm text-red-500">Camera access failed. Check browser permissions.</p>
+          )}
         </div>
       )}
 

@@ -54,6 +54,18 @@ interface SetupPasswordRequest {
   confirmPassword: string;
 }
 
+/**
+ * Suggest a role based on position title (for admin reference only — not auto-assigned)
+ */
+function getSuggestedRole(position: string | null): AuthRole {
+  if (!position) return 'viewer';
+  const p = position.toLowerCase();
+  if (p.includes('admin') || p.includes('director') || p.includes('ceo') || p.includes('cso')) return 'admin';
+  if (p.includes('manager') || p.includes('supervisor') || p.includes('head') || p.includes('lead')) return 'manager';
+  if (p.includes('technician') || p.includes('installer') || p.includes('engineer')) return 'technician';
+  return 'viewer';
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -186,34 +198,29 @@ export default async function handler(
     const userCountResult = await sql`SELECT COUNT(*) as count FROM users`;
     const isFirstUser = parseInt(String(userCountResult[0]?.count || '0')) === 0;
 
-    const mapPositionToAuthRole = (position: string | null): AuthRole => {
-      if (!position) return 'viewer';
-      const positionLower = position.toLowerCase();
-
-      // Admin positions
-      if (positionLower.includes('admin') || positionLower.includes('director') || positionLower.includes('ceo') || positionLower.includes('cso')) {
-        return 'admin';
-      }
-      // Manager positions
-      if (positionLower.includes('manager') || positionLower.includes('supervisor') || positionLower.includes('head') || positionLower.includes('lead')) {
-        return 'manager';
-      }
-      // Technician positions
-      if (positionLower.includes('technician') || positionLower.includes('installer') || positionLower.includes('engineer')) {
-        return 'technician';
-      }
-      // Default to viewer
-      return 'viewer';
-    };
-
     // Determine if this user should be super_admin:
-    // 1. First user in the system becomes super_admin automatically
+    // 1. First user ONLY if BOOTSTRAP_SUPER_ADMIN=true is set (prevents attacker registration on wiped DB)
     // 2. Email is in the SUPER_ADMIN_EMAILS env variable
-    // 3. Otherwise, use position-based role mapping
-    const isSuperAdmin = isFirstUser || BOOTSTRAP_SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+    // 3. Otherwise, all new users default to 'viewer' (admin can promote later)
+    const bootstrapEnabled = process.env.BOOTSTRAP_SUPER_ADMIN === 'true';
+    const isSuperAdmin = (isFirstUser && bootstrapEnabled) || BOOTSTRAP_SUPER_ADMIN_EMAILS.includes(normalizedEmail);
+
+    // Default all users to 'viewer' — admins promote manually
+    // Log suggested role based on position for admin reference
+    const suggestedRole = getSuggestedRole(staffMember.position as string | null);
+    if (suggestedRole !== 'viewer') {
+      log.info('setup-password', {
+        action: 'suggestedRole',
+        email: normalizedEmail,
+        position: staffMember.position,
+        suggestedRole,
+        message: 'New user defaulted to viewer. Admin can promote to suggested role.',
+      });
+    }
+
     const authRole = isSuperAdmin
       ? 'super_admin' as AuthRole
-      : mapPositionToAuthRole(staffMember.position as string | null);
+      : 'viewer' as AuthRole;
 
     // Super admins get the 'all' permission for full system access
     const userPermissions = isSuperAdmin ? ['all'] : [];
@@ -285,11 +292,15 @@ export default async function handler(
     `;
 
     // Step 7: Auto-login - Create session and JWT
+    const firstName = (staffMember.first_name as string) || '';
+    const lastName = (staffMember.last_name as string) || '';
     const user: AuthUser = {
       id: userId,
+      userId,
       email: normalizedEmail,
-      firstName: (staffMember.first_name as string) || '',
-      lastName: (staffMember.last_name as string) || '',
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim() || normalizedEmail,
       role: authRole,
       permissions: userPermissions,
       isActive: true,

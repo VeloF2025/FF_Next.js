@@ -661,7 +661,10 @@ export class OneMapClient {
 // Factory function for creating client with env vars
 export function createOneMapClient(): OneMapClient {
   const email = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
-  const password = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
+  const password = process.env.ONEMAP_PASSWORD;
+  if (!password) {
+    throw new Error('ONEMAP_PASSWORD environment variable is required');
+  }
 
   return new OneMapClient({ email, password });
 }

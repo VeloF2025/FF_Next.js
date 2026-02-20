@@ -69,7 +69,11 @@ function AlertCard({ title, count, type }: AlertCardProps) {
   );
 }
 
-export function FieldStockDashboard() {
+interface FieldStockDashboardProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export function FieldStockDashboard({ onNavigate }: FieldStockDashboardProps) {
   const { summary, loading, error, refresh } = useFieldStockDashboard();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -145,7 +149,7 @@ export function FieldStockDashboard() {
 
       {/* Quick Actions - Moved to top for better accessibility */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+        <button onClick={() => onNavigate?.('pickings')} className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
           <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
             <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
@@ -155,7 +159,7 @@ export function FieldStockDashboard() {
           </div>
         </button>
 
-        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+        <button onClick={() => onNavigate?.('consumptions')} className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
           <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
             <ScanLine className="h-5 w-5 text-green-600 dark:text-green-400" />
           </div>
@@ -165,7 +169,7 @@ export function FieldStockDashboard() {
           </div>
         </button>
 
-        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+        <button onClick={() => onNavigate?.('returns')} className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
           <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
             <ArrowRightLeft className="h-5 w-5 text-purple-600 dark:text-purple-400" />
           </div>
@@ -175,7 +179,7 @@ export function FieldStockDashboard() {
           </div>
         </button>
 
-        <button className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
+        <button onClick={() => onNavigate?.('locations')} className="flex items-center gap-3 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-4 text-left hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors">
           <div className="rounded-lg bg-orange-100 p-2 dark:bg-orange-900/30">
             <MapPin className="h-5 w-5 text-orange-600 dark:text-orange-400" />
           </div>

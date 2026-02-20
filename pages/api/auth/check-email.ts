@@ -48,8 +48,7 @@ type EmailStatus =
   | 'STAFF_NOT_FOUND'
   | 'FIRST_TIME_USER'
   | 'PASSWORD_REQUIRED'
-  | 'PASSWORD_SETUP_REQUIRED'
-  | 'USER_DISABLED';
+  | 'PASSWORD_SETUP_REQUIRED';
 
 interface StaffInfo {
   id: string;
@@ -177,13 +176,13 @@ export default async function handler(
 
     const user = userResult[0]!;
 
-    // Check if user is active
+    // Check if user is active — return generic STAFF_NOT_FOUND to prevent user enumeration
     if (!user.is_active) {
       return res.status(200).json({
         success: true,
         data: {
-          status: 'USER_DISABLED',
-          message: 'Your account has been disabled. Please contact your administrator.',
+          status: 'STAFF_NOT_FOUND',
+          message: 'Email not found. Please contact your administrator.',
         },
       });
     }

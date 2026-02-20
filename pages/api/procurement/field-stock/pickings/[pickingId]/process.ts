@@ -173,7 +173,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       UPDATE stock_pickings
       SET status = 'confirmed', updated_at = NOW()
       WHERE id = ${pickingId}
-    `.catch(() => {});
+    `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, 'field-stock'));
 
     log.error('Error processing picking', { error, pickingId }, 'field-stock');
     return apiResponse.internalError(res, error);

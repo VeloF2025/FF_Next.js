@@ -139,12 +139,12 @@ export async function extractPOFromImage(
 
     // Record successful extraction metrics (non-blocking)
     if (extraction.confidence >= 0.7) {
-      recordCorrectExtraction('procurement', 'po_header', extraction.confidence).catch(() => {});
+      recordCorrectExtraction('procurement', 'po_header', extraction.confidence).catch((e) => log.debug('Non-blocking operation failed', { error: e instanceof Error ? e.message : 'unknown' }, 'po-extraction'));
       if (extraction.quantity) {
-        recordCorrectExtraction('procurement', 'po_quantity', extraction.confidence).catch(() => {});
+        recordCorrectExtraction('procurement', 'po_quantity', extraction.confidence).catch((e) => log.debug('Non-blocking operation failed', { error: e instanceof Error ? e.message : 'unknown' }, 'po-extraction'));
       }
       if (extraction.total || extraction.unitPrice) {
-        recordCorrectExtraction('procurement', 'po_pricing', extraction.confidence).catch(() => {});
+        recordCorrectExtraction('procurement', 'po_pricing', extraction.confidence).catch((e) => log.debug('Non-blocking operation failed', { error: e instanceof Error ? e.message : 'unknown' }, 'po-extraction'));
       }
     }
 

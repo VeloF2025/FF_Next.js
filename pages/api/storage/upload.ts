@@ -103,7 +103,7 @@ async function handler(
     // Validate file type via magic bytes
     const mimeType = file.mimetype || '';
     if (!validateMagicBytes(buffer, mimeType)) {
-      await fs.promises.unlink(file.filepath).catch(() => {});
+      await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'storage'));
       return res.status(400).json({
         success: false,
         error: `File type not allowed or content does not match declared type: ${mimeType}`,
@@ -120,7 +120,7 @@ async function handler(
     );
 
     // Clean up temp file
-    await fs.promises.unlink(file.filepath).catch(() => {});
+    await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'storage'));
 
     log.info(`File uploaded: ${result.path}`, { data: { url: result.url } }, 'storage-upload');
 

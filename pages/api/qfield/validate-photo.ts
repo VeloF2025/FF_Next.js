@@ -18,8 +18,11 @@ const VLM_API_ENDPOINT = `${VLM_API_BASE}/v1/chat/completions`;
 const VLM_MODEL = 'Qwen/Qwen3-VL-8B-Instruct';
 const VLM_TIMEOUT_MS = 30000; // 30 seconds for real-time use
 
-// API key for QField plugin (can be set in env)
-const QFIELD_API_KEY = process.env.QFIELD_PLUGIN_API_KEY || 'qfield-validation-key';
+// API key for QField plugin — required env var, no fallback
+const QFIELD_API_KEY = process.env.QFIELD_PLUGIN_API_KEY;
+if (!QFIELD_API_KEY) {
+  log.warn({ module: 'qfield-validate-photo' }, 'QFIELD_PLUGIN_API_KEY not set — endpoint will reject all requests');
+}
 
 // Work type prompts optimized for field feedback
 const VALIDATION_PROMPTS: Record<string, string> = {

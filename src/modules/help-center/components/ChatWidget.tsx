@@ -9,6 +9,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Sparkles, ChevronDown, ChevronLeft, Loader2, Bot, User,
   LayoutDashboard, FolderKanban, CheckCircle, MapPin, Wrench, ShoppingCart, Package, Truck, Users, BarChart3, MessageSquare, Settings, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { log } from '@/lib/logger';
 
 interface ChatMessage {
   id: string;
@@ -61,10 +62,10 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
   // Check if user has data lookup permission
   useEffect(() => {
     if (userId) {
-      fetch(`/api/chat/access?userId=${userId}`)
+      fetch('/api/chat/access', { credentials: 'include' })
         .then(r => r.json())
         .then(d => setDataAccess(!!d.dataAccess))
-        .catch(() => {});
+        .catch((e) => log.debug('Chat access check failed', { error: e instanceof Error ? e.message : 'unknown' }, 'help-center'));
     }
   }, [userId]);
 

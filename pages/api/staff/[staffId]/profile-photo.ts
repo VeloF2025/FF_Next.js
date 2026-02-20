@@ -99,7 +99,7 @@ async function handleUpload(req: NextApiRequest, res: NextApiResponse, staffId: 
 
     // Cleanup temp file
     if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {});
+      await fs.promises.unlink(tempFilePath).catch((e) => logger.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }));
     }
 
     return res.status(200).json({
@@ -112,7 +112,7 @@ async function handleUpload(req: NextApiRequest, res: NextApiResponse, staffId: 
 
     // Cleanup temp file
     if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {});
+      await fs.promises.unlink(tempFilePath).catch((e) => logger.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }));
     }
 
     return res.status(500).json({ error: 'Failed to upload profile photo', message: errorMessage });

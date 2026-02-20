@@ -182,13 +182,13 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
           vlm_retry_count = vlm_retry_count + 1,
           updated_at = NOW()
       WHERE id = ${reviewId}::uuid
-    `.catch(() => {});
+    `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, MODULE));
 
     await sql`
       INSERT INTO construction_qa_activity (review_id, event_type, actor, payload)
       VALUES (${reviewId}::uuid, 'vlm_failed', 'vlm',
         ${JSON.stringify({ error: result.error })}::jsonb)
-    `.catch(() => {});
+    `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, MODULE));
 
     log.error('VLM validation failed', { reviewId, error: result.error }, MODULE);
     return result;

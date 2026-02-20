@@ -67,6 +67,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       JOIN stock_items si ON si.id = ss.stock_item_id
       LEFT JOIN stock_locations sl ON sl.id = ss.current_location_id
       WHERE ss.status = 'issued'
+        AND ss.current_location_id IN (
+          SELECT DISTINCT destination_location_id
+          FROM stock_pickings
+          WHERE contractor_id = ${contractorId}
+        )
       ORDER BY ss.updated_at DESC
       LIMIT 50
     `;

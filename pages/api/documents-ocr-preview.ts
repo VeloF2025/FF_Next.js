@@ -867,7 +867,7 @@ async function handler(
 
       // Clean up temp files
       for (const tempPath of tempFilePaths) {
-        try { fs.unlinkSync(tempPath); } catch {}
+        try { fs.unlinkSync(tempPath); } catch (e) { log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'ocr-preview'); }
       }
 
       // Clean up storage files (fire and forget)
@@ -931,14 +931,14 @@ async function handler(
 
       // Clean up temp files
       for (const tempPath of tempFilePaths) {
-        try { fs.unlinkSync(tempPath); } catch {}
+        try { fs.unlinkSync(tempPath); } catch (e) { log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'ocr-preview'); }
       }
 
       // Clean up storage files
       for (const storagePath of storagePaths) {
         const filename = storagePath.split('/').pop();
         if (filename) {
-          deleteStaffDocument(staffId, filename).catch(() => {});
+          deleteStaffDocument(staffId, filename).catch((e) => log.debug('Non-blocking operation failed', { error: e instanceof Error ? e.message : 'unknown' }, 'ocr-preview'));
         }
       }
 

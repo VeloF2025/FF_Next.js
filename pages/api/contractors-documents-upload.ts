@@ -114,7 +114,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Validate magic bytes match an allowed file type
     const { valid, detectedType } = validateMagicBytes(fileBuffer);
     if (!valid) {
-      await fs.promises.unlink(file.filepath).catch(() => {});
+      await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'CONTRACTORS_DOCUMENTS_UPLOAD'));
       return res.status(400).json({
         error: `File content does not match an allowed type (detected: ${detectedType}). Allowed: PDF, JPG, PNG, Word, Excel`
       });
@@ -177,9 +177,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Clean up temp file
     if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {
-        // Ignore cleanup errors
-      });
+      await fs.promises.unlink(tempFilePath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'CONTRACTORS_DOCUMENTS_UPLOAD'));
     }
 
     return res.status(201).json({
@@ -216,9 +214,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Cleanup: Remove temp file
     if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {
-        // Ignore cleanup errors
-      });
+      await fs.promises.unlink(tempFilePath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'CONTRACTORS_DOCUMENTS_UPLOAD'));
     }
 
     return res.status(500).json({
