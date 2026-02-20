@@ -101,11 +101,11 @@ export default async function handler(
 
     const dbUser = users[0];
 
-    // Check if user is active
+    // Check if user is active — return same error as invalid credentials to prevent enumeration
     if (!dbUser.is_active) {
-      return res.status(403).json({
+      return res.status(401).json({
         success: false,
-        error: { code: 'USER_DISABLED', message: 'Your account has been disabled' },
+        error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
       });
     }
 

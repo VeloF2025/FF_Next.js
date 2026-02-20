@@ -28,5 +28,13 @@
       "sizes": "1280x720",
       "type": "image/png"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Stock Portal",
+      "short_name": "Stock",
+      "url": "/stock/portal",
+      "description": "Mobile stock management portal"
+    }
   ]
 }

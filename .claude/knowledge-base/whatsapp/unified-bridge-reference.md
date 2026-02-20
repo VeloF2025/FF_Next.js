@@ -1,6 +1,6 @@
 # WhatsApp Unified Bridge - Quick Reference
 
-> Last updated: 2026-01-26
+> Last updated: 2026-02-20
 
 ## Service Locations
 
@@ -8,8 +8,7 @@
 |---------|--------|------|--------|
 | Unified Bridge | VPS (72.61.197.178) | 8083 | **ACTIVE** |
 | Command Bot | VPS | 8086 | Active |
-| WA Feedback Proxy | Velocity (100.96.203.105) | 8092 | Active |
-| ~~WhatsApp Sender~~ | ~~VPS~~ | ~~8081~~ | **DISABLED** |
+| WA Feedback Proxy | Velocity (100.96.203.105) | 8092 | **LEGACY** |
 
 ## Quick Health Checks
 
@@ -23,7 +22,7 @@ curl -s http://72.61.197.178:8083/groups | jq .
 # Reload groups from database (no restart needed)
 curl -s http://72.61.197.178:8083/reload-groups
 
-# WA Feedback proxy health
+# WA Feedback proxy health (legacy)
 curl -s http://100.96.203.105:8092/health
 ```
 
@@ -32,16 +31,12 @@ curl -s http://100.96.203.105:8092/health
 ```bash
 curl -s -X POST http://72.61.197.178:8083/send-message \
   -H "Content-Type: application/json" \
-  -d '{
-    "group_jid": "120363423864087150@g.us",
-    "recipient_jid": "0@s.whatsapp.net",
-    "message": "Test message from bridge"
-  }'
+  -d '{"group_jid":"120363423864087150@g.us","recipient_jid":"0@s.whatsapp.net","message":"Test message from bridge"}'
 ```
 
 **Note:** Use `120363423864087150@g.us` (Velo Server) for test messages.
 
-## Current Monitored Groups (7)
+## Current Monitored Groups (9)
 
 | Group | Type | JID |
 |-------|------|-----|
@@ -49,8 +44,10 @@ curl -s -X POST http://72.61.197.178:8083/send-message \
 | Mohadin | dr_submission | `120363421532174586@g.us` |
 | Mamelodi | dr_submission | `120363408849234743@g.us` |
 | Marketing Activations | dr_submission | `120363422808656601@g.us` |
+| Mamelodi Internal | dr_submission | `120363425029043207@g.us` |
 | Mohadin Maintenance | maintenance | `120363424360693693@g.us` |
 | Lawley Maintenance | maintenance | `120363423947610853@g.us` |
+| Mohadin Pre-Provision | pre_provision | `120363423163566226@g.us` |
 | Velo Server | admin | `120363423864087150@g.us` |
 
 ## Managing Groups
@@ -61,7 +58,7 @@ Navigate to **Communications → WhatsApp → Groups tab**
 
 Features:
 - View all monitored groups with type badges
-- Add new groups with type selection (DR Submission, Maintenance, Admin)
+- Add new groups with type selection (DR Submission, Maintenance, Admin, Pre-Provision)
 - Edit existing groups (name, JID, type, description, active status)
 - Delete groups
 - Send test messages
@@ -72,6 +69,7 @@ Group Types:
 |------|-------|---------|
 | `dr_submission` | Purple | DR photo submissions - processed and acknowledged |
 | `maintenance` | Blue | Maintenance photos - reactions on success/failure |
+| `pre_provision` | Yellow | Pre-provisioning tasks |
 | `admin` | Gray | Admin commands only (for wa-command-bot) |
 
 ### Option B: Direct Database + CLI
@@ -105,6 +103,12 @@ const sql = neon(process.env.DATABASE_URL);
 ```bash
 curl http://72.61.197.178:8083/reload-groups
 ```
+
+## Bridge Phone Number
+
+**Phone:** +27 63 841 2276  
+**JID:** 27638412276@s.whatsapp.net  
+**Version:** 2.0.0
 
 ## SSH Access
 
@@ -162,7 +166,7 @@ CREATE TABLE wa_monitored_groups (
   group_jid VARCHAR(100) UNIQUE NOT NULL,
   group_name VARCHAR(200) NOT NULL,
   project_name VARCHAR(200),
-  group_type VARCHAR(50) DEFAULT 'dr_submission',  -- dr_submission, maintenance, admin
+  group_type VARCHAR(50) DEFAULT 'dr_submission',  -- dr_submission, maintenance, admin, pre_provision
   description TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -174,7 +178,7 @@ CREATE TABLE wa_monitored_groups (
 
 | File | Purpose |
 |------|---------|
-| `.claude/modules/wa-monitor.md` | Full module documentation |
+| `.claude/skills/modules/wa-monitor.md` | Full module documentation |
 | `/home/louis/whatsapp-bridge-go/main.go` | Bridge source (Velocity) |
 | `/opt/whatsapp-bridge/` | Deployed binary (VPS) |
-| `/home/louis/wa-feedback-service/` | Feedback proxy (Velocity) |
+| `/home/louis/wa-feedback-service/` | Feedback proxy (Velocity, legacy) |

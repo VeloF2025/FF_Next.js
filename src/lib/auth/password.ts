@@ -4,7 +4,7 @@
  */
 
 import * as bcrypt from 'bcryptjs';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, randomInt, createHash } from 'crypto';
 
 // Cost factor for bcrypt (10-12 is recommended for production)
 const SALT_ROUNDS = 12;
@@ -78,7 +78,7 @@ export function checkPasswordStrength(password: string): {
 }
 
 /**
- * Generate a random password
+ * Generate a cryptographically secure random password
  */
 export function generateRandomPassword(length: number = 16): string {
   const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -87,24 +87,26 @@ export function generateRandomPassword(length: number = 16): string {
   const special = '!@#$%^&*';
   const all = uppercase + lowercase + numbers + special;
 
-  let password = '';
+  const chars: string[] = [];
 
-  // Ensure at least one of each type
-  password += uppercase[Math.floor(Math.random() * uppercase.length)];
-  password += lowercase[Math.floor(Math.random() * lowercase.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += special[Math.floor(Math.random() * special.length)];
+  // Ensure at least one of each type using crypto.randomInt
+  chars.push(uppercase[randomInt(uppercase.length)]!);
+  chars.push(lowercase[randomInt(lowercase.length)]!);
+  chars.push(numbers[randomInt(numbers.length)]!);
+  chars.push(special[randomInt(special.length)]!);
 
   // Fill the rest
   for (let i = 4; i < length; i++) {
-    password += all[Math.floor(Math.random() * all.length)];
+    chars.push(all[randomInt(all.length)]!);
   }
 
-  // Shuffle the password
-  return password
-    .split('')
-    .sort(() => Math.random() - 0.5)
-    .join('');
+  // Fisher-Yates shuffle using crypto.randomInt
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j]!, chars[i]!];
+  }
+
+  return chars.join('');
 }
 
 /**

@@ -73,10 +73,8 @@ async function sendResetEmail(
   }
 
   try {
-    // Dynamic import hidden from webpack static analysis
-    // nodemailer is only needed when SMTP is configured
-    // eslint-disable-next-line no-eval
-    const nodemailer = eval('require')('nodemailer');
+    // Dynamic import - nodemailer is only needed when SMTP is configured
+    const nodemailer = await import('nodemailer');
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -87,8 +85,8 @@ async function sendResetEmail(
         pass: process.env.SMTP_PASS,
       },
       tls: {
-        // Allow expired/self-signed certs (ISP mail server has expired cert)
-        rejectUnauthorized: false,
+        // Only disable cert validation when explicitly opted in (e.g., ISP with expired cert)
+        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
       },
     });
 

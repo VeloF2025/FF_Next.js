@@ -30,11 +30,11 @@ Before 2026-01-31, all 4 URLs were hardcoded `const` values pointing to staging 
 
 To verify which URLs are compiled into the binary:
 ```bash
-strings /opt/whatsapp-bridge/whatsapp-bridge | grep fibreflow.app
+ssh root@72.61.197.178 "strings /opt/whatsapp-bridge/whatsapp-bridge | grep fibreflow.app"
 # Should show: app.fibreflow.app (1 occurrence)
 # Should NOT show: vf.fibreflow.app (0 occurrences)
 
-strings /opt/whatsapp-bridge/whatsapp-bridge | grep FIBREFLOW_URL
+ssh root@72.61.197.178 "strings /opt/whatsapp-bridge/whatsapp-bridge | grep FIBREFLOW_URL"
 # Should show: FIBREFLOW_URL (confirms env var is read)
 ```
 
@@ -50,6 +50,9 @@ handleMessage()
   ├── groupType == "maintenance"
   │     ├── processDropNumbers()  → SKIPS (returns early)
   │     └── forwardToMaintenanceAPI() → /api/maintenance/wa-message
+  │
+  ├── groupType == "pre_provision"
+  │     └── TBD (pre-provisioning workflow)
   │
   └── groupType == "admin"
         └── Command bot only (wa-command-bot:8086)
@@ -71,18 +74,23 @@ Known maintenance group JIDs:
 ## Compilation & Deployment
 
 ### Source Location
-- Server: Velocity (`100.96.203.105`)
-- Path: `/home/louis/whatsapp-bridge-go/main.go`
-- User: `louis` (or compile with `sudo`)
+- **Server**: Velocity (`100.96.203.105`)
+- **Path**: `/home/louis/whatsapp-bridge-go/main.go`
+- **User**: `louis` (or compile with `sudo`)
 
-### Compile
+### Target Location
+- **Server**: VPS (`72.61.197.178`)
+- **Path**: `/opt/whatsapp-bridge/whatsapp-bridge`
+- **Service**: `whatsapp-bridge.service`
+
+### Compile on Velocity
 ```bash
 sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge .
 ```
 
-### Deploy (SCP Relay)
+### Deploy to VPS (SCP Relay)
 Velocity and VPS cannot SSH to each other. Must relay via local machine:
 ```bash
 # 1. Copy from Velocity to local
@@ -117,11 +125,53 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$B64' | base64 -d
 
 ## Systemd Service (VPS)
 
-File: `/etc/systemd/system/whatsapp-bridge.service`
+**File**: `/etc/systemd/system/whatsapp-bridge.service`
 
 Key environment variables:
 - `FIBREFLOW_URL=https://app.fibreflow.app`
 - `DATABASE_URL=postgresql://...` (Neon DB connection)
 
-Binary: `/opt/whatsapp-bridge/whatsapp-bridge`
-Logs: `/opt/whatsapp-bridge/bridge.log`
+**Binary**: `/opt/whatsapp-bridge/whatsapp-bridge`  
+**Logs**: `/opt/whatsapp-bridge/bridge.log`  
+**Version**: 2.0.0  
+**Phone**: +27 63 841 2276 (27638412276@s.whatsapp.net)
+
+## Group Configuration
+
+Groups are loaded from `wa_monitored_groups` table in Neon database (9 groups as of Feb 2026).
+
+**Reload without restart:**
+```bash
+curl http://72.61.197.178:8083/reload-groups
+```
+
+**List current groups:**
+```bash
+curl http://72.61.197.178:8083/groups | jq .
+```
+
+## Unified Bridge Architecture (Feb 2026)
+
+**Key Change:** Bridge now handles ALL WhatsApp operations:
+- Receives DR submissions
+- Sends DR acknowledgments directly (no separate sender)
+- Sends QA feedback messages directly
+- Handles maintenance group messages
+- Processes pre-provision workflow
+
+**Previous Architecture** (deprecated):
+- whatsapp-sender.service on port 8081 (DISABLED)
+- whatsapp-bridge.service on port 8083 (receive only)
+
+**Current Architecture**:
+- whatsapp-bridge.service on port 8083 (unified)
+- Version 2.0.0
+- Single phone number for all operations
+
+## Version History
+
+| Date | Change |
+|------|--------|
+| Feb 20, 2026 | Architecture unified to VPS, version 2.0.0, 9 groups |
+| Jan 31, 2026 | URL configuration via environment variables |
+| Jan 26, 2026 | Maintenance group routing added |

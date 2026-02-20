@@ -27,13 +27,9 @@
 - Root cause of DR474666: Sheets error → API 500 → no ack
 - Functions still exist as dead code, just not called
 
-**3. Dedup TTL Reduction** (`sender_proxy.go`)
-```go
-// Changed from: msgCacheTTL = 10 * time.Minute
-// Changed to:   msgCacheTTL = 90 * time.Second
-```
-- Prevents infinite loops while allowing genuine resubmissions
-- Fixes: DR1730948 blocked after only 2m20s with 10min TTL
+**3. Dedup TTL Reduction** (removed in unified bridge)
+- Unified bridge handles deduplication internally
+- No separate sender proxy needed
 
 ### Weekly Stats (Feb 3-10, 2026)
 - **13 real DRs** missed acks (excluding DR474666 now fixed)
@@ -114,9 +110,9 @@ curl -s "https://app.fibreflow.app/api/health" | jq '.checks.database'
 
 ### Resolution
 
-#### 1. Restart Services (clears stale connections)
+#### 1. Restart Bridge (clears stale connections)
 ```bash
-ssh root@72.61.197.178 "systemctl restart whatsapp-sender.service whatsapp-bridge.service"
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 #### 2. Find Missed Submissions
@@ -149,12 +145,12 @@ ACK=$(curl -s -X POST "https://app.fibreflow.app/api/activate/dr-acknowledgment"
 # Extract message
 echo "$ACK" | jq -r '.data.message'
 
-# Send via sender service (use user_name from qa_photo_reviews + @lid)
-ssh root@72.61.197.178 "curl -s http://localhost:8081/send-message -X POST \
+# Send via bridge
+ssh root@72.61.197.178 "curl -s http://localhost:8083/send-message -X POST \
   -H 'Content-Type: application/json' \
   -d '{
     \"group_jid\": \"120363418298130331@g.us\",
-    \"recipient_jid\": \"USER_ID_HERE@lid\",
+    \"recipient_jid\": \"0@s.whatsapp.net\",
     \"message\": \"📸 *DR123456 Received!*\\n\\nThank you! QA review will follow shortly.\"
   }'"
 ```
@@ -165,42 +161,47 @@ ssh root@72.61.197.178 "curl -s http://localhost:8081/send-message -X POST \
 | Lawley | `120363418298130331@g.us` |
 | Mohadin | `120363421532174586@g.us` |
 | Mamelodi | `120363408849234743@g.us` |
+| Marketing Activations | `120363422808656601@g.us` |
 | Mamelodi Internal | `120363425029043207@g.us` |
-| Velo Test | `120363421664266245@g.us` |
+| Mohadin Maintenance | `120363424360693693@g.us` |
+| Lawley Maintenance | `120363423947610853@g.us` |
+| Mohadin Pre-Provision | `120363423163566226@g.us` |
+| Velo Server | `120363423864087150@g.us` |
 
 ---
 
-## WA Sender Service Endpoints
+## Unified Bridge Architecture (Feb 2026)
 
-**Note**: Despite module docs showing sender as "DISABLED", `whatsapp-sender.service` on port 8081 is still active and separate from bridge.
+### Bridge Service Endpoint
+
+**Note**: Unified bridge on VPS 72.61.197.178 port 8083 handles ALL WhatsApp operations.
 
 ### Health Check
 ```bash
-curl http://72.61.197.178:8081/health
+curl http://72.61.197.178:8083/health
 ```
 
 ### Send Message
 ```bash
-POST http://72.61.197.178:8081/send-message
+POST http://72.61.197.178:8083/send-message
 Content-Type: application/json
 
 {
   "group_jid": "120363418298130331@g.us",
-  "recipient_jid": "206798481035291@lid",
+  "recipient_jid": "0@s.whatsapp.net",
   "message": "Your message here"
 }
 ```
 
 **Required fields:**
 - `group_jid` - WhatsApp group JID (from table above)
-- `recipient_jid` - User's LID (from `qa_photo_reviews.user_name` + `@lid`)
+- `recipient_jid` - User's JID or `0@s.whatsapp.net` for broadcast
 - `message` - Message content (supports markdown-like formatting with `*bold*`)
 
 ### Response
 ```json
 {
   "success": true,
-  "message_id": "3EB015C823AEA99C9EECFB",
   "message": "Message sent successfully"
 }
 ```
@@ -220,16 +221,16 @@ Normal WhatsApp Web protocol behavior - connection drops happen periodically and
 
 ### When to Worry
 - If errors are constant (every few seconds)
-- If `systemctl status whatsapp-sender` shows frequent restarts
+- If `systemctl status whatsapp-bridge` shows frequent restarts
 - If messages are not being delivered
 
 ### Resolution
 ```bash
-# Restart sender to establish fresh connection
-ssh root@72.61.197.178 "systemctl restart whatsapp-sender.service"
+# Restart bridge to establish fresh connection
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 
 # Check if healthy after restart
-sleep 10 && ssh root@72.61.197.178 "curl -s http://localhost:8081/health"
+sleep 10 && ssh root@72.61.197.178 "curl -s http://localhost:8083/health"
 ```
 
 ---
@@ -242,8 +243,8 @@ sleep 10 && ssh root@72.61.197.178 "curl -s http://localhost:8081/health"
 ```
 
 ### Cause
-When WhatsApp recipients request message re-encryption (retry receipt), but the sender's message store no longer has the original message. This happens when:
-- Sender service was restarted
+When WhatsApp recipients request message re-encryption (retry receipt), but the bridge's message store no longer has the original message. This happens when:
+- Bridge service was restarted
 - Message store was cleared
 - Message is older than store retention
 
@@ -252,3 +253,13 @@ Recipients may not be able to decrypt/view certain messages sent before a restar
 
 ### Resolution
 No action needed - these are informational errors about past messages. New messages will work correctly.
+
+---
+
+## Version History
+
+| Date | Change |
+|------|--------|
+| Feb 20, 2026 | Updated for unified VPS bridge architecture |
+| Feb 10, 2026 | Ack retry logic, serial warnings, dedup TTL fixes |
+| Jan 31, 2026 | Initial troubleshooting guide created |

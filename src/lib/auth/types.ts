@@ -19,12 +19,13 @@ export interface AuthUser {
   department?: string;
 }
 
-export type AuthRole = 'super_admin' | 'admin' | 'manager' | 'technician' | 'viewer' | 'system';
+export type AuthRole = 'super_admin' | 'admin' | 'manager' | 'storeman' | 'technician' | 'viewer' | 'system';
 
 export interface JWTPayload {
   sub: string; // user id
   email: string;
   role: AuthRole;
+  /** @deprecated Permissions no longer stored in JWT — fetched from DB via middleware */
   permissions: string[];
   sessionId: string;
   iat: number;
@@ -63,6 +64,7 @@ export const ROLE_HIERARCHY: Record<AuthRole, number> = {
   system: 5,
   admin: 4,
   manager: 3,
+  storeman: 2,
   technician: 2,
   viewer: 1,
 };

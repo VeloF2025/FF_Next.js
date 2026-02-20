@@ -327,8 +327,11 @@ export class ApiResponseHelper {
       'https://app.fibreflow.app',
       'https://vf.fibreflow.app',
       'https://dev.fibreflow.app',
-      'http://localhost:3004',
-      'http://localhost:3005',
+      // Only include localhost origins in development
+      ...(process.env.NODE_ENV === 'development' ? [
+        'http://localhost:3004',
+        'http://localhost:3005',
+      ] : []),
     ];
     const safeOrigin = origin && allowedOrigins.includes(origin) ? origin : '';
     if (!safeOrigin) return;

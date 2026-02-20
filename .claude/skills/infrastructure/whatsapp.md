@@ -1,5 +1,8 @@
 # WhatsApp Infrastructure Skill
 
+> **Last updated:** 2026-02-20  
+> **Status:** Current architecture - VPS unified bridge
+
 ## Overview
 
 Comprehensive documentation of the WhatsApp communication infrastructure for FibreFlow DR photo processing.
@@ -8,42 +11,49 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 
 | Component | Port | Service | Location |
 |-----------|------|---------|----------|
-| **Go WhatsApp Bridge** | 8083 | `whatsapp-bridge.service` | `/home/louis/whatsapp-bridge-go/` |
-| **WA Feedback Service** | 8090 | Docker: `drop-number-api` | Docker container |
-| **Node.js WA Feedback** | 8092 | `wa-feedback.service` | `/home/louis/wa-feedback-service/` |
-| **VLM Server** | 8100 | `vllm-qwen.service` | systemd service |
-| **OneMap API** | 8003 | Docker: `dr-photo-api` | Docker container |
+| **Go WhatsApp Bridge** | 8083 | `whatsapp-bridge.service` | VPS (72.61.197.178) `/opt/whatsapp-bridge/` |
+| **WA Command Bot** | 8086 | `wa-command-bot.service` | VPS (72.61.197.178) |
+| **WA Feedback (LEGACY)** | 8092 | `wa-feedback.service` | Velocity (100.96.203.105) - **DEPRECATED** |
+| **VLM Server** | 8100 | `vllm-qwen.service` | Velocity (100.96.203.105) systemd service |
+| **OneMap API** | 8003 | Docker: `dr-photo-api` | Velocity Docker container |
 
 ## Phone Numbers
 
 | Purpose | Number | Format | Notes |
 |---------|--------|--------|-------|
-| **Primary Bridge** | +27 71 179 6125 | `27711796125@s.whatsapp.net` | Go Bridge - receives DRs, sends acks |
-| **Sender (Mentions)** | +27 71 155 8396 | N/A | Sends feedback with @mentions |
+| **Unified Bridge** | +27 63 841 2276 | `27638412276@s.whatsapp.net` | VPS - receives DRs, sends acks directly |
 
-## WhatsApp Groups (Projects)
+**REMOVED SERVICES:**
+- ~~Old sender (+27 82 418 9511)~~ - **DEAD** (port 8081 service removed)
+- ~~wa-monitor-prod Python service~~ - **DEAD** (replaced by Go bridge)
 
-| Project | Group JID | Description |
-|---------|-----------|-------------|
-| **Lawley** | `120363418298130331@g.us` | Lawley Activation 3 |
-| **Mohadin** | `120363421532174586@g.us` | Mohadin Activations |
-| **Velo Test** | `120363421664266245@g.us` | Testing group |
-| **Mamelodi** | `120363408849234743@g.us` | Mamelodi POP1 Activations |
-| **Marketing** | `120363422808656601@g.us` | Lawley Marketing Activations |
+## WhatsApp Groups (9 Monitored)
+
+| Project | Group JID | Type |
+|---------|-----------|------|
+| **Lawley** | `120363418298130331@g.us` | dr_submission |
+| **Mohadin** | `120363421532174586@g.us` | dr_submission |
+| **Mamelodi** | `120363408849234743@g.us` | dr_submission |
+| **Marketing Activations** | `120363422808656601@g.us` | dr_submission |
+| **Mamelodi Internal** | `120363425029043207@g.us` | dr_submission |
+| **Mohadin Maintenance** | `120363424360693693@g.us` | maintenance |
+| **Lawley Maintenance** | `120363423947610853@g.us` | maintenance |
+| **Mohadin Pre-Provision** | `120363423163566226@g.us` | pre_provision |
+| **Velo Server** | `120363423864087150@g.us` | admin |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        VELOCITY SERVER (100.96.203.105)                  │
+│                          VPS (72.61.197.178)                             │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐  │
-│  │  WhatsApp User   │    │  Go WA Bridge    │    │  FibreFlow API   │  │
-│  │  (Field Agent)   │───▶│  (Port 8083)     │───▶│  (vf.fibreflow)  │  │
+│  │  WhatsApp User   │    │  Unified Bridge  │    │  FibreFlow API   │  │
+│  │  (Field Agent)   │───▶│  (Port 8083)     │───▶│  (app.fibreflow) │  │
 │  │                  │    │                  │    │                  │  │
-│  │  Sends: DR123456 │    │  - whatsmeow lib │    │  process-new-dr  │  │
-│  └──────────────────┘    │  - SQLite store  │    │  dr-acknowledgment│  │
+│  │  Sends: DR123456 │    │  - whatsmeow lib │    │  dr-acknowledgment│  │
+│  └──────────────────┘    │  - SQLite store  │    │  process-new-dr  │  │
 │         ▲                │  - Neon DB write │    └────────┬─────────┘  │
 │         │                └────────┬─────────┘             │            │
 │         │                         │                       │            │
@@ -51,23 +61,29 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 │         │    │                    │                                     │
 │         │    ▼                    ▼                                     │
 │  ┌──────┴───────────┐    ┌──────────────────┐    ┌──────────────────┐  │
-│  │  Threaded Reply  │    │   OneMap API     │    │  Neon Database   │  │
-│  │  (Acknowledgment)│    │  (Port 8003)     │    │  (PostgreSQL)    │  │
-│  │                  │    │                  │    │                  │  │
-│  │  📸 DR123456     │    │  Photo storage   │    │  qa_photo_reviews│  │
-│  │  ✅ Photos: 12   │    │  Serial lookup   │    │  dr_photo_unified│  │
-│  │  ✅ ONT: ABC123  │    │                  │    │  wa_monitor_drops│  │
+│  │  Threaded Reply  │    │   Neon Database  │    │  OneMap API      │  │
+│  │  (Bridge sends   │    │  (PostgreSQL)    │    │  (Velocity)      │  │
+│  │   directly!)     │    │                  │    │                  │  │
+│  │                  │    │  wa_monitored_   │    │  Photo storage   │  │
+│  │  📸 DR123456     │    │    groups        │    │  Serial lookup   │  │
+│  │  ✅ Photos: 12   │    │  qa_photo_reviews│    │                  │  │
+│  │  ✅ ONT: ABC123  │    │  dr_photo_unified│    │                  │  │
 │  └──────────────────┘    └──────────────────┘    └──────────────────┘  │
 │                                                                          │
-│  ┌──────────────────┐    ┌──────────────────┐                          │
-│  │  WA Feedback     │    │  VLM Server      │                          │
-│  │  (Port 8090)     │    │  (Port 8100)     │                          │
-│  │                  │    │                  │                          │
-│  │  QA Review       │    │  Qwen3-VL-8B     │                          │
-│  │  Feedback msgs   │    │  Photo categorize│                          │
-│  └──────────────────┘    └──────────────────┘                          │
+│  ┌──────────────────┐                                                   │
+│  │  WA Command Bot  │        SENDER_URL=http://localhost:1             │
+│  │  (Port 8086)     │        (DISABLED - bridge sends directly)        │
+│  │                  │                                                   │
+│  │  Admin commands  │                                                   │
+│  └──────────────────┘                                                   │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
+
+         Velocity Server (100.96.203.105) - LEGACY ONLY
+         ┌────────────────────────────────────────┐
+         │  wa-feedback.service (port 8092)       │
+         │  ⚠️  DEPRECATED - avoid new usage      │
+         └────────────────────────────────────────┘
 ```
 
 ## Message Flow
@@ -78,11 +94,11 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 Field Agent sends "DR1730468" to WhatsApp group
          │
          ▼
-Go Bridge receives via whatsmeow event handler
+VPS Bridge receives via whatsmeow event handler
          │
          ├──▶ Extract DR pattern: DR[0-9]+
          │
-         ├──▶ Write to SQLite (local messages.db)
+         ├──▶ Write to SQLite (local store/messages.db)
          │
          ├──▶ Insert/Update qa_photo_reviews (Neon)
          │
@@ -100,7 +116,7 @@ Call FibreFlow dr-acknowledgment API
          ├──▶ Get UPS serial
          │
          ▼
-Send threaded reply to original message
+Bridge sends threaded reply directly (no separate sender)
          │
          └──▶ "📸 DR1730468 Received!
               ✅ Photos: 12
@@ -117,7 +133,7 @@ QA Reviewer marks DR as complete/incomplete
 Click "Send Feedback" on Dashboard
          │
          ▼
-POST /api/wa-monitor-send-feedback
+POST /api/wa-monitor-send-feedback (FibreFlow)
          │
          ├──▶ Get drop details from database
          │
@@ -126,105 +142,102 @@ POST /api/wa-monitor-send-feedback
          ├──▶ Format feedback message
          │
          ▼
-If sender_phone exists:
-    └──▶ Send via WA Sender (port 8081) with @mention
-Else:
-    └──▶ Send via WA Bridge (port 8083) without @mention
+Send via VPS Bridge (port 8083)
+         │
+         └──▶ POST http://72.61.197.178:8083/send-message
          │
          ▼
 Update feedback_sent timestamp in database
 ```
 
-## Go WhatsApp Bridge
+## Go WhatsApp Bridge (VPS)
 
 ### Location
 ```
-/home/louis/whatsapp-bridge-go/
-├── main.go              # Main application (70KB)
+VPS: 72.61.197.178
+/opt/whatsapp-bridge/
 ├── whatsapp-bridge      # Compiled binary
 ├── bridge.log           # Application logs
 ├── store/
 │   ├── messages.db      # SQLite message history
-│   ├── whatsapp.db      # whatsmeow session data
-│   └── store.db         # Additional storage
-├── go.mod               # Go module definition
-└── bridge_db_proxy.py   # Database proxy script
+│   └── whatsapp.db      # whatsmeow session data
+└── whatsapp-bridge.service  # Systemd service
+
+Source (Velocity):
+/home/louis/whatsapp-bridge-go/main.go
 ```
 
 ### Key Features
 - Uses `whatsmeow` library (go.mau.fi/whatsmeow)
 - Stores session in SQLite (`whatsapp.db`)
 - Writes directly to Neon PostgreSQL
-- Optional Google Sheets sync (credentials not configured)
 - HTTP API on port 8083
+- **Handles both receiving AND sending** (unified architecture)
+- Version: 2.0.0
 
-### Configuration (in main.go)
-```go
-var PROJECTS = map[string]map[string]string{
-    "Lawley": {
-        "group_jid": "120363418298130331@g.us",
-        "project_name": "Lawley",
-    },
-    // ... other projects
-}
-
-const NEON_DB_URL = "postgresql://neondb_owner:$NEON_DB_PASSWORD@..."
-const FIBREFLOW_API_URL = "https://vf.fibreflow.app/api/activate/process-new-dr"
-const FIBREFLOW_ACK_API_URL = "https://vf.fibreflow.app/api/activate/dr-acknowledgment"
+### Configuration (Environment)
+```bash
+FIBREFLOW_URL=https://app.fibreflow.app
+NEON_DB_URL=postgresql://neondb_owner:...@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+SENDER_URL=http://localhost:1  # DISABLED - bridge sends directly
 ```
 
 ### API Endpoints
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/send` | POST | Send message to group |
-| `/api/download` | POST | Download media |
+| `/health` | GET | Service health check |
+| `/groups` | GET | List monitored groups |
+| `/reload-groups` | GET | Reload groups from DB (no restart) |
+| `/send-message` | POST | Send message to group |
 
 ### Service Management
 ```bash
-# Service config
-/etc/systemd/system/whatsapp-bridge.service
+# SSH to VPS
+ssh root@72.61.197.178
 
 # Check status
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-bridge.service
+systemctl status whatsapp-bridge
 
 # Restart
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
+systemctl restart whatsapp-bridge
 
 # View logs
-tail -f /home/louis/whatsapp-bridge-go/bridge.log
+tail -f /opt/whatsapp-bridge/bridge.log
+journalctl -u whatsapp-bridge -f
 ```
 
-## WA Feedback Service
+## WA Feedback Service (LEGACY)
 
-### Node.js Service (Port 8092 - systemd config, 8090 default)
-```
-/home/louis/wa-feedback-service/
-├── wa-feedback-service.js   # Main application
-├── package.json
-└── node_modules/
-```
+### ⚠️ DEPRECATED - Avoid New Usage
 
-### Key Endpoints
-```javascript
-// Health check
-GET /health
-// Returns: { status: "healthy", service: "wa-feedback-service" }
+**Location:** Velocity (100.96.203.105) port 8092
 
-// Send feedback
-POST /send-feedback
-// Body: { message, dropId, drNumber, recipient, useMention }
-```
-
-### Docker Container (Port 8090)
-The `drop-number-api` container also runs on port 8090:
 ```bash
-docker inspect drop-number-api
-# Health endpoint returns: { status: "healthy", database: "connected" }
+# Legacy service still running but not recommended
+/home/louis/wa-feedback-service/wa-feedback-service.js
 ```
+
+**Migration path:** Use VPS bridge `/send-message` endpoint instead.
 
 ## Database Tables
 
-### qa_photo_reviews
+### wa_monitored_groups (Neon)
+Groups monitored by the bridge:
+```sql
+CREATE TABLE wa_monitored_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_jid VARCHAR(100) UNIQUE NOT NULL,
+  group_name VARCHAR(200) NOT NULL,
+  project_name VARCHAR(200),
+  group_type VARCHAR(50) DEFAULT 'dr_submission',  -- dr_submission, maintenance, admin, pre_provision
+  description TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### qa_photo_reviews (Neon)
 Primary table for WhatsApp QA drops:
 ```sql
 CREATE TABLE qa_photo_reviews (
@@ -233,7 +246,6 @@ CREATE TABLE qa_photo_reviews (
   project TEXT,
   user_name TEXT,
   sender_phone VARCHAR(20),  -- WhatsApp sender JID
-  submitted_by TEXT,
 
   -- 12 QA steps
   step_01_house_photo BOOLEAN DEFAULT false,
@@ -251,7 +263,7 @@ CREATE TABLE qa_photo_reviews (
 );
 ```
 
-### dr_photo_unified_reviews
+### dr_photo_unified_reviews (Neon)
 Unified table for VLM categorization:
 ```sql
 CREATE TABLE dr_photo_unified_reviews (
@@ -274,25 +286,13 @@ CREATE TABLE dr_photo_unified_reviews (
 );
 ```
 
-### wa_monitor_drops
-Legacy/secondary drop tracking:
-```sql
-CREATE TABLE wa_monitor_drops (
-  id UUID PRIMARY KEY,
-  drop_number VARCHAR(20) UNIQUE,
-  project VARCHAR(100),
-  sender_phone VARCHAR(20),
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
 ## FibreFlow API Endpoints
 
 ### DR Acknowledgment
 ```
 POST /api/activate/dr-acknowledgment
 ```
-Called by Go Bridge to get acknowledgment data:
+Called by VPS Bridge to get acknowledgment data:
 ```typescript
 // Request
 { dropNumber: "DR1730468", project: "Lawley" }
@@ -315,7 +315,7 @@ Called by Go Bridge to get acknowledgment data:
 ```
 POST /api/wa-monitor-send-feedback
 ```
-Called by Dashboard to send QA feedback:
+Called by Dashboard to send QA feedback via VPS bridge:
 ```typescript
 // Request
 {
@@ -330,41 +330,45 @@ Called by Dashboard to send QA feedback:
     dropNumber: "DR1730468",
     project: "Lawley",
     group: "Lawley Activation 3",
-    sentAt: "2026-01-18T..."
+    sentAt: "2026-02-20T..."
   }
 }
 ```
 
-### Process New DR
-```
-POST /api/activate/process-new-dr
-```
-Called to validate and process new DR submissions.
-
 ## SSH Commands
 
 ```bash
-# Connect to server
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+# Connect to VPS (WhatsApp services)
+ssh root@72.61.197.178
 
-# Check all WhatsApp services
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status whatsapp-bridge.service
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status wa-feedback.service
+# Check bridge status
+systemctl status whatsapp-bridge
 
 # View bridge logs
-tail -f /home/louis/whatsapp-bridge-go/bridge.log
+tail -f /opt/whatsapp-bridge/bridge.log
 
 # Filter for DR processing
-grep -E 'DR[0-9]+|Ack|acknowledgment' /home/louis/whatsapp-bridge-go/bridge.log | tail -30
+grep -E 'DR[0-9]+|Ack|acknowledgment' /opt/whatsapp-bridge/bridge.log | tail -30
 
 # Restart bridge
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
+systemctl restart whatsapp-bridge
 
-# Check ports
-netstat -tlnp | grep -E '(8081|8083|8090|8092)'
+# Test health
+curl http://localhost:8083/health | jq .
 
-# Docker services
-docker ps | grep -E '(drop-number|dr-photo)'
+# List monitored groups
+curl http://localhost:8083/groups | jq .
+
+# Reload groups from database
+curl http://localhost:8083/reload-groups
+```
+
+```bash
+# Connect to Velocity (legacy services)
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+
+# Check LEGACY wa-feedback (avoid new usage)
+echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status wa-feedback.service
 ```
 
 ## Troubleshooting
@@ -374,11 +378,17 @@ docker ps | grep -E '(drop-number|dr-photo)'
 
 **Diagnosis:**
 ```bash
-# Check bridge logs for errors
-grep -E 'ACK|ERROR|FAILED' /home/louis/whatsapp-bridge-go/bridge.log | tail -20
+# SSH to VPS
+ssh root@72.61.197.178
+
+# Check bridge logs
+grep -E 'ACK|ERROR|FAILED' /opt/whatsapp-bridge/bridge.log | tail -20
+
+# Check health
+curl http://localhost:8083/health
 
 # Test acknowledgment API directly
-curl -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
+curl -X POST https://app.fibreflow.app/api/activate/dr-acknowledgment \
   -H "Content-Type: application/json" \
   -d '{"dropNumber":"DR1730468","project":"Lawley"}'
 ```
@@ -387,10 +397,15 @@ curl -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
 - FibreFlow API unreachable
 - OneMap timeout (5 second limit)
 - Bridge service crashed
+- WhatsApp session disconnected
 
 **Fix:**
 ```bash
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
+# Restart bridge
+systemctl restart whatsapp-bridge
+
+# Check if reconnected
+tail -20 /opt/whatsapp-bridge/bridge.log
 ```
 
 ### Issue: Feedback not sending
@@ -398,20 +413,17 @@ echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 
 **Diagnosis:**
 ```bash
-# Check wa-feedback health
-curl http://100.96.203.105:8090/health
+# Check VPS bridge health
+curl http://72.61.197.178:8083/health
 
-# Check Docker container
-docker logs drop-number-api --tail 50
+# Check FibreFlow API logs
+ssh velo@100.96.203.105 "journalctl -u fibreflow -n 50"
 ```
 
 **Fix:**
 ```bash
-# Restart wa-feedback service
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback.service
-
-# Or restart Docker container
-docker restart drop-number-api
+# Restart VPS bridge
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 ### Issue: WhatsApp disconnected
@@ -419,67 +431,67 @@ docker restart drop-number-api
 
 **Diagnosis:**
 ```bash
-# Check bridge status
-tail -50 /home/louis/whatsapp-bridge-go/bridge.log | grep -E 'connect|disconnect|error'
+ssh root@72.61.197.178
+tail -50 /opt/whatsapp-bridge/bridge.log | grep -E 'connect|disconnect|error'
+curl http://localhost:8083/health | jq '.needs_auth, .pairing_state'
 ```
 
 **Fix:**
-1. Restart the bridge service
-2. If persistent, may need to re-scan QR code (rare)
+1. Restart the bridge service: `systemctl restart whatsapp-bridge`
+2. If `needs_auth: true`, may need to re-scan QR code (contact admin)
 
 ### Issue: Messages going to wrong group
-**Check project mapping in:**
-1. Go bridge: `/home/louis/whatsapp-bridge-go/main.go` - `PROJECTS` map
-2. FibreFlow: `pages/api/wa-monitor-send-feedback.ts` - `PROJECT_GROUPS`
-
-Both must have matching JIDs for each project.
+**Check group configuration:**
+1. Neon DB: `wa_monitored_groups` table
+2. Reload groups: `curl http://72.61.197.178:8083/reload-groups`
 
 ## Adding a New WhatsApp Group
 
-### 1. Update Go Bridge
-Edit `/home/louis/whatsapp-bridge-go/main.go`:
-```go
-var PROJECTS = map[string]map[string]string{
-    // ... existing projects ...
-    "NewProject": {
-        "group_jid":          "123456789012345@g.us",  // Get from WhatsApp
-        "project_name":       "NewProject",
-        "group_description": "New Project Activations",
-    },
-}
-```
+### Option A: WA Portal UI (Recommended)
 
-### 2. Rebuild and restart
+Navigate to **Communications → WhatsApp → Groups tab**
+
+1. Click **"Add Group"**
+2. Fill in:
+   - Group JID (see below for how to find it)
+   - Group Name
+   - Project Name
+   - Type (dr_submission, maintenance, admin, pre_provision)
+   - Description (optional)
+3. Click **Save**
+4. Bridge auto-reloads groups (no restart needed)
+
+### Option B: Direct Database
+
+#### Step 1: Add bridge phone to WhatsApp group
+Add **+27 63 841 2276** to the WhatsApp group
+
+#### Step 2: Find the Group JID
 ```bash
-cd /home/louis/whatsapp-bridge-go
-go build -o whatsapp-bridge main.go
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
+# Send a message in the group, then check VPS logs
+ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log | grep 'Storing message'"
+# Look for: 📝 Storing message from 120363XXXXXXXXXX@g.us
 ```
 
-### 3. Update FibreFlow API
-Edit `pages/api/wa-monitor-send-feedback.ts`:
-```typescript
-const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
-  // ... existing projects ...
-  'NewProject': {
-    jid: '123456789012345@g.us',
-    name: 'New Project Activations'
-  }
-};
+#### Step 3: Add to database
+```sql
+INSERT INTO wa_monitored_groups
+  (group_jid, group_name, project_name, group_type, description, is_active)
+VALUES
+  ('120363XXXXXXXXXX@g.us', 'Group Name', 'Project', 'dr_submission', 'Description', true);
 ```
 
-### 4. Deploy FibreFlow
+#### Step 4: Reload groups
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
-  "cd /home/louis/apps/fibreflow && git pull && npm ci && npm run build && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+curl http://72.61.197.178:8083/reload-groups
 ```
 
 ## Security Considerations
 
 1. **Phone numbers stored as JIDs** - Not plain numbers
-2. **Messages stored in SQLite** - Local backup on server
+2. **Messages stored in SQLite** - Local backup on VPS
 3. **Neon connection uses SSL** - `sslmode=require`
-4. **Arcjet protection** on feedback API - Rate limiting, bot detection
+4. **VPS SSH access** - Key-based authentication only
 5. **No credentials in code** - Uses environment variables
 
 ## Related Skills
@@ -493,6 +505,9 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
 
 | Date | Change |
 |------|--------|
-| Jan 16, 2026 | wa-feedback service created (port 8090) |
-| Jan 18, 2026 | Health check fixed for wa-feedback |
-| Jan 18, 2026 | This skill document created |
+| Feb 20, 2026 | Updated to VPS unified bridge architecture (v2.0.0) |
+| Feb 20, 2026 | Removed references to dead port 8081 sender service |
+| Feb 20, 2026 | Updated phone to +27 63 841 2276 |
+| Feb 20, 2026 | Added 9 monitored groups with types |
+| Feb 20, 2026 | Marked wa-feedback as LEGACY |
+| Jan 18, 2026 | Original skill document created |

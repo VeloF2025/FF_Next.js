@@ -32,7 +32,6 @@ export async function signToken(
   const token = await new SignJWT({
     email: user.email,
     role: user.role,
-    permissions: user.permissions,
     sessionId,
   })
     .setProtectedHeader({ alg: 'HS256' })
@@ -61,7 +60,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       sub: payload.sub as string,
       email: payload.email as string,
       role: payload.role as AuthRole,
-      permissions: (payload.permissions as string[]) || [],
+      permissions: [], // Permissions fetched from DB via getUserAndValidateSession()
       sessionId: payload.sessionId as string,
       iat: payload.iat || 0,
       exp: payload.exp || 0,
