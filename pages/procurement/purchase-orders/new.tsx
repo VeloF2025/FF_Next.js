@@ -53,6 +53,7 @@ const PAYMENT_TERMS = [
   { value: 'net14', label: 'Net 14 Days' },
   { value: 'net30', label: 'Net 30 Days' },
   { value: 'net60', label: 'Net 60 Days' },
+  { value: 'net90', label: 'Net 90 Days' },
   { value: 'eom', label: 'End of Month' },
   { value: 'prepaid', label: 'Prepaid' },
 ];

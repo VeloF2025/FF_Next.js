@@ -163,6 +163,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       'net30': 'Net 30', 'Net 30': 'Net 30', 'net 30': 'Net 30',
       'net45': 'Net 45', 'Net 45': 'Net 45', 'net 45': 'Net 45',
       'net60': 'Net 60', 'Net 60': 'Net 60', 'net 60': 'Net 60',
+      'net90': 'Net 90', 'Net 90': 'Net 90', 'net 90': 'Net 90',
       'eom': 'EOM', 'EOM': 'EOM',
       'prepaid': 'Prepaid', 'Prepaid': 'Prepaid',
     };
