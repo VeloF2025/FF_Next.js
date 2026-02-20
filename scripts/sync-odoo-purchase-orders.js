@@ -218,12 +218,19 @@ async function syncPurchaseOrders() {
         for (const line of lines) {
           const stockItemId = line.product_id ? productMap.get(line.product_id[0]) : null;
 
+          // Calculate tax rate from Odoo's subtotal/total (e.g. 15% VAT)
+          const lineSubtotal = line.price_subtotal || 0;
+          const lineTotal = line.price_total || 0;
+          const lineTaxRate = lineSubtotal > 0
+            ? Math.round((lineTotal - lineSubtotal) / lineSubtotal * 10000) / 100
+            : 0;
+
           try {
             await sql`
               INSERT INTO purchase_order_items (
                 purchase_order_id, stock_item_id, item_code, item_description,
                 quantity_ordered, quantity_received, quantity_invoiced,
-                unit_price, total_price,
+                unit_price, total_price, tax_rate,
                 uom, expected_delivery_date,
                 odoo_line_id, created_at
               ) VALUES (
@@ -231,7 +238,7 @@ async function syncPurchaseOrders() {
                 ${line.product_id ? line.product_id[1].split(']')[0].replace('[', '') : null},
                 ${line.name || 'No description'},
                 ${line.product_qty || 0}, ${line.qty_received || 0}, ${line.qty_invoiced || 0},
-                ${line.price_unit || 0}, ${line.price_total || 0},
+                ${line.price_unit || 0}, ${lineSubtotal}, ${lineTaxRate},
                 ${line.product_uom_id ? line.product_uom_id[1] : 'unit'},
                 ${line.date_planned ? new Date(line.date_planned) : null},
                 ${line.id}, NOW()
