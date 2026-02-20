@@ -42,28 +42,31 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
   };
 
   return (
-    <div
+    // WCAG: Changed from <div onClick> to <button> for keyboard accessibility (4.1.2)
+    <button
+      type="button"
+      aria-label={`Task: ${task.title} — ${task.status.replace('_', ' ')}, ${task.priority} priority`}
       className={cn(
-        "bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 cursor-pointer hover:shadow-md transition-shadow",
+        "w-full text-left bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4 cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] transition-shadow",
         task.offline && "border-orange-300 bg-orange-500/10"
       )}
       onClick={() => onSelect(task)}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center space-x-2">
-          {getTaskIcon(task.type)}
+          <span aria-hidden="true">{getTaskIcon(task.type)}</span>
           <span className={cn("text-xs font-medium px-2 py-1 rounded-full", getStatusColor(task.status))}>
             {task.status.replace('_', ' ')}
           </span>
         </div>
-        <ChevronRight className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
+        <ChevronRight className="w-5 h-5 text-[var(--ff-text-tertiary)]" aria-hidden="true" />
       </div>
 
       <h3 className="font-medium text-[var(--ff-text-primary)] mb-1">{task.title}</h3>
       <p className="text-sm text-[var(--ff-text-secondary)] mb-2">{task.customer}</p>
 
       <div className="flex items-center text-xs text-[var(--ff-text-tertiary)] mb-2">
-        <MapPin className="w-3 h-3 mr-1" />
+        <MapPin className="w-3 h-3 mr-1" aria-hidden="true" />
         {task.address}
       </div>
 
@@ -73,8 +76,8 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
         </span>
         <div className="flex items-center space-x-2">
           {task.attachments > 0 && (
-            <div className="flex items-center text-[var(--ff-text-tertiary)]">
-              <Paperclip className="w-3 h-3 mr-1" />
+            <div className="flex items-center text-[var(--ff-text-tertiary)]" aria-label={`${task.attachments} attachment${task.attachments !== 1 ? 's' : ''}`}>
+              <Paperclip className="w-3 h-3 mr-1" aria-hidden="true" />
               {task.attachments}
             </div>
           )}
@@ -85,10 +88,10 @@ export function TaskCard({ task, onSelect }: TaskCardProps) {
       </div>
 
       {task.offline && (
-        <div className="mt-2 text-xs text-orange-400 font-medium">
+        <div className="mt-2 text-xs text-orange-400 font-medium" role="status">
           Offline Mode
         </div>
       )}
-    </div>
+    </button>
   );
 }

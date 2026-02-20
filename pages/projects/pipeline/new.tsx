@@ -123,9 +123,10 @@ const NewPipelineProjectPage: NextPage = () => {
           <div className="flex items-center gap-4 mb-8">
             <Link
               href="/projects/pipeline"
-              className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+              aria-label="Back to pipeline projects"
+              className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </Link>
             <div>
               <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] flex items-center gap-2">
@@ -140,8 +141,8 @@ const NewPipelineProjectPage: NextPage = () => {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <div role="alert" aria-live="polite" className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" aria-hidden="true" />
               <p className="text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
@@ -156,26 +157,29 @@ const NewPipelineProjectPage: NextPage = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                    Project Name <span className="text-red-500">*</span>
+                  <label htmlFor="project_name" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                    Project Name <span className="text-red-500" aria-hidden="true">*</span>
                   </label>
                   <input
                     type="text"
+                    id="project_name"
                     name="project_name"
                     value={formData.project_name}
                     onChange={handleChange}
                     required
+                    aria-required="true"
                     placeholder="Enter project name"
                     className="w-full px-4 py-2 border border-[var(--ff-border-light)] rounded-lg bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                  <label htmlFor="project_code" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                     Project Code
                   </label>
                   <input
                     type="text"
+                    id="project_code"
                     name="project_code"
                     value={formData.project_code}
                     onChange={handleChange}
@@ -185,12 +189,13 @@ const NewPipelineProjectPage: NextPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                    <DollarSign className="w-4 h-4 inline mr-1" />
+                  <label htmlFor="estimated_value" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                    <DollarSign className="w-4 h-4 inline mr-1" aria-hidden="true" />
                     Estimated Value (ZAR)
                   </label>
                   <input
                     type="number"
+                    id="estimated_value"
                     name="estimated_value"
                     value={formData.estimated_value}
                     onChange={handleChange}
@@ -211,11 +216,12 @@ const NewPipelineProjectPage: NextPage = () => {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                    <Building2 className="w-4 h-4 inline mr-1" />
+                  <label htmlFor="client_id" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                    <Building2 className="w-4 h-4 inline mr-1" aria-hidden="true" />
                     Client
                   </label>
                   <select
+                    id="client_id"
                     name="client_id"
                     value={formData.client_id}
                     onChange={handleChange}
@@ -231,11 +237,12 @@ const NewPipelineProjectPage: NextPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
-                    <User className="w-4 h-4 inline mr-1" />
+                  <label htmlFor="project_manager_id" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                    <User className="w-4 h-4 inline mr-1" aria-hidden="true" />
                     Project Manager
                   </label>
                   <select
+                    id="project_manager_id"
                     name="project_manager_id"
                     value={formData.project_manager_id}
                     onChange={handleChange}
@@ -255,16 +262,17 @@ const NewPipelineProjectPage: NextPage = () => {
             {/* Location */}
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
               <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
-                <MapPin className="w-5 h-5 inline mr-1" />
+                <MapPin className="w-5 h-5 inline mr-1" aria-hidden="true" />
                 Location
               </h2>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                  <label htmlFor="province" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                     Province
                   </label>
                   <select
+                    id="province"
                     name="province"
                     value={formData.province}
                     onChange={handleChange}
@@ -284,11 +292,12 @@ const NewPipelineProjectPage: NextPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
+                  <label htmlFor="municipality" className="block text-sm font-medium text-[var(--ff-text-primary)] mb-1">
                     Municipality
                   </label>
                   <input
                     type="text"
+                    id="municipality"
                     name="municipality"
                     value={formData.municipality}
                     onChange={handleChange}
@@ -301,8 +310,9 @@ const NewPipelineProjectPage: NextPage = () => {
 
             {/* Notes */}
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Notes</h2>
+              <label htmlFor="notes" className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4 block">Notes</label>
               <textarea
+                id="notes"
                 name="notes"
                 value={formData.notes}
                 onChange={handleChange}
@@ -316,14 +326,14 @@ const NewPipelineProjectPage: NextPage = () => {
             <div className="flex items-center justify-end gap-4">
               <Link
                 href="/projects/pipeline"
-                className="px-6 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                className="px-6 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] transition-colors"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-6 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
