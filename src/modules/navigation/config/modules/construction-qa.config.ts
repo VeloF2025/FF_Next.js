@@ -11,7 +11,7 @@ import type { ModuleNavigationConfig } from '../../types';
 
 export const constructionQaConfig: ModuleNavigationConfig = {
   moduleId: 'construction-qa',
-  moduleName: 'Construction QA',
+  moduleName: 'Civil QA',
   description: 'Civil, optical, and splicing quality assurance',
   basePath: '/construction-qa',
   icon: HardHat,

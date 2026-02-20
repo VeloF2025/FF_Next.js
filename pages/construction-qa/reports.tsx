@@ -14,7 +14,7 @@ const ReportsPage: NextPage = () => {
   return (
     <AppLayout>
       <Head>
-        <title>Reports | Construction QA | FibreFlow</title>
+        <title>Reports | Civil QA | FibreFlow</title>
       </Head>
       <ModulePage config={constructionQaConfig}>
         <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -23,7 +23,7 @@ const ReportsPage: NextPage = () => {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Reports Coming Soon</h2>
           <p className="text-gray-400 max-w-md">
-            Construction QA analytics and reporting will be available in a future update.
+            Civil QA analytics and reporting will be available in a future update.
             This will include pass/fail trends, discipline breakdowns, and technician
             performance metrics.
           </p>

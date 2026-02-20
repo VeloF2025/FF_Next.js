@@ -14,7 +14,7 @@ const ConstructionQaIndex: NextPage = () => {
   return (
     <AppLayout>
       <Head>
-        <title>Construction QA | FibreFlow</title>
+        <title>Civil QA | FibreFlow</title>
       </Head>
       <ModulePage config={constructionQaConfig}>
         <ConstructionQaCentrePage />

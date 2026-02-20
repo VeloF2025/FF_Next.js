@@ -13,7 +13,7 @@ export const fieldOperationsSection: NavSection = {
     {
       to: '/construction-qa',
       icon: HardHat,
-      label: 'Construction QA',
+      label: 'Civil QA',
       shortLabel: 'CQA',
       permissions: [],
       rbacKey: 'field',

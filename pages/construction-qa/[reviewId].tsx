@@ -18,7 +18,7 @@ const ReviewDetailPage: NextPage = () => {
   return (
     <AppLayout>
       <Head>
-        <title>Review Detail | Construction QA | FibreFlow</title>
+        <title>Review Detail | Civil QA | FibreFlow</title>
       </Head>
       <ModulePage config={constructionQaConfig}>
         {reviewId && typeof reviewId === 'string' ? (
