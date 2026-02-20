@@ -1,13 +1,15 @@
 /**
  * Phase 2: Photo Review
  * Walk through each checklist step, view assigned photos, toggle checked state.
+ * Click any photo to open full-screen lightbox with zoom.
  */
 
 'use client';
 
-import { useState } from 'react';
-import { CheckCircle, XCircle, ChevronDown, ChevronRight, Image, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2 } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
+import { PhotoLightbox } from './PhotoLightbox';
 
 interface PhotoData {
   id: string;
@@ -33,7 +35,7 @@ interface Props {
 
 export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onStepChange }: Props) {
   const [expandedStep, setExpandedStep] = useState<number | null>(1);
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Group photos by step
   const photosByStep = new Map<number, PhotoData[]>();
@@ -46,6 +48,22 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
       unassigned.push(photo);
     }
   }
+
+  // Flat list of all photos for lightbox navigation (step photos first, then unassigned)
+  const allPhotos = useMemo(() => {
+    const ordered: PhotoData[] = [];
+    for (const step of checklist) {
+      const stepPhotos = photosByStep.get(step.step) || [];
+      ordered.push(...stepPhotos);
+    }
+    ordered.push(...unassigned);
+    return ordered;
+  }, [photos, checklist]);
+
+  const openLightbox = (photoId: string) => {
+    const idx = allPhotos.findIndex(p => p.id === photoId);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
 
   const getStepColumn = (step: number): string => {
     const pad = String(step).padStart(2, '0');
@@ -62,7 +80,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
       <div>
         <h2 className="text-lg font-semibold text-white mb-1">Photo Review</h2>
         <p className="text-sm text-gray-400">
-          Review each checklist step and verify photos meet quality standards.
+          Review each checklist step and verify photos meet quality standards. Click any photo to enlarge.
         </p>
       </div>
 
@@ -148,10 +166,8 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                       {stepPhotos.map(photo => (
                         <div
                           key={photo.id}
-                          onClick={() => setSelectedPhoto(selectedPhoto === photo.id ? null : photo.id)}
-                          className={`relative rounded-lg overflow-hidden border cursor-pointer transition-all ${
-                            selectedPhoto === photo.id ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-[var(--border-color)]'
-                          }`}
+                          onClick={() => openLightbox(photo.id)}
+                          className="relative rounded-lg overflow-hidden border cursor-pointer transition-all hover:border-blue-500 hover:ring-2 hover:ring-blue-500/30 border-[var(--border-color)] group"
                         >
                           {/* Photo thumbnail */}
                           <div className="aspect-square bg-gray-900 flex items-center justify-center">
@@ -161,6 +177,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />
+                          </div>
+
+                          {/* Enlarge indicator on hover */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                            <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
 
                           {/* VLM badge */}
@@ -181,20 +202,10 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                             </div>
                           )}
 
-                          {/* Photo info on expand */}
-                          {selectedPhoto === photo.id && (
-                            <div className="p-2 bg-gray-900/95 text-xs space-y-1">
-                              <div className="text-gray-400">{photo.filename}</div>
-                              {photo.vlm_feedback && (
-                                <div className="text-gray-300">{photo.vlm_feedback}</div>
-                              )}
-                              {photo.vlm_issues && photo.vlm_issues.length > 0 && (
-                                <div className="text-red-400">
-                                  Issues: {photo.vlm_issues.join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                          {/* Filename at bottom */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1">
+                            <div className="text-[10px] text-gray-300 truncate">{photo.filename}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -213,21 +224,37 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
             Unassigned Photos ({unassigned.length})
           </h3>
           <p className="text-xs text-gray-500 mb-3">
-            These photos are not linked to any checklist step yet.
+            These photos are not linked to any checklist step yet. Click to enlarge.
           </p>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
             {unassigned.map(photo => (
-              <div key={photo.id} className="aspect-square bg-gray-900 rounded overflow-hidden">
+              <div
+                key={photo.id}
+                onClick={() => openLightbox(photo.id)}
+                className="aspect-square bg-gray-900 rounded overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500/30 transition-all group relative"
+              >
                 <img
                   src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
                   alt={photo.filename || 'Photo'}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                  <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={allPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   );

@@ -81,7 +81,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { reviewId, stepUpdates, extractedDataUpdates, notes, reviewedBy } = req.body;
+    const { reviewId, stepUpdates, extractedDataUpdates, notes, reviewedBy, featureIdUpdate } = req.body;
 
     if (!reviewId) {
       return apiResponse.badRequest(res, 'reviewId is required');
@@ -141,6 +141,20 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       updatedFields.push('qa_notes');
     }
 
+    // Feature ID rename/reassign
+    if (featureIdUpdate && typeof featureIdUpdate === 'string') {
+      setClauses.push(`feature_id = $${paramIdx}`);
+      params.push(featureIdUpdate.trim());
+      paramIdx++;
+      updatedFields.push('feature_id');
+
+      // If renaming to a valid pole pattern, try to backfill zone/PON and clear unidentified
+      const validPolePattern = /^[A-Z]{3}\.P\./;
+      if (validPolePattern.test(featureIdUpdate.trim())) {
+        setClauses.push(`workflow_status = CASE WHEN workflow_status = 'unidentified' THEN 'pending' ELSE workflow_status END`);
+      }
+    }
+
     // Move to in_review if currently pending
     setClauses.push(`workflow_status = CASE WHEN workflow_status = 'pending' THEN 'in_review' ELSE workflow_status END`);
 
@@ -160,13 +174,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     // Log activity
     if (updatedFields.length > 0) {
+      const eventType = updatedFields.includes('feature_id') ? 'comment_added' : 'step_checked';
+      const payload = updatedFields.includes('feature_id')
+        ? { action: 'feature_id_renamed', new_feature_id: featureIdUpdate, updated_fields: updatedFields }
+        : { updated_fields: updatedFields };
+
       await sql`
         INSERT INTO construction_qa_activity (review_id, event_type, actor, payload)
         VALUES (
           ${reviewId}::uuid,
-          'step_checked',
+          ${eventType},
           ${reviewedBy || 'unknown'},
-          ${JSON.stringify({ updated_fields: updatedFields })}::jsonb
+          ${JSON.stringify(payload)}::jsonb
         )
       `;
     }

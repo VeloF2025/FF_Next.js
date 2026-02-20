@@ -27,6 +27,9 @@ import {
   Database,
   Gavel,
   MessageSquare,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { getChecklist } from '../../types/construction.types';
@@ -111,6 +114,10 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
   const [decision, setDecision] = useState<QaDecision | null>(null);
   const [reasonCodes, setReasonCodes] = useState<QaReasonCode[]>([]);
   const [notes, setNotes] = useState('');
+
+  // Feature rename state
+  const [isEditingFeatureId, setIsEditingFeatureId] = useState(false);
+  const [editFeatureId, setEditFeatureId] = useState('');
 
   // Fetch review data
   const fetchReview = useCallback(async () => {
@@ -215,6 +222,35 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
     }
   };
 
+  // Save feature ID rename
+  const saveFeatureId = async () => {
+    if (!review || !editFeatureId.trim() || editFeatureId.trim() === review.feature_id) {
+      setIsEditingFeatureId(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/construction-qa/review', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewId: review.id,
+          featureIdUpdate: editFeatureId.trim(),
+          reviewedBy: 'current_user',
+        }),
+      });
+      if (res.ok) {
+        await fetchReview();
+        setIsEditingFeatureId(false);
+      }
+    } catch (err) {
+      log.error('Failed to update feature ID', { module: 'construction-qa', error: (err as Error).message }, 'construction-qa');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const goNext = async () => {
     const idx = PHASES.findIndex(p => p.key === phase);
     if (idx < PHASES.length - 1) {
@@ -268,7 +304,40 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
           <ArrowLeft className="w-5 h-5 text-gray-400" />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-white">{review.feature_id}</h1>
+          <div className="flex items-center gap-2">
+            {isEditingFeatureId ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editFeatureId}
+                  onChange={e => setEditFeatureId(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') saveFeatureId();
+                    if (e.key === 'Escape') setIsEditingFeatureId(false);
+                  }}
+                  className="px-2 py-1 bg-gray-800 border border-blue-500 rounded text-white text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  autoFocus
+                />
+                <button onClick={saveFeatureId} disabled={saving} className="p-1 text-green-400 hover:text-green-300" title="Save">
+                  <Check className="w-5 h-5" />
+                </button>
+                <button onClick={() => setIsEditingFeatureId(false)} className="p-1 text-gray-400 hover:text-gray-300" title="Cancel">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold text-white">{review.feature_id}</h1>
+                <button
+                  onClick={() => { setEditFeatureId(review.feature_id); setIsEditingFeatureId(true); }}
+                  className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+                  title="Rename or reassign to another pole"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
           <p className="text-sm text-gray-400">
             {review.project_name} · {review.discipline} ·{' '}
             {review.zone_no !== null ? `Z${review.zone_no}` : ''}{' '}

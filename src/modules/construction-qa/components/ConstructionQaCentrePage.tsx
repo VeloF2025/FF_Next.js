@@ -276,7 +276,7 @@ export function ConstructionQaCentrePage() {
       </div>
 
       {/* Stats Cards */}
-      <StatsGrid cards={statCards} columns={statCards.length} />
+      <StatsGrid cards={statCards} columns={stats.unidentified > 0 ? 6 : 5} />
 
       {/* Discipline Tabs */}
       <div className="flex gap-1 bg-[var(--card-bg)] p-1 rounded-lg border border-[var(--border-color)]">
