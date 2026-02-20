@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import { AppLayout } from '@/components/layout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { useTabPersistence } from '@/modules/procurement/hooks';
@@ -16,7 +17,6 @@ import {
   FolderTree,
   PackagePlus,
   ClipboardCheck,
-  Package,
   Plus,
   Search,
   Loader2,
@@ -34,6 +34,8 @@ import {
   Calendar,
   Filter,
   Download,
+  MapPin,
+  ExternalLink,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
@@ -44,7 +46,6 @@ import { BundleItemsModal } from '@/components/procurement/bundles';
 // Import existing components
 import { StockItemsPage } from '@/modules/stock-items';
 import StockManagement from '@/modules/procurement/stock/StockManagement';
-import { FieldStockDashboard } from '@/modules/procurement/field-stock/components';
 
 interface InventoryPageProps {
   projectId?: string;
@@ -56,7 +57,6 @@ const TABS = [
   { id: 'categories', label: 'Categories', icon: FolderTree },
   { id: 'bundles', label: 'Bundles', icon: PackagePlus },
   { id: 'takes', label: 'Takes', icon: ClipboardCheck },
-  { id: 'field', label: 'Field', icon: Package },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
 ] as const;
 
@@ -1318,6 +1318,14 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
                   </button>
                 );
               })}
+              <Link
+                href="/procurement/field-stock"
+                className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-secondary)] transition-colors"
+              >
+                <MapPin className="h-4 w-4" />
+                Field Stock
+                <ExternalLink className="h-3 w-3 opacity-50" />
+              </Link>
             </nav>
           </div>
         </div>
@@ -1333,7 +1341,6 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
               {activeTab === 'categories' && <CategoriesTabContent />}
               {activeTab === 'bundles' && <BundlesTabContent />}
               {activeTab === 'takes' && <StockTakesTabContent />}
-              {activeTab === 'field' && <FieldStockDashboard />}
               {activeTab === 'reports' && <BundleReportsTabContent />}
             </>
           )}
