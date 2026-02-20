@@ -45,6 +45,16 @@ export default withAuth(withErrorHandler(async (
         ORDER BY pri.created_at
       `;
 
+      // Get pending approval request ID (if any)
+      const approvalRows = await sql`
+        SELECT id FROM approval_requests
+        WHERE document_type = 'purchase_requisition'
+          AND document_id = ${id}
+          AND status = 'pending'
+        LIMIT 1
+      `;
+      const approvalRequestId = approvalRows.length > 0 ? approvalRows[0]!.id : null;
+
       const result: PurchaseRequisition = {
         id: requisition.id,
         requisitionNumber: requisition.requisition_number,
@@ -81,6 +91,8 @@ export default withAuth(withErrorHandler(async (
           poId: item.po_id as string | undefined,
           createdAt: item.created_at as string,
         })),
+        itemCount: items.length,
+        approvalRequestId: approvalRequestId as string | null,
         createdAt: requisition.created_at,
         updatedAt: requisition.updated_at,
       };

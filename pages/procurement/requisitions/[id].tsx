@@ -37,7 +37,7 @@ interface RequisitionItem {
   quantity: number;
   uom: string;
   estimatedUnitPrice: number | null;
-  lineTotal: number;
+  estimatedTotal: number | null;
   suggestedSupplierId: number | null;
   suggestedSupplierName: string | null;
   notes: string | null;
@@ -72,6 +72,7 @@ interface RequisitionDetail {
   approvedByName: string | null;
   approvedDate: string | null;
   approvalNotes: string | null;
+  approvalRequestId: string | null;
   items: RequisitionItem[];
   history: HistoryEvent[];
   createdAt: string;
@@ -116,6 +117,10 @@ export default function RequisitionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('details');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Reject modal state
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Convert to PO modal state
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -208,6 +213,35 @@ export default function RequisitionDetailPage() {
         }
       }
 
+      if (action === 'reject') {
+        setShowRejectModal(true);
+        setActionLoading(null);
+        return;
+      }
+
+      // Route approve to the approval endpoint
+      if (action === 'approve') {
+        if (!requisition.approvalRequestId) {
+          setError('No pending approval request found for this requisition');
+          setActionLoading(null);
+          return;
+        }
+        const response = await fetch(`/api/procurement/approvals/${requisition.approvalRequestId}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: '' }),
+        });
+        const data = await response.json();
+        if (data.success) {
+          fetchRequisition();
+        } else {
+          setError(data.error?.message || 'Failed to approve requisition');
+        }
+        setActionLoading(null);
+        return;
+      }
+
+      // Default: submit, recall, delete go through the requisition submit endpoint
       const response = await fetch(`/api/procurement/requisitions/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,6 +262,32 @@ export default function RequisitionDetailPage() {
     } catch (err) {
       log.error(`Failed to ${action} requisition`, err);
       setError(`Failed to ${action} requisition`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!requisition || !requisition.approvalRequestId || !rejectReason.trim()) return;
+
+    try {
+      setActionLoading('reject');
+      const response = await fetch(`/api/procurement/approvals/${requisition.approvalRequestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: rejectReason.trim() }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setShowRejectModal(false);
+        setRejectReason('');
+        fetchRequisition();
+      } else {
+        setError(data.error?.message || 'Failed to reject requisition');
+      }
+    } catch (err) {
+      log.error('Failed to reject requisition', err);
+      setError('Failed to reject requisition');
     } finally {
       setActionLoading(null);
     }
@@ -343,7 +403,7 @@ export default function RequisitionDetailPage() {
 
   const tabs = [
     { id: 'details' as TabId, label: 'Details' },
-    { id: 'items' as TabId, label: `Items (${requisition?.itemCount || 0})` },
+    { id: 'items' as TabId, label: `Items (${requisition?.itemCount || requisition?.items?.length || 0})` },
     { id: 'history' as TabId, label: 'History' },
   ];
 
@@ -616,7 +676,11 @@ export default function RequisitionDetailPage() {
                             {item.estimatedUnitPrice ? formatCurrency(item.estimatedUnitPrice) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] font-medium">
-                            {item.lineTotal > 0 ? formatCurrency(item.lineTotal) : '-'}
+                            {(item.estimatedTotal && item.estimatedTotal > 0)
+                              ? formatCurrency(item.estimatedTotal)
+                              : item.estimatedUnitPrice && item.quantity
+                                ? formatCurrency(item.estimatedUnitPrice * item.quantity)
+                                : '-'}
                           </td>
                           <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                             {item.suggestedSupplierName || '-'}
@@ -802,6 +866,52 @@ export default function RequisitionDetailPage() {
                     <ShoppingCart className="h-4 w-4" />
                   )}
                   Create Purchase Order
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reject Modal */}
+        {showRejectModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">
+                Reject Requisition
+              </h3>
+              <div className="mb-4">
+                <label className="block text-sm text-[var(--ff-text-secondary)] mb-2">
+                  Reason for rejection <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="Please provide a reason for rejection..."
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500/50 resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowRejectModal(false);
+                    setRejectReason('');
+                  }}
+                  className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReject}
+                  disabled={!rejectReason.trim() || actionLoading === 'reject'}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {actionLoading === 'reject' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  Reject
                 </button>
               </div>
             </div>

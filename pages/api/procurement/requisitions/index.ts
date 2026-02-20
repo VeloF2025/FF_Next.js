@@ -15,8 +15,10 @@ export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
-  // Get user ID from authenticated request (withAuth attaches user to req)
-  const userId = (req as AuthenticatedNextApiRequest).user?.id || 'system';
+  // Get user info from authenticated request (withAuth attaches user to req)
+  const authUser = (req as AuthenticatedNextApiRequest).user;
+  const userId = authUser?.id || 'system';
+  const userName = authUser?.name || authUser?.email || 'System User';
 
   if (req.method === 'GET') {
     try {
@@ -98,8 +100,8 @@ export default withAuth(withErrorHandler(async (
         ) VALUES (
           ${body.projectId || null},
           ${body.department || null},
-          ${userId || 'system'},
-          ${body.requestedByName || 'System User'},
+          ${userId},
+          ${userName},
           ${body.requiredDate || null},
           ${body.urgency || 'normal'},
           ${body.notes || null},

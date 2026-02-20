@@ -47,6 +47,10 @@ export interface PurchaseRequisition {
 
   // Items
   items?: PurchaseRequisitionItem[];
+  itemCount?: number;
+
+  // Approval workflow
+  approvalRequestId?: string | null;
 
   // Timestamps
   createdAt: string;
