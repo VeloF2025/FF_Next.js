@@ -45,12 +45,7 @@ import { BundleItemsModal } from '@/components/procurement/bundles';
 // Import existing components
 import { StockItemsPage } from '@/modules/stock-items';
 import StockManagement from '@/modules/procurement/stock/StockManagement';
-import {
-  FieldStockDashboard,
-  LocationList,
-  SerialScanner,
-  ConsumptionRecorder,
-} from '@/modules/procurement/field-stock/components';
+import { FieldStockDashboard } from '@/modules/procurement/field-stock/components';
 
 interface InventoryPageProps {
   projectId?: string;
@@ -1259,11 +1254,19 @@ function BundleReportsTabContent() {
 }
 
 export default function InventoryPage({ projectId }: InventoryPageProps) {
+  const router = useRouter();
   const { activeTab, changeTab, isInitialized } = useTabPersistence({
     pageKey: 'inventory',
     defaultTab: 'stock',
     validTabs: TABS.map(t => t.id),
   });
+
+  // Field Stock has its own standalone page with 8 sub-tabs (PRD-027)
+  useEffect(() => {
+    if (isInitialized && activeTab === 'field') {
+      router.replace('/procurement/field-stock');
+    }
+  }, [isInitialized, activeTab, router]);
 
   return (
     <AppLayout>

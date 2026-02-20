@@ -191,11 +191,7 @@ const nextConfig = {
         destination: '/procurement/inventory?tab=takes',
         permanent: true,
       },
-      {
-        source: '/procurement/field-stock',
-        destination: '/procurement/inventory?tab=field',
-        permanent: true,
-      },
+      // field-stock has its own standalone page with 8 sub-tabs (PRD-027)
       // Financial
       {
         source: '/procurement/budget',
