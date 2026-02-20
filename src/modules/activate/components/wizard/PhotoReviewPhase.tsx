@@ -11,7 +11,7 @@
  * 4. If approved → Show summary and enable "Continue"
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { log } from '@/lib/logger';
 import type {
   VlmCategorizationResult,
@@ -20,6 +20,7 @@ import type {
 } from '../../types/unified.types';
 import { STEP_LABELS, PHOTO_REJECTION_REASONS } from '../../utils/stepMapper';
 import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 
 interface PhotoReviewPhaseProps {
   dropNumber: string;
@@ -56,14 +57,29 @@ export function PhotoReviewPhase({
     new Map()
   );
 
-  // Lightbox state
-  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  // Lightbox state — index into lightboxPhotos
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Edit mode - allows editing approved categorizations without re-running VLM
   const [isEditing, setIsEditing] = useState(false);
 
   // Categorization progress phase
   const [categorizationPhase, setCategorizationPhase] = useState<CategorizationPhase | null>(null);
+
+  // Build flat lightbox photo list from categorization results
+  const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
+    state.results.map(r => ({
+      url: `/api/activate/photo/${dropNumber}/${r.photo_filename}`,
+      label: r.photo_filename,
+      metadata: `Step ${r.vlm_predicted_step}: ${STEP_LABELS[r.vlm_predicted_step] || 'Unknown'} — Confidence: ${Math.round(r.vlm_confidence * 100)}%`,
+    })),
+    [state.results, dropNumber]
+  );
+
+  const openLightbox = (photoFilename: string) => {
+    const idx = state.results.findIndex(r => r.photo_filename === photoFilename);
+    setLightboxIndex(idx >= 0 ? idx : null);
+  };
 
   // Load categorization state on mount
   useEffect(() => {
@@ -426,7 +442,7 @@ export function PhotoReviewPhase({
               {/* Thumbnail */}
               <button
                 type="button"
-                onClick={() => setLightboxPhoto(photoUrl)}
+                onClick={() => openLightbox(result.photo_filename)}
                 className="flex-shrink-0 relative group"
               >
                 <img
@@ -480,26 +496,13 @@ export function PhotoReviewPhase({
 
       return (
         <div className="space-y-4">
-          {/* Photo lightbox */}
-          {lightboxPhoto && (
-            <div
-              className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-              onClick={() => setLightboxPhoto(null)}
-            >
-              <div className="relative max-w-4xl max-h-[90vh]">
-                <img
-                  src={lightboxPhoto}
-                  alt="Full size"
-                  className="max-w-full max-h-[90vh] object-contain rounded-lg"
-                />
-                <button
-                  onClick={() => setLightboxPhoto(null)}
-                  className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full hover:bg-black/70"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+          {/* Photo lightbox with zoom/pan/navigation */}
+          {lightboxIndex !== null && (
+            <PhotoLightbox
+              photos={lightboxPhotos}
+              initialIndex={lightboxIndex}
+              onClose={() => setLightboxIndex(null)}
+            />
           )}
 
           {/* Edit mode header */}
@@ -724,26 +727,13 @@ export function PhotoReviewPhase({
         photoCount={photoCount}
       />
 
-      {/* Photo lightbox */}
-      {lightboxPhoto && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={lightboxPhoto}
-              alt="Full size"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
-            <button
-              onClick={() => setLightboxPhoto(null)}
-              className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full hover:bg-black/70"
-            >
-              ×
-            </button>
-          </div>
-        </div>
+      {/* Photo lightbox with zoom/pan/navigation */}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
 
       {/* Header */}
@@ -808,7 +798,7 @@ export function PhotoReviewPhase({
                 {/* Thumbnail */}
                 <button
                   type="button"
-                  onClick={() => setLightboxPhoto(photoUrl)}
+                  onClick={() => openLightbox(result.photo_filename)}
                   className="flex-shrink-0 relative group"
                 >
                   <img

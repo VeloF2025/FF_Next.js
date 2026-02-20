@@ -9,8 +9,9 @@
  * - Separate Internal Notes and Technician Feedback
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { log } from '@/lib/logger';
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 import type {
   QaWizardState,
   QaDecision,
@@ -96,8 +97,23 @@ export function FinalDecisionPhase({
   const [internalNotes, setInternalNotes] = useState(initialData?.internalNotes ?? '');
   const [technicianFeedback, setTechnicianFeedback] = useState(initialData?.technicianFeedback ?? '');
 
-  // Photo lightbox state
-  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  // Photo lightbox state — index-based for navigation
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Build flat lightbox photo list
+  const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
+    photos.map(p => ({
+      url: p.url,
+      label: p.filename,
+      metadata: p.step ? `Step ${p.step}` : undefined,
+    })),
+    [photos]
+  );
+
+  const openLightboxByUrl = (photoUrl: string) => {
+    const idx = photos.findIndex(p => p.url === photoUrl);
+    setLightboxIndex(idx >= 0 ? idx : null);
+  };
 
   // Track if user has made changes (for draft save prompt)
   const [hasChanges, setHasChanges] = useState(false);
@@ -377,7 +393,7 @@ export function FinalDecisionPhase({
     return (
       <button
         type="button"
-        onClick={() => setLightboxPhoto(photo.url)}
+        onClick={() => openLightboxByUrl(photo.url)}
         className="relative group"
       >
         <img
@@ -394,26 +410,13 @@ export function FinalDecisionPhase({
 
   return (
     <div className="space-y-6">
-      {/* Photo Lightbox */}
-      {lightboxPhoto && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setLightboxPhoto(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh]">
-            <img
-              src={lightboxPhoto}
-              alt="Full size"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
-            <button
-              onClick={() => setLightboxPhoto(null)}
-              className="absolute top-2 right-2 p-2 bg-card/20 rounded-full hover:bg-card/40"
-            >
-              <span className="text-white text-xl">×</span>
-            </button>
-          </div>
-        </div>
+      {/* Photo Lightbox with zoom/pan/navigation */}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
 
       {/* Technician-Actionable Issues (shown prominently) */}

@@ -5,7 +5,7 @@
  *
  * Features:
  * - Grid display of WA photos
- * - Photo lightbox for viewing
+ * - Full-screen photo lightbox with zoom/pan/navigation
  * - VLM-extracted serial info display
  * - Sender and timestamp metadata
  *
@@ -14,10 +14,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 // Using regular img for proxied images (Next.js Image optimizer can't handle auth-protected API routes)
 import { format } from 'date-fns';
 import { User, Camera, Cpu, ZoomIn } from 'lucide-react';
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 
 export interface WAPhoto {
   id: string;
@@ -36,6 +37,16 @@ export interface WAPhoto {
   proxy_url?: string;
 }
 
+/** Build image URL from proxy_url or local_path */
+function getWAPhotoUrl(photo: WAPhoto): string {
+  if (photo.proxy_url) return photo.proxy_url;
+  if (!photo.local_path) return '';
+  const pathParts = photo.local_path.split('/');
+  const filename = pathParts[pathParts.length - 1];
+  const drFolder = pathParts[pathParts.length - 2];
+  return `/api/activate/photo/${drFolder}/${filename}`;
+}
+
 interface WAPhotosGalleryProps {
   photos: WAPhoto[];
   emptyMessage?: string;
@@ -47,7 +58,25 @@ export function WAPhotosGallery({
   emptyMessage = 'No photos available',
   showVlmInfo = true,
 }: WAPhotosGalleryProps) {
-  const [lightboxPhoto, setLightboxPhoto] = useState<WAPhoto | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Build flat lightbox photo list for navigation
+  const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
+    photos.map(p => {
+      const url = getWAPhotoUrl(p);
+      const parts: string[] = [];
+      if (p.sender_name) parts.push(`From: ${p.sender_name}`);
+      parts.push(format(new Date(p.message_timestamp), 'dd MMM yyyy HH:mm'));
+      if (p.vlm_ont_serial) parts.push(`ONT: ${p.vlm_ont_serial}`);
+      if (p.vlm_ups_serial) parts.push(`UPS: ${p.vlm_ups_serial}`);
+      return {
+        url,
+        label: p.original_filename || 'WA Photo',
+        metadata: parts.join('  |  '),
+      };
+    }),
+    [photos]
+  );
 
   if (photos.length === 0) {
     return (
@@ -61,20 +90,21 @@ export function WAPhotosGallery({
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {photos.map((photo) => (
+        {photos.map((photo, idx) => (
           <WAPhotoThumbnail
             key={photo.id}
             photo={photo}
             showVlmInfo={showVlmInfo}
-            onClick={() => setLightboxPhoto(photo)}
+            onClick={() => setLightboxIndex(idx)}
           />
         ))}
       </div>
 
-      {lightboxPhoto && (
-        <WAPhotoLightbox
-          photo={lightboxPhoto}
-          onClose={() => setLightboxPhoto(null)}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
         />
       )}
     </>
@@ -89,17 +119,7 @@ interface WAPhotoThumbnailProps {
 
 function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps) {
   const [imageError, setImageError] = useState(false);
-  // Build image URL from proxy_url or construct from local_path
-  // NEW local_path format: /var/lib/docker/volumes/boss-vps_dr_photos/_data/{DR}/{filename}
-  const getImageUrl = () => {
-    if (photo.proxy_url) return photo.proxy_url;
-    if (!photo.local_path) return '';
-    const pathParts = photo.local_path.split('/');
-    const filename = pathParts[pathParts.length - 1];
-    const drFolder = pathParts[pathParts.length - 2];
-    return `/api/activate/photo/${drFolder}/${filename}`;
-  };
-  const imageUrl = getImageUrl();
+  const imageUrl = getWAPhotoUrl(photo);
 
   return (
     <div
@@ -172,125 +192,4 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
       </div>
     </div>
   );
-}
-
-interface WAPhotoLightboxProps {
-  photo: WAPhoto;
-  onClose: () => void;
-}
-
-function WAPhotoLightbox({ photo, onClose }: WAPhotoLightboxProps) {
-  const [imageError, setImageError] = useState(false);
-  // Build image URL from proxy_url or construct from local_path
-  const getImageUrl = () => {
-    if (photo.proxy_url) return photo.proxy_url;
-    if (!photo.local_path) return '';
-    const pathParts = photo.local_path.split('/');
-    const filename = pathParts[pathParts.length - 1];
-    const drFolder = pathParts[pathParts.length - 2];
-    return `/api/activate/photo/${drFolder}/${filename}`;
-  };
-  const imageUrl = getImageUrl();
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative max-w-5xl w-full max-h-full"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
-        >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
-        {/* Image */}
-        <div className="relative bg-gray-900 rounded-lg overflow-hidden">
-          {!imageError ? (
-            <img
-              src={imageUrl}
-              alt={photo.original_filename || 'WA Photo'}
-              className="w-full h-auto max-h-[75vh] object-contain"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">
-              <div className="text-center">
-                <Camera className="h-24 w-24 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-white">Failed to load image</p>
-              </div>
-            </div>
-          )}
-
-          {/* Metadata Overlay */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black to-transparent p-6">
-            <div className="text-white space-y-3">
-              {/* Sender Info */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700">
-                  <User className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="font-medium">{photo.sender_name || 'Unknown'}</p>
-                  <p className="text-sm text-gray-400">
-                    {format(new Date(photo.message_timestamp), 'dd MMM yyyy HH:mm:ss')}
-                  </p>
-                </div>
-              </div>
-
-              {/* VLM Extracted Serials */}
-              {(photo.vlm_ont_serial || photo.vlm_ups_serial) && (
-                <div className="flex items-center gap-6 pt-3 border-t border-gray-700">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm text-gray-400">AI Extracted:</span>
-                  </div>
-                  {photo.vlm_ont_serial && (
-                    <div className="text-sm">
-                      <span className="text-gray-400">ONT:</span>{' '}
-                      <span className="font-mono text-green-400">{photo.vlm_ont_serial}</span>
-                    </div>
-                  )}
-                  {photo.vlm_ups_serial && (
-                    <div className="text-sm">
-                      <span className="text-gray-400">UPS:</span>{' '}
-                      <span className="font-mono text-blue-400">{photo.vlm_ups_serial}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* File Info */}
-              <div className="flex items-center gap-4 text-xs text-gray-400">
-                {photo.original_filename && <span>{photo.original_filename}</span>}
-                {photo.file_size_bytes && (
-                  <span>{formatFileSize(photo.file_size_bytes)}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
