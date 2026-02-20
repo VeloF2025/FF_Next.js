@@ -189,7 +189,7 @@ export default function StockCategoriesPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-white font-medium">{category.name}</span>
-              <span className="text-xs text-gray-500 font-mono">{category.code}</span>
+              <span className="text-xs text-gray-400 font-mono">{category.code}</span>
               {category.is_system && (
                 <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/20 text-blue-400">
                   SYSTEM
@@ -202,7 +202,7 @@ export default function StockCategoriesPage() {
               )}
             </div>
             {category.description && (
-              <p className="text-xs text-gray-500 truncate">{category.description}</p>
+              <p className="text-xs text-gray-400 truncate">{category.description}</p>
             )}
           </div>
 

@@ -471,7 +471,7 @@ export default function ProcurementReportsPage() {
                               <span className="font-medium text-[var(--ff-text-primary)]">
                                 {formatCurrency(category.amount)}
                               </span>
-                              <span className={`text-xs ${category.change === 0 ? 'text-gray-500' : category.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              <span className={`text-xs ${category.change === 0 ? 'text-gray-400' : category.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                 {category.change === 0 ? '' : `${category.change >= 0 ? '+' : ''}${category.change}%`}
                               </span>
                             </div>

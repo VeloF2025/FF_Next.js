@@ -251,7 +251,7 @@ export default function StockTakesPage() {
                     <td className="px-4 py-3">
                       <p className="text-white font-medium">{st.name}</p>
                       {st.description && (
-                        <p className="text-xs text-gray-500 truncate max-w-xs">{st.description}</p>
+                        <p className="text-xs text-gray-400 truncate max-w-xs">{st.description}</p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -285,7 +285,7 @@ export default function StockTakesPage() {
                           {formatCurrency(Math.abs(st.calc_variance_value || st.total_variance_value || 0))}
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-500">-</span>
+                        <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center text-sm text-gray-400">

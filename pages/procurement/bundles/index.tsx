@@ -301,7 +301,7 @@ export default function BundlesPage() {
           <div className="p-8 text-center text-gray-400">Loading...</div>
         ) : bundles.length === 0 ? (
           <div className="bg-[#1a1d23] rounded-lg border border-gray-700/50 p-8 text-center">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-500" />
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
             <p className="text-gray-400">No bundles found</p>
             <button
               onClick={() => {
@@ -383,7 +383,7 @@ function BundleCard({ bundle, onView, onEdit, onDelete, formatCurrency }: Bundle
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="text-white font-medium">{bundle.name}</h3>
-            <p className="text-xs text-gray-500 font-mono">{bundle.bundle_code}</p>
+            <p className="text-xs text-gray-400 font-mono">{bundle.bundle_code}</p>
           </div>
           <div className="flex items-center gap-1">
             <span className={`px-2 py-0.5 text-xs font-medium rounded ${
@@ -733,7 +733,7 @@ function BundleModal({ bundle, categories, stockItems, onSave, onClose }: Bundle
                 {isLoadingItems ? (
                   <div className="p-4 text-center text-gray-400">Loading items...</div>
                 ) : bundleItems.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
+                  <div className="p-4 text-center text-gray-400">
                     No items added yet
                   </div>
                 ) : (
@@ -748,10 +748,10 @@ function BundleModal({ bundle, categories, stockItems, onSave, onClose }: Bundle
                           key={bi.stock_item_id}
                           className="flex items-center gap-3 px-3 py-2 border-b border-gray-700/50 last:border-b-0"
                         >
-                          <span className="text-gray-500 text-sm w-6">{idx + 1}</span>
+                          <span className="text-gray-400 text-sm w-6">{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-white text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">{item.item_code}</p>
+                            <p className="text-xs text-gray-400">{item.item_code}</p>
                           </div>
                           <input
                             type="number"
@@ -839,7 +839,7 @@ function BundleDetailModal({ bundle, onClose, onEdit, formatCurrency }: BundleDe
         <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-white">{bundle.name}</h2>
-            <p className="text-sm text-gray-500 font-mono">{bundle.bundle_code}</p>
+            <p className="text-sm text-gray-400 font-mono">{bundle.bundle_code}</p>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-white">
             <X className="w-5 h-5" />
@@ -871,7 +871,7 @@ function BundleDetailModal({ bundle, onClose, onEdit, formatCurrency }: BundleDe
                     <tr key={item.id} className="border-b border-gray-700/50 last:border-b-0">
                       <td className="px-4 py-3">
                         <p className="text-white text-sm">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">{item.item_code}</p>
+                        <p className="text-xs text-gray-400">{item.item_code}</p>
                       </td>
                       <td className="px-4 py-3 text-center text-gray-300">
                         {item.quantity} {item.effective_uom}

@@ -240,7 +240,7 @@ export default function StockTakeDetailPage() {
               </div>
               <p className="text-gray-400 text-sm mt-1">{stockTake.reference_number}</p>
               {stockTake.description && (
-                <p className="text-gray-500 text-sm mt-2">{stockTake.description}</p>
+                <p className="text-gray-400 text-sm mt-2">{stockTake.description}</p>
               )}
             </div>
           </div>
@@ -408,7 +408,7 @@ export default function StockTakeDetailPage() {
                   <tr key={line.id} className="border-b border-gray-700/50 hover:bg-gray-800/30">
                     <td className="px-4 py-3">
                       <p className="text-white font-medium">{line.item_name}</p>
-                      <p className="text-xs text-gray-500">{line.item_code}</p>
+                      <p className="text-xs text-gray-400">{line.item_code}</p>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-400 text-sm">{line.uom}</td>
                     {!isBlindCount && (
@@ -432,7 +432,7 @@ export default function StockTakeDetailPage() {
                           }}
                         />
                       ) : (
-                        <span className={line.counted_quantity !== null ? 'text-white' : 'text-gray-500'}>
+                        <span className={line.counted_quantity !== null ? 'text-white' : 'text-gray-400'}>
                           {line.counted_quantity !== null ? line.counted_quantity : '-'}
                         </span>
                       )}
@@ -443,7 +443,7 @@ export default function StockTakeDetailPage() {
                           {line.variance_quantity > 0 ? '+' : ''}{line.variance_quantity}
                         </span>
                       ) : (
-                        <span className="text-gray-500">-</span>
+                        <span className="text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">

@@ -283,7 +283,7 @@ export default function ProcurementBudgetDashboard() {
                         {data.count}
                       </div>
                       <div className="text-gray-400 text-sm capitalize">{health}</div>
-                      <div className="text-gray-500 text-xs mt-1">
+                      <div className="text-gray-400 text-xs mt-1">
                         {formatCurrency(data.budgetSum)}
                       </div>
                     </div>
@@ -314,7 +314,7 @@ export default function ProcurementBudgetDashboard() {
                         <span className={alert.severity === 'critical' ? 'text-red-400' : 'text-yellow-400'}>
                           {alert.title}
                         </span>
-                        <span className="text-gray-500 text-sm ml-2">
+                        <span className="text-gray-400 text-sm ml-2">
                           {alert.project_code} - {alert.project_name}
                         </span>
                       </div>
@@ -359,7 +359,7 @@ export default function ProcurementBudgetDashboard() {
                     >
                       <td className="p-4">
                         <div className="text-white font-medium">{budget.project_code}</div>
-                        <div className="text-gray-500 text-sm">{budget.project_name}</div>
+                        <div className="text-gray-400 text-sm">{budget.project_name}</div>
                       </td>
                       <td className="p-4 text-right text-white font-mono">
                         {formatCurrency(budget.total_budget)}
@@ -430,7 +430,7 @@ export default function ProcurementBudgetDashboard() {
                       <div className="text-white font-bold mt-1">
                         {formatCurrency(cat.total_committed)}
                       </div>
-                      <div className="text-gray-500 text-xs mt-1">
+                      <div className="text-gray-400 text-xs mt-1">
                         {cat.project_count} project{cat.project_count !== 1 ? 's' : ''}
                       </div>
                     </div>
@@ -467,7 +467,7 @@ export default function ProcurementBudgetDashboard() {
                         <LayoutTemplate className="w-5 h-5 text-blue-400" />
                         <span className="text-white font-medium">{template.name}</span>
                       </div>
-                      <span className="text-gray-500 text-xs">{template.code}</span>
+                      <span className="text-gray-400 text-xs">{template.code}</span>
                     </div>
                     {template.is_system && (
                       <span className="px-2 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400">
@@ -488,14 +488,14 @@ export default function ProcurementBudgetDashboard() {
                       </div>
                     ))}
                     {(template.category_count > 5) && (
-                      <div className="text-gray-500 text-sm">
+                      <div className="text-gray-400 text-sm">
                         +{template.category_count - 5} more categories
                       </div>
                     )}
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: COLORS.border.primary }}>
-                    <span className="text-gray-500 text-xs">
+                    <span className="text-gray-400 text-xs">
                       Used {template.usage_count} time{template.usage_count !== 1 ? 's' : ''}
                     </span>
                     <button

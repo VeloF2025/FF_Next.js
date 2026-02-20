@@ -467,7 +467,7 @@ export default function CostCentersPage() {
                         <div>
                           <span className="text-white">{center.name}</span>
                           {center.parent_name && (
-                            <span className="text-gray-500 text-sm ml-2">
+                            <span className="text-gray-400 text-sm ml-2">
                               ← {center.parent_code}
                             </span>
                           )}
