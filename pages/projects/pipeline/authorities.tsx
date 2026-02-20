@@ -318,22 +318,22 @@ const AuthoritiesPage: NextPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="bg-[var(--ff-bg-tertiary)]">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)]">
                     Authority
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)]">
                     Type
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)]">
                     Location
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)]">
                     Contact
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)]">
                     Turnaround
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)]">
                     Actions
                   </th>
                 </tr>

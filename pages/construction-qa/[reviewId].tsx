@@ -24,7 +24,7 @@ const ReviewDetailPage: NextPage = () => {
         {reviewId && typeof reviewId === 'string' ? (
           <ReviewWizard reviewId={reviewId} />
         ) : (
-          <div className="text-center text-gray-500 py-12">Loading...</div>
+          <div className="text-center text-gray-400 py-12">Loading...</div>
         )}
       </ModulePage>
     </AppLayout>
