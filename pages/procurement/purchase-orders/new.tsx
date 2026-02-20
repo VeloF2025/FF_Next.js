@@ -456,7 +456,7 @@ export default function NewPurchaseOrderPage() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-visible">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[var(--ff-border-light)]">
