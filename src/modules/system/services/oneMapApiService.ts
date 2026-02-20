@@ -17,7 +17,10 @@
 import { log } from '@/lib/logger';
 
 const ONEMAP_EMAIL = process.env.ONEMAP_EMAIL || 'hein@velocityfibre.co.za';
-const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD || 'VeloF@2025';
+const ONEMAP_PASSWORD = process.env.ONEMAP_PASSWORD;
+if (!ONEMAP_PASSWORD) {
+  log.warn('OneMapAPI', 'ONEMAP_PASSWORD not set — authentication will fail');
+}
 const LAYER_ID = '5121';
 const BASE_URL = 'https://www.1map.co.za';
 const FETCH_TIMEOUT_MS = 30000; // 30 second timeout - 1Map search can take 10-15s under load

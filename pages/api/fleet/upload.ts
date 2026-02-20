@@ -93,7 +93,7 @@ async function handler(
     // Validate magic bytes match an allowed file type
     const { valid, detectedType } = validateMagicBytes(buffer);
     if (!valid) {
-      await fs.promises.unlink(file.filepath).catch(() => {});
+      await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'FLEET_UPLOAD'));
       return res.status(400).json({
         success: false,
         error: { message: `File content does not match an allowed image type (detected: ${detectedType})`, code: 'INVALID_FILE_CONTENT' }
@@ -117,7 +117,7 @@ async function handler(
     );
 
     // Clean up temp file
-    await fs.promises.unlink(file.filepath).catch(() => {});
+    await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'FLEET_UPLOAD'));
 
     log.info('FleetUpload', {
       action: 'upload',

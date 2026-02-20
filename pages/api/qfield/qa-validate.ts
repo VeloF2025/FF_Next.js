@@ -359,7 +359,7 @@ async function processOneValidation(
         workflow_status = 'pending',
         vlm_feedback = ${'Validation error: ' + errorMessage}
       WHERE id = ${validation.id}::uuid
-    `.catch(() => {}); // Ignore DB errors here
+    `.catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield')); // Non-critical DB update
 
     log.error({ module: 'qfield-qa-validate', id: validation.id, error: errorMessage }, 'Validation failed');
 

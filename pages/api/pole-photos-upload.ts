@@ -123,7 +123,7 @@ async function handler(
     // Validate magic bytes match an allowed image type
     const { valid: magicValid } = validateImageMagicBytes(buffer);
     if (!magicValid) {
-      await fs.promises.unlink(file.filepath).catch(() => {});
+      await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'pole-photos-upload'));
       return res.status(400).json({
         success: false,
         error: 'File content does not match expected image format.'
@@ -151,7 +151,7 @@ async function handler(
     `;
 
     // Clean up temp file
-    await fs.promises.unlink(file.filepath).catch(() => {});
+    await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'pole-photos-upload'));
 
     log.info(`Pole photo uploaded: ${poleId}/${photoType}`, { data: { url: result.url } }, 'pole-photos-upload');
 

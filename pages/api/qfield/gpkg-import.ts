@@ -171,7 +171,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (jobId) {
       const errMsg = error instanceof Error ? error.message : 'Unknown error';
-      await updateJobStatus(sql, jobId, 'failed', {}, [errMsg]).catch(() => {});
+      await updateJobStatus(sql, jobId, 'failed', {}, [errMsg]).catch((e) => log.warn('DB operation failed (non-critical)', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield'));
     }
 
     const msg = error instanceof Error ? error.message : 'Unknown error';

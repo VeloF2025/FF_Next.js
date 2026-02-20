@@ -145,7 +145,7 @@ export async function listRooms(): Promise<LiveKitRoom[]> {
             try {
                 const metadata = JSON.parse(room.metadata || '{}');
                 title = metadata.title || room.name;
-            } catch { }
+            } catch (e) { log.debug('JSON parse failed for room metadata', { error: e instanceof Error ? e.message : 'unknown' }, 'livekit'); }
 
             return {
                 name: room.name,

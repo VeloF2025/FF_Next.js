@@ -87,7 +87,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const fileBuffer = await fs.promises.readFile(file.filepath);
       const { valid: magicValid } = validateExcelMagicBytes(fileBuffer);
       if (!magicValid) {
-        await fs.promises.unlink(file.filepath).catch(() => {});
+        await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield'));
         return res.status(400).json({ error: 'File content does not match Excel format (.xls or .xlsx).' });
       }
     }

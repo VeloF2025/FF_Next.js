@@ -224,7 +224,7 @@ async function handlePost(
     return apiResponse.internalError(res, error, `Failed to upload document: ${errMsg}`);
   } finally {
     if (tempFilePath) {
-      await fs.promises.unlink(tempFilePath).catch(() => {});
+      await fs.promises.unlink(tempFilePath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'procurement'));
     }
   }
 }

@@ -528,7 +528,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Clean up temp files
     for (const tempPath of tempFilePaths) {
-      await fs.promises.unlink(tempPath).catch(() => {});
+      await fs.promises.unlink(tempPath).catch((e) => logger.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }));
     }
 
     if (!document) {
@@ -606,7 +606,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Cleanup: Remove temp files
     for (const tempPath of tempFilePaths) {
-      await fs.promises.unlink(tempPath).catch(() => {});
+      await fs.promises.unlink(tempPath).catch((e) => logger.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }));
     }
 
     return res.status(500).json({

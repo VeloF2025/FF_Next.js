@@ -292,11 +292,15 @@ export default async function handler(
     `;
 
     // Step 7: Auto-login - Create session and JWT
+    const firstName = (staffMember.first_name as string) || '';
+    const lastName = (staffMember.last_name as string) || '';
     const user: AuthUser = {
       id: userId,
+      userId,
       email: normalizedEmail,
-      firstName: (staffMember.first_name as string) || '',
-      lastName: (staffMember.last_name as string) || '',
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim() || normalizedEmail,
       role: authRole,
       permissions: userPermissions,
       isActive: true,

@@ -19,6 +19,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import { detectPatterns, calculateTotalCosts } from '@/modules/fleet';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // Disable body parser for file uploads
 export const config = {
@@ -124,12 +125,12 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Validate magic bytes match Excel format
     const { valid: magicValid } = validateExcelMagicBytes(fileBuffer);
     if (!magicValid) {
-      await fs.promises.unlink(uploadedFile.filepath).catch(() => {});
+      await fs.promises.unlink(uploadedFile.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'FLEET_INVESTIGATION'));
       return apiResponse.validationError(res, { file: 'File content does not match Excel format (.xls or .xlsx).' });
     }
 
     // Clean up temp file
-    await fs.promises.unlink(uploadedFile.filepath).catch(() => {});
+    await fs.promises.unlink(uploadedFile.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'FLEET_INVESTIGATION'));
 
     // Create job record
     const jobs = await sql`

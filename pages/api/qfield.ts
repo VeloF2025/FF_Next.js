@@ -138,8 +138,8 @@ async function getHealthStatus(): Promise<HealthStatus> {
         lastCount: parsed.last_count || null,
         lastError: parsed.last_error || null,
       };
-    } catch {
-      // JSON parse failed
+    } catch (e) {
+      log.debug('QField sync API JSON parse failed', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield');
     }
   }
 
@@ -173,8 +173,8 @@ async function getHealthStatus(): Promise<HealthStatus> {
       httpCode: parseInt(code, 10),
       latency: `${(parseFloat(time) * 1000).toFixed(0)}ms`,
     };
-  } catch {
-    // External URL check failed
+  } catch (e) {
+    log.debug('QField external URL check failed', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield');
   }
 
   return {
