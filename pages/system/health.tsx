@@ -117,27 +117,28 @@ export default function SystemHealthHub() {
               Auto-refresh
             </label>
 
-            {/* Last refresh time */}
-            <span className="text-sm text-gray-500">
-              Updated {lastRefresh.toLocaleTimeString()}
+            {/* Last refresh time — WCAG: gray-500→gray-400 for 4.5:1 contrast on dark bg */}
+            <span className="text-sm text-gray-400" aria-live="polite" aria-atomic="true">
+              {isRefreshing ? 'Refreshing...' : `Updated ${lastRefresh.toLocaleTimeString()}`}
             </span>
 
             {/* Refresh button */}
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
+              aria-label={isRefreshing ? 'Refreshing data...' : 'Refresh data'}
               className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600
-                         text-white rounded-lg transition-colors disabled:opacity-50"
+                         text-white rounded-lg transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
             </button>
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs — WCAG: role="tablist" + role="tab" + aria-selected + aria-controls */}
         <div className="border-b border-gray-700">
-          <nav className="flex gap-1">
+          <nav role="tablist" aria-label="System health sections" className="flex gap-1">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -145,14 +146,18 @@ export default function SystemHealthHub() {
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  id={`health-tab-${tab.id}`}
+                  aria-selected={isActive}
+                  aria-controls={`health-panel-${tab.id}`}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset
                     ${isActive
                       ? 'border-blue-500 text-blue-400'
                       : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
                     }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4" aria-hidden="true" />
                   {tab.label}
                 </button>
               );
@@ -160,12 +165,28 @@ export default function SystemHealthHub() {
           </nav>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content — WCAG: role="tabpanel" + id + aria-labelledby */}
         <div key={lastRefresh.getTime()}>
-          {activeTab === 'overview' && <OverviewDashboard />}
-          {activeTab === 'infrastructure' && <InfrastructureDashboard />}
-          {activeTab === 'qfield' && <QFieldDashboard />}
-          {activeTab === 'self-healing' && <SelfHealingDashboard />}
+          {activeTab === 'overview' && (
+            <div role="tabpanel" id="health-panel-overview" aria-labelledby="health-tab-overview">
+              <OverviewDashboard />
+            </div>
+          )}
+          {activeTab === 'infrastructure' && (
+            <div role="tabpanel" id="health-panel-infrastructure" aria-labelledby="health-tab-infrastructure">
+              <InfrastructureDashboard />
+            </div>
+          )}
+          {activeTab === 'qfield' && (
+            <div role="tabpanel" id="health-panel-qfield" aria-labelledby="health-tab-qfield">
+              <QFieldDashboard />
+            </div>
+          )}
+          {activeTab === 'self-healing' && (
+            <div role="tabpanel" id="health-panel-self-healing" aria-labelledby="health-tab-self-healing">
+              <SelfHealingDashboard />
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>

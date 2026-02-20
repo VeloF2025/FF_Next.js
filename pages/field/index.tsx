@@ -235,13 +235,17 @@ export default function FieldAppPage({
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation — WCAG: role="tablist" + role="tab" + aria-selected + aria-controls */}
         <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow mb-6">
           <div className="border-b border-[var(--ff-border-light)]">
-            <nav className="flex -mb-px">
+            <nav role="tablist" aria-label="Field app sections" className="flex -mb-px">
               <button
+                role="tab"
+                id="field-tab-tasks"
+                aria-selected={activeTab === 'tasks'}
+                aria-controls="field-panel-tasks"
                 onClick={() => setActiveTab('tasks')}
-                className={`px-6 py-3 font-medium text-sm ${
+                className={`px-6 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
                   activeTab === 'tasks'
                     ? 'border-b-2 border-blue-500 text-blue-600'
                     : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
@@ -250,8 +254,12 @@ export default function FieldAppPage({
                 Tasks ({tasks.length})
               </button>
               <button
+                role="tab"
+                id="field-tab-technicians"
+                aria-selected={activeTab === 'technicians'}
+                aria-controls="field-panel-technicians"
                 onClick={() => setActiveTab('technicians')}
-                className={`px-6 py-3 font-medium text-sm ${
+                className={`px-6 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
                   activeTab === 'technicians'
                     ? 'border-b-2 border-blue-500 text-blue-600'
                     : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
@@ -260,8 +268,12 @@ export default function FieldAppPage({
                 Technicians ({technicians.length})
               </button>
               <button
+                role="tab"
+                id="field-tab-overview"
+                aria-selected={activeTab === 'overview'}
+                aria-controls="field-panel-overview"
                 onClick={() => setActiveTab('overview')}
-                className={`px-6 py-3 font-medium text-sm ${
+                className={`px-6 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
                   activeTab === 'overview'
                     ? 'border-b-2 border-blue-500 text-blue-600'
                     : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
@@ -273,10 +285,10 @@ export default function FieldAppPage({
           </div>
         </div>
 
-        {/* Tab Content */}
-        <div className="space-y-4">
+        {/* Tab Content — WCAG: role="tabpanel" + id + aria-labelledby */}
+        <div>
           {activeTab === 'tasks' && (
-            <>
+            <div role="tabpanel" id="field-panel-tasks" aria-labelledby="field-tab-tasks" className="space-y-4">
               {tasks.map(task => (
                 <TaskCard
                   key={task.id}
@@ -290,11 +302,11 @@ export default function FieldAppPage({
                   No tasks assigned
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {activeTab === 'technicians' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div role="tabpanel" id="field-panel-technicians" aria-labelledby="field-tab-technicians" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {technicians.map(technician => (
                 <TechnicianCard
                   key={technician.id}
@@ -311,7 +323,7 @@ export default function FieldAppPage({
           )}
 
           {activeTab === 'overview' && (
-            <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
+            <div role="tabpanel" id="field-panel-overview" aria-labelledby="field-tab-overview" className="bg-[var(--ff-bg-secondary)] rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold mb-4 text-[var(--ff-text-primary)]">Field Operations Overview</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>

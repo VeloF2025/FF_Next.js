@@ -66,15 +66,22 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    // WCAG: role="dialog" + aria-modal + aria-labelledby for proper modal semantics (4.1.2)
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="task-dialog-title"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    >
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] p-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Task Details</h2>
+          <h2 id="task-dialog-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">Task Details</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-[var(--ff-bg-hover)] rounded-md"
+            aria-label="Close task details"
+            className="p-2 hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded-md"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -102,7 +109,7 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
           {/* Customer Info */}
           <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
             <h4 className="font-medium text-[var(--ff-text-primary)] mb-3 flex items-center">
-              <User className="w-4 h-4 mr-2" />
+              <User className="w-4 h-4 mr-2" aria-hidden="true" />
               Customer Information
             </h4>
             <div className="space-y-2 text-sm">
@@ -114,11 +121,11 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
                 <span className="flex-1">{task.address}</span>
               </div>
               <div className="flex items-center space-x-2">
-                <MapPin className="w-4 h-4" />
+                <MapPin className="w-4 h-4" aria-hidden="true" />
                 <span>
                   {task.coordinates.lat.toFixed(4)}, {task.coordinates.lng.toFixed(4)}
                 </span>
-                <button className="text-blue-600 hover:underline">
+                <button className="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded">
                   View on Map
                 </button>
               </div>
@@ -128,7 +135,7 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
           {/* Task Details */}
           <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
             <h4 className="font-medium text-[var(--ff-text-primary)] mb-3 flex items-center">
-              <FileText className="w-4 h-4 mr-2" />
+              <FileText className="w-4 h-4 mr-2" aria-hidden="true" />
               Task Details
             </h4>
             <div className="space-y-2 text-sm">
@@ -153,8 +160,9 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
 
           {/* Action Notes */}
           <div className="border border-[var(--ff-border-light)] rounded-lg p-4">
-            <h4 className="font-medium text-[var(--ff-text-primary)] mb-3">Add Notes</h4>
+            <label htmlFor="task-notes" className="font-medium text-[var(--ff-text-primary)] mb-3 block">Add Notes</label>
             <textarea
+              id="task-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
@@ -165,12 +173,12 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
 
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
-              <Camera className="w-5 h-5 mr-2" />
+            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]">
+              <Camera className="w-5 h-5 mr-2" aria-hidden="true" />
               Take Photo
             </button>
-            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
-              <Phone className="w-5 h-5 mr-2" />
+            <button className="flex items-center justify-center px-4 py-3 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]">
+              <Phone className="w-5 h-5 mr-2" aria-hidden="true" />
               Call Customer
             </button>
           </div>
@@ -182,7 +190,7 @@ export function TaskDialog({ task, isOpen, onClose, onStatusUpdate }: TaskDialog
             </div>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded-md"
             >
               Cancel
             </button>

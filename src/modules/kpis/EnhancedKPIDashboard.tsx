@@ -76,6 +76,17 @@ export function EnhancedKPIDashboard() {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'good': return 'Good';
+      case 'warning': return 'Warning';
+      case 'critical': return 'Critical';
+      default: return status;
+    }
+  };
+
+  const activeTabPanelId = `kpi-panel-${activeTab}`;
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -83,15 +94,19 @@ export function EnhancedKPIDashboard() {
         <p className="text-[var(--ff-text-secondary)] mt-1">Monitor and analyze key performance indicators</p>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — WCAG: role="tablist" with aria-label, each tab has role="tab" + aria-selected + aria-controls */}
       <div className="border-b border-[var(--ff-border-light)] mb-6">
-        <nav className="-mb-px flex space-x-8">
+        <nav role="tablist" aria-label="KPI categories" className="-mb-px flex space-x-8">
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              id={`kpi-tab-${tab.id}`}
+              aria-selected={activeTab === tab.id}
+              aria-controls={`kpi-panel-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`
-                py-2 px-1 border-b-2 font-medium text-sm transition-colors
+                py-2 px-1 border-b-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
@@ -104,58 +119,76 @@ export function EnhancedKPIDashboard() {
         </nav>
       </div>
 
-      {/* KPI Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {kpiMetrics.map((metric) => (
-          <div key={metric.name} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-sm text-[var(--ff-text-secondary)]">{metric.name}</p>
-              <span className={`text-xs font-semibold ${getStatusColor(metric.status)}`}>
-                {metric.status.toUpperCase()}
-              </span>
-            </div>
-            <div className="flex items-end justify-between">
-              <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                {metric.value}{metric.unit}
-              </p>
-              <p className="text-xs text-[var(--ff-text-secondary)]">
-                Target: {metric.target}{metric.unit}
-              </p>
-            </div>
-            <div className="mt-2 w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
-              <div
-                className={`h-2 rounded-full ${
-                  metric.status === 'good' ? 'bg-green-500' :
-                  metric.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
-                }`}
-                style={{ width: `${(metric.value / metric.target) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Tab panel — WCAG: role="tabpanel" + id + aria-labelledby */}
+      <div
+        role="tabpanel"
+        id={activeTabPanelId}
+        aria-labelledby={`kpi-tab-${activeTab}`}
+      >
+        {/* KPI Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          {kpiMetrics.map((metric) => {
+            const progressPercent = Math.min(100, Math.round((metric.value / metric.target) * 100));
+            return (
+              <div key={metric.name} className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{metric.name}</p>
+                  {/* WCAG: use CSS uppercase class instead of JS .toUpperCase() to preserve semantic text for screen readers */}
+                  <span className={`text-xs font-semibold uppercase tracking-wide ${getStatusColor(metric.status)}`}>
+                    {getStatusLabel(metric.status)}
+                  </span>
+                </div>
+                <div className="flex items-end justify-between">
+                  <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                    {metric.value}{metric.unit}
+                  </p>
+                  <p className="text-xs text-[var(--ff-text-secondary)]">
+                    Target: {metric.target}{metric.unit}
+                  </p>
+                </div>
+                {/* WCAG: role="progressbar" with aria-valuenow/min/max and aria-label */}
+                <div className="mt-2 w-full bg-[var(--ff-bg-tertiary)] rounded-full h-2">
+                  <div
+                    role="progressbar"
+                    aria-valuenow={progressPercent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${metric.name}: ${progressPercent}% of target`}
+                    className={`h-2 rounded-full ${
+                      metric.status === 'good' ? 'bg-green-500' :
+                      metric.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-      {/* Navigation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {cards.map((card) => (
-          <div
-            key={card.title}
-            onClick={card.onClick}
-            className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div className="flex items-start space-x-4">
-              <div className={`${card.color} p-3 rounded-lg`}>
-                <card.icon className="w-6 h-6 text-white" />
+        {/* Navigation Cards — WCAG: changed from <div onClick> to <button> for keyboard accessibility */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {cards.map((card) => (
+            <button
+              key={card.title}
+              type="button"
+              onClick={card.onClick}
+              className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-sm border border-[var(--ff-border-light)] p-6 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:ring-offset-1 transition-shadow cursor-pointer text-left w-full"
+            >
+              <div className="flex items-start space-x-4">
+                <div className={`${card.color} p-3 rounded-lg`} aria-hidden="true">
+                  <card.icon className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{card.description}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-1">
-                  {card.title}
-                </h3>
-                <p className="text-sm text-[var(--ff-text-secondary)]">{card.description}</p>
-              </div>
-            </div>
-          </div>
-        ))}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
