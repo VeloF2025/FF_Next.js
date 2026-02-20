@@ -2,9 +2,25 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 })
 
+// Inject build-time version info (git SHA, timestamp)
+const { execSync } = require('child_process');
+const getGitSha = () => {
+  try { return execSync('git rev-parse HEAD', { stdio: ['pipe', 'pipe', 'pipe'] }).toString().trim(); }
+  catch { return process.env.GIT_SHA || 'unknown'; }
+};
+const BUILD_GIT_SHA = getGitSha();
+const BUILD_TIMESTAMP = new Date().toISOString();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+
+  // Build-time version info — available in server-side code via process.env
+  env: {
+    GIT_SHA: BUILD_GIT_SHA,
+    GIT_SHA_SHORT: BUILD_GIT_SHA.slice(0, 8),
+    BUILD_TIMESTAMP,
+  },
 
   // TypeScript and ESLint
   typescript: {

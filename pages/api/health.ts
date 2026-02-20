@@ -5,6 +5,12 @@ interface HealthCheck {
   status: 'healthy' | 'unhealthy' | 'degraded';
   timestamp: string;
   uptime: number;
+  version: {
+    gitCommit: string;
+    gitCommitShort: string;
+    builtAt: string;
+    environment: string;
+  };
   checks: {
     database: 'connected' | 'error' | 'pending';
     memory: 'ok' | 'high' | 'critical' | 'pending';
@@ -39,11 +45,19 @@ export default async function handler(
     return res.status(405).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
+      uptime: 0,
+      version: {
+        gitCommit: process.env.GIT_SHA || 'unknown',
+        gitCommitShort: process.env.GIT_SHA_SHORT || 'unknown',
+        builtAt: process.env.BUILD_TIMESTAMP || 'unknown',
+        environment: process.env.NODE_ENV || 'unknown',
+      },
       checks: {
         database: 'error',
-        memory: 'error',
+        memory: 'ok',
         environment: 'error',
       },
+      details: {},
     } as HealthCheck);
   }
 
@@ -51,6 +65,12 @@ export default async function handler(
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    version: {
+      gitCommit: process.env.GIT_SHA || 'unknown',
+      gitCommitShort: process.env.GIT_SHA_SHORT || 'unknown',
+      builtAt: process.env.BUILD_TIMESTAMP || 'unknown',
+      environment: process.env.NODE_ENV || 'unknown',
+    },
     checks: {
       database: 'pending',
       memory: 'pending',
