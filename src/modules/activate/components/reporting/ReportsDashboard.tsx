@@ -29,6 +29,7 @@ import {
   Target,
   Clock,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type { ReportCategory, ReportFilters } from '../../types/reporting.types';
 import { useActivateData, getTodaySAST, getYesterdaySAST } from '../../context';
 
@@ -295,11 +296,43 @@ export function ReportsDashboard() {
     setTimeout(() => setIsLoading(false), 100);
   }, []);
 
-  // Handle export (placeholder - will be implemented in Phase 6)
-  const handleExport = useCallback(() => {
-    // TODO: Implement export functionality
-    alert('Export functionality coming soon!');
-  }, []);
+  // Export filtered report data to Excel via /api/activate/export
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.set('dateTo', filters.dateTo);
+      if (filters.project) params.set('project', filters.project);
+
+      const response = await fetch(`/api/activate/export?${params.toString()}`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const exportCount = response.headers.get('X-Export-Count') || '?';
+      const parts: string[] = ['activate-reports'];
+      if (filters.project) parts.push(filters.project.replace(/\s+/g, '-'));
+      if (filters.dateFrom) parts.push(filters.dateFrom);
+      if (filters.dateTo && filters.dateTo !== filters.dateFrom) parts.push(`to-${filters.dateTo}`);
+      parts.push(`${exportCount}-records`);
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${parts.join('-')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success(`Exported ${exportCount} records`);
+    } catch (err) {
+      toast.error('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filters]);
 
   return (
     <div className="space-y-6">
@@ -414,10 +447,11 @@ export function ReportsDashboard() {
             </button>
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 transition-colors"
+              disabled={isExporting}
+              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Download className="h-4 w-4" />
-              Export
+              <Download className={`h-4 w-4 ${isExporting ? 'animate-bounce' : ''}`} />
+              {isExporting ? 'Exporting...' : 'Export'}
             </button>
           </div>
         </div>

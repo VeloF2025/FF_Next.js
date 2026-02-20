@@ -21,7 +21,7 @@ Unified system for DR (Drop Receipt) photo review with:
 | **API Prefix** | `/api/activate/*` |
 | **Main Table** | `dr_photo_unified_reviews` |
 | **VLM Server** | `http://100.96.203.105:8100` (Qwen3) |
-| **WA Feedback** | `http://100.96.203.105:8090` |
+| **WA Feedback** | `http://100.96.203.105:8092` |
 
 ## Tab-Based UI
 
@@ -29,7 +29,7 @@ Unified system for DR (Drop Receipt) photo review with:
 |-----|---------|
 | **DR Summary** | Landing page - Project stats with Zone/PON drill-down |
 | **QA Centre** | DR list for review with filters and pagination |
-| **Reports** | 8 report types (Anomalies, Trends, Team Performance, QA Funnel) |
+| **Reports** | 10 report types (Anomalies, Trends, Team Performance, QA Funnel, Offline Devices, Serial Swaps, Serial Mismatches, Installation Gaps, Activation Progress, Maturity Tracking) |
 | **Data Import** | Import OES/ARCH Excel activation reports |
 | **Manual Entry** | Add DRs manually |
 
@@ -552,9 +552,9 @@ Event logging for full DR lifecycle tracking.
   - UPS serial (or "Not scanned" warning)
   - **🔴 SWAPPED SERIALS alert** if ONT/UPS appear to be in wrong fields
 
-### WA Feedback Service (Port 8090)
+### WA Feedback Service (Port 8092)
 - Sends QA feedback messages
-- Health: `curl http://100.96.203.105:8090/health`
+- Health: `curl http://100.96.203.105:8092/health`
 
 ### Group Mapping
 | Project | Group JID |
@@ -572,7 +572,7 @@ Event logging for full DR lifecycle tracking.
 2. **OneMap** - Photo storage API (100.96.203.105:8003)
 3. **VLM** - Qwen3 server (100.96.203.105:8100)
 4. **WA Bridge** - Inferred from recent DR activity
-5. **WA Feedback** - Sender service (100.96.203.105:8090)
+5. **WA Feedback** - Sender service (100.96.203.105:8092)
 
 ## Troubleshooting
 
@@ -592,7 +592,7 @@ echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service
 
 ### WA Feedback Not Sending
 ```bash
-curl http://100.96.203.105:8090/health
+curl http://100.96.203.105:8092/health
 echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback
 ```
 

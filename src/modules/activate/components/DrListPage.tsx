@@ -24,6 +24,7 @@ import {
   getYesterdaySAST,
 } from '../context';
 import { log } from '@/lib/logger';
+import toast from 'react-hot-toast';
 
 type TabType = 'dashboard' | 'reports';
 
@@ -271,7 +272,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
       document.body.removeChild(a);
     } catch (err) {
       log.error('Export error', { err, filters }, 'DrListPage');
-      alert('Failed to export data. Please try again.');
+      toast.error('Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);
     }

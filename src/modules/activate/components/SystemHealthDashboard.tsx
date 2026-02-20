@@ -24,6 +24,7 @@ interface HealthData {
     vlm: ServiceStatus;
     whatsappBridge: ServiceStatus;
     whatsappSender?: ServiceStatus;
+    sharepoint?: ServiceStatus;
   };
   recentActivity: {
     lastDRProcessed: string | null;
@@ -193,6 +194,7 @@ export function SystemHealthDashboard({
     { key: 'vlm', label: 'VLM (AI)', icon: '🤖', ...health.services.vlm },
     { key: 'whatsappBridge', label: 'WA Bridge', icon: '💬', ...health.services.whatsappBridge },
     ...(health.services.whatsappSender ? [{ key: 'whatsappSender', label: 'WA Sender', icon: '📤', ...health.services.whatsappSender }] : []),
+    ...(health.services.sharepoint ? [{ key: 'sharepoint', label: 'SharePoint', icon: '📁', ...health.services.sharepoint }] : []),
   ];
 
   // Compact view for header/navbar
@@ -242,6 +244,14 @@ export function SystemHealthDashboard({
                 Last updated: {lastRefresh.toLocaleTimeString()}
               </div>
             )}
+            <div className="mt-2 pt-2 border-t border-border">
+              <a
+                href="/activate/monitoring"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                View full monitoring →
+              </a>
+            </div>
           </div>
         )}
       </div>
@@ -267,12 +277,20 @@ export function SystemHealthDashboard({
               )}
             </div>
           </div>
-          <button
-            onClick={fetchHealth}
-            className="px-3 py-1 text-sm border border-border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchHealth}
+              className="px-3 py-1 text-sm border border-border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              Refresh
+            </button>
+            <a
+              href="/activate/monitoring"
+              className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+            >
+              Full Monitoring
+            </a>
+          </div>
         </div>
       </div>
 

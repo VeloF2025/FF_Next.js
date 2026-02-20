@@ -142,10 +142,14 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
 
       {/* Tabs */}
       <div className="border-b border-border">
-        <nav className="flex -mb-px">
+        <nav className="flex -mb-px" role="tablist" aria-label="DR review sections">
           {tabs.map((tab) => (
             <button
               key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              aria-controls={`tabpanel-${tab.key}`}
+              id={`tab-${tab.key}`}
               onClick={() => setActiveTab(tab.key)}
               className={`
                 px-6 py-4 text-sm font-medium border-b-2 transition-colors
@@ -164,7 +168,12 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
       </div>
 
       {/* Tab Content */}
-      <div className="p-6">
+      <div
+        className="p-6"
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
         {activeTab === 'summary' && (
           <DrSummaryPage
             dropNumber={dropNumber}

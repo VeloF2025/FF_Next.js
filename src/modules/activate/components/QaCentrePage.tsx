@@ -24,6 +24,7 @@ import type {
   SerialValidationStatus,
 } from '../services/activateDataService';
 import { log } from '@/lib/logger';
+import toast from 'react-hot-toast';
 
 // ============================================================================
 // BADGE COLOR REFERENCE
@@ -331,7 +332,7 @@ function QaCentrePageContent() {
 
   // Local UI state
   const [searchInput, setSearchInput] = useState('');
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   // Debounced search
@@ -441,7 +442,7 @@ function QaCentrePageContent() {
       document.body.removeChild(a);
     } catch (err) {
       log.error('Export error', { error: err });
-      alert('Failed to export data. Please try again.');
+      toast.error('Failed to export data. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -615,6 +616,8 @@ function QaCentrePageContent() {
                     <option value="all">All</option>
                     <option value="installed">Installed Only</option>
                     <option value="activated">Activated Only</option>
+                    <option value="not_reviewed">Not Reviewed</option>
+                    <option value="reviewed">Reviewed</option>
                   </select>
                 </div>
 
