@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
@@ -1254,19 +1253,11 @@ function BundleReportsTabContent() {
 }
 
 export default function InventoryPage({ projectId }: InventoryPageProps) {
-  const router = useRouter();
   const { activeTab, changeTab, isInitialized } = useTabPersistence({
     pageKey: 'inventory',
     defaultTab: 'stock',
     validTabs: TABS.map(t => t.id),
   });
-
-  // Field Stock has its own standalone page with 8 sub-tabs (PRD-027)
-  useEffect(() => {
-    if (isInitialized && activeTab === 'field') {
-      router.replace('/procurement/field-stock');
-    }
-  }, [isInitialized, activeTab, router]);
 
   return (
     <AppLayout>
