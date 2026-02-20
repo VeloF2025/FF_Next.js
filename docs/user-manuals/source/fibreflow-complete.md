@@ -15,7 +15,7 @@ pdf_options:
     <section>
       <div class="header-line">
         <span style="color: #023047; font-weight: 600;">VELOCITY FIBRE</span>
-        <span>FibreFlow — Complete User Manual v1.4</span>
+        <span>FibreFlow — Complete User Manual v1.5</span>
       </div>
     </section>
   footerTemplate: |-
@@ -1547,8 +1547,8 @@ The Procurement module manages the complete purchasing workflow — from Bill of
 
 **Navigation:** Sidebar → **Procurement** (click section header)
 
-![Procurement Dashboard](../help-screenshots/complete/17-procurement-dashboard.png)
-*Figure 7.1: Procurement Dashboard showing order statistics, pending approvals, and quick actions*
+![Procurement Dashboard](/help-center/screenshots/17-procurement-dashboard.png)
+*Figure 7.1: Procurement Dashboard showing overview statistics, workflow diagram, and quick-action cards*
 
 #### Quick Actions
 
@@ -1563,12 +1563,13 @@ The procurement module uses horizontal tabs for navigation:
 
 | Tab | Purpose |
 |-----|---------|
-| **Dashboard** | Overview statistics and quick actions |
-| **Sourcing** | BOQ management |
-| **Purchasing** | RFQ and PO management |
-| **Inventory** | Stock items, movements, stock takes |
-| **Financial** | Cost tracking and budget overview |
-| **Approvals** | Pending approval items |
+| **Dashboard** | Overview statistics, workflow diagram, and quick-action cards |
+| **Sourcing** | BOQ management and stock matching |
+| **Purchasing** | Sub-tabs: Requisitions, Quotes, Purchase Orders, GRN |
+| **Inventory** | Stock items, movements, stock takes, adjustments |
+| **Field Stock** | Field inventory: locations, serials, pickings, returns, adjustments |
+| **Approvals** | Pending approval tasks with Approve/Reject actions |
+| **Reports** | Analytics, audit logs, fault reports, exports |
 
 ### 7.2 Sourcing — BOQ Management
 
@@ -1576,7 +1577,7 @@ The Bill of Quantities (BOQ) manages material requirements for projects.
 
 **Navigation:** Procurement → **Sourcing** tab
 
-![BOQ List](../help-screenshots/complete/18-procurement-boq.png)
+![BOQ List](/help-center/screenshots/18-procurement-boq.png)
 *Figure 7.2: BOQ management showing project BOQs with upload and column mapping features*
 
 #### Creating a BOQ
@@ -1600,13 +1601,92 @@ The Bill of Quantities (BOQ) manages material requirements for projects.
 - **History** — Track BOQ revisions and changes
 - **Export** — Download BOQ as Excel
 
+### 7.2b Purchase Requisitions **(NEW)**
+
+Create purchase requests that go through an approval workflow before becoming purchase orders.
+
+**Navigation:** Procurement → **Purchasing** tab → **Requisitions** sub-tab
+
+![Requisitions List](/help-center/screenshots/38-requisitions-list.png)
+*Figure 7.3a: Requisitions list showing requisition number, status badge, item count, and estimated total*
+
+#### Creating a Requisition
+
+1. Navigate to **Purchasing** → **Requisitions** tab
+2. Click **+ New Requisition**
+3. Fill in the form:
+   - **Project** — Select associated project (optional)
+   - **Department** — e.g., Operations, Finance, Engineering
+   - **Required By** — Date items are needed (optional)
+   - **Urgency** — Normal, High, or Critical
+   - **Notes** — Additional instructions for the approver
+4. Add line items using **+ Add Item**:
+   - **Description** — What you need (required)
+   - **Quantity** — How many (required)
+   - **UOM** — Unit of measure: Units, Metres, Rolls, etc. (required)
+   - **Unit Price** — Estimated cost per unit
+5. Review the **Summary** showing item count and estimated total
+6. Click **Create Requisition**
+
+![Create Requisition Form](/help-center/screenshots/42-create-requisition.png)
+*Figure 7.3b: New Requisition form with department, urgency, line items, and summary total*
+
+> **Tip:** The requisition is created in **Draft** status. You must click **Submit** on the detail page to send it for approval.
+
+#### Submitting for Approval
+
+1. Open the requisition detail page
+2. Click **Submit** to send for approval
+3. The system applies auto-approval rules:
+   - **Below R10,000** — Auto-approved immediately (no manager action needed)
+   - **R10,000 and above** — Routed to manager for review
+
+#### Requisition Detail Page
+
+![Requisition Detail](/help-center/screenshots/39-requisition-detail.png)
+*Figure 7.3c: Requisition detail showing status, Approve/Reject buttons, and item summary*
+
+The detail page shows:
+- **Status badge** — Draft, Pending Approval, Approved, or Rejected
+- **Approve / Reject buttons** — Visible to approvers when status is Pending Approval
+- **Details tab** — Project, department, urgency, requested by, summary
+- **Items tab** — Line items with description, quantity, UOM, unit price, line total
+- **History tab** — Audit trail of all status changes
+
+#### Approval Workflow
+
+| Status | Description |
+|--------|-------------|
+| **Draft** | Requisition created, not yet submitted |
+| **Pending Approval** | Submitted and awaiting manager approval (>= R10,000) |
+| **Approved** | Approved — ready to convert to Purchase Order or RFQ |
+| **Rejected** | Rejected with reason — can be edited and resubmitted |
+
+#### Approving or Rejecting
+
+**To approve:** Click the green **Approve** button on the requisition detail page or from the Approvals tab.
+
+**To reject:** Click the red **Reject** button. A modal will appear requiring a rejection reason. Enter the reason and click **Reject** to confirm.
+
+> **Important:** After rejection, the requisition returns to Draft status. The requester can edit items and resubmit.
+
+#### Converting to Purchase Order
+
+Once a requisition is approved:
+1. Open the requisition detail page
+2. Click **Convert to PO**
+3. A new Purchase Order is created pre-populated with the requisition items
+4. Edit PO details as needed and submit
+
+---
+
 ### 7.3 RFQ — Request for Quotation
 
 Send requests for quotation to suppliers and compare responses.
 
 **Navigation:** Procurement → **Purchasing** tab → RFQ section
 
-![RFQ Detail](../help-screenshots/complete/19-procurement-rfq.png)
+![RFQ Detail](/help-center/screenshots/19-procurement-rfq.png)
 *Figure 7.3: RFQ detail page showing line items, supplier responses, and comparison view*
 
 #### Creating an RFQ
@@ -1634,7 +1714,7 @@ Create and manage purchase orders with approval workflows.
 
 **Navigation:** Procurement → **Purchasing** tab → PO section
 
-![Purchase Order](../help-screenshots/complete/20-procurement-po.png)
+![Purchase Order](/help-center/screenshots/20-procurement-po.png)
 *Figure 7.4: Purchase Order detail showing line items, approval status, and version history*
 
 #### PO Approval Workflow
@@ -1677,7 +1757,7 @@ Manage stock items, track movements, and perform stock takes.
 
 **Navigation:** Procurement → **Inventory** tab
 
-![Stock Management](../help-screenshots/complete/21-procurement-stock.png)
+![Stock Management](/help-center/screenshots/21-procurement-stock.png)
 *Figure 7.5: Stock management dashboard showing items, levels, and movement history*
 
 #### Stock Items
@@ -1698,14 +1778,96 @@ Track all inventory movements:
 - **Transfers** — Items moved between locations
 - **Adjustments** — Stock count corrections
 
+#### Stock Adjustments **(NEW)**
+
+Adjust stock quantities directly when discrepancies are found (damaged items, theft, found stock, count errors).
+
+![Stock Adjustments](/help-center/screenshots/43-stock-adjustments.png)
+*Figure 7.5b: Stock Adjustments panel showing adjustment history with filters and "New Adjustment" button*
+
+**Navigation:** Procurement → **Field Stock** → **Adjustments** tab (also available on Inventory page)
+
+**Step-by-Step: Creating a Stock Adjustment**
+
+1. Navigate to **Field Stock** → **Adjustments** tab
+2. Click **+ New Adjustment**
+3. Fill in the form:
+   - **Location** — Select the warehouse or field location
+   - **Stock Item** — Select the item to adjust
+   - **Adjustment Type** — Choose **Increase** (found/received) or **Decrease** (damaged/lost)
+   - **Quantity** — Amount to adjust
+   - **Reason** — Select from: Damaged, Theft, Expired, Found, Count Error, System Error, Transfer, Usage, Receipt, Other
+   - **Notes** — Additional context (optional)
+4. Click **Create Adjustment**
+5. Stock quantities update immediately
+
+**Adjustment History Table:**
+
+| Column | Description |
+|--------|-------------|
+| **Date** | When the adjustment was made |
+| **Reference** | Auto-generated reference (ADJ-YYYYMM-0001) |
+| **Item** | Stock item name and code |
+| **Location** | Where the adjustment was applied |
+| **Type** | Increase (green) or Decrease (red) badge |
+| **Qty** | Quantity adjusted |
+| **Reason** | Reason code for the adjustment |
+| **By** | Who performed the adjustment |
+
+**Filtering Adjustments:**
+- **Location** dropdown — Filter by specific location
+- **Reason** dropdown — Filter by reason code
+- **Date range** — From/To date pickers
+- Click **Filter** to apply
+
+> **Tip:** Use "Count Error" as the reason when adjustments result from stock takes. For damaged goods, use "Damaged" and consider filing a Fault Report (Section 7.11).
+
+#### Stock Takes **(NEW)**
+
+Perform periodic stock counts to verify physical quantities against system records.
+
+**Step-by-Step: Performing a Stock Take**
+
+1. Navigate to **Inventory** → **Takes** tab
+2. Click **+ New Stock Take**
+3. Select the **Location** to count
+4. Click **Initialize** to populate lines from current stock levels
+5. For each line, enter the **Counted Quantity** (what you physically counted)
+6. The system calculates **Variance** automatically (counted - expected)
+7. Click **Complete** when all lines are counted
+8. Submit for **Review/Approval**
+9. When approved, variances automatically update stock quantities
+
+**Stock Take Statuses:**
+
+| Status | Description |
+|--------|-------------|
+| **Draft** | Stock take created, lines not yet populated |
+| **In Progress** | Lines initialized, counting underway |
+| **Pending Review** | Counting complete, awaiting approval |
+| **Approved** | Variances applied to stock quantities |
+| **Cancelled** | Stock take cancelled |
+
+> **Important:** When a stock take is approved, all lines with non-zero variance automatically create stock adjustments. Lines with zero variance are marked as verified.
+
 #### Goods Receipt Notes (GRN)
 
-Record received goods against purchase orders:
-1. Navigate to a PO → Click **Receive Goods**
-2. Enter quantities received for each line item
-3. Note any discrepancies
-4. Upload delivery note/photo
-5. Confirm receipt
+Record received goods against purchase orders.
+
+**Navigation:** Procurement → **Purchasing** tab → **GRN** sub-tab
+
+![GRN List](/help-center/screenshots/41-grn-list.png)
+*Figure 7.5c: GRN list showing goods receipt records with status and PO references*
+
+**Step-by-Step: Recording a Goods Receipt**
+
+1. Navigate to **Purchasing** → **GRN** sub-tab
+2. Click **+ New GRN** or navigate to a PO and click **Receive Goods**
+3. Enter quantities received for each line item
+4. Note any discrepancies (short shipment, wrong items, damage)
+5. Upload delivery note or photo of received goods
+6. Click **Confirm Receipt**
+7. Stock levels are automatically updated
 
 ### 7.6 Financial **(ENHANCED)**
 
@@ -1726,17 +1888,58 @@ The Income Dashboard now shows revenue tracking based on actual activations:
 - **Client PO Status** — Outstanding and fulfilled client purchase orders
 - **Real-time Progress** — Progress calculated from live activation data, not estimates
 
-### 7.7 Approvals
+### 7.7 Approvals **(ENHANCED)**
 
-View and action pending approvals across procurement.
+The centralised Approvals page shows all pending procurement approvals in one place — requisitions, purchase orders, and other document types.
 
 **Navigation:** Procurement → **Approvals** tab
 
-| Action | Description |
-|--------|-------------|
-| **Approve** | Approve the purchase order |
-| **Reject** | Reject with reason |
-| **Request Changes** | Send back for modifications |
+![Approvals Page](/help-center/screenshots/40-approvals-page.png)
+*Figure 7.7: Pending Approvals page showing stats cards, document type filter, and Approve/Reject actions*
+
+#### Statistics Cards
+
+The top of the page shows summary counts:
+
+| Card | Description |
+|------|-------------|
+| **Total Pending** | Total items awaiting your approval |
+| **Requisitions** | Pending purchase requisitions |
+| **Purchase Orders** | Pending PO approvals |
+| **Overdue** | Items past their approval deadline |
+
+#### Filtering and Search
+
+- **Search bar** — Search by document number or requester name
+- **Type filter** — Filter by All Types, Requisitions, or Purchase Orders
+
+#### Approval List
+
+Each pending item shows:
+- **Document number** (e.g., PR26-00001) with type badge (Requisition / PO)
+- **Description** — Document title and approval level required
+- **Requester** — Who submitted the request and when
+- **Amount** — Total value in Rands
+- **Approve button** (green) — One-click approval with optional notes
+- **Reject button** (red) — Opens modal requiring a rejection reason
+
+#### Step-by-Step: Approving an Item
+
+1. Navigate to **Procurement** → **Approvals** tab
+2. Review the pending items list
+3. Click a row to view full details, or action directly from the list
+4. Click **Approve** to approve immediately
+5. The item status changes and it disappears from the pending list
+
+#### Step-by-Step: Rejecting an Item
+
+1. Click the **Reject** button next to the item
+2. A modal appears with a text field for the rejection reason
+3. Enter a clear reason (this is shown to the requester)
+4. Click **Reject** to confirm
+5. The item returns to Draft status for the requester to revise
+
+> **Important:** You can also approve or reject from the document detail page (e.g., Requisition detail). The Approvals tab is a convenience view that aggregates all pending items.
 
 ### 7.8 Suppliers
 
@@ -1759,8 +1962,8 @@ The Field Stock Control module provides comprehensive tracking and management of
 
 **User Audiences:** Stock managers, warehouse staff, field technicians, contractors
 
-<!-- ![Field Stock Control Dashboard](../help-screenshots/complete/38-field-stock-dashboard.png) -->
-*Figure 7.9: Field Stock Control dashboard showing van stock levels, technician accountability, and recent movements*
+![Field Stock Control Dashboard](/help-center/screenshots/37-field-stock-control.png)
+*Figure 7.9: Field Stock Control dashboard showing sub-tabs for locations, serials, pickings, returns, and adjustments*
 
 #### Overview
 
@@ -3489,7 +3692,32 @@ Users can customize their sidebar by:
 
 ## 14. Appendices
 
-### Appendix A: What's New in Version 1.4
+### Appendix A: What's New in Version 1.5
+
+This section summarizes the major changes and new features since version 1.4 (February 14, 2026).
+
+#### New Features (Version 1.5)
+
+| Feature | Module | Description |
+|---------|--------|-------------|
+| **Purchase Requisitions** | Procurement | Full requisition workflow: create, submit, approve/reject with reason, convert to PO. Auto-approval for items under R10,000. New Section 7.2b |
+| **Stock Adjustments** | Procurement | Direct stock quantity adjustments with 10 reason codes (Damaged, Theft, Found, etc.). Filter by location, reason, date range. Available on both Inventory and Field Stock pages |
+| **Stock Take → Quant Updates** | Procurement | Approving a stock take now automatically updates stock quantities based on counted variances |
+| **Approval Workflow Enhancement** | Procurement | Centralised Approvals page with stats cards, document type filtering, and inline Approve/Reject actions |
+
+#### Documentation Updates (Version 1.5)
+
+- **Section 7.2b** — New Purchase Requisitions section with step-by-step workflows and 3 screenshots
+- **Section 7.5** — Added Stock Adjustments and Stock Takes sub-sections with step-by-step guidance
+- **Section 7.7** — Expanded Approvals section with screenshot, stats cards, and step-by-step approve/reject workflows
+- **Section 7.5** — Added GRN screenshot and improved step-by-step instructions
+- **Screenshots Updated** — 6 new procurement screenshots added (requisitions list, requisition detail, create form, approvals page, GRN list, stock adjustments)
+- **Tab Navigation** — Updated Dashboard Tabs table to reflect current UI (7 main tabs with sub-tabs)
+- **Field Stock Screenshot** — Un-commented and linked live Field Stock Control dashboard screenshot
+
+---
+
+### Appendix A.0: What's New in Version 1.4
 
 This section summarizes the major changes and new features since version 1.3 (February 11, 2026).
 
