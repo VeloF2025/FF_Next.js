@@ -21,6 +21,7 @@ import {
   MapPin,
   CreditCard,
   AlertCircle,
+  Save,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
@@ -79,6 +80,7 @@ interface PurchaseOrderDetail {
   projectId: string | null;
   projectName: string | null;
   deliveryAddress: string;
+  orderDate: string | null;
   expectedDeliveryDate: string | null;
   paymentTerms: string;
   currency: string;
@@ -116,6 +118,14 @@ export default function PurchaseOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('details');
   const [actionLoading, setActionLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFields, setEditFields] = useState({
+    orderDate: '',
+    expectedDeliveryDate: '',
+    deliveryAddress: '',
+    paymentTerms: '',
+    internalNotes: '',
+  });
 
   useEffect(() => {
     // router.isReady ensures query params are available (hydration complete)
@@ -201,6 +211,51 @@ export default function PurchaseOrderDetailPage() {
     }
   };
 
+  const startEditing = () => {
+    if (!purchaseOrder) return;
+    setEditFields({
+      orderDate: purchaseOrder.orderDate?.split('T')[0] || '',
+      expectedDeliveryDate: purchaseOrder.expectedDeliveryDate?.split('T')[0] || '',
+      deliveryAddress: purchaseOrder.deliveryAddress || '',
+      paymentTerms: purchaseOrder.paymentTerms || '',
+      internalNotes: purchaseOrder.notes || '',
+    });
+    setIsEditing(true);
+  };
+
+  const handleSaveFields = async () => {
+    if (!purchaseOrder) return;
+    try {
+      setActionLoading(true);
+      const response = await fetch(`/api/procurement/purchase-orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_fields',
+          fields: {
+            orderDate: editFields.orderDate || null,
+            expectedDeliveryDate: editFields.expectedDeliveryDate || null,
+            deliveryAddress: editFields.deliveryAddress,
+            paymentTerms: editFields.paymentTerms,
+            internalNotes: editFields.internalNotes,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setIsEditing(false);
+        await fetchPurchaseOrder();
+      } else {
+        setError(data.error?.message || 'Failed to save');
+      }
+    } catch (err) {
+      log.error('Failed to save PO fields', err);
+      setError('Failed to save');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-ZA', {
       style: 'currency',
@@ -257,6 +312,35 @@ export default function PurchaseOrderDetailPage() {
 
     return (
       <div className="flex items-center gap-2">
+        {purchaseOrder.odooPoId && !isEditing && (
+          <button
+            onClick={startEditing}
+            disabled={actionLoading}
+            className="inline-flex items-center gap-2 px-3 py-2 border border-orange-500/50 text-orange-400 rounded-lg hover:bg-orange-500/10 transition-colors"
+          >
+            <Edit className="h-4 w-4" />
+            Edit Details
+          </button>
+        )}
+        {isEditing && (
+          <>
+            <button
+              onClick={handleSaveFields}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              Save
+            </button>
+            <button
+              onClick={() => setIsEditing(false)}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
+            >
+              Cancel
+            </button>
+          </>
+        )}
         {status === 'draft' && (
           <>
             <button
@@ -557,20 +641,51 @@ export default function PurchaseOrderDetailPage() {
                 </dl>
               </div>
 
-              {/* Delivery Information */}
+              {/* Delivery & Dates */}
               <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin className="h-5 w-5 text-green-400" />
-                  <h3 className="font-semibold text-[var(--ff-text-primary)]">Delivery Information</h3>
+                  <h3 className="font-semibold text-[var(--ff-text-primary)]">Delivery & Dates</h3>
                 </div>
                 <dl className="space-y-3">
                   <div>
-                    <dt className="text-sm text-[var(--ff-text-tertiary)]">Delivery Address</dt>
-                    <dd className="text-[var(--ff-text-primary)] whitespace-pre-wrap">{purchaseOrder.deliveryAddress}</dd>
+                    <dt className="text-sm text-[var(--ff-text-tertiary)]">Order Date</dt>
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        value={editFields.orderDate}
+                        onChange={(e) => setEditFields({ ...editFields, orderDate: e.target.value })}
+                        className="mt-1 w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    ) : (
+                      <dd className="text-[var(--ff-text-primary)]">{formatDate(purchaseOrder.orderDate)}</dd>
+                    )}
                   </div>
                   <div>
                     <dt className="text-sm text-[var(--ff-text-tertiary)]">Expected Delivery</dt>
-                    <dd className="text-[var(--ff-text-primary)]">{formatDate(purchaseOrder.expectedDeliveryDate)}</dd>
+                    {isEditing ? (
+                      <input
+                        type="date"
+                        value={editFields.expectedDeliveryDate}
+                        onChange={(e) => setEditFields({ ...editFields, expectedDeliveryDate: e.target.value })}
+                        className="mt-1 w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    ) : (
+                      <dd className="text-[var(--ff-text-primary)]">{formatDate(purchaseOrder.expectedDeliveryDate)}</dd>
+                    )}
+                  </div>
+                  <div>
+                    <dt className="text-sm text-[var(--ff-text-tertiary)]">Delivery Address</dt>
+                    {isEditing ? (
+                      <textarea
+                        value={editFields.deliveryAddress}
+                        onChange={(e) => setEditFields({ ...editFields, deliveryAddress: e.target.value })}
+                        rows={3}
+                        className="mt-1 w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    ) : (
+                      <dd className="text-[var(--ff-text-primary)] whitespace-pre-wrap">{purchaseOrder.deliveryAddress || '-'}</dd>
+                    )}
                   </div>
                 </dl>
               </div>
@@ -584,18 +699,34 @@ export default function PurchaseOrderDetailPage() {
                 <dl className="space-y-3">
                   <div>
                     <dt className="text-sm text-[var(--ff-text-tertiary)]">Terms</dt>
-                    <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.paymentTerms}</dd>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editFields.paymentTerms}
+                        onChange={(e) => setEditFields({ ...editFields, paymentTerms: e.target.value })}
+                        className="mt-1 w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    ) : (
+                      <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.paymentTerms}</dd>
+                    )}
                   </div>
                   <div>
                     <dt className="text-sm text-[var(--ff-text-tertiary)]">Currency</dt>
                     <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.currency}</dd>
                   </div>
-                  {purchaseOrder.notes && (
-                    <div>
-                      <dt className="text-sm text-[var(--ff-text-tertiary)]">Notes</dt>
-                      <dd className="text-[var(--ff-text-primary)] whitespace-pre-wrap">{purchaseOrder.notes}</dd>
-                    </div>
-                  )}
+                  <div>
+                    <dt className="text-sm text-[var(--ff-text-tertiary)]">Notes</dt>
+                    {isEditing ? (
+                      <textarea
+                        value={editFields.internalNotes}
+                        onChange={(e) => setEditFields({ ...editFields, internalNotes: e.target.value })}
+                        rows={3}
+                        className="mt-1 w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
+                    ) : (
+                      <dd className="text-[var(--ff-text-primary)] whitespace-pre-wrap">{purchaseOrder.notes || '-'}</dd>
+                    )}
+                  </div>
                 </dl>
               </div>
 

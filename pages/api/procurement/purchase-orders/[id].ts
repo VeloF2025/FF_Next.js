@@ -50,6 +50,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.project_id,
         p.project_name,
         po.delivery_address,
+        po.order_date,
         po.expected_delivery_date,
         po.payment_terms,
         po.currency,
@@ -147,6 +148,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       projectId: po.project_id,
       projectName: po.project_name,
       deliveryAddress: po.delivery_address,
+      orderDate: po.order_date,
       expectedDeliveryDate: po.expected_delivery_date,
       paymentTerms: po.payment_terms,
       currency: po.currency || 'ZAR',
@@ -366,6 +368,71 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
           newValues: { status: 'cancelled' },
         });
         return apiResponse.success(res, { id, status: 'cancelled', action: 'cancelled' });
+      }
+
+      case 'update_fields': {
+        // Allow field edits on Odoo-imported POs only
+        const checkOdoo = await sql`SELECT odoo_po_id FROM purchase_orders WHERE id = ${id}`;
+        if (!checkOdoo[0]?.odoo_po_id) {
+          return apiResponse.badRequest(res, 'Field editing is only allowed for Odoo-imported POs');
+        }
+
+        const { fields } = req.body;
+        if (!fields || typeof fields !== 'object') {
+          return apiResponse.badRequest(res, 'Fields object is required');
+        }
+
+        const allowedFields: Record<string, string> = {
+          expectedDeliveryDate: 'expected_delivery_date',
+          orderDate: 'order_date',
+          deliveryAddress: 'delivery_address',
+          paymentTerms: 'payment_terms',
+          internalNotes: 'internal_notes',
+          supplierNotes: 'supplier_notes',
+        };
+
+        const updates: string[] = [];
+        const values: (string | null)[] = [];
+        let vi = 1;
+
+        for (const [key, val] of Object.entries(fields)) {
+          const col = allowedFields[key];
+          if (!col) continue;
+          updates.push(`${col} = $${vi}`);
+          values.push(val as string | null);
+          vi++;
+        }
+
+        if (updates.length === 0) {
+          return apiResponse.badRequest(res, 'No valid fields to update');
+        }
+
+        updates.push(`updated_at = NOW()`);
+        const updateQuery = `UPDATE purchase_orders SET ${updates.join(', ')} WHERE id = $${vi}`;
+        values.push(id);
+
+        await sql.query(updateQuery, values);
+
+        await sql`
+          INSERT INTO purchase_order_history (
+            purchase_order_id, action, notes, created_by, created_at
+          ) VALUES (
+            ${id}, ${'edited'}, ${`Fields updated: ${Object.keys(fields).join(', ')}`}, ${userId}, NOW()
+          )
+        `;
+
+        log.info('PO fields updated (Odoo)', { id, fields: Object.keys(fields) });
+
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          newValues: fields,
+        });
+
+        return apiResponse.success(res, { id, action: 'updated', fields: Object.keys(fields) });
       }
 
       default:
