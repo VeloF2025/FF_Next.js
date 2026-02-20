@@ -207,7 +207,7 @@ const TOOLS = [
       name: 'query_database',
       description: `Execute a read-only PostgreSQL SELECT query against the FibreFlow database. Only SELECT is allowed. Results limited to 100 rows. Use get_schema first if unsure about column names.
 
-Common tables: oes_activations (home activations, has activation_date DATE and team), dr_photo_unified_reviews (QA photo reviews), maintenance_tickets, projects, staff, technicians, fleet_vehicles, purchase_orders, assets.
+Common tables: oes_activations (home activations, has activation_date DATE and team), dr_photo_unified_reviews (QA photo reviews), maintenance_tickets, projects, staff, technicians, fleet_vehicles, purchase_orders (has odoo_po_id for Odoo-imported POs, po_number like P00003), purchase_order_items (has tax_rate, tax_amount, total_price), assets.
 
 PostgreSQL date tips:
 - Current date: CURRENT_DATE

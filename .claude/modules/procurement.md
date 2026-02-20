@@ -241,6 +241,47 @@ When stock take approved (`POST /stock-takes/[id]/actions` action='approve'):
 - Creates `field_stock_movements` + `stock_take_adjustments` records
 - Lines marked 'adjusted' (variance) or 'verified' (zero)
 
+## Odoo Purchase Order Integration (2026-02-20)
+
+### Overview
+Purchase orders imported from Odoo via `scripts/sync-odoo-purchase-orders.js` are tracked with `odoo_po_id` (integer Odoo internal record ID) in the `purchase_orders` table. Odoo PO names (P00003, P00004, etc.) are stored as `po_number` during sync — the PO number IS the Odoo reference.
+
+### DB Columns
+- `purchase_orders.odoo_po_id` INTEGER — Odoo internal record ID
+- `purchase_orders.odoo_sync_status` VARCHAR
+- `purchase_orders.odoo_write_date` TIMESTAMP
+- Index: `idx_po_odoo_id ON purchase_orders(odoo_po_id) WHERE odoo_po_id IS NOT NULL`
+
+### API
+- **GET list** (`/api/procurement/purchase-orders`) — Returns `odooPoId`, `orderDate`; searchable by Odoo ID
+- **GET detail** (`/api/procurement/purchase-orders/[id]`) — Returns `odooPoId`, `orderDate`
+- **PATCH** (`/api/procurement/purchase-orders/[id]`) — `action: 'update_fields'` allows editing dates, address, payment terms, notes for Odoo POs only
+
+### Editable Fields (Odoo POs Only)
+| Frontend Field | DB Column |
+|---|---|
+| `expectedDeliveryDate` | `expected_delivery_date` |
+| `orderDate` | `order_date` |
+| `deliveryAddress` | `delivery_address` |
+| `paymentTerms` | `payment_terms` |
+| `internalNotes` | `internal_notes` |
+| `supplierNotes` | `supplier_notes` |
+
+### UI
+- **PO List**: Orange "Odoo" badge on Odoo-imported POs, order date displayed
+- **PO Detail**: "Imported from Odoo" banner, "Edit Details" button for inline editing
+- **Unified Purchasing Page** (`/procurement/purchasing?tab=purchase-orders`) is the actual page users navigate to (not the standalone `/procurement/purchase-orders`)
+
+### Tax Calculation
+- The DB trigger `tr_poi_calc` calculates `tax_amount = total_price * tax_rate / 100` per line item
+- The DB trigger `tr_poi_totals` sums line item `tax_amount` values to PO `tax_amount`
+- Sync script derives `tax_rate` per line from Odoo's `price_subtotal`/`price_total`
+- Line items use `price_subtotal` (excl tax) for `total_price`
+
+### Gotcha
+- `odoo_synced_at` column does NOT exist — don't reference it
+- `odoo_po_id` is just an internal DB integer (3, 4, 5) — NOT the user-facing Odoo reference (which is `po_number` like P00003)
+
 ## Permissions (RBAC)
 
 Procurement uses real AuthContext RBAC via `useProcurementPermissions(projectId?)` hook.
@@ -288,6 +329,6 @@ Fully built infrastructure — DB tables, API endpoints, hooks, UI all wired to 
 **Pages:**
 | Page | Path | Description |
 |------|------|-------------|
-| Field Stock | `/procurement/field-stock` | 8 tabs: Dashboard, Locations, Items, Pickings, Returns, Consumptions, Accountability, Adjustments |
+| Field Stock | `/procurement/field-stock` | 8 tabs: Dashboard, Locations, Items, Transfers, Returns, Consumptions, Accountability, Adjustments |
 | Stock Portal | `/stock/portal` | Mobile-first storeman portal (PWA) |
 | Inventory | `/procurement/inventory` | Tabs: Stock, Items, Bundles, Takes, Adjustments, Reports |

@@ -1738,6 +1738,33 @@ FibreFlow now includes VLM learning for Purchase Order extraction:
 - **Confidence Scoring** — Each extraction includes a confidence score
 - **Manual Override** — Users can correct and improve AI extraction results
 
+#### Odoo-Imported Purchase Orders
+
+POs imported from Odoo are visually identified with an orange **Odoo** badge in the PO list and an **"Imported from Odoo"** banner on the detail page.
+
+**Identifying Odoo POs:**
+- **List View** — Orange "Odoo" badge next to the PO number (e.g., P00003)
+- **Detail View** — Orange "Imported from Odoo" banner below the PO header
+
+**Editing Odoo PO Details:**
+
+Odoo-imported POs allow inline editing of key fields directly from the detail page:
+
+1. Navigate to the PO detail page for an Odoo-imported PO
+2. Click the **Edit Details** button (orange, top-right)
+3. Modify any of the available fields:
+   - **Order Date** — Date picker
+   - **Expected Delivery** — Date picker
+   - **Delivery Address** — Text input
+   - **Payment Terms** — Dropdown selector
+   - **Notes** — Text area for internal notes
+4. Click **Save** to persist changes, or **Cancel** to discard
+
+> **Note:** The Edit Details button only appears for Odoo-imported POs. Standard FibreFlow POs follow the normal draft editing workflow.
+
+**Searching Odoo POs:**
+Use the search bar on the PO list page to search by PO number (e.g., "P00003") or by other standard fields like supplier name.
+
 ### 7.5 Inventory
 
 Manage stock items, track movements, and perform stock takes.
