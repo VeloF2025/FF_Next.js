@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { notify } from '@/modules/notifications/services';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -71,6 +72,19 @@ export default withAuth(withErrorHandler(async (
       documentId: request.document_id,
       approvedBy: userId,
     });
+
+    // UNS: Notify the requester that their request was approved
+    if (request.requested_by) {
+      notify({
+        event_type: 'procurement.approved',
+        title: `${request.document_type?.replace(/_/g, ' ')} approved`,
+        body: notes ? `Notes: ${notes}` : undefined,
+        action_url: '/app/procurement/approvals',
+        source_module: 'procurement',
+        source_id: request.document_id,
+        recipient_user_ids: [request.requested_by],
+      }).catch(() => {});
+    }
 
     return apiResponse.success(res, updated[0], 'Approval granted successfully');
   } catch (error) {

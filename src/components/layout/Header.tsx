@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { HeaderProps, Notification } from './header/HeaderTypes';
 import { BreadcrumbNavigation } from './header/BreadcrumbNavigation';
@@ -8,9 +8,31 @@ import { NotificationsDropdown } from './header/NotificationsDropdown';
 import { UserMenuDropdown } from './header/UserMenuDropdown';
 import { useAuth } from '@/contexts/AuthContext';
 import { log } from '@/lib/logger';
+import {
+  useUnreadCount,
+  useNotificationList,
+  useMarkAsRead,
+  useMarkAllAsRead,
+} from '@/modules/notifications/hooks';
 
-export function Header({ 
-  title = 'Dashboard', 
+/** Format relative time from ISO string */
+function formatRelativeTime(isoDate: string): string {
+  const now = Date.now();
+  const then = new Date(isoDate).getTime();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60_000);
+
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? 's' : ''} ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+  return new Date(isoDate).toLocaleDateString();
+}
+
+export function Header({
+  title = 'Dashboard',
   breadcrumbs = ['Home'],
   actions,
   showSearch = true,
@@ -20,15 +42,33 @@ export function Header({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [notifications] = useState<Notification[]>([
-    { id: 1, title: 'New project assigned', time: '5 min ago', unread: true },
-    { id: 2, title: 'Staff member added', time: '1 hour ago', unread: true },
-    { id: 3, title: 'Report generated', time: '2 hours ago', unread: false },
-  ]);
-  
+
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { signOut } = useAuth();
+
+  // Real notification data
+  const { data: unreadCount = 0 } = useUnreadCount();
+  const { data: rawNotifications = [], isLoading } = useNotificationList(20);
+  const markAsReadMutation = useMarkAsRead();
+  const markAllAsReadMutation = useMarkAllAsRead();
+
+  // Transform raw DB rows to Notification UI type
+  const notifications: Notification[] = useMemo(
+    () =>
+      rawNotifications.map((n) => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        time: formatRelativeTime(n.created_at),
+        unread: !n.is_read,
+        severity: n.severity,
+        action_url: n.action_url,
+        source_module: n.source_module,
+        icon: n.icon,
+      })),
+    [rawNotifications]
+  );
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -48,9 +88,8 @@ export function Header({
   const handleLogout = async () => {
     try {
       await signOut();
-      // signOut redirects to /sign-in automatically
     } catch (error) {
-      log.error('Logout failed', error, 'Header');
+      log.error('Logout failed', error instanceof Error ? { message: error.message } : {}, 'Header');
     }
   };
 
@@ -58,7 +97,7 @@ export function Header({
     <header className="bg-[var(--ff-surface-primary)] border-b border-[var(--ff-border-primary)] shadow-sm">
       <div className="px-4 lg:px-6 py-4">
         <div className="flex items-center justify-between">
-          <BreadcrumbNavigation 
+          <BreadcrumbNavigation
             breadcrumbs={breadcrumbs}
             title={title}
             {...(onMenuClick && { onMenuClick })}
@@ -74,7 +113,7 @@ export function Header({
           {/* Right side - Search + Theme + Notifications + User */}
           <div className="flex items-center gap-1 sm:gap-2 lg:space-x-3">
             {showSearch && (
-              <SearchBar 
+              <SearchBar
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
               />
@@ -83,7 +122,7 @@ export function Header({
             <ThemeToggle variant="compact" showLabel={false} />
 
             {/* Sync/Refresh button */}
-            <button 
+            <button
               className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-surface-secondary)] rounded-lg transition-colors"
               title="Sync data"
             >
@@ -95,6 +134,10 @@ export function Header({
               showNotifications={showNotifications}
               onToggleNotifications={() => setShowNotifications(!showNotifications)}
               notificationRef={notificationRef}
+              unreadCount={unreadCount}
+              onMarkAsRead={(id) => markAsReadMutation.mutate([id])}
+              onMarkAllAsRead={() => markAllAsReadMutation.mutate()}
+              isLoading={isLoading}
             />
 
             <UserMenuDropdown

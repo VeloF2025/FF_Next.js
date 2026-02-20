@@ -3,6 +3,7 @@
  */
 
 import { User as UserType } from '@/types/auth.types';
+import type { NotificationSeverity } from '@/modules/notifications/types';
 
 export interface HeaderProps {
   title?: string;
@@ -14,10 +15,15 @@ export interface HeaderProps {
 }
 
 export interface Notification {
-  id: number;
+  id: string;
   title: string;
+  body: string | null;
   time: string;
   unread: boolean;
+  severity: NotificationSeverity;
+  action_url: string | null;
+  source_module: string | null;
+  icon: string;
 }
 
 export interface BreadcrumbsProps {
@@ -36,6 +42,10 @@ export interface NotificationsDropdownProps {
   showNotifications: boolean;
   onToggleNotifications: () => void;
   notificationRef: React.RefObject<HTMLDivElement>;
+  unreadCount: number;
+  onMarkAsRead: (id: string) => void;
+  onMarkAllAsRead: () => void;
+  isLoading?: boolean;
 }
 
 export interface UserMenuDropdownProps {

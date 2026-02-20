@@ -7,10 +7,11 @@
 
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { notify } from '@/modules/notifications/services';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://72.61.197.178:8081';
+const WA_SENDER_URL = process.env.WA_FEEDBACK_URL || 'http://100.96.203.105:8092';
 
 export type NotificationType = 'rejection' | 'escalation' | 'assignment' | 'retake_reminder';
 
@@ -154,6 +155,26 @@ async function sendQFieldNotification(
       log.error(logPrefix, { notificationId, error: sendResult.error }, 'Failed to send notification');
     }
 
+    // UNS: fire-and-forget in-app notification for rejection/escalation
+    if (type === 'rejection' || type === 'escalation') {
+      const eventType = type === 'rejection' ? 'activate.qa_rejected' : 'activate.qa_rejected';
+      // Resolve user_id from staff phone if available
+      const staffUserId = await resolveStaffUserId(context.recipientPhone);
+      if (staffUserId) {
+        notify({
+          event_type: eventType,
+          title: type === 'rejection'
+            ? `QA Photo Rejected — ${context.projectName || 'Unknown Project'}`
+            : `QA Escalation — ${context.projectName || 'Unknown Project'}`,
+          body: context.notes || undefined,
+          action_url: '/app/qfield/qa?tab=queue',
+          source_module: 'qfield-qa',
+          source_id: context.validationId,
+          recipient_user_ids: [staffUserId],
+        }).catch(() => {});
+      }
+    }
+
     return {
       success: sendResult.success,
       notificationId,
@@ -281,6 +302,23 @@ async function sendWhatsAppMessage(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Resolve a user_id from a staff phone number for UNS notifications
+ */
+async function resolveStaffUserId(phone?: string): Promise<string | null> {
+  if (!phone) return null;
+  try {
+    const rows = await sql`
+      SELECT user_id FROM staff
+      WHERE phone = ${phone} AND user_id IS NOT NULL
+      LIMIT 1
+    `;
+    return rows[0]?.user_id || null;
+  } catch {
+    return null;
   }
 }
 

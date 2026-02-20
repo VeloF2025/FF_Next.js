@@ -23,6 +23,7 @@
 import { createLogger } from '@/lib/logger';
 import { query, queryOne } from '../utils/db';
 import { getDefaultWhatsAppService } from './whatsappService';
+import { notify } from '@/modules/notifications/services';
 import type { Ticket, TicketStatus } from '../types/ticket';
 import { RecipientType, NotificationUseCase } from '../types/whatsapp';
 import type { WhatsAppNotification, NotificationVariables } from '../types/whatsapp';
@@ -617,6 +618,19 @@ export async function triggerOnTicketAssignment(
   ticket: Ticket,
   previousStatus: TicketStatus
 ): Promise<TriggerResult> {
+  // UNS: fire-and-forget in-app notification
+  if (ticket.assigned_to) {
+    notify({
+      event_type: 'maintenance.ticket_assigned',
+      title: `Ticket ${ticket.ticket_uid} assigned to you`,
+      body: ticket.title || undefined,
+      action_url: `/app/maintenance/tickets/${ticket.id}`,
+      source_module: 'maintenance',
+      source_id: ticket.id,
+      recipient_user_ids: [ticket.assigned_to],
+    }).catch(() => {});
+  }
+
   const service = getDefaultNotificationTriggerService();
   return await service.handleEvent({
     type: 'ticket.assigned',
@@ -643,6 +657,19 @@ export async function triggerOnQARejection(
   ticket: Ticket,
   rejectionReason?: string
 ): Promise<TriggerResult> {
+  // UNS: fire-and-forget in-app notification
+  if (ticket.assigned_to) {
+    notify({
+      event_type: 'maintenance.qa_rejected',
+      title: `Ticket ${ticket.ticket_uid} rejected by QA`,
+      body: rejectionReason || 'Please review QA feedback',
+      action_url: `/app/maintenance/tickets/${ticket.id}`,
+      source_module: 'maintenance',
+      source_id: ticket.id,
+      recipient_user_ids: [ticket.assigned_to],
+    }).catch(() => {});
+  }
+
   const service = getDefaultNotificationTriggerService();
   return await service.handleEvent({
     type: 'ticket.qa_rejected',
@@ -665,6 +692,18 @@ export async function triggerOnQARejection(
  * await triggerOnTicketClosure(ticket);
  */
 export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerResult> {
+  // UNS: fire-and-forget in-app notification
+  if (ticket.assigned_to) {
+    notify({
+      event_type: 'maintenance.ticket_closed',
+      title: `Ticket ${ticket.ticket_uid} closed`,
+      action_url: `/app/maintenance/tickets/${ticket.id}`,
+      source_module: 'maintenance',
+      source_id: ticket.id,
+      recipient_user_ids: [ticket.assigned_to],
+    }).catch(() => {});
+  }
+
   const service = getDefaultNotificationTriggerService();
   return await service.handleEvent({
     type: 'ticket.closed',
@@ -686,6 +725,21 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
  * await triggerOnSLAWarning(ticket);
  */
 export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult> {
+  // UNS: fire-and-forget in-app notification
+  if (ticket.assigned_to) {
+    notify({
+      event_type: 'maintenance.sla_warning',
+      title: `SLA Warning — Ticket ${ticket.ticket_uid}`,
+      body: ticket.sla_due_at
+        ? `Due at ${new Date(ticket.sla_due_at).toLocaleString('en-ZA')}`
+        : 'SLA deadline approaching',
+      action_url: `/app/maintenance/tickets/${ticket.id}`,
+      source_module: 'maintenance',
+      source_id: ticket.id,
+      recipient_user_ids: [ticket.assigned_to],
+    }).catch(() => {});
+  }
+
   const service = getDefaultNotificationTriggerService();
   return await service.handleEvent({
     type: 'ticket.sla_warning',
