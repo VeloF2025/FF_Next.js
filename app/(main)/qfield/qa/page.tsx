@@ -1,12 +1,10 @@
-'use client';
+import { redirect } from 'next/navigation';
 
 /**
- * QField QA Page
- * Photo validation and quality assurance for QField photos
+ * QField QA — Deprecated
+ * All QField photo data has been migrated to Construction QA.
+ * This page now redirects to /construction-qa.
  */
-
-import { QFieldQaDashboard } from '@/modules/qfield-qa';
-
 export default function QFieldQaPage() {
-  return <QFieldQaDashboard />;
+  redirect('/construction-qa');
 }

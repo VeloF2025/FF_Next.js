@@ -18,14 +18,8 @@ export const fieldOperationsSection: NavSection = {
       permissions: [],
       rbacKey: 'field',
     },
-    {
-      to: '/qfield/qa',
-      icon: CheckSquare,
-      label: 'QField QA',
-      shortLabel: 'QF QA',
-      permissions: [],
-      rbacKey: 'field',
-    },
+    // QField QA deprecated — data migrated to Construction QA (2026-02-20)
+    // { to: '/qfield/qa', icon: CheckSquare, label: 'QField QA', shortLabel: 'QF QA', permissions: [], rbacKey: 'field' },
     // Hidden items - uncomment as needed:
     // { to: '/field', icon: Smartphone, label: 'Field App Portal', shortLabel: 'Field', permissions: [], rbacKey: 'field' },
     // { to: '/onemap', icon: MapPin, label: 'OneMap Data Grid', shortLabel: 'OneMap', permissions: [], rbacKey: 'projects.onemap' },
