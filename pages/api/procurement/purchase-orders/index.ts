@@ -46,7 +46,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (search) {
-      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.name ILIKE $${paramIndex})`);
+      whereConditions.push(`(po.po_number ILIKE $${paramIndex} OR s.name ILIKE $${paramIndex} OR p.project_name ILIKE $${paramIndex} OR CAST(po.odoo_po_id AS TEXT) ILIKE $${paramIndex})`);
       params.push(`%${search}%`);
       paramIndex++;
     }
@@ -86,7 +86,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         (SELECT COUNT(*)::int FROM purchase_order_items WHERE purchase_order_id = po.id) as item_count,
         po.department,
         po.created_by as created_by_name,
-        po.created_at
+        po.created_at,
+        po.odoo_po_id,
+        po.odoo_synced_at
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
@@ -113,6 +115,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       department: row.department || null,
       createdByName: row.created_by_name || 'System',
       createdAt: row.created_at,
+      odooPoId: row.odoo_po_id || null,
+      odooSyncedAt: row.odoo_synced_at || null,
     }));
 
     return apiResponse.paginated(res, purchaseOrders, {

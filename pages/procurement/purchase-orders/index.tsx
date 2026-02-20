@@ -44,6 +44,8 @@ interface POListItem {
   itemCount: number;
   createdByName: string;
   createdAt: string;
+  odooPoId: number | null;
+  odooSyncedAt: string | null;
 }
 
 const statusConfig: Record<POStatus, { label: string; color: string; icon: typeof Clock }> = {
@@ -92,7 +94,8 @@ export default function PurchaseOrdersPage() {
     const matchesSearch =
       po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       po.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.projectName?.toLowerCase().includes(searchTerm.toLowerCase());
+      po.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(po.odooPoId || '').includes(searchTerm);
 
     const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
 
@@ -286,6 +289,11 @@ export default function PurchaseOrdersPage() {
                             {po.version > 1 && (
                               <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded">
                                 v{po.version}
+                              </span>
+                            )}
+                            {po.odooPoId && (
+                              <span className="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                                Odoo #{po.odooPoId}
                               </span>
                             )}
                           </div>
