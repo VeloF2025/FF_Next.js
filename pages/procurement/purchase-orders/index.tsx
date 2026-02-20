@@ -292,7 +292,7 @@ export default function PurchaseOrdersPage() {
                             )}
                             {po.odooPoId && (
                               <span className="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                                Odoo #{po.odooPoId}
+                                Odoo
                               </span>
                             )}
                           </div>

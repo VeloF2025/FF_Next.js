@@ -483,9 +483,6 @@ export default function PurchaseOrderDetailPage() {
                     <span className="font-medium text-orange-700 dark:text-orange-300">
                       Imported from Odoo
                     </span>
-                    <span className="text-orange-600 dark:text-orange-400">
-                      Reference: #{purchaseOrder.odooPoId}
-                    </span>
                   </div>
                 )}
               </div>
