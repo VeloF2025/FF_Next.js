@@ -69,6 +69,8 @@ interface POListItem {
   status: POStatus;
   supplierName: string;
   projectName: string | null;
+  deliveryDate: string | null;
+  orderDate: string | null;
   total: number;
   itemCount: number;
   createdAt: string;
@@ -369,10 +371,18 @@ function PurchaseOrdersTabContent() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-[var(--ff-text-secondary)]">{po.supplierName}</p>
+                    <p className="text-sm text-[var(--ff-text-secondary)]">
+                      {po.supplierName}
+                      {po.projectName && <span className="text-[var(--ff-text-tertiary)]"> &middot; {po.projectName}</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {(po.orderDate || po.deliveryDate) && (
+                    <span className="text-sm text-[var(--ff-text-tertiary)]">
+                      {po.orderDate ? formatDate(po.orderDate) : formatDate(po.deliveryDate!)}
+                    </span>
+                  )}
                   <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${status.color}`}>
                     <StatusIcon className="h-3 w-3" />
                     {status.label}

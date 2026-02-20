@@ -87,6 +87,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.department,
         po.created_by as created_by_name,
         po.created_at,
+        po.order_date,
         po.odoo_po_id
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
@@ -114,6 +115,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       department: row.department || null,
       createdByName: row.created_by_name || 'System',
       createdAt: row.created_at,
+      orderDate: row.order_date || null,
       odooPoId: row.odoo_po_id || null,
     }));
 
