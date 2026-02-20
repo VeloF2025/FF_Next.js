@@ -1,8 +1,13 @@
 # Go WhatsApp Bridge Configuration
 
-> Deep reference for bridge URL configuration, compilation, and deployment
+> **Last updated:** 2026-02-20  
+> **Architecture:** VPS unified bridge v2.0.0
 
-## URL Configuration (2026-01-31)
+## Overview
+
+Deep reference for VPS bridge configuration, compilation, and deployment. The bridge handles ALL WhatsApp operations from a single VPS service.
+
+## URL Configuration
 
 Bridge API target URLs are driven by the `FIBREFLOW_URL` environment variable:
 
@@ -21,10 +26,6 @@ var MAINTENANCE_WA_API_URL = fibreflowBaseURL + "/api/maintenance/wa-message"
 ```
 
 The systemd service sets: `Environment=FIBREFLOW_URL=https://app.fibreflow.app`
-
-### History
-
-Before 2026-01-31, all 4 URLs were hardcoded `const` values pointing to staging (`vf.fibreflow.app`). The `FIBREFLOW_URL` env var existed in the systemd service but the Go code never called `os.Getenv()` to read it.
 
 ### Verification
 
@@ -76,7 +77,7 @@ Known maintenance group JIDs:
 ### Source Location
 - **Server**: Velocity (`100.96.203.105`)
 - **Path**: `/home/louis/whatsapp-bridge-go/main.go`
-- **User**: `louis` (or compile with `sudo`)
+- **User**: `louis`
 
 ### Target Location
 - **Server**: VPS (`72.61.197.178`)
@@ -85,16 +86,17 @@ Known maintenance group JIDs:
 
 ### Compile on Velocity
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
+ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
 cd /home/louis/whatsapp-bridge-go
 go build -o whatsapp-bridge .
 ```
 
-### Deploy to VPS (SCP Relay)
-Velocity and VPS cannot SSH to each other. Must relay via local machine:
+### Deploy to VPS
+
+**Method A: Direct SCP (from local machine)**
 ```bash
 # 1. Copy from Velocity to local
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
+scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
 
 # 2. Copy from local to VPS
 scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
@@ -106,39 +108,80 @@ ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ssh root@72.61.197.178 "systemctl status whatsapp-bridge && tail -5 /opt/whatsapp-bridge/bridge.log"
 ```
 
-### Shell Escaping Pitfall
-When editing Go source via SSH, sed and heredocs lose double quotes. Use base64-encoded Python scripts:
+**Method B: Direct from Velocity (if SSH keys configured)**
 ```bash
-# Write Python fix locally
-cat > /tmp/fix.py << 'PYEOF'
-with open('/home/louis/whatsapp-bridge-go/main.go', 'r') as f:
-    content = f.read()
-content = content.replace('old_string', 'new_string')
-with open('/home/louis/whatsapp-bridge-go/main.go', 'w') as f:
-    f.write(content)
-PYEOF
-
-# Base64 encode and execute remotely
-B64=$(base64 -w0 /tmp/fix.py)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$B64' | base64 -d | python3"
+# From Velocity, if VPS SSH keys are set up
+ssh velo@100.96.203.105
+cd /home/louis/whatsapp-bridge-go
+scp whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 ## Systemd Service (VPS)
 
 **File**: `/etc/systemd/system/whatsapp-bridge.service`
 
-Key environment variables:
-- `FIBREFLOW_URL=https://app.fibreflow.app`
-- `DATABASE_URL=postgresql://...` (Neon DB connection)
+```ini
+[Unit]
+Description=WhatsApp Bridge v2.0
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/whatsapp-bridge/whatsapp-bridge
+WorkingDirectory=/opt/whatsapp-bridge
+Environment=FIBREFLOW_URL=https://app.fibreflow.app
+Environment=DATABASE_URL=postgresql://neondb_owner:...@ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+Environment=SENDER_URL=http://localhost:1
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Key Environment Variables:**
+- `FIBREFLOW_URL` - FibreFlow API base URL
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `SENDER_URL` - Set to `http://localhost:1` (disabled, bridge sends directly)
 
 **Binary**: `/opt/whatsapp-bridge/whatsapp-bridge`  
 **Logs**: `/opt/whatsapp-bridge/bridge.log`  
+**Store**: `/opt/whatsapp-bridge/store/` (SQLite session + message DB)  
 **Version**: 2.0.0  
 **Phone**: +27 63 841 2276 (27638412276@s.whatsapp.net)
 
+### Service Commands
+
+```bash
+# SSH to VPS
+ssh root@72.61.197.178
+
+# Check status
+systemctl status whatsapp-bridge
+
+# Restart
+systemctl restart whatsapp-bridge
+
+# View logs
+tail -f /opt/whatsapp-bridge/bridge.log
+journalctl -u whatsapp-bridge -f
+
+# Enable on boot
+systemctl enable whatsapp-bridge
+```
+
 ## Group Configuration
 
-Groups are loaded from `wa_monitored_groups` table in Neon database (9 groups as of Feb 2026).
+Groups are loaded from `wa_monitored_groups` table in Neon database.
+
+**Current Count:** 9 groups (as of Feb 2026)
+
+**Group Types:**
+- `dr_submission` (4) - DR photo submissions
+- `maintenance` (2) - Maintenance photos
+- `pre_provision` (1) - Pre-provisioning tasks
+- `admin` (1) - Admin commands (for wa-command-bot)
 
 **Reload without restart:**
 ```bash
@@ -150,28 +193,166 @@ curl http://72.61.197.178:8083/reload-groups
 curl http://72.61.197.178:8083/groups | jq .
 ```
 
-## Unified Bridge Architecture (Feb 2026)
+**Add new group (via database):**
+```sql
+INSERT INTO wa_monitored_groups
+  (group_jid, group_name, project_name, group_type, description, is_active)
+VALUES
+  ('120363XXXXXXXXXX@g.us', 'Group Name', 'Project', 'dr_submission', 'Description', true);
+```
 
-**Key Change:** Bridge now handles ALL WhatsApp operations:
-- Receives DR submissions
-- Sends DR acknowledgments directly (no separate sender)
-- Sends QA feedback messages directly
-- Handles maintenance group messages
-- Processes pre-provision workflow
+Then reload: `curl http://72.61.197.178:8083/reload-groups`
 
-**Previous Architecture** (deprecated):
-- whatsapp-sender.service on port 8081 (DISABLED)
-- whatsapp-bridge.service on port 8083 (receive only)
+## Unified Bridge Architecture (v2.0.0)
 
-**Current Architecture**:
-- whatsapp-bridge.service on port 8083 (unified)
-- Version 2.0.0
-- Single phone number for all operations
+**Current Architecture (Feb 2026):**
+
+```
+VPS: 72.61.197.178
+Phone: +27 63 841 2276
+    │
+    └─→ whatsapp-bridge.service (Port 8083)
+            ├─→ RECEIVES messages from 9 monitored groups
+            ├─→ SENDS DR acknowledgments directly
+            ├─→ SENDS QA feedback directly
+            ├─→ SENDS maintenance messages directly
+            └─→ Writes to Neon PostgreSQL + SQLite store
+```
+
+**Key Features:**
+- Single service handles ALL WhatsApp operations
+- No separate sender service needed
+- Direct message sending via whatsmeow library
+- Unified phone number for all operations
+- Hot-reload groups from database without restart
+
+**Previous Architecture** (deprecated as of Feb 2026):
+- ~~whatsapp-bridge.service on port 8083 (receive only)~~ - Now unified
+- ~~Two different phone numbers~~ - Now single number
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Service health, connection status, monitored groups |
+| `/groups` | GET | List all monitored groups from database |
+| `/reload-groups` | GET | Reload groups from Neon (no restart) |
+| `/send-message` | POST | Send message to group |
+
+**Health Response:**
+```json
+{
+  "status": "ok",
+  "service": "whatsapp-bridge",
+  "version": "2.0.0",
+  "connected": true,
+  "phone": "27638412276@s.whatsapp.net",
+  "monitored_groups": 9,
+  "pairing_state": "connected",
+  "needs_auth": false
+}
+```
+
+**Send Message Request:**
+```json
+{
+  "group_jid": "120363408849234743@g.us",
+  "recipient_jid": "27715844472@s.whatsapp.net",
+  "message": "DR1234567 - QA review complete!"
+}
+```
+
+## Database Connection
+
+**Neon PostgreSQL:**
+```
+Host: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
+Database: neondb
+SSL: Required
+Connection String: In DATABASE_URL env var
+```
+
+**Tables Used:**
+- `wa_monitored_groups` - Group configuration (loaded on startup + reload)
+- `qa_photo_reviews` - DR submissions and QA status
+- `dr_photo_unified_reviews` - VLM categorization data
+
+**SQLite Store (local on VPS):**
+```
+/opt/whatsapp-bridge/store/whatsapp.db - whatsmeow session data
+/opt/whatsapp-bridge/store/messages.db - Message history backup
+```
+
+## Troubleshooting
+
+### Binary Not Updating After Deployment
+
+**Symptoms:** Changes to main.go not reflected after build + deploy + restart
+
+**Diagnosis:**
+```bash
+# Check binary modification time
+ssh root@72.61.197.178 "ls -l /opt/whatsapp-bridge/whatsapp-bridge"
+
+# Check if service is using the binary
+ssh root@72.61.197.178 "systemctl status whatsapp-bridge | grep PID"
+
+# Verify compiled URLs
+ssh root@72.61.197.178 "strings /opt/whatsapp-bridge/whatsapp-bridge | grep fibreflow"
+```
+
+**Fix:**
+1. Ensure binary was actually copied: `scp` with `-v` verbose flag
+2. Restart service: `systemctl restart whatsapp-bridge`
+3. Check process: `ps aux | grep whatsapp-bridge`
+4. If still old, try full stop/start: `systemctl stop whatsapp-bridge && systemctl start whatsapp-bridge`
+
+### Groups Not Loading After Database Update
+
+**Symptoms:** Added group to wa_monitored_groups but bridge doesn't see it
+
+**Fix:**
+```bash
+# Reload groups from database (no restart needed)
+curl http://72.61.197.178:8083/reload-groups
+
+# Verify group appears
+curl http://72.61.197.178:8083/groups | jq '.[] | select(.project_name=="YourProject")'
+
+# Check logs for reload confirmation
+ssh root@72.61.197.178 "tail -20 /opt/whatsapp-bridge/bridge.log | grep reload"
+```
+
+### Connection Lost / Needs Re-pairing
+
+**Symptoms:** Health check shows `needs_auth: true` or `connected: false`
+
+**Diagnosis:**
+```bash
+ssh root@72.61.197.178
+curl http://localhost:8083/health | jq '.connected, .needs_auth, .pairing_state'
+tail -50 /opt/whatsapp-bridge/bridge.log | grep -i "pair\|connect\|session"
+```
+
+**Fix:**
+1. Check logs for pairing code
+2. If code present, link device on phone (+27 63 841 2276)
+3. If no code, restart service: `systemctl restart whatsapp-bridge`
+4. Monitor logs: `tail -f /opt/whatsapp-bridge/bridge.log`
+
+## Security Notes
+
+1. **VPS Access:** SSH key-based only (root@72.61.197.178)
+2. **Database:** SSL required (`sslmode=require`)
+3. **Credentials:** Never hardcode in source, use env vars
+4. **Store Directory:** Contains WhatsApp session secrets, protect access
+5. **Bridge Secret:** Used for maintenance API auth (`fibreflow-bridge-2026`)
 
 ## Version History
 
 | Date | Change |
 |------|--------|
-| Feb 20, 2026 | Architecture unified to VPS, version 2.0.0, 9 groups |
+| Feb 20, 2026 | Unified VPS architecture, v2.0.0, single phone number |
 | Jan 31, 2026 | URL configuration via environment variables |
 | Jan 26, 2026 | Maintenance group routing added |
+| Jan 18, 2026 | Initial bridge documentation |

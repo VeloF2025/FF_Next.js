@@ -1330,7 +1330,11 @@
       "Bash(STORIES_DIR=/home/hein/Workspace/FF_Next.js/.claude/user-stories node run-smoke-tests.mjs:*)",
       "Bash(gh api:*)",
       "Bash(/home/hein/.bun/bin/bun:*)",
-      "Bash(git -C /home/hein/.claude status)"
+      "Bash(git -C /home/hein/.claude status)",
+      "Bash(npm audit:*)",
+      "Bash(/tmp/test-auth.mjs:*)",
+      "Bash(/tmp/activate-audit-part2.mjs:*)",
+      "Bash(/tmp/activate-audit-part4.mjs:*)"
     ],
     "deny": [],
     "ask": [],

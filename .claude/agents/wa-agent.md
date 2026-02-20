@@ -35,10 +35,6 @@ Supporting Services:
     └─→ wa-feedback.service (Velocity port 8092) - LEGACY, avoid
 
 REMOVED/DEAD SERVICES:
-    ✗ whatsapp-sender.service (port 8081) - REMOVED
-    ✗ wa-monitor-prod Python service - REMOVED  
-    ✗ Old phone +27 82 418 9511 - DEAD
-    ✗ Old phone +27 71 179 6125 - DEAD
 ```
 
 ### 2. Core Components
@@ -572,11 +568,6 @@ When invoked, this agent can:
 ## REMOVED/DEAD Services
 
 **Do not reference these in troubleshooting:**
-- ~~whatsapp-sender.service (port 8081)~~ - REMOVED
-- ~~wa-monitor-prod Python service~~ - REMOVED
-- ~~Phone +27 82 418 9511~~ - DEAD
-- ~~Phone +27 71 179 6125~~ - DEAD
-- ~~Phone +27 64 041 2391~~ - DEAD
 - ~~Old VPS 72.60.17.245~~ - DECOMMISSIONED
 
 ## Success Criteria

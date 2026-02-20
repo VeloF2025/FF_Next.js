@@ -1,5 +1,8 @@
 # WA Monitor: ACK Message Troubleshooting
 
+> **Last updated:** 2026-02-20  
+> **Architecture:** VPS unified bridge v2.0.0
+
 ## Bridge Reliability Fixes (2026-02-10)
 
 ### Investigation: DR474666 Missing Acknowledgment

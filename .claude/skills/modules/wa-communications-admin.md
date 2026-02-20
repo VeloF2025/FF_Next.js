@@ -53,7 +53,7 @@ Configuration settings for WhatsApp services:
 - created_at, updated_at (TIMESTAMPS)
 ```
 
-### wa_group_mappings
+### wa_group_mappings (deprecated - use wa_monitored_groups)
 Project-to-WhatsApp group mappings:
 ```sql
 - id (UUID PRIMARY KEY)
@@ -64,6 +64,8 @@ Project-to-WhatsApp group mappings:
 - enabled (BOOLEAN)
 - created_at, updated_at (TIMESTAMPS)
 ```
+
+**Note:** Bridge now loads from `wa_monitored_groups` table.
 
 ### wa_message_templates
 Message templates with variable support:
@@ -83,7 +85,7 @@ Audit trail for all WhatsApp messages:
 ```sql
 - id (UUID PRIMARY KEY)
 - direction (TEXT) -- inbound, outbound
-- service (TEXT) -- sender, bridge, monitor
+- service (TEXT) -- bridge, command-bot
 - group_jid (TEXT)
 - message_type (TEXT) -- text, ack, feedback
 - message_content (TEXT)
@@ -91,6 +93,19 @@ Audit trail for all WhatsApp messages:
 - status (TEXT) -- sent, delivered, failed, pending
 - error_message (TEXT)
 - created_at (TIMESTAMP)
+```
+
+### wa_monitored_groups (current, used by bridge)
+Group configuration loaded by bridge:
+```sql
+- id (UUID PRIMARY KEY)
+- group_jid (VARCHAR(100) UNIQUE NOT NULL)
+- group_name (VARCHAR(200) NOT NULL)
+- project_name (VARCHAR(200))
+- group_type (VARCHAR(50) DEFAULT 'dr_submission') -- dr_submission, maintenance, admin, pre_provision
+- description (TEXT)
+- is_active (BOOLEAN DEFAULT true)
+- created_at, updated_at (TIMESTAMPTZ)
 ```
 
 ## UI Components
@@ -101,9 +116,9 @@ Audit trail for all WhatsApp messages:
 - Focus management with refs
 
 ### Services Tab
-- Displays Bridge and Sender service status
-- Shows phone numbers, URLs, last message timestamps
-- Restart button for each service (3-second delay for confirmation)
+- Displays Bridge service status (unified on VPS)
+- Shows phone number (+27 63 841 2276), URL (72.61.197.178:8083), last message timestamp
+- Restart button with 3-second delay for confirmation
 - Overall health badge (healthy/degraded/down)
 - Auto-refresh every 30 seconds
 
@@ -113,6 +128,7 @@ Audit trail for all WhatsApp messages:
 - Edit existing group settings
 - Delete with confirmation modal (focus trapping)
 - Send test message to verify connectivity
+- Group type selection: dr_submission, maintenance, admin, pre_provision
 
 ### Templates Tab
 - List templates grouped by category
@@ -151,17 +167,17 @@ The portal integrates with the existing WhatsApp infrastructure:
 ```
 WhatsApp Admin Portal (FibreFlow UI)
     │
-    ├─→ wa-feedback (Velocity 100.96.203.105:8092)
-    │       └─→ Proxies to VPS sender
+    ├─→ whatsapp-bridge (VPS 72.61.197.178:8083)
+    │       └─→ Unified: receives, sends acks, sends feedback
     │
-    ├─→ whatsapp-sender (VPS 72.61.197.178:8081)
-    │       └─→ Status checks, test messages
+    ├─→ wa-command-bot (VPS 72.61.197.178:8086)
+    │       └─→ Admin commands only
     │
-    └─→ whatsapp-bridge (VPS 72.61.197.178:8083)
-            └─→ Message receiving, DB writes
+    └─→ wa-feedback (Velocity 100.96.203.105:8092) - LEGACY
+            └─→ Proxies to bridge (backward compatibility)
 
-Primary Server: VPS 72.61.197.178 (Hostinger - WhatsApp services)
-Proxy Server: 100.96.203.105 (Velocity - wa-feedback only)
+Primary Server: VPS 72.61.197.178 (WhatsApp services)
+Legacy Proxy: 100.96.203.105 (Velocity - wa-feedback only)
 ```
 
 ## Common Tasks
@@ -173,8 +189,9 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 1. Go to Groups tab
 2. Click "Add Group"
 3. Enter project name and group JID
-4. Toggle enabled status
-5. Send test message to verify
+4. Select group type (dr_submission, maintenance, admin, pre_provision)
+5. Toggle enabled status
+6. Send test message to verify
 
 ### Edit Message Template
 1. Go to Templates tab
@@ -200,13 +217,13 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 ## Troubleshooting
 
 ### Service Shows Disconnected
-1. Check VPS sender connectivity: `curl http://72.61.197.178:8081/health`
-2. SSH to VPS and check service: `ssh root@72.61.197.178 "systemctl status whatsapp-sender"`
+1. Check VPS bridge connectivity: `curl http://72.61.197.178:8083/health`
+2. SSH to VPS and check service: `ssh root@72.61.197.178 "systemctl status whatsapp-bridge"`
 3. Use restart button in UI or restart manually on VPS
 
 ### Test Message Not Sending
 1. Verify group JID is correct format (`XXXXX@g.us`)
-2. Check sender service status
+2. Check bridge service status
 3. Review logs tab for error details
 4. Ensure group is enabled
 
@@ -217,6 +234,22 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 
 ## Related Documentation
 
-- `docs/wa-monitor/WHATSAPP_ARCHITECTURE.md` - Full architecture guide
-- `src/modules/wa-monitor/README.md` - WA Monitor module
+- `.claude/knowledge-base/whatsapp/unified-bridge-reference.md` - Quick reference
+- `.claude/skills/infrastructure/whatsapp.md` - Full architecture
 - `.claude/agents/wa-agent.md` - WA troubleshooting agent
+
+## Version History
+
+| Date | Change |
+|------|--------|
+| Feb 20, 2026 | Updated for unified VPS bridge architecture, 9 groups |
+| Jan 26, 2026 | WhatsApp Admin Portal created |
+
+## Important Notes (Updated Feb 2026)
+
+1. **Architecture Change:** Unified VPS bridge (version 2.0.0) at 72.61.197.178:8083
+2. **Phone Number:** +27 63 841 2276 (unified for all operations)
+3. **9 Monitored Groups:** Including pre_provision type
+4. **No Separate Sender:** Bridge handles all message sending
+5. **wa-feedback:** Legacy service on Velocity, proxies to bridge
+6. **Group Types:** dr_submission, maintenance, admin, pre_provision

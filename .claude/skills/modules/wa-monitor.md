@@ -26,7 +26,7 @@ This skill makes Claude Code proactive about WA Monitor issues by:
 2. Silently invoke WA agent
 3. Check if drop exists in database
 4. Check if drop was rejected (validation)
-5. Check monitor logs for processing
+5. Check bridge logs for processing
 6. Report findings with context
 
 **Response Template**:
@@ -45,33 +45,31 @@ Project: [project name]
 ### Trigger 2: Service Health Issues
 
 **Keywords**:
-- "monitor down"
+- "bridge down"
 - "not showing"
 - "drops missing"
-- "wa monitor broken"
+- "wa bridge broken"
 - "service stopped"
 - "not working"
 
 **Automatic Actions**:
 1. Invoke WA agent
-2. Check service status (prod + dev)
-3. Check WhatsApp bridge status
-4. Check for recent errors in logs
-5. Verify database connection
-6. Report health status
+2. Check bridge service status (VPS)
+3. Check for recent errors in logs
+4. Verify database connection
+5. Report health status
 
 **Response Template**:
 ```
 🏥 WA Monitor Health Check:
 
-Services:
-  wa-monitor-prod: ✅ active / ❌ inactive
-  wa-monitor-dev: ✅ active / ❌ inactive
+Services (VPS 72.61.197.178):
   whatsapp-bridge: ✅ active / ❌ inactive
+  wa-command-bot: ✅ active / ❌ inactive
 
 Recent Activity:
   Last drop processed: [timestamp]
-  Last heartbeat: [timestamp]
+  Last message: [timestamp]
 
 Errors (last hour): [count] errors found
 [Show last 3 errors if any]
@@ -139,7 +137,8 @@ Resolution:
 Lawley:    [count] drops
 Mohadin:   [count] drops
 Mamelodi:  [count] drops
-Velo Test: [count] drops
+Marketing: [count] drops
+Mamelodi Internal: [count] drops
 
 Total: [count] drops
 
@@ -172,11 +171,8 @@ Drops with LIDs: [count] found
 Resolution Steps:
 1. Look up LID → phone number
 2. Update database
-3. Restart monitor (clear cache)
 
 [Provide exact commands]
-
-Prevention: Ensure /opt/wa-monitor/prod/restart-monitor.sh is used
 ```
 
 ### Trigger 6: Adding New Project
@@ -191,131 +187,27 @@ Prevention: Ensure /opt/wa-monitor/prod/restart-monitor.sh is used
 1. Invoke WA agent
 2. Provide 5-minute guide
 3. Check if Group JID provided
-4. Generate config YAML
-5. Provide deployment steps
+4. Generate database insert
+5. Provide reload command
 
 **Response Template**:
 ```
 ➕ Adding New WhatsApp Group (5 minutes):
 
 Prerequisites:
-- WhatsApp bridge in group (082 418 9511)
+- WhatsApp bridge in group (+27 63 841 2276)
 - Group JID: [check if provided]
 
 Steps:
-1. Find Group JID (if not provided)
-2. Test in DEV first
-3. Deploy to PROD
-4. Verify monitoring
+1. Add phone to group
+2. Find Group JID from logs
+3. Add to database
+4. Reload bridge
 
 [Provide exact commands for each step]
 ```
 
-### Trigger 7: Delete Sent Messages (Jan 2026)
-
-**Keywords**:
-- "delete message"
-- "delete last message"
-- "remove sent message"
-- "undo whatsapp"
-- "delete the messages"
-
-**Automatic Actions**:
-1. Invoke WA agent
-2. List recent deletable messages (within 1 hour)
-3. Identify message IDs from logs or user context
-4. Delete via Sender API
-5. Confirm deletion
-
-**Response Template**:
-```
-🗑️ Message Deletion:
-
-Recent Deletable Messages (last hour):
-[List from /list-recent endpoint]
-
-To delete:
-curl -X POST http://localhost:8081/delete-message \
-  -H "Content-Type: application/json" \
-  -d '{"message_id":"XXX","group_jid":"YYY@g.us"}'
-
-[Execute and confirm result]
-```
-
-**Note:** Messages can only be deleted within 1 hour of sending.
-
-### Trigger 8: Duplicate Messages (Jan 2026)
-
-**Keywords**:
-- "duplicate messages"
-- "sending multiple"
-- "infinite loop"
-- "ack loop"
-- "same message twice"
-
-**Automatic Actions**:
-1. Invoke WA agent
-2. Check bridge logs for ack-filter
-3. Verify filter is in main.go
-4. Check sender_proxy.go deduplication
-5. Rebuild bridge if needed
-
-**Response Template**:
-```
-🔄 Duplicate Message Investigation:
-
-Ack Filter Status: ✅/❌
-Deduplication Cache: ✅/❌
-
-If missing, rebuild bridge:
-cd /home/louis/whatsapp-bridge-go
-go build -o whatsapp-bridge *.go
-sudo systemctl restart whatsapp-bridge.service
-
-[Check logs for confirmation]
-```
-
-### Trigger 9: WhatsApp Portal Issues (Jan 2026)
-
-**Keywords**:
-- "whatsapp portal"
-- "services tab"
-- "wa admin"
-- "phone pairing"
-- "portal not loading"
-- "dark theme"
-
-**Automatic Actions**:
-1. Check if it's a frontend issue (console errors)
-2. Check if API endpoints are responding
-3. Verify waAdminApi service methods
-4. Check for missing phones API
-
-**Response Template**:
-```
-🖥️ WhatsApp Portal Investigation:
-
-Portal URL: /communications/whatsapp
-API Status: ✅/❌
-
-Services API: /api/communications/whatsapp/services/status
-Phones API: /api/communications/whatsapp/phones
-
-Common Issues:
-- Console errors: Check waAdminApiService.ts has phonesApi
-- Dark theme: Check ServicesTab.tsx uses dark-compatible colors
-- Service status: Bridge/Sender health endpoints
-
-Fix: Ensure all API endpoints are deployed
-```
-
-**Key Files:**
-- `src/modules/communications/whatsapp/components/ServicesTab.tsx`
-- `src/modules/communications/whatsapp/services/waAdminApiService.ts`
-- `pages/api/communications/whatsapp/phones/`
-- `pages/api/communications/whatsapp/services/[service]/`
-
-### Trigger 10: Maintenance Group Routing Issues (Jan 2026)
+### Trigger 7: Maintenance Group Routing Issues (Updated Feb 2026)
 
 **Keywords**:
 - "maintenance group"
@@ -337,6 +229,7 @@ Fix: Ensure all API endpoints are deployed
 Bridge routing:
   dr_submission → processDropNumbers + ack + sync ✅/❌
   maintenance → forwardToMaintenanceAPI only ✅/❌
+  pre_provision → TBD workflow ✅/❌
 
 Maintenance API: /api/maintenance/wa-message
   Auth: Bridge secret ✅/❌
@@ -351,6 +244,32 @@ If acks appearing in maintenance groups:
 ```
 
 **KB Reference:** `.claude/knowledge-base/wa-monitor/bridge-configuration.md`
+
+### Trigger 8: Pre-Provision Workflow
+
+**Keywords**:
+- "pre-provision"
+- "pre provision"
+- "Mohadin pre-provision"
+
+**Automatic Actions**:
+1. Check pre_provision group configuration
+2. Verify group is being monitored
+3. Check workflow implementation status
+
+**Response Template**:
+```
+📋 Pre-Provision Group Check:
+
+Group: Mohadin Pre-Provision
+JID: 120363423163566226@g.us
+Type: pre_provision
+Status: [active/inactive]
+
+Workflow: [implemented/pending]
+
+[Provide current workflow details or implementation status]
+```
 
 ## Auto-Activation Rules
 
@@ -368,7 +287,7 @@ If acks appearing in maintenance groups:
 
 ### DON'T (Never Do Without Explicit Request):
 - ❌ Restart production services
-- ❌ Modify Python code
+- ❌ Modify source code
 - ❌ Change database data
 - ❌ Edit config files
 
@@ -447,15 +366,13 @@ Skill: [Detects service issue keywords, invokes WA agent]
 Claude: "🏥 Running health check...
 
 ⚠️ Issue Found:
-  wa-monitor-dev: ❌ inactive (exit code 1)
-  wa-monitor-prod: ✅ active
-  whatsapp-bridge: ✅ active
+  whatsapp-bridge: ❌ inactive (exit code 1)
 
-Last error (dev): [error message]
+Last error: [error message from logs]
 
-Fix: systemctl restart wa-monitor-dev
+Fix: systemctl restart whatsapp-bridge
 
-Would you like me to investigate the dev service error?"
+Would you like me to investigate the error further?"
 ```
 
 ### Example 3: Daily Stats
@@ -464,11 +381,11 @@ User: "How many drops today?"
   ↓
 Skill: [Detects stats request, invokes WA agent]
   ↓
-Claude: "📊 Today's Drops (2025-11-17):
+Claude: "📊 Today's Drops (2026-02-20):
 
 Lawley:    3 drops
 Mamelodi:  1 drop
-Velo Test: 1 drop
+Marketing: 1 drop
 
 Total: 5 drops"
 ```
@@ -500,6 +417,7 @@ Use emoji indicators for quick scanning:
 - 🏥 Health check
 - 🔧 Fix available
 - ⏭️ Skipped/Disabled
+- 📋 Pre-provision workflow
 
 ## Success Criteria
 
@@ -523,3 +441,12 @@ Adjust sensitivity if:
 - Too many false triggers → Tighten keyword matching
 - Missing obvious issues → Expand trigger phrases
 - User frequently overrides → Make less aggressive
+
+## Important Reminders (Updated Feb 2026)
+
+1. **Architecture**: Unified VPS bridge at 72.61.197.178:8083
+2. **Phone**: +27 63 841 2276 (unified for ALL messages)
+3. **No separate sender service** on VPS
+4. **Groups**: 9 monitored groups (including pre_provision type)
+5. **Version**: Bridge 2.0.0
+6. **Services**: whatsapp-bridge + wa-command-bot (VPS only)

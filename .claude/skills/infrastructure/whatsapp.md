@@ -24,8 +24,6 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 | **Unified Bridge** | +27 63 841 2276 | `27638412276@s.whatsapp.net` | VPS - receives DRs, sends acks directly |
 
 **REMOVED SERVICES:**
-- ~~Old sender (+27 82 418 9511)~~ - **DEAD** (port 8081 service removed)
-- ~~wa-monitor-prod Python service~~ - **DEAD** (replaced by Go bridge)
 
 ## WhatsApp Groups (9 Monitored)
 
@@ -506,7 +504,6 @@ curl http://72.61.197.178:8083/reload-groups
 | Date | Change |
 |------|--------|
 | Feb 20, 2026 | Updated to VPS unified bridge architecture (v2.0.0) |
-| Feb 20, 2026 | Removed references to dead port 8081 sender service |
 | Feb 20, 2026 | Updated phone to +27 63 841 2276 |
 | Feb 20, 2026 | Added 9 monitored groups with types |
 | Feb 20, 2026 | Marked wa-feedback as LEGACY |

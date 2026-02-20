@@ -1,4 +1,4 @@
-# PRD: Construction QA Module
+# PRD: Civil QA Module
 
 **Document Version:** 1.0
 **Status:** Draft — Ready for Implementation
@@ -36,7 +36,7 @@ FibreFlow currently has a mature QA system for the final stage of fiber deployme
 
 The upstream construction phases — pole planting (civil), cable stringing (optical), and dome joint splicing — have no equivalent system. Photos are captured in QField, synced to MinIO, and undergo only an automated confidence-threshold check with no structured review workflow, no checklist enforcement, no field technician feedback loop, and no management reporting.
 
-This PRD specifies the **Construction QA Module**: a production-quality quality assurance system for the three pre-activation construction disciplines. It replicates the architecture and UX sophistication of the Activate QA Center, adapted for civil and optical construction work. It introduces multi-source photo ingestion (QField, SharePoint, WhatsApp, manual upload), discipline-specific photo checklists, VLM prompts tuned to FiberTime construction standards, and a fully reportable workflow from field capture to formal acceptance.
+This PRD specifies the **Civil QA Module**: a production-quality quality assurance system for the three pre-activation construction disciplines. It replicates the architecture and UX sophistication of the Activate QA Center, adapted for civil and optical construction work. It introduces multi-source photo ingestion (QField, SharePoint, WhatsApp, manual upload), discipline-specific photo checklists, VLM prompts tuned to FiberTime construction standards, and a fully reportable workflow from field capture to formal acceptance.
 
 The module is designed to ship in three phases. Phase 1 (MVP) delivers civil QA for pole planting. Phase 2 adds optical and SharePoint sync. Phase 3 adds splicing QA, WhatsApp ingestion, and full reporting parity with the Activate QA Center.
 
@@ -65,7 +65,7 @@ FibreFlow's quality process has a significant gap upstream of home drop activati
 
 ### 2.3 What Success Looks Like
 
-A fiber network PON should have a clear, auditable QA trail from first pole planted to last activation. Every pole has a signed-off photo set. Every cable span has a confirmed attachment record. Every dome joint has a documented splice acceptance. The Construction QA Module makes this possible.
+A fiber network PON should have a clear, auditable QA trail from first pole planted to last activation. Every pole has a signed-off photo set. Every cable span has a confirmed attachment record. Every dome joint has a documented splice acceptance. The Civil QA Module makes this possible.
 
 ---
 
@@ -124,7 +124,7 @@ A fiber network PON should have a clear, auditable QA trail from first pole plan
 ### 4.4 Project Manager
 
 - **Description:** Oversees one or more projects from planning to activation. Uses pipeline and reporting views.
-- **Interaction with module:** Views per-PON stage tracking. Monitors QA bottlenecks. Uses Construction QA data to validate milestone completion for billing.
+- **Interaction with module:** Views per-PON stage tracking. Monitors QA bottlenecks. Uses Civil QA data to validate milestone completion for billing.
 
 ### 4.5 QA Reviewer (Administrative)
 
@@ -719,7 +719,7 @@ All photo sources are normalised into a single pipeline that produces records in
 
 ### 8.2 Source 1: QField Sync (Primary)
 
-Photos captured in QField are stored in QFieldCloud's MinIO instance. The existing `qfield_photo_validations` system already imports these. The Construction QA module reads from `qfield_photo_validations` for photos with `work_type IN ('pole_installation', 'cable_stringing', 'dome_joint')` and creates/updates corresponding `construction_qa_reviews` records.
+Photos captured in QField are stored in QFieldCloud's MinIO instance. The existing `qfield_photo_validations` system already imports these. The Civil QA module reads from `qfield_photo_validations` for photos with `work_type IN ('pole_installation', 'cable_stringing', 'dome_joint')` and creates/updates corresponding `construction_qa_reviews` records.
 
 **Photo access via MinIO proxy:**
 
@@ -743,7 +743,7 @@ QField photos contain feature context in the QFieldCloud file path or metadata. 
 
 ### 8.3 Source 2: SharePoint Sync
 
-The existing `sharepointDrSyncService.ts` uses Microsoft Graph API with OAuth client credentials. The Construction QA module follows the same pattern with a different folder hierarchy.
+The existing `sharepointDrSyncService.ts` uses Microsoft Graph API with OAuth client credentials. The Civil QA module follows the same pattern with a different folder hierarchy.
 
 **SharePoint folder hierarchy for construction:**
 
@@ -785,12 +785,12 @@ SHAREPOINT_CLIENT_ID=...              # Shared with DR sync
 SHAREPOINT_CLIENT_SECRET=...          # Shared with DR sync
 SHAREPOINT_SITE_ID=...                # Shared with DR sync
 SHAREPOINT_DRIVE_ID=...               # Shared with DR sync
-SHAREPOINT_CONSTRUCTION_ROOT_FOLDER_ID=...  # NEW — points to Construction QA root
+SHAREPOINT_CONSTRUCTION_ROOT_FOLDER_ID=...  # NEW — points to Civil QA root
 ```
 
 ### 8.4 Source 3: WhatsApp (Phase 3)
 
-Photos submitted via WhatsApp groups are handled by the existing WA Bridge (VPS 72.61.197.178:8083). The Construction QA module adds a new message processor alongside the existing `process-new-dr.ts`.
+Photos submitted via WhatsApp groups are handled by the existing WA Bridge (VPS 72.61.197.178:8083). The Civil QA module adds a new message processor alongside the existing `process-new-dr.ts`.
 
 Construction photos arrive in designated WA groups (separate from activation groups). The processor:
 1. Extracts the feature ID from the caption text using regex patterns (e.g., `POLE: LAW001`, `SPAN: S-001-002`, `JOINT: FTS-01`)
@@ -856,7 +856,7 @@ async function resizeForVlm(buffer: Buffer): Promise<Buffer> {
 | Timeout | 45 seconds |
 | Retry | 3 attempts, exponential backoff |
 
-The VLM endpoint is shared with the Activate module. Construction QA requests should include a discipline-specific system prompt prefix to ensure model context is correctly framed.
+The VLM endpoint is shared with the Activate module. Civil QA requests should include a discipline-specific system prompt prefix to ensure model context is correctly framed.
 
 ### 9.2 Response Schema
 
@@ -1353,7 +1353,7 @@ Reason: ${ex.correction_notes}
 
 ## 10. QA Workflow — 5-Phase Wizard
 
-The Construction QA wizard adapts the 5-phase pattern from the Activate QA Center (`QaWizardContainer.tsx`) to construction disciplines.
+The Civil QA wizard adapts the 5-phase pattern from the Activate QA Center (`QaWizardContainer.tsx`) to construction disciplines.
 
 ### 10.1 Wizard Entry Points
 
@@ -1520,7 +1520,7 @@ The bridge is shared with the Activate module. No new bridge infrastructure is n
 
 Construction projects use the same WhatsApp groups as their activation counterparts, unless dedicated construction groups are configured.
 
-Per-project WA group configuration is stored in `qfield_validation_config.notification_group_jid`. Construction QA adds a separate column for construction-specific groups:
+Per-project WA group configuration is stored in `qfield_validation_config.notification_group_jid`. Civil QA adds a separate column for construction-specific groups:
 
 ```sql
 -- Add to qfield_validation_config (or store in project settings):
@@ -1555,7 +1555,7 @@ When construction photos are submitted directly to a monitored WA group:
 
 ### 12.1 Report Types
 
-The Construction QA module ships 8 report types, mirroring the Activate QA Center's reporting structure.
+The Civil QA module ships 8 report types, mirroring the Activate QA Center's reporting structure.
 
 | Report | Endpoint | Description |
 |--------|----------|-------------|
@@ -1608,7 +1608,7 @@ Zone 2:
 
 ### 12.3 PON Stage Tracking Integration
 
-The `pon_stage_tracking` table (migration 179) tracks build pipeline stages. Construction QA data feeds into this:
+The `pon_stage_tracking` table (migration 179) tracks build pipeline stages. Civil QA data feeds into this:
 
 - `poles_planted` count updates when a pole has `qa_decision = 'PASS'` in civil QA
 - `optical_complete` updates when all cable spans in a PON have optical QA `PASS`
@@ -2010,7 +2010,7 @@ The existing QField QA module (`src/modules/qfield-qa/`) and its associated tabl
 - The automated validation pipeline (cron VLM on QField photos)
 - WhatsApp rejection notifications from the automated pipeline
 
-The Construction QA module **supplements** the existing module. It reads from `qfield_photo_validations` as an input source but creates its own review records in `construction_qa_reviews`.
+The Civil QA module **supplements** the existing module. It reads from `qfield_photo_validations` as an input source but creates its own review records in `construction_qa_reviews`.
 
 **Data relationship:**
 
@@ -2028,7 +2028,7 @@ poles / cable_spans / joints (existing tables from migration 109)
 
 ### 17.2 Existing Photos (6,000+ in qfield_photo_validations)
 
-The 6,000+ photos already imported into `qfield_photo_validations` (LAW_Pole_Audit, MOA_Pole_Audit, etc.) are eligible for Construction QA ingestion. The initial ingest script:
+The 6,000+ photos already imported into `qfield_photo_validations` (LAW_Pole_Audit, MOA_Pole_Audit, etc.) are eligible for Civil QA ingestion. The initial ingest script:
 
 ```typescript
 // One-time backfill: import existing qfield_photo_validations into construction_qa
@@ -2047,7 +2047,7 @@ Photos that already exist in `construction_qa_photos` (matched by `source = 'qfi
 
 ### 17.4 Permission / RBAC Integration
 
-The Construction QA module uses the existing role-based access control system. New permissions to add:
+The Civil QA module uses the existing role-based access control system. New permissions to add:
 
 ```sql
 -- Add to your permissions table / RBAC config:
@@ -2066,12 +2066,12 @@ Default role assignments:
 
 ### 17.5 Navigation Integration
 
-Add Construction QA to the main application navigation under a "Quality" section, alongside the existing Activate QA Centre link. Update `AppLayout` navigation configuration.
+Add Civil QA to the main application navigation under a "Quality" section, alongside the existing Activate QA Centre link. Update `AppLayout` navigation configuration.
 
 ```typescript
 // In navigation config:
 {
-  label: 'Construction QA',
+  label: 'Civil QA',
   href: '/construction-qa',
   icon: HardHat,
   permission: 'qa:construction:read',
@@ -2080,7 +2080,7 @@ Add Construction QA to the main application navigation under a "Quality" section
 
 ### 17.6 Feature Flag
 
-To allow incremental rollout, wrap Construction QA routes in a feature flag:
+To allow incremental rollout, wrap Civil QA routes in a feature flag:
 
 ```bash
 # .env.local
