@@ -159,7 +159,7 @@ export function CreatePickingForm({
         onSuccess?.(picking.id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create picking');
+      setError(err instanceof Error ? err.message : 'Failed to create transfer');
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +173,7 @@ export function CreatePickingForm({
       await signPicking(createdPickingId, { signatureData, signedBy });
       onSuccess?.(createdPickingId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign picking');
+      setError(err instanceof Error ? err.message : 'Failed to sign transfer');
     } finally {
       setSubmitting(false);
     }
@@ -213,7 +213,7 @@ export function CreatePickingForm({
             <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
             <div>
               <p className="font-medium text-green-800 dark:text-green-200">
-                Picking Created Successfully
+                Transfer Created Successfully
               </p>
               <p className="text-sm text-green-700 dark:text-green-300">
                 Please sign below to confirm receipt of materials.
@@ -250,7 +250,7 @@ export function CreatePickingForm({
       {/* Picking Type */}
       <div>
         <label className="mb-1 block text-sm font-medium text-muted-foreground">
-          Picking Type
+          Transfer Type
         </label>
         <select
           value={pickingType}
@@ -434,7 +434,7 @@ export function CreatePickingForm({
           ) : (
             <>
               <Check className="h-4 w-4" />
-              Create Picking
+              Create Transfer
             </>
           )}
         </button>

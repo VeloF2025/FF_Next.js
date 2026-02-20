@@ -155,7 +155,7 @@ export function FieldStockDashboard({ onNavigate }: FieldStockDashboardProps) {
           </div>
           <div>
             <p className="font-medium text-[var(--ff-text-primary)]">Issue Stock</p>
-            <p className="text-sm text-[var(--ff-text-tertiary)]">Create new picking</p>
+            <p className="text-sm text-[var(--ff-text-tertiary)]">Create new transfer</p>
           </div>
         </button>
 

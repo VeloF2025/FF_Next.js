@@ -148,7 +148,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
           <div>
-            <p className="font-medium text-red-800 dark:text-red-200">Error loading pickings</p>
+            <p className="font-medium text-red-800 dark:text-red-200">Error loading transfers</p>
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             <button
               onClick={handleRefresh}
@@ -214,21 +214,21 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
             >
               <Plus className="h-4 w-4" />
-              New Picking
+              New Transfer
             </button>
           )}
         </div>
       </div>
 
-      {/* Pickings List */}
+      {/* Transfers List */}
       {filteredPickings.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center dark:border-gray-700 dark:bg-gray-800">
           <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-foreground">No pickings found</h3>
+          <h3 className="mt-4 text-lg font-medium text-foreground">No transfers found</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {filterType !== 'all' || filterStatus !== 'all'
               ? 'Try adjusting your filters to see more results.'
-              : 'Create a new picking to get started.'}
+              : 'Create a new transfer to get started.'}
           </p>
           {onCreateNew && (
             <button
@@ -236,7 +236,7 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               <Plus className="h-4 w-4" />
-              Create Picking
+              Create Transfer
             </button>
           )}
         </div>

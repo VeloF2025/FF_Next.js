@@ -381,7 +381,7 @@ function getQuickQuestions(topicId: string): string[] {
     'maintenance': ['How do I create a ticket?', 'What are the SLA targets?', 'How does the Kanban board work?'],
     'procurement': [
       'How do I create a BOQ?',
-      'How do I process a field stock picking?',
+      'How do I process a field stock transfer?',
       'How do I report a faulty item?',
       'How do I view the procurement audit trail?',
     ],

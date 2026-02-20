@@ -77,7 +77,7 @@ const tabs: TabConfig[] = [
   },
   {
     id: 'pickings',
-    label: 'Pickings',
+    label: 'Transfers',
     icon: <Package className="h-5 w-5" />,
     description: 'Stock issues and transfers'
   },
@@ -107,7 +107,7 @@ const tabs: TabConfig[] = [
   },
 ];
 
-/** Pickings tab with list/create toggle */
+/** Transfers tab with list/create toggle */
 function PickingsTab() {
   const [view, setView] = useState<'list' | 'create'>('list');
   if (view === 'create') {
@@ -120,7 +120,7 @@ function PickingsTab() {
           onClick={() => setView('create')}
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
-          <Plus className="h-4 w-4" /> New Picking
+          <Plus className="h-4 w-4" /> New Transfer
         </button>
       </div>
       <PickingList />
