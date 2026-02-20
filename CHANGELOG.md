@@ -12,6 +12,8 @@ All notable changes to FibreFlow will be documented in this file.
 - feat: add photo lightbox with zoom/pan and feature ID rename in Civil QA (470522c4)
 - feat: add shared PhotoLightbox with zoom/pan to Activate QA Centre (2cbfba95)
 - feat: field stock management — mobile portal, API routes, desktop wiring (PRD-027) (caee4de1)
+- feat: stock adjustments — direct qty adjustments with reason codes + stock take approve updates quants (ca3c15c1)
+- feat: add Adjustments tab to Inventory and Field Stock pages
 
 ### 🐛 Fixes
 - fix: security hardening — auth, CORS, RBAC, and API safety improvements (397caa84)
@@ -19,6 +21,12 @@ All notable changes to FibreFlow will be documented in this file.
 - fix: remove field-stock redirect so standalone page with 8 sub-tabs is reachable (14e01e94)
 - fix: usePickings auto-fetch deadlock — loading initialized true but never triggered fetch (c21c1530)
 - fix: revert inventory page redirect that broke Stock/Items/Bundles/Takes tabs (8c079870)
+- fix: requisition approve/reject routing — route to approval endpoints instead of submit (f44ad595)
+- fix: add reject modal with reason field to requisition detail page
+- fix: return approvalRequestId and itemCount from requisition detail API
+- fix: line total display uses estimatedTotal field correctly
+- fix: use authenticated user name for requisition creation (was 'System User')
+- fix: use field_stock_movements table for adjustments (correct schema) (ca3c15c1)
 
 ### 📦 Other Changes
 - rename: Construction QA → Civil QA (f93efbdf)

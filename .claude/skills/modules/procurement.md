@@ -305,6 +305,85 @@ FROM stock_movements
 WHERE project_id = 'xxx';
 ```
 
+## Purchase Requisitions
+
+### Workflow
+```
+Draft → Submit → Pending Approval → Approved → Convert to PO/RFQ
+                                  ↓ (if rejected)
+                              Draft (edit & resubmit)
+```
+
+### Requisition API
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/procurement/requisitions` | List/Create requisitions |
+| GET/PUT/DELETE | `/api/procurement/requisitions/[id]` | Detail/Update/Delete |
+| POST | `/api/procurement/requisitions/[id]/submit` | Submit for approval |
+| POST | `/api/procurement/requisitions/[id]/convert-to-po` | Convert to PO |
+
+### Auto-Approval Rules
+- Requisitions < R10,000: Auto-approved
+- Requisitions >= R10,000: Creates `approval_request`, status → `pending_approval`
+- Detail API returns `approvalRequestId` for frontend routing
+
+## Unified Approval Workflow
+
+Centralized approval system for all procurement documents.
+
+### Approval API
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/procurement/approvals/pending` | Pending tasks for current user |
+| POST | `/api/procurement/approvals/[id]/approve` | Approve (notes optional) |
+| POST | `/api/procurement/approvals/[id]/reject` | Reject (reason required) |
+
+### Supported Document Types
+`purchase_requisition`, `purchase_order`, `boq`, `rfq`, `goods_receipt`, `supplier_registration`, `payment_request`
+
+### Critical Pattern
+- Approve/Reject uses `approval_request` ID, NOT the document ID
+- Both endpoints update the approval_request AND source document status
+
+## Stock Adjustments
+
+### Direct Adjustment API
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/procurement/adjustments` | List adjustments with filters |
+| POST | `/api/procurement/adjustments` | Create adjustment (increase/decrease) |
+| GET | `/api/procurement/stock-takes/reasons` | List reason codes |
+
+### Adjustment Flow
+1. Select item, location, direction, quantity, reason code
+2. Updates `stock_quants` (UPSERT for increase, UPDATE for decrease)
+3. Creates `field_stock_movements` record (reference: ADJ-YYYYMM-seq)
+4. Virtual ADJUST location as counterparty
+
+### Stock Take Approval → Quant Updates
+When approved: updates `stock_quants`, creates `field_stock_movements` + `stock_take_adjustments`, marks lines adjusted/verified.
+
+## Field Stock & Inventory
+
+### Key Pages
+| Page | Path | Description |
+|------|------|-------------|
+| Field Stock | `/procurement/field-stock` | 8 tabs: Dashboard, Locations, Items, Pickings, Returns, Consumptions, Accountability, Adjustments |
+| Inventory | `/procurement/inventory` | Tabs: Stock, Items, Bundles, Takes, Adjustments, Reports |
+| Stock Portal | `/stock/portal` | Mobile-first storeman portal (PWA) |
+
+### Field Stock API
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/api/procurement/field-stock/items` | Stock items |
+| GET/POST | `/api/procurement/field-stock/pickings` | Pickings |
+| POST | `/api/procurement/field-stock/pickings/[id]/process` | Process picking → updates quants |
+| GET/POST | `/api/procurement/stock-takes` | Stock takes |
+| POST | `/api/procurement/stock-takes/[id]/actions` | State transitions |
+
+### Hooks
+`usePickings`, `useAdjustments`, `useStockItems`, `useLocations`
+
 ## Related Skills
 
 - `/oes-import` - OES data imports
@@ -321,9 +400,14 @@ WHERE project_id = 'xxx';
 | RFQ List | `/procurement/rfq` |
 | New RFQ | `/procurement/rfq/new` |
 | Requisitions | `/procurement/requisitions` |
+| Requisition Detail | `/procurement/requisitions/[id]` |
+| Create Requisition | `/procurement/requisitions/new` |
 | Purchase Orders | `/procurement/purchase-orders` |
+| PO Detail | `/procurement/purchase-orders/[id]` |
 | GRN | `/procurement/grn` |
 | Approvals | `/procurement/approvals` |
+| Inventory | `/procurement/inventory` |
 | Stock | `/procurement/stock` |
 | Field Stock | `/procurement/field-stock` |
+| Stock Portal | `/stock/portal` |
 | Suppliers | `/suppliers` |

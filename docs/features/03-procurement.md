@@ -10,6 +10,11 @@ The Procurement module is a **comprehensive procurement management system** that
 - **Supplier Management**: Supplier invitations and quote submissions
 - **Stock Control**: Inventory tracking and movement history
 - **Cable Drum Management**: Specialized tracking for fiber cable drums
+- **Purchase Requisitions**: Request-to-approve workflow with auto/manual approval (auto-approved below R10,000)
+- **Approval Workflows**: Multi-level, threshold-based approval for all document types
+- **Stock Adjustments**: Direct quantity adjustments with reason codes and audit trail
+- **Stock Takes**: Full cycle counting with variance approval (draft → in_progress → pending_review → approved)
+- **Field Stock**: Location-based inventory with pickings, returns, consumptions
 
 ### Key Features
 - Multi-step procurement workflows
@@ -17,8 +22,40 @@ The Procurement module is a **comprehensive procurement management system** that
 - Automated quote comparison
 - Real-time stock levels
 - Audit trail for all transactions
+- Purchase requisition to PO conversion
+- Unified approval dashboard for all document types
+- Stock take with automatic quant updates on approval
+- Direct stock adjustments with audit trail and reason codes
+- Mobile storeman portal (PWA)
+- Field stock pickings and accountability tracking
 
-## Database Schema
+## Current Architecture (2026)
+
+### Key Tables (Added 2026)
+| Table | Purpose |
+|-------|---------|
+| `purchase_requisitions` | Purchase request header |
+| `purchase_requisition_items` | Requisition line items |
+| `approval_workflows` | Workflow definitions per document type |
+| `approval_levels` | Multi-level approval thresholds |
+| `approval_requests` | Pending approval instances |
+| `stock_quants` | Current stock per (item, location, lot) |
+| `stock_locations` | Warehouses, technician vans, virtual locations |
+| `stock_takes` | Stock take header (draft→in_progress→pending_review→approved) |
+| `stock_take_lines` | Count lines with variance tracking |
+| `stock_take_adjustments` | Adjustment records from approved takes |
+| `field_stock_movements` | All field stock movements (pickings, adjustments, returns) |
+| `stock_pickings` | Material issue/receipt/transfer records |
+| `stock_adjustment_reasons` | 10 predefined reason codes |
+
+### Key API Patterns
+- All APIs use `apiResponse` from `@/lib/apiResponse` for consistent responses
+- Auth via `withAuth` middleware (cookie-based JWT)
+- Approval endpoints operate on `approval_requests.id`, not document IDs
+- Stock quant updates use UPSERT on `(stock_item_id, location_id, lot_number)`
+- No conditional SQL fragments — use explicit query branches (Neon driver limitation)
+
+## Database Schema (Original)
 
 ### Procurement Tables (14 tables)
 
