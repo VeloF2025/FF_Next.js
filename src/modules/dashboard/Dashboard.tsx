@@ -3,6 +3,7 @@ import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, Trendi
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { QuickActions } from './components/QuickActions';
+import { StaleProjectsWidget } from './components/StaleProjectsWidget';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { useMainDashboardData } from '../../hooks/useDashboardData';
 import { getMainDashboardCards } from '../../config/dashboards/dashboardConfigs';
@@ -192,6 +193,11 @@ export function Dashboard() {
         <div className="grid grid-cols-1">
           <RecentActivityFeed />
         </div>
+      )}
+
+      {/* Stale Projects Alert Widget */}
+      {hasPermission(Permission.PROJECTS_READ) && (
+        <StaleProjectsWidget />
       )}
 
       {/* Additional KPI Cards for Analytics Users */}
