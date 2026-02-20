@@ -72,6 +72,8 @@ interface POListItem {
   total: number;
   itemCount: number;
   createdAt: string;
+  odooPoId: number | null;
+  odooSyncedAt: string | null;
 }
 
 // Types for GRN
@@ -305,7 +307,8 @@ function PurchaseOrdersTabContent() {
   const filtered = orders.filter(
     (po) =>
       po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      po.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
+      po.supplierName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(po.odooPoId || '').includes(searchTerm)
   );
 
   if (isLoading) {
@@ -359,7 +362,14 @@ function PurchaseOrdersTabContent() {
                 <div className="flex items-center gap-3">
                   <ShoppingCart className="h-5 w-5 text-[var(--ff-text-tertiary)]" />
                   <div>
-                    <p className="font-medium text-[var(--ff-text-primary)]">{po.poNumber}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-[var(--ff-text-primary)]">{po.poNumber}</p>
+                      {po.odooPoId && (
+                        <span className="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                          Odoo #{po.odooPoId}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-[var(--ff-text-secondary)]">{po.supplierName}</p>
                   </div>
                 </div>
