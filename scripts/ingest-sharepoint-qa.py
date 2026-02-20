@@ -69,6 +69,27 @@ PROJECT_FOLDERS = {
         "folders": {},
         "sp_folder_id": "01XUF54KDR25PVMKXSHRFIIKG4SLAJ6WFP",
     },
+    "Thembisa POP 1": {
+        "project_db_id": "7d8b94d6-8e5a-4dbb-9ede-69ce3884e004",
+        "pole_prefix": "TEM.P.",
+        "joint_prefix": "TEM.AGG.DM.",
+        "folders": {
+            "pole_planting": "01XUF54KBLL6VWY2PRYZH3L2HSDEAYX2NH",
+            "cpac_civils": "01XUF54KAE2BUB2JR4YNFLOS4LJ3NV56FF",
+            "pop_civils": "01XUF54KFARNMGVRIQ3VGK3X5OJIBK4MQU",
+        },
+        "sp_folder_id": "01XUF54KDAUM2LVJJIZRCZSS6BFL7NUCVF",  # POP 1 root
+    },
+    "Thembisa POP 3": {
+        "project_db_id": "1de088dd-fe24-43fb-b8d3-94fca61ef91d",
+        "pole_prefix": "TEM.P.",
+        "joint_prefix": "TEM.AGG.DM.",
+        "folders": {
+            "cpac_civils": "01XUF54KAF6EZ4SVIP2JGI3GEZFHFR42QH",
+            "pop_civils": "01XUF54KA5KAE2SQUKZVDY4HT73LABBUOA",
+        },
+        "sp_folder_id": "01XUF54KFDHXSE3DSBCNCYMGDBVZ2H2XMC",  # POP 3 root
+    },
 }
 
 # Regex to extract pole number from filenames like LAW.P.A013.JPG or LAW.P.A013_1.JPG
@@ -320,6 +341,15 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
     add_to_existing = {}  # pole_number -> [photo, ...] for poles with existing reviews
     unmatched = []
     skipped_duplicate = 0
+
+    # Reconnect to DB — SharePoint scan may have taken long enough to cause idle timeout
+    try:
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+    conn = psycopg2.connect(db_url)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     # Load existing photo storage_keys to avoid duplicate photo inserts
     cur.execute(
