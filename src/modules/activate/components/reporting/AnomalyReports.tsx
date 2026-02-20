@@ -227,8 +227,51 @@ function DiscrepancySection({
     { id: 'all', label: 'All Records', count: data.records.length, color: 'blue' },
   ];
 
+  // Detect when WA and OES datasets are non-overlapping (both non-zero but 0 matched)
+  const hasNonOverlappingData =
+    data.summary.matched === 0 &&
+    data.summary.total_wa_submissions > 0 &&
+    data.summary.total_oes_activations > 0;
+
+  // Detect when only one side has data (possible date range issue)
+  const onlyWaData =
+    data.summary.total_wa_submissions > 0 &&
+    data.summary.total_oes_activations === 0;
+  const onlyOesData =
+    data.summary.total_oes_activations > 0 &&
+    data.summary.total_wa_submissions === 0;
+
   return (
     <div className="space-y-6">
+      {/* Contextual warnings for date mismatch */}
+      {hasNonOverlappingData && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <span className="font-medium">Date mismatch detected:</span> WA submissions and OES activations exist but none overlap.
+            Try a wider date range or check if OES data has been imported for this period.
+          </p>
+        </div>
+      )}
+      {onlyWaData && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-blue-800 dark:text-blue-300">
+            <span className="font-medium">No OES activations found</span> for this date.
+            OES data is typically imported the next business day — try selecting a date from a previous day.
+          </p>
+        </div>
+      )}
+      {onlyOesData && (
+        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-purple-600 dark:text-purple-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-purple-800 dark:text-purple-300">
+            <span className="font-medium">No WA submissions found</span> for this date, but OES activations exist.
+            These may be manual activations or the WA date filter needs adjustment.
+          </p>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <ReportCardGrid columns={5}>
         <ReportCard

@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react';
 import { Trophy, Users, CheckCircle, Medal } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type {
   ReportFilters,
   TeamPerformanceResponse,
@@ -126,7 +127,7 @@ export function TeamReports({ filters, refreshKey }: TeamReportsProps) {
         />
         <ReportCard
           title="Top Performer"
-          value={data?.summary?.top_performer || '-'}
+          value={formatTechnicianName(data?.summary?.top_performer ?? null)}
           color="cyan"
           icon={<Trophy className="h-4 w-4" />}
           isLoading={isLoading}
@@ -256,7 +257,16 @@ function TeamComparisonSection({
   }
 
   if (data.length === 0) {
-    return <EmptyState message="No team data available" />;
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p className="font-medium">No team data available</p>
+        <p className="text-sm mt-1">
+          Teams appear when OES activations include a team name. Ensure technicians are
+          assigned to teams in the OES system for this date range.
+        </p>
+      </div>
+    );
   }
 
   // Prepare data for chart
@@ -580,6 +590,22 @@ function EmptyState({ message }: { message: string }) {
       <p>{message}</p>
     </div>
   );
+}
+
+/**
+ * Format a technician name: if it looks like a raw phone number (all digits),
+ * reformat it as a local number. Otherwise return as-is.
+ */
+function formatTechnicianName(name: string | null): string {
+  if (!name) return '-';
+  // Matches pure digit strings ≥ 10 chars (e.g. WhatsApp IDs like 199669355409424)
+  const digitsOnly = name.replace(/\s/g, '');
+  if (/^\+?\d{10,}$/.test(digitsOnly)) {
+    // Strip country code prefix 27 → 0, then group as 0XX XXX XXXX
+    const local = digitsOnly.replace(/^27/, '0').replace(/^(\d{3})(\d{3})(\d{4})$/, '$1 $2 $3');
+    return local;
+  }
+  return name;
 }
 
 export default TeamReports;

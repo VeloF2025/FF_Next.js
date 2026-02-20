@@ -25,6 +25,7 @@ import {
   Download,
   ExternalLink,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import type {
   ReportFilters,
   SerialSwapReportResponse,
@@ -101,7 +102,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       // Refresh data
       fetchData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      toast.error(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setActionLoading(null);
     }
@@ -129,7 +130,7 @@ export function SerialSwapReports({ filters, refreshKey }: SerialSwapReportsProp
       a.download = `serial-swaps-${statusLabel}-${filters.dateFrom}-to-${filters.dateTo}.csv`;
       a.click();
     } catch (err) {
-      alert('Export failed');
+      toast.error('Export failed. Please try again.');
     }
   };
 

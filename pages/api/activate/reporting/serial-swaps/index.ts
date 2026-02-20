@@ -74,7 +74,12 @@ async function handler(
     }
 
     if (status) {
-      conditions.push(`serial_swap_status = $${paramIndex}`);
+      // NULL status means newly detected (implicitly pending_correction)
+      if (status === 'pending_correction') {
+        conditions.push(`(serial_swap_status = $${paramIndex} OR serial_swap_status IS NULL)`);
+      } else {
+        conditions.push(`serial_swap_status = $${paramIndex}`);
+      }
       params.push(status as string);
       paramIndex++;
     }
@@ -85,7 +90,7 @@ async function handler(
     const summaryQuery = `
       SELECT
         COUNT(*) FILTER (WHERE serial_swap_detected = true) as total_detected,
-        COUNT(*) FILTER (WHERE serial_swap_status = 'pending_correction') as pending_correction,
+        COUNT(*) FILTER (WHERE serial_swap_status = 'pending_correction' OR serial_swap_status IS NULL) as pending_correction,
         COUNT(*) FILTER (WHERE serial_swap_status = 'corrected_in_1map') as corrected,
         COUNT(*) FILTER (WHERE serial_swap_status = 'false_positive') as false_positive,
         AVG(
@@ -95,7 +100,7 @@ async function handler(
           END
         ) as avg_resolution_days,
         COUNT(*) FILTER (
-          WHERE serial_swap_status = 'pending_correction'
+          WHERE (serial_swap_status = 'pending_correction' OR serial_swap_status IS NULL)
           AND serial_swap_detected_at < NOW() - interval '7 days'
         ) as backlog_over_7_days
       FROM dr_photo_unified_reviews
