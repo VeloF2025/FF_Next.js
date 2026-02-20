@@ -143,31 +143,39 @@ function RequisitionsTabContent() {
   const router = useRouter();
   const [requisitions, setRequisitions] = useState<RequisitionListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchRequisitions();
   }, []);
 
-  const fetchRequisitions = async () => {
+  const fetchRequisitions = async (page = 1, append = false) => {
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/procurement/requisitions');
+      if (page === 1) setIsLoading(true);
+      else setIsLoadingMore(true);
+      const response = await fetch(`/api/procurement/requisitions?limit=500&page=${page}`);
       const data = await response.json();
       if (data.success) {
-        setRequisitions(data.data || []);
+        const items = data.data || [];
+        setRequisitions(prev => append ? [...prev, ...items] : items);
+        setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
       log.error('Failed to fetch requisitions', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
   const filtered = requisitions.filter(
     (r) =>
       r.requisitionNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.projectName?.toLowerCase().includes(searchTerm.toLowerCase())
+      r.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.requestedByName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (isLoading) {
@@ -199,6 +207,13 @@ function RequisitionsTabContent() {
           New Requisition
         </button>
       </div>
+
+      {totalCount > 0 && (
+        <p className="text-sm text-[var(--ff-text-tertiary)]">
+          Showing {filtered.length} of {totalCount} requisition{totalCount !== 1 ? 's' : ''}
+          {searchTerm && ` (filtered from ${requisitions.length})`}
+        </p>
+      )}
 
       <div className="space-y-2">
         {filtered.map((req) => {
@@ -237,6 +252,20 @@ function RequisitionsTabContent() {
           </div>
         )}
       </div>
+
+      {requisitions.length < totalCount && (
+        <button
+          onClick={() => fetchRequisitions(Math.ceil(requisitions.length / 500) + 1, true)}
+          disabled={isLoadingMore}
+          className="w-full py-3 text-sm font-medium text-blue-400 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+        >
+          {isLoadingMore ? (
+            <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</span>
+          ) : (
+            `Load More (${requisitions.length} of ${totalCount})`
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -246,24 +275,30 @@ function PurchaseOrdersTabContent() {
   const router = useRouter();
   const [orders, setOrders] = useState<POListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = 1, append = false) => {
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/procurement/purchase-orders');
+      if (page === 1) setIsLoading(true);
+      else setIsLoadingMore(true);
+      const response = await fetch(`/api/procurement/purchase-orders?pageSize=500&page=${page}`);
       const data = await response.json();
       if (data.success) {
-        setOrders(data.data || []);
+        const items = data.data || [];
+        setOrders(prev => append ? [...prev, ...items] : items);
+        setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
       log.error('Failed to fetch purchase orders', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -303,6 +338,13 @@ function PurchaseOrdersTabContent() {
         </button>
       </div>
 
+      {totalCount > 0 && (
+        <p className="text-sm text-[var(--ff-text-tertiary)]">
+          Showing {filtered.length} of {totalCount} purchase order{totalCount !== 1 ? 's' : ''}
+          {searchTerm && ` (filtered from ${orders.length})`}
+        </p>
+      )}
+
       <div className="space-y-2">
         {filtered.map((po) => {
           const status = poStatusConfig[po.status];
@@ -340,6 +382,20 @@ function PurchaseOrdersTabContent() {
           </div>
         )}
       </div>
+
+      {orders.length < totalCount && (
+        <button
+          onClick={() => fetchOrders(Math.ceil(orders.length / 500) + 1, true)}
+          disabled={isLoadingMore}
+          className="w-full py-3 text-sm font-medium text-blue-400 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+        >
+          {isLoadingMore ? (
+            <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</span>
+          ) : (
+            `Load More (${orders.length} of ${totalCount})`
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -349,31 +405,38 @@ function GRNTabContent() {
   const router = useRouter();
   const [grns, setGrns] = useState<GRNListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchGRNs();
   }, []);
 
-  const fetchGRNs = async () => {
+  const fetchGRNs = async (page = 1, append = false) => {
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/procurement/grn');
+      if (page === 1) setIsLoading(true);
+      else setIsLoadingMore(true);
+      const response = await fetch(`/api/procurement/grn?limit=500&page=${page}`);
       const data = await response.json();
       if (data.success) {
-        setGrns(data.data || []);
+        const items = data.data || [];
+        setGrns(prev => append ? [...prev, ...items] : items);
+        setTotalCount(data.pagination?.total || items.length);
       }
     } catch (err) {
       log.error('Failed to fetch GRNs', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
   const filtered = grns.filter(
     (grn) =>
       grn.grnNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      grn.purchaseOrderNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+      grn.purchaseOrderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      grn.supplierName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (isLoading) {
@@ -405,6 +468,13 @@ function GRNTabContent() {
           New GRN
         </button>
       </div>
+
+      {totalCount > 0 && (
+        <p className="text-sm text-[var(--ff-text-tertiary)]">
+          Showing {filtered.length} of {totalCount} GRN{totalCount !== 1 ? 's' : ''}
+          {searchTerm && ` (filtered from ${grns.length})`}
+        </p>
+      )}
 
       <div className="space-y-2">
         {filtered.map((grn) => {
@@ -442,6 +512,20 @@ function GRNTabContent() {
           </div>
         )}
       </div>
+
+      {grns.length < totalCount && (
+        <button
+          onClick={() => fetchGRNs(Math.ceil(grns.length / 500) + 1, true)}
+          disabled={isLoadingMore}
+          className="w-full py-3 text-sm font-medium text-blue-400 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+        >
+          {isLoadingMore ? (
+            <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading...</span>
+          ) : (
+            `Load More (${grns.length} of ${totalCount})`
+          )}
+        </button>
+      )}
     </div>
   );
 }
