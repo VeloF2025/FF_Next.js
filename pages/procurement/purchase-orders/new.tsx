@@ -28,6 +28,7 @@ interface POItem {
 
 interface Supplier {
   id: string;
+  name: string;
   companyName: string;
 }
 
@@ -35,6 +36,7 @@ interface Project {
   id: string;
   name: string;
   project_code: string;
+  status: string;
 }
 
 const UOM_OPTIONS = [
@@ -122,10 +124,15 @@ export default function NewPurchaseOrderPage() {
 
   const fetchProjects = async () => {
     try {
-      const response = await fetch('/api/projects?status=active');
+      const response = await fetch('/api/projects');
       const data = await response.json();
       if (data.success) {
-        setProjects(data.data || []);
+        const all = data.data || [];
+        const eligible = all.filter((p: Project) => {
+          const s = p.status?.toLowerCase();
+          return s === 'active' || s === 'planning';
+        });
+        setProjects(eligible);
       }
     } catch (err) {
       log.error('Failed to fetch projects', err);
@@ -296,7 +303,7 @@ export default function NewPurchaseOrderPage() {
                   <option value="">Select a supplier</option>
                   {suppliers.map((supplier) => (
                     <option key={supplier.id} value={supplier.id}>
-                      {supplier.companyName}
+                      {supplier.companyName || supplier.name}
                     </option>
                   ))}
                 </select>
