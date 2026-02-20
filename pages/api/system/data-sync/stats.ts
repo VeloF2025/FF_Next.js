@@ -29,10 +29,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Fetch OLT stats
     const oltStats = await getOltStats();
 
+    // Fetch QField stats
+    const qfieldStats = await getQFieldStats();
+
     const stats: DataSyncStats = {
       maintenance: maintenanceStats,
       activate: activateStats,
       olt: oltStats,
+      qfield: qfieldStats,
     };
 
     return res.status(200).json({ success: true, data: stats });
@@ -176,6 +180,30 @@ async function getOltStats() {
       fixedThisWeek: 0,
       totalImported: 0,
     };
+  }
+}
+
+async function getQFieldStats() {
+  try {
+    const projectsResult = await sql`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE sync_enabled = true) as active
+      FROM qfield_projects
+    `;
+    const totalProjects = parseInt(projectsResult[0]?.total || '0', 10);
+    const activeProjects = parseInt(projectsResult[0]?.active || '0', 10);
+
+    const lastSyncResult = await sql`
+      SELECT MAX(last_synced_at) as last_sync
+      FROM qfield_projects
+      WHERE sync_enabled = true
+    `;
+    const lastSync = lastSyncResult[0]?.last_sync || null;
+
+    return { totalProjects, activeProjects, lastSync };
+  } catch {
+    return { totalProjects: 0, activeProjects: 0, lastSync: null };
   }
 }
 

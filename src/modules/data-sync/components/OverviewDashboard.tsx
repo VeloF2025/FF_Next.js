@@ -18,7 +18,7 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Upload,
-  Users,
+  Map,
 } from 'lucide-react';
 import type { TabGroupId, DataSyncStats } from '../types';
 
@@ -62,6 +62,14 @@ const CATEGORY_CARDS: {
     description: 'Nokia OLT report import, serial mismatch fixes, and 1Map integration',
     color: 'text-red-400',
     bgColor: 'bg-red-500/10',
+  },
+  {
+    id: 'qfield',
+    label: 'QField',
+    icon: Map,
+    description: 'QFieldCloud project management, sync configuration, and field data integration',
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/10',
   },
   {
     id: 'history',
@@ -180,6 +188,19 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             icon: CheckCircle,
           },
         ];
+      case 'qfield':
+        return stats.qfield ? [
+          {
+            label: 'Active Projects',
+            value: stats.qfield.activeProjects.toString(),
+            icon: Map,
+          },
+          {
+            label: 'Last Sync',
+            value: formatRelativeTime(stats.qfield.lastSync),
+            icon: Clock,
+          },
+        ] : [];
       case 'history':
         return [
           { label: 'View All', value: 'Timeline', icon: Clock },
@@ -200,7 +221,9 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
             </div>
             <span className="text-sm text-[var(--ff-text-secondary)]">Total Sync Sources</span>
           </div>
-          <p className="text-3xl font-bold text-[var(--ff-text-primary)]">3</p>
+          <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
+            {accessibleGroups ? accessibleGroups.filter(g => g !== 'history').length : CATEGORY_CARDS.filter(c => c.id !== 'history').length}
+          </p>
         </div>
 
         {loading ? (
