@@ -27,7 +27,7 @@ import type {
 import { useProcurementPortalOptional } from '../context/ProcurementPortalProvider';
 
 // Define category structure
-type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'approvals' | 'reports';
+type CategoryId = 'dashboard' | 'sourcing' | 'purchasing' | 'inventory' | 'field-stock' | 'approvals' | 'reports';
 
 interface SubTab {
   id: ProcurementTabId;
@@ -55,7 +55,7 @@ const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'purchase-orders': 'purchasing',
   'grn': 'purchasing',
   'stock': 'inventory',
-  'field-stock': 'inventory',
+  'field-stock': 'field-stock',
   'approvals': 'approvals',
   'reports': 'reports',
 };
@@ -130,6 +130,13 @@ export function ProcurementTabs({
       icon: Boxes,
       subTabs: [
         { id: 'stock', label: 'Stock Management', icon: Package, permission: 'canAccessStock', path: '/procurement/inventory' },
+      ]
+    },
+    {
+      id: 'field-stock',
+      label: 'Field Stock',
+      icon: MapPin,
+      subTabs: [
         { id: 'field-stock', label: 'Field Stock', icon: MapPin, permission: 'canAccessFieldStock', path: '/procurement/field-stock' },
       ]
     },

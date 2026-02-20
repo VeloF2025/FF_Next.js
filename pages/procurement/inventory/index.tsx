@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { GetServerSideProps } from 'next';
-import Link from 'next/link';
 import { AppLayout } from '@/components/layout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { useTabPersistence } from '@/modules/procurement/hooks';
@@ -34,8 +33,6 @@ import {
   Calendar,
   Filter,
   Download,
-  MapPin,
-  ExternalLink,
 } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
@@ -1318,14 +1315,6 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
                   </button>
                 );
               })}
-              <Link
-                href="/procurement/field-stock"
-                className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-secondary)] transition-colors"
-              >
-                <MapPin className="h-4 w-4" />
-                Field Stock
-                <ExternalLink className="h-3 w-3 opacity-50" />
-              </Link>
             </nav>
           </div>
         </div>
