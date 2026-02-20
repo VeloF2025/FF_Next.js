@@ -90,7 +90,6 @@ interface PurchaseOrderDetail {
   createdBy: string | null;
   createdAt: string;
   odooPoId: number | null;
-  odooSyncedAt: string | null;
   updatedAt: string;
   items: POLineItem[];
   history: POHistoryEvent[];
@@ -487,11 +486,6 @@ export default function PurchaseOrderDetailPage() {
                     <span className="text-orange-600 dark:text-orange-400">
                       Reference: #{purchaseOrder.odooPoId}
                     </span>
-                    {purchaseOrder.odooSyncedAt && (
-                      <span className="text-xs text-orange-500">
-                        Synced {new Date(purchaseOrder.odooSyncedAt).toLocaleDateString()}
-                      </span>
-                    )}
                   </div>
                 )}
               </div>

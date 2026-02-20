@@ -73,7 +73,6 @@ interface POListItem {
   itemCount: number;
   createdAt: string;
   odooPoId: number | null;
-  odooSyncedAt: string | null;
 }
 
 // Types for GRN

@@ -66,8 +66,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.current_approval_request_id,
         po.approved_by,
         po.approved_at,
-        po.odoo_po_id,
-        po.odoo_synced_at
+        po.odoo_po_id
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
@@ -169,7 +168,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       approvedAt: po.approved_at,
       // Odoo integration
       odooPoId: po.odoo_po_id || null,
-      odooSyncedAt: po.odoo_synced_at || null,
       // Quote comparison for approvers
       quoteComparison,
       items,

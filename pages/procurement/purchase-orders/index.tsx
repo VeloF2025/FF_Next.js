@@ -45,7 +45,6 @@ interface POListItem {
   createdByName: string;
   createdAt: string;
   odooPoId: number | null;
-  odooSyncedAt: string | null;
 }
 
 const statusConfig: Record<POStatus, { label: string; color: string; icon: typeof Clock }> = {
