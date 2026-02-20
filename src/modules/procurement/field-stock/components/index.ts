@@ -23,3 +23,6 @@ export { ReturnList, CreateReturnModal, ReturnInspectionForm } from './returns';
 
 // Accountability
 export { ContractorAccountabilityList } from './accountability';
+
+// Adjustments
+export { AdjustmentPanel, CreateAdjustmentForm } from './adjustments';

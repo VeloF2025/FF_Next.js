@@ -43,6 +43,7 @@ import { BundleItemsModal } from '@/components/procurement/bundles';
 // Import existing components
 import { StockItemsPage } from '@/modules/stock-items';
 import StockManagement from '@/modules/procurement/stock/StockManagement';
+import { AdjustmentPanel } from '@/modules/procurement/field-stock/components/adjustments';
 
 interface InventoryPageProps {
   projectId?: string;
@@ -54,6 +55,7 @@ const TABS = [
   { id: 'categories', label: 'Categories', icon: FolderTree },
   { id: 'bundles', label: 'Bundles', icon: PackagePlus },
   { id: 'takes', label: 'Takes', icon: ClipboardCheck },
+  { id: 'adjustments', label: 'Adjustments', icon: Settings },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
 ] as const;
 
@@ -1330,6 +1332,7 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
               {activeTab === 'categories' && <CategoriesTabContent />}
               {activeTab === 'bundles' && <BundlesTabContent />}
               {activeTab === 'takes' && <StockTakesTabContent />}
+              {activeTab === 'adjustments' && <AdjustmentPanel />}
               {activeTab === 'reports' && <BundleReportsTabContent />}
             </>
           )}

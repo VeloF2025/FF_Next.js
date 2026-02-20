@@ -36,10 +36,12 @@ import {
   Loader2,
   ShoppingCart,
   AlertTriangle,
+  Settings,
 } from 'lucide-react';
 import { FaultReportList } from '@/modules/procurement/field-stock/components/faults';
+import { AdjustmentPanel } from '@/modules/procurement/field-stock/components/adjustments';
 
-type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults';
+type TabType = 'dashboard' | 'locations' | 'serials' | 'consumptions' | 'pickings' | 'returns' | 'accountability' | 'faults' | 'adjustments';
 
 interface TabConfig {
   id: TabType;
@@ -96,6 +98,12 @@ const tabs: TabConfig[] = [
     label: 'Faults',
     icon: <AlertTriangle className="h-5 w-5" />,
     description: 'Equipment fault reports and analytics'
+  },
+  {
+    id: 'adjustments',
+    label: 'Adjustments',
+    icon: <Settings className="h-5 w-5" />,
+    description: 'Stock quantity adjustments'
   },
 ];
 
@@ -257,6 +265,8 @@ export default function FieldStockPage() {
         return <AccountabilityTabContent />;
       case 'faults':
         return <FaultReportList />;
+      case 'adjustments':
+        return <AdjustmentPanel />;
       default:
         return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
     }

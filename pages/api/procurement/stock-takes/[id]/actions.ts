@@ -150,16 +150,110 @@ async function handleApprove(
     RETURNING *
   `;
 
-  // Mark all lines as verified
+  // Get ADJUST virtual location
+  const adjustLoc = await sql`SELECT id FROM stock_locations WHERE code = 'ADJUST'`;
+  const adjustLocationId = adjustLoc.length > 0 ? (adjustLoc[0]!.id as string) : null;
+
+  // Fetch lines with non-zero variance
+  const varianceLines = await sql`
+    SELECT stl.*, si.standard_cost
+    FROM stock_take_lines stl
+    JOIN stock_items si ON si.id = stl.stock_item_id
+    WHERE stl.stock_take_id = ${id} AND stl.variance_quantity != 0
+  `;
+
+  const takeRef = (current.reference_number as string) || id;
+  const takeLocationId = current.location_id as string;
+
+  // Apply variance adjustments to stock_quants
+  for (const line of varianceLines) {
+    const finalCount = (line.recount_quantity ?? line.counted_quantity) as number;
+    const expected = line.expected_quantity as number;
+    const variance = finalCount - expected;
+    const itemId = line.stock_item_id as string;
+    const lineLocationId = (line.location_id as string) || takeLocationId;
+    const unitCost = (line.standard_cost as number) || 0;
+
+    if (variance > 0) {
+      // Found more stock - increase at location
+      await sql`
+        INSERT INTO stock_quants (stock_item_id, location_id, quantity, last_movement_date)
+        VALUES (${itemId}, ${lineLocationId}, ${variance}, NOW())
+        ON CONFLICT (stock_item_id, location_id, lot_number)
+        DO UPDATE SET
+          quantity = stock_quants.quantity + ${variance},
+          last_movement_date = NOW(),
+          updated_at = NOW()
+      `;
+    } else {
+      // Found less stock - decrease at location
+      await sql`
+        UPDATE stock_quants
+        SET
+          quantity = quantity + ${variance},
+          last_movement_date = NOW(),
+          updated_at = NOW()
+        WHERE stock_item_id = ${itemId}
+          AND location_id = ${lineLocationId}
+      `;
+    }
+
+    // Record stock movement
+    const fromLoc = variance > 0 ? adjustLocationId : lineLocationId;
+    const toLoc = variance > 0 ? lineLocationId : adjustLocationId;
+    await sql`
+      INSERT INTO stock_movements (
+        stock_item_id, movement_type, from_location_id, to_location_id,
+        quantity, reference, notes, performed_by, performed_at
+      ) VALUES (
+        ${itemId}, 'adjustment', ${fromLoc}, ${toLoc},
+        ${Math.abs(variance)}, ${'ST-' + takeRef},
+        ${'Stock take variance adjustment'},
+        ${data.approved_by_name || 'system'}, NOW()
+      )
+    `;
+
+    // Record stock_take_adjustments
+    const adjType = variance > 0 ? 'increase' : 'decrease';
+    await sql`
+      INSERT INTO stock_take_adjustments (
+        stock_take_id, stock_take_line_id, stock_item_id,
+        adjustment_type, quantity_before, quantity_after, adjustment_quantity,
+        unit_cost, adjustment_value, reason_code, reason_description,
+        approved_by, approved_at, created_by_name
+      ) VALUES (
+        ${id}, ${line.id}, ${itemId},
+        ${adjType}, ${expected}, ${finalCount}, ${Math.abs(variance)},
+        ${unitCost}, ${Math.abs(variance) * unitCost}, 'COUNT_ERROR',
+        ${'Variance from stock take ' + takeRef},
+        ${data.approved_by_name || null}, NOW(), ${data.approved_by_name || 'system'}
+      )
+    `;
+
+    // Mark this line as adjusted
+    await sql`
+      UPDATE stock_take_lines
+      SET status = 'adjusted', updated_at = NOW()
+      WHERE id = ${line.id}
+    `;
+  }
+
+  // Mark remaining (zero-variance) lines as verified
   await sql`
     UPDATE stock_take_lines
     SET status = 'verified', updated_at = NOW()
-    WHERE stock_take_id = ${id} AND status != 'adjusted'
+    WHERE stock_take_id = ${id} AND status NOT IN ('adjusted', 'verified')
   `;
+
+  log.info('Stock take approved with adjustments', {
+    stockTakeId: id,
+    varianceLinesCount: varianceLines.length,
+  }, 'procurement:stock-takes');
 
   return apiResponse.success(res, {
     ...result[0],
-    message: 'Stock take approved'
+    adjustments_applied: varianceLines.length,
+    message: `Stock take approved. ${varianceLines.length} variance adjustment(s) applied.`
   });
 }
 
