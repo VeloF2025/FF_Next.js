@@ -96,7 +96,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Alert stats
       sql`
         SELECT
-          (SELECT COUNT(*) FROM stock_items WHERE qty_available <= min_stock_level AND min_stock_level > 0 AND is_active = true) as low_stock,
+          (SELECT COUNT(*) FROM stock_items si2 WHERE si2.min_stock_level > 0 AND si2.is_active = true
+            AND COALESCE((SELECT SUM(sq2.quantity) FROM stock_quants sq2 WHERE sq2.stock_item_id = si2.id), 0) <= si2.min_stock_level
+          ) as low_stock,
           (SELECT COUNT(*) FROM stock_returns WHERE status = 'pending') as pending_returns,
           (SELECT COUNT(*) FROM contractor_stock_accountability WHERE is_blocked = true) as blocked_contractors
       `,
