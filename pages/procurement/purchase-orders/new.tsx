@@ -13,6 +13,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { StockItemSearch } from '@/modules/procurement/components/StockItemSearch';
 
 // Types
 interface POItem {
@@ -143,6 +144,15 @@ export default function NewPurchaseOrderPage() {
 
   const handleItemChange = (index: number, field: keyof POItem, value: string | number) => {
     setItems(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
+
+  const handleStockItemSelect = (index: number, stockItem: { item_code: string; name: string; uom: string }) => {
+    setItems(items.map((item, i) => i === index ? {
+      ...item,
+      itemDescription: stockItem.name,
+      itemCode: stockItem.item_code,
+      uom: stockItem.uom || item.uom,
+    } : item));
   };
 
   const calculateLineTotal = (quantity: number, unitPrice: number) => {
@@ -468,12 +478,10 @@ export default function NewPurchaseOrderPage() {
                   {items.map((item, index) => (
                     <tr key={item.id}>
                       <td className="px-2 py-2">
-                        <input
-                          type="text"
+                        <StockItemSearch
                           value={item.itemDescription}
-                          onChange={(e) => handleItemChange(index, 'itemDescription', e.target.value)}
-                          className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                          placeholder="Item description"
+                          onChange={(val) => handleItemChange(index, 'itemDescription', val)}
+                          onSelect={(stockItem) => handleStockItemSelect(index, stockItem)}
                         />
                       </td>
                       <td className="px-2 py-2">
@@ -483,6 +491,7 @@ export default function NewPurchaseOrderPage() {
                           onChange={(e) => handleItemChange(index, 'itemCode', e.target.value)}
                           className="w-full px-2 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-blue-500/50"
                           placeholder="SKU"
+                          readOnly={false}
                         />
                       </td>
                       <td className="px-2 py-2">
