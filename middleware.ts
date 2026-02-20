@@ -50,10 +50,10 @@ function setSecurityHeaders(response: NextResponse) {
     "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.fibreflow.app https://firebasestorage.googleapis.com",
-    "connect-src 'self' https://*.fibreflow.app https://*.neon.tech wss://*.neon.tech",
+    "connect-src 'self' https://*.fibreflow.app https://*.neon.tech wss://*.neon.tech https://cloudflareinsights.com",
   ].join('; '));
   if (process.env.NODE_ENV === 'production') {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
