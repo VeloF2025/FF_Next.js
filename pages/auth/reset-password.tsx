@@ -99,16 +99,17 @@ export default function ResetPasswordPage() {
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
         <p className="text-sm text-blue-200">
-          <CheckCircle className="w-4 h-4 inline mr-1" />
+          <CheckCircle className="w-4 h-4 inline mr-1" aria-hidden="true" />
           Create a new password for your account
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label htmlFor="reset-new-password" className="block text-sm font-medium text-slate-300 mb-2">
           New Password
         </label>
         <VelocityInput
+          id="reset-new-password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -122,16 +123,18 @@ export default function ResetPasswordPage() {
           disabled={loading}
           disableFloating
         />
-        <p className="mt-1 text-xs text-slate-500">
+        {/* text-slate-400 (7:1) — text-slate-500 would fail WCAG 1.4.3 on dark bg */}
+        <p className="mt-1 text-xs text-slate-400">
           Min 8 characters with uppercase, lowercase, number, and special character
         </p>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-slate-300 mb-2">
           Confirm Password
         </label>
         <VelocityInput
+          id="reset-confirm-password"
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
@@ -300,7 +303,7 @@ export default function ResetPasswordPage() {
 
                 {/* Error message (for form validation errors) */}
                 {error && pageState === 'form' && (
-                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/40 rounded-lg">
+                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/40 rounded-lg" role="alert" aria-live="polite">
                     <p className="text-red-200 text-sm text-center">{error}</p>
                   </div>
                 )}
@@ -315,7 +318,7 @@ export default function ResetPasswordPage() {
                       <p className="text-sm italic text-slate-300 mb-2">
                         &quot;{quote.text}&quot;
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-400">
                         — {quote.author}
                       </p>
                     </div>

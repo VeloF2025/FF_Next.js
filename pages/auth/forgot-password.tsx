@@ -68,10 +68,11 @@ export default function ForgotPasswordPage() {
   const renderForm = () => (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label htmlFor="forgot-email" className="block text-sm font-medium text-slate-300 mb-2">
           Email Address
         </label>
         <VelocityInput
+          id="forgot-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -194,7 +195,7 @@ export default function ForgotPasswordPage() {
 
                 {/* Error message */}
                 {error && (
-                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/40 rounded-lg">
+                  <div className="mb-6 p-4 bg-red-500/20 border border-red-500/40 rounded-lg" role="alert" aria-live="polite">
                     <p className="text-red-200 text-sm text-center">{error}</p>
                   </div>
                 )}

@@ -4,6 +4,9 @@
  * Checklist grouped by phase (accordion).
  * Each item has: checkbox, description, responsible party badge,
  * date completed, notes field.
+ *
+ * WCAG 2.1 AA — refactored 2026-02-21
+ *   Uses AccessibleAccordion, ProgressBar, AccessibleCheckbox from @/components/accessible
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -14,6 +17,13 @@ import type {
   PrereqPhaseGroup,
   PrereqItem,
 } from '@/types/pon-stages.types';
+import {
+  AccessibleAccordion,
+  AccessibleCheckbox,
+  ProgressBar,
+  PREREQ_THRESHOLDS,
+  type AccordionItemConfig,
+} from '@/components/accessible';
 
 interface ProjectPrereqsProps {
   projectId: string;
@@ -79,14 +89,14 @@ const PARTY_COLORS: Record<string, string> = {
   client: 'bg-amber-500/20 text-amber-400',
 };
 
-function getProgressColor(pct: number): string {
-  if (pct === 0) return 'bg-gray-600';
-  if (pct < 50) return 'bg-red-500';
-  if (pct < 80) return 'bg-amber-500';
-  return 'bg-emerald-500';
-}
+// ─── PrereqItemRow ────────────────────────────────────────────────────────────
 
-function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
+function PrereqItemRow({
+  item,
+  onToggle,
+  onUpdateNotes,
+  onNavigate,
+}: {
   item: PrereqItem;
   onToggle: (id: string, completed: boolean) => void;
   onUpdateNotes: (id: string, notes: string) => void;
@@ -100,164 +110,192 @@ function PrereqItemRow({ item, onToggle, onUpdateNotes, onNavigate }: {
     ? PARTY_COLORS[item.responsible_party] || 'bg-gray-500/20 text-gray-400'
     : '';
 
-  return (
-    <div className={`border-b border-[var(--ff-border-light)] last:border-0 ${
-      item.is_completed ? 'opacity-70' : ''
-    }`}>
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Checkbox — read-only for auto-detected items */}
-        <button
-          onClick={() => item.auto_status !== 'auto' && onToggle(item.id, !item.is_completed)}
-          className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-            item.is_completed
-              ? item.auto_status === 'auto'
-                ? 'bg-emerald-500 border-emerald-500 cursor-default'
-                : 'bg-emerald-500 border-emerald-500'
-              : 'border-gray-500 hover:border-blue-400'
-          }`}
-          title={item.auto_status === 'auto' ? 'Auto-detected from project data' : undefined}
-        >
-          {item.is_completed && (
-            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          )}
-        </button>
+  // Unique IDs for aria relationships
+  const nameId = `prereq-name-${item.id}`;
+  const hintId = item.auto_status === 'auto' ? `prereq-hint-${item.id}` : undefined;
+  const notesId = `prereq-notes-${item.id}`;
 
-        {/* Description — keep link for auto-completed items so user can verify */}
+  return (
+    <div
+      className={`border-b border-[var(--ff-border-light)] last:border-0 ${
+        item.is_completed ? 'opacity-70' : ''
+      }`}
+    >
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* ── Checkbox (WCAG: real input, labelled by name span) ── */}
+        <AccessibleCheckbox
+          id={`prereq-check-${item.id}`}
+          checked={item.is_completed}
+          onChange={(checked) =>
+            item.auto_status !== 'auto' && onToggle(item.id, checked)
+          }
+          labelledById={nameId}
+          describedById={hintId}
+          readOnly={item.auto_status === 'auto'}
+          readOnlyTitle="Auto-detected from project data"
+          size="md"
+        />
+
+        {/* ── Description ── */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           {targetTab && onNavigate && (!item.is_completed || item.auto_status === 'auto') ? (
             <button
+              id={nameId}
+              type="button"
               onClick={() => onNavigate(targetTab)}
-              className="text-sm text-[var(--ff-text-primary)] hover:text-blue-400 hover:underline transition-colors text-left"
+              className="text-sm text-[var(--ff-text-primary)] hover:text-blue-400 hover:underline transition-colors text-left focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded"
             >
               {item.requirement_name}
             </button>
           ) : (
-            <span className={`text-sm ${
-              item.is_completed
-                ? 'line-through text-[var(--ff-text-secondary)]'
-                : 'text-[var(--ff-text-primary)]'
-            }`}>
+            <span
+              id={nameId}
+              className={`text-sm ${
+                item.is_completed
+                  ? 'line-through text-[var(--ff-text-secondary)]'
+                  : 'text-[var(--ff-text-primary)]'
+              }`}
+            >
               {item.requirement_name}
             </span>
           )}
+
           {item.auto_status === 'auto' && (
             <span
+              id={hintId}
               className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 whitespace-nowrap"
-              title="Auto-detected from project data"
             >
               Auto
             </span>
           )}
         </div>
 
-        {/* Responsible party badge */}
+        {/* ── Responsible party badge ── */}
         {item.responsible_party && (
           <span className={`text-xs px-2 py-0.5 rounded-full ${partyColor}`}>
             {item.responsible_party}
           </span>
         )}
 
-        {/* Completed date */}
+        {/* ── Completed date ── */}
         {item.completed_at && (
           <span className="text-xs text-[var(--ff-text-secondary)]">
             {new Date(item.completed_at).toLocaleDateString('en-ZA', {
-              day: 'numeric', month: 'short',
+              day: 'numeric',
+              month: 'short',
             })}
           </span>
         )}
 
-        {/* Notes toggle */}
+        {/* ── Notes toggle (WCAG: aria-label, aria-expanded, aria-controls) ── */}
         <button
-          onClick={() => setShowNotes(!showNotes)}
-          className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] p-1"
-          title="Notes"
+          type="button"
+          onClick={() => setShowNotes((v) => !v)}
+          aria-label={`${showNotes ? 'Hide' : 'Show'} notes for ${item.requirement_name}`}
+          aria-expanded={showNotes}
+          aria-controls={notesId}
+          className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] p-1 rounded focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+            />
           </svg>
         </button>
       </div>
 
-      {/* Notes area */}
-      {showNotes && (
-        <div className="px-4 pb-3 pl-12">
-          <textarea
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            onBlur={() => onUpdateNotes(item.id, notes)}
-            placeholder="Add notes..."
-            rows={2}
-            className="w-full text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-secondary)] focus:outline-none focus:border-blue-500"
-          />
-        </div>
-      )}
+      {/* ── Notes area ── */}
+      <div id={notesId} hidden={!showNotes} className="px-4 pb-3 pl-12">
+        <label
+          htmlFor={`notes-textarea-${item.id}`}
+          className="sr-only"
+        >
+          Notes for {item.requirement_name}
+        </label>
+        <textarea
+          id={`notes-textarea-${item.id}`}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={() => onUpdateNotes(item.id, notes)}
+          placeholder="Add notes..."
+          rows={2}
+          className="w-full text-sm bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded px-3 py-2 text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] focus:border-transparent"
+        />
+      </div>
     </div>
   );
 }
 
-function PhaseAccordion({ group, isExpanded, onToggle, onToggleItem, onUpdateNotes, onNavigate }: {
+// ─── PhaseHeader ──────────────────────────────────────────────────────────────
+
+function PhaseHeader({
+  group,
+  isExpanded,
+  headingId,
+}: {
   group: PrereqPhaseGroup;
   isExpanded: boolean;
-  onToggle: () => void;
-  onToggleItem: (id: string, completed: boolean) => void;
-  onUpdateNotes: (id: string, notes: string) => void;
-  onNavigate?: (tab: string) => void;
+  headingId: string;
 }) {
   return (
-    <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
-      {/* Phase header */}
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-[var(--ff-bg-tertiary)] transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-[var(--ff-text-secondary)]">
-            {isExpanded ? '\u25BC' : '\u25B6'}
-          </span>
-          <span className="font-medium text-[var(--ff-text-primary)]">
-            {group.phase_label}
-          </span>
-          <span className="text-xs text-[var(--ff-text-secondary)]">
-            {group.completed}/{group.total}
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-sm font-medium ${
-            group.pct >= 100 ? 'text-emerald-400' :
-            group.pct > 0 ? 'text-amber-400' :
-            'text-[var(--ff-text-secondary)]'
-          }`}>
-            {group.pct}%
-          </span>
-          <div className="w-24 bg-gray-700 rounded-full h-1.5">
-            <div
-              className={`h-1.5 rounded-full transition-all ${getProgressColor(group.pct)}`}
-              style={{ width: `${Math.min(group.pct, 100)}%` }}
-            />
-          </div>
-        </div>
-      </button>
-
-      {/* Items */}
-      {isExpanded && (
-        <div className="border-t border-[var(--ff-border-light)]">
-          {group.items.map(item => (
-            <PrereqItemRow
-              key={item.id}
-              item={item}
-              onToggle={onToggleItem}
-              onUpdateNotes={onUpdateNotes}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </div>
-      )}
+    <div className="w-full flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <svg
+          className={`w-3 h-3 text-[var(--ff-text-secondary)] transition-transform ${
+            isExpanded ? 'rotate-90' : ''
+          }`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
+          <path
+            fillRule="evenodd"
+            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+            clipRule="evenodd"
+          />
+        </svg>
+        <span id={headingId} className="font-medium text-[var(--ff-text-primary)]">
+          {group.phase_label}
+        </span>
+        <span className="text-xs text-[var(--ff-text-secondary)]">
+          {group.completed}/{group.total}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span
+          className={`text-sm font-medium ${
+            group.pct >= 100
+              ? 'text-emerald-400'
+              : group.pct > 0
+              ? 'text-amber-400'
+              : 'text-[var(--ff-text-secondary)]'
+          }`}
+          aria-hidden="true"
+        >
+          {group.pct}%
+        </span>
+        <ProgressBar
+          value={group.pct}
+          labelledById={headingId}
+          thresholds={PREREQ_THRESHOLDS}
+          size="sm"
+          className="w-24"
+        />
+      </div>
     </div>
   );
 }
+
+// ─── ProjectPrereqs ───────────────────────────────────────────────────────────
 
 export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
   const router = useRouter();
@@ -267,12 +305,16 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
 
-  const handleNavigateToTab = useCallback((tab: string) => {
-    router.push({
-      pathname: router.pathname,
-      query: { ...router.query, tab },
-    }, undefined, { shallow: true });
-  }, [router]);
+  const handleNavigateToTab = useCallback(
+    (tab: string) => {
+      router.push(
+        { pathname: router.pathname, query: { ...router.query, tab } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
 
   const fetchData = useCallback(async () => {
     try {
@@ -304,7 +346,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
   }, [fetchData]);
 
   const togglePhase = (phase: string) => {
-    setExpandedPhases(prev => {
+    setExpandedPhases((prev) => {
       const next = new Set(prev);
       if (next.has(phase)) next.delete(phase);
       else next.add(phase);
@@ -322,7 +364,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
       });
       if (!res.ok) throw new Error('Failed to update');
       // Optimistic update
-      setData(prev => {
+      setData((prev) => {
         if (!prev) return prev;
         const updated = { ...prev };
         for (const phase of updated.phases) {
@@ -332,14 +374,26 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
               item.completed_at = completed ? new Date().toISOString() : null;
             }
           }
-          phase.completed = phase.items.filter(i => i.is_completed).length;
-          phase.pct = phase.total > 0 ? Math.round((phase.completed / phase.total) * 10000) / 100 : 0;
+          phase.completed = phase.items.filter((i) => i.is_completed).length;
+          phase.pct =
+            phase.total > 0
+              ? Math.round((phase.completed / phase.total) * 10000) / 100
+              : 0;
         }
-        updated.overall.completed = updated.phases.reduce((sum, p) => sum + p.completed, 0);
-        updated.overall.total = updated.phases.reduce((sum, p) => sum + p.total, 0);
-        updated.overall.pct = updated.overall.total > 0
-          ? Math.round((updated.overall.completed / updated.overall.total) * 10000) / 100
-          : 0;
+        updated.overall.completed = updated.phases.reduce(
+          (sum, p) => sum + p.completed,
+          0,
+        );
+        updated.overall.total = updated.phases.reduce(
+          (sum, p) => sum + p.total,
+          0,
+        );
+        updated.overall.pct =
+          updated.overall.total > 0
+            ? Math.round(
+                (updated.overall.completed / updated.overall.total) * 10000,
+              ) / 100
+            : 0;
         return updated;
       });
     } catch {
@@ -372,9 +426,7 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
       });
       if (!res.ok) throw new Error('Failed to apply template');
       const json = await res.json();
-      if (json.success) {
-        fetchData();
-      }
+      if (json.success) fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to apply template');
     } finally {
@@ -382,11 +434,17 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
     }
   };
 
+  // ── Loading / error / empty states ─────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500" />
+          <div
+            className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-500"
+            role="status"
+            aria-label="Loading pre-requisites"
+          />
           <span className="text-[var(--ff-text-secondary)]">Loading pre-requisites...</span>
         </div>
       </div>
@@ -395,11 +453,15 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
 
   if (error) {
     return (
-      <div className="bg-[var(--ff-card-bg)] rounded-lg border border-red-500/30 p-6">
+      <div
+        className="bg-[var(--ff-card-bg)] rounded-lg border border-red-500/30 p-6"
+        role="alert"
+      >
         <p className="text-red-400">{error}</p>
         <button
+          type="button"
           onClick={fetchData}
-          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           Retry
         </button>
@@ -407,7 +469,6 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
     );
   }
 
-  // No prereqs yet - offer to apply template
   if (!data || data.phases.length === 0) {
     return (
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-8 text-center">
@@ -415,9 +476,10 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
           No pre-requisites configured for this project.
         </p>
         <button
+          type="button"
           onClick={handleApplyTemplate}
           disabled={applying}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {applying ? 'Applying...' : 'Apply VF Standard Template (45 items)'}
         </button>
@@ -425,13 +487,43 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
     );
   }
 
+  // ── Build accordion items ───────────────────────────────────────────────────
+
+  const accordionItems: AccordionItemConfig[] = data.phases.map((group) => {
+    const headingId = `phase-heading-${group.phase}`;
+    return {
+      id: group.phase,
+      header: (isExpanded) => (
+        <PhaseHeader group={group} isExpanded={isExpanded} headingId={headingId} />
+      ),
+      body: (
+        <>
+          {group.items.map((item) => (
+            <PrereqItemRow
+              key={item.id}
+              item={item}
+              onToggle={handleToggleItem}
+              onUpdateNotes={handleUpdateNotes}
+              onNavigate={handleNavigateToTab}
+            />
+          ))}
+        </>
+      ),
+    };
+  });
+
+  const overallHeadingId = 'prereqs-overall-heading';
+
   return (
     <div className="space-y-4">
-      {/* Header with overall progress */}
+      {/* ── Overall progress header ── */}
       <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+            <h3
+              id={overallHeadingId}
+              className="text-lg font-semibold text-[var(--ff-text-primary)]"
+            >
               Project Pre-requisites
             </h3>
             <p className="text-sm text-[var(--ff-text-secondary)]">
@@ -439,26 +531,20 @@ export function ProjectPrereqs({ projectId }: ProjectPrereqsProps) {
             </p>
           </div>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-2.5">
-          <div
-            className={`h-2.5 rounded-full transition-all ${getProgressColor(data.overall.pct)}`}
-            style={{ width: `${Math.min(data.overall.pct, 100)}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={data.overall.pct}
+          labelledById={overallHeadingId}
+          thresholds={PREREQ_THRESHOLDS}
+          size="md"
+        />
       </div>
 
-      {/* Phase accordions */}
-      {data.phases.map(group => (
-        <PhaseAccordion
-          key={group.phase}
-          group={group}
-          isExpanded={expandedPhases.has(group.phase)}
-          onToggle={() => togglePhase(group.phase)}
-          onToggleItem={handleToggleItem}
-          onUpdateNotes={handleUpdateNotes}
-          onNavigate={handleNavigateToTab}
-        />
-      ))}
+      {/* ── Phase accordions ── */}
+      <AccessibleAccordion
+        items={accordionItems}
+        expandedIds={expandedPhases}
+        onToggle={togglePhase}
+      />
     </div>
   );
 }

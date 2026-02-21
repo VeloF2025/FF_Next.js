@@ -217,7 +217,7 @@ export function PremiumLoginPage() {
       <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-            <User className="w-5 h-5 text-emerald-400" />
+            <User className="w-5 h-5 text-emerald-400" aria-hidden="true" />
           </div>
           <div>
             <p className="text-emerald-200 font-medium">
@@ -314,7 +314,7 @@ export function PremiumLoginPage() {
       <div className="flex justify-end">
         <Link
           href={`/auth/forgot-password?email=${encodeURIComponent(email)}`}
-          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+          className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900 rounded"
         >
           Forgot Password?
         </Link>
@@ -340,7 +340,7 @@ export function PremiumLoginPage() {
         <p className="text-sm text-blue-200">
           {step === 'setup-password' && (
             <>
-              <Check className="w-4 h-4 inline mr-1" />
+              <Check className="w-4 h-4 inline mr-1" aria-hidden="true" />
               Set up your password to access FibreFlow
             </>
           )}
