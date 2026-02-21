@@ -2,7 +2,25 @@
 
 > Track security-related changes, hardening measures, and vulnerability fixes
 
-**Last Updated:** 2026-02-20
+**Last Updated:** 2026-02-21
+
+---
+
+## [2026-02-21] Auth Isolation Sweep — 11 Endpoints Fixed
+
+### User Identity Isolation
+- **Reminders (5 endpoints):** `/api/reminders`, `/api/reminders-update`, `/api/reminders-delete`, `/api/reminder-preferences`, `/api/user-sidebar-preferences` — all were hardcoding `userId = 'dev-user-1'` despite `withAuth` being present. All authenticated users shared a single preference/reminder row. Fixed to use `req.user.id` from JWT auth context.
+- **Suppliers — Privilege Escalation (4 endpoints):** `/api/suppliers`, `/api/suppliers/[supplierId]` (PUT+DELETE), `/api/suppliers/[supplierId]/ratings`, `/api/suppliers/[supplierId]/compliance` — `userId` was accepted from `req.body`, allowing any authenticated user to act as any other user in supplier CRUD. Fixed to use `req.user.id` only.
+- **Supplier Ratings:** `userName` also accepted from body — now uses `req.user.name`.
+- **Staff Document Audit Trail (2 endpoints):** `/api/staff-documents-upload`, `/api/staff-documents-download` — audit log was recording `'System'` as actor. Fixed to use `req.user.name`.
+
+### Root Cause
+All affected endpoints used `withAuth` correctly for authentication enforcement but ignored the attached `req.user` context inside the handler body.
+
+### Commits
+- `c20d5899` — reminders + sidebar preferences (3 files)
+- `eee9f624` — reminders list/delete + suppliers (6 files)
+- `bdd29cc6` — staff document audit names (2 files)
 
 ---
 
@@ -38,11 +56,31 @@
 
 ---
 
+## Auth Isolation Sweep — Feb 21, 2026
+
+### Hardcoded userId / Privilege Escalation Fixes
+**Severity:** High — clients could pass arbitrary userId in request body
+
+**Affected endpoints (now fixed):**
+- `GET/POST/DELETE /api/reminders` — hardcoded `'dev-user-1'` removed
+- `POST/PUT/DELETE /api/suppliers` — userId from `req.body` replaced with `req.user.id`
+- `PUT/DELETE /api/suppliers/ratings` — same fix
+- `POST /api/suppliers/compliance` — same fix
+- Sidebar and other reminder endpoints — userId wired from `withAuth` context
+
+**Root cause:** During development, `userId` was read from `req.body` (caller-supplied) instead of from the authenticated session. An authenticated user could supply any userId to act on behalf of others.
+
+**Fix:** All affected routes now use `(req as any).user?.id` from `withAuth` middleware. The client can no longer influence which user's data is modified.
+
+---
+
 ## Related Commits
 - `397caa84` - fix: security hardening — auth, CORS, RBAC, and API safety improvements
 - `d811f17f` - fix: security hardening phase 2 — empty catches, HMAC portal tokens, CSP, OneMap secrets
 - `cf219ca5` - fix: procurement audit — critical security, SQL, and link fixes
 - `19a8361d` - Merge pull request #47 from VelocityFibre/fix/security-hardening
+- `c20d5899` - fix(auth): wire real user ID into sidebar/reminder endpoints
+- `eee9f624` - fix(auth): remove hardcoded userId from supplier + reminder endpoints
 
 ---
 
