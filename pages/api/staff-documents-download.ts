@@ -85,7 +85,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         staffId,
         documentType,
         fileName,
-        'System', // TODO: Get downloader name from session
+        (req as any).user?.name || 'System',
         req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
       );
     }

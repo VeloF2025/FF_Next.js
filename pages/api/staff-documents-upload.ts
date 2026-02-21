@@ -542,7 +542,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       staffId,
       documentType,
       primaryFileName,
-      'System', // TODO: Get uploader name from session
+      (req as any).user?.name || 'System',
       req.headers['x-forwarded-for'] as string || req.socket?.remoteAddress
     );
 
