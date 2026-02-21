@@ -1,0 +1,204 @@
+/**
+ * Deployment Health API
+ * Aggregates service health, GitHub Actions CI status, and error log data.
+ * Used by the Deployment Health Dashboard (/deployment).
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ServiceHealth {
+  name: string;
+  url: string;
+  status: 'healthy' | 'degraded' | 'unreachable' | 'error';
+  httpCode: number | null;
+  responseTimeMs: number | null;
+  commit?: string;
+  commitShort?: string;
+  environment?: string;
+  uptime?: number;
+  memoryUsed?: string;
+  dbStatus?: string;
+  error?: string;
+}
+
+export interface GithubRun {
+  id: number;
+  name: string;
+  status: 'completed' | 'in_progress' | 'queued' | 'waiting';
+  conclusion: 'success' | 'failure' | 'cancelled' | 'skipped' | null;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+  branch: string;
+  actor: string;
+  commitMessage?: string;
+}
+
+export interface DeploymentHealthData {
+  services: ServiceHealth[];
+  github: {
+    runs: GithubRun[];
+    error?: string;
+  };
+  errorLog: {
+    count5min: number | null;
+    count1hour: number | null;
+    recentLines: string[];
+    error?: string;
+  };
+  checkedAt: string;
+}
+
+// ─── Service Health Check ─────────────────────────────────────────────────────
+
+const SERVICES = [
+  { name: 'FibreFlow Prod',    url: 'https://app.fibreflow.app/api/health' },
+  { name: 'FibreFlow Staging', url: 'https://vf.fibreflow.app/api/health' },
+  { name: 'FibreFlow Dev',     url: 'https://dev.fibreflow.app/api/health' },
+  { name: 'GazTime API',       url: 'http://localhost:3333/health' },
+];
+
+async function checkService(svc: typeof SERVICES[0]): Promise<ServiceHealth> {
+  const start = Date.now();
+  try {
+    const res = await fetch(svc.url, {
+      signal: AbortSignal.timeout(6000),
+      headers: { 'Accept': 'application/json' },
+    });
+    const ms = Date.now() - start;
+    const body = await res.json().catch(() => ({}));
+
+    // FibreFlow health shape: { status, version: { gitCommitShort }, checks: { database }, details: { memory } }
+    // GazTime health shape:   { status, version: { gitCommitShort }, uptime }
+    const ffMemory = body?.details?.memory?.heapUsed;
+    const status: ServiceHealth['status'] =
+      !res.ok ? 'error' :
+      body?.status === 'healthy' || body?.status === 'ok' ? 'healthy' :
+      body?.status === 'degraded' ? 'degraded' : 'error';
+
+    return {
+      name: svc.name,
+      url: svc.url.replace('/api/health', '').replace('/health', ''),
+      status,
+      httpCode: res.status,
+      responseTimeMs: ms,
+      commit: body?.version?.gitCommit,
+      commitShort: body?.version?.gitCommitShort,
+      environment: body?.version?.environment,
+      uptime: body?.uptime ?? undefined,
+      memoryUsed: ffMemory,
+      dbStatus: body?.checks?.database,
+    };
+  } catch (err: any) {
+    return {
+      name: svc.name,
+      url: svc.url.replace('/api/health', '').replace('/health', ''),
+      status: 'unreachable',
+      httpCode: null,
+      responseTimeMs: Date.now() - start,
+      error: err?.message?.slice(0, 80),
+    };
+  }
+}
+
+// ─── GitHub Actions ───────────────────────────────────────────────────────────
+
+async function fetchGithubRuns(): Promise<{ runs: GithubRun[]; error?: string }> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) return { runs: [], error: 'No GITHUB_TOKEN configured' };
+
+  try {
+    const res = await fetch(
+      'https://api.github.com/repos/VelocityFibre/FF_Next.js/actions/runs?per_page=10&branch=master',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!res.ok) return { runs: [], error: `GitHub API ${res.status}` };
+    const data = await res.json();
+    const runs: GithubRun[] = (data.workflow_runs || []).slice(0, 8).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      conclusion: r.conclusion,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      url: r.html_url,
+      branch: r.head_branch,
+      actor: r.actor?.login || 'unknown',
+      commitMessage: r.head_commit?.message?.split('\n')[0]?.slice(0, 80),
+    }));
+    return { runs };
+  } catch (err: any) {
+    return { runs: [], error: err?.message?.slice(0, 80) };
+  }
+}
+
+// ─── Error Log ────────────────────────────────────────────────────────────────
+
+async function fetchErrorLog(): Promise<DeploymentHealthData['errorLog']> {
+  try {
+    const { execSync } = await import('child_process');
+    const count5min = execSync(
+      "journalctl -u fibreflow --since '5 minutes ago' -p err --no-pager -q 2>/dev/null | wc -l",
+      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).toString().trim();
+
+    const count1hour = execSync(
+      "journalctl -u fibreflow --since '1 hour ago' -p err --no-pager -q 2>/dev/null | wc -l",
+      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).toString().trim();
+
+    const recent = execSync(
+      "journalctl -u fibreflow -p err --no-pager -q -n 15 2>/dev/null",
+      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).toString().trim();
+
+    return {
+      count5min: parseInt(count5min) || 0,
+      count1hour: parseInt(count1hour) || 0,
+      recentLines: recent ? recent.split('\n').filter(Boolean).slice(-15) : [],
+    };
+  } catch (err: any) {
+    return {
+      count5min: null,
+      count1hour: null,
+      recentLines: [],
+      error: 'journalctl unavailable',
+    };
+  }
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
+async function handler(req: NextApiRequest, res: NextApiResponse<DeploymentHealthData>) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).end();
+  }
+
+  // Run all checks in parallel
+  const [services, github, errorLog] = await Promise.all([
+    Promise.all(SERVICES.map(checkService)),
+    fetchGithubRuns(),
+    fetchErrorLog(),
+  ]);
+
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(200).json({
+    services,
+    github,
+    errorLog,
+    checkedAt: new Date().toISOString(),
+  });
+}
+
+export default withAuth(handler);

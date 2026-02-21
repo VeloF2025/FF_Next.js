@@ -212,6 +212,14 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
+    // Deployment Health
+    if (path.includes('deployment')) {
+      return {
+        title: 'Deployment Health',
+        breadcrumbs: ['Home', 'System', 'Deployment Health'],
+      };
+    }
+
     // Settings
     if (path.includes('settings')) {
       return {
