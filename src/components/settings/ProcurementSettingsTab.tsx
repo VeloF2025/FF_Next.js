@@ -124,10 +124,10 @@ export function ProcurementSettingsTab() {
                   <Icon className="w-4 h-4 text-[var(--ff-primary-400)]" />
                 </div>
                 <div className="text-left">
-                  <h4 className="font-medium text-[var(--ff-text-primary)]">
+                  <h4 className="text-base font-semibold text-[var(--ff-text-primary)]">
                     {section.label}
                   </h4>
-                  <p className="text-xs text-[var(--ff-text-secondary)]">
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
                     {section.description}
                   </p>
                 </div>

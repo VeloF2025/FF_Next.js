@@ -224,17 +224,17 @@ export function ApprovalWorkflowsSection() {
           {stats.map(s => (
             <div
               key={s.documentType}
-              className="p-3 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]"
+              className="p-4 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]"
             >
-              <div className="text-xs text-[var(--ff-text-secondary)] capitalize">
+              <div className="text-sm font-medium text-[var(--ff-text-primary)] capitalize">
                 {s.documentType.replace(/_/g, ' ')}
               </div>
-              <div className="text-lg font-semibold text-[var(--ff-text-primary)]">
+              <div className="text-2xl font-bold text-[var(--ff-text-primary)] mt-1">
                 {s.total}
               </div>
-              <div className="flex gap-2 text-xs mt-1">
-                <span className="text-yellow-400">{s.pending} pending</span>
-                <span className="text-green-400">{s.approved} approved</span>
+              <div className="flex gap-3 text-sm mt-1.5">
+                <span className="text-yellow-400 font-medium">{s.pending} pending</span>
+                <span className="text-green-400 font-medium">{s.approved} approved</span>
               </div>
             </div>
           ))}
@@ -256,8 +256,8 @@ export function ApprovalWorkflowsSection() {
               <div className="flex items-center gap-3">
                 <Shield className="w-5 h-5 text-[var(--ff-primary-400)]" />
                 <div>
-                  <h5 className="font-medium text-[var(--ff-text-primary)]">{workflow.name}</h5>
-                  <p className="text-xs text-[var(--ff-text-secondary)]">{workflow.description}</p>
+                  <h5 className="text-base font-semibold text-[var(--ff-text-primary)]">{workflow.name}</h5>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">{workflow.description}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ export function ApprovalWorkflowsSection() {
                 {!isEditing ? (
                   <button
                     onClick={() => setEditingWorkflow(workflow.id)}
-                    className="px-3 py-1 text-xs rounded-md bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-400)] hover:bg-[var(--ff-primary-500)]/30 transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--ff-primary-500)]/20 text-[var(--ff-primary-300)] hover:bg-[var(--ff-primary-500)]/30 transition-colors"
                   >
                     Edit Levels
                   </button>
@@ -313,39 +313,39 @@ export function ApprovalWorkflowsSection() {
               <div className="p-4">
                 <div className="flex items-center gap-2 overflow-x-auto">
                   {workflow.levels.map((level, idx) => (
-                    <div key={level.id || idx} className="flex items-center gap-2 flex-shrink-0">
+                    <div key={level.id || idx} className="flex items-center gap-3 flex-shrink-0">
                       <div
-                        className={`p-3 rounded-lg border text-center min-w-[140px] ${
+                        className={`px-4 py-3 rounded-lg border text-center min-w-[160px] ${
                           level.autoApprove
-                            ? 'border-green-500/30 bg-green-500/10'
-                            : 'border-blue-500/30 bg-blue-500/10'
+                            ? 'border-green-500/40 bg-green-500/10'
+                            : 'border-blue-500/40 bg-blue-500/10'
                         }`}
                       >
-                        <div className="text-xs font-medium text-[var(--ff-text-primary)]">
+                        <div className="text-sm font-semibold text-[var(--ff-text-primary)]">
                           {level.name}
                         </div>
-                        <div className="text-[10px] text-[var(--ff-text-secondary)] mt-1">
+                        <div className="text-xs text-[var(--ff-text-secondary)] mt-1 font-medium">
                           {formatAmount(level.minAmount)}
                           {level.maxAmount ? ` - ${formatAmount(level.maxAmount)}` : '+'}
                         </div>
-                        <div className="text-[10px] mt-1 flex items-center justify-center gap-1">
+                        <div className="text-xs mt-1.5 flex items-center justify-center gap-1">
                           {level.autoApprove ? (
-                            <span className="text-green-400 flex items-center gap-0.5">
-                              <CheckCircle className="w-3 h-3" /> Auto
+                            <span className="text-green-400 font-medium flex items-center gap-1">
+                              <CheckCircle className="w-3.5 h-3.5" /> Auto
                             </span>
                           ) : level.approverType === 'user' && level.approverName ? (
-                            <span className="text-blue-400 flex items-center gap-0.5">
-                              <User className="w-3 h-3" /> {level.approverName}
+                            <span className="text-blue-300 flex items-center gap-1">
+                              <User className="w-3.5 h-3.5" /> {level.approverName}
                             </span>
                           ) : (
-                            <span className="text-blue-400 flex items-center gap-0.5">
-                              <Users className="w-3 h-3" /> {level.approverRole || 'any'}
+                            <span className="text-blue-300 flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" /> {level.approverRole || 'any'}
                             </span>
                           )}
                         </div>
                       </div>
                       {idx < workflow.levels.length - 1 && (
-                        <ArrowRight className="w-4 h-4 text-[var(--ff-text-tertiary)] flex-shrink-0" />
+                        <ArrowRight className="w-5 h-5 text-[var(--ff-text-secondary)] flex-shrink-0" />
                       )}
                     </div>
                   ))}
@@ -379,7 +379,7 @@ export function ApprovalWorkflowsSection() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {/* Name */}
                       <div>
-                        <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Name</label>
+                        <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Name</label>
                         <input
                           type="text"
                           value={level.name}
@@ -390,7 +390,7 @@ export function ApprovalWorkflowsSection() {
 
                       {/* Min Amount */}
                       <div>
-                        <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Min Amount (R)</label>
+                        <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Min Amount (R)</label>
                         <input
                           type="number"
                           value={level.minAmount}
@@ -401,7 +401,7 @@ export function ApprovalWorkflowsSection() {
 
                       {/* Max Amount */}
                       <div>
-                        <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Max Amount (R)</label>
+                        <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Max Amount (R)</label>
                         <input
                           type="number"
                           value={level.maxAmount ?? ''}
@@ -415,7 +415,7 @@ export function ApprovalWorkflowsSection() {
 
                       {/* Auto-approve toggle */}
                       <div>
-                        <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Auto-approve</label>
+                        <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Auto-approve</label>
                         <button
                           onClick={() => updateLevel(workflow.id, idx, { autoApprove: !level.autoApprove })}
                           className="flex items-center gap-1 mt-0.5"
@@ -436,7 +436,7 @@ export function ApprovalWorkflowsSection() {
                     {!level.autoApprove && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Approver Type</label>
+                          <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Approver Type</label>
                           <select
                             value={level.approverType}
                             onChange={e => updateLevel(workflow.id, idx, {
@@ -454,7 +454,7 @@ export function ApprovalWorkflowsSection() {
 
                         {level.approverType === 'role' ? (
                           <div>
-                            <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">Role</label>
+                            <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">Role</label>
                             <select
                               value={level.approverRole || ''}
                               onChange={e => updateLevel(workflow.id, idx, { approverRole: e.target.value })}
@@ -468,7 +468,7 @@ export function ApprovalWorkflowsSection() {
                           </div>
                         ) : (
                           <div>
-                            <label className="text-[10px] text-[var(--ff-text-secondary)] block mb-1">User</label>
+                            <label className="text-xs font-medium text-[var(--ff-text-secondary)] block mb-1">User</label>
                             <select
                               value={level.approverUserId || ''}
                               onChange={e => {
