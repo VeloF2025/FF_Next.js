@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import pool from '@/lib/db';
 
 async function handler(
@@ -250,4 +251,4 @@ async function handler(
   return res.status(400).json({ error: 'Invalid action. Use "stats", "list", "export", or "lookup-status".' });
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withErrorHandler(withRole('manager')(handler)));

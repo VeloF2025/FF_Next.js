@@ -9,6 +9,7 @@ import {
   withAuth,
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth';
+import { withErrorHandler } from '@/lib/api-error-handler';
 
 async function handler(
   req: AuthenticatedNextApiRequest,
@@ -41,4 +42,4 @@ async function handler(
   });
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

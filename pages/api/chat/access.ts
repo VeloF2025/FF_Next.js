@@ -28,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json({ dataAccess: hasAccess });
   } catch (err) {
     log.error('Chat access check error', err instanceof Error ? { message: err.message } : { err }, 'ChatAccess');
-    return res.status(200).json({ dataAccess: false });
+    return res.status(500).json({ error: 'Failed to check chat access permissions' });
   }
 }
 

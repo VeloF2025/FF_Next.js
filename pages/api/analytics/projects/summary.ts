@@ -67,18 +67,9 @@ async function handler(
     });
   } catch (error) {
     log.error('Project summary error', { error });
-    return res.status(200).json({
-      success: true,
-      data: projectId ? null : {
-        total_projects: 0,
-        active_projects: 0,
-        completed_projects: 0,
-        on_hold_projects: 0,
-        cancelled_projects: 0,
-        total_budget: 0,
-        average_budget: 0,
-        unique_clients: 0
-      }
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch project summary',
     });
   }
 }
