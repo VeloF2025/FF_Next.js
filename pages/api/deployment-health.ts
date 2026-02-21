@@ -201,7 +201,39 @@ async function fetchErrorLog(): Promise<DeploymentHealthData['errorLog']> {
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
-
+/**
+ * GET /api/deployment-health
+ * 
+ * Returns aggregated deployment and CI health data for the Deployment Health Dashboard.
+ * 
+ * Authentication: Required (withAuth middleware)
+ * 
+ * Response:
+ *   - services: Array of service health checks (prod/staging/dev + GazTime)
+ *   - github: GitHub Actions workflow runs on master branch (up to 8)
+ *   - errorLog: journalctl error counts + recent lines (prod service only)
+ *   - checkedAt: ISO timestamp of when this data was collected
+ * 
+ * Caching:
+ *   - Results cached for 20 seconds in-memory to reduce external API load
+ *   - X-Cache header indicates hit/miss for visibility
+ *   - Cache is in-process only; not shared across instances
+ * 
+ * Timeouts:
+ *   - Service health checks: 6 seconds each
+ *   - GitHub API: 8 seconds
+ *   - journalctl queries: 5 seconds each
+ * 
+ * Graceful Degradation:
+ *   - If any service is unreachable, returns 'unreachable' status + error message
+ *   - If GitHub token not configured, returns empty runs array + error message
+ *   - If journalctl unavailable, returns null counts + error message
+ * 
+ * Example Usage:
+ *   curl -H "Authorization: Bearer <token>" https://app.fibreflow.app/api/deployment-health
+ * 
+ * @see pages/deployment.tsx for the dashboard UI that consumes this API
+ */
 async function handler(req: NextApiRequest, res: NextApiResponse<DeploymentHealthData>) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
