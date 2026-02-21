@@ -2,10 +2,16 @@
  * Deployment Health API
  * Aggregates service health, GitHub Actions CI status, and error log data.
  * Used by the Deployment Health Dashboard (/deployment).
+ * 
+ * Caching: Results cached for 20s to reduce redundant external API calls.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+
+// ─── Cache ────────────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 20_000; // 20 seconds
+let cachedResult: { data: DeploymentHealthData; timestamp: number } | null = null;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -202,6 +208,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse<DeploymentHealt
     return res.status(405).end();
   }
 
+  const now = Date.now();
+  
+  // Return cached result if still valid
+  if (cachedResult && now - cachedResult.timestamp < CACHE_TTL_MS) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Cache', 'hit');
+    return res.status(200).json(cachedResult.data);
+  }
+
   // Run all checks in parallel
   const [services, github, errorLog] = await Promise.all([
     Promise.all(SERVICES.map(checkService)),
@@ -209,13 +224,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse<DeploymentHealt
     fetchErrorLog(),
   ]);
 
-  res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({
+  const result: DeploymentHealthData = {
     services,
     github,
     errorLog,
     checkedAt: new Date().toISOString(),
-  });
+  };
+
+  // Cache the result
+  cachedResult = { data: result, timestamp: now };
+
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Cache', 'miss');
+  return res.status(200).json(result);
 }
 
 export default withAuth(handler);
