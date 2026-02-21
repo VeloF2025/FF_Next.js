@@ -121,3 +121,13 @@ nul
 
 # Local credentials (never commit)
 .claude/credentials.local.md
+
+# Browser automation / session artifacts
+snapshot.txt
+
+# Temporary analysis scripts
+analyze-*.js
+
+# Backup files
+*.backup.*
+CHANGELOG.md.backup.*
