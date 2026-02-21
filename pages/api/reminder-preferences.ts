@@ -6,9 +6,9 @@ import { neon } from '@neondatabase/serverless';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // TODO: Replace with proper Clerk auth when ready for production
-  const userId = 'dev-user-1';
-  const email = 'ai@velocityfibre.co.za'; // TODO: Get from Clerk when ready
+  const userId = (req as any).user?.id;
+  const email = (req as any).user?.email;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
 

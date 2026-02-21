@@ -10,8 +10,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  // TODO: Replace with proper Clerk auth when ready for production
-  const userId = 'dev-user-1';
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
 
   try {
     const { id, title, description, due_date, priority, status } = req.body;

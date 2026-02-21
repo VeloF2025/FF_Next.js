@@ -30,8 +30,8 @@ const DEFAULT_ITEMS = ['meetings', 'action-items'];
 const MAX_ITEMS = 5; // Dashboard is always pinned, plus 5 custom items
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // TODO: Replace with proper Clerk auth when ready for production
-  const userId = 'dev-user-1';
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     if (req.method === 'GET') {
