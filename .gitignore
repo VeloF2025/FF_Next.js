@@ -130,4 +130,5 @@ analyze-*.js
 
 # Backup files
 *.backup.*
+*.backup-*
 CHANGELOG.md.backup.*
