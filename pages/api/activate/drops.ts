@@ -10,15 +10,7 @@
  * - Reduced auto-sync interval from every request to once per 5 minutes
  * - CTE-based queries instead of multiple subqueries
  *
- * TODO: Add database indexes:
- *   CREATE INDEX idx_dr_unified_is_oes_only ON dr_photo_unified_reviews(is_oes_only) WHERE is_oes_only = FALSE OR is_oes_only IS NULL;
- *   CREATE INDEX idx_dr_unified_created_at ON dr_photo_unified_reviews(created_at DESC);
- *   CREATE INDEX idx_dr_unified_submitted_date ON dr_photo_unified_reviews(submitted_date);
- *   CREATE INDEX idx_dr_unified_project ON dr_photo_unified_reviews(project);
- *   CREATE INDEX idx_dr_unified_feedback_sent ON dr_photo_unified_reviews(feedback_sent);
- *   CREATE INDEX idx_oes_activations_drop_number ON oes_activations(drop_number);
- *   CREATE INDEX idx_drops_drop_number ON drops(drop_number);
- *   CREATE INDEX idx_wa_monitor_drops_number ON wa_monitor_drops(drop_number, created_at DESC);
+ * NOTE: All recommended indexes confirmed present in DB as of 2026-02-21 (verified).
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
