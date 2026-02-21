@@ -2,13 +2,15 @@
 """
 Batch VLM classification of unassigned construction QA photos.
 
-Downloads each unclassified photo from SharePoint, sends to VLM (Qwen3-VL on Velocity:8100)
-for visual classification into checklist steps, and updates the DB.
+Downloads each unclassified photo from SharePoint or QField (MinIO),
+sends to VLM (Qwen3-VL on Velocity:8100) for visual classification
+into checklist steps, and updates the DB.
 
 Usage:
   python3 scripts/classify-qa-photos-vlm.py --project Lawley --limit 50 --dry-run
-  python3 scripts/classify-qa-photos-vlm.py --project Lawley --limit 200
-  python3 scripts/classify-qa-photos-vlm.py --project all --limit 100
+  python3 scripts/classify-qa-photos-vlm.py --project all --limit 200
+  python3 scripts/classify-qa-photos-vlm.py --source qfield --project all --limit 500
+  python3 scripts/classify-qa-photos-vlm.py --source all --project all --limit 1000
 
 Requires: psycopg2, requests, Pillow
 """
@@ -18,6 +20,7 @@ import base64
 import io
 import json
 import re
+import subprocess
 import sys
 import time
 
@@ -31,6 +34,13 @@ SP_TENANT_ID = "f22e6344-a35d-43b0-ad8c-a247f513c1ee"
 SP_CLIENT_ID = "075bd672-bffa-45ba-9fd0-724535e612db"
 SP_CLIENT_SECRET = "Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF"
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+# -- MinIO / QField config -----------------------------------------------------
+
+VELOCITY_HOST = "100.96.203.105"
+VELOCITY_USER = "velo"
+MINIO_BUCKET = "qfieldcloud-prod"
+MINIO_CONTAINER = "qfieldcloud-minio-1"
 
 # -- VLM config ----------------------------------------------------------------
 
@@ -106,6 +116,39 @@ def download_sp_photo(token, drive_id, item_id):
         return None
 
 
+def download_qfield_photo(storage_key, local_minio=False):
+    """Download a photo from QField MinIO. Returns bytes or None.
+
+    If local_minio=True, runs docker exec directly (for running on Velocity).
+    Otherwise, SSHes to Velocity first.
+    """
+    object_path = storage_key.lstrip("/")
+    mc_path = f"local/{MINIO_BUCKET}/{object_path}"
+    escaped_path = mc_path.replace("'", "'\\''")
+
+    if local_minio:
+        cmd = ["docker", "exec", MINIO_CONTAINER, "mc", "cat", mc_path]
+    else:
+        cmd = [
+            "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+            f"{VELOCITY_USER}@{VELOCITY_HOST}",
+            f"docker exec {MINIO_CONTAINER} mc cat '{escaped_path}'"
+        ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, timeout=30)
+        if result.returncode != 0:
+            return None
+        data = result.stdout
+        if len(data) < 100 or len(data) > 10_000_000:
+            return None
+        # Validate magic bytes (JPEG or PNG)
+        if data[:2] == b'\xff\xd8' or data[:4] == b'\x89PNG':
+            return data
+        return None
+    except (subprocess.TimeoutExpired, Exception):
+        return None
+
+
 def resize_for_vlm(photo_bytes):
     """Resize photo for VLM token limits. Returns base64 JPEG string."""
     from PIL import Image
@@ -177,18 +220,28 @@ def parse_classification(text):
     return None, None, f"Could not parse: {text[:100]}"
 
 
-def run_classification(project_name, db_url, limit=100, dry_run=False, discipline="civil"):
+def run_classification(project_name, db_url, limit=100, dry_run=False, discipline="civil", source="all", local_minio=False):
     """Batch classify unassigned photos via VLM."""
     print(f"\n{'='*70}")
     print(f"  VLM Photo Classification — {discipline.title()}")
     print(f"  Project: {project_name}")
+    print(f"  Source: {source}")
     print(f"  Limit: {limit}")
     print(f"  Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"{'='*70}\n")
 
     # -- Auth ------------------------------------------------------------------
     print("  [1/3] Setup...")
-    sp_token = get_sp_token()
+    sp_token = None
+    if source in ("sharepoint", "all"):
+        try:
+            sp_token = get_sp_token()
+        except Exception as e:
+            if source == "sharepoint":
+                print(f"    ERROR: SharePoint auth failed: {e}")
+                sys.exit(1)
+            print(f"    WARN: SharePoint auth failed, will skip SP photos: {e}")
+
     conn = psycopg2.connect(db_url)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -204,6 +257,12 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         project_filter = "AND p.project_id = %s::uuid"
         params.append(str(row["id"]))
 
+    # Build source filter
+    if source == "all":
+        source_filter = "AND p.source IN ('sharepoint', 'qfield')"
+    else:
+        source_filter = f"AND p.source = '{source}'"
+
     # -- Fetch unclassified photos ---------------------------------------------
     print("  [2/3] Fetching unclassified photos...")
     query = f"""
@@ -214,7 +273,7 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         JOIN projects pr ON pr.id = p.project_id
         WHERE p.checklist_step IS NULL
           AND r.discipline = %s
-          AND p.source = 'sharepoint'
+          {source_filter}
           {project_filter}
         ORDER BY pr.project_name, r.feature_id
         LIMIT %s
@@ -239,27 +298,37 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
     for i, photo in enumerate(photos):
         photo_id = str(photo["id"])
         storage_key = photo["storage_key"]
+        photo_source = photo["source"]
         filename = photo["filename"] or "unknown"
         feature = photo["feature_id"]
         proj = photo["project_name"]
-
-        # Parse storage_key: "sharepoint:{driveId}:{itemId}"
-        parts = storage_key.split(":")
-        if len(parts) < 3 or parts[0] != "sharepoint":
-            stats["skipped"] += 1
-            continue
-        drive_id = parts[1]
-        item_id = ":".join(parts[2:])
 
         # Progress
         elapsed = time.time() - start_time
         rate = (i + 1) / elapsed if elapsed > 0 else 0
         eta = (len(photos) - i - 1) / rate if rate > 0 else 0
 
-        print(f"    [{i+1}/{len(photos)}] {proj}/{feature}/{filename[:30]}", end=" ", flush=True)
+        src_tag = "SP" if photo_source == "sharepoint" else "QF"
+        print(f"    [{i+1}/{len(photos)}] [{src_tag}] {proj}/{feature}/{filename[:30]}", end=" ", flush=True)
 
-        # Download
-        photo_bytes = download_sp_photo(sp_token, drive_id, item_id)
+        # Download based on source
+        photo_bytes = None
+        if photo_source == "sharepoint":
+            parts = storage_key.split(":")
+            if len(parts) < 3 or parts[0] != "sharepoint":
+                stats["skipped"] += 1
+                print("bad key")
+                continue
+            drive_id = parts[1]
+            item_id = ":".join(parts[2:])
+            photo_bytes = download_sp_photo(sp_token, drive_id, item_id)
+        elif photo_source == "qfield":
+            photo_bytes = download_qfield_photo(storage_key, local_minio=local_minio)
+        else:
+            stats["skipped"] += 1
+            print(f"unknown source: {photo_source}")
+            continue
+
         if not photo_bytes:
             print("download failed")
             stats["failed"] += 1
@@ -362,6 +431,10 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=100, help="Max photos to process (default 100)")
     parser.add_argument("--dry-run", action="store_true", help="Classify but don't update DB")
     parser.add_argument("--discipline", default="civil", help="Discipline to classify (default: civil)")
+    parser.add_argument("--source", default="all", choices=["sharepoint", "qfield", "all"],
+                        help="Photo source to classify (default: all)")
+    parser.add_argument("--local-minio", action="store_true",
+                        help="Use local docker exec for MinIO (when running on Velocity)")
     parser.add_argument("--db-url", help="Database URL (defaults to DATABASE_URL env var)")
     args = parser.parse_args()
 
@@ -377,4 +450,6 @@ if __name__ == "__main__":
         print("ERROR: No database URL. Set DATABASE_URL or use --db-url")
         sys.exit(1)
 
-    run_classification(args.project, db_url, limit=args.limit, dry_run=args.dry_run, discipline=args.discipline)
+    run_classification(args.project, db_url, limit=args.limit, dry_run=args.dry_run,
+                       discipline=args.discipline, source=args.source,
+                       local_minio=args.local_minio)
