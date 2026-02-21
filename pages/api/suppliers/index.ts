@@ -68,7 +68,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { data, userId } = req.body;
+    const { data } = req.body;
     
     if (!data || !data.name || !data.email) {
       return res.status(400).json({
@@ -77,8 +77,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // TODO: Get actual userId from auth context
-    const actualUserId = userId || 'system';
+    const actualUserId = (req as any).user?.id || 'system';
     
     const supplierId = await NeonSupplierService.create(data, actualUserId);
     

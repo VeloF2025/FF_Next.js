@@ -6,9 +6,8 @@ import { log } from '@/lib/logger';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // TODO: Replace with proper Clerk auth when ready for production
-  // For now, use a test user ID for development
-  const userId = 'dev-user-1';
+  const userId = (req as any).user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     if (req.method === 'GET') {

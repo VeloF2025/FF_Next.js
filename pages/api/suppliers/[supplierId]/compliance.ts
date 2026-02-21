@@ -119,7 +119,8 @@ async function handleGet(id: string, res: NextApiResponse) {
 
 async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { document, userId } = req.body;
+    const { document } = req.body;
+    const userId = (req as any).user?.id;
     
     if (!document || !document.type || !document.name || !document.url) {
       return res.status(400).json({
@@ -136,8 +137,7 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // TODO: Get actual userId from auth context
-    const actualUserId = userId || 'system';
+    const actualUserId = userId || 'system'; // userId already from req.user above
 
     // Add the document
     await NeonSupplierService.addComplianceDocument(
@@ -163,7 +163,8 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
 
 async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { documentId, action, data, userId } = req.body;
+    const { documentId, action, data } = req.body;
+    const userId = (req as any).user?.id;
     
     if (!documentId) {
       return res.status(400).json({
@@ -171,8 +172,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
       });
     }
 
-    // TODO: Get actual userId from auth context
-    const actualUserId = userId || 'system';
+    const actualUserId = userId || 'system'; // userId already from req.user above
 
     switch (action) {
       case 'verify':

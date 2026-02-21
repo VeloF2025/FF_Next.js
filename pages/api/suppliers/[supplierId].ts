@@ -61,7 +61,7 @@ async function handleGet(id: string, res: NextApiResponse) {
 
 async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { data, userId } = req.body;
+    const { data } = req.body;
     
     if (!data) {
       return res.status(400).json({
@@ -78,8 +78,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
       });
     }
 
-    // TODO: Get actual userId from auth context
-    const actualUserId = userId || 'system';
+    const actualUserId = (req as any).user?.id || 'system';
     
     await NeonSupplierService.update(id, data, actualUserId);
     
@@ -95,7 +94,8 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
 
 async function handleDelete(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { soft, reason, userId } = req.body;
+    const { soft, reason } = req.body;
+    const userId = (req as any).user?.id;
 
     // Check if supplier exists
     const existing = await NeonSupplierService.getById(id);
@@ -108,7 +108,7 @@ async function handleDelete(id: string, req: NextApiRequest, res: NextApiRespons
 
     if (soft) {
       // Soft delete (deactivate)
-      const actualUserId = userId || 'system';
+      const actualUserId = userId || 'system'; // userId already from req.user above
       await NeonSupplierService.softDelete(id, reason || 'Deactivated via API', actualUserId);
     } else {
       // Check for dependencies before hard delete

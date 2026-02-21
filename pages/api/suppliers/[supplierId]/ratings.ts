@@ -90,7 +90,7 @@ async function handleGet(id: string, res: NextApiResponse) {
 
 async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse) {
   try {
-    const { rating, reviewTitle, reviewText, userId, userName } = req.body;
+    const { rating, reviewTitle, reviewText } = req.body;
     
     if (!rating || !rating.overall) {
       return res.status(400).json({
@@ -111,9 +111,8 @@ async function handlePost(id: string, req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // TODO: Get actual userId from auth context
-    const actualUserId = userId || 'system';
-    const actualUserName = userName || 'Anonymous';
+    const actualUserId = (req as any).user?.id || 'system';
+    const actualUserName = (req as any).user?.name || 'Anonymous';
 
     // Add the rating
     await sql`
