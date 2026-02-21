@@ -95,11 +95,8 @@ async function handler(
 
     // OPTIMIZED: Run all queries in parallel instead of sequentially
     // Reduced from 3s to ~500ms by executing 8 queries concurrently
-    // TODO: Add indexes:
-    //   - CREATE INDEX idx_projects_status ON projects(status);
-    //   - CREATE INDEX idx_drops_status ON drops(status);
-    //   - CREATE INDEX idx_drops_project_id ON drops(project_id);
-    //   - CREATE INDEX idx_projects_created_at ON projects(created_at);
+    // NOTE: All recommended indexes confirmed present (2026-02-21).
+    //   idx_projects_created_at was missing — created via Flow on 2026-02-21.
     const [
       countsRows,
       budgetRows,
