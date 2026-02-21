@@ -37,6 +37,12 @@ export interface GithubRun {
   commitMessage?: string;
 }
 
+export interface ServiceErrorCount {
+  service: string;
+  count5min: number | null;
+  count1hour: number | null;
+}
+
 export interface DeploymentHealthData {
   services: ServiceHealth[];
   github: {
@@ -46,6 +52,7 @@ export interface DeploymentHealthData {
   errorLog: {
     count5min: number | null;
     count1hour: number | null;
+    byService: ServiceErrorCount[];
     recentLines: string[];
     error?: string;
   };
@@ -144,33 +151,43 @@ async function fetchGithubRuns(): Promise<{ runs: GithubRun[]; error?: string }>
 
 // ─── Error Log ────────────────────────────────────────────────────────────────
 
+const FF_SERVICES = ['fibreflow', 'fibreflow-staging', 'fibreflow-dev'];
+
 async function fetchErrorLog(): Promise<DeploymentHealthData['errorLog']> {
   try {
     const { execSync } = await import('child_process');
-    const count5min = execSync(
-      "journalctl -u fibreflow --since '5 minutes ago' -p err --no-pager -q 2>/dev/null | wc -l",
-      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
-    ).toString().trim();
 
-    const count1hour = execSync(
-      "journalctl -u fibreflow --since '1 hour ago' -p err --no-pager -q 2>/dev/null | wc -l",
-      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
-    ).toString().trim();
+    const run = (cmd: string) => {
+      try {
+        return execSync(cmd, { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).toString().trim();
+      } catch { return '0'; }
+    };
 
-    const recent = execSync(
-      "journalctl -u fibreflow -p err --no-pager -q -n 15 2>/dev/null",
-      { timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }
-    ).toString().trim();
+    // Per-service error counts
+    const byService: ServiceErrorCount[] = FF_SERVICES.map(svc => ({
+      service: svc,
+      count5min: parseInt(run(`journalctl -u ${svc} --since '5 minutes ago' -p err --no-pager -q 2>/dev/null | wc -l`)) || 0,
+      count1hour: parseInt(run(`journalctl -u ${svc} --since '1 hour ago' -p err --no-pager -q 2>/dev/null | wc -l`)) || 0,
+    }));
+
+    // Aggregate totals
+    const count5min = byService.reduce((s, x) => s + (x.count5min ?? 0), 0);
+    const count1hour = byService.reduce((s, x) => s + (x.count1hour ?? 0), 0);
+
+    // Recent error lines from prod (most important service)
+    const recent = run("journalctl -u fibreflow -p err --no-pager -q -n 15 2>/dev/null");
 
     return {
-      count5min: parseInt(count5min) || 0,
-      count1hour: parseInt(count1hour) || 0,
+      count5min,
+      count1hour,
+      byService,
       recentLines: recent ? recent.split('\n').filter(Boolean).slice(-15) : [],
     };
   } catch (err: any) {
     return {
       count5min: null,
       count1hour: null,
+      byService: [],
       recentLines: [],
       error: 'journalctl unavailable',
     };

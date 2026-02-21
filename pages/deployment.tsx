@@ -12,7 +12,7 @@ import {
   Wifi, WifiOff, GitCommit, Clock, Zap, Terminal,
   Activity, Github, Server, ExternalLink,
 } from 'lucide-react';
-import type { DeploymentHealthData, ServiceHealth, GithubRun } from './api/deployment-health';
+import type { DeploymentHealthData, ServiceHealth, GithubRun, ServiceErrorCount } from './api/deployment-health';
 
 const REFRESH_INTERVAL = 30_000; // 30 seconds
 
@@ -187,6 +187,12 @@ function RunRow({ run }: { run: GithubRun }) {
 
 // ─── Error Log ────────────────────────────────────────────────────────────────
 
+const SVC_LABELS: Record<string, string> = {
+  'fibreflow': 'Prod',
+  'fibreflow-staging': 'Staging',
+  'fibreflow-dev': 'Dev',
+};
+
 function ErrorLogPanel({ errorLog }: { errorLog: DeploymentHealthData['errorLog'] }) {
   const hasErrors = (errorLog.count5min ?? 0) > 0;
 
@@ -196,6 +202,7 @@ function ErrorLogPanel({ errorLog }: { errorLog: DeploymentHealthData['errorLog'
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
           <h3 className="font-semibold text-sm text-[var(--ff-text-primary)]">Error Log Tail</h3>
+          <span className="text-xs text-[var(--ff-text-tertiary)]">(prod)</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className={`flex items-center gap-1 ${hasErrors ? 'text-red-500' : 'text-green-500'}`}>
@@ -203,11 +210,29 @@ function ErrorLogPanel({ errorLog }: { errorLog: DeploymentHealthData['errorLog'
             {errorLog.count5min ?? '?'} errors (5m)
           </span>
           <span className="text-[var(--ff-text-tertiary)]">
-            {errorLog.count1hour ?? '?'} errors (1h)
+            {errorLog.count1hour ?? '?'} (1h)
           </span>
         </div>
       </div>
-      <div className="bg-gray-950 font-mono text-xs text-green-400 p-4 min-h-[180px] max-h-[300px] overflow-y-auto">
+
+      {/* Per-service breakdown */}
+      {errorLog.byService.length > 0 && (
+        <div className="flex gap-3 px-4 py-2 border-b border-[var(--ff-border-light)] text-xs">
+          {errorLog.byService.map(s => {
+            const label = SVC_LABELS[s.service] ?? s.service;
+            const hot = (s.count5min ?? 0) > 0;
+            return (
+              <div key={s.service} className={`flex items-center gap-1.5 ${hot ? 'text-red-500' : 'text-[var(--ff-text-tertiary)]'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${hot ? 'bg-red-500' : 'bg-green-500/60'}`} />
+                <span className="font-medium">{label}</span>
+                <span>{s.count5min ?? '?'}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="bg-gray-950 font-mono text-xs text-green-400 p-4 min-h-[160px] max-h-[260px] overflow-y-auto">
         {errorLog.error ? (
           <p className="text-yellow-400"># {errorLog.error}</p>
         ) : errorLog.recentLines.length === 0 ? (
