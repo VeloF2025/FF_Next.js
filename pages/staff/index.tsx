@@ -415,65 +415,75 @@ export default function StaffDirectoryPage() {
                 <table className="min-w-full divide-y divide-[var(--ff-border-light)]">
                   <thead className="bg-[var(--ff-bg-tertiary)]">
                     <tr>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
-                        onClick={() => handleSort('name')}
-                      >
-                        <div className="flex items-center">
+                      {/* WCAG: scope="col" + aria-sort on sortable headers; <button> inside <th> for keyboard access */}
+                      <th scope="col" aria-sort={sortColumn === 'name' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('name')}
+                          className="flex items-center w-full px-6 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hover:text-[var(--ff-text-primary)] select-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
+                        >
                           Staff Member
                           <SortIcon column="name" />
-                        </div>
+                        </button>
                       </th>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
-                        onClick={() => handleSort('position')}
-                      >
-                        <div className="flex items-center">
+                      <th scope="col" aria-sort={sortColumn === 'position' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('position')}
+                          className="flex items-center w-full px-6 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hover:text-[var(--ff-text-primary)] select-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
+                        >
                           Position
                           <SortIcon column="position" />
-                        </div>
+                        </button>
                       </th>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
-                        onClick={() => handleSort('department')}
-                      >
-                        <div className="flex items-center">
+                      <th scope="col" aria-sort={sortColumn === 'department' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('department')}
+                          className="flex items-center w-full px-6 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hover:text-[var(--ff-text-primary)] select-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
+                        >
                           Department
                           <SortIcon column="department" />
-                        </div>
+                        </button>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                         Contact
                       </th>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
-                        onClick={() => handleSort('status')}
-                      >
-                        <div className="flex items-center">
+                      <th scope="col" aria-sort={sortColumn === 'status' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('status')}
+                          className="flex items-center w-full px-6 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hover:text-[var(--ff-text-primary)] select-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
+                        >
                           Status
                           <SortIcon column="status" />
-                        </div>
+                        </button>
                       </th>
-                      <th
-                        className="px-6 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide cursor-pointer hover:text-[var(--ff-text-primary)] select-none"
-                        onClick={() => handleSort('projects')}
-                      >
-                        <div className="flex items-center">
+                      <th scope="col" aria-sort={sortColumn === 'projects' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'} className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('projects')}
+                          className="flex items-center w-full px-6 py-3 text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide hover:text-[var(--ff-text-primary)] select-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
+                        >
                           Projects
                           <SortIcon column="projects" />
-                        </div>
+                        </button>
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
                     {sortedStaff.map((member) => (
+                      // WCAG: tabIndex + onKeyDown + aria-label makes row keyboard accessible (M1)
                       <tr
                         key={member.id}
-                        className="hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors"
+                        className="hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)]"
                         onClick={() => handleView(member)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleView(member)}
+                        tabIndex={0}
+                        aria-label={`View ${member.name || 'staff member'}`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -500,23 +510,26 @@ export default function StaffDirectoryPage() {
                           <div className="text-sm text-[var(--ff-text-primary)]">{formatLabel(member.department)}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
+                          {/* WCAG: icon-only links need aria-label (C2) */}
                           <div className="flex items-center space-x-2">
                             {member.email && (
                               <a
                                 href={`mailto:${member.email}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-blue-400 hover:text-blue-300"
+                                aria-label={`Email ${member.name || 'staff member'}`}
+                                className="text-blue-400 hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded"
                               >
-                                <Mail className="h-4 w-4" />
+                                <Mail className="h-4 w-4" aria-hidden="true" />
                               </a>
                             )}
                             {member.phone && (
                               <a
                                 href={`tel:${member.phone}`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-blue-400 hover:text-blue-300"
+                                aria-label={`Call ${member.name || 'staff member'}`}
+                                className="text-blue-400 hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded"
                               >
-                                <Phone className="h-4 w-4" />
+                                <Phone className="h-4 w-4" aria-hidden="true" />
                               </a>
                             )}
                           </div>
@@ -532,33 +545,40 @@ export default function StaffDirectoryPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          {/* WCAG: icon-only buttons need aria-label (C1) */}
                           <div className="flex items-center justify-end space-x-2">
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleView(member);
                               }}
-                              className="text-blue-400 hover:text-blue-300"
+                              aria-label={`View ${member.name || 'staff member'}`}
+                              className="text-blue-400 hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded p-0.5"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4" aria-hidden="true" />
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEdit(member);
                               }}
-                              className="text-indigo-400 hover:text-indigo-300"
+                              aria-label={`Edit ${member.name || 'staff member'}`}
+                              className="text-indigo-400 hover:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded p-0.5"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-4 w-4" aria-hidden="true" />
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(member.id);
                               }}
-                              className="text-red-400 hover:text-red-300"
+                              aria-label={`Delete ${member.name || 'staff member'}`}
+                              className="text-red-400 hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500 rounded p-0.5"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
                             </button>
                           </div>
                         </td>
