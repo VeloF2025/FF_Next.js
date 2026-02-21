@@ -577,4 +577,11 @@ if __name__ == "__main__":
         print("ERROR: No database URL. Set DATABASE_URL or use --db-url")
         sys.exit(1)
 
-    run_ingestion(args.project, db_url, dry_run=args.dry_run, folder_id=args.folder_id)
+    if args.project.lower() == "all":
+        for proj_name in PROJECT_FOLDERS:
+            try:
+                run_ingestion(proj_name, db_url, dry_run=args.dry_run, folder_id=args.folder_id)
+            except Exception as e:
+                print(f"\n  ERROR running {proj_name}: {e}\n")
+    else:
+        run_ingestion(args.project, db_url, dry_run=args.dry_run, folder_id=args.folder_id)
