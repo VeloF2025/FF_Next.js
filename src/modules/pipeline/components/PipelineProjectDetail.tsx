@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/auth.types';
@@ -131,7 +131,7 @@ const APPROVAL_STATUS_COLORS: Record<
 
 export function PipelineProjectDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams();
   const { currentUser } = useAuth();
 
   const [project, setProject] = useState<PipelineProjectWithRelations | null>(null);

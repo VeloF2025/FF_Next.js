@@ -1,11 +1,11 @@
 'use client';
 
 import { Upload, FileText } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter, useParams } from 'next/navigation';
 
 export function SOWHeader() {
   const router = useRouter();
-  const { projectId } = router.query;
+  const { projectId } = useParams();
   const projectIdStr = typeof projectId === 'string' ? projectId : '';
 
   const handleImportClick = () => {
