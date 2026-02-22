@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Save, Building } from 'lucide-react';
 import { useClient, useCreateClient, useUpdateClient } from '@/hooks/useClients';
 import { 
