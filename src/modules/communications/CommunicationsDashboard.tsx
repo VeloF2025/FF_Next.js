@@ -237,69 +237,99 @@ const CommunicationsDashboard: React.FC = () => {
       {/* Tabs Container */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
         <div className="border-b border-[var(--ff-border-light)]">
-          <nav className="flex gap-1 px-4 -mb-px" aria-label="Tabs">
-            {tabs.map((tab, index) => (
-              <button
-                key={tab}
-                onClick={() => handleTabChange(index as CommunicationsTab)}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${
-                  selectedTab === index
-                    ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
-                    : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
-                }`}
-              >
-                {tab}
-                {/* Show count badge for Meetings tab */}
-                {index === 1 && data.meetings.length > 0 && (
-                  <span className="ml-2 px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full">
-                    {data.meetings.length}
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* WCAG: role=tablist on nav, role=tab + aria-selected + aria-controls on each button */}
+          <nav role="tablist" className="flex gap-1 px-4 -mb-px" aria-label="Communications tabs">
+            {tabs.map((tab, index) => {
+              const tabId = `comms-tab-${tab.toLowerCase().replace(/\s+/g, '-')}`;
+              const panelId = `comms-panel-${tab.toLowerCase().replace(/\s+/g, '-')}`;
+              return (
+                <button
+                  key={tab}
+                  id={tabId}
+                  role="tab"
+                  aria-selected={selectedTab === index}
+                  aria-controls={panelId}
+                  onClick={() => handleTabChange(index as CommunicationsTab)}
+                  className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--ff-accent)] ${
+                    selectedTab === index
+                      ? 'border-[var(--ff-primary)] text-[var(--ff-primary)]'
+                      : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:border-[var(--ff-border-light)]'
+                  }`}
+                >
+                  {tab}
+                  {/* Show count badge for Meetings tab */}
+                  {index === 1 && data.meetings.length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full" aria-hidden="true">
+                      {data.meetings.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
         <div className="p-6">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-text-tertiary)]" />
+            <div className="flex items-center justify-center py-12" role="status" aria-label="Loading communications">
+              <RefreshCw className="w-6 h-6 animate-spin text-[var(--ff-text-tertiary)]" aria-hidden="true" />
               <span className="ml-2 text-[var(--ff-text-secondary)]">Loading...</span>
             </div>
           ) : (
             <>
-              {selectedTab === 0 && (
+              {/* WCAG: role=tabpanel + id (matches aria-controls) + aria-labelledby (matches tab id) */}
+              <div
+                id="comms-panel-overview"
+                role="tabpanel"
+                aria-labelledby="comms-tab-overview"
+                hidden={selectedTab !== 0}
+              >
                 <CommunicationsOverviewTab
                   meetings={data.meetings}
                   actionItems={data.actionItems}
                   getStatusColor={getStatusColor}
                   getPriorityColor={getPriorityColor}
                 />
-              )}
+              </div>
 
-              {selectedTab === 1 && (
+              <div
+                id="comms-panel-meetings"
+                role="tabpanel"
+                aria-labelledby="comms-tab-meetings"
+                hidden={selectedTab !== 1}
+              >
                 <CommunicationsMeetingsTab
                   meetings={data.meetings}
                   getStatusColor={getStatusColor}
                   onRefresh={handleRefresh}
                 />
-              )}
+              </div>
 
-              {selectedTab === 2 && (
+              <div
+                id="comms-panel-action-items"
+                role="tabpanel"
+                aria-labelledby="comms-tab-action-items"
+                hidden={selectedTab !== 2}
+              >
                 <CommunicationsActionTab
                   actionItems={data.actionItems}
                   meetings={data.meetings}
                   getStatusColor={getStatusColor}
                   getPriorityColor={getPriorityColor}
                 />
-              )}
+              </div>
 
-              {selectedTab === 3 && (
+              <div
+                id="comms-panel-notifications"
+                role="tabpanel"
+                aria-labelledby="comms-tab-notifications"
+                hidden={selectedTab !== 3}
+              >
                 <CommunicationsNotificationsTab
                   notifications={data.notifications}
                   getPriorityColor={getPriorityColor}
                 />
-              )}
+              </div>
             </>
           )}
         </div>
