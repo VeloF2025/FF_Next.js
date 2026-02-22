@@ -12,18 +12,21 @@ export default defineConfig({
     hookTimeout: 10000,
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@/lib': path.resolve(__dirname, './lib'),
-      '@/components': path.resolve(__dirname, './src/components'),
-      '@/hooks': path.resolve(__dirname, './src/hooks'),
-      '@/types': path.resolve(__dirname, './src/types'),
-      '@/contexts': path.resolve(__dirname, './src/contexts'),
-      '@/services': path.resolve(__dirname, './src/services'),
-      '@/modules': path.resolve(__dirname, './src/modules'),
-      '@/pages': path.resolve(__dirname, './pages'),
-      '@/config': path.resolve(__dirname, './src/config'),
-    },
+    // IMPORTANT: More specific aliases must come before generic '@'
+    // otherwise '@' → './src' will greedily match '@/lib/...' before
+    // the '@/lib' → './lib' alias gets a chance to apply.
+    alias: [
+      { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
+      { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
+      { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },
+      { find: '@/types', replacement: path.resolve(__dirname, './src/types') },
+      { find: '@/contexts', replacement: path.resolve(__dirname, './src/contexts') },
+      { find: '@/services', replacement: path.resolve(__dirname, './src/services') },
+      { find: '@/modules', replacement: path.resolve(__dirname, './src/modules') },
+      { find: '@/pages', replacement: path.resolve(__dirname, './pages') },
+      { find: '@/config', replacement: path.resolve(__dirname, './src/config') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
   },
   esbuild: {
     jsx: 'automatic',

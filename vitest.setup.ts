@@ -50,7 +50,31 @@ vi.mock('@/contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-// Mock @/lib/logger to prevent "No log export" errors
+// Mock lib/logger.ts (used by lib/api-error-handler.ts and others)
+vi.mock('./lib/logger', () => ({
+  log: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    getLogs: vi.fn(() => []),
+    clearLogs: vi.fn(),
+  },
+  apiLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  createLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
+}));
+
+// Mock @/lib/logger (alias used by src/ files)
 vi.mock('@/lib/logger', () => ({
   log: {
     debug: vi.fn(),
@@ -60,18 +84,18 @@ vi.mock('@/lib/logger', () => ({
     getLogs: vi.fn(() => []),
     clearLogs: vi.fn(),
   },
-  createLogger: vi.fn(() => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  })),
   apiLogger: {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
   },
+  createLogger: vi.fn(() => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));
 
 // Mock @/lib/api-error-handler (self-referential for integration tests)

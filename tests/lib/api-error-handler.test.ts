@@ -36,13 +36,13 @@ function createMockRes(): NextApiResponse {
   const res: any = {
     statusCode: 200,
     _getHeaders: () => ({}),
-    setHeader: jest.fn().mockReturnThis(),
-    removeHeader: jest.fn().mockReturnThis(),
-    writeHead: jest.fn().mockReturnThis(),
-    end: jest.fn().mockReturnThis(),
-    status: jest.fn().mockReturnThis(),
-    json: jest.fn().mockReturnThis(),
-    send: jest.fn().mockReturnThis(),
+    setHeader: vi.fn().mockReturnThis(),
+    removeHeader: vi.fn().mockReturnThis(),
+    writeHead: vi.fn().mockReturnThis(),
+    end: vi.fn().mockReturnThis(),
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+    send: vi.fn().mockReturnThis(),
     headersSent: false,
   };
   return res;
@@ -290,7 +290,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
    */
   describe('withErrorHandler() wrapper', () => {
     it('should execute handler successfully and log request/response', async () => {
-      const handler = jest.fn().mockResolvedValue(undefined);
+      const handler = vi.fn().mockResolvedValue(undefined);
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq({ method: 'POST', url: '/api/users' });
@@ -302,7 +302,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should handle handler throwing an error', async () => {
-      const handler = jest.fn().mockRejectedValue(new Error('Something failed'));
+      const handler = vi.fn().mockRejectedValue(new Error('Something failed'));
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq();
@@ -321,7 +321,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should handle handler throwing non-Error object', async () => {
-      const handler = jest.fn().mockRejectedValue('String error');
+      const handler = vi.fn().mockRejectedValue('String error');
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq();
@@ -339,7 +339,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should handle OPTIONS requests for CORS preflight', async () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq({ method: 'OPTIONS' });
@@ -353,7 +353,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should set CORS headers for allowed origins', async () => {
-      const handler = jest.fn().mockResolvedValue(undefined);
+      const handler = vi.fn().mockResolvedValue(undefined);
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq({
@@ -378,7 +378,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should not set CORS headers for disallowed origins', async () => {
-      const handler = jest.fn().mockResolvedValue(undefined);
+      const handler = vi.fn().mockResolvedValue(undefined);
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq({
@@ -395,7 +395,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should handle missing origin header gracefully', async () => {
-      const handler = jest.fn().mockResolvedValue(undefined);
+      const handler = vi.fn().mockResolvedValue(undefined);
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq({ headers: {} });
@@ -407,7 +407,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should not attempt to send error response if headers already sent', async () => {
-      const handler = jest.fn().mockRejectedValue(new Error('Failed'));
+      const handler = vi.fn().mockRejectedValue(new Error('Failed'));
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq();
@@ -424,7 +424,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'development';
 
-      const handler = jest.fn().mockRejectedValue(new Error('Test error'));
+      const handler = vi.fn().mockRejectedValue(new Error('Test error'));
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq();
@@ -448,7 +448,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
 
-      const handler = jest.fn().mockRejectedValue(new Error('Test error'));
+      const handler = vi.fn().mockRejectedValue(new Error('Test error'));
       const wrapped = withErrorHandler(handler);
 
       const req = createMockReq();
@@ -466,7 +466,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should handle various HTTP methods', async () => {
-      const handler = jest.fn().mockResolvedValue(undefined);
+      const handler = vi.fn().mockResolvedValue(undefined);
       const wrapped = withErrorHandler(handler);
 
       const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
@@ -507,7 +507,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
    */
   describe('Integration with typical API patterns', () => {
     it('should work with GET endpoint returning data', async () => {
-      const handler = jest.fn(async (req, res) => {
+      const handler = vi.fn(async (req, res) => {
         res.status(200).json(successResponse([{ id: 1 }, { id: 2 }]));
       });
       const wrapped = withErrorHandler(handler);
@@ -525,7 +525,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should work with POST endpoint returning error', async () => {
-      const handler = jest.fn(async (req, res) => {
+      const handler = vi.fn(async (req, res) => {
         res.status(400).json(HttpErrors.BadRequest('Invalid input'));
       });
       const wrapped = withErrorHandler(handler);
@@ -550,7 +550,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should work with DELETE endpoint returning 404', async () => {
-      const handler = jest.fn(async (req, res) => {
+      const handler = vi.fn(async (req, res) => {
         res.status(404).json(HttpErrors.NotFound('Item not found'));
       });
       const wrapped = withErrorHandler(handler);
@@ -573,7 +573,7 @@ describe('API Error Handler (lib/api-error-handler.ts)', () => {
     });
 
     it('should preserve handler status code on success', async () => {
-      const handler = jest.fn(async (req, res) => {
+      const handler = vi.fn(async (req, res) => {
         res.status(201).json(successResponse({ id: 1 }, 'Created'));
       });
       const wrapped = withErrorHandler(handler);
