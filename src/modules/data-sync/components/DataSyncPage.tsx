@@ -17,7 +17,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Database,
@@ -90,6 +90,7 @@ const TAB_GROUPS: {
 
 export function DataSyncPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -97,9 +98,9 @@ export function DataSyncPage() {
   const { can, isLoading: permissionsLoading } = usePermission();
   const { isFeatureEnabled, isLoading: featuresLoading } = useSystemFeatures();
 
-  // Get group and tab from URL
-  const activeGroup = (router.query.group as TabGroupId) || null;
-  const activeTab = (router.query.tab as string) || null;
+  // Get group and tab from URL (App Router)
+  const activeGroup = (searchParams.get('group') as TabGroupId) || null;
+  const activeTab = searchParams.get('tab') || null;
 
   // Show loading state while permissions are being resolved
   const isLoading = permissionsLoading || featuresLoading;
@@ -130,26 +131,18 @@ export function DataSyncPage() {
     return accessibleGroups.some((g) => g.id === activeGroup);
   }, [activeGroup, accessibleGroups]);
 
-  // Handle group change
+  // Handle group change (App Router)
   const handleGroupChange = (groupId: TabGroupId | null) => {
     if (groupId === null) {
-      router.push('/system/data-sync', undefined, { shallow: true });
+      router.push('/system/data-sync');
     } else {
-      router.push(
-        { pathname: '/system/data-sync', query: { group: groupId } },
-        undefined,
-        { shallow: true }
-      );
+      router.push(`/system/data-sync?group=${groupId}`);
     }
   };
 
-  // Handle tab change within a group
+  // Handle tab change within a group (App Router)
   const handleTabChange = (groupId: TabGroupId, tabId: string) => {
-    router.push(
-      { pathname: '/system/data-sync', query: { group: groupId, tab: tabId } },
-      undefined,
-      { shallow: true }
-    );
+    router.push(`/system/data-sync?group=${groupId}&tab=${tabId}`);
   };
 
   // Handle refresh
