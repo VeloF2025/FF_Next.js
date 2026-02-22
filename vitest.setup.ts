@@ -66,4 +66,17 @@ vi.mock('@/lib/logger', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   })),
+  apiLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
+
+// Mock @/lib/api-error-handler (self-referential for integration tests)
+// This allows tests to import the real implementation while mocking its dependencies
+vi.mock('@/lib/api-error-handler', async () => {
+  const actual = await vi.importActual('@/lib/api-error-handler');
+  return actual;
+}, { esmock: true });
