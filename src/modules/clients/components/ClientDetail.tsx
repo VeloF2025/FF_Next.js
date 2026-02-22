@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useParams } from 'next/navigation';
 import { Edit, Trash2, Building, Activity, FileText } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -22,7 +22,7 @@ import { log } from '@/lib/logger';
 
 export function ClientDetail() {
   const router = useRouter();
-  const { id } = router.query as { id: string };
+  const { id } = useParams() as { id: string };
   const { hasPermission } = useAuth();
   const { data: client, isLoading, error } = useClient(id || '');
   const deleteMutation = useDeleteClient();
