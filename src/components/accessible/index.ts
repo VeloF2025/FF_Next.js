@@ -13,3 +13,6 @@ export type { AccessibleAccordionProps, AccordionItemConfig } from './Accessible
 
 export { AccessibleCheckbox } from './AccessibleCheckbox';
 export type { AccessibleCheckboxProps } from './AccessibleCheckbox';
+
+export { AccessibleModal } from './AccessibleModal';
+export type { AccessibleModalProps } from './AccessibleModal';
