@@ -1,6 +1,6 @@
 // 🟢 WORKING: Main Workflow Portal with comprehensive tabbed navigation
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, GitBranch, ArrowLeft } from 'lucide-react';
 import { WorkflowPortalProvider } from './context/WorkflowPortalContext';
 import { WorkflowTabs } from './components/WorkflowTabs';
@@ -15,6 +15,7 @@ interface WorkflowPortalPageProps {
 // Portal layout component
 function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const {
     activeTab,
@@ -26,23 +27,20 @@ function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
     // refreshData removed - not used in current implementation
   } = useWorkflowPortal();
 
-  // Handle tab changes from URL
+  // Handle tab changes from URL (App Router)
   useEffect(() => {
-    const tabParam = router.query.tab as WorkflowTabId;
+    const tabParam = searchParams.get('tab') as WorkflowTabId;
     if (tabParam && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [router.query.tab, activeTab, setActiveTab]);
+  }, [searchParams, activeTab, setActiveTab]);
 
-  // Handle tab changes
+  // Handle tab changes (App Router)
   const handleTabChange = (tabId: WorkflowTabId) => {
     setActiveTab(tabId);
 
     // Update URL with tab parameter
-    router.push({
-      pathname: router.pathname,
-      query: { ...router.query, tab: tabId }
-    }, undefined, { shallow: true });
+    router.push(`?tab=${tabId}`);
   };
 
   // Navigate back to settings
