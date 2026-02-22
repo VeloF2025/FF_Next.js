@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, FormEvent, useRef } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import Head from 'next/head';
 import Link from 'next/link';
 import { Mail, Lock, ArrowLeft, Check, User } from 'lucide-react';
