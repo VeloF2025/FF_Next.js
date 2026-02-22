@@ -4,7 +4,7 @@
  */
 
 import { Bell, CheckCheck, Inbox } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { NotificationsDropdownProps } from './HeaderTypes';
 
 /** Severity → left border color */
