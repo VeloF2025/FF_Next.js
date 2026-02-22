@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { MapPin, Camera, CheckCircle, AlertTriangle } from 'lucide-react';
 import type { NeonPole } from '../../services/poleTrackerNeonService';
 import { getStatusColor, getPhaseColor, getStatusDisplayText, formatPhaseText } from '../utils/poleDisplayUtils';

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, X, TrendingUp, Clock, Users, Briefcase, User, Building } from 'lucide-react';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);

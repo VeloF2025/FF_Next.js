@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus, Download, Upload } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { PermissionGate } from '@/components/PermissionGate';
 
 interface ProjectListHeaderProps {

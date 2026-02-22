@@ -1,7 +1,7 @@
 'use client';
 
 import { Map, Grid3x3, Download, Upload, Layers, Search } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 
 export function OneMapDashboard() {
   const router = useRouter();

@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import {
   Building2, Mail, Phone, MapPin, Star, TrendingUp,
   AlertCircle, CheckCircle, Clock, XCircle, MoreVertical

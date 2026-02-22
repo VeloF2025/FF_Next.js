@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { HomeInstall } from './types/home-install.types';
 import { HomeInstallsHeader } from './components/HomeInstallsHeader';
 import { HomeInstallsTable } from './components/HomeInstallsTable';

@@ -20,7 +20,7 @@ import {
   Bell,
   ExternalLink,
 } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { log } from '@/lib/logger';
 
 interface BirthdayAlert {

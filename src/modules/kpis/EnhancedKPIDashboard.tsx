@@ -1,7 +1,7 @@
 'use client';
 
 import { Target, TrendingUp, BarChart3, PieChart, Activity, Settings } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export function EnhancedKPIDashboard() {

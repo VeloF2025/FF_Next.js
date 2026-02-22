@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Plus, Upload, Download, Building2 } from 'lucide-react';
 import { PermissionGate } from '@/components/PermissionGate';
 import type { ClientFilter } from '@/types/client.types';

@@ -1,7 +1,7 @@
 'use client';
 
 import { MapPin, Camera, Upload, BarChart3, CheckCircle, AlertTriangle, Users, Plus, UtilityPole } from 'lucide-react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { StatCard } from '../../../components/dashboard/StatCard';
 import { DashboardHeader } from '../../../components/dashboard/DashboardHeader';

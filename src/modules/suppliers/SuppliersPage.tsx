@@ -7,7 +7,7 @@ import { SupplierCard } from './components/SupplierCard';
 import { SupplierStatus, ProductCategory } from '@/types/supplier.types';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { PermissionGate } from '@/components/PermissionGate';
 
 export function SuppliersPage() {

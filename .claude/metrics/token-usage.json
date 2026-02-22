@@ -225,6 +225,20 @@
         "mcp__chrome-devtools__fill": 5,
         "mcp__chrome-devtools__wait_for": 1
       }
+    },
+    "3fd9b7ff-7617-473a-81a7-61a820305028": {
+      "session_id": "3fd9b7ff-7617-473a-81a7-61a820305028",
+      "started_at": "2026-02-22T08:25:45.996Z",
+      "total_input_tokens": 2175,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.006525000000000001,
+      "tool_calls": 77,
+      "tools_used": {
+        "Read": 23,
+        "Grep": 23,
+        "Glob": 13,
+        "Bash": 18
+      }
     }
   }
 }
