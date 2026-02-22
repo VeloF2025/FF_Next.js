@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Calendar, RefreshCw, Video, Film } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -36,6 +36,7 @@ const TAB_NAMES = ['overview', 'meetings', 'action-items', 'notifications'];
 
 const CommunicationsDashboard: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedTab, setSelectedTab] = useState<CommunicationsTab>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -47,24 +48,22 @@ const CommunicationsDashboard: React.FC = () => {
 
   const tabs = ['Overview', 'Meetings', 'Action Items', 'Notifications'];
 
-  // Handle URL params for tab selection
+  // Handle URL params for tab selection (App Router: no router.isReady needed)
   useEffect(() => {
-    if (router.isReady) {
-      const tabParam = router.query.tab as string;
-      if (tabParam) {
-        const tabIndex = TAB_NAMES.indexOf(tabParam.toLowerCase());
-        if (tabIndex !== -1) {
-          setSelectedTab(tabIndex as CommunicationsTab);
-        }
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      const tabIndex = TAB_NAMES.indexOf(tabParam.toLowerCase());
+      if (tabIndex !== -1) {
+        setSelectedTab(tabIndex as CommunicationsTab);
       }
     }
-  }, [router.isReady, router.query.tab]);
+  }, [searchParams]);
 
-  // Update URL when tab changes
+  // Update URL when tab changes (App Router)
   const handleTabChange = (index: CommunicationsTab) => {
     setSelectedTab(index);
     const tabName = TAB_NAMES[index];
-    router.push(`/communications?tab=${tabName}`, undefined, { shallow: true });
+    router.push(`/communications?tab=${tabName}`);
   };
 
   // Handle refresh with loading state
