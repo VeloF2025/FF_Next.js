@@ -7,7 +7,7 @@
  * New code should import from './components' directly
  */
 
-import { useRouter } from 'next/router';
+import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { DashboardHeader } from '../../../components/dashboard/DashboardHeader';
 import { 
@@ -22,7 +22,7 @@ import { usePoleDetail } from './hooks/usePoleDetail';
 
 export function PoleTrackerDetail() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams();
   const { pole, tabs, activeTab, handleTabChange } = usePoleDetail(id);
 
   return (
