@@ -103,7 +103,125 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
     fetchConfigs();
   }, [fetchConfigs]);
 
-  // Trigger sync
+  // Poll for sync completion
+  const pollForCompletion = useCallback(async () => {
+    const config = configs[0];
+    if (!config) return;
+
+    const maxPolls = 90; // 90 polls * 5s = 7.5 min max
+    let polls = 0;
+
+    const poll = async () => {
+      polls++;
+      try {
+        const histRes = await fetch(`/api/pipeline/smartsheet/history?configId=${config.id}&limit=1`);
+        const histData = await histRes.json();
+        const latest = histData?.data?.history?.[0];
+
+        if (latest && latest.status !== 'running') {
+          // Sync finished
+          setIsSyncing(false);
+          fetchConfigs();
+          onSyncComplete?.();
+
+          if (latest.status === 'completed' || latest.status === 'partial') {
+            const syncResult: SyncResult = {
+              success: latest.status === 'completed',
+              historyId: latest.id,
+              stats: {
+                processed: latest.rows_processed,
+                created: latest.rows_created,
+                updated: latest.rows_updated,
+                skipped: 0,
+                errored: latest.rows_errored,
+              },
+              errors: [],
+              warnings: [],
+              duration_ms: latest.duration_ms || 0,
+            };
+            setLastResult(syncResult);
+
+            toast.custom(
+              (t) => (
+                <div
+                  className={`${
+                    t.visible ? 'animate-enter' : 'animate-leave'
+                  } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+                >
+                  <div className="flex-1 w-0 p-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 pt-0.5">
+                        {syncResult.success ? (
+                          <CheckCircle className="h-10 w-10 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-10 w-10 text-yellow-500" />
+                        )}
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          Smartsheet Sync Complete
+                        </p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Database className="h-4 w-4 text-blue-500" />
+                            <span>{syncResult.stats.processed.toLocaleString()} projects synced</span>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <ArrowUpDown className="h-4 w-4 text-purple-500" />
+                            <span className="text-green-600">+{syncResult.stats.created} new</span>
+                            <span className="text-blue-600">~{syncResult.stats.updated} updated</span>
+                            {syncResult.stats.errored > 0 && (
+                              <span className="text-red-600">!{syncResult.stats.errored} errors</span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Duration: {((syncResult.duration_ms || 0) / 1000).toFixed(1)}s
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex border-l border-border">
+                    <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ),
+              { duration: 6000 }
+            );
+          } else {
+            setError('Sync failed on the server');
+            toast.error('Smartsheet sync failed');
+          }
+          return; // Stop polling
+        }
+
+        // Still running - continue polling
+        if (polls < maxPolls) {
+          setTimeout(poll, 5000);
+        } else {
+          setIsSyncing(false);
+          setError('Sync is still running. Check back in a few minutes.');
+          toast.error('Sync timeout — check history for results');
+        }
+      } catch {
+        // Network error during poll - retry
+        if (polls < maxPolls) {
+          setTimeout(poll, 5000);
+        }
+      }
+    };
+
+    // Start polling after 5s delay (give server time to create history record)
+    setTimeout(poll, 5000);
+  }, [configs, fetchConfigs, onSyncComplete]);
+
+  // Trigger sync (fire-and-forget, then poll)
   const handleSync = async () => {
     setIsSyncing(true);
     setError(null);
@@ -116,78 +234,19 @@ export function SmartsheetSyncPanel({ compact = false, onSyncComplete }: Smartsh
         body: JSON.stringify({}),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || 'Sync failed');
+        const data = await res.json();
+        throw new Error(data.error?.message || data.error || 'Failed to start sync');
       }
 
-      setLastResult(data);
-      fetchConfigs(); // Refresh configs and history
-      onSyncComplete?.();
+      toast.success('Sync started — running in background...');
 
-      // Show FibreFlow-style toast notification
-      const syncResult = data as SyncResult;
-      toast.custom(
-        (t) => (
-          <div
-            className={`${
-              t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-card shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-          >
-            <div className="flex-1 w-0 p-4">
-              <div className="flex items-start">
-                <div className="flex-shrink-0 pt-0.5">
-                  {syncResult.success ? (
-                    <CheckCircle className="h-10 w-10 text-green-500" />
-                  ) : syncResult.stats.errored > 0 ? (
-                    <AlertTriangle className="h-10 w-10 text-yellow-500" />
-                  ) : (
-                    <XCircle className="h-10 w-10 text-red-500" />
-                  )}
-                </div>
-                <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    Smartsheet Sync Complete
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Database className="h-4 w-4 text-blue-500" />
-                      <span>{syncResult.stats.processed.toLocaleString()} projects synced</span>
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <ArrowUpDown className="h-4 w-4 text-purple-500" />
-                      <span className="text-green-600">+{syncResult.stats.created} new</span>
-                      <span className="text-blue-600">~{syncResult.stats.updated} updated</span>
-                      {syncResult.stats.errored > 0 && (
-                        <span className="text-red-600">!{syncResult.stats.errored} errors</span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Duration: {(syncResult.duration_ms / 1000).toFixed(1)}s
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex border-l border-border">
-              <button
-                onClick={() => toast.dismiss(t.id)}
-                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 focus:outline-none"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        ),
-        { duration: 6000 }
-      );
+      // Start polling for completion
+      pollForCompletion();
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Sync failed';
       setError(errorMsg);
       toast.error(`Smartsheet sync failed: ${errorMsg}`);
-    } finally {
       setIsSyncing(false);
     }
   };
