@@ -1,9 +1,23 @@
 # Procurement Overview
 
 **URL**: /procurement
-**Preconditions**: User is logged in
+**Preconditions**: Fresh browser session (auth handled in Auth section below)
 **Priority**: Critical
 **Module**: Procurement
+
+## Auth
+
+**Login flow** — run before story steps if not already authenticated (sidebar not visible):
+
+1. Navigate to `{BASE_URL}/sign-in`
+2. Fill the **Email** field (`id="username"`) with `hein@velocityfibre.co.za`
+3. Press **Enter** or click **Continue**
+4. Wait for the password field to appear (multi-step form)
+5. Fill the **Password** field (`id="current-password"`) with `Mitzi@0203`
+6. Click the **Sign In** button
+7. Wait for redirect — confirm the sidebar navigation is visible
+
+> Skip this section if already logged in (sidebar already visible on screen).
 
 ## Steps
 
@@ -12,8 +26,8 @@
    - Expect: Page loads with procurement tabs visible
 
 2. **Verify tab navigation**
-   - Action: look for procurement tabs (BOQ, RFQ, Requisitions, PO, GRN, Approvals, Stock, Field Stock)
-   - Expect: Multiple tabs visible, at least one is active/selected
+   - Action: look for procurement category tabs at the top
+   - Expect: Tabs visible: Dashboard, Sourcing, Purchasing, Inventory, Field Stock, Approvals, Reports — at least one active/selected
 
 3. **Check Requisitions tab**
    - Action: click Requisitions tab or navigate to /procurement/requisitions
@@ -49,11 +63,11 @@
 
 10. **Check Field Stock**
     - Action: navigate to /procurement/field-stock
-    - Expect: 8 sub-tabs visible: Dashboard, Locations, Items, Pickings, Returns, Consumptions, Accountability, Adjustments
+    - Expect: Sub-tabs visible: Dashboard, Locations, Serials, Consumptions, Transfers, Returns, Accountability, Faults, Adjustments (9 tabs)
 
 11. **Check Inventory**
     - Action: navigate to /procurement/inventory
-    - Expect: Tabs: Stock, Items, Bundles, Takes, Adjustments, Reports
+    - Expect: Tabs: Stock, Items, Categories, Bundles, Takes, Adjustments, Reports
 
 12. **Check Adjustments tab**
     - Action: click Adjustments tab on Inventory or Field Stock page

@@ -52,7 +52,9 @@ For each story in scope, spawn a `browser-qa` agent using the Task tool:
 Task tool:
   subagent_type: browser-qa
   prompt: "Validate the user story at .claude/user-stories/{story}.md against {environment_url}.
-           Execute every step, take screenshots at each step, and report pass/fail results."
+           The BASE_URL is {environment_url} — replace {BASE_URL} in the Auth section with this value.
+           Execute the ## Auth section first (multi-step login: email → Continue → password → Sign In).
+           Then execute every ## Steps step, take screenshots at each step, and report pass/fail results."
 ```
 
 **Parallelization rules:**
@@ -107,9 +109,23 @@ Stories live in `.claude/user-stories/{module}-{workflow}.md`:
 # Story Name
 
 **URL**: /path
-**Preconditions**: requirements
+**Preconditions**: Fresh browser session (auth handled in Auth section below)
 **Priority**: Critical | High | Medium
 **Module**: module-name
+
+## Auth
+
+**Login flow** — run before story steps if not already authenticated (sidebar not visible):
+
+1. Navigate to `{BASE_URL}/sign-in`
+2. Fill the **Email** field (`id="username"`) with `hein@velocityfibre.co.za`
+3. Press **Enter** or click **Continue**
+4. Wait for the password field to appear (multi-step form)
+5. Fill the **Password** field (`id="current-password"`) with `Mitzi@0203`
+6. Click the **Sign In** button
+7. Wait for redirect — confirm the sidebar navigation is visible
+
+> Skip this section if already logged in (sidebar already visible on screen).
 
 ## Steps
 

@@ -98,7 +98,7 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create adjustment';
       notificationService.error(message);
-      log.error('Failed to create adjustment', err);
+      log.error('Failed to create adjustment', { data: err });
     } finally {
       setSubmitting(false);
     }
@@ -118,15 +118,20 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
         <div className="space-y-4">
           {/* Location */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location *</label>
+            <label htmlFor="adj-location-id" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Location *</label>
             <input
+              id="adj-location-search"
+              name="location-search"
               type="text"
               placeholder="Search locations..."
               value={locationSearch}
               onChange={(e) => setLocationSearch(e.target.value)}
+              aria-label="Search locations"
               className="w-full px-3 py-2 mb-1 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] text-sm"
             />
             <select
+              id="adj-location-id"
+              name="location_id"
               value={formData.location_id}
               onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
@@ -142,15 +147,20 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Stock Item */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Item *</label>
+            <label htmlFor="adj-stock-item-id" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Stock Item *</label>
             <input
+              id="adj-item-search"
+              name="item-search"
               type="text"
               placeholder="Search items..."
               value={itemSearch}
               onChange={(e) => setItemSearch(e.target.value)}
+              aria-label="Search stock items"
               className="w-full px-3 py-2 mb-1 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] text-sm"
             />
             <select
+              id="adj-stock-item-id"
+              name="stock_item_id"
               value={formData.stock_item_id}
               onChange={(e) => setFormData({ ...formData, stock_item_id: e.target.value })}
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
@@ -197,8 +207,10 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Quantity */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Quantity *</label>
+            <label htmlFor="adj-quantity" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Quantity *</label>
             <input
+              id="adj-quantity"
+              name="quantity"
               type="number"
               min="0.001"
               step="0.001"
@@ -211,8 +223,10 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Reason */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Reason *</label>
+            <label htmlFor="adj-reason" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Reason *</label>
             <select
+              id="adj-reason"
+              name="reason_code"
               value={formData.reason_code}
               onChange={(e) => setFormData({ ...formData, reason_code: e.target.value })}
               className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
@@ -228,8 +242,10 @@ export function CreateAdjustmentForm({ isOpen, onClose, onSubmit, reasons }: Cre
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Notes</label>
+            <label htmlFor="adj-notes" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Notes</label>
             <textarea
+              id="adj-notes"
+              name="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Optional notes about this adjustment"

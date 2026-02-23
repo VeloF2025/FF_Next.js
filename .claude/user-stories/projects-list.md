@@ -1,9 +1,23 @@
 # Projects List Page
 
 **URL**: /projects
-**Preconditions**: User is logged in, at least 1 project exists
+**Preconditions**: Fresh browser session (auth handled in Auth section below), at least 1 project exists
 **Priority**: Critical
 **Module**: Projects
+
+## Auth
+
+**Login flow** — run before story steps if not already authenticated (sidebar not visible):
+
+1. Navigate to `{BASE_URL}/sign-in`
+2. Fill the **Email** field (`id="username"`) with `hein@velocityfibre.co.za`
+3. Press **Enter** or click **Continue**
+4. Wait for the password field to appear (multi-step form)
+5. Fill the **Password** field (`id="current-password"`) with `Mitzi@0203`
+6. Click the **Sign In** button
+7. Wait for redirect — confirm the sidebar navigation is visible
+
+> Skip this section if already logged in (sidebar already visible on screen).
 
 ## Steps
 
@@ -25,4 +39,4 @@
 
 5. **Verify project detail page**
    - Action: check for project name heading and tabs
-   - Expect: Project name visible, navigation tabs present (Overview, Drops, Pipeline, etc.)
+   - Expect: Project name visible as h1, navigation tabs present — actual tabs are: Overview, Work 1, Contracts, Planning, Build, Operations, Finance
