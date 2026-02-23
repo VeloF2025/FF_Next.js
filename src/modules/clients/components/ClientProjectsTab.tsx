@@ -6,7 +6,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import { 
   FileText, 

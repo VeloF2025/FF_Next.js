@@ -6,7 +6,7 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { usePermission } from '@/hooks/usePermission';
 import { getActiveTabByPath, getActiveSubTabByPath } from '../config/registry';
 import type { ModuleNavigationConfig, TabConfig, TabBadge } from '../types';
@@ -42,15 +42,14 @@ export function useModuleTabs({
   tabBadges = {},
 }: UseModuleTabsOptions): UseModuleTabsReturn {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { can } = usePermission();
 
   // Construct full path with query params
   const fullPath = useMemo(() => {
-    const params = searchParams?.toString();
-    return params ? `${pathname}?${params}` : pathname || '';
-  }, [pathname, searchParams]);
+    const pathname = router.asPath.split('?')[0] || '';
+    const search = router.asPath.includes('?') ? router.asPath.split('?')[1] : '';
+    return search ? `${pathname}?${search}` : pathname;
+  }, [router.asPath]);
 
   // Determine active tab from current URL
   const activeTabConfig = useMemo(() => {

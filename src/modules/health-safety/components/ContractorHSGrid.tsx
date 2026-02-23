@@ -3,7 +3,7 @@
  * Displays H&S compliance status for all contractors assigned to a project
  */
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import {
   Shield,

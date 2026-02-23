@@ -17,7 +17,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/router';
 import {
   ArrowLeft,
   Database,
@@ -90,7 +90,7 @@ const TAB_GROUPS: {
 
 export function DataSyncPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = { get: (key: string) => (router.query[key] as string) || null };
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 

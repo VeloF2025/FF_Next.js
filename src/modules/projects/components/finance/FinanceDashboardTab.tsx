@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import type { FinanceDashboardData } from '@/types/finance';
 import { FinanceSummaryCards } from './FinanceSummaryCards';
 import { ClientPOProgressCard } from './ClientPOProgressCard';

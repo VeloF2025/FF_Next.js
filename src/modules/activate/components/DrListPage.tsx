@@ -10,7 +10,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { RefreshCw, Calendar, Filter, X, Download, ChevronRight, ChevronDown, Layers, Wifi, Radio, Eye, CheckCircle } from 'lucide-react';
 import { StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatCard';

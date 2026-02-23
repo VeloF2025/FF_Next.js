@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { ActionItem } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';

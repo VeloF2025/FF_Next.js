@@ -1,7 +1,7 @@
 'use client';
 
 import { FileText, Download, Filter, PieChart, BarChart3, TrendingUp, Clock, Plus, RefreshCw } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { StatsGrid } from '../../components/dashboard/EnhancedStatCard';
 import { DashboardHeader } from '../../components/dashboard/DashboardHeader';

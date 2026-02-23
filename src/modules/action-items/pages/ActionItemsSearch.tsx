@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Filter, ArrowLeft, Search } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { ActionItem, ActionItemFilters } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
 import { ActionItemsList } from '../components/ActionItemsList';

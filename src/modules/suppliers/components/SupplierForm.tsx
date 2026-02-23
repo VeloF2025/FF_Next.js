@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Save, Building } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';

@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { Plus, Calendar, RefreshCw, Video, Film } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ const TAB_NAMES = ['overview', 'meetings', 'action-items', 'notifications'];
 
 const CommunicationsDashboard: React.FC = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = { get: (key: string) => (router.query[key] as string) || null };
   const [selectedTab, setSelectedTab] = useState<CommunicationsTab>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);

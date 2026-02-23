@@ -8,7 +8,7 @@
  * Features: Enhanced info density, time in status, category badge.
  */
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 import type { Ticket } from '../../types/ticket';
 import { TicketPriority } from '../../types/ticket';

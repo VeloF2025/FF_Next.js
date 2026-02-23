@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Save, User, Briefcase, Shield } from 'lucide-react';
 import { useStaffMember, useUpdateStaff } from '@/hooks/useStaff';
 import {

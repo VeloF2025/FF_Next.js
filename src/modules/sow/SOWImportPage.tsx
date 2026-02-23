@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { SOWUploadWizard } from '@/components/sow/SOWUploadWizard';
 import { SOWProjectSelector } from './components/SOWProjectSelector';

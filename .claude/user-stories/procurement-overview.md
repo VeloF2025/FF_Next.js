@@ -31,7 +31,7 @@
 
 3. **Check Requisitions tab**
    - Action: click Requisitions tab or navigate to /procurement/requisitions
-   - Expect: Requisition list loads with table showing columns: #, Department, Status, Urgency, Total, Date
+   - Expect: Requisition list loads with table showing columns: PR#, Project, Status, Items, Total
 
 4. **Create new requisition**
    - Action: click "New Requisition" button

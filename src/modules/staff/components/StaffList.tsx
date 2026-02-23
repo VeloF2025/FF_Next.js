@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import { staffService } from '@/services/staffService';
 import { StaffImport } from '@/components/staff/StaffImport';

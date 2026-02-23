@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import type { Client } from '@/types/client.types';
 import { getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, getCategoryIcon, formatCurrency } from '../utils/clientUtils';

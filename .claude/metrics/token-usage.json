@@ -229,15 +229,35 @@
     "3fd9b7ff-7617-473a-81a7-61a820305028": {
       "session_id": "3fd9b7ff-7617-473a-81a7-61a820305028",
       "started_at": "2026-02-22T08:25:45.996Z",
-      "total_input_tokens": 2175,
+      "total_input_tokens": 69342,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.006525000000000001,
-      "tool_calls": 77,
+      "total_cost_usd": 0.2080259999999999,
+      "tool_calls": 1405,
       "tools_used": {
-        "Read": 23,
-        "Grep": 23,
-        "Glob": 13,
-        "Bash": 18
+        "Read": 149,
+        "Grep": 37,
+        "Glob": 35,
+        "Bash": 255,
+        "Skill": 4,
+        "Write": 3,
+        "Edit": 30,
+        "Task": 18,
+        "TaskOutput": 6,
+        "mcp__chrome-devtools__list_pages": 20,
+        "mcp__chrome-devtools__navigate_page": 136,
+        "mcp__chrome-devtools__take_screenshot": 172,
+        "mcp__chrome-devtools__take_snapshot": 152,
+        "mcp__chrome-devtools__evaluate_script": 208,
+        "mcp__chrome-devtools__list_console_messages": 38,
+        "mcp__chrome-devtools__get_console_message": 2,
+        "mcp__chrome-devtools__list_network_requests": 23,
+        "mcp__chrome-devtools__fill": 25,
+        "mcp__chrome-devtools__click": 33,
+        "mcp__chrome-devtools__wait_for": 43,
+        "TaskStop": 3,
+        "mcp__chrome-devtools__press_key": 4,
+        "mcp__chrome-devtools__select_page": 6,
+        "mcp__chrome-devtools__get_network_request": 3
       }
     }
   }

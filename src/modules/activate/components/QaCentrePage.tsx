@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { Search, RefreshCw, Calendar, Download, Filter, X } from 'lucide-react';
 import { SystemHealthDashboard } from './SystemHealthDashboard';
 import {

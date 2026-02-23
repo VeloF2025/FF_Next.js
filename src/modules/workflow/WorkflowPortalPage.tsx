@@ -1,6 +1,6 @@
 // 🟢 WORKING: Main Workflow Portal with comprehensive tabbed navigation
 import React, { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { AlertCircle, GitBranch, ArrowLeft } from 'lucide-react';
 import { WorkflowPortalProvider } from './context/WorkflowPortalContext';
 import { WorkflowTabs } from './components/WorkflowTabs';
@@ -15,7 +15,7 @@ interface WorkflowPortalPageProps {
 // Portal layout component
 function WorkflowPortalLayout({ children }: WorkflowPortalPageProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = { get: (key: string) => (router.query[key] as string) || null };
 
   const {
     activeTab,

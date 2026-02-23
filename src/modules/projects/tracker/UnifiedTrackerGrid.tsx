@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { Download, RefreshCw, Grid3x3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTrackerData } from './hooks/useTrackerData';
@@ -9,10 +9,10 @@ import { TrackerStats } from './components/TrackerStats';
 import { TrackerFilters } from './components/TrackerFilters';
 import { TrackerTable } from './components/TrackerTable';
 
-export function UnifiedTrackerGrid() {
+export function UnifiedTrackerGrid({ projectId: projectIdProp }: { projectId?: string } = {}) {
   const router = useRouter();
-  const { projectId } = useParams();
-  const projectIdStr = typeof projectId === 'string' ? projectId : '';
+  const routerProjectId = router.query.id as string | undefined;
+  const projectIdStr = projectIdProp || routerProjectId || '';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'pole' | 'drop' | 'fiber'>('all');
   const [selectedPhase, setSelectedPhase] = useState<string>('all');

@@ -1,6 +1,6 @@
 // 🟢 WORKING: Two-level procurement tabs with direct navigation to dedicated pages
 import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import {
   BarChart3,
   FileText,

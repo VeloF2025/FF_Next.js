@@ -1,7 +1,7 @@
 'use client';
 
 import { FileSpreadsheet, Upload, Download, Search, CheckCircle, AlertCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 
 export function SOWDashboard() {
   const router = useRouter();

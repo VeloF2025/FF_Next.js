@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
 import type { DRSummary, DRState } from '../types/summary.types';
 import type { SerialVerificationResult } from '@/pages/api/activate/serial-verification';

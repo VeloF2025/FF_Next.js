@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import { Eye, Edit, Trash2, TrendingUp, AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface ProjectTableProps {
