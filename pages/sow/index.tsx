@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const SOWDashboard = dynamic(() => import('@/modules/sow/SOWDashboard').then(mod => mod.SOWDashboard || mod.default), {
   ssr: false,
@@ -7,7 +8,11 @@ const SOWDashboard = dynamic(() => import('@/modules/sow/SOWDashboard').then(mod
 });
 
 export default function SOWDashboardPage() {
-  return <SOWDashboard />;
+  return (
+    <AppLayout>
+      <SOWDashboard />
+    </AppLayout>
+  );
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
