@@ -65,7 +65,8 @@ interface Location {
 
 export default function NewGRNPage() {
   const router = useRouter();
-  const { purchaseOrderId } = router.query;
+  // Accept both ?purchaseOrderId= and ?po= (PO detail page uses ?po=)
+  const purchaseOrderId = (router.query.purchaseOrderId || router.query.po) as string | undefined;
 
   // Form state
   const [selectedPOId, setSelectedPOId] = useState<string>('');
@@ -107,7 +108,7 @@ export default function NewGRNPage() {
     const loadData = async () => {
       try {
         const [posRes, suppliersRes, locationsRes] = await Promise.all([
-          fetch('/api/procurement/purchase-orders?status=approved&status=sent'),
+          fetch('/api/procurement/purchase-orders?status=approved&status=sent&status=acknowledged&pageSize=500'),
           fetch('/api/suppliers'),
           fetch('/api/procurement/field-stock/locations'),
         ]);

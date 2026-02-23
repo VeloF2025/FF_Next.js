@@ -833,7 +833,16 @@ export default function PurchaseOrderDetailPage() {
               {purchaseOrder.receipts.length === 0 ? (
                 <div className="text-center py-12">
                   <Truck className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
-                  <p className="text-[var(--ff-text-secondary)]">No goods received yet</p>
+                  <p className="text-[var(--ff-text-secondary)] mb-4">No goods received yet</p>
+                  {['approved', 'sent', 'acknowledged', 'partial_receipt'].includes(purchaseOrder.status) && (
+                    <button
+                      onClick={() => router.push(`/procurement/grn/new?po=${id}`)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      <PackageCheck className="h-4 w-4" />
+                      New GRN
+                    </button>
+                  )}
                 </div>
               ) : (
                 <table className="w-full">
