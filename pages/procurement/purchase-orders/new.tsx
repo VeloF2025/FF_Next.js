@@ -11,6 +11,8 @@ import {
   Building,
   Truck,
   CreditCard,
+  Paperclip,
+  Upload,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { StockItemSearch } from '@/modules/procurement/components/StockItemSearch';
@@ -99,6 +101,11 @@ export default function NewPurchaseOrderPage() {
   const [currency] = useState('ZAR');
   const [vatRate, setVatRate] = useState(15);
   const [notes, setNotes] = useState('');
+  const [supplierReference, setSupplierReference] = useState('');
+  const [quoteNumber, setQuoteNumber] = useState('');
+  const [quoteAttachmentUrl, setQuoteAttachmentUrl] = useState('');
+  const [quoteAttachmentName, setQuoteAttachmentName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [items, setItems] = useState<POItem[]>([createEmptyItem()]);
 
   // Reference data
@@ -136,6 +143,37 @@ export default function NewPurchaseOrderPage() {
       }
     } catch (err) {
       log.error('Failed to fetch projects', err);
+    }
+  };
+
+  const handleQuoteUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'procurement');
+      formData.append('category', 'quote-attachments');
+
+      const response = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setQuoteAttachmentUrl(data.url);
+        setQuoteAttachmentName(file.name);
+      } else {
+        setError(data.error || 'Failed to upload quote');
+      }
+    } catch (err) {
+      log.error('Failed to upload quote attachment', err);
+      setError('Failed to upload quote attachment');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -215,6 +253,10 @@ export default function NewPurchaseOrderPage() {
           currency,
           vatRate,
           notes: notes || null,
+          supplierReference: supplierReference || null,
+          quoteNumber: quoteNumber || null,
+          quoteAttachmentUrl: quoteAttachmentUrl || null,
+          quoteAttachmentName: quoteAttachmentName || null,
           items: validItems.map((item) => ({
             itemDescription: item.itemDescription,
             itemCode: item.itemCode || null,
@@ -343,6 +385,65 @@ export default function NewPurchaseOrderPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Supplier Reference
+                </label>
+                <input
+                  type="text"
+                  value={supplierReference}
+                  onChange={(e) => setSupplierReference(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  placeholder="Supplier PO/ref number"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Quote Number
+                </label>
+                <input
+                  type="text"
+                  value={quoteNumber}
+                  onChange={(e) => setQuoteNumber(e.target.value)}
+                  className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  placeholder="Quote reference"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Quote Attachment
+                </label>
+                {quoteAttachmentUrl ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg">
+                    <Paperclip className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                    <span className="text-sm text-[var(--ff-text-primary)] truncate flex-1">{quoteAttachmentName}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setQuoteAttachmentUrl(''); setQuoteAttachmentName(''); }}
+                      className="text-red-400 hover:text-red-300 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label className={`flex items-center gap-2 px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg cursor-pointer hover:bg-[var(--ff-bg-hover)] transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <Upload className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                    <span className="text-sm text-[var(--ff-text-tertiary)]">
+                      {isUploading ? 'Uploading...' : 'Upload quote (PDF/image)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      onChange={handleQuoteUpload}
+                      className="hidden"
+                      disabled={isUploading}
+                    />
+                  </label>
+                )}
               </div>
             </div>
           </div>

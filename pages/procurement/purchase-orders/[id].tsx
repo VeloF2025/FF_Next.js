@@ -22,6 +22,7 @@ import {
   CreditCard,
   AlertCircle,
   Save,
+  Paperclip,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
@@ -92,6 +93,10 @@ interface PurchaseOrderDetail {
   createdBy: string | null;
   createdAt: string;
   odooPoId: number | null;
+  supplierReference: string | null;
+  quoteNumber: string | null;
+  quoteAttachmentUrl: string | null;
+  quoteAttachmentName: string | null;
   updatedAt: string;
   items: POLineItem[];
   history: POHistoryEvent[];
@@ -636,6 +641,34 @@ export default function PurchaseOrderDetailPage() {
                     <div>
                       <dt className="text-sm text-[var(--ff-text-tertiary)]">Project</dt>
                       <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.projectName}</dd>
+                    </div>
+                  )}
+                  {purchaseOrder.supplierReference && (
+                    <div>
+                      <dt className="text-sm text-[var(--ff-text-tertiary)]">Supplier Reference</dt>
+                      <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.supplierReference}</dd>
+                    </div>
+                  )}
+                  {purchaseOrder.quoteNumber && (
+                    <div>
+                      <dt className="text-sm text-[var(--ff-text-tertiary)]">Quote Number</dt>
+                      <dd className="text-[var(--ff-text-primary)]">{purchaseOrder.quoteNumber}</dd>
+                    </div>
+                  )}
+                  {purchaseOrder.quoteAttachmentUrl && (
+                    <div>
+                      <dt className="text-sm text-[var(--ff-text-tertiary)]">Quote Attachment</dt>
+                      <dd>
+                        <a
+                          href={purchaseOrder.quoteAttachmentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                          {purchaseOrder.quoteAttachmentName || 'View Quote'}
+                        </a>
+                      </dd>
                     </div>
                   )}
                 </dl>

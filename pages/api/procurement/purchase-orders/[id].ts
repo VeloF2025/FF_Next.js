@@ -67,7 +67,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         po.current_approval_request_id,
         po.approved_by,
         po.approved_at,
-        po.odoo_po_id
+        po.odoo_po_id,
+        po.supplier_reference,
+        po.quote_number,
+        po.quote_attachment_url,
+        po.quote_attachment_name,
+        po.department
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
@@ -170,6 +175,12 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       approvedAt: po.approved_at,
       // Odoo integration
       odooPoId: po.odoo_po_id || null,
+      // Quote / supplier reference
+      supplierReference: po.supplier_reference || null,
+      quoteNumber: po.quote_number || null,
+      quoteAttachmentUrl: po.quote_attachment_url || null,
+      quoteAttachmentName: po.quote_attachment_name || null,
+      department: po.department || null,
       // Quote comparison for approvers
       quoteComparison,
       items,

@@ -88,7 +88,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
         po.created_by as created_by_name,
         po.created_at,
         po.order_date,
-        po.odoo_po_id
+        po.odoo_po_id,
+        po.supplier_reference,
+        po.quote_number
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
       LEFT JOIN projects p ON po.project_id = p.id
@@ -117,6 +119,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       createdAt: row.created_at,
       orderDate: row.order_date || null,
       odooPoId: row.odoo_po_id || null,
+      supplierReference: row.supplier_reference || null,
+      quoteNumber: row.quote_number || null,
     }));
 
     return apiResponse.paginated(res, purchaseOrders, {
@@ -149,6 +153,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     const internalNotes = body.internalNotes || body.notes;
     const supplierNotes = body.supplierNotes;
     const department = body.department;
+    const quoteNumber = body.quoteNumber;
+    const quoteAttachmentUrl = body.quoteAttachmentUrl;
+    const quoteAttachmentName = body.quoteAttachmentName;
     const items = body.items;
     const createdBy = body.createdBy || 'system';
 
@@ -229,12 +236,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         po_number, status, supplier_id, supplier_contact, supplier_reference,
         project_id, department, delivery_address, expected_delivery_date, shipping_method,
         payment_terms, currency, tax_rate, subtotal, tax_amount, total_amount,
-        internal_notes, supplier_notes, created_by, created_at, updated_at
+        internal_notes, supplier_notes, created_by, quote_number, quote_attachment_url,
+        quote_attachment_name, created_at, updated_at
       ) VALUES (
         $1, 'draft', $2, $3, $4,
         $5, $6, $7, $8, $9,
         $10, $11, $12, $13, $14, $15,
-        $16, $17, $18, NOW(), NOW()
+        $16, $17, $18, $19, $20,
+        $21, NOW(), NOW()
       )
       RETURNING id, po_number
     `;
@@ -257,7 +266,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       totalAmount,
       internalNotes || null,
       supplierNotes || null,
-      createdBy
+      createdBy,
+      quoteNumber || null,
+      quoteAttachmentUrl || null,
+      quoteAttachmentName || null,
     ]);
 
     const poId = poResult[0]!.id;
