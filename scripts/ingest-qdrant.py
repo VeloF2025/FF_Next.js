@@ -214,21 +214,33 @@ def embed_texts(texts, api_key):
     """Embed a list of texts via OpenAI API. Returns list of vectors."""
     import urllib.request
     import json
+    import time
 
     all_embeddings = []
     for i in range(0, len(texts), EMBED_BATCH_SIZE):
         batch = texts[i : i + EMBED_BATCH_SIZE]
         body = json.dumps({"model": EMBEDDING_MODEL, "input": batch}).encode()
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/embeddings",
-            data=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-        )
-        with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read())
+
+        data = None
+        for attempt in range(5):
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/embeddings",
+                data=body,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read())
+                break
+            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+                wait = 2 ** attempt
+                print(f"    Embed API error (attempt {attempt+1}/5): {e} — retrying in {wait}s")
+                time.sleep(wait)
+        if data is None:
+            raise RuntimeError(f"OpenAI embeddings API failed after 5 retries for batch at index {i}")
 
         for item in data["data"]:
             all_embeddings.append(item["embedding"])
