@@ -51,7 +51,7 @@ function HealthSafetyContent() {
       {/* Quick Actions */}
       <div className="flex gap-3">
         <Link
-          href="/projects/health-safety/incidents/new"
+          href="/health-safety/incidents/new"
           className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
         >
           <AlertTriangle className="w-4 h-4" />
