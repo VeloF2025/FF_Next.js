@@ -11,6 +11,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { withAuth } from '@/lib/auth/middleware';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
@@ -23,7 +24,7 @@ const SP_CLIENT_SECRET = 'Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF';
 // Token cache (tokens last ~3600s, cache for 3000s)
 let spTokenCache: { token: string; expiresAt: number } | null = null;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -49,6 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to proxy photo' });
   }
 }
+
+export default withAuth(handler);
 
 async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void> {
   const objectPath = key.startsWith('/') ? key.slice(1) : key;

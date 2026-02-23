@@ -12,8 +12,9 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { validateReviewPhotos } from '@/modules/construction-qa/services/vlmConstructionService';
 import type { Discipline } from '@/modules/construction-qa/types';
+import { withAuth } from '@/lib/auth/middleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
   }
@@ -46,3 +47,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);

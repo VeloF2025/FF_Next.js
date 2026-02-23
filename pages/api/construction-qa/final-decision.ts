@@ -9,13 +9,18 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
   }
+
+  // Authenticated user is the decision-maker — not caller-supplied
+  const authReq = req as AuthenticatedNextApiRequest;
+  const decidedBy = authReq.user?.name || authReq.user?.email || 'unknown';
 
   try {
     const {
@@ -24,11 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       reasonCodes = [],
       notes = '',
       sendFeedback = false,
-      decidedBy,
     } = req.body;
 
-    if (!reviewId || !decision || !decidedBy) {
-      return apiResponse.badRequest(res, 'reviewId, decision, and decidedBy are required');
+    if (!reviewId || !decision) {
+      return apiResponse.badRequest(res, 'reviewId and decision are required');
     }
 
     const validDecisions = ['PASS', 'FAIL', 'REWORK_NEEDED'];
@@ -150,6 +154,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, error);
   }
 }
+
+export default withAuth(handler);
 
 function buildFeedbackMessage(
   projectName: string,

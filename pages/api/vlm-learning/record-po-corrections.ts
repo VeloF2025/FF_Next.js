@@ -2,8 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { recordPOFormCorrections } from '@/modules/projects/services/poExtractionService';
 import { log } from '@/lib/logger';
+import { withAuth } from '@/lib/auth/middleware';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || '');
   }
@@ -23,3 +24,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.error(res, 'Failed to record corrections');
   }
 }
+
+export default withAuth(handler);
