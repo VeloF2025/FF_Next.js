@@ -83,24 +83,24 @@ FibreFlow endpoints currently return mixed error formats:
 **Owner:** Flow  
 **Impact:** Zero (internal changes only)
 
-- [ ] Create `@/lib/api-response.ts` with unified response helpers
+- [x] Create `@/lib/api-response.ts` with unified response helpers (0f4f8258)
 - [ ] Add linter rule to flag old error formats
 - [ ] Write integration tests for error cases
 - [ ] Create Storybook examples for frontend error states
 - [ ] Coordinate with Pixel: impact assessment + component updates needed
 
 **Deliverables:**
-- Unified response builder library
+- Unified response builder library (done)
 - Test suite for error cases
 - Frontend impact report from Pixel
 
-### Phase 2: Rollout to Dev/Staging (Week 2)
+### Phase 2: Rollout to Dev (Week 2)
 **Timeline:** Mar 1-8  
 **Owner:** Flow  
-**Impact:** Dev/Staging only
+**Impact:** Dev environment only
 
 - [ ] Convert 10-15 endpoint modules to new format (high-volume endpoints first)
-- [ ] Test with frontend on staging
+- [ ] Test with frontend on dev
 - [ ] Gather metrics: error response time, JSON size impact
 - [ ] Validate with Pixel on frontend (error toasts, retry logic)
 
@@ -111,18 +111,36 @@ FibreFlow endpoints currently return mixed error formats:
 
 **Rollback plan:** Keep old handlers in place, gradual cut-over
 
-### Phase 3: Rollout to Production (Week 3)
+### Phase 3: Rollout to Staging (Week 3)
 **Timeline:** Mar 8-15  
+**Owner:** Flow (migration) → Forge (deployment)  
+**Impact:** Staging APIs
+
+- [ ] Submit CR: Phase 2 batch (10-15 endpoints migrated to staging)
+- [ ] Forge deploys Phase 2 batch to staging
+- [ ] Capture baseline: `journalctl -u fibreflow-production` error count (for metrics comparison)
+- [ ] Monitor error rates, frontend error handling
+- [ ] Validation gates:
+  - Error rate increase < 5%
+  - Malformed response shape < 1%
+  - Response time increase < 5ms
+  - Frontend error handling working correctly
+
+**Rollback plan:** Maintain old response handlers for 2 weeks if needed
+
+### Phase 4: Rollout to Production (Week 4)
+**Timeline:** Mar 15-22  
 **Owner:** Forge (deploying)  
 **Impact:** Production APIs
 
-- [ ] Deploy Phase 2 batch to production (10-15 endpoints)
-- [ ] Monitor error rates, frontend error handling
-- [ ] Roll out remaining endpoints in 3-4 batches
-- [ ] Complete all 654 endpoints by Mar 31
+- [ ] Submit committee CR: Phase 3 batch ready for production
+- [ ] Forge deploys Phase 3 batch to production (10-15 endpoints)
+- [ ] Monitor error rates vs staging baseline, frontend error handling
+- [ ] Roll out remaining endpoints in 3-4 batches through Mar 31
 
-**Validation gates:**
-- Error rate increase < 1%
+**Validation gates (per Forge):**
+- Error rate increase vs baseline < 5%
+- Malformed response shape < 1%
 - Response time increase < 5ms
 - Frontend error handling working correctly
 
@@ -239,12 +257,14 @@ export async function handler(req: Request) {
 | 1 | Response library + tests | 2 days | Flow |
 | 1 | Linter rule + docs | 1 day | Flow |
 | 1 | Frontend impact assessment | 2 days | Pixel |
-| 2 | Migrate 10-15 endpoints | 3 days | Flow |
-| 2 | Frontend validation | 2 days | Pixel |
-| 3 | Production rollout (batch 1-4) | 5 days | Forge + Flow |
-| 3 | Monitoring + cleanup | 2 days | Flow |
+| 2 | Migrate 10-15 endpoints to dev | 3 days | Flow |
+| 2 | Frontend validation on dev | 2 days | Pixel |
+| 3 | Migrate to staging + baseline capture | 2 days | Flow |
+| 3 | Staging validation + metrics | 2 days | Forge + Flow |
+| 4 | Production rollout (batch 1-4) | 5 days | Forge + Flow |
+| 4 | Monitoring + cleanup | 2 days | Flow |
 
-**Total:** ~20 days over 4 weeks
+**Total:** ~20 days over 4 weeks (Feb 23 - Mar 31)
 
 ---
 
@@ -272,21 +292,28 @@ export async function handler(req: Request) {
 ## Decision Gates
 
 **Phase 1 Complete:** Feb 27 (EOD)
-- [ ] Response library ready
+- [x] Response library ready (0f4f8258)
 - [ ] Tests passing
 - [ ] Pixel impact assessment done
-- [ ] Approval from Gene + Jarvis
+- [x] Approval from Forge (11:26 AM Mon)
 
 **Phase 2 Ready:** Mar 1
-- [ ] Dev/Staging conversion complete
-- [ ] Pixel testing on staging
+- [ ] Dev endpoint batch complete (10-15 endpoints)
+- [ ] Pixel testing on dev
 - [ ] Metrics confirm no regression
-- [ ] Approval from Forge
+- [ ] Approval from Flow + Pixel
 
-**Production Ready:** Mar 8
-- [ ] All metrics green
+**Phase 3 Ready:** Mar 8
+- [ ] Staging CR submitted (Phase 2 batch)
+- [ ] Forge approved, deploy to staging
+- [ ] Baseline error count captured
+- [ ] Staging metrics green
+
+**Phase 4 Ready:** Mar 15
+- [ ] Committee CR approved (Phase 3 batch for production)
+- [ ] Forge can deploy to production
 - [ ] Rollback plan confirmed
-- [ ] Forge can deploy batches
+- [ ] Batch deployment 1-4 scheduled for Mar 15-31
 
 ---
 
@@ -316,6 +343,8 @@ export async function handler(req: Request) {
 
 ---
 
-**Proposed Start:** Monday, Feb 23 (today)  
-**Phase 1 Target:** Friday, Feb 27  
-**Production Target:** Mar 31, 2026
+**Proposed Start:** Monday, Feb 23 (today) ✅  
+**Phase 1 Complete:** Friday, Feb 27  
+**Phase 2 Complete:** Friday, Mar 8  
+**Phase 3 Complete:** Friday, Mar 15  
+**Phase 4 Complete:** Mar 31, 2026
