@@ -1,0 +1,55 @@
+name: WCAG P10 — Contrast Check
+
+# Scans TSX/TSX source for known low-contrast Tailwind colour classes.
+# Pure static analysis — no build or browser required. Runs in ~15s.
+# Blocked by: GitHub Actions billing exhaustion (Hein to resolve).
+# Prepared by: Pixel 2026-02-23
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'src/**/*.tsx'
+      - 'src/**/*.ts'
+      - 'pages/**/*.tsx'
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/**/*.tsx'
+      - 'src/**/*.ts'
+      - 'pages/**/*.tsx'
+
+jobs:
+  contrast-check:
+    name: WCAG Contrast — Static Source Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run contrast check script
+        id: contrast
+        run: node scripts/ci-contrast-check.js
+        continue-on-error: true
+
+      - name: Report results
+        run: |
+          if [ "${{ steps.contrast.outcome }}" == "failure" ]; then
+            echo "❌ WCAG contrast violations found — see output above"
+            echo ""
+            echo "Fix: Replace failing classes with WCAG AA compliant alternatives:"
+            echo "  text-gray-500   → text-gray-400   (dark theme)"
+            echo "  text-slate-500  → text-slate-400  (dark theme)"
+            echo "  text-gray-600   → text-gray-400   (dark theme)"
+            echo "  text-slate-600  → text-slate-400  (dark theme)"
+            echo ""
+            echo "See: MEMORY.md contrast benchmarks or skills/wcag-fix/SKILL.md"
+            exit 1
+          fi
+          echo "✅ No known contrast violations found"

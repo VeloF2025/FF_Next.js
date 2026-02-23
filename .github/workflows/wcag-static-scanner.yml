@@ -1,0 +1,76 @@
+name: WCAG P12 — Static Axe Scanner
+
+# Runs axe-core accessibility checks via vitest + jest-axe on the accessible
+# component library. Catches ARIA violations, missing labels, role semantics.
+# No build or browser required — jsdom environment only. Runs in ~30s.
+# Blocked by: GitHub Actions billing exhaustion (Hein to resolve).
+# Prepared by: Pixel 2026-02-23
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'src/components/accessible/**'
+      - 'tests/accessibility/**'
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/components/accessible/**'
+      - 'tests/accessibility/**'
+
+jobs:
+  wcag-axe-scan:
+    name: WCAG Axe — Accessible Component Library
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run axe accessibility tests
+        id: axe
+        run: npx vitest run tests/accessibility/wcag-axe.test.tsx --reporter=verbose
+        # Note: continue-on-error is intentionally NOT set — this is a hard gate
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: wcag-axe-results
+          path: coverage/
+          retention-days: 14
+
+  wcag-ci-summary:
+    name: WCAG Gates Summary
+    runs-on: ubuntu-latest
+    needs: [wcag-axe-scan]
+    if: always()
+
+    steps:
+      - name: Report WCAG gate status
+        run: |
+          echo "## WCAG CI Gate Status"
+          echo ""
+          echo "| Gate | Status |"
+          echo "|------|--------|"
+          echo "| P12 Static Axe Scanner | ${{ needs.wcag-axe-scan.result == 'success' && '✅ Pass' || '❌ Fail' }} |"
+          echo ""
+          if [ "${{ needs.wcag-axe-scan.result }}" != "success" ]; then
+            echo "❌ WCAG gate failed — accessibility violations detected"
+            echo ""
+            echo "Resources:"
+            echo "  - skills/wcag-fix/SKILL.md — fix patterns"
+            echo "  - src/components/accessible/ — accessible component library"
+            echo "  - tests/accessibility/wcag-axe.test.tsx — test details"
+            exit 1
+          fi
+          echo "✅ All WCAG gates passed"
