@@ -68,15 +68,11 @@ export default withAuth(withErrorHandler(async (
     // Update the source document status
     await updateDocumentStatus(request.document_type, request.document_id, 'rejected');
 
-    log.info({
-      module: 'procurement',
-      action: 'approval_rejected',
-      approvalRequestId: id,
-      documentType: request.document_type,
-      documentId: request.document_id,
-      rejectedBy: userId,
-      reason: reason.trim(),
-    });
+    log.info(
+      `Approval rejected: ${request.document_type} ${request.document_id}`,
+      { approvalRequestId: id, rejectedBy: userId, reason: reason.trim() },
+      'procurement'
+    );
 
     // UNS: Notify the requester that their request was rejected
     if (request.requested_by) {
@@ -108,7 +104,6 @@ async function updateDocumentStatus(
         await sql`
           UPDATE purchase_requisitions
           SET
-            approval_status = ${status},
             status = 'rejected',
             updated_at = NOW()
           WHERE id = ${documentId}
@@ -119,7 +114,6 @@ async function updateDocumentStatus(
         await sql`
           UPDATE purchase_orders
           SET
-            approval_status = ${status},
             status = 'rejected',
             updated_at = NOW()
           WHERE id = ${documentId}
@@ -157,19 +151,14 @@ async function updateDocumentStatus(
         break;
 
       default:
-        log.warn({
-          module: 'procurement',
-          message: `Unknown document type for status update: ${documentType}`,
-        });
+        log.warn(`Unknown document type for status update: ${documentType}`, undefined, 'procurement');
     }
   } catch (error) {
-    log.error({
-      module: 'procurement',
-      message: 'Failed to update document status after rejection',
-      error,
-      documentType,
-      documentId,
-    });
+    log.error(
+      'Failed to update document status after rejection',
+      { error, documentType, documentId },
+      'procurement'
+    );
     // Don't throw - rejection is still valid even if document update fails
   }
 }

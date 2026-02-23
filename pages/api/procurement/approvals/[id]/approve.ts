@@ -64,14 +64,11 @@ export default withAuth(withErrorHandler(async (
     // Update the source document status if applicable
     await updateDocumentStatus(request.document_type, request.document_id, 'approved');
 
-    log.info({
-      module: 'procurement',
-      action: 'approval_approved',
-      approvalRequestId: id,
-      documentType: request.document_type,
-      documentId: request.document_id,
-      approvedBy: userId,
-    });
+    log.info(
+      `Approval approved: ${request.document_type} ${request.document_id}`,
+      { approvalRequestId: id, approvedBy: userId },
+      'procurement'
+    );
 
     // UNS: Notify the requester that their request was approved
     if (request.requested_by) {
@@ -103,8 +100,9 @@ async function updateDocumentStatus(
         await sql`
           UPDATE purchase_requisitions
           SET
-            approval_status = ${status},
             status = ${status === 'approved' ? 'approved' : 'rejected'},
+            approved_at = ${status === 'approved' ? new Date().toISOString() : null},
+            approved_by = ${status === 'approved' ? 'workflow-approved' : null},
             updated_at = NOW()
           WHERE id = ${documentId}
         `;
@@ -114,7 +112,6 @@ async function updateDocumentStatus(
         await sql`
           UPDATE purchase_orders
           SET
-            approval_status = ${status},
             status = ${status === 'approved' ? 'approved' : 'rejected'},
             updated_at = NOW()
           WHERE id = ${documentId}
@@ -152,19 +149,14 @@ async function updateDocumentStatus(
         break;
 
       default:
-        log.warn({
-          module: 'procurement',
-          message: `Unknown document type for status update: ${documentType}`,
-        });
+        log.warn(`Unknown document type for status update: ${documentType}`, undefined, 'procurement');
     }
   } catch (error) {
-    log.error({
-      module: 'procurement',
-      message: 'Failed to update document status',
-      error,
-      documentType,
-      documentId,
-    });
+    log.error(
+      'Failed to update document status',
+      { error, documentType, documentId },
+      'procurement'
+    );
     // Don't throw - approval is still valid even if document update fails
   }
 }
