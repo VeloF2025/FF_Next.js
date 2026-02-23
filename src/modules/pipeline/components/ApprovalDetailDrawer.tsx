@@ -441,20 +441,31 @@ export function ApprovalDetailDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop */}
+    <>
+    {/* WCAG 2.1.2: Escape key closes drawer */}
+    <div
+      className="fixed inset-0 z-50 flex justify-end"
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
+    >
+      {/* Backdrop — decorative, aria-hidden so AT ignores it */}
       <div
         className="fixed inset-0 bg-black/50"
+        aria-hidden="true"
         onClick={onClose}
       />
 
-      {/* Drawer */}
-      <div className="relative w-full max-w-lg bg-[var(--ff-bg-primary)] shadow-xl overflow-y-auto">
+      {/* Drawer — WCAG: role=dialog + aria-modal + aria-labelledby (1.3.1, 4.1.2) */}
+      <div
+        className="relative w-full max-w-lg bg-[var(--ff-bg-primary)] shadow-xl overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="approval-drawer-title"
+      >
         {/* Header */}
         <div className="sticky top-0 bg-[var(--ff-bg-primary)] border-b border-[var(--ff-border-light)] p-4 z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+              <h2 id="approval-drawer-title" className="text-lg font-semibold text-[var(--ff-text-primary)]">
                 {approval.approval_type_name}
               </h2>
               <p className="text-sm text-[var(--ff-text-secondary)]">
@@ -462,10 +473,12 @@ export function ApprovalDetailDrawer({
               </p>
             </div>
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 hover:bg-[var(--ff-bg-secondary)] rounded-lg transition-colors"
+              aria-label="Close approval drawer"
+              className="p-2 hover:bg-[var(--ff-bg-secondary)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)]"
             >
-              <X className="w-5 h-5 text-[var(--ff-text-secondary)]" />
+              <X className="w-5 h-5 text-[var(--ff-text-secondary)]" aria-hidden="true" />
             </button>
           </div>
 
@@ -590,10 +603,11 @@ export function ApprovalDetailDrawer({
                     Submit Application
                   </h3>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="submit-application-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Application Date *
                     </label>
                     <input
+                      id="submit-application-date"
                       type="date"
                       value={submitData.application_date}
                       onChange={(e) =>
@@ -603,10 +617,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="submit-reference-number" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Reference Number
                     </label>
                     <input
+                      id="submit-reference-number"
                       type="text"
                       value={submitData.application_reference}
                       onChange={(e) =>
@@ -617,10 +632,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="submit-application-fee" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Application Fee
                     </label>
                     <input
+                      id="submit-application-fee"
                       type="number"
                       value={submitData.application_fee}
                       onChange={(e) =>
@@ -631,10 +647,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="submit-notes" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Notes
                     </label>
                     <textarea
+                      id="submit-notes"
                       value={submitData.notes}
                       onChange={(e) =>
                         setSubmitData({ ...submitData, notes: e.target.value })
@@ -694,10 +711,11 @@ export function ApprovalDetailDrawer({
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      <label htmlFor="approve-approval-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Approval Date *
                       </label>
                       <input
+                        id="approve-approval-date"
                         type="date"
                         value={approveData.approval_date}
                         onChange={(e) =>
@@ -707,10 +725,11 @@ export function ApprovalDetailDrawer({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      <label htmlFor="approve-reference" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Reference *
                       </label>
                       <input
+                        id="approve-reference"
                         type="text"
                         value={approveData.approval_reference}
                         onChange={(e) =>
@@ -722,10 +741,11 @@ export function ApprovalDetailDrawer({
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      <label htmlFor="approve-issue-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Issue Date
                       </label>
                       <input
+                        id="approve-issue-date"
                         type="date"
                         value={approveData.issue_date}
                         onChange={(e) =>
@@ -735,10 +755,11 @@ export function ApprovalDetailDrawer({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                      <label htmlFor="approve-expiry-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                         Expiry Date
                       </label>
                       <input
+                        id="approve-expiry-date"
                         type="date"
                         value={approveData.expiry_date}
                         onChange={(e) =>
@@ -749,10 +770,11 @@ export function ApprovalDetailDrawer({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="approve-conditions" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Conditions
                     </label>
                     <textarea
+                      id="approve-conditions"
                       value={approveData.conditions}
                       onChange={(e) =>
                         setApproveData({ ...approveData, conditions: e.target.value })
@@ -788,10 +810,11 @@ export function ApprovalDetailDrawer({
                     Record Rejection
                   </h3>
                   <div>
-                    <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="reject-reason" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Rejection Reason *
                     </label>
                     <textarea
+                      id="reject-reason"
                       value={rejectData.rejection_reason}
                       onChange={(e) =>
                         setRejectData({ ...rejectData, rejection_reason: e.target.value })
@@ -940,10 +963,11 @@ export function ApprovalDetailDrawer({
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="timeline-application-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                       Application Date
                     </label>
                     <input
+                      id="timeline-application-date"
                       type="date"
                       value={timelineData.application_date}
                       onChange={(e) => setTimelineData({ ...timelineData, application_date: e.target.value })}
@@ -951,10 +975,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="timeline-issue-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                       Issue Date
                     </label>
                     <input
+                      id="timeline-issue-date"
                       type="date"
                       value={timelineData.issue_date}
                       onChange={(e) => setTimelineData({ ...timelineData, issue_date: e.target.value })}
@@ -962,10 +987,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="timeline-expiry-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                       Expiry Date
                     </label>
                     <input
+                      id="timeline-expiry-date"
                       type="date"
                       value={timelineData.expiry_date}
                       onChange={(e) => setTimelineData({ ...timelineData, expiry_date: e.target.value })}
@@ -973,10 +999,11 @@ export function ApprovalDetailDrawer({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                    <label htmlFor="timeline-approval-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                       Approval Date
                     </label>
                     <input
+                      id="timeline-approval-date"
                       type="date"
                       value={timelineData.approval_date}
                       onChange={(e) => setTimelineData({ ...timelineData, approval_date: e.target.value })}
@@ -1053,10 +1080,11 @@ export function ApprovalDetailDrawer({
             {editingSection === 'references' ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="ref-application-reference" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Application Reference
                   </label>
                   <input
+                    id="ref-application-reference"
                     type="text"
                     value={referencesData.application_reference}
                     onChange={(e) => setReferencesData({ ...referencesData, application_reference: e.target.value })}
@@ -1065,10 +1093,11 @@ export function ApprovalDetailDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="ref-approval-reference" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Approval Reference
                   </label>
                   <input
+                    id="ref-approval-reference"
                     type="text"
                     value={referencesData.approval_reference}
                     onChange={(e) => setReferencesData({ ...referencesData, approval_reference: e.target.value })}
@@ -1133,10 +1162,11 @@ export function ApprovalDetailDrawer({
             {editingSection === 'financial' ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="fin-application-fee" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Application Fee (R)
                   </label>
                   <input
+                    id="fin-application-fee"
                     type="number"
                     value={financialData.application_fee}
                     onChange={(e) => setFinancialData({ ...financialData, application_fee: e.target.value })}
@@ -1157,10 +1187,11 @@ export function ApprovalDetailDrawer({
                   </label>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="fin-fee-paid-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Fee Paid Date
                   </label>
                   <input
+                    id="fin-fee-paid-date"
                     type="date"
                     value={financialData.fee_paid_date}
                     onChange={(e) => setFinancialData({ ...financialData, fee_paid_date: e.target.value })}
@@ -1168,10 +1199,11 @@ export function ApprovalDetailDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="fin-fee-receipt-ref" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Fee Receipt Reference
                   </label>
                   <input
+                    id="fin-fee-receipt-ref"
                     type="text"
                     value={financialData.fee_receipt_reference}
                     onChange={(e) => setFinancialData({ ...financialData, fee_receipt_reference: e.target.value })}
@@ -1248,10 +1280,11 @@ export function ApprovalDetailDrawer({
             {editingSection === 'details' ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="edit-conditions" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Conditions
                   </label>
                   <textarea
+                    id="edit-conditions"
                     value={detailsData.conditions}
                     onChange={(e) => setDetailsData({ ...detailsData, conditions: e.target.value })}
                     rows={3}
@@ -1260,10 +1293,11 @@ export function ApprovalDetailDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="edit-coverage-desc" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Coverage Description
                   </label>
                   <textarea
+                    id="edit-coverage-desc"
                     value={detailsData.coverage_description}
                     onChange={(e) => setDetailsData({ ...detailsData, coverage_description: e.target.value })}
                     rows={2}
@@ -1272,10 +1306,11 @@ export function ApprovalDetailDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="edit-notes" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Notes
                   </label>
                   <textarea
+                    id="edit-notes"
                     value={detailsData.notes}
                     onChange={(e) => setDetailsData({ ...detailsData, notes: e.target.value })}
                     rows={3}
@@ -1357,10 +1392,11 @@ export function ApprovalDetailDrawer({
             {editingSection === 'followup' ? (
               <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-4 space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="followup-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Next Follow-up Date
                   </label>
                   <input
+                    id="followup-date"
                     type="date"
                     value={followupData.next_followup_date}
                     onChange={(e) => setFollowupData({ ...followupData, next_followup_date: e.target.value })}
@@ -1368,10 +1404,11 @@ export function ApprovalDetailDrawer({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  <label htmlFor="followup-notes" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
                     Follow-up Notes
                   </label>
                   <textarea
+                    id="followup-notes"
                     value={followupData.followup_notes}
                     onChange={(e) => setFollowupData({ ...followupData, followup_notes: e.target.value })}
                     rows={3}
@@ -1431,6 +1468,7 @@ export function ApprovalDetailDrawer({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
