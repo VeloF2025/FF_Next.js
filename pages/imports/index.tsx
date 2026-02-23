@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const ImportsDataGridPage = dynamic(() => import('@/modules/sow/ImportsDataGridPage').then(mod => mod.ImportsDataGridPage || mod.default), {
   ssr: false,
@@ -7,7 +8,11 @@ const ImportsDataGridPage = dynamic(() => import('@/modules/sow/ImportsDataGridP
 });
 
 export default function ImportsPageWrapper() {
-  return <ImportsDataGridPage />;
+  return (
+    <AppLayout>
+      <ImportsDataGridPage />
+    </AppLayout>
+  );
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {

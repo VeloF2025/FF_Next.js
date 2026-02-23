@@ -2,7 +2,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { notificationService } from '@/services/core/NotificationService';
 import {
     Play,
@@ -121,6 +123,7 @@ export default function RecordingsPage() {
     };
 
     return (
+      <AppLayout>
         <div className="min-h-screen bg-[var(--ff-bg-tertiary)]">
             {/* Header */}
             <header className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] px-6 py-4">
@@ -328,5 +331,10 @@ export default function RecordingsPage() {
                 )}
             </div>
         </div>
+      </AppLayout>
     );
+}
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  return { props: {} };
 }

@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const SOWManagement = dynamic(() => import('@/modules/projects/sow/SOWManagement').then(mod => mod.SOWManagement || mod.default), {
   ssr: false,
@@ -7,7 +8,11 @@ const SOWManagement = dynamic(() => import('@/modules/projects/sow/SOWManagement
 });
 
 export default function SOWManagementPage() {
-  return <SOWManagement />;
+  return (
+    <AppLayout>
+      <SOWManagement />
+    </AppLayout>
+  );
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {

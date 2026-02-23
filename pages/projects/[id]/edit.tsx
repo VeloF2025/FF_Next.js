@@ -2,6 +2,7 @@ import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const ProjectForm = dynamic(() => import('@/modules/projects/components/ProjectForm').then(mod => mod.ProjectForm || mod.default), {
   ssr: false,
@@ -74,9 +75,13 @@ export default function EditProjectPage() {
     router.push('/projects');
   };
 
-  if (loading || !id) return <div>Loading...</div>;
+  if (loading || !id) return <AppLayout><div>Loading...</div></AppLayout>;
 
-  return <ProjectForm project={project} onSubmit={handleSubmit} onCancel={handleCancel} />;
+  return (
+    <AppLayout>
+      <ProjectForm project={project} onSubmit={handleSubmit} onCancel={handleCancel} />
+    </AppLayout>
+  );
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
