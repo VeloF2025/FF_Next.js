@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logUpdate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -63,6 +64,8 @@ export default withAuth(withErrorHandler(async (
 
     // Create approval request if needed
     if (needsApproval) {
+      let approvalCreated = false;
+
       // Find applicable workflow
       const [workflow] = await sql`
         SELECT id FROM approval_workflows
@@ -104,7 +107,27 @@ export default withAuth(withErrorHandler(async (
               'pending'
             )
           `;
+          approvalCreated = true;
         }
+      }
+
+      // If no workflow/level configured, auto-approve to prevent stuck state
+      if (!approvalCreated) {
+        log.warn(
+          'No approval workflow or level configured for purchase_requisition — auto-approving',
+          { requisitionId: id, amount },
+          'procurement'
+        );
+        await sql`
+          UPDATE purchase_requisitions
+          SET
+            status = 'approved',
+            approved_at = ${new Date().toISOString()},
+            approved_by = 'auto-approved'
+          WHERE id = ${id}
+        `;
+        // Override the returned status
+        updated!.status = 'approved';
       }
     }
 
@@ -113,9 +136,9 @@ export default withAuth(withErrorHandler(async (
     return apiResponse.success(res, {
       id: updated!.id,
       status: updated!.status,
-      message: needsApproval
-        ? 'Requisition submitted for approval'
-        : 'Requisition auto-approved (under threshold)',
+      message: updated!.status === 'approved'
+        ? 'Requisition auto-approved'
+        : 'Requisition submitted for approval',
     });
   } catch (error) {
     return apiResponse.databaseError(res, error, 'Failed to submit requisition');
