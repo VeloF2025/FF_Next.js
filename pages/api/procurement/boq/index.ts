@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { BOQItem } from '../../../../src/types/procurement/boq.types';
-import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
@@ -97,15 +97,10 @@ export default withAuth(withErrorHandler(async (
         categories: [...new Set(transformedItems.map(item => item.category))],
       };
 
-      res.status(200).json({ 
-        items: transformedItems,
-        total: transformedItems.length,
-        boqs: boqData,
-        stats
-      });
+      apiResponse.success(res, { items: transformedItems, total: transformedItems.length, boqs: boqData, stats });
     } catch (error) {
       log.error('Error fetching BOQ items', { error, module: 'procurement:boq' });
-      res.status(500).json({ error: 'Failed to fetch BOQ items' });
+      apiResponse.internalError(res, error);
     }
   } else if (req.method === 'POST') {
     try {
@@ -113,7 +108,7 @@ export default withAuth(withErrorHandler(async (
       const effectiveProjectId = body.projectId || projectId;
 
       if (!effectiveProjectId) {
-        return res.status(400).json({ error: 'Project ID is required' });
+        return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Project ID is required');
       }
 
       // If items array is provided, create a full BOQ with items
@@ -191,8 +186,7 @@ export default withAuth(withErrorHandler(async (
           insertedItems.push(insertedResult[0]);
         }
 
-        return res.status(201).json({
-          message: 'BOQ created successfully',
+        return apiResponse.created(res, {
           boqId: boq.id,
           boq: boq,
           items: insertedItems,
@@ -203,9 +197,7 @@ export default withAuth(withErrorHandler(async (
       // Single item creation (legacy support) - requires existing boqId
       const newItem = body;
       if (!newItem.boqId) {
-        return res.status(400).json({
-          error: 'boqId is required for single item creation. Use items array to create a new BOQ with items.'
-        });
+        return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'boqId is required for single item creation. Use items array to create a new BOQ with items.');
       }
 
       const insertResult = await sql`
@@ -239,15 +231,14 @@ export default withAuth(withErrorHandler(async (
         total_price: insertedItem.total_price
       });
 
-      res.status(201).json({
-        message: 'BOQ item created successfully',
+      apiResponse.created(res, {
         item: insertedItem
       });
     } catch (error) {
       log.error('Error creating BOQ', { error, module: 'procurement:boq' });
-      res.status(500).json({ error: 'Failed to create BOQ' });
+      apiResponse.internalError(res, error);
     }
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }))

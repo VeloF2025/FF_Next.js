@@ -20,6 +20,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 interface InstallationGapItem {
   drop_number: string;
@@ -70,7 +71,7 @@ async function handler(
   res: NextApiResponse<InstallationGapsResponse | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   try {
@@ -216,12 +217,10 @@ async function handler(
       projectsAffected: response.summary.by_project.length,
     });
 
-    return res.status(200).json(response);
+    return apiResponse.success(res, response);
   } catch (error) {
     log.error('InstallationGapsAPI', 'Failed to fetch installation gaps report', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

@@ -6,6 +6,7 @@
  */
 
 import type { NextApiResponse } from 'next';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
@@ -27,19 +28,17 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   const { pp_data_ids, ticket_type, priority, notes } = req.body;
 
   if (!Array.isArray(pp_data_ids) || pp_data_ids.length === 0) {
-    return res.status(400).json({ error: 'pp_data_ids must be a non-empty array' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
   if (!ticket_type || !VALID_TICKET_TYPES.includes(ticket_type)) {
-    return res.status(400).json({
-      error: `ticket_type must be one of: ${VALID_TICKET_TYPES.join(', ')}`,
-    });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, `ticket_type must be one of: ${VALID_TICKET_TYPES.join(', ')}`);
   }
 
   const ticketPriority = priority && Object.values(TicketPriority).includes(priority)
@@ -61,7 +60,7 @@ async function handler(
     const skipped = pp_data_ids.length - records.length;
 
     if (records.length === 0) {
-      return res.status(200).json({
+      return apiResponse.success(res, {
         success: true,
         data: { created: 0, skipped: pp_data_ids.length, tickets: [] },
       });
@@ -105,13 +104,13 @@ async function handler(
 
     logger.info('PP Data tickets created', { created: tickets.length, skipped });
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: { created: tickets.length, skipped, tickets },
     });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
-    return res.status(500).json({ error: 'Failed to create tickets' });
+    return apiResponse.internalError(res, error);
   }
 }
 

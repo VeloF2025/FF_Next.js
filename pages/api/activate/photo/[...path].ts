@@ -15,6 +15,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 // Photo server endpoints
 const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
@@ -26,26 +27,26 @@ async function handler(
 ): Promise<void> {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    return res.status(405).end('Method Not Allowed');
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
     const { path } = req.query;
 
     if (!path || !Array.isArray(path) || path.length < 2) {
-      return res.status(400).json({ error: 'Invalid path. Expected /photo/[drNumber]/[filename]' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     const [drNumber, filename] = path;
 
     // Validate DR number format
     if (!drNumber.match(/^DR\d+$/i)) {
-      return res.status(400).json({ error: 'Invalid DR number format' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     // Validate filename (prevent path traversal)
     if (filename.includes('..') || filename.includes('/')) {
-      return res.status(400).json({ error: 'Invalid filename' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     // Route based on filename pattern:
@@ -92,7 +93,7 @@ async function handler(
     return res.status(200).send(buffer);
   } catch (error) {
     log.error('[PhotoProxy] Error proxying photo:', error);
-    return res.status(500).json({ error: 'Failed to fetch photo' });
+    return apiResponse.internalError(res, error);
   }
 }
 

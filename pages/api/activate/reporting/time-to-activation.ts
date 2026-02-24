@@ -16,6 +16,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -48,16 +49,14 @@ async function handler(
   res: NextApiResponse<TimeToActivationResponse | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   try {
     const { dateFrom, dateTo, project } = req.query;
 
     if (!dateFrom || !dateTo) {
-      return res.status(400).json({
-        error: 'Missing required parameters: dateFrom and dateTo',
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
@@ -154,7 +153,7 @@ async function handler(
       within_24h_percent: number;
     };
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       summary: {
         total_matched: Number(stats.total_matched || 0),
         avg_hours: Number(stats.avg_hours || 0),
@@ -175,9 +174,7 @@ async function handler(
     });
   } catch (error) {
     log.error('TimeToActivationAPI', 'Failed to fetch time-to-activation report', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

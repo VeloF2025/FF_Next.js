@@ -15,6 +15,7 @@ import { createLogger } from '@/lib/logger';
 import pool from '@/lib/db';
 import { parseSwapMessage } from '@/modules/activate/services/swapMessageParser';
 import { logOntSwapReported } from '@/modules/activate/services/activity-log/eventLoggers';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 const logger = createLogger('api:activate:wa-swap-message');
 
@@ -48,7 +49,7 @@ async function handler(
   res: NextApiResponse<SwapApiResponse>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   try {
@@ -57,24 +58,21 @@ async function handler(
     // --- Auth ---
     if (!BRIDGE_SECRET) {
       logger.error('WA_BRIDGE_SECRET env var not set');
-      return res.status(500).json({ success: false, error: 'Server configuration error' });
+      return apiResponse.internalError(res, error);
     }
     if (body.secret !== BRIDGE_SECRET) {
       logger.warn('Invalid or missing bridge secret');
-      return res.status(401).json({ success: false, error: 'Unauthorized: invalid bridge secret' });
+      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
     }
 
     // --- Validate required fields ---
     if (!body.group_jid || !body.sender_jid || !body.message_id) {
       logger.warn('Missing required fields');
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: group_jid, sender_jid, message_id',
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     if (!body.text || body.text.trim().length === 0) {
-      return res.status(200).json({ success: true, skipped: true });
+      return apiResponse.success(res, { success: true, skipped: true });
     }
 
     // --- Look up group to get project ---
@@ -86,7 +84,7 @@ async function handler(
 
     if (groupResult.rows.length === 0) {
       logger.warn(`Message from unknown/inactive group: ${body.group_jid}`);
-      return res.status(200).json({ success: true, skipped: true });
+      return apiResponse.success(res, { success: true, skipped: true });
     }
 
     const project = groupResult.rows[0].project_name;
@@ -109,7 +107,7 @@ async function handler(
         ]
       );
       logger.info(`Swap message unparseable (${body.message_id}), logged for review`);
-      return res.status(200).json({ success: true, skipped: true });
+      return apiResponse.success(res, { success: true, skipped: true });
     }
 
     logger.info(`Parsed swap message: ${parsed.dropNumber} -> ${parsed.newSerial} (${parsed.swapType}, ${parsed.confidence})`);
@@ -234,7 +232,7 @@ async function handler(
 
     logger.info(`ONT swap recorded: ${swapRecord.id} (${parsed.dropNumber} -> ${parsed.newSerial})`);
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: {
         id: swapRecord.id,
@@ -247,7 +245,7 @@ async function handler(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error(`Failed to process swap message: ${errorMessage}`);
-    return res.status(500).json({ success: false, error: errorMessage });
+    return apiResponse.internalError(res, error);
   }
 }
 

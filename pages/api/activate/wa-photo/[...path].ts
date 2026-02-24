@@ -12,6 +12,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 // VPS photo viewer endpoint (serves /var/lib/docker/volumes/boss-vps_dr_photos/_data/)
 const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
@@ -19,13 +20,13 @@ const VPS_PHOTO_API = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   const { path } = req.query;
 
   if (!path || !Array.isArray(path) || path.length < 2) {
-    return res.status(400).json({ error: 'Invalid path. Expected: /wa-photo/{drNumber}/{filename}' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Invalid path. Expected: /wa-photo/{drNumber}/{filename}');
   }
 
   const [drNumber, filename] = path;
@@ -33,12 +34,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Security: Validate path components to prevent directory traversal
   if (filename.includes('..') || filename.includes('/') || drNumber.includes('..') || drNumber.includes('/')) {
     log.warn(`[WaPhotoProxy] Rejected path traversal attempt: ${drNumber}/${filename}`);
-    return res.status(400).json({ error: 'Invalid path components' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
   // Validate DR number format
   if (!drNumber.match(/^DR\d+$/i)) {
-    return res.status(400).json({ error: 'Invalid DR number format' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
   // Validate filename format - accepts both:
@@ -47,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const validFilename = filename.match(/^(wa_)?DR\d+[_\w]+\.(jpg|jpeg|png|webp)$/i);
   if (!validFilename) {
     log.warn(`[WaPhotoProxy] Rejected invalid filename: ${filename}`);
-    return res.status(400).json({ error: 'Invalid filename format' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
   try {
@@ -64,7 +65,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!response.ok) {
       log.warn(`[WaPhotoProxy] Photo not found: ${drNumber}/${filename} (${response.status})`);
-      return res.status(404).json({ error: 'Photo not found' });
+      return apiResponse.error(res, ErrorCode.NOT_FOUND, 'Not found');
     }
 
     // Return the proxied image
@@ -77,7 +78,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.send(buffer);
   } catch (error) {
     log.error(`[WaPhotoProxy] Error proxying photo ${drNumber}/${filename}:`, error);
-    return res.status(500).json({ error: 'Failed to fetch photo' });
+    return apiResponse.internalError(res, error);
   }
 }
 

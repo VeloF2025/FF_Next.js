@@ -11,6 +11,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
@@ -22,7 +23,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed. PP data is imported automatically via the OES import.' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   const action = req.query.action as string;
@@ -49,7 +50,7 @@ async function handler(
     const stats = statsResult.rows[0];
     const lastImport = lastImportResult.rows[0] || null;
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: {
         total: parseInt(stats.total, 10),
@@ -104,7 +105,7 @@ async function handler(
       [...params, limit, offset]
     );
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: dataResult.rows,
       pagination: {
@@ -235,7 +236,7 @@ async function handler(
       }
     }
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: row
         ? {
@@ -248,7 +249,7 @@ async function handler(
     });
   }
 
-  return res.status(400).json({ error: 'Invalid action. Use "stats", "list", "export", or "lookup-status".' });
+  return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
 }
 
 export default withAuth(withErrorHandler(withRole('manager')(handler)));

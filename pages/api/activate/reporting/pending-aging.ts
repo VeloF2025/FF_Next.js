@@ -14,6 +14,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -50,7 +51,7 @@ async function handler(
   res: NextApiResponse<PendingAgingResponse | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   try {
@@ -140,7 +141,7 @@ async function handler(
         Number(buckets.find((b) => b.bucket === '4-7 days')?.count || 0),
     };
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       summary,
       buckets: buckets.map((b) => ({
         ...b,
@@ -152,9 +153,7 @@ async function handler(
     });
   } catch (error) {
     log.error('PendingAgingAPI', 'Failed to fetch pending aging report', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 
