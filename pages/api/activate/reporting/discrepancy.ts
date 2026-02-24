@@ -13,6 +13,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getDiscrepancyReport } from '@/modules/activate/services/reportingService';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 async function handler(
@@ -20,7 +21,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -28,9 +29,7 @@ async function handler(
 
     // Validate required parameters
     if (!waDate) {
-      return res.status(400).json({
-        error: 'Missing required parameter: waDate',
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing required parameters: dateFrom and dateTo');
     }
 
     const waDateStr = Array.isArray(waDate) ? waDate[0] : waDate;
@@ -53,12 +52,10 @@ async function handler(
 
     const data = await getDiscrepancyReport(waDateStr, oesDateStr || undefined, projectStr || undefined);
 
-    return res.status(200).json(data);
+    return apiResponse.success(res, data);
   } catch (error) {
     log.error('DiscrepancyAPI', 'Failed to fetch discrepancy report', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

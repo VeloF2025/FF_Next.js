@@ -14,6 +14,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSerialValidationReport } from '@/modules/activate/services/reportingService';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 
 async function handler(
@@ -21,7 +22,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -29,9 +30,7 @@ async function handler(
 
     // Validate required parameters
     if (!dateFrom || !dateTo) {
-      return res.status(400).json({
-        error: 'Missing required parameters: dateFrom and dateTo',
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing required parameters: dateFrom and dateTo');
     }
 
     const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
@@ -58,14 +57,12 @@ async function handler(
       mismatchesOnlyBool
     );
 
-    return res.status(200).json(data);
+    return apiResponse.success(res, data);
   } catch (error) {
     log.error('SerialValidationAPI', 'Failed to fetch serial validation report', {
       error,
     });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Internal server error',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 
