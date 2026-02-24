@@ -38,19 +38,23 @@ export function signPortalToken(sessionData: Record<string, unknown>): string {
  */
 function verifyPortalToken(token: string): Record<string, unknown> | null {
   const crypto = require('crypto');
-  const secret = process.env.JWT_SECRET;
+  // Portal sessions are signed with PORTAL_SESSION_SECRET (not JWT_SECRET)
+  // These are distinct secrets — using JWT_SECRET here was the root cause of the
+  // "Invalid or tampered portal session" bug (fixed 2026-02-24)
+  const secret = process.env.PORTAL_SESSION_SECRET;
   if (!secret) return null;
 
-  const parts = token.split('.');
-  if (parts.length === 2) {
-    // Signed token: payload.signature
-    const [payload, signature] = parts;
-    const expected = crypto.createHmac('sha256', secret).update(payload!).digest('hex');
-    if (!crypto.timingSafeEqual(Buffer.from(signature!, 'hex'), Buffer.from(expected, 'hex'))) {
-      return null; // Tampered
-    }
+  // Use lastIndexOf to correctly handle base64 payloads that may contain '.' chars
+  const dotIndex = token.lastIndexOf('.');
+  if (dotIndex !== -1) {
+    const payload = token.substring(0, dotIndex);
+    const signature = token.substring(dotIndex + 1);
+    const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     try {
-      return JSON.parse(Buffer.from(payload!, 'base64').toString('utf-8'));
+      if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))) {
+        return null; // Tampered
+      }
+      return JSON.parse(Buffer.from(payload, 'base64').toString('utf-8'));
     } catch {
       return null;
     }
@@ -394,6 +398,8 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
           // Portal tokens are HMAC-signed: base64(payload).signature
           const sessionData = verifyPortalToken(portalToken);
           if (!sessionData) {
+            // Clear the stale/tampered cookie so the client re-authenticates automatically
+            res.setHeader('Set-Cookie', 'ff_portal_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
             return res.status(401).json({
               success: false,
               error: { code: 'INVALID_PORTAL_TOKEN', message: 'Invalid or tampered portal session' },
@@ -424,6 +430,9 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
               return handler(fleetReq, res);
             }
           }
+
+          // Session expired or revoked — clear the stale cookie
+          res.setHeader('Set-Cookie', 'ff_portal_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
         } catch {
           // Invalid portal session, continue to reject
         }

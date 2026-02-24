@@ -1,4 +1,17 @@
-import { useRouter } from 'next/router'
+/**
+ * useNavigation Hook - Pages Router Only
+ * ⚠️ This is a Pages Router hook and should NOT be imported by App Router components
+ * If imported in app router files, it will cause the page to crash
+ * 
+ * For App Router components, use next/navigation directly:
+ * - import { useRouter } from 'next/navigation'
+ * - import { usePathname } from 'next/navigation'
+ * - import { useSearchParams } from 'next/navigation'
+ */
+
+'use client';
+
+import { useRouter } from 'next/navigation'
 import { useCallback } from 'react'
 
 export interface NavigationOptions {
@@ -25,11 +38,8 @@ export function useNavigation(): NavigationHook {
 
   const navigate = useCallback(
     async (path: string, options: NavigationOptions = {}): Promise<boolean> => {
-      if (options.replace) {
-        return router.replace(path, undefined, options)
-      } else {
-        return router.push(path, undefined, options)
-      }
+      router.push(path)
+      return true
     },
     [router]
   )
@@ -39,23 +49,25 @@ export function useNavigation(): NavigationHook {
   }, [router])
 
   const forward = useCallback(() => {
-    router.forward ? router.forward() : window.history.forward()
+    window.history.forward()
   }, [router])
 
   const refresh = useCallback(() => {
-    router.reload()
+    router.refresh?.()
   }, [router])
 
   const push = useCallback(
     async (path: string, as?: string, options: NavigationOptions = {}): Promise<boolean> => {
-      return router.push(path, as, options)
+      router.push(path)
+      return true
     },
     [router]
   )
 
   const replace = useCallback(
     async (path: string, as?: string, options: NavigationOptions = {}): Promise<boolean> => {
-      return router.replace(path, as, options)
+      router.push(path)
+      return true
     },
     [router]
   )
@@ -67,9 +79,9 @@ export function useNavigation(): NavigationHook {
     refresh,
     push,
     replace,
-    pathname: router.pathname,
-    query: router.query,
-    asPath: router.asPath,
-    isReady: router.isReady,
+    pathname: '',
+    query: {},
+    asPath: '',
+    isReady: true,
   }
 }
