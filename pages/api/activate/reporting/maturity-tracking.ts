@@ -484,7 +484,7 @@ async function handler(
         avgCompletionPercent,
       });
 
-      return apiResponse.success(res, response);
+      return res.status(200).json(response);
     } finally {
       client.release();
     }

@@ -361,7 +361,7 @@ async function handler(
         projectCount: hierarchy.length,
       });
 
-      return apiResponse.success(res, response);
+      return res.status(200).json(response);
     } finally {
       client.release();
     }

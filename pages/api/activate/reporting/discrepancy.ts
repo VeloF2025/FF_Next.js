@@ -52,7 +52,7 @@ async function handler(
 
     const data = await getDiscrepancyReport(waDateStr, oesDateStr || undefined, projectStr || undefined);
 
-    return apiResponse.success(res, data);
+    return res.status(200).json(data);
   } catch (error) {
     log.error('DiscrepancyAPI', 'Failed to fetch discrepancy report', { error });
     return apiResponse.internalError(res, error);

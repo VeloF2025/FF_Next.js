@@ -52,7 +52,7 @@ async function handler(
       projectStr
     );
 
-    return apiResponse.success(res, data);
+    return res.status(200).json(data);
   } catch (error) {
     log.error('ResubmissionsAPI', 'Failed to fetch resubmission report', { error });
     return apiResponse.internalError(res, error);

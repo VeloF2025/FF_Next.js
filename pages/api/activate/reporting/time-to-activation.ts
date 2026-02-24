@@ -153,7 +153,7 @@ async function handler(
       within_24h_percent: number;
     };
 
-    return apiResponse.success(res, {
+    return res.status(200).json({
       summary: {
         total_matched: Number(stats.total_matched || 0),
         avg_hours: Number(stats.avg_hours || 0),

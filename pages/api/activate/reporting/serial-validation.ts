@@ -57,7 +57,7 @@ async function handler(
       mismatchesOnlyBool
     );
 
-    return apiResponse.success(res, data);
+    return res.status(200).json(data);
   } catch (error) {
     log.error('SerialValidationAPI', 'Failed to fetch serial validation report', {
       error,

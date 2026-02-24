@@ -52,7 +52,7 @@ async function handler(
       projectStr || undefined
     );
 
-    return apiResponse.success(res, data);
+    return res.status(200).json(data);
   } catch (error) {
     log.error('DailyCountsAPI', 'Failed to fetch daily counts', { error });
     return apiResponse.internalError(res, error);

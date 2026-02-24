@@ -115,7 +115,7 @@ async function handler(
       }
     );
 
-    return apiResponse.success(res, data);
+    return res.status(200).json(data);
   } catch (error) {
     log.error('OfflineDevicesAPI', 'Failed to fetch offline devices report', { error });
     return apiResponse.internalError(res, error);

@@ -141,7 +141,7 @@ async function handler(
         Number(buckets.find((b) => b.bucket === '4-7 days')?.count || 0),
     };
 
-    return apiResponse.success(res, {
+    return res.status(200).json({
       summary,
       buckets: buckets.map((b) => ({
         ...b,

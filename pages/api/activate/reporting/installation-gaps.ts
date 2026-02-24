@@ -217,7 +217,7 @@ async function handler(
       projectsAffected: response.summary.by_project.length,
     });
 
-    return apiResponse.success(res, response);
+    return res.status(200).json(response);
   } catch (error) {
     log.error('InstallationGapsAPI', 'Failed to fetch installation gaps report', { error });
     return apiResponse.internalError(res, error);
