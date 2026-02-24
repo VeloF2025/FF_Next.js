@@ -90,3 +90,33 @@ All affected endpoints used `withAuth` correctly for authentication enforcement 
 - **DevOps:** Forge
 
 For security issues, report immediately via Mission Control (type: urgent, to: jarvis).
+
+---
+
+## [2026-02-23] Auth Isolation Sweep — Construction QA + VLM Learning
+
+### Authentication Enforcement
+- **Construction QA Endpoints:** Added `withAuth` middleware to 6 routes
+  - `/api/construction-qa/[id]` (GET, PATCH, DELETE)
+  - `/api/construction-qa/photos/[id]` (GET, DELETE)
+  - `/api/construction-qa` (POST)
+- **VLM Learning Endpoints:** Added `withAuth` middleware to 2 routes
+  - `/api/vlm-learning/feedback` (POST)
+  - `/api/vlm-learning/stats` (GET)
+
+### Impact
+- **8 previously-unauthenticated endpoints** now require authentication
+- Prevents unauthorized access to construction QA data
+- Secures VLM training feedback and statistics
+- Completes auth isolation for civil QA module
+
+### Related Commits
+- `9a0996f7` - fix(auth): add withAuth to all construction-qa + vlm-learning endpoints — CRITICAL SECURITY
+
+### Security Context
+This is part of ongoing auth isolation sweep (Feb 21-23). Previous sweeps covered:
+- Feb 21: 11 endpoints (staff docs, suppliers, misc)
+- Feb 22: Pre-push git hook to prevent regressions
+- Feb 23: 8 endpoints (construction QA, VLM learning)
+
+**Total secured:** 19 endpoints across 3 days
