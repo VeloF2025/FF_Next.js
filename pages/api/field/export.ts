@@ -2,12 +2,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   try {
@@ -29,7 +30,7 @@ async function handler(
     res.status(200).send(csv);
   } catch (error) {
     log.error('Error exporting data', { error });
-    res.status(500).json({ error: 'Failed to export data' });
+    apiResponse.internalError(res, error);
   }
 }
 

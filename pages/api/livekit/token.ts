@@ -4,6 +4,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { generateToken } from '@/modules/livekit/services/livekitService';
 import type { TokenRequest, TokenResponse } from '@/modules/livekit/types/livekit.types';
 
@@ -13,17 +14,14 @@ async function handler(
 ) {
     // Only allow POST
     if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
     }
 
     try {
         const { roomName, participantName, participantIdentity } = req.body as TokenRequest;
 
         if (!roomName || !participantName) {
-            return res.status(400).json({
-                success: false,
-                error: 'roomName and participantName are required'
-            });
+            return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'roomName and participantName are required');
         }
 
         const result = await generateToken({
@@ -33,13 +31,13 @@ async function handler(
         });
 
         if (!result.success) {
-            return res.status(500).json(result);
+            return apiResponse.internalError(res, new Error(result.error));
         }
 
-        return res.status(200).json(result);
+        return apiResponse.success(res, result);
     } catch (error: any) {
         log.error('Token API error', { error });
-        return res.status(500).json({ success: false, error: error.message });
+        return apiResponse.internalError(res, error);
     }
 }
 

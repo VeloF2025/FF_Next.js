@@ -9,25 +9,20 @@ import {
   withAuth,
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth';
-import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({
-      success: false,
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'Only GET allowed' },
-    });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   // User is already attached by withAuth middleware
   const { user } = req;
 
-  return res.status(200).json({
-    success: true,
-    data: {
+  return apiResponse.success(res, {
       user: {
         id: user.id,
         email: user.email,

@@ -11,9 +11,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { userHasPermission } from '@/lib/permissions';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userId = authReq.user.id;
@@ -25,10 +26,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       'view'
     );
 
-    return res.status(200).json({ dataAccess: hasAccess });
+    return apiResponse.success(res, { dataAccess: hasAccess });
   } catch (err) {
     log.error('Chat access check error', err instanceof Error ? { message: err.message } : { err }, 'ChatAccess');
-    return res.status(500).json({ error: 'Failed to check chat access permissions' });
+    return apiResponse.internalError(res, err);
   }
 }
 
