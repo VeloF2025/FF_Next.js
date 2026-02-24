@@ -16,17 +16,22 @@ import {
   Plus
 } from 'lucide-react';
 import AssetsClient from './client';
+import { assetService, maintenanceService } from '@/modules/assets/services';
+import { log } from '@/lib/logger';
 
 async function getDashboardStats() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005'}/api/assets/dashboard`, {
-      cache: 'no-store',
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.data;
+    const [assetStats, maintenanceStats] = await Promise.all([
+      assetService.getDashboardStats(),
+      maintenanceService.getDashboardStats(),
+    ]);
+
+    return {
+      assets: assetStats.success ? assetStats.data : null,
+      maintenance: maintenanceStats.success ? maintenanceStats.data : null,
+    };
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    log.error('Error fetching dashboard stats:', { error }, 'assets:dashboard');
     return null;
   }
 }
