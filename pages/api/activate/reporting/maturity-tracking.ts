@@ -59,6 +59,11 @@ interface RawVelocityRow {
   activated: string;
 }
 
+interface RawPoScopeRow {
+  project_id: string;
+  po_total_scope: string;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse<MaturityTrackingResponse | { error: string }>
@@ -85,6 +90,34 @@ async function handler(
     const client = await pool.connect();
 
     try {
+      // Query 0: Get PO contracted drops per project (business target)
+      // Falls back to SOW drop count if no PO exists
+      const poScopeQuery = `
+        SELECT
+          cpo.project_id::text as project_id,
+          SUM(cpo.contracted_drops)::text as po_total_scope
+        FROM client_purchase_orders cpo
+        JOIN projects p ON p.id = cpo.project_id
+        WHERE p.status = 'active'
+          AND (
+            $1::text IS NULL
+            OR ($2::boolean = true AND cpo.project_id = $1::uuid)
+            OR ($2::boolean = false AND p.project_name = $1::text)
+          )
+        GROUP BY cpo.project_id
+      `;
+
+      const poScopeResult = await client.query<RawPoScopeRow>(poScopeQuery, [
+        projectFilter,
+        isUuid,
+      ]);
+
+      // Build PO scope lookup: project_id -> contracted drops total
+      const poScopeMap = new Map<string, number>();
+      for (const row of poScopeResult.rows) {
+        poScopeMap.set(row.project_id, parseInt(row.po_total_scope, 10));
+      }
+
       // Query 1: Get scope and activation counts with first/latest dates
       const projectQuery = `
         SELECT
@@ -340,6 +373,15 @@ async function handler(
         }
         if (!projectNode.latest_activation_date || (row.latest_activation_date && row.latest_activation_date > projectNode.latest_activation_date)) {
           projectNode.latest_activation_date = row.latest_activation_date;
+        }
+      }
+
+      // Override project-level total_scope with PO contracted drops when available
+      for (const projectNode of projectMap.values()) {
+        const poScope = poScopeMap.get(projectNode.project_id);
+        if (poScope && poScope > 0) {
+          projectNode.total_scope = poScope;
+          projectNode.remaining = poScope - projectNode.activated;
         }
       }
 
