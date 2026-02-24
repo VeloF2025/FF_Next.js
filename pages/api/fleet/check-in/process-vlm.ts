@@ -143,6 +143,8 @@ async function handler(
         if (!isPreviewMode && !persistResultsOnly && odometerResult.reading !== null) {
           if (validation.suggestedAction === 'reject') {
             log.warn('FleetVlmApi', `ODO rejected by validation: ${validation.warning}`);
+            // Write raw VLM response to debug log for diagnosis without SSH (e.g. digit drop issues)
+            try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch {}
             result.error = validation.warning || 'Reading failed validation';
           } else {
             await recordOdometerReading({
@@ -155,6 +157,7 @@ async function handler(
               discrepancyReason: validation.warning || undefined,
             });
             log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
+            if (validation.suggestedAction === 'verify') { try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch {} }
           }
         }
         break;
