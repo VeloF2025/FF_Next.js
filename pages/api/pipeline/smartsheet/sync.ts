@@ -42,10 +42,10 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     const targetSheetId = sheetId || DEFAULT_SHEET_ID;
 
     log.info('Smartsheet sync triggered', { sheetId: targetSheetId, userId });
+    // eslint-disable-next-line no-console -- temporary debug to trace background execution
+    console.log('[SYNC DEBUG] Handler entered, sending 202...');
 
     // Send 202 immediately — res.json() flushes the response to the client.
-    // The async handler continues executing below (the withAuth wrapper awaits
-    // the full handler promise, keeping the async context alive in Node.js).
     res.status(202).json({
       success: true,
       data: {
@@ -54,15 +54,21 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       },
     });
 
-    // Now run the sync in the SAME async context (no detached promise).
-    // The HTTP response is already sent; this just keeps the handler running.
+    // eslint-disable-next-line no-console -- temporary debug
+    console.log('[SYNC DEBUG] 202 sent, starting background sync...');
+
+    // Run sync in same async context after response is flushed
     _syncRunning = true;
     try {
+      // eslint-disable-next-line no-console -- temporary debug
+      console.log('[SYNC DEBUG] Calling syncFromSmartsheet...');
       const result = await pipelineSmartsheetService.syncFromSmartsheet(
         targetSheetId,
         'manual',
         userId
       );
+      // eslint-disable-next-line no-console -- temporary debug
+      console.log('[SYNC DEBUG] Sync completed:', result.success, result.stats.processed, 'rows');
       log.info('Smartsheet sync completed', {
         success: result.success,
         processed: result.stats.processed,
@@ -72,9 +78,13 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         duration_ms: result.duration_ms,
       });
     } catch (error) {
+      // eslint-disable-next-line no-console -- temporary debug
+      console.log('[SYNC DEBUG] Sync error:', error instanceof Error ? error.message : error);
       log.error('Smartsheet sync failed in background', error);
     } finally {
       _syncRunning = false;
+      // eslint-disable-next-line no-console -- temporary debug
+      console.log('[SYNC DEBUG] Handler complete, _syncRunning reset');
     }
   } catch (error) {
     // Only reaches here if something fails before res.json()
