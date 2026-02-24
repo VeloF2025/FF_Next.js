@@ -108,6 +108,7 @@
     "lucide-react": "^0.279.0",
     "neonctl": "^2.19.0",
     "next": "14.2.18",
+    "nodemailer": "^8.0.1",
     "papaparse": "^5.5.3",
     "pdf2pic": "^3.2.0",
     "pino": "^9.9.1",
