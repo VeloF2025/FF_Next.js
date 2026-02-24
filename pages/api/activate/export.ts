@@ -14,6 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';
@@ -194,7 +195,7 @@ function toExcel(rows: ExportRow[]): Buffer {
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST']);
   }
 
   try {
@@ -339,7 +340,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Return as JSON if format=json requested
     if (format === 'json') {
-      return res.status(200).json({
+      return apiResponse.success(res, {
         success: true,
         data: rows,
         meta: {
@@ -371,10 +372,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).send(excel);
   } catch (error: any) {
     log.error('ActivateExportAPI', 'Error exporting data', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to export data',
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 
