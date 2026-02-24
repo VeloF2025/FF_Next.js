@@ -22,6 +22,7 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { VlmAnalysisType } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { recordVlmCorrection, recordCorrectExtraction } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -245,6 +246,28 @@ async function handler(
           ${overrideValue ?? null}
         )
       `;
+    }
+
+    // Record VLM learning metrics (fire-and-forget, never blocks main flow)
+    if (!isPreviewMode && !result.error) {
+      if (overrideValue && result.extractedValue) {
+        // User corrected the VLM reading — record as correction for learning
+        recordVlmCorrection({
+          module: 'fleet',
+          analysisType,
+          sourceId: recordId,
+          sourceTable: 'fleet_check_records',
+          vlmExtractedValue: String(result.extractedNumeric ?? result.extractedValue),
+          vlmConfidence: result.confidence,
+          vlmModel: 'Qwen/Qwen3-VL-8B-Instruct',
+          correctedValue: overrideValue,
+          correctionReason: 'human_override',
+        }).catch(e => log.warn('FleetVlmApi', `Learning correction record failed (non-critical): ${e}`));
+      } else if (result.confidence >= 0.7) {
+        // High-confidence successful extraction — record as correct for metrics
+        recordCorrectExtraction('fleet', analysisType, result.confidence)
+          .catch(e => log.warn('FleetVlmApi', `Learning metric record failed (non-critical): ${e}`));
+      }
     }
 
     log.info('FleetVlmApi', `${analysisType} processing completed in ${processingTimeMs}ms (preview: ${isPreviewMode})`);

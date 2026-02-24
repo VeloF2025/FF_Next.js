@@ -12,6 +12,7 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import sharp from 'sharp';
 import { withAuth } from '@/lib/auth';
+import { recordCorrectExtraction } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ExtractIdPhotoAPI');
@@ -153,6 +154,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let facePhotoUrl = `${VF_STORAGE_URL}/${storagePath}`;
 
     logger.info('Face photo uploaded', { staffId, facePhotoUrl });
+
+    // Record VLM learning metric (fire-and-forget)
+    recordCorrectExtraction('staff', 'id_extraction', 0.8).catch(() => {});
 
     // Step 6: Update staff record with the extracted face photo URL
     await sql`

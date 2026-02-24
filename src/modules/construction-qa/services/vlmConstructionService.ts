@@ -11,6 +11,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';
+import { recordCorrectExtraction } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
@@ -121,6 +122,12 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
 
         result.stepResults.push(vlmResult);
         result.photosProcessed++;
+
+        // Record VLM learning metric (fire-and-forget)
+        if (vlmResult.confidence >= 0.7) {
+          recordCorrectExtraction('construction_qa', 'construction_photo_qa', vlmResult.confidence)
+            .catch(() => {});
+        }
       } catch (photoErr) {
         log.error('Photo VLM failed', { photoId: photo.id, error: (photoErr as Error).message }, MODULE);
       }

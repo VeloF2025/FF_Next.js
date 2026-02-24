@@ -632,6 +632,7 @@ export async function getModuleAccuracySummaries(): Promise<ModuleAccuracySummar
       assets: 'Assets',
       staff: 'Staff/HR',
       qfield: 'QField QA',
+      construction_qa: 'Construction QA',
     };
 
     return result.map((row) => {

@@ -13,6 +13,7 @@
  */
 
 import { log } from '@/lib/logger';
+import { recordCorrectExtraction } from '@/services/vlmLearningService';
 
 // ============================================================================
 // CONFIGURATION
@@ -136,6 +137,12 @@ export async function extractAssetFromLabel(
       hasSerial: !!extraction.serialNumber,
       confidence: extraction.confidence,
     });
+
+    // Record VLM learning metric (fire-and-forget)
+    if (extraction.success && extraction.confidence >= 0.7) {
+      recordCorrectExtraction('assets', 'equipment_label', extraction.confidence)
+        .catch(() => {});
+    }
 
     return extraction;
   } catch (error) {

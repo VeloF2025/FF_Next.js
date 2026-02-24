@@ -65,6 +65,8 @@ const MODULE_LABELS: Record<VlmModule, string> = {
   procurement: 'Procurement',
   assets: 'Assets',
   staff: 'Staff',
+  qfield: 'QField',
+  construction_qa: 'Construction QA',
 };
 
 export default function VlmLearningPage() {

@@ -14,7 +14,7 @@
 /**
  * Modules that use VLM extraction
  */
-export type VlmModule = 'activate' | 'fleet' | 'procurement' | 'assets' | 'staff' | 'qfield';
+export type VlmModule = 'activate' | 'fleet' | 'procurement' | 'assets' | 'staff' | 'qfield' | 'construction_qa';
 
 /**
  * Analysis types by module
@@ -47,7 +47,9 @@ export type VlmAnalysisType =
   | 'id_extraction'
   | 'photo_match'
   // QField module
-  | 'qfield_photo_qa';
+  | 'qfield_photo_qa'
+  // Construction QA module
+  | 'construction_photo_qa';
 
 /**
  * Analysis types grouped by module (for UI filtering)
@@ -67,6 +69,7 @@ export const ANALYSIS_TYPES_BY_MODULE: Record<VlmModule, VlmAnalysisType[]> = {
   assets: ['equipment_label'],
   staff: ['id_extraction', 'photo_match'],
   qfield: ['qfield_photo_qa'],
+  construction_qa: ['construction_photo_qa'],
 };
 
 // ============================================================================

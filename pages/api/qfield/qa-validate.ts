@@ -15,6 +15,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { execSync } from 'child_process';
+import { recordCorrectExtraction } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -341,6 +342,11 @@ async function processOneValidation(
       confidence: vlmResult.confidence,
       needsRetake,
     }, 'Validation completed');
+
+    // Record VLM learning metric (fire-and-forget)
+    if (vlmResult.confidence >= 0.7) {
+      recordCorrectExtraction('qfield', 'qfield_photo_qa', vlmResult.confidence).catch(() => {});
+    }
 
     return {
       id: validation.id,
