@@ -9,7 +9,7 @@ import { createAuditLog } from '@/services/procurement/auditService';
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
-export default withAuth(withErrorHandler(async (
+export default withAuth(async (
   req: NextApiRequest,
   res: NextApiResponse
 ) => {
@@ -241,4 +241,4 @@ export default withAuth(withErrorHandler(async (
   } else {
     apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
-}))
+})

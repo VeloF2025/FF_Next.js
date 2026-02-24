@@ -23,18 +23,17 @@ async function handler(
   const { user } = req;
 
   return apiResponse.success(res, {
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        permissions: user.permissions,
-        profilePicture: user.profilePicture,
-        department: user.department,
-      },
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      permissions: user.permissions,
+      profilePicture: user.profilePicture,
+      department: user.department,
     },
   });
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);

@@ -20,4 +20,4 @@ async function handler(
     return apiResponse.success(res, { serverUrl, configured: !!serverUrl });
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);
