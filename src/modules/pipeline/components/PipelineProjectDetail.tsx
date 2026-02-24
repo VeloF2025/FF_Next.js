@@ -49,6 +49,7 @@ import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
 import { AddApprovalModal } from './AddApprovalModal';
 import { LinkToProjectModal } from './LinkToProjectModal';
+import { PipelineProjectSearch } from './PipelineProjectSearch';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
   new: 'New',
@@ -524,6 +525,11 @@ export function PipelineProjectDetail() {
               ? `Approvals Pending (${approvalStatus.approved}/${approvalStatus.total})`
               : STATUS_LABELS[project.pipeline_status]}
           </span>
+        </div>
+
+        {/* Project Search */}
+        <div className="mb-6 pl-11">
+          <PipelineProjectSearch currentProjectId={id as string} />
         </div>
 
         {/* Approval Progress */}
