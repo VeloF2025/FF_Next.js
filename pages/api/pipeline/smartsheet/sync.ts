@@ -4,9 +4,12 @@
  *
  * Protected: super_admin role required
  *
- * Fire-and-forget: returns 202 immediately with historyId,
+ * Fire-and-forget: returns 202 immediately,
  * sync runs in background. Client polls /api/pipeline/smartsheet/history
  * for completion status.
+ *
+ * The promise is stored at module level so Node.js keeps the
+ * async work alive after the HTTP response is sent.
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -18,9 +21,22 @@ import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth
 // Velocity_Master_Tracker sheet ID
 const DEFAULT_SHEET_ID = '8735086443712388';
 
+// Module-level reference prevents Node.js from GC'ing the background promise
+// after the HTTP response is sent. Without this, Next.js API routes clean up
+// detached promises and the sync never executes.
+let _activeSyncPromise: Promise<void> | null = null;
+
 async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
+  }
+
+  // Reject if a sync is already running
+  if (_activeSyncPromise) {
+    return res.status(409).json({
+      success: false,
+      error: 'A sync is already running. Wait for it to complete.',
+    });
   }
 
   try {
@@ -29,9 +45,13 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
 
     const targetSheetId = sheetId || DEFAULT_SHEET_ID;
 
-    // Fire-and-forget: start sync in background, respond immediately
-    // This avoids Cloudflare 524 timeouts (sync takes 5-6 min for ~210 rows)
-    pipelineSmartsheetService.syncFromSmartsheet(
+    log.info('Smartsheet sync triggered, starting background work', {
+      sheetId: targetSheetId,
+      userId,
+    });
+
+    // Store at module level so Node keeps it alive after res.end()
+    _activeSyncPromise = pipelineSmartsheetService.syncFromSmartsheet(
       targetSheetId,
       'manual',
       userId
@@ -46,6 +66,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
       });
     }).catch((error) => {
       log.error('Smartsheet sync failed in background', error);
+    }).finally(() => {
+      _activeSyncPromise = null;
     });
 
     return res.status(202).json({
