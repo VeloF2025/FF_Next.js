@@ -238,6 +238,7 @@ export function CheckInForm({
           vlmResults={vlmResults}
           onPhotoCapture={handlePhotoCapture}
           onPhotoRemove={removePhoto}
+          onRetryVlm={processPhotoWithVlm}
           hasDamage={hasMinorFailures || hasCriticalFailures}
         />
       </div>

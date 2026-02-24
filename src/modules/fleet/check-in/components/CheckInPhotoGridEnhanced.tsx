@@ -37,6 +37,7 @@ interface CheckInPhotoGridEnhancedProps {
   vlmResults: Map<CheckPhotoType, VlmResult>;
   onPhotoCapture: (type: CheckPhotoType, dataUrl: string, file?: File, latitude?: number | null, longitude?: number | null) => void;
   onPhotoRemove: (type: CheckPhotoType) => void;
+  onRetryVlm?: (type: CheckPhotoType) => void;
   hasDamage?: boolean;
 }
 
@@ -46,6 +47,7 @@ export function CheckInPhotoGridEnhanced({
   vlmResults,
   onPhotoCapture,
   onPhotoRemove,
+  onRetryVlm,
   hasDamage = false,
 }: CheckInPhotoGridEnhancedProps) {
   const inputRefs = useRef<Map<CheckPhotoType, HTMLInputElement>>(new Map());
@@ -107,9 +109,20 @@ export function CheckInPhotoGridEnhanced({
 
     if (vlmResult.error) {
       return (
-        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs rounded-full" title={vlmResult.error}>
-          <AlertCircle className="w-3 h-3" />
-          <span>Unreadable — enter manually</span>
+        <div className="absolute top-2 left-2 flex items-center gap-1" title={vlmResult.error}>
+          <div className="flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs rounded-full">
+            <AlertCircle className="w-3 h-3" />
+            <span>Unreadable — enter manually</span>
+          </div>
+          {onRetryVlm && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRetryVlm(type); }}
+              className="px-2 py-1 bg-white/90 text-red-600 text-xs rounded-full font-medium hover:bg-white shadow-sm border border-red-300"
+              title="Re-analyse photo"
+            >
+              Retry
+            </button>
+          )}
         </div>
       );
     }
