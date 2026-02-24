@@ -13,6 +13,7 @@ import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { userHasPermission } from '@/lib/permissions';
 import { createLogger } from '@/lib/logger';
+import { withAuth } from '@/lib/auth/middleware';
 
 const logger = createLogger('api:chat:query');
 
@@ -228,7 +229,7 @@ const QUERIES: QueryDef[] = [
 
 // ── Handler ──────────────────────────────────────────────────────
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED, 'Only POST requests allowed');
   }
@@ -326,6 +327,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Query execution failed');
   }
 }
+
+export default withAuth(handler);
 
 // Export query definitions for the chat API to use as function descriptions
 export { QUERIES };
