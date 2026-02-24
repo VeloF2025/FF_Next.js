@@ -17,6 +17,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { pipelineSmartsheetService } from '@/modules/pipeline/services';
 import { log } from '@/lib/logger';
 import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import * as fs from 'fs';
 
 // Velocity_Master_Tracker sheet ID
 const DEFAULT_SHEET_ID = '8735086443712388';
@@ -24,51 +25,56 @@ const DEFAULT_SHEET_ID = '8735086443712388';
 // Track whether a sync is in progress to prevent concurrent runs
 let _syncRunning = false;
 
+// Debug helper that writes to a file (can't be stripped by minifier)
+function syncDebug(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync('/tmp/smartsheet-sync-debug.log', line); } catch { /* ignore */ }
+}
+
 async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
+  syncDebug('Handler called, method=POST');
+
   if (_syncRunning) {
+    syncDebug('Rejected: sync already running');
     return res.status(409).json({
       success: false,
       error: 'A sync is already running. Wait for it to complete.',
     });
   }
 
-  try {
-    const { sheetId } = req.body;
-    const userId = req.user?.id;
-    const targetSheetId = sheetId || DEFAULT_SHEET_ID;
+  const { sheetId } = req.body;
+  const userId = req.user?.id;
+  const targetSheetId = sheetId || DEFAULT_SHEET_ID;
 
-    log.info('Smartsheet sync triggered', { sheetId: targetSheetId, userId });
-    // eslint-disable-next-line no-console -- temporary debug to trace background execution
-    console.log('[SYNC DEBUG] Handler entered, sending 202...');
+  syncDebug(`Sending 202, sheetId=${targetSheetId}, userId=${userId}`);
+  log.info('Smartsheet sync triggered', { sheetId: targetSheetId, userId });
 
-    // Send 202 immediately — res.json() flushes the response to the client.
-    res.status(202).json({
-      success: true,
-      data: {
-        message: 'Sync started — processing in background. Poll history for status.',
-        status: 'running',
-      },
-    });
+  // Send 202 immediately
+  res.status(202).json({
+    success: true,
+    data: {
+      message: 'Sync started — processing in background. Poll history for status.',
+      status: 'running',
+    },
+  });
 
-    // eslint-disable-next-line no-console -- temporary debug
-    console.log('[SYNC DEBUG] 202 sent, starting background sync...');
+  syncDebug('202 sent, scheduling background sync via setImmediate');
 
-    // Run sync in same async context after response is flushed
+  // Use setImmediate to completely detach from HTTP request context
+  setImmediate(() => {
+    syncDebug('setImmediate fired, starting sync...');
     _syncRunning = true;
-    try {
-      // eslint-disable-next-line no-console -- temporary debug
-      console.log('[SYNC DEBUG] Calling syncFromSmartsheet...');
-      const result = await pipelineSmartsheetService.syncFromSmartsheet(
-        targetSheetId,
-        'manual',
-        userId
-      );
-      // eslint-disable-next-line no-console -- temporary debug
-      console.log('[SYNC DEBUG] Sync completed:', result.success, result.stats.processed, 'rows');
+
+    pipelineSmartsheetService.syncFromSmartsheet(
+      targetSheetId,
+      'manual',
+      userId
+    ).then((result) => {
+      syncDebug(`Sync completed: success=${result.success}, processed=${result.stats.processed}`);
       log.info('Smartsheet sync completed', {
         success: result.success,
         processed: result.stats.processed,
@@ -77,22 +83,14 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
         errored: result.stats.errored,
         duration_ms: result.duration_ms,
       });
-    } catch (error) {
-      // eslint-disable-next-line no-console -- temporary debug
-      console.log('[SYNC DEBUG] Sync error:', error instanceof Error ? error.message : error);
+    }).catch((error) => {
+      syncDebug(`Sync error: ${error instanceof Error ? error.message : String(error)}`);
       log.error('Smartsheet sync failed in background', error);
-    } finally {
+    }).finally(() => {
       _syncRunning = false;
-      // eslint-disable-next-line no-console -- temporary debug
-      console.log('[SYNC DEBUG] Handler complete, _syncRunning reset');
-    }
-  } catch (error) {
-    // Only reaches here if something fails before res.json()
-    if (!res.headersSent) {
-      return apiResponse.internalError(res, error);
-    }
-    log.error('Smartsheet sync handler error', error);
-  }
+      syncDebug('Sync promise settled, _syncRunning=false');
+    });
+  });
 }
 
 // Protect endpoint: requires super_admin role
