@@ -107,9 +107,9 @@ export function CheckInPhotoGridEnhanced({
 
     if (vlmResult.error) {
       return (
-        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs rounded-full">
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-xs rounded-full" title={vlmResult.error}>
           <AlertCircle className="w-3 h-3" />
-          <span>Error</span>
+          <span>Unreadable — enter manually</span>
         </div>
       );
     }

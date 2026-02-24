@@ -884,46 +884,73 @@ function categoryToPercent(category: string | null): number | null {
 export async function extractFuelLevel(
   base64Image: string
 ): Promise<FuelGaugeExtractionResult> {
-  try {
-    log.info('FleetVlmService', 'Extracting fuel gauge level...');
+  const MAX_RETRIES = 2;
 
-    const content = await callVlmApi(base64Image, FUEL_GAUGE_PROMPT, 'fuel_gauge');
-    const result = parseVlmJson<{
-      level_category?: string | null;
-      level: number | null;
-      confidence: number;
-      description: string;
-    }>(content);
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      log.info('FleetVlmService', `Extracting fuel gauge level (attempt ${attempt}/${MAX_RETRIES})...`);
 
-    // Prefer categorical level if available (more reliable)
-    let level = result.level;
-    if (result.level_category) {
-      const categoryLevel = categoryToPercent(result.level_category);
-      if (categoryLevel !== null) {
-        log.info('FleetVlmService', `Using categorical level: ${result.level_category} -> ${categoryLevel}%`);
-        level = categoryLevel;
+      const content = await callVlmApi(base64Image, FUEL_GAUGE_PROMPT, 'fuel_gauge');
+      const result = parseVlmJson<{
+        level_category?: string | null;
+        level: number | null;
+        confidence: number;
+        description: string;
+      }>(content);
+
+      // Prefer categorical level if available (more reliable)
+      let level = result.level;
+      if (result.level_category) {
+        const categoryLevel = categoryToPercent(result.level_category);
+        if (categoryLevel !== null) {
+          log.info('FleetVlmService', `Using categorical level: ${result.level_category} -> ${categoryLevel}%`);
+          level = categoryLevel;
+        }
       }
-    }
 
-    // Ensure level is within 0-100 range
-    if (level !== null) {
-      level = Math.max(0, Math.min(100, level));
-    }
+      // Ensure level is within 0-100 range
+      if (level !== null) {
+        level = Math.max(0, Math.min(100, level));
+      }
 
-    return {
-      level,
-      confidence: result.confidence || 0,
-      description: result.description || '',
-    };
-  } catch (error) {
-    log.error('FleetVlmService', `Fuel gauge extraction failed: ${error}`);
-    return {
-      level: null,
-      confidence: 0,
-      description: 'Extraction failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+      // If confidence is very low but we got a value, log a warning but still return it
+      if (level !== null && (result.confidence || 0) < 0.4) {
+        log.warn('FleetVlmService', `Low confidence fuel gauge read: ${level}% @ ${result.confidence} conf — attempt ${attempt}`);
+      }
+
+      return {
+        level,
+        confidence: result.confidence || 0,
+        description: result.description || '',
+      };
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      log.error('FleetVlmService', `Fuel gauge extraction attempt ${attempt} failed: ${errMsg}`);
+
+      // Retry on timeout or parse errors, not on permanent failures
+      const isRetryable = errMsg.includes('timeout') || errMsg.includes('PARSE_ERROR') || errMsg.includes('NO_CONTENT');
+      if (attempt < MAX_RETRIES && isRetryable) {
+        log.info('FleetVlmService', `Retrying fuel gauge extraction (${attempt}/${MAX_RETRIES})...`);
+        await new Promise(resolve => setTimeout(resolve, 1500 * attempt)); // 1.5s, 3s backoff
+        continue;
+      }
+
+      return {
+        level: null,
+        confidence: 0,
+        description: 'Could not read fuel gauge from photo',
+        error: errMsg,
+      };
+    }
   }
+
+  // Fallback (should not reach here)
+  return {
+    level: null,
+    confidence: 0,
+    description: 'Extraction failed after retries',
+    error: 'Max retries exceeded',
+  };
 }
 
 /**
