@@ -9,13 +9,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
   }
 
   try {
@@ -78,7 +79,7 @@ async function handler(
       WHERE latitude IS NOT NULL AND longitude IS NOT NULL
     `);
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       summary: {
         total_records: total,
         has_latitude: parseInt(stats.has_latitude),
@@ -101,9 +102,7 @@ async function handler(
 
   } catch (error) {
     log.error('Check OES coordinates error', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to check OES coordinates'
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 export default withAuth(handler);

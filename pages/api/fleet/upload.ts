@@ -10,6 +10,7 @@ import { IncomingForm, File as FormidableFile } from 'formidable';
 import fs from 'fs';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withFleetAuth } from '@/lib/auth/middleware';
 
 /** Validate file content matches expected type by checking magic bytes */
@@ -48,10 +49,7 @@ async function handler(
   res: NextApiResponse<UploadResponse>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      error: { message: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }
-    });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
@@ -81,10 +79,7 @@ async function handler(
     const file = Array.isArray(fileField) ? fileField[0] : fileField;
 
     if (!file) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'No file uploaded', code: 'NO_FILE' }
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'No file uploaded');
     }
 
     // Read file buffer
@@ -94,10 +89,7 @@ async function handler(
     const { valid, detectedType } = validateMagicBytes(buffer);
     if (!valid) {
       await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'FLEET_UPLOAD'));
-      return res.status(400).json({
-        success: false,
-        error: { message: `File content does not match an allowed image type (detected: ${detectedType})`, code: 'INVALID_FILE_CONTENT' }
-      });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, `File content does not match an allowed image type (detected: ${detectedType})`);
     }
 
     // Build the category path
@@ -126,7 +118,7 @@ async function handler(
       folder,
     });
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: {
         url: result.url,
@@ -136,13 +128,7 @@ async function handler(
     });
   } catch (error) {
     log.error('FleetUpload', { action: 'error', error });
-    return res.status(500).json({
-      success: false,
-      error: {
-        message: error instanceof Error ? error.message : 'Failed to upload file',
-        code: 'UPLOAD_FAILED'
-      }
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

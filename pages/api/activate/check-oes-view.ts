@@ -9,13 +9,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']);
   }
 
   try {
@@ -85,7 +86,7 @@ WHERE oes.latitude IS NOT NULL
   AND oes.latitude != 0
   AND oes.longitude != 0;`;
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       view_exists: viewExists,
       view_count: viewCount,
       view_sample: viewData,
@@ -100,9 +101,7 @@ WHERE oes.latitude IS NOT NULL
 
   } catch (error) {
     log.error('Check OES view error', { error });
-    return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to check OES view'
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 export default withAuth(handler);
