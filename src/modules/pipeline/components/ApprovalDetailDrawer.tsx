@@ -207,10 +207,10 @@ export function ApprovalDetailDrawer({
     approval.internal_status === 'ops_approved';
   const canMarkApproved =
     (currentUserRole === 'admin' || currentUserRole === 'ops') &&
-    ['submitted', 'in_review', 'additional_info_required'].includes(approval.status);
+    ['submitted', 'in_review', 'additional_info_required', 'conditionally_approved'].includes(approval.status);
   const canMarkRejected =
     (currentUserRole === 'admin' || currentUserRole === 'ops') &&
-    ['submitted', 'in_review', 'additional_info_required'].includes(approval.status);
+    ['submitted', 'in_review', 'additional_info_required', 'conditionally_approved'].includes(approval.status);
 
   const hasActions = canPmApprove || canOpsApprove || canSubmit || canMarkApproved || canMarkRejected;
   const canEdit = ['admin', 'pm', 'ops'].includes(currentUserRole);
