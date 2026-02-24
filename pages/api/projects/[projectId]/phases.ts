@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { phaseOperations, phaseGenerator } from '@/services/projects/phases/neonPhaseService';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
@@ -16,13 +17,13 @@ async function handler(
   try {
     // Authenticate user with Clerk
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
     }
 
     const projectId = req.query.projectId as string;
 
     if (!projectId) {
-      return res.status(400).json({ error: 'Project ID is required' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     switch (req.method) {
@@ -30,10 +31,10 @@ async function handler(
         // Get all phases for a project
         try {
           const phases = await phaseOperations.getProjectPhases(projectId);
-          return res.status(200).json(phases);
+          return apiResponse.success(res, phases);
         } catch (error) {
           log.error('Error fetching project phases:', { data: error }, 'phases-api');
-          return res.status(500).json({ error: 'Failed to fetch project phases' });
+          return apiResponse.internalError(res, error);
         }
 
       case 'POST':
@@ -45,34 +46,34 @@ async function handler(
             // Generate default phases for the project
             await phaseGenerator.generateDefaultPhases(projectId, userId);
             const phases = await phaseOperations.getProjectPhases(projectId);
-            return res.status(201).json({ 
+            return apiResponse.success(res, { 
               message: 'Default phases generated successfully',
               phases 
             });
           } else {
             // Create a single phase
             if (!phaseData.name) {
-              return res.status(400).json({ error: 'Phase name is required' });
+              return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
             }
             
             const phaseId = await phaseOperations.createPhase(projectId, phaseData, userId);
-            return res.status(201).json({ 
+            return apiResponse.success(res, { 
               id: phaseId,
               message: 'Phase created successfully' 
             });
           }
         } catch (error) {
           log.error('Error creating phase:', { data: error }, 'phases-api');
-          return res.status(500).json({ error: 'Failed to create phase' });
+          return apiResponse.internalError(res, error);
         }
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
-        return res.status(405).json({ error: `Method ${req.method} not allowed` });
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE']);
     }
   } catch (error) {
     log.error('API error:', { data: error }, 'phases-api');
-    return res.status(500).json({ error: 'Internal server error' });
+    return apiResponse.internalError(res, error);
   }
 }
 

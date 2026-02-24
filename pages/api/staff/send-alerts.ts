@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { StaffNotificationService, NotificationResult } from '@/services/staff/staffNotificationService';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 const logger = createLogger('StaffSendAlertsAPI');
 
@@ -27,7 +28,7 @@ async function handler(
   res: NextApiResponse<SendAlertsResponse | { error: string }>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   // Optional: Add API key authentication for cron jobs
@@ -36,7 +37,7 @@ async function handler(
 
   if (expectedKey && apiKey !== expectedKey) {
     logger.warn('Unauthorized send-alerts attempt', { providedKey: apiKey ? 'provided' : 'missing' });
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
   }
 
   try {
@@ -74,7 +75,7 @@ async function handler(
       results: results.map(r => ({ type: r.type, success: r.success, count: r.count })),
     });
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: failCount === 0,
       results,
       message: failCount === 0
@@ -83,7 +84,7 @@ async function handler(
     });
   } catch (error) {
     logger.error('Failed to send staff alerts', { error });
-    return res.status(500).json({ error: 'Failed to send alerts' });
+    return apiResponse.internalError(res, error);
   }
 }
 

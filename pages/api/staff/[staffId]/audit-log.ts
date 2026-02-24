@@ -7,18 +7,19 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuditLog } from '@/services/staff/staffAuditService';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 const logger = createLogger('StaffAuditLogAPI');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   const { staffId } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
   }
 
   try {
@@ -34,14 +35,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       actionTypes: actionTypes as any,
     });
 
-    return res.status(200).json({
+    return apiResponse.success(res, {
       success: true,
       data: result,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Failed to fetch audit log', { staffId, error: errorMessage });
-    return res.status(500).json({ error: 'Failed to fetch audit log' });
+    return apiResponse.internalError(res, error);
   }
 }
 

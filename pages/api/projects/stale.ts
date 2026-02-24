@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 /**
  * Stale Projects API
@@ -36,7 +37,7 @@ export interface StaleProjectsResponse {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   const thresholdDays = Math.max(1, parseInt(String(req.query.days || '7'), 10));
@@ -82,13 +83,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     log.info('StaleProjects', `Found ${projects.length} stale projects (threshold: ${thresholdDays}d)`);
-    return res.status(200).json(response);
+    return apiResponse.success(res, response);
   } catch (error) {
     log.error('StaleProjects', 'Failed to fetch stale projects', { error });
-    return res.status(500).json({
-      error: 'Failed to fetch stale projects',
-      details: error instanceof Error ? error.message : String(error),
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 

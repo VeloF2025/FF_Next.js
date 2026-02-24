@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { progressCalculations } from '@/services/projects/phases/neonPhaseService';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
@@ -16,13 +17,13 @@ async function handler(
   try {
     // Authenticate user with Clerk
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
     }
 
     const projectId = req.query.projectId as string;
 
     if (!projectId) {
-      return res.status(400).json({ error: 'Project ID is required' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     switch (req.method) {
@@ -30,10 +31,10 @@ async function handler(
         // Get project progress summary
         try {
           const progressSummary = await progressCalculations.getProjectProgressSummary(projectId);
-          return res.status(200).json(progressSummary);
+          return apiResponse.success(res, progressSummary);
         } catch (error) {
           log.error('Error fetching project progress:', { data: error }, 'progress-api');
-          return res.status(500).json({ error: 'Failed to fetch project progress' });
+          return apiResponse.internalError(res, error);
         }
 
       case 'POST':
@@ -55,22 +56,22 @@ async function handler(
           
           // Return updated progress summary
           const progressSummary = await progressCalculations.getProjectProgressSummary(projectId);
-          return res.status(200).json({
+          return apiResponse.success(res, {
             message: 'Progress updated successfully',
             summary: progressSummary
           });
         } catch (error) {
           log.error('Error updating project progress:', { data: error }, 'progress-api');
-          return res.status(500).json({ error: 'Failed to update project progress' });
+          return apiResponse.internalError(res, error);
         }
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
-        return res.status(405).json({ error: `Method ${req.method} not allowed` });
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE']);
     }
   } catch (error) {
     log.error('API error:', { data: error }, 'progress-api');
-    return res.status(500).json({ error: 'Internal server error' });
+    return apiResponse.internalError(res, error);
   }
 }
 

@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { phaseOperations, stepOperations, taskOperations } from '@/services/projects/phases/neonPhaseService';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
@@ -17,14 +18,14 @@ async function handler(
   try {
     // Authenticate user with Clerk
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
     }
 
     const projectId = req.query.projectId as string;
     const phaseId = req.query.phaseId as string;
 
     if (!projectId || !phaseId) {
-      return res.status(400).json({ error: 'Project ID and Phase ID are required' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     switch (req.method) {
@@ -33,7 +34,7 @@ async function handler(
         try {
           const phase = await phaseOperations.getPhaseById(projectId, phaseId);
           if (!phase) {
-            return res.status(404).json({ error: 'Phase not found' });
+            return apiResponse.error(res, ErrorCode.NOT_FOUND, 'Not found');
           }
           
           // Get steps for this phase
@@ -47,42 +48,42 @@ async function handler(
             })
           );
           
-          return res.status(200).json({
+          return apiResponse.success(res, {
             ...phase,
             steps: stepsWithTasks
           });
         } catch (error) {
           log.error('Error fetching phase details:', { data: error }, 'phase-api');
-          return res.status(500).json({ error: 'Failed to fetch phase details' });
+          return apiResponse.internalError(res, error);
         }
 
       case 'PUT':
         // Update phase
         try {
           await phaseOperations.updatePhase(projectId, phaseId, req.body, userId);
-          return res.status(200).json({ message: 'Phase updated successfully' });
+          return apiResponse.success(res, { message: 'Phase updated successfully' });
         } catch (error) {
           log.error('Error updating phase:', { data: error }, 'phase-api');
-          return res.status(500).json({ error: 'Failed to update phase' });
+          return apiResponse.internalError(res, error);
         }
 
       case 'DELETE':
         // Delete phase
         try {
           await phaseOperations.deletePhase(projectId, phaseId);
-          return res.status(200).json({ message: 'Phase deleted successfully' });
+          return apiResponse.success(res, { message: 'Phase deleted successfully' });
         } catch (error) {
           log.error('Error deleting phase:', { data: error }, 'phase-api');
-          return res.status(500).json({ error: 'Failed to delete phase' });
+          return apiResponse.internalError(res, error);
         }
 
       default:
         res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
-        return res.status(405).json({ error: `Method ${req.method} not allowed` });
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE']);
     }
   } catch (error) {
     log.error('API error:', { data: error }, 'phase-api');
-    return res.status(500).json({ error: 'Internal server error' });
+    return apiResponse.internalError(res, error);
   }
 }
 

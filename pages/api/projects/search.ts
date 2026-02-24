@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 /**
  * Projects Search API Route
@@ -12,20 +13,20 @@ async function handler(
 ) {
   // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
   try {
     // Get authentication from Clerk
     const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.error(res, ErrorCode.UNAUTHORIZED, 'Unauthorized');
     }
 
     const { q } = req.query;
 
     if (!q || typeof q !== 'string') {
-      return res.status(400).json({ error: 'Search query is required' });
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
     // Proxy to backend API server
@@ -47,13 +48,10 @@ async function handler(
     }
 
     const result = await response.json();
-    return res.status(200).json(result);
+    return apiResponse.success(res, result);
   } catch (error) {
     log.error('Project search error', { error });
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to search projects'
-    });
+    return apiResponse.internalError(res, error);
   }
 }
 
