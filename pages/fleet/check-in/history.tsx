@@ -727,17 +727,24 @@ export default function CheckInHistoryPage() {
                                         </span>
                                         {getConfidenceBadge(vlm.confidence)}
                                       </div>
-                                      <p className="font-mono text-sm mt-1 text-gray-900 dark:text-white">
-                                        {vlm.extractedNumeric?.toLocaleString() || vlm.extractedValue || '-'}
-                                      </p>
-                                      {vlm.error && (
-                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                          ⚠️ {vlm.error}
+                                      {vlm.overrideValue ? (
+                                        <>
+                                          <p className="font-mono text-sm mt-1 text-gray-900 dark:text-white">
+                                            {Number(vlm.overrideValue).toLocaleString()}{' '}
+                                            <span className="text-xs text-blue-600 dark:text-blue-400 font-sans">(corrected)</span>
+                                          </p>
+                                          <p className="font-mono text-xs mt-0.5 text-gray-400 line-through">
+                                            VLM: {vlm.extractedNumeric?.toLocaleString() || vlm.extractedValue || '-'}
+                                          </p>
+                                        </>
+                                      ) : (
+                                        <p className="font-mono text-sm mt-1 text-gray-900 dark:text-white">
+                                          {vlm.extractedNumeric?.toLocaleString() || vlm.extractedValue || '-'}
                                         </p>
                                       )}
-                                      {vlm.overrideValue && (
-                                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                          Override: {vlm.overrideValue}
+                                      {vlm.error && (
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                          {vlm.error}
                                         </p>
                                       )}
                                     </div>

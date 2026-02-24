@@ -33,6 +33,7 @@ interface ProcessVlmRequest {
   base64Image: string;
   expectedPlate?: string; // For license plate verification
   persistResultsOnly?: boolean; // When true, only save VLM results - skip fuel/odometer history recording
+  overrideValue?: string; // User-corrected value (HITL override) to store alongside raw VLM extraction
 }
 
 interface ProcessVlmResponse {
@@ -71,6 +72,7 @@ async function handler(
       base64Image,
       expectedPlate,
       persistResultsOnly,
+      overrideValue,
     } = req.body as ProcessVlmRequest;
 
     // Validate required fields
@@ -224,7 +226,8 @@ async function handler(
         INSERT INTO fleet_photo_vlm_results (
           photo_id, analysis_type, extracted_value, extracted_numeric,
           confidence, plate_matches_vehicle, expected_plate,
-          vlm_model, raw_response, processing_time_ms, processing_status, error_message
+          vlm_model, raw_response, processing_time_ms, processing_status, error_message,
+          override_value
         )
         VALUES (
           ${photoId},
@@ -238,7 +241,8 @@ async function handler(
           ${result.rawResponse ?? null},
           ${processingTimeMs},
           ${result.error ? 'failed' : 'completed'},
-          ${result.error ?? null}
+          ${result.error ?? null},
+          ${overrideValue ?? null}
         )
       `;
     }

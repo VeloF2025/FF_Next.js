@@ -661,6 +661,12 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
                 // Fire and forget - don't block submission for VLM persistence
                 // persistResultsOnly=true: only save VLM results to fleet_photo_vlm_results,
                 // skip fuel/odometer history recording (already recorded by createCheckRecord with user's final values)
+                // Include override value if user corrected the VLM reading (HITL)
+                const overrideValue =
+                  (type === 'dashboard' && odometerWasOverridden) ? formState.odometerReading :
+                  (type === 'fuel_gauge' && fuelWasOverridden) ? formState.fuelLevel :
+                  undefined;
+
                 fetch('/api/fleet/check-in/process-vlm', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -672,6 +678,7 @@ export function useCheckIn(options: UseCheckInOptions): UseCheckInReturn {
                     base64Image: base64,
                     expectedPlate: vehicleRegistration,
                     persistResultsOnly: true,
+                    overrideValue: overrideValue || undefined,
                   }),
                 })
                   .then(r => {
