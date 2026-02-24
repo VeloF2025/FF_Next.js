@@ -1,7 +1,7 @@
 /**
  * Field App — Task by ID
- * Phase 1: GET wired to real DB with staff JOIN (replaces mock data)
- * Phase 2 (future): PATCH status updates, DELETE
+ * Phase 1: GET wired to real DB with staff JOIN
+ * Phase 2: PATCH status updates + metadata merge (notes, photos, qualityCheck)
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
@@ -95,19 +95,74 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   // ─── PATCH /api/field/tasks/[id] ─────────────────────────────────────────
   } else if (req.method === 'PATCH') {
-    // Phase 2: DB update — stub for now
-    const updates = req.body;
-    log.info('FieldTasksApi', `PATCH task ${id} (stub) — Phase 2 pending`);
-    return res.status(200).json({
-      message: 'Task updated successfully',
-      task: { id, ...updates, updatedAt: new Date().toISOString() },
-    });
+    const { status, notes, photos, qualityCheck, syncStatus, offlineEdits } = req.body as {
+      status?: string;
+      notes?: unknown[];
+      photos?: unknown[];
+      qualityCheck?: Record<string, unknown>;
+      syncStatus?: string;
+      offlineEdits?: boolean;
+    };
+
+    const VALID_STATUSES = ['pending', 'in_progress', 'completed', 'cancelled'];
+    if (status && !VALID_STATUSES.includes(status)) {
+      return apiResponse.error(res, ErrorCode.BAD_REQUEST,
+        `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
+    }
+
+    try {
+      // Fetch existing task first (need current metadata to merge)
+      const existing = await sql`SELECT status, metadata FROM tasks WHERE id = ${id} LIMIT 1`;
+      if (!existing.length) {
+        return apiResponse.error(res, ErrorCode.NOT_FOUND, `Task ${id} not found`);
+      }
+
+      const currentMeta = (existing[0]!.metadata as Record<string, unknown>) || {};
+
+      // Build merged metadata (deep merge — don't replace, extend)
+      const updatedMeta: Record<string, unknown> = {
+        ...currentMeta,
+        ...(notes !== undefined && { notes }),
+        ...(photos !== undefined && { photos }),
+        ...(qualityCheck !== undefined && { qualityCheck }),
+        ...(syncStatus !== undefined && { syncStatus }),
+        ...(offlineEdits !== undefined && { offlineEdits }),
+      };
+
+      // Apply updates — only touch columns that changed
+      const updatedRows = await sql`
+        UPDATE tasks SET
+          status     = COALESCE(${status ?? null}, status),
+          metadata   = ${JSON.stringify(updatedMeta)}::jsonb,
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING id, status, updated_at
+      `;
+
+      if (!updatedRows.length) {
+        return apiResponse.error(res, ErrorCode.NOT_FOUND, `Task ${id} not found`);
+      }
+
+      const updated = updatedRows[0]!;
+      log.info('FieldTasksApi', `Task ${id} updated: status=${updated.status}`);
+
+      return apiResponse.success(res, {
+        id: updated.id,
+        status: updated.status,
+        updatedAt: updated.updated_at,
+        syncStatus: syncStatus || (currentMeta.syncStatus as string) || 'synced',
+      }, 'Task updated successfully');
+    } catch (error) {
+      log.error('FieldTasksApi', `Error updating task ${id}: ${error}`);
+      return apiResponse.internalError(res, error);
+    }
 
   // ─── DELETE /api/field/tasks/[id] ────────────────────────────────────────
   } else if (req.method === 'DELETE') {
-    // Phase 2: DB delete — stub for now
-    log.info('FieldTasksApi', `DELETE task ${id} (stub) — Phase 2 pending`);
-    return res.status(200).json({ message: 'Task deleted successfully' });
+    // Phase 2: DB delete — stub (field app doesn't delete tasks, just cancels)
+    log.info('FieldTasksApi', `DELETE task ${id} — use PATCH status=cancelled instead`);
+    return apiResponse.error(res, ErrorCode.METHOD_NOT_ALLOWED,
+      'Tasks cannot be deleted. Use PATCH with status=cancelled.');
 
   } else {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PATCH', 'DELETE']);
