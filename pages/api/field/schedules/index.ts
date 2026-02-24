@@ -1,53 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
-import { neon } from '@neondatabase/serverless';
-import { safeArrayQuery, safeMutation } from '../../../../lib/safe-query';
+import { safeArrayQuery } from '../../../../lib/safe-query';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
-const sql = neon(process.env.DATABASE_URL!);
-
-async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      // Return empty data for now - schedules functionality pending migration
-      const schedules = await safeArrayQuery(
-        async () => [],
-        { logError: false }
-      );
-      
-      res.status(200).json({
-        schedules,
-        total: 0,
-        taskCounts: [],
-        message: 'Schedules functionality is being migrated'
-      });
+      const schedules = await safeArrayQuery(async () => [], { logError: false });
+      return apiResponse.success(res, { schedules, total: 0, taskCounts: [] }, 'Schedules functionality is being migrated');
     } catch (error) {
-      log.error('Error fetching schedules', { error });
-      res.status(500).json({ error: 'Failed to fetch schedules' });
+      log.error('FieldSchedules', `Error fetching schedules: ${error}`);
+      return apiResponse.internalError(res, error);
     }
-  } else if (req.method === 'POST') {
-    // Temporarily disabled during migration
-    res.status(503).json({ 
-      error: 'Schedule creation is temporarily disabled during migration',
-      message: 'This feature will be available soon'
-    });
-  } else if (req.method === 'PUT') {
-    // Temporarily disabled during migration
-    res.status(503).json({ 
-      error: 'Schedule updates are temporarily disabled during migration',
-      message: 'This feature will be available soon'
-    });
-  } else if (req.method === 'DELETE') {
-    // Temporarily disabled during migration
-    res.status(503).json({ 
-      error: 'Schedule deletion is temporarily disabled during migration',
-      message: 'This feature will be available soon'
-    });
+  } else if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    return apiResponse.error(res, ErrorCode.SERVICE_UNAVAILABLE, `Schedule ${req.method === 'POST' ? 'creation' : req.method === 'PUT' ? 'updates' : 'deletion'} is temporarily disabled during migration`);
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
 }
 

@@ -1,51 +1,30 @@
 /**
  * Unified Storage Delete API
- * DELETE /api/storage/delete
- * Handles file deletion from VF Storage
- *
- * @see docs/ARCHITECTURE_STORAGE.md for storage architecture
+ * DELETE /api/storage/delete — removes a file from VF Storage
  */
-
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withAuth } from '@/lib/auth';
 import { vfStorage } from '@/services/vfStorageAdapter';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
-import { withAuth } from '@/lib/auth';
-interface DeleteResponse {
-  success: boolean;
-  error?: string;
-}
-
-async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<DeleteResponse>
-) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['DELETE']);
+  }
+
+  const { type, category, fileName } = req.body;
+  if (!type || !category || !fileName) {
+    return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing required fields: type, category, fileName');
   }
 
   try {
-    const { type, category, fileName } = req.body;
-
-    if (!type || !category || !fileName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: type, category, fileName'
-      });
-    }
-
-    // Delete from VF Storage
     await vfStorage.deleteFile(type, category, fileName);
-
-    log.info(`File deleted: ${storagePath}`, {}, 'storage-delete');
-
-    return res.status(200).json({ success: true });
+    log.info('StorageDelete', `Deleted file: ${type}/${category}/${fileName}`);
+    return apiResponse.success(res, { deleted: true });
   } catch (error) {
-    log.error('Storage delete error:', { data: error }, 'storage-delete');
-    return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete file',
-    });
+    log.error('StorageDelete', `Error deleting file: ${error}`);
+    return apiResponse.internalError(res, error);
   }
 }
 
