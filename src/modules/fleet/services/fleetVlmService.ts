@@ -68,35 +68,41 @@ async function resizeImageForVlm(base64Image: string): Promise<string> {
     const metadata = await sharp(inputBuffer).metadata();
     const width = metadata.width || 0;
     const height = metadata.height || 0;
+    const format = metadata.format || 'unknown';
 
-    // Skip resizing if image is already small enough
-    if (width <= VLM_MAX_WIDTH && height <= VLM_MAX_HEIGHT) {
-      log.info('FleetVlmService', `Image ${width}x${height} already within limits, skipping resize`);
+    const needsResize = width > VLM_MAX_WIDTH || height > VLM_MAX_HEIGHT;
+    const needsConvert = format !== 'jpeg' && format !== 'jpg';
+
+    if (!needsResize && !needsConvert) {
+      log.info('FleetVlmService', `Image ${width}x${height} JPEG already within limits, skipping`);
       return base64Image;
     }
 
-    log.info('FleetVlmService', `Resizing image from ${width}x${height} to max ${VLM_MAX_WIDTH}x${VLM_MAX_HEIGHT}`);
+    log.info('FleetVlmService', `Processing image ${width}x${height} ${format} (resize: ${needsResize}, convert: ${needsConvert})`);
 
-    const resizedBuffer = await sharp(inputBuffer)
-      .resize(VLM_MAX_WIDTH, VLM_MAX_HEIGHT, {
+    let pipeline = sharp(inputBuffer);
+    if (needsResize) {
+      pipeline = pipeline.resize(VLM_MAX_WIDTH, VLM_MAX_HEIGHT, {
         fit: 'inside',
         withoutEnlargement: true,
-      })
-      .jpeg({ quality: VLM_JPEG_QUALITY })
-      .toBuffer();
+      });
+    }
+    const outputBuffer = await pipeline.jpeg({ quality: VLM_JPEG_QUALITY }).toBuffer();
 
-    const resizedBase64 = resizedBuffer.toString('base64');
+    const outputBase64 = outputBuffer.toString('base64');
 
-    // Log size reduction
     const originalSize = Math.round(inputBuffer.length / 1024);
-    const resizedSize = Math.round(resizedBuffer.length / 1024);
-    log.info('FleetVlmService', `Image resized: ${originalSize}KB -> ${resizedSize}KB (${Math.round(resizedSize/originalSize*100)}%)`);
+    const outputSize = Math.round(outputBuffer.length / 1024);
+    log.info('FleetVlmService', `Image processed: ${originalSize}KB -> ${outputSize}KB (${format} -> jpeg)`);
 
-    return resizedBase64;
+    return outputBase64;
   } catch (error) {
-    log.error('FleetVlmService', `Image resize failed: ${error}`);
-    // Return original if resize fails - better than no result
-    return base64Image;
+    log.error('FleetVlmService', `Image processing failed: ${error}`);
+    throw new FleetVlmError(
+      `Failed to process image for VLM: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'IMAGE_PROCESSING_ERROR',
+      error
+    );
   }
 }
 
