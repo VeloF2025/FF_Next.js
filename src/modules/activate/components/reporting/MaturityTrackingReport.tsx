@@ -107,14 +107,30 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
     });
   }, []);
 
-  // Filter data based on hide options
+  // Filter data based on hide options (project, zone, and PON level)
   const filteredHierarchy = useMemo(() => {
     if (!data) return [];
-    return data.hierarchy.filter((p) => {
-      if (hideComplete && p.completion_percent >= 100) return false;
-      if (hideZero && p.activated === 0) return false;
-      return true;
-    });
+    let projects = data.hierarchy;
+
+    if (hideComplete) {
+      projects = projects.filter((p) => p.completion_percent < 100);
+    }
+    if (hideZero) {
+      projects = projects
+        .filter((p) => p.activated > 0)
+        .map((p) => ({
+          ...p,
+          zones: p.zones
+            .filter((z) => z.activated > 0)
+            .map((z) => ({
+              ...z,
+              pons: z.pons.filter((pon) => pon.activated > 0),
+            }))
+            .filter((z) => z.pons.length > 0),
+        }));
+    }
+
+    return projects;
   }, [data, hideComplete, hideZero]);
 
   // Export CSV
