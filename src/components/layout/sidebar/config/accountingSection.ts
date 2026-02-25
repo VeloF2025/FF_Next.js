@@ -10,10 +10,10 @@ import { Calculator } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const accountingSection: NavSection = {
-  section: 'ACCOUNTING',
+  section: 'Accounting',
   sectionId: 'accounting',
-  isCollapsible: true,
-  defaultExpanded: false,
+  sectionLink: '/accounting',
+  isCollapsible: false,
   items: [
     {
       to: '/accounting',
