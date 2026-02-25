@@ -543,7 +543,7 @@ export async function allocateTransaction(
     const supRows = (await sql`SELECT name FROM suppliers WHERE id = ${Number(entityId)}`) as Row[];
     const supName = supRows.length > 0 ? String(supRows[0]!.name) : `Supplier #${entityId}`;
     entryDesc = description || `Payment to ${supName}`;
-    source = 'bank_allocation_supplier';
+    source = 'auto_supplier_payment';
     lines = [
       { glAccountId: apAccountId, debit: amount, credit: 0, description: entryDesc },
       { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
@@ -554,7 +554,7 @@ export async function allocateTransaction(
     const custRows = (await sql`SELECT company_name FROM clients WHERE id = ${entityId}::UUID`) as Row[];
     const custName = custRows.length > 0 ? String(custRows[0]!.company_name) : `Customer #${entityId}`;
     entryDesc = description || `Receipt from ${custName}`;
-    source = 'bank_allocation_customer';
+    source = 'auto_payment';
     lines = [
       { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
       { glAccountId: arAccountId, debit: 0, credit: amount, description: entryDesc },
@@ -562,7 +562,7 @@ export async function allocateTransaction(
   } else {
     // Standard GL account allocation
     entryDesc = description || tx.description || 'Bank allocation';
-    source = 'bank_allocation';
+    source = 'auto_bank_recon';
     const isCredit = Number(tx.amount) > 0;
     lines = isCredit
       ? [
