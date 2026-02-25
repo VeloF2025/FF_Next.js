@@ -88,7 +88,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const b of balances as { accountId: string; debit: number; credit: number }[]) {
         if (Number(b.debit) > 0 || Number(b.credit) > 0) {
           await sql`
-            INSERT INTO gl_journal_lines (id, journal_entry_id, account_id, debit, credit, description, created_at)
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
             VALUES (gen_random_uuid(), ${entry.id}, ${b.accountId}, ${Number(b.debit) || 0}, ${Number(b.credit) || 0}, 'Opening Balance', NOW())
           `;
         }

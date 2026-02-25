@@ -70,7 +70,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           END
         ), 0)::numeric as actual_amount
       FROM gl_accounts ga
-      LEFT JOIN gl_journal_lines jl ON jl.account_id = ga.id
+      LEFT JOIN gl_journal_lines jl ON jl.gl_account_id = ga.id
       LEFT JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
         AND je.status = 'posted'
         AND je.entry_date >= ${startDate}

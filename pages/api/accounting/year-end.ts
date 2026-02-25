@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COALESCE(SUM(jl.credit - jl.debit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-          JOIN gl_accounts ga ON ga.id = jl.account_id
+          JOIN gl_accounts ga ON ga.id = jl.gl_account_id
           WHERE ga.account_type = 'revenue'
             AND je.status = 'posted'
             AND je.entry_date >= ${fy.start_date}
@@ -52,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COALESCE(SUM(jl.debit - jl.credit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-          JOIN gl_accounts ga ON ga.id = jl.account_id
+          JOIN gl_accounts ga ON ga.id = jl.gl_account_id
           WHERE ga.account_type = 'expense'
             AND je.status = 'posted'
             AND je.entry_date >= ${fy.start_date}
@@ -110,7 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT ga.id, ga.account_code, ga.account_name,
           COALESCE(SUM(jl.credit - jl.debit), 0)::numeric as balance
         FROM gl_accounts ga
-        LEFT JOIN gl_journal_lines jl ON jl.account_id = ga.id
+        LEFT JOIN gl_journal_lines jl ON jl.gl_account_id = ga.id
         LEFT JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
           AND je.status = 'posted'
           AND je.entry_date >= ${yearRange.start_date}
@@ -124,7 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT ga.id, ga.account_code, ga.account_name,
           COALESCE(SUM(jl.debit - jl.credit), 0)::numeric as balance
         FROM gl_accounts ga
-        LEFT JOIN gl_journal_lines jl ON jl.account_id = ga.id
+        LEFT JOIN gl_journal_lines jl ON jl.gl_account_id = ga.id
         LEFT JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
           AND je.status = 'posted'
           AND je.entry_date >= ${yearRange.start_date}
@@ -173,7 +173,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // DR Revenue accounts (to zero them)
       for (const rev of revenueAccounts) {
         await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, account_id, debit, credit, description, created_at)
+          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
           VALUES (gen_random_uuid(), ${closingEntry.id}, ${rev.id}, ${Number(rev.balance)}, 0, 'Year-end close', NOW())
         `;
       }
@@ -181,7 +181,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // CR Expense accounts (to zero them)
       for (const exp of expenseAccounts) {
         await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, account_id, debit, credit, description, created_at)
+          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
           VALUES (gen_random_uuid(), ${closingEntry.id}, ${exp.id}, 0, ${Number(exp.balance)}, 'Year-end close', NOW())
         `;
       }
@@ -189,12 +189,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Net income → Retained Earnings
       if (netIncome >= 0) {
         await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, account_id, debit, credit, description, created_at)
+          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
           VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, 0, ${netIncome}, 'Net income to retained earnings', NOW())
         `;
       } else {
         await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, account_id, debit, credit, description, created_at)
+          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
           VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, ${Math.abs(netIncome)}, 0, 'Net loss to retained earnings', NOW())
         `;
       }
