@@ -76,11 +76,55 @@ export interface AutoMatchCandidate {
   bankTransactionId: string;
   journalLineId: string;
   confidence: number; // 0-1
-  matchReason: 'exact_reference' | 'amount_date' | 'amount_only';
+  matchReason: 'exact_reference' | 'amount_date' | 'amount_only' | 'rule_match';
 }
 
 export interface AutoMatchResult {
   matched: number;
   unmatched: number;
   candidates: AutoMatchCandidate[];
+}
+
+// ── Bank Categorisation Rules ───────────────────────────────────────────────
+
+export type RuleMatchField = 'description' | 'reference' | 'both';
+export type RuleMatchType = 'contains' | 'starts_with' | 'ends_with' | 'exact';
+
+export interface BankCategorisationRule {
+  id: string;
+  ruleName: string;
+  matchField: RuleMatchField;
+  matchType: RuleMatchType;
+  matchPattern: string;
+  glAccountId: string;
+  supplierId?: string;
+  descriptionTemplate?: string;
+  priority: number;
+  isActive: boolean;
+  autoCreateEntry: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined
+  glAccountCode?: string;
+  glAccountName?: string;
+  supplierName?: string;
+}
+
+export interface RuleCreateInput {
+  ruleName: string;
+  matchField: RuleMatchField;
+  matchType: RuleMatchType;
+  matchPattern: string;
+  glAccountId: string;
+  supplierId?: string;
+  descriptionTemplate?: string;
+  priority?: number;
+  autoCreateEntry?: boolean;
+}
+
+export interface RuleApplyResult {
+  applied: number;
+  skipped: number;
+  entries: Array<{ bankTxId: string; ruleName: string; journalEntryId: string }>;
 }

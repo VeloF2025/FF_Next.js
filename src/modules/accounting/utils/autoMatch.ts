@@ -1,8 +1,9 @@
 /**
- * PRD-060: FibreFlow Accounting Module — Phase 4
+ * PRD-060: FibreFlow Accounting Module
  * Bank Transaction Auto-Match Algorithm
  *
- * Three-tier matching strategy:
+ * Four-tier matching strategy:
+ *   Tier 0: Rule-based match via bank_categorisation_rules (confidence 1.0)
  *   Tier 1: Exact reference match (confidence 1.0)
  *   Tier 2: Amount + date within 3 days (confidence 0.9)
  *   Tier 3: Amount only match (confidence 0.7)

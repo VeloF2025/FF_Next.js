@@ -16,7 +16,7 @@ import {
   DollarSign, FileCheck, ClipboardList, PieChart,
   Scale, CalendarCheck, BookMarked, Banknote,
   Repeat, XCircle, SlidersHorizontal, Layers,
-  RotateCcw, Percent, Shield,
+  RotateCcw, Percent, Shield, Zap,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -201,6 +201,14 @@ export const accountingSection: NavSection = {
           icon: FileSpreadsheet,
           label: 'Reconcile',
           shortLabel: 'Recon',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/bank-reconciliation/rules',
+          icon: Zap,
+          label: 'Mapping Rules',
+          shortLabel: 'Rules',
           permissions: [],
           rbacKey: 'accounting',
         },
