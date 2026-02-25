@@ -376,7 +376,7 @@ export default function FleetAnalyticsPage() {
             color="bg-gray-600"
           />
           <KPICard
-            title="Leased Vehicles"
+            title="Leased / Rental"
             value={kpis?.leasedVehicles || 0}
             subtitle={formatCurrency(kpis?.totalLeaseCost12m || 0) + '/year'}
             icon={Calendar}
@@ -573,11 +573,11 @@ export default function FleetAnalyticsPage() {
                         <span className={`inline-flex px-2 py-1 rounded text-xs font-medium ${
                           vehicle.ownershipType === 'company'
                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                            : vehicle.ownershipType === 'leased'
+                            : vehicle.ownershipType === 'leased' || vehicle.ownershipType === 'rental'
                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
                             : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
                         }`}>
-                          {vehicle.ownershipType}
+                          {vehicle.ownershipType === 'company' ? 'Company' : vehicle.ownershipType === 'leased' ? 'Leased' : vehicle.ownershipType === 'rental' ? 'Rental' : vehicle.ownershipType}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-[var(--ff-text-primary)]">

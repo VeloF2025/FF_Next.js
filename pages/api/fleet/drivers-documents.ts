@@ -71,6 +71,7 @@ async function handler(
           ELSE 'valid'
         END as license_status
       FROM staff s
+      INNER JOIN fleet_vehicles fv ON fv.assigned_driver_id = s.id
       LEFT JOIN latest_license ll ON ll.staff_id = s.id
       WHERE UPPER(s.status) = 'ACTIVE'
       ORDER BY

@@ -52,6 +52,7 @@ const URGENCY_STYLES: Record<ServiceUrgency, { bg: string; text: string; label: 
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   oil_change: 'Oil Change',
+  general_service: 'General Service',
   major_service: 'Major Service',
   minor_service: 'Minor Service',
   brake_pads: 'Brake Pads',

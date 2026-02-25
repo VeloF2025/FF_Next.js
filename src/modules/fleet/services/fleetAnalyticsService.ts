@@ -45,7 +45,7 @@ export async function getFleetKPIs(): Promise<FleetKPIs> {
       SELECT
         COUNT(*) as total_vehicles,
         COUNT(*) FILTER (WHERE status = 'active') as active_vehicles,
-        COUNT(*) FILTER (WHERE ownership_type = 'leased') as leased_vehicles,
+        COUNT(*) FILTER (WHERE ownership_type IN ('leased', 'rental')) as leased_vehicles,
         COUNT(*) FILTER (WHERE ownership_type = 'company') as company_vehicles
       FROM fleet_vehicles
       WHERE status != 'retired'
@@ -457,7 +457,7 @@ export async function generateDailySnapshot(): Promise<AnalyticsSnapshot> {
       SELECT
         COUNT(*) as total_vehicles,
         COUNT(*) FILTER (WHERE status = 'active') as active_vehicles,
-        COUNT(*) FILTER (WHERE ownership_type = 'leased') as leased_vehicles,
+        COUNT(*) FILTER (WHERE ownership_type IN ('leased', 'rental')) as leased_vehicles,
         COUNT(*) FILTER (WHERE ownership_type = 'company') as company_vehicles
       FROM fleet_vehicles
       WHERE status != 'retired'
