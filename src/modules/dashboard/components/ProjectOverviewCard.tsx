@@ -6,6 +6,7 @@ import { cn } from '@/utils/cn';
 import { ProjectQueryService } from '@/services/projects/core/projectQueryService';
 import { Project } from '@/types/project.types';
 import { log } from '@/lib/logger';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 
 interface DisplayProject {
   id: string;
@@ -183,10 +184,7 @@ export function ProjectOverviewCard({
   });
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
+    return formatDisplayDateShort(dateString);
   };
 
   const getDaysRemaining = (endDate: string) => {

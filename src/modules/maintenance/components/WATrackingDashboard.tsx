@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -385,7 +385,7 @@ export function WATrackingDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm text-[var(--ff-text-secondary)]">
-                        {format(new Date(flag.last_activity_at), 'dd MMM HH:mm')}
+                        {formatDisplayDateTime(flag.last_activity_at)}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -439,7 +439,7 @@ export function WATrackingDashboard() {
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1">
                                     <p className="text-[10px] text-white truncate">
-                                      {format(new Date(photo.timestamp), 'HH:mm dd MMM')}
+                                      {formatDisplayDateTime(photo.timestamp)}
                                     </p>
                                   </div>
                                 </button>
@@ -507,7 +507,7 @@ export function WATrackingDashboard() {
             <div className="p-3 border-t border-[var(--ff-border-light)]">
               <p className="text-sm text-[var(--ff-text-primary)]">{lightboxPhoto.filename}</p>
               <p className="text-xs text-[var(--ff-text-secondary)]">
-                {format(new Date(lightboxPhoto.timestamp), 'dd MMM yyyy HH:mm')} • {lightboxPhoto.sender}
+                {formatDisplayDateTime(lightboxPhoto.timestamp)} • {lightboxPhoto.sender}
               </p>
             </div>
           </div>

@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import { DriverLicenseUploadModal } from '../DriverLicenseUploadModal';
 import { DocumentVerificationModal } from '@/components/shared/DocumentVerificationModal';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface DriverDocument {
   staffId: string;
@@ -408,7 +409,7 @@ export function DriversDocumentsTab({ onRefresh }: DriversDocumentsTabProps) {
                     <td className="py-3 px-4">
                       {driver.licenseExpiry ? (
                         <span className="text-sm text-[var(--ff-text-primary)]">
-                          {new Date(driver.licenseExpiry).toLocaleDateString()}
+                          {formatDisplayDate(driver.licenseExpiry)}
                         </span>
                       ) : (
                         <span className="text-sm text-[var(--ff-text-tertiary)]">—</span>

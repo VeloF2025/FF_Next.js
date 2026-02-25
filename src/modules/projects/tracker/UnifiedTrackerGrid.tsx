@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { Download, RefreshCw, Grid3x3 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateTimeISO, formatDateISO } from '@/utils/dateFormat';
 import { useTrackerData } from './hooks/useTrackerData';
 import { TrackerStats } from './components/TrackerStats';
 import { TrackerFilters } from './components/TrackerFilters';
@@ -140,7 +140,7 @@ export function UnifiedTrackerGrid({ projectId: projectIdProp }: { projectId?: s
         `${item.progress}%`,
         `${item.photos}/${item.totalPhotos}`,
         `${item.qualityChecks}/${item.totalChecks}`,
-        item.lastUpdated ? format(item.lastUpdated, 'yyyy-MM-dd HH:mm') : 'N/A'
+        item.lastUpdated ? formatDateTimeISO(item.lastUpdated) : 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -148,7 +148,7 @@ export function UnifiedTrackerGrid({ projectId: projectIdProp }: { projectId?: s
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tracker-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `tracker-export-${formatDateISO(new Date())}.csv`;
     a.click();
   };
 

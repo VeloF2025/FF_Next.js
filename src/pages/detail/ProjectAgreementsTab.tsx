@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Download, Eye, Clock, CheckCircle, AlertTriangle, X, Loader2 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface Agreement {
   id: string;
@@ -85,12 +86,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatDisplayDate(dateStr, '—');
 }
 
 interface GenerateModalProps {

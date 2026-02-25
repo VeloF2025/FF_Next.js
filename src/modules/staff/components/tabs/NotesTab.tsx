@@ -23,8 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 import { notificationService } from '@/services/core/NotificationService';
 import type { StaffMember } from '@/types/staff';
@@ -78,33 +77,24 @@ const CONTRACT_SUMMARY_TEMPLATE = `## Employment Contract Summary
 
 // Generate summary from staff data and contract metadata
 function generateContractSummary(staff: StaffMember, contractMetadata?: Record<string, any>): string {
-  const formatDateStr = (date: unknown): string => {
-    if (!date) return 'N/A';
-    try {
-      return format(safeToDate(date), 'dd MMM yyyy');
-    } catch {
-      return 'N/A';
-    }
-  };
-
   const variables: Record<string, string> = {
     employeeName: staff.name || 'N/A',
     saIdNumber: staff.saIdNumber || 'N/A',
     position: formatLabel(staff.position, 'N/A'),
     department: formatLabel(staff.department, 'N/A'),
-    startDate: formatDateStr(staff.startDate),
+    startDate: formatDisplayDate(staff.startDate, 'N/A'),
     employmentType: contractMetadata?.employmentType || 'Permanent',
     companyName: contractMetadata?.companyName || 'Velocity Fibre (Pty) Ltd',
     workLocation: staff.workLocation || contractMetadata?.workLocation || 'N/A',
     salary: contractMetadata?.salary || 'As per contract',
     salaryPeriod: contractMetadata?.salaryPeriod || 'monthly',
     reportsTo: staff.managerName || staff.reportsTo || 'N/A',
-    contractSigned: contractMetadata?.signatureDate ? `Yes (${formatDateStr(contractMetadata.signatureDate)})` : 'Pending',
+    contractSigned: contractMetadata?.signatureDate ? `Yes (${formatDisplayDate(contractMetadata.signatureDate, 'N/A')})` : 'Pending',
     employeeSigned: contractMetadata?.employeeSigned === true || contractMetadata?.employeeSigned === 'true' ? '✅ Yes' : '❌ No',
     employerSigned: contractMetadata?.employerSigned === true || contractMetadata?.employerSigned === 'true' ? '✅ Yes' : '❌ No',
     witnessesSigned: contractMetadata?.witnessesSigned === true || contractMetadata?.witnessesSigned === 'true' ? '✅ Yes' : '⚠️ Not signed',
     additionalNotes: contractMetadata?.signatureNotes || 'None',
-    generatedDate: format(new Date(), 'dd MMM yyyy HH:mm'),
+    generatedDate: formatDisplayDateTime(new Date()),
   };
 
   let summary = CONTRACT_SUMMARY_TEMPLATE;
@@ -327,11 +317,7 @@ export function NotesTab({ staff, staffId }: NotesTabProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    try {
-      return format(safeToDate(dateStr), 'dd MMM yyyy HH:mm');
-    } catch {
-      return 'Unknown date';
-    }
+    return formatDisplayDateTime(dateStr, 'Unknown date');
   };
 
   if (isLoading) {

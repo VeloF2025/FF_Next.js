@@ -11,9 +11,8 @@ import {
 import { staffService } from '@/services/staffService';
 import { StaffImport } from '@/components/staff/StaffImport';
 import { StaffFilter, Department, StaffStatus, StaffLevel, StaffMember } from '@/types/staff.types';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '@/utils/dateFormat';
 // import { Timestamp } from 'firebase/firestore'; // Unused in current implementation
-import { safeToDate } from '@/utils/dateHelpers';
 import {
   StandardModuleHeader,
   StandardSummaryCards,
@@ -125,13 +124,12 @@ export function StaffList() {
       header: 'Status',
       render: (staff: StaffMember) => <StatusBadge status={staff.status} />
     },
-    { 
-      key: 'startDate', 
+    {
+      key: 'startDate',
       header: 'Start Date',
       render: (staff: StaffMember) => {
         if (!staff.startDate) return '-';
-        const d = safeToDate(staff.startDate);
-        return format(d, 'dd MMM yyyy');
+        return formatDisplayDate(staff.startDate, '-');
       }
     }
   ];

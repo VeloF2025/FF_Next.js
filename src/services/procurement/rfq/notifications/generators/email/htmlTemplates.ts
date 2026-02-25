@@ -4,6 +4,7 @@
  */
 
 import { RFQ } from '@/types/procurement.types';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 export class RFQEmailHTMLTemplates {
   /**
@@ -226,12 +227,6 @@ export class RFQEmailHTMLTemplates {
    * Format deadline for display
    */
   private static formatDeadline(deadline: Date): string {
-    return deadline.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDisplayDateTime(deadline);
   }
 }

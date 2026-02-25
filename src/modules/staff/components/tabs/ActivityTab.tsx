@@ -23,7 +23,7 @@ import {
   XCircle,
   Upload,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDisplayDateTime, formatDisplayDateShort } from '@/utils/dateFormat';
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
 import { formatLabel } from '@/lib/utils';
@@ -108,11 +108,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
   };
 
   const formatDate = (dateStr: string) => {
-    try {
-      return format(safeToDate(dateStr), 'dd MMM yyyy HH:mm');
-    } catch {
-      return 'Unknown date';
-    }
+    return formatDisplayDateTime(dateStr, 'Unknown date');
   };
 
   const getRelativeTime = (dateStr: string) => {
@@ -128,7 +124,7 @@ export function ActivityTab({ staffId }: ActivityTabProps) {
       if (diffMins < 60) return `${diffMins}m ago`;
       if (diffHours < 24) return `${diffHours}h ago`;
       if (diffDays < 7) return `${diffDays}d ago`;
-      return format(date, 'dd MMM');
+      return formatDisplayDateShort(date);
     } catch {
       return '';
     }

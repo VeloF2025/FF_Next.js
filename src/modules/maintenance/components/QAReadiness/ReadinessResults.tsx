@@ -17,6 +17,7 @@
 import React from 'react';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import type { QAReadinessCheck, QAReadinessFailedCheck } from '../../types/verification';
 
 interface ReadinessResultsProps {
@@ -114,19 +115,6 @@ function calculateProgress(checkItems: CheckItem[]): {
 }
 
 /**
- * 🟢 WORKING: Format check timestamp
- */
-function formatCheckTime(date: Date): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-/**
  * 🟢 WORKING: Readiness results display component
  */
 export function ReadinessResults({ check, compact = false }: ReadinessResultsProps) {
@@ -152,7 +140,7 @@ export function ReadinessResults({ check, compact = false }: ReadinessResultsPro
             </div>
           )}
           <p className="text-xs text-[var(--ff-text-secondary)] mt-1">
-            Checked on {formatCheckTime(check.checked_at)}
+            Checked on {formatDisplayDateTime(check.checked_at)}
           </p>
         </div>
 

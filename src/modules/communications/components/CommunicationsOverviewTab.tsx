@@ -1,6 +1,7 @@
 'use client';
 
 import { Calendar, Clock, Users, User, Video, ExternalLink } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { ActionItem } from '@/types/communications.types';
 
@@ -23,12 +24,7 @@ export function CommunicationsOverviewTab({
 
   // Format date safely
   const formatDate = (date: Date | string): string => {
-    try {
-      const d = date instanceof Date ? date : new Date(date);
-      return d.toLocaleDateString();
-    } catch {
-      return 'Unknown date';
-    }
+    return formatDisplayDate(date, 'Unknown date');
   };
 
   return (

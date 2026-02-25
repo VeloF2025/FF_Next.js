@@ -5,6 +5,7 @@
 
 import { RFQ } from '@/types/procurement.types';
 import { RFQNotificationEvent } from './types';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 export abstract class BaseRFQGenerator {
   protected static baseUrl: string = '';
@@ -88,12 +89,6 @@ export abstract class BaseRFQGenerator {
    * Format deadline for display
    */
   protected static formatDeadline(deadline: Date): string {
-    return deadline.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDisplayDateTime(deadline);
   }
 }

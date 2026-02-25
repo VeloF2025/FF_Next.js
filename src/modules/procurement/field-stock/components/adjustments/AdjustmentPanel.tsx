@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAdjustments, useLocations } from '../../hooks';
 import { CreateAdjustmentForm } from './CreateAdjustmentForm';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 export function AdjustmentPanel() {
   const { adjustments, loading, error, reasons, refresh, createAdjustment, fetchReasons } =
@@ -203,7 +204,7 @@ export function AdjustmentPanel() {
                 return (
                   <tr key={adj.id} className="hover:bg-[var(--ff-bg-secondary)]">
                     <td className="px-4 py-3 text-[var(--ff-text-primary)]">
-                      {new Date(adj.performed_at).toLocaleDateString()}
+                      {formatDisplayDate(adj.performed_at)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-[var(--ff-text-secondary)]">
                       {adj.reference}

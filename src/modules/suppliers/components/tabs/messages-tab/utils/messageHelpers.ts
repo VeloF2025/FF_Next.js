@@ -2,6 +2,7 @@
 // Utility functions for message formatting and conversion
 
 import type { Message, MessageThread } from '../types/messages.types';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 
 export const formatMessageTime = (timestamp: string): string => {
   const date = new Date(timestamp);
@@ -11,7 +12,7 @@ export const formatMessageTime = (timestamp: string): string => {
   if (diffHours < 24) {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   }
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDisplayDateShort(date);
 };
 
 export const messagesToThreads = (messages: Message[]): MessageThread[] => {

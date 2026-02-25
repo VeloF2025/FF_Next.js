@@ -4,6 +4,7 @@
 import React from 'react';
 import { FileText, Check, AlertCircle, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface Quote {
   id: string;
@@ -60,14 +61,7 @@ export const POQuoteComparison: React.FC<POQuoteComparisonProps> = ({
     }).format(value);
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | null) => formatDisplayDate(dateStr, '-');
 
   const selectedQuote = quoteComparison.selectedQuote;
   const otherQuotes = quoteComparison.allQuotes.filter(q => !q.isSelected);

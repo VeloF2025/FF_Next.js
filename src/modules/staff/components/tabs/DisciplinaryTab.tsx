@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Plus, Calendar, User, FileText, CheckCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { DisciplinaryIncident } from '@/types/staff';
 import {
   DISCIPLINARY_TYPE_LABELS,
@@ -209,7 +209,7 @@ function IncidentCard({ incident, expanded, onToggle, onEdit }: IncidentCardProp
           </div>
           <div>
             <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-              {format(new Date(incident.incidentDate), 'dd MMM yyyy')}
+              {formatDisplayDate(incident.incidentDate)}
             </p>
           </div>
         </div>
@@ -259,7 +259,7 @@ function IncidentCard({ incident, expanded, onToggle, onEdit }: IncidentCardProp
                   <div>
                     <p className="text-[var(--ff-text-secondary)]">Follow-up Date</p>
                     <p className="text-[var(--ff-text-primary)]">
-                      {format(new Date(incident.followUpDate), 'dd MMM yyyy')}
+                      {formatDisplayDate(incident.followUpDate)}
                     </p>
                   </div>
                 </div>
@@ -271,7 +271,7 @@ function IncidentCard({ incident, expanded, onToggle, onEdit }: IncidentCardProp
                   <div>
                     <p className="text-[var(--ff-text-secondary)]">Resolved</p>
                     <p className="text-[var(--ff-text-primary)]">
-                      {format(new Date(incident.resolvedDate), 'dd MMM yyyy')}
+                      {formatDisplayDate(incident.resolvedDate)}
                     </p>
                   </div>
                 </div>

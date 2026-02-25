@@ -24,6 +24,7 @@ import {
   Lock,
 } from 'lucide-react';
 import type { SyncHistoryEntry, SyncOperationType } from '../../types';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { usePermission } from '@/hooks/usePermission';
 
 // Filter options
@@ -120,7 +121,7 @@ export function HistoryGroup({ activeTab, onTabChange }: HistoryGroupProps) {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDisplayDate(date);
   };
 
   // Format duration

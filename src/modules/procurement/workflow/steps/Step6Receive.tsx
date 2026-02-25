@@ -18,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { WorkflowState } from '../useWorkflowState';
 
 // 🟢 WORKING: full type coverage
@@ -172,7 +173,7 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
                   <span style={{ fontSize: 14, color: 'var(--ff-text-primary)', fontWeight: 500 }}>{grn.grnNumber}</span>
                   {grn.receivedDate && (
                     <span style={{ fontSize: 12, color: 'var(--ff-text-tertiary)' }}>
-                      {new Date(grn.receivedDate).toLocaleDateString('en-ZA')}
+                      {formatDisplayDate(grn.receivedDate)}
                     </span>
                   )}
                 </div>

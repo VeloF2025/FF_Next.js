@@ -32,6 +32,7 @@ import { ClientPOCreateModal } from '@/modules/projects/components/finance/Clien
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import type { ClientPurchaseOrder } from '@/types/finance';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ProjectDocumentsTabProps {
   projectId: string;
@@ -453,7 +454,7 @@ function DocumentUploadCard({
           <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">{label}</h4>
           {document && (
             <p className="text-xs text-[var(--ff-text-secondary)] mt-0.5">
-              Uploaded: {new Date(document.uploadedAt).toLocaleDateString()}
+              Uploaded: {formatDisplayDate(document.uploadedAt)}
             </p>
           )}
         </div>

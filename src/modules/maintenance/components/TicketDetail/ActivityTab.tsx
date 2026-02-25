@@ -25,7 +25,8 @@ import {
   Pin,
   ChevronRight,
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
 import { useTicketActivities, type TicketActivity } from '../../hooks/useTicketActivities';
 
@@ -207,7 +208,7 @@ function ActivityItem({ activity }: { activity: TicketActivity }) {
 
         {/* Timestamp detail */}
         <div className="text-xs text-[var(--ff-text-secondary)]">
-          {format(new Date(activity.created_at), 'MMM d, yyyy \'at\' h:mm a')}
+          {formatDisplayDateTime(activity.created_at)}
         </div>
       </div>
     </div>

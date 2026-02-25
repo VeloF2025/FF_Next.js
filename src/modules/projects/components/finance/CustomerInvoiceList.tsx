@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { CustomerInvoice, CustomerInvoiceSummary } from '@/types/finance';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface CustomerInvoiceListProps {
   projectId: string;
@@ -18,14 +19,7 @@ interface CustomerInvoiceListProps {
 export function CustomerInvoiceList({ projectId, invoices, summary, onRefresh }: CustomerInvoiceListProps) {
   const [selectedInvoice, setSelectedInvoice] = useState<CustomerInvoice | null>(null);
 
-  const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | undefined) => formatDisplayDate(dateStr, '-');
 
   const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'bg-gray-500/20', text: 'text-gray-400' },

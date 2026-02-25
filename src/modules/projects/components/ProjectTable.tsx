@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/router';
 import { Eye, Edit, Trash2, TrendingUp, AlertTriangle, AlertCircle } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ProjectTableProps {
   projects: any[] | undefined;
@@ -30,14 +31,7 @@ export function ProjectTable({ projects, isLoading, error, onDelete }: ProjectTa
     return 'N/A';
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateString: string) => formatDisplayDate(dateString);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-ZA', {

@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { CheckCircle2, Circle, Loader2, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { useProjectRequirements, completeRequirement, ProjectRequirement } from '@/hooks/useProjectOverview';
 import { useQueryClient } from '@tanstack/react-query';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ProjectWorkflowChecklistProps {
   projectId: string;
@@ -240,7 +241,7 @@ function RequirementItem({ requirement, isCompleting, onComplete }: RequirementI
             'text-[var(--ff-text-tertiary)]'
           }`}>
             {isExpired ? 'Expired: ' : isExpiringSoon ? 'Expiring: ' : 'Expires: '}
-            {new Date(expiryDate).toLocaleDateString()}
+            {formatDisplayDate(expiryDate)}
           </p>
         )}
       </div>

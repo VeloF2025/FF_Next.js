@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import type { AuditLogListItem, AuditEntityTypeValue, AuditActionValue } from '@/types/procurement/audit.types';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 
 interface EntityAuditPanelProps {
   entityType: AuditEntityTypeValue;
@@ -47,7 +48,7 @@ function formatRelativeTime(date: Date | string): string {
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
+  return formatDisplayDateShort(d);
 }
 
 export function EntityAuditPanel({ entityType, entityId }: EntityAuditPanelProps) {

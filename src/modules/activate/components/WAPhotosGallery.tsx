@@ -16,7 +16,7 @@
 
 import { useState, useMemo } from 'react';
 // Using regular img for proxied images (Next.js Image optimizer can't handle auth-protected API routes)
-import { format } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { User, Camera, Cpu, ZoomIn } from 'lucide-react';
 import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 
@@ -66,7 +66,7 @@ export function WAPhotosGallery({
       const url = getWAPhotoUrl(p);
       const parts: string[] = [];
       if (p.sender_name) parts.push(`From: ${p.sender_name}`);
-      parts.push(format(new Date(p.message_timestamp), 'dd MMM yyyy HH:mm'));
+      parts.push(formatDisplayDateTime(p.message_timestamp));
       if (p.vlm_ont_serial) parts.push(`ONT: ${p.vlm_ont_serial}`);
       if (p.vlm_ups_serial) parts.push(`UPS: ${p.vlm_ups_serial}`);
       return {
@@ -165,7 +165,7 @@ function WAPhotoThumbnail({ photo, showVlmInfo, onClick }: WAPhotoThumbnailProps
           <span className="truncate">{photo.sender_name || 'Unknown'}</span>
         </div>
         <div className="text-xs text-muted-foreground dark:text-gray-400 mt-1">
-          {format(new Date(photo.message_timestamp), 'dd MMM HH:mm')}
+          {formatDisplayDateTime(photo.message_timestamp)}
         </div>
 
         {/* VLM Extracted Serials */}

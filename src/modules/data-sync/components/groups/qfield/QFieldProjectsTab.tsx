@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { QFieldProject } from '../../../types';
 import { QFieldProjectModal } from './QFieldProjectModal';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 export function QFieldProjectsTab() {
   const [projects, setProjects] = useState<QFieldProject[]>([]);
@@ -100,16 +101,6 @@ export function QFieldProjectsTab() {
     await fetchProjects();
   };
 
-  const formatDate = (date: string | null) => {
-    if (!date) return 'Never';
-    return new Date(date).toLocaleDateString('en-ZA', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   if (loading) {
     return (
@@ -233,7 +224,7 @@ export function QFieldProjectsTab() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
                       <Clock className="w-3 h-3" />
-                      {formatDate(project.last_synced_at)}
+                      {formatDisplayDateTime(project.last_synced_at) || 'Never'}
                     </div>
                   </td>
 

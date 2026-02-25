@@ -3,7 +3,7 @@
  */
 
 import { Client } from '@/types/client.types';
-import { format } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 interface ClientAddressNotesProps {
   client: Client;
@@ -39,22 +39,16 @@ export function ClientAddressNotes({ client }: ClientAddressNotesProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
           <div>
             <span className="font-medium">Created:</span>{' '}
-            {client.createdAt?.toDate 
-              ? format(client.createdAt.toDate(), 'dd MMM yyyy HH:mm')
-              : 'N/A'}
+            {formatDisplayDateTime(client.createdAt)}
           </div>
           <div>
             <span className="font-medium">Updated:</span>{' '}
-            {client.updatedAt?.toDate 
-              ? format(client.updatedAt.toDate(), 'dd MMM yyyy HH:mm')
-              : 'N/A'}
+            {formatDisplayDateTime(client.updatedAt)}
           </div>
           {client.lastContactDate && (
             <div>
               <span className="font-medium">Last Contact:</span>{' '}
-              {client.lastContactDate.toDate 
-                ? format(client.lastContactDate.toDate(), 'dd MMM yyyy')
-                : 'N/A'}
+              {formatDisplayDateTime(client.lastContactDate)}
             </div>
           )}
         </div>

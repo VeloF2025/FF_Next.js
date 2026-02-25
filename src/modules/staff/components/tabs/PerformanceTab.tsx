@@ -32,6 +32,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { TrendChart, GaugeChart } from '@/modules/activate/components/reporting/shared/TrendChart';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 
 interface StaffPerformanceMetrics {
@@ -524,7 +525,7 @@ export function PerformanceTab({ staffId }: PerformanceTabProps) {
                     </td>
                     <td className="py-3 text-[var(--ff-text-secondary)]">{sub.project}</td>
                     <td className="py-3 text-[var(--ff-text-secondary)]">
-                      {new Date(sub.submittedAt).toLocaleDateString()}
+                      {formatDisplayDate(sub.submittedAt)}
                     </td>
                     <td className="py-3 text-center">
                       <span

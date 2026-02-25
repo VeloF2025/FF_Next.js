@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Users, Clock, Send, CheckCircle, XCircle, Award, MoreVertical } from 'lucide-react';
 import { RFQ, RFQStatus } from '@/types/procurement.types';
-import { format } from 'date-fns';
+import { formatDisplayDate, formatDisplayDateShort } from '@/utils/dateFormat';
 
 interface RFQCardProps {
   rfq: RFQ;
@@ -89,7 +89,7 @@ export function RFQCard({ rfq }: RFQCardProps) {
         )}
         <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
           <Calendar className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
-          <span>Deadline: {rfq.responseDeadline ? format(rfq.responseDeadline, 'MMM dd, yyyy') : 'N/A'}</span>
+          <span>Deadline: {formatDisplayDate(rfq.responseDeadline)}</span>
         </div>
         <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
           <Users className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
@@ -109,7 +109,7 @@ export function RFQCard({ rfq }: RFQCardProps) {
             <p className="text-xs text-[var(--ff-text-secondary)]">{rfq.itemCount} items</p>
             {rfq.responseDeadline && (
               <p className="text-xs text-[var(--ff-text-secondary)]">
-                Response Due: {format(rfq.responseDeadline, 'MMM dd')}
+                Response Due: {formatDisplayDateShort(rfq.responseDeadline)}
               </p>
             )}
           </div>

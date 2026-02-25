@@ -20,8 +20,7 @@ import {
   BadgeCheck,
 } from 'lucide-react';
 import type { StaffMember } from '@/types/staff';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import {
   SA_CONTRACT_CONFIG,
   SA_CONTRACT_TYPE_LABELS,
@@ -69,12 +68,7 @@ export function ComplianceTab({ staff, onUploadDocument }: ComplianceTabProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   const formatDate = (date: unknown): string => {
-    if (!date) return 'N/A';
-    try {
-      return format(safeToDate(date), 'dd MMM yyyy');
-    } catch {
-      return 'Invalid Date';
-    }
+    return formatDisplayDate(date as Parameters<typeof formatDisplayDate>[0], 'N/A');
   };
 
   // Get contract config for dynamic field visibility
@@ -546,7 +540,7 @@ function DocumentStatusRow({
           )}
           {doc.expiryDate && (
             <p className="text-xs text-[var(--ff-text-secondary)]">
-              Expires: {new Date(doc.expiryDate).toLocaleDateString('en-ZA')}
+              Expires: {formatDisplayDate(doc.expiryDate)}
             </p>
           )}
         </div>

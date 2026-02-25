@@ -3,7 +3,8 @@
  * Utility functions for formatting, filtering, and data manipulation
  */
 
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { formatDisplayDateTime, formatDisplayDate } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 import type { QaReviewDrop, DropStatus } from '../types/wa-monitor.types';
 
@@ -17,8 +18,7 @@ export function formatDateTime(date: Date | string | null): string {
   if (!date) return '-';
 
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return format(dateObj, 'MMM d, yyyy h:mm a');
+    return formatDisplayDateTime(date);
   } catch (error) {
     log.error('Error formatting date', { error, date }, 'waMonitorHelpers.formatDateTime');
     return '-';
@@ -49,8 +49,7 @@ export function formatDate(date: Date | string | null): string {
   if (!date) return '-';
 
   try {
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return format(dateObj, 'MMM d, yyyy');
+    return formatDisplayDate(date);
   } catch (error) {
     log.error('Error formatting date', { error, date }, 'waMonitorHelpers.formatDate');
     return '-';

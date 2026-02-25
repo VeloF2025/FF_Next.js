@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Calendar, FileText, Upload, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateISO } from '@/utils/dateFormat';
 import type { DisciplinaryIncident } from '@/types/staff';
 import {
   DISCIPLINARY_TYPE_LABELS,
@@ -36,19 +36,19 @@ export function DisciplinaryIncidentForm({
     resolvedDate: string;
   }>({
     incidentDate: incident?.incidentDate
-      ? format(new Date(incident.incidentDate), 'yyyy-MM-dd')
-      : format(new Date(), 'yyyy-MM-dd'),
+      ? formatDateISO(incident.incidentDate)
+      : formatDateISO(new Date()),
     incidentType: incident?.incidentType || 'verbal_warning',
     description: incident?.description || '',
     outcome: incident?.outcome || '',
     issuedBy: incident?.issuedBy || '',
     followUpDate: incident?.followUpDate
-      ? format(new Date(incident.followUpDate), 'yyyy-MM-dd')
+      ? formatDateISO(incident.followUpDate)
       : '',
     followUpNotes: incident?.followUpNotes || '',
     isResolved: incident?.isResolved || false,
     resolvedDate: incident?.resolvedDate
-      ? format(new Date(incident.resolvedDate), 'yyyy-MM-dd')
+      ? formatDateISO(incident.resolvedDate)
       : '',
   });
   const [attachments, setAttachments] = useState<File[]>([]);

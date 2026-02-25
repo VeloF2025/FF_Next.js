@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import type { ClientPurchaseOrder, GenerateInvoicePreview, UninvoicedDrop } from '@/types/finance';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface InvoiceGenerationModalProps {
   projectId: string;
@@ -216,7 +217,7 @@ export function InvoiceGenerationModal({
                           <td className="px-3 py-2 text-[var(--ff-text-primary)]">{drop.dropNumber}</td>
                           <td className="px-3 py-2 text-[var(--ff-text-secondary)]">{drop.lid || '-'}</td>
                           <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
-                            {new Date(drop.activationDate).toLocaleDateString('en-ZA')}
+                            {formatDisplayDate(drop.activationDate)}
                           </td>
                           <td className="px-3 py-2 text-right text-[var(--ff-text-primary)]">
                             R {drop.pricePerDrop.toLocaleString()}

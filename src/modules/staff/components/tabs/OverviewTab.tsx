@@ -1,8 +1,7 @@
 'use client';
 
 import { Mail, Phone, MapPin, FileText, Upload, Download, Trash2, Camera, User, RefreshCw, CheckCircle, AlertCircle, XCircle, Briefcase, Building2, BadgeCheck, Users, Locate, CalendarDays, CreditCard, Globe } from 'lucide-react';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { StaffMember } from '@/types/staff';
 import { useState, useRef } from 'react';
 import { formatLabel } from '@/lib/utils';
@@ -88,12 +87,7 @@ export function OverviewTab({ staff, onCvUpload, onCvDelete, onProfilePhotoUploa
   };
 
   const formatDate = (date: unknown): string => {
-    if (!date) return 'N/A';
-    try {
-      return format(safeToDate(date), 'dd MMM yyyy');
-    } catch {
-      return 'Invalid Date';
-    }
+    return formatDisplayDate(date as Parameters<typeof formatDisplayDate>[0], 'N/A');
   };
 
   const formatPosition = (position: string): string => formatLabel(position, 'N/A');

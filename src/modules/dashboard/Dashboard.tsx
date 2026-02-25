@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDisplayDateLong } from '@/utils/dateFormat';
 import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp } from 'lucide-react';
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
@@ -41,12 +42,7 @@ export function Dashboard() {
 
   const getFormattedDate = () => {
     if (!mounted) return '';
-    return new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    return formatDisplayDateLong(new Date());
   };
 
   // 🟢 WORKING: Get dashboard cards configuration

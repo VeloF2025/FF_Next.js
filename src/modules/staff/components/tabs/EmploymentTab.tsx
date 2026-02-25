@@ -1,8 +1,7 @@
 'use client';
 
 import { Briefcase, Calendar, Clock, Award, Users } from 'lucide-react';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { StaffMember } from '@/types/staff';
 import { SA_CONTRACT_TYPE_LABELS } from '@/types/staff/compliance.types';
 import { formatLabel } from '@/lib/utils';
@@ -13,12 +12,7 @@ interface EmploymentTabProps {
 
 export function EmploymentTab({ staff }: EmploymentTabProps) {
   const formatDate = (date: unknown): string => {
-    if (!date) return 'N/A';
-    try {
-      return format(safeToDate(date), 'dd MMM yyyy');
-    } catch {
-      return 'Invalid Date';
-    }
+    return formatDisplayDate(date as Parameters<typeof formatDisplayDate>[0], 'N/A');
   };
 
   const formatCurrency = (amount?: number): string => {

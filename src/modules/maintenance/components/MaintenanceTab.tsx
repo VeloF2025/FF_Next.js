@@ -16,7 +16,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import {
   MessageSquare,
   Image as ImageIcon,
@@ -302,15 +302,15 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
           <div className="mt-3 flex items-center gap-6 text-xs text-muted-foreground dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-3">
             <span>
               First reported:{' '}
-              {format(new Date(data.flag.first_reported_at), 'dd MMM yyyy HH:mm')}
+              {formatDisplayDateTime(data.flag.first_reported_at)}
             </span>
             <span>
               Last activity:{' '}
-              {format(new Date(data.flag.last_activity_at), 'dd MMM yyyy HH:mm')}
+              {formatDisplayDateTime(data.flag.last_activity_at)}
             </span>
             {data.flag.resolved_at && (
               <span className="text-green-600 dark:text-green-400">
-                Resolved: {format(new Date(data.flag.resolved_at), 'dd MMM yyyy HH:mm')}
+                Resolved: {formatDisplayDateTime(data.flag.resolved_at)}
               </span>
             )}
           </div>
@@ -338,7 +338,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                       {message.sender_name || 'Unknown'}
                     </span>
                     <span className="text-xs text-muted-foreground dark:text-gray-400">
-                      {format(new Date(message.message_timestamp), 'dd MMM yyyy HH:mm')}
+                      {formatDisplayDateTime(message.message_timestamp)}
                     </span>
                   </div>
                   {message.message_text && (
@@ -404,7 +404,7 @@ export function MaintenanceTab({ dropNumber, onCreateTicket }: MaintenanceTabPro
                     {photo.original_filename || `Photo ${photo.photo_index}`}
                   </div>
                   <div className="text-muted-foreground">
-                    {format(new Date(photo.created_at), 'dd MMM HH:mm')}
+                    {formatDisplayDateTime(photo.created_at)}
                   </div>
                 </div>
               </div>

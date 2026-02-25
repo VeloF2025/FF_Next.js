@@ -5,6 +5,7 @@
 
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
+import { formatDisplayMonthYear } from '@/utils/dateFormat';
 
 /**
  * Team performance analytics service
@@ -240,10 +241,7 @@ export class TeamAnalyticsService {
         .sort(([a], [b]) => a.localeCompare(b))
         .slice(-months)
         .map(([month, records]) => ({
-          month: new Date(month + '-01').toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short' 
-          }),
+          month: formatDisplayMonthYear(month + '-01'),
           averageProductivity: Math.round(
             (records.reduce((sum, r) => sum + parseFloat(r.productivityScore), 0) / records.length) * 10
           ) / 10,

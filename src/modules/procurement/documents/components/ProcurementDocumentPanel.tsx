@@ -16,6 +16,7 @@ import {
   type ProcurementDocumentType,
   type ProcurementEntityType,
 } from '@/types/procurement/document.types';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface DocumentTypeOption {
   value: ProcurementDocumentType;
@@ -47,13 +48,6 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 export function ProcurementDocumentPanel({
   entityType,
@@ -243,7 +237,7 @@ export function ProcurementDocumentPanel({
                       {typeLabel}
                     </span>
                     {doc.fileSize && <span>{formatFileSize(doc.fileSize)}</span>}
-                    <span>{formatDate(doc.uploadedAt)}</span>
+                    <span>{formatDisplayDate(doc.uploadedAt)}</span>
                     {doc.uploadedByName && <span>by {doc.uploadedByName}</span>}
                   </div>
                   {doc.notes && (

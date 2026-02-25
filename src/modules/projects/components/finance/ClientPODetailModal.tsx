@@ -9,6 +9,7 @@ import type { ClientPurchaseOrder, ClientPOProgress, SpareSummary, SpareUsageLog
 import type { ProjectDocument, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
 import { DOCUMENT_TYPE_LABELS } from '@/modules/projects/types/po-extraction.types';
 import { log } from '@/lib/logger';
+import { formatDisplayDate, formatDisplayDateShort } from '@/utils/dateFormat';
 
 interface ClientPODetailModalProps {
   projectId: string;
@@ -120,14 +121,7 @@ export function ClientPODetailModal({ projectId, clientPO, onClose, onUpdated }:
     e.target.value = '';
   }, [handleDocumentUpload]);
 
-  const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | undefined) => formatDisplayDate(dateStr, '-');
 
   const formatFileSize = (bytes: number | undefined) => {
     if (!bytes) return '';
@@ -319,7 +313,7 @@ export function ClientPODetailModal({ projectId, clientPO, onClose, onUpdated }:
                             {entry.reason.replace(/_/g, ' ')}
                           </span>
                           <span className="text-[var(--ff-text-secondary)]">
-                            {new Date(entry.recordedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
+                            {formatDisplayDateShort(entry.recordedAt)}
                           </span>
                         </div>
                       </div>

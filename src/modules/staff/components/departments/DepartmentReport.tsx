@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { Card, CardContent } from '@/shared/components/ui/Card';
 import {
   Users,
@@ -218,7 +219,7 @@ export function DepartmentReport({ report, isLoading }: DepartmentReportProps) {
                     </p>
                     <p className="text-xs text-[var(--ff-text-tertiary)]">
                       {activity.details} •{' '}
-                      {new Date(activity.date).toLocaleDateString()}
+                      {formatDisplayDate(activity.date)}
                     </p>
                   </div>
                 </div>

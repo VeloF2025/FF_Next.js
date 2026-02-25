@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import type { ReportPeriod, ReportData, DisplacedReport, OltRecord } from '../../../types';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface OltReportingTabProps {
   setError: (e: string | null) => void;
@@ -223,7 +224,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
                           </td>
                           <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs truncate">{record.import_filename || '-'}</td>
                           <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">
-                            {record.created_at ? new Date(record.created_at).toLocaleDateString() : '-'}
+                            {record.created_at ? formatDisplayDate(record.created_at) : '-'}
                           </td>
                         </tr>
                       ))}
@@ -333,7 +334,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
                             </td>
                             <td className="py-2 px-3 font-mono text-green-400 text-xs truncate">{rec.new_value}</td>
                             <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs">
-                              {rec.created_at ? new Date(rec.created_at).toLocaleDateString() : '-'}
+                              {rec.created_at ? formatDisplayDate(rec.created_at) : '-'}
                             </td>
                           </tr>
                         );

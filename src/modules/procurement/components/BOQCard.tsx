@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Calendar, DollarSign, FileText, MoreVertical, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { BOQ, BOQStatus } from '@/types/procurement.types';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface BOQCardProps {
   boq: BOQ;
@@ -76,7 +76,7 @@ export function BOQCard({ boq }: BOQCardProps) {
         </div>
         <div className="flex items-center text-sm text-[var(--ff-text-secondary)]">
           <Calendar className="h-4 w-4 mr-2 text-[var(--ff-text-tertiary)]" />
-          <span>Created {format(boq.createdAt, 'MMM dd, yyyy')}</span>
+          <span>Created {formatDisplayDate(boq.createdAt)}</span>
         </div>
       </div>
 
@@ -100,7 +100,7 @@ export function BOQCard({ boq }: BOQCardProps) {
         <div className="mt-3 pt-3 border-t border-[var(--ff-border-light)]">
           <p className="text-xs text-[var(--ff-text-secondary)]">
             Approved by {boq.approvedBy} on{' '}
-            {boq.approvedAt && format(boq.approvedAt, 'MMM dd, yyyy')}
+            {boq.approvedAt && formatDisplayDate(boq.approvedAt)}
           </p>
         </div>
       )}

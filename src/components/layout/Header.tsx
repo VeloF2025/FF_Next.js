@@ -8,6 +8,7 @@ import { NotificationsDropdown } from './header/NotificationsDropdown';
 import { UserMenuDropdown } from './header/UserMenuDropdown';
 import { useAuth } from '@/contexts/AuthContext';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import {
   useUnreadCount,
   useNotificationList,
@@ -28,7 +29,7 @@ function formatRelativeTime(isoDate: string): string {
   if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? 's' : ''} ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
-  return new Date(isoDate).toLocaleDateString();
+  return formatDisplayDate(isoDate);
 }
 
 export function Header({

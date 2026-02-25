@@ -1,5 +1,5 @@
-import { format, parseISO, isValid } from 'date-fns'
 import { clsx, type ClassValue } from 'clsx'
+import { formatDisplayDate } from '@/utils/dateFormat'
 
 /**
  * Combines class names using clsx
@@ -10,20 +10,10 @@ export function cn(...inputs: ClassValue[]): string {
 
 /**
  * Format date string to readable format
+ * @deprecated Use formatDisplayDate() from @/utils/dateFormat
  */
-export function formatDate(
-  dateString: string,
-  formatString: string = 'MMM dd, yyyy'
-): string {
-  try {
-    const date = parseISO(dateString)
-    if (!isValid(date)) {
-      return 'Invalid date'
-    }
-    return format(date, formatString)
-  } catch {
-    return 'Invalid date'
-  }
+export function formatDate(dateString: string): string {
+  return formatDisplayDate(dateString, 'Invalid date');
 }
 
 /**

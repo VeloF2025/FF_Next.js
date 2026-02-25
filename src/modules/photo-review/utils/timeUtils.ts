@@ -1,3 +1,5 @@
+import { formatDisplayDate, formatDisplayDateShort } from '@/utils/dateFormat';
+
 /**
  * Format a date to a relative time string (e.g., "2 hours ago", "Yesterday")
  */
@@ -19,11 +21,10 @@ export function formatRelativeTime(date: string | Date | undefined): string {
     if (diffDay < 7) return `${diffDay}d ago`;
 
     // Format as date for older items
-    return then.toLocaleDateString('en-ZA', {
-        month: 'short',
-        day: 'numeric',
-        year: then.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-    });
+    if (then.getFullYear() !== now.getFullYear()) {
+        return formatDisplayDate(then);
+    }
+    return formatDisplayDateShort(then);
 }
 
 /**

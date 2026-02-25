@@ -3,6 +3,8 @@
  * Common formatting and utility functions for project details
  */
 
+import { formatDisplayDate } from '@/utils/dateFormat';
+
 /**
  * Format currency value to South African Rand
  */
@@ -17,13 +19,7 @@ export const formatCurrency = (amount: number): string => {
  * Format date from timestamp to localized string
  */
 export const formatDate = (timestamp: any): string => {
-  if (!timestamp) return 'N/A';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString('en-ZA', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
-  });
+  return formatDisplayDate(timestamp);
 };
 
 /**

@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { AlertTriangle, XCircle, Info, Check, CheckCheck } from 'lucide-react';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import type { BudgetAlert, AlertSeverity, AlertStatus } from '@/types/budget';
 
 interface BudgetAlertsPanelProps {
@@ -68,12 +69,7 @@ const getStatusBadge = (status: AlertStatus) => {
 };
 
 const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDisplayDateTime(dateString);
 };
 
 export function BudgetAlertsPanel({

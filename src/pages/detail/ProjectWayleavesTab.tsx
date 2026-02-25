@@ -27,6 +27,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { PipelineProjectApprovalWithType } from '@/modules/pipeline/types';
 import { LinkPipelineModal } from './LinkPipelineModal';
 
@@ -123,12 +124,7 @@ const pipelineStatusColors: Record<string, string> = {
 };
 
 function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatDisplayDate(dateStr, '—');
 }
 
 function getDaysUntilExpiry(expiryDate: string | null): number | null {

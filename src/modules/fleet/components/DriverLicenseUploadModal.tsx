@@ -12,6 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Upload, Loader2, Search, User, FileText, AlertCircle } from 'lucide-react';
 import { DocumentUploadWizard } from '@/components/shared/DocumentUploadWizard';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface AvailableDriver {
   id: string;
@@ -201,7 +202,7 @@ export function DriverLicenseUploadModal({
                           )}
                           {staff.licenseExpiry && (
                             <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                              Expires: {new Date(staff.licenseExpiry).toLocaleDateString()}
+                              Expires: {formatDisplayDate(staff.licenseExpiry)}
                             </p>
                           )}
                         </div>

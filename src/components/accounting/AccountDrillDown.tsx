@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
@@ -14,9 +15,7 @@ const fmtDate = (d: string) => {
   if (!d) return '—';
   // Handle YYYY-MM-DD strings by appending T00:00:00 to avoid timezone-shift issues
   const iso = d.length === 10 ? `${d}T00:00:00` : d;
-  const dt = new Date(iso);
-  if (isNaN(dt.getTime())) return d;
-  return dt.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDisplayDate(iso, d);
 };
 
 interface Transaction {

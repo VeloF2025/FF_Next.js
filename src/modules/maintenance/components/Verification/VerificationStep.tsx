@@ -18,6 +18,7 @@
 import React, { useCallback } from 'react';
 import { Check, Camera, Clock, User } from 'lucide-react';
 import { PhotoUpload } from './PhotoUpload';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { cn } from '@/lib/utils';
 import type { VerificationStep as VerificationStepType, VerificationStepNumber } from '../../types/verification';
 import { VERIFICATION_STEP_TEMPLATES, getStepCategoryColor } from '../../constants/verificationSteps';
@@ -189,13 +190,7 @@ export function VerificationStep({
               <div className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 <span>
-                  {new Date(step.completed_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatDisplayDateTime(step.completed_at)}
                 </span>
               </div>
               {step.completed_by && (

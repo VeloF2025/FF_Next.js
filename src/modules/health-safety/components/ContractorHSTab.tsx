@@ -23,6 +23,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { DOCUMENT_TYPES, REQUIRED_DOCUMENTS } from '../types/compliance.types';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ContractorHSTabProps {
   contractorId: string | number;
@@ -500,7 +501,7 @@ function DocumentsSection({
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {doc?.document?.expiry_date
-                      ? `Expires: ${new Date(doc.document.expiry_date).toLocaleDateString()}`
+                      ? `Expires: ${formatDisplayDate(doc.document.expiry_date)}`
                       : 'No expiry'}
                   </p>
                 </div>
@@ -597,7 +598,7 @@ function IncidentsSection({
                 <div>
                   <p className="font-medium text-foreground">{incident.title}</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(incident.incident_date).toLocaleDateString()} •{' '}
+                    {formatDisplayDate(incident.incident_date)} •{' '}
                     {incident.incident_type?.replace(/_/g, ' ')}
                   </p>
                 </div>

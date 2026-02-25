@@ -22,6 +22,7 @@ import {
   Building,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { getRAGStatus, AUDIT_STATUS_CONFIG } from '../types/audit.types';
 import type { HSProjectConfig, HSProjectAudit } from '../types/audit.types';
 import { ContractorHSGrid } from './ContractorHSGrid';
@@ -348,7 +349,7 @@ function DueDateCard({
       {dueDate ? (
         <>
           <p className={`text-lg font-semibold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-foreground'}`}>
-            {dueDate.toLocaleDateString()}
+            {formatDisplayDate(dueDate)}
           </p>
           {frequency && (
             <p className="text-xs text-muted-foreground capitalize">{frequency}</p>
@@ -383,7 +384,7 @@ function AuditRow({ audit }: { audit: HSProjectAudit }) {
             {audit.audit_type.charAt(0).toUpperCase() + audit.audit_type.slice(1)} Audit
           </p>
           <p className="text-sm text-muted-foreground">
-            {new Date(audit.audit_date).toLocaleDateString()}
+            {formatDisplayDate(audit.audit_date)}
             {audit.auditor_name && ` • ${audit.auditor_name}`}
           </p>
         </div>

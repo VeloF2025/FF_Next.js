@@ -10,6 +10,7 @@ import type {
   DocumentDisplayStatus,
 } from '../types/documentReport.types';
 import { getExpiryWarningDays } from '../types/documentCategories';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 /**
  * Calculate days until expiry from an expiry date
@@ -156,12 +157,7 @@ export function formatExpiryDate(
 ): string {
   if (!expiryDate) return 'N/A';
 
-  const date = new Date(expiryDate);
-  const formatted = date.toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  const formatted = formatDisplayDate(expiryDate);
 
   if (daysUntilExpiry !== null) {
     if (daysUntilExpiry < 0) {

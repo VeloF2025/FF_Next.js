@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Car, Plus, AlertTriangle, Calendar, Fuel, Gauge, FileWarning, Edit, Trash2, CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Pencil, X, Save, Truck } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { VehicleAssignment } from '@/types/staff';
 import { checkVehicleNeedsAttention, formatVehicleDisplayName } from '@/types/staff/vehicle.types';
 import { log } from '@/lib/logger';
@@ -256,7 +256,7 @@ export function VehiclesTab({
                   <p className={`text-sm font-medium ${
                     licenseDetails.isExpired ? 'text-red-400' : 'text-[var(--ff-text-primary)]'
                   }`}>
-                    {format(new Date(licenseDetails.expiryDate), 'dd MMM yyyy')}
+                    {formatDisplayDate(licenseDetails.expiryDate)}
                   </p>
                 </div>
               )}
@@ -265,7 +265,7 @@ export function VehiclesTab({
                 <div>
                   <p className="text-xs text-[var(--ff-text-secondary)] mb-1">Issued Date</p>
                   <p className="text-sm font-medium text-[var(--ff-text-primary)]">
-                    {format(new Date(licenseDetails.issuedDate), 'dd MMM yyyy')}
+                    {formatDisplayDate(licenseDetails.issuedDate)}
                   </p>
                 </div>
               )}
@@ -368,8 +368,8 @@ export function VehiclesTab({
                         {formatVehicleDisplayName(vehicle)}
                       </p>
                       <p className="text-sm text-[var(--ff-text-secondary)]">
-                        {format(new Date(vehicle.assignmentStart), 'dd MMM yyyy')}
-                        {vehicle.assignmentEnd && ` - ${format(new Date(vehicle.assignmentEnd), 'dd MMM yyyy')}`}
+                        {formatDisplayDate(vehicle.assignmentStart)}
+                        {vehicle.assignmentEnd && ` - ${formatDisplayDate(vehicle.assignmentEnd)}`}
                       </p>
                     </div>
                   </div>
@@ -508,7 +508,7 @@ function VehicleCard({ vehicle, attention, onEdit, onRemove }: VehicleCardProps)
               {formatVehicleDisplayName(vehicle)}
             </p>
             <p className="text-sm text-[var(--ff-text-secondary)]">
-              Assigned {format(new Date(vehicle.assignmentStart), 'dd MMM yyyy')}
+              Assigned {formatDisplayDate(vehicle.assignmentStart)}
             </p>
           </div>
         </div>
@@ -560,7 +560,7 @@ function VehicleCard({ vehicle, attention, onEdit, onRemove }: VehicleCardProps)
                 ? 'text-red-400'
                 : 'text-[var(--ff-text-primary)]'
             }`}>
-              {format(new Date(vehicle.licenseDiscExpiry), 'dd MMM yyyy')}
+              {formatDisplayDate(vehicle.licenseDiscExpiry)}
             </p>
           </div>
         )}
@@ -576,7 +576,7 @@ function VehicleCard({ vehicle, attention, onEdit, onRemove }: VehicleCardProps)
                 ? 'text-red-400'
                 : 'text-[var(--ff-text-primary)]'
             }`}>
-              {format(new Date(vehicle.serviceDueDate), 'dd MMM yyyy')}
+              {formatDisplayDate(vehicle.serviceDueDate)}
             </p>
           </div>
         )}

@@ -1,9 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Mail, Phone, Calendar, Briefcase, Award } from 'lucide-react';
 import { useStaffMember, useDeleteStaff } from '@/hooks/useStaff';
-import { format } from 'date-fns';
-import { safeToDate } from '@/utils/dateHelpers';
-import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { notificationService } from '@/services/core/NotificationService';
 import { formatLabel } from '@/lib/utils';
 
@@ -184,19 +182,7 @@ export function StaffDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">Start Date</p>
                   <p className="font-medium">
-                    {(() => {
-                      const startDate = staff.startDate;
-                      if (startDate) {
-                        try {
-                          const date = safeToDate(startDate);
-                          return format(date, 'dd MMM yyyy');
-                        } catch (error) {
-                          log.warn('Error formatting start date:', { data: error }, 'StaffDetail');
-                          return 'Invalid Date';
-                        }
-                      }
-                      return 'N/A';
-                    })()}
+                    {formatDisplayDate(staff.startDate, 'N/A')}
                   </p>
                 </div>
               </div>
@@ -207,19 +193,7 @@ export function StaffDetail() {
                   <div>
                     <p className="text-sm text-muted-foreground">End Date</p>
                     <p className="font-medium">
-                      {(() => {
-                        const endDate = staff.endDate;
-                        if (endDate) {
-                          try {
-                            const date = safeToDate(endDate);
-                            return format(date, 'dd MMM yyyy');
-                          } catch (error) {
-                            log.warn('Error formatting end date:', { data: error }, 'StaffDetail');
-                            return 'Invalid Date';
-                          }
-                        }
-                        return 'N/A';
-                      })()}
+                      {formatDisplayDate(staff.endDate, 'N/A')}
                     </p>
                   </div>
                 </div>

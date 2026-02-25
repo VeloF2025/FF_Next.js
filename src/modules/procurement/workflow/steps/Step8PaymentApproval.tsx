@@ -17,6 +17,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { WorkflowState } from '../useWorkflowState';
 
 // 🟢 WORKING: full type coverage
@@ -319,7 +320,7 @@ const TaskCard: React.FC<{ task: ApprovalTask }> = ({ task }) => (
     {task.levelName && <InfoRow label="Level" value={task.levelName} />}
     {task.documentNumber && <InfoRow label="Invoice Ref" value={task.documentNumber} />}
     {task.documentAmount !== undefined && <InfoRow label="Amount" value={formatCurrency(task.documentAmount)} />}
-    {task.dueDate && <InfoRow label="Due" value={new Date(task.dueDate).toLocaleDateString('en-ZA')} />}
+    {task.dueDate && <InfoRow label="Due" value={formatDisplayDate(task.dueDate)} />}
     {task.isOverdue && (
       <div style={{ gridColumn: '1/-1', display: 'flex', alignItems: 'center', gap: 6 }}>
         <AlertCircle style={{ width: 14, height: 14, color: '#dc2626' }} />

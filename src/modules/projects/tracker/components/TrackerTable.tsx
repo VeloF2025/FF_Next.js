@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin, Home, Cable, Camera, CheckCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 import { TrackerItem } from '../types/tracker.types';
 
 interface TrackerTableProps {
@@ -114,7 +114,7 @@ export function TrackerTable({ data, isLoading, expandedRows, toggleRowExpansion
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">
-                      {item.lastUpdated ? format(item.lastUpdated, 'MMM dd, HH:mm') : 'N/A'}
+                      {item.lastUpdated ? formatDisplayDateTime(item.lastUpdated) : 'N/A'}
                     </td>
                     <td className="px-4 py-3">
                       <button

@@ -4,6 +4,7 @@
  */
 
 import { CheckCircle, Database, Clock, Hash, Activity } from 'lucide-react';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 interface SOWDataStatusProps {
   sowData: {
@@ -35,13 +36,7 @@ export function SOWDataStatus({
 
   // Format last imported date
   const lastImported = summary?.lastImported
-    ? new Date(summary.lastImported).toLocaleDateString('en-ZA', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+    ? formatDisplayDateTime(summary.lastImported)
     : 'Not yet imported';
 
   return (

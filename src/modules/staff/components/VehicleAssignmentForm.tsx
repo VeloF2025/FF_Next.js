@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Calendar, Car, Fuel, AlertTriangle, Search, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateISO } from '@/utils/dateFormat';
 import type { VehicleAssignment, VehicleAssignmentCreate } from '@/types/staff';
 import { COMMON_VEHICLE_MAKES } from '@/types/staff/vehicle.types';
 import Link from 'next/link';
@@ -53,20 +53,20 @@ export function VehicleAssignmentForm({
     vehicleColor: vehicle?.vehicleColor || '',
     vehicleVin: vehicle?.vehicleVin || '',
     assignmentStart: vehicle?.assignmentStart
-      ? format(new Date(vehicle.assignmentStart), 'yyyy-MM-dd')
-      : format(new Date(), 'yyyy-MM-dd'),
+      ? formatDateISO(vehicle.assignmentStart)
+      : formatDateISO(new Date()),
     assignmentEnd: vehicle?.assignmentEnd
-      ? format(new Date(vehicle.assignmentEnd), 'yyyy-MM-dd')
+      ? formatDateISO(vehicle.assignmentEnd)
       : '',
     fuelCardNumber: vehicle?.fuelCardNumber || '',
     fuelCardLimit: vehicle?.fuelCardLimit?.toString() || '',
     odometerStart: vehicle?.odometerStart?.toString() || '',
     odometerCurrent: vehicle?.odometerCurrent?.toString() || '',
     licenseDiscExpiry: vehicle?.licenseDiscExpiry
-      ? format(new Date(vehicle.licenseDiscExpiry), 'yyyy-MM-dd')
+      ? formatDateISO(vehicle.licenseDiscExpiry)
       : '',
     serviceDueDate: vehicle?.serviceDueDate
-      ? format(new Date(vehicle.serviceDueDate), 'yyyy-MM-dd')
+      ? formatDateISO(vehicle.serviceDueDate)
       : '',
     serviceDueKm: vehicle?.serviceDueKm?.toString() || '',
     insurancePolicyNumber: vehicle?.insurancePolicyNumber || '',

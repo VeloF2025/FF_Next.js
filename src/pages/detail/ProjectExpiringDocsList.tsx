@@ -6,6 +6,7 @@
 import { useState, forwardRef } from 'react';
 import { AlertTriangle, Clock, ExternalLink, FileText, ChevronRight, ChevronUp, Loader2 } from 'lucide-react';
 import { useProjectExpiringDocs, ExpiringDocument, ExpiryUrgency } from '@/hooks/useProjectOverview';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ProjectExpiringDocsListProps {
   projectId: string;
@@ -195,7 +196,7 @@ export const ProjectExpiringDocsList = forwardRef<HTMLDivElement, ProjectExpirin
                       : `Expires in ${doc.days_until_expiry} days`
                     }
                     {' · '}
-                    {new Date(doc.expiry_date).toLocaleDateString()}
+                    {formatDisplayDate(doc.expiry_date)}
                   </p>
                 </div>
 

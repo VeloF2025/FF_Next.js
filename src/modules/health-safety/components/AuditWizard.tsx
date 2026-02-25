@@ -22,6 +22,7 @@ import {
   Info,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { ResponseValue, RAGStatus } from '../types/audit.types';
 import { CHECKLIST_CATEGORIES } from '../types/checklist.types';
 
@@ -202,7 +203,7 @@ export function AuditWizard({ auditId, onComplete, onCancel }: AuditWizardProps)
               {audit?.audit_type?.charAt(0).toUpperCase() + audit?.audit_type?.slice(1)} Audit
             </h2>
             <p className="text-sm text-muted-foreground">
-              {audit?.project_name} • {new Date(audit?.audit_date).toLocaleDateString()}
+              {audit?.project_name} • {formatDisplayDate(audit?.audit_date)}
             </p>
           </div>
 

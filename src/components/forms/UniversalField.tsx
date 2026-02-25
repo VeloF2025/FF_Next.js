@@ -1,5 +1,6 @@
 import React from 'react';
 import { UseFormRegister, FieldErrors, FieldError } from 'react-hook-form';
+import { formatDisplayDateLong } from '@/utils/dateFormat';
 import { AlertCircle } from 'lucide-react';
 
 // Re-export FieldIcons from separate file for backward compatibility
@@ -167,11 +168,7 @@ function formatDisplayValue(
       }).format(typeof value === 'number' ? value : parseFloat(String(value)) || 0);
     
     case 'date':
-      return new Date(String(value)).toLocaleDateString('en-ZA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+      return formatDisplayDateLong(String(value));
     
     case 'select': {
       const option = options?.find(opt => opt.value === value);

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { LabelScanner, type VerificationResult } from './LabelScanner';
 import { log } from '@/lib/logger';
+import { formatDisplayDateTime } from '@/utils/dateFormat';
 
 // ============================================================================
 // TYPES
@@ -128,17 +129,6 @@ export function AssetVerificationPanel({
     [assetId, onVerificationComplete]
   );
 
-  // Format date
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   // Compact mode - just badge and button
   if (compact) {
@@ -204,7 +194,7 @@ export function AssetVerificationPanel({
         <div className="space-y-1 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>Verified: {formatDate(verifiedAt)}</span>
+            <span>Verified: {formatDisplayDateTime(verifiedAt)}</span>
           </div>
           {verifiedBy && (
             <div className="text-muted-foreground dark:text-gray-400 ml-6">

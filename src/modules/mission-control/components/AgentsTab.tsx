@@ -1,6 +1,7 @@
 import React from 'react';
 import { Wifi, WifiOff, Clock, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { MCAgent } from '../types';
 
 const AGENT_CONFIG: Record<string, { icon: string; color: string }> = {
@@ -22,7 +23,7 @@ function formatTime(dateStr: string | null): string {
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
-  return d.toLocaleDateString();
+  return formatDisplayDate(d);
 }
 
 interface AgentsTabProps {

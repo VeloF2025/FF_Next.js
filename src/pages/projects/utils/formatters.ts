@@ -3,6 +3,8 @@
  * Utility functions for formatting project data
  */
 
+import { formatDisplayDate } from '@/utils/dateFormat';
+
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
@@ -11,13 +13,7 @@ export const formatCurrency = (amount: number): string => {
 };
 
 export const formatDate = (timestamp: any): string => {
-  if (!timestamp) return 'N/A';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString('en-ZA', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
-  });
+  return formatDisplayDate(timestamp);
 };
 
 export const formatProjectStatus = (status: string): string => {

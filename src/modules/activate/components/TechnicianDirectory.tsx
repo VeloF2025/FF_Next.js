@@ -34,6 +34,7 @@ import {
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { Badge } from '@/shared/components/ui/Badge';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type {
   TechnicianSummary,
   ActivatorSummary,
@@ -798,7 +799,7 @@ function DiscoverSection({ discovered, isLoading, onRefresh, onImport }: Discove
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">
-                  {tech.lastSeen ? new Date(tech.lastSeen).toLocaleDateString() : '-'}
+                  {tech.lastSeen ? formatDisplayDate(tech.lastSeen) : '-'}
                 </td>
               </tr>
             ))}

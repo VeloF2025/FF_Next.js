@@ -21,6 +21,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 
 interface BirthdayAlert {
@@ -109,8 +110,7 @@ export function StaffAlertsPanel({ className = '', defaultExpanded = true }: Sta
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    return formatDisplayDateShort(dateStr);
   };
 
   const getDaysText = (days: number) => {

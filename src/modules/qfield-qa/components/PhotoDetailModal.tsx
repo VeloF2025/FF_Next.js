@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 import { qfieldQaApiService } from '../services/qfieldQaApiService';
 import type { PhotoValidation, WorkflowStatus } from '../types';
-import { format } from 'date-fns';
+import { formatDisplayDate, formatDisplayDateTime } from '@/utils/dateFormat';
 
 interface PhotoDetailModalProps {
   photo: PhotoValidation;
@@ -361,7 +361,7 @@ export function PhotoDetailModal({
                         {photo.due_date && (
                           <InfoRow
                             label="Due Date"
-                            value={format(new Date(photo.due_date), 'dd MMM yyyy')}
+                            value={formatDisplayDate(photo.due_date)}
                             icon={<Calendar className="w-4 h-4 text-gray-400" />}
                           />
                         )}
@@ -377,7 +377,7 @@ export function PhotoDetailModal({
                         {photo.manual_reviewed_at && (
                           <InfoRow
                             label="Reviewed At"
-                            value={format(new Date(photo.manual_reviewed_at), 'dd MMM yyyy HH:mm')}
+                            value={formatDisplayDateTime(photo.manual_reviewed_at)}
                             icon={<Clock className="w-4 h-4 text-gray-400" />}
                           />
                         )}

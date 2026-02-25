@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import toast from 'react-hot-toast';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 import type {
   PrereqsResponse,
   PrereqPhaseGroup,
@@ -180,10 +181,7 @@ function PrereqItemRow({
         {/* ── Completed date ── */}
         {item.completed_at && (
           <span className="text-xs text-[var(--ff-text-secondary)]">
-            {new Date(item.completed_at).toLocaleDateString('en-ZA', {
-              day: 'numeric',
-              month: 'short',
-            })}
+            {formatDisplayDateShort(item.completed_at)}
           </span>
         )}
 

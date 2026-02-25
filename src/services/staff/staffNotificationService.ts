@@ -4,6 +4,7 @@
  */
 
 import { neon } from '@neondatabase/serverless';
+import { formatDisplayDateShort, formatDisplayDate } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -89,10 +90,7 @@ export class StaffNotificationService {
 
       // Format birthday list for email
       const birthdayList = birthdays.map((b) => {
-        const dateStr = new Date(b.dateOfBirth).toLocaleDateString('en-ZA', {
-          day: 'numeric',
-          month: 'long',
-        });
+        const dateStr = formatDisplayDateShort(b.dateOfBirth);
         const daysText = b.daysUntil === 0 ? '🎂 TODAY!' :
                         b.daysUntil === 1 ? 'Tomorrow' :
                         `In ${b.daysUntil} days`;
@@ -180,7 +178,7 @@ This is an automated reminder from FibreFlow HR.
 
       const formatDoc = (d: ExpiryAlert) => {
         const icon = d.severity === 'critical' ? '🔴' : d.severity === 'warning' ? '🟡' : '🟢';
-        const dateStr = new Date(d.expiryDate).toLocaleDateString('en-ZA');
+        const dateStr = formatDisplayDate(d.expiryDate);
         const daysText = d.daysUntil < 0 ? `EXPIRED ${Math.abs(d.daysUntil)} days ago` :
                         d.daysUntil === 0 ? 'EXPIRES TODAY' :
                         `${d.daysUntil} days`;

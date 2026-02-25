@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 // Types
 interface StockItemDisplay {
@@ -285,19 +286,8 @@ export default function StockManagement({ projectId, projectName }: StockManagem
     );
   };
 
-  // Format date helper
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'N/A';
-    try {
-      return new Date(dateStr).toLocaleDateString('en-ZA', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      });
-    } catch {
-      return dateStr;
-    }
-  };
+  // Format date helper — delegates to centralized utility
+  const formatDate = (dateStr: string) => formatDisplayDate(dateStr);
 
   return (
     <div className="p-6 space-y-6">

@@ -28,6 +28,7 @@ import {
   EyeOff,
   Eye,
 } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type {
   MaturityTrackingResponse,
   ProjectMaturityNode,
@@ -717,7 +718,7 @@ function ProjectionBadge({ projection }: { projection: ProjectionData }) {
     <div className="text-xs" title={`Confidence: ${projection.confidence}`}>
       <div className={`font-medium ${confidenceColor[projection.confidence]}`}>
         <Calendar className="w-3 h-3 inline mr-1" />
-        {formatDate(projection.projected_completion_date)}
+        {formatDisplayDate(projection.projected_completion_date)}
       </div>
       <div className="text-[var(--ff-text-secondary)]">
         {projection.days_to_completion} days
@@ -761,10 +762,5 @@ function ProgressText({ percent }: { percent: number }) {
   return <span className={`font-medium ${color}`}>{percent.toFixed(1)}%</span>;
 }
 
-// Format date helper
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 export default MaturityTrackingReport;

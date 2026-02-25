@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface Incident {
   id: string;
@@ -100,15 +101,6 @@ function getStatusConfig(status: string) {
     default:
       return { bg: 'bg-secondary', text: 'text-muted-foreground', label: status };
   }
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 export function ProjectIncidentsSection({ projectId, compact = false }: ProjectIncidentsSectionProps) {
@@ -294,7 +286,7 @@ export function ProjectIncidentsSection({ projectId, compact = false }: ProjectI
                   <div className="col-span-2">
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      <span>{formatDate(incident.incident_date || incident.created_at)}</span>
+                      <span>{formatDisplayDate(incident.incident_date || incident.created_at)}</span>
                     </div>
                   </div>
 

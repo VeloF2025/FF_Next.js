@@ -17,6 +17,7 @@ import {
   Download,
 } from 'lucide-react';
 import { useProjectFinancials } from '../hooks/useProjectFinancials';
+import { formatDisplayMonthYear } from '@/utils/dateFormat';
 
 function formatCurrency(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA', {
@@ -32,8 +33,7 @@ function formatCompact(amount: number): string {
 }
 
 function formatMonth(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short' });
+  return formatDisplayMonthYear(iso);
 }
 
 interface Props {

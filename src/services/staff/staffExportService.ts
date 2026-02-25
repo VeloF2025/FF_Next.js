@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { StaffMember } from '@/types/staff.types';
 import { staffNeonService } from './staffNeonService';
-import { safeToDate } from '@/utils/dateHelpers';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { StaffAccessResult } from '@/types/staff/access.types';
 
 /**
@@ -36,7 +36,7 @@ export const staffExportService = {
         'City': s.city,
         'Province': s.province,
         'Postal Code': s.postalCode,
-        'Start Date': s.startDate ? safeToDate(s.startDate).toLocaleDateString('en-GB') : '',
+        'Start Date': s.startDate ? formatDisplayDate(s.startDate, '') : '',
         'Contract Type': s.contractType,
         'Working Hours': s.workingHours,
         'Available Weekends': s.availableWeekends ? 'Yes' : 'No',

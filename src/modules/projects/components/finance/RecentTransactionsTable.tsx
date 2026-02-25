@@ -4,6 +4,7 @@
  */
 
 import type { RecentTransaction } from '@/types/finance';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface RecentTransactionsTableProps {
   transactions: RecentTransaction[];
@@ -72,14 +73,7 @@ export function RecentTransactionsTable({ transactions }: RecentTransactionsTabl
     },
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string) => formatDisplayDate(dateStr);
 
   return (
     <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)] p-6">

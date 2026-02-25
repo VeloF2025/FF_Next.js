@@ -8,6 +8,7 @@ import PizZip from 'pizzip';
 import fs from 'fs';
 import path from 'path';
 import { log } from '@/lib/logger';
+import { formatDisplayDateLong } from '@/utils/dateFormat';
 
 export interface ContractorDocData {
   contractor_name: string;
@@ -91,11 +92,7 @@ export async function generateMasterBuildAgreement(
   contractorData: ContractorDocData
 ): Promise<DocumentGenerationResult> {
   const today = new Date();
-  const formattedDate = today.toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const formattedDate = formatDisplayDateLong(today);
 
   const data = {
     ...contractorData,

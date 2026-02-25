@@ -27,6 +27,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import type { StaffDocument, DocumentVerification, OcrMetadata, DocumentType } from '@/types/staff-document.types';
 import {
   DOCUMENT_TYPE_LABELS,
@@ -119,13 +120,7 @@ const formatFileSize = (bytes?: number): string => {
 
 // Format date for display
 const formatDate = (dateString?: string): string => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatDisplayDate(dateString, '');
 };
 
 // Check if file is an image

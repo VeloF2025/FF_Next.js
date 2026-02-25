@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ImportError {
   row_number: number;
@@ -150,7 +151,7 @@ export function WeeklyImportHistory() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-[var(--ff-text-secondary)]">
-                      {new Date(report.created_at).toLocaleDateString()}
+                      {formatDisplayDate(report.created_at)}
                     </td>
                   </tr>
                   {isExpanded && hasErrors && (

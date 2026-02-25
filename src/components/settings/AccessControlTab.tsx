@@ -11,6 +11,7 @@ import {
   ShieldCheck, ShieldOff, UserCheck, UserX, Save, RotateCcw
 } from 'lucide-react';
 import { UserPermissionsModal } from './UserPermissionsModal';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 // Custom Toggle Switch Component
 function ToggleSwitch({
@@ -991,7 +992,7 @@ export function AccessControlTab() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--ff-text-secondary)]">
                     {user.lastLogin
-                      ? new Date(user.lastLogin).toLocaleDateString()
+                      ? formatDisplayDate(user.lastLogin)
                       : <span className="text-[var(--ff-text-tertiary)]">Never</span>
                     }
                   </td>

@@ -46,7 +46,7 @@ import {
   Refresh as RefreshIcon,
   Block as BlockIcon,
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { formatDateISO } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 
 // ==================== TYPES ====================
@@ -104,7 +104,7 @@ export function DailyReconciliationDashboard({
 }: DailyReconciliationDashboardProps) {
   // State
   const [selectedDate, setSelectedDate] = useState<string>(
-    defaultDate || format(new Date(), 'yyyy-MM-dd')
+    defaultDate || formatDateISO(new Date())
   );
   const [data, setData] = useState<DailyReconciliationData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);

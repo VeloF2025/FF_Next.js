@@ -10,6 +10,7 @@
 
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
+import { formatDisplayDateShort } from '@/utils/dateFormat';
 import type { Ticket } from '../../types/ticket';
 import { TicketPriority } from '../../types/ticket';
 
@@ -55,7 +56,7 @@ export function KanbanCard({ ticket, isDragging }: KanbanCardProps) {
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-    return new Date(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    return formatDisplayDateShort(date);
   };
 
   // Calculate time in current status

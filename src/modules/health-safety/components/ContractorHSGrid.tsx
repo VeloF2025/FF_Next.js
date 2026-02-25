@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface ContractorHSStatus {
   contractor_id: string;
@@ -79,15 +80,6 @@ function getRagColor(rag: 'red' | 'amber' | 'green') {
         border: 'border-red-200 dark:border-red-800',
       };
   }
-}
-
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 export function ContractorHSGrid({ projectId, compact = false }: ContractorHSGridProps) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronDown, ChevronRight, Eye, Edit, MapPin, Phone, Clock, User, Package } from 'lucide-react';
 import { HomeInstall } from '../types/home-install.types';
 import { cn } from '@/src/utils/cn';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface HomeInstallsTableProps {
   installs: HomeInstall[];
@@ -33,13 +34,7 @@ export function HomeInstallsTable({
     }
   };
 
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (date: string | Date) => formatDisplayDate(date);
 
 
   if (installs.length === 0) {

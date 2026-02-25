@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertTriangle, Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatDisplayDate } from '@/utils/dateFormat';
 import { useFaultReports } from '../../hooks/useFaultReports';
 import { CreateFaultReportForm } from './CreateFaultReportForm';
 import { FaultReportDetail } from './FaultReportDetail';
@@ -252,7 +253,7 @@ export function FaultReportList() {
                       {fault.discoveredByName ?? '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                      {new Date(fault.createdAt).toLocaleDateString()}
+                      {formatDisplayDate(fault.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <button

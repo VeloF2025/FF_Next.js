@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import type { CustomerInvoice, CustomerInvoiceItem } from '@/types/finance';
 import { log } from '@/lib/logger';
+import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface InvoiceDetailModalProps {
   projectId: string;
@@ -83,14 +84,7 @@ export function InvoiceDetailModal({ projectId, invoice, onClose, onUpdated }: I
     }
   };
 
-  const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-ZA', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
+  const formatDate = (dateStr: string | undefined) => formatDisplayDate(dateStr, '-');
 
   const statusColors: Record<string, { bg: string; text: string }> = {
     draft: { bg: 'bg-gray-500/20', text: 'text-gray-400' },
