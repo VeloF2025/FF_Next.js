@@ -96,3 +96,121 @@ export interface CreditNoteCreateInput {
   taxRate?: number;
   projectId?: string;
 }
+
+// ── Customer Write-Offs ──────────────────────────────────────────────────────
+
+export type WriteOffStatus = 'draft' | 'approved' | 'cancelled';
+
+export interface CustomerWriteOff {
+  id: string;
+  writeOffNumber: string;
+  clientId: string;
+  invoiceId: string;
+  amount: number;
+  reason: string;
+  writeOffDate: string;
+  status: WriteOffStatus;
+  glJournalEntryId?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined
+  clientName?: string;
+  invoiceNumber?: string;
+}
+
+export interface WriteOffCreateInput {
+  clientId: string;
+  invoiceId: string;
+  amount: number;
+  reason: string;
+  writeOffDate?: string;
+}
+
+// ── Recurring Invoices ───────────────────────────────────────────────────────
+
+export type RecurringInvoiceFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annually';
+export type RecurringInvoiceStatus = 'active' | 'paused' | 'completed' | 'cancelled';
+
+export interface RecurringInvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate?: number;
+  glAccountId?: string;
+}
+
+export interface RecurringInvoice {
+  id: string;
+  templateName: string;
+  clientId: string;
+  projectId?: string;
+  frequency: RecurringInvoiceFrequency;
+  nextRunDate: string;
+  endDate?: string;
+  lastRunDate?: string;
+  runCount: number;
+  status: RecurringInvoiceStatus;
+  description?: string;
+  lineItems: RecurringInvoiceLineItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  totalAmount: number;
+  paymentTerms?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined
+  clientName?: string;
+}
+
+export interface RecurringInvoiceCreateInput {
+  templateName: string;
+  clientId: string;
+  projectId?: string;
+  frequency: RecurringInvoiceFrequency;
+  nextRunDate: string;
+  endDate?: string;
+  description?: string;
+  lineItems: RecurringInvoiceLineItem[];
+  taxRate?: number;
+  paymentTerms?: string;
+}
+
+// ── Adjustments ──────────────────────────────────────────────────────────────
+
+export type AdjustmentEntityType = 'customer' | 'supplier';
+export type AdjustmentType = 'debit' | 'credit';
+export type AdjustmentStatus = 'draft' | 'approved' | 'cancelled';
+
+export interface AccountingAdjustment {
+  id: string;
+  adjustmentNumber: string;
+  entityType: AdjustmentEntityType;
+  entityId: string;
+  adjustmentType: AdjustmentType;
+  amount: number;
+  reason: string;
+  adjustmentDate: string;
+  status: AdjustmentStatus;
+  glJournalEntryId?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined
+  entityName?: string;
+}
+
+export interface AdjustmentCreateInput {
+  entityType: AdjustmentEntityType;
+  entityId: string;
+  adjustmentType: AdjustmentType;
+  amount: number;
+  reason: string;
+  adjustmentDate?: string;
+}

@@ -1,17 +1,22 @@
 /**
  * Accounting section configuration
  *
- * Organized to match Sage One navigation structure:
- * Customers, Suppliers, Banking, Accounts, Accountant's Area, Reports
+ * Sage-aligned navigation with Phase 1 additions:
+ * - Recurring Invoices, Write-Offs, Adjustments under Customers
+ * - Batch Payments, Adjustments under Suppliers
+ * - Recurring Journals under Accounts
+ * - New VAT section
  */
 
 import {
   Calculator, BookOpen, FileSpreadsheet, BarChart3,
   Receipt, Wallet, Clock, CreditCard, FileText,
-  Landmark, Database, TrendingDown, TrendingUp, Upload,
+  Landmark, Database, TrendingDown, Upload,
   Users, ShoppingCart, ArrowLeftRight, Settings,
   DollarSign, FileCheck, ClipboardList, PieChart,
   Scale, CalendarCheck, BookMarked, Banknote,
+  Repeat, XCircle, SlidersHorizontal, Layers,
+  RotateCcw, Percent,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -48,6 +53,14 @@ export const accountingSection: NavSection = {
           rbacKey: 'accounting',
         },
         {
+          to: '/accounting/recurring-invoices',
+          icon: Repeat,
+          label: 'Recurring Invoices',
+          shortLabel: 'Recur',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
           to: '/accounting/customer-payments',
           icon: CreditCard,
           label: 'Receipts',
@@ -60,6 +73,22 @@ export const accountingSection: NavSection = {
           icon: FileCheck,
           label: 'Credit Notes',
           shortLabel: 'CN',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/write-offs',
+          icon: XCircle,
+          label: 'Write-Offs',
+          shortLabel: 'WO',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/adjustments?type=customer',
+          icon: SlidersHorizontal,
+          label: 'Adjustments',
+          shortLabel: 'Adj',
           permissions: [],
           rbacKey: 'accounting',
         },
@@ -108,10 +137,26 @@ export const accountingSection: NavSection = {
           rbacKey: 'accounting',
         },
         {
+          to: '/accounting/batch-payments',
+          icon: Layers,
+          label: 'Batch Payments',
+          shortLabel: 'Batch',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
           to: '/accounting/supplier-returns',
           icon: TrendingDown,
           label: 'Returns',
           shortLabel: 'Ret',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/adjustments?type=supplier',
+          icon: SlidersHorizontal,
+          label: 'Adjustments',
+          shortLabel: 'Adj',
           permissions: [],
           rbacKey: 'accounting',
         },
@@ -169,7 +214,7 @@ export const accountingSection: NavSection = {
         },
       ],
     },
-    // ── Accounts (Sage: Accounts menu) ───────────────
+    // ── Accounts (Sage: Accounts + Accountant's Area) ─
     {
       to: '#',
       icon: BookOpen,
@@ -196,6 +241,14 @@ export const accountingSection: NavSection = {
           rbacKey: 'accounting',
         },
         {
+          to: '/accounting/recurring-journals',
+          icon: RotateCcw,
+          label: 'Recurring Journals',
+          shortLabel: 'RJ',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
           to: '/accounting/fiscal-periods',
           icon: CalendarCheck,
           label: 'Fiscal Periods',
@@ -208,6 +261,34 @@ export const accountingSection: NavSection = {
           icon: Settings,
           label: 'Default Accounts',
           shortLabel: 'Dflt',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
+    },
+    // ── VAT (Sage: Accountant's Area > VAT) ──────────
+    {
+      to: '#',
+      icon: Percent,
+      label: 'VAT',
+      shortLabel: 'VAT',
+      permissions: [],
+      rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/reports/vat-return',
+          icon: DollarSign,
+          label: 'VAT Return',
+          shortLabel: 'VRtn',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/vat-adjustments',
+          icon: SlidersHorizontal,
+          label: 'VAT Adjustments',
+          shortLabel: 'VAdj',
           permissions: [],
           rbacKey: 'accounting',
         },
@@ -284,14 +365,6 @@ export const accountingSection: NavSection = {
           rbacKey: 'accounting',
         },
         {
-          to: '/accounting/reports/vat-return',
-          icon: DollarSign,
-          label: 'VAT Return',
-          shortLabel: 'VAT',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-        {
           to: '/accounting/reports/budget-vs-actual',
           icon: BarChart3,
           label: 'Budget vs Actual',
@@ -309,12 +382,12 @@ export const accountingSection: NavSection = {
         },
       ],
     },
-    // ── Migration ─────────────────────────────────────
+    // ── Settings ─────────────────────────────────────
     {
       to: '/accounting/sage-migration',
       icon: Database,
-      label: 'Sage Migration',
-      shortLabel: 'Migrate',
+      label: 'Data Import',
+      shortLabel: 'Import',
       permissions: [],
       rbacKey: 'accounting',
     },

@@ -1,0 +1,51 @@
+/**
+ * Recurring Journal Actions API
+ * POST — pause, resume, cancel, generate
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
+import {
+  updateRecurringJournalStatus,
+  generateJournalFromRecurring,
+} from '@/modules/accounting/services/recurringJournalService';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
+  }
+
+  try {
+    const { action, id } = req.body;
+    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
+    if (!action || !id) return apiResponse.badRequest(res, 'action and id are required');
+
+    switch (action) {
+      case 'pause':
+        await updateRecurringJournalStatus(id, 'paused');
+        return apiResponse.success(res, { status: 'paused' });
+      case 'resume':
+        await updateRecurringJournalStatus(id, 'active');
+        return apiResponse.success(res, { status: 'active' });
+      case 'cancel':
+        await updateRecurringJournalStatus(id, 'cancelled');
+        return apiResponse.success(res, { status: 'cancelled' });
+      case 'generate': {
+        if (!userId) return apiResponse.badRequest(res, 'userId is required');
+        const journalId = await generateJournalFromRecurring(id, userId);
+        return apiResponse.success(res, { journalId });
+      }
+      default:
+        return apiResponse.badRequest(res, `Unknown action: ${action}`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Action failed';
+    log.error('Recurring journal action failed', { error: err }, 'accounting-api');
+    return apiResponse.badRequest(res, msg);
+  }
+}
+
+export default withAuth(withErrorHandler(handler));

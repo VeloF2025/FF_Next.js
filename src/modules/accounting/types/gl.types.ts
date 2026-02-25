@@ -32,7 +32,73 @@ export type GLEntrySource =
   | 'auto_credit_note'
   | 'auto_bank_recon'
   | 'auto_supplier_invoice'
-  | 'auto_supplier_payment';
+  | 'auto_supplier_payment'
+  | 'auto_write_off'
+  | 'auto_adjustment'
+  | 'auto_vat_adjustment'
+  | 'auto_batch_payment'
+  | 'auto_recurring';
+
+// ── Recurring Journals ────────────────────────────────────────────────────────
+
+export type RecurringFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annually';
+export type RecurringStatus = 'active' | 'paused' | 'completed' | 'cancelled';
+
+export interface RecurringJournal {
+  id: string;
+  templateName: string;
+  description?: string;
+  frequency: RecurringFrequency;
+  nextRunDate: string;
+  endDate?: string;
+  lastRunDate?: string;
+  runCount: number;
+  status: RecurringStatus;
+  lines: JournalLineInput[];
+  totalAmount: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecurringJournalCreateInput {
+  templateName: string;
+  description?: string;
+  frequency: RecurringFrequency;
+  nextRunDate: string;
+  endDate?: string;
+  lines: JournalLineInput[];
+}
+
+// ── VAT Adjustments ──────────────────────────────────────────────────────────
+
+export type VATAdjustmentType = 'input' | 'output';
+export type VATAdjustmentStatus = 'draft' | 'approved' | 'cancelled';
+
+export interface VATAdjustment {
+  id: string;
+  adjustmentNumber: string;
+  adjustmentDate: string;
+  vatPeriod?: string;
+  adjustmentType: VATAdjustmentType;
+  amount: number;
+  reason: string;
+  status: VATAdjustmentStatus;
+  glJournalEntryId?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VATAdjustmentCreateInput {
+  adjustmentDate: string;
+  vatPeriod?: string;
+  adjustmentType: VATAdjustmentType;
+  amount: number;
+  reason: string;
+}
 
 export type GLEntryStatus = 'draft' | 'posted' | 'reversed';
 

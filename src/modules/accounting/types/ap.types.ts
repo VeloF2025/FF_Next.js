@@ -202,3 +202,38 @@ export interface AgingInvoice {
   amountPaid: number;
   balance: number;
 }
+
+// ── Supplier Batch Payments ──────────────────────────────────────────────────
+
+export type BatchPaymentStatus = 'draft' | 'approved' | 'processed' | 'cancelled';
+
+export interface SupplierPaymentBatch {
+  id: string;
+  batchNumber: string;
+  batchDate: string;
+  totalAmount: number;
+  paymentCount: number;
+  paymentMethod: PaymentMethod;
+  bankAccountId?: string;
+  status: BatchPaymentStatus;
+  glJournalEntryId?: string;
+  notes?: string;
+  processedBy?: string;
+  processedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined
+  payments?: SupplierPayment[];
+}
+
+export interface BatchPaymentCreateInput {
+  batchDate?: string;
+  paymentMethod?: PaymentMethod;
+  bankAccountId?: string;
+  notes?: string;
+  payments: {
+    supplierId: string;
+    invoiceAllocations: { invoiceId: string; amount: number }[];
+  }[];
+}
