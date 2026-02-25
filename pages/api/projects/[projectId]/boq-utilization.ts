@@ -54,7 +54,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     LEFT JOIN purchase_order_items poi ON poi.boq_item_id = bi.id
     LEFT JOIN goods_receipt_items gri ON gri.po_item_id = poi.id
     WHERE b.project_id = ${projectId}
-      AND bi.item_code != 'TOTAL'
+      AND b.status NOT IN ('superseded', 'archived', 'cancelled')
+      AND (bi.item_code IS NULL OR bi.item_code != 'TOTAL')
     GROUP BY bi.id, bi.boq_id, bi.line_number, bi.item_code, bi.description,
              bi.uom, bi.quantity, bi.unit_price, bi.total_price
     ORDER BY bi.line_number NULLS LAST, bi.description
