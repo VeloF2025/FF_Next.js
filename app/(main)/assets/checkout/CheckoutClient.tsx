@@ -44,25 +44,45 @@ interface CheckoutClientProps {
 
 type AssigneeType = 'staff' | 'project' | 'vehicle' | 'contractor';
 
-export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initialStaff, projects }: CheckoutClientProps) {
+export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staffMembers: initialStaff, projects: initialProjects }: CheckoutClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>(initialStaff);
   const [staffLoading, setStaffLoading] = useState(initialStaff.length === 0);
+  const [projectList, setProjectList] = useState<Project[]>(initialProjects);
+  const [projectsLoading, setProjectsLoading] = useState(initialProjects.length === 0);
+  const [assets, setAssets] = useState<Asset[]>(initialAssets);
+  const [assetsLoading, setAssetsLoading] = useState(initialAssets.length === 0);
 
-  // Fetch staff client-side if server-side fetch returned empty (auth issue)
+  // Client-side fallback fetches when server-side RSC fetch fails (no auth cookies)
   useEffect(() => {
-    if (initialStaff.length > 0) return;
-    fetch('/api/staff?status=active', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        setStaffMembers(data.data || []);
-      })
-      .catch(err => log.error('Failed to fetch staff', { error: err }))
-      .finally(() => setStaffLoading(false));
-  }, [initialStaff]);
+    if (initialStaff.length === 0) {
+      fetch('/api/staff?status=active', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => setStaffMembers(data.data || []))
+        .catch(err => log.error('Failed to fetch staff', { error: err }))
+        .finally(() => setStaffLoading(false));
+    }
+    if (initialProjects.length === 0) {
+      fetch('/api/projects', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => {
+          const active = (data.data || []).filter((p: Project) => p.status === 'active' || p.status === 'in_progress');
+          setProjectList(active);
+        })
+        .catch(err => log.error('Failed to fetch projects', { error: err }))
+        .finally(() => setProjectsLoading(false));
+    }
+    if (initialAssets.length === 0) {
+      fetch('/api/assets?status=available&limit=100', { credentials: 'include' })
+        .then(res => res.json())
+        .then(data => setAssets(data.data || []))
+        .catch(err => log.error('Failed to fetch assets', { error: err }))
+        .finally(() => setAssetsLoading(false));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [formData, setFormData] = useState({
     assetId: preselectedAssetId || '',
@@ -78,7 +98,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initi
 
   // Get selected staff/project details
   const selectedStaff = staffMembers.find((s) => s.id === formData.assigneeId);
-  const selectedProject = projects.find((p) => p.id === formData.projectId);
+  const selectedProject = projectList.find((p) => p.id === formData.projectId);
 
   const selectedAsset = assets.find((a) => a.id === formData.assetId);
 
@@ -204,7 +224,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initi
             required
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Choose an asset...</option>
+            <option value="">{assetsLoading ? 'Loading assets...' : 'Choose an asset...'}</option>
             {assets.map((asset) => (
               <option key={asset.id} value={asset.id}>
                 {asset.assetNumber} - {asset.name}
@@ -316,7 +336,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initi
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             {formData.assigneeType === 'project' ? 'Project *' : 'Link to Project (optional)'}
           </label>
-          {formData.assigneeType === 'project' && projects.length === 0 ? (
+          {formData.assigneeType === 'project' && projectList.length === 0 && !projectsLoading ? (
             <p className="text-sm text-amber-600 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
               No active projects found. Please create a project first.
             </p>
@@ -332,7 +352,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initi
                 <option value="">
                   {formData.assigneeType === 'project' ? 'Select project...' : 'No project link'}
                 </option>
-                {projects.map((project) => (
+                {projectList.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.project_code} - {project.name}
                     {project.client_name && ` (${project.client_name})`}
@@ -399,7 +419,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initi
             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
           >
             <option value="">No project link</option>
-            {projects.map((project) => (
+            {projectList.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.project_code} - {project.name}
                 {project.client_name && ` (${project.client_name})`}
