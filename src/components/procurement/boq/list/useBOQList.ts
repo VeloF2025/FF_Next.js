@@ -39,8 +39,9 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
         throw new Error('Failed to fetch BOQs');
       }
       const data = await response.json();
-      // API returns { boqs: [...], items: [...], stats: {...} }
-      const boqData = data.boqs || [];
+      // API returns { success: true, data: { boqs: [...], items: [...], stats: {...} } }
+      const payload = data.data ?? data;
+      const boqData = payload.boqs || [];
       // Transform to BOQ type
       const transformed: BOQ[] = boqData.map((b: any) => ({
         id: b.id,
