@@ -45,6 +45,15 @@ interface FleetVehicle {
   status: string;
 }
 
+interface Contractor {
+  id: string;
+  companyName: string;
+  contactPerson: string;
+  businessType: string;
+  status: string;
+  isActive: boolean;
+}
+
 interface CheckoutClientProps {
   assets: Asset[];
   preselectedAssetId?: string;
@@ -67,6 +76,8 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
   const [assetsLoading, setAssetsLoading] = useState(initialAssets.length === 0);
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [contractorsLoading, setContractorsLoading] = useState(true);
 
   // Client-side fallback fetches when server-side RSC fetch fails (no auth cookies)
   useEffect(() => {
@@ -99,6 +110,14 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
       .then(data => setVehicles(data.data || []))
       .catch(err => log.error('Failed to fetch vehicles', { error: err }))
       .finally(() => setVehiclesLoading(false));
+    fetch('/api/contractors?status=active', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        const active = (data.data || []).filter((c: Contractor) => c.isActive !== false);
+        setContractors(active);
+      })
+      .catch(err => log.error('Failed to fetch contractors', { error: err }))
+      .finally(() => setContractorsLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [formData, setFormData] = useState({
@@ -159,10 +178,11 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
         toName = selectedProject.name;
       } else if (formData.assigneeType === 'contractor') {
         if (!formData.contractorName) {
-          throw new Error('Please enter contractor/SMME name');
+          throw new Error('Please select a contractor');
         }
-        toId = crypto.randomUUID();
-        toName = formData.contractorName;
+        const selectedContractor = contractors.find(c => c.id === formData.contractorName);
+        toId = selectedContractor?.id || formData.contractorName;
+        toName = selectedContractor?.companyName || formData.contractorName;
       } else {
         // Vehicle
         if (!formData.vehicleReg) {
@@ -422,21 +442,37 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
         </div>
       )}
 
-      {/* Contractor/SMME Name */}
+      {/* Contractor/SMME Selection */}
       {formData.assigneeType === 'contractor' && (
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Contractor / SMME Name *
+            Contractor / SMME *
           </label>
-          <input
-            type="text"
-            name="contractorName"
-            value={formData.contractorName}
-            onChange={handleChange}
-            required
-            placeholder="e.g., Letsema Construction"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500"
-          />
+          {contractorsLoading ? (
+            <div className="flex items-center gap-2 p-3 text-sm text-gray-500 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading contractors...
+            </div>
+          ) : contractors.length === 0 ? (
+            <p className="text-sm text-amber-600 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              No active contractors found. Please add contractors first.
+            </p>
+          ) : (
+            <select
+              name="contractorName"
+              value={formData.contractorName}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select contractor...</option>
+              {contractors.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.companyName}{c.contactPerson ? ` (${c.contactPerson})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
