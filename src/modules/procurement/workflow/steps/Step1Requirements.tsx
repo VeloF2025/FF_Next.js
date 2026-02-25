@@ -8,6 +8,7 @@ import { Loader2, AlertCircle, Calendar, Building2, ChevronDown } from 'lucide-r
 import type { RequisitionUrgency } from '@/types/procurement/requisition.types';
 import type { WorkflowState } from '../useWorkflowState';
 import { RequisitionItemsTable, type FormItem } from './RequisitionItemsTable';
+import { loadStep1Draft, useStep1Draft } from './useStep1Draft';
 import { log } from '@/lib/logger';
 // calcTotal below is local and avoids importing the shared helper to keep concerns clear
 
@@ -42,12 +43,17 @@ function makeItem(): FormItem {
 
 /** Step 1: Create a new purchase requisition. */
 export function Step1Requirements({ state, onComplete }: Step1RequirementsProps) {
-  const [projectId, setProjectId] = useState(state.projectId ?? '');
-  const [department, setDepartment] = useState('');
-  const [requiredDate, setRequiredDate] = useState('');
-  const [urgency, setUrgency] = useState<RequisitionUrgency>('normal');
-  const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<FormItem[]>([makeItem()]);
+  const { saveDraft, clearDraft, lastSaved } = useStep1Draft();
+
+  // Restore from draft if the step hasn't been submitted yet
+  const draft = state.requisitionId ? null : loadStep1Draft();
+
+  const [projectId, setProjectId] = useState(draft?.projectId ?? state.projectId ?? '');
+  const [department, setDepartment] = useState(draft?.department ?? '');
+  const [requiredDate, setRequiredDate] = useState(draft?.requiredDate ?? '');
+  const [urgency, setUrgency] = useState<RequisitionUrgency>((draft?.urgency as RequisitionUrgency) ?? 'normal');
+  const [notes, setNotes] = useState(draft?.notes ?? '');
+  const [items, setItems] = useState<FormItem[]>(draft?.items ?? [makeItem()]);
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -70,7 +76,23 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
     load();
   }, []);
 
+  // Auto-save form to localStorage whenever any field changes
+  useEffect(() => {
+    if (state.requisitionId) return; // already submitted — don't overwrite cleared draft
+    saveDraft({ projectId, department, requiredDate, urgency, notes, items });
+  }, [projectId, department, requiredDate, urgency, notes, items, saveDraft, state.requisitionId]);
+
   const getMinDate = () => new Date().toISOString().split('T')[0];
+
+  const handleClearDraft = () => {
+    clearDraft();
+    setProjectId('');
+    setDepartment('');
+    setRequiredDate('');
+    setUrgency('normal');
+    setNotes('');
+    setItems([makeItem()]);
+  };
 
   const addItem = () => setItems((prev) => [...prev, makeItem()]);
 
@@ -158,6 +180,7 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
       };
 
       if (json.success && json.data) {
+        clearDraft();
         const selectedProject = projects.find((p) => p.id === projectId);
         onComplete({
           requisitionId: json.data.id,
@@ -180,6 +203,16 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Draft status bar */}
+      {lastSaved && !state.requisitionId && (
+        <div className="flex items-center justify-between text-xs text-[var(--ff-text-tertiary)]">
+          <span>Draft saved {lastSaved.toLocaleTimeString()}</span>
+          <button type="button" onClick={handleClearDraft} className="hover:text-red-400 transition-colors">
+            Clear draft
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
