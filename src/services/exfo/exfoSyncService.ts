@@ -120,12 +120,32 @@ async function matchAssets(
 }
 
 /**
+ * Known EXFO code → FibreFlow project name mappings.
+ * EXFO uses short codes (MOA, GRA) that don't match project_code or substring.
+ */
+const PROJECT_CODE_MAP: Record<string, string> = {
+  'MOA': 'Mohadin',
+  'GRA': 'Grasmere',
+};
+
+/**
  * Match parsed project code to a FibreFlow project.
  */
 async function matchProject(projectCode: string | null): Promise<string | null> {
   if (!projectCode) return null;
 
-  // Try exact match on project_code first
+  // Try known mapping first
+  const mappedName = PROJECT_CODE_MAP[projectCode.toUpperCase()];
+  if (mappedName) {
+    const mapped = await sql`
+      SELECT id FROM projects
+      WHERE UPPER(project_name) = UPPER(${mappedName})
+      LIMIT 1
+    `;
+    if (mapped.length > 0) return mapped[0]!.id as string;
+  }
+
+  // Try exact match on project_code
   const rows = await sql`
     SELECT id FROM projects
     WHERE UPPER(project_code) = UPPER(${projectCode})
