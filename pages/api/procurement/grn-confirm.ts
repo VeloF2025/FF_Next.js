@@ -18,6 +18,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { createAuditLog } from '@/services/procurement/auditService';
+import { postGRNToGL } from '@/modules/accounting/services/glIntegrationHooks';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -222,6 +223,16 @@ export default withAuth(withErrorHandler(async (
       performedBy: userId,
       newValues: { status: 'completed', totalQuantityReceived, movementId: movement.id },
     });
+
+    // 7. GL integration: DR Materials, CR AP
+    const grnTotalValue = grnItems.reduce((sum: number, item: Record<string, unknown>) =>
+      sum + Number(item.total_cost || 0), 0);
+    if (grnTotalValue > 0) {
+      const poProjectId = grn.purchase_order_id
+        ? (await sql`SELECT project_id FROM purchase_orders WHERE id = ${grn.purchase_order_id}`)?.[0]?.project_id
+        : null;
+      await postGRNToGL(grnId, grnTotalValue, poProjectId || null, userId, grn.grn_number);
+    }
 
     log.info('GRN confirmed successfully', {
       grnId,

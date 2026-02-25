@@ -17,6 +17,7 @@ import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { postCustomerInvoiceToGL, postCustomerPaymentToGL } from '@/modules/accounting/services/glIntegrationHooks';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -215,6 +216,8 @@ async function handleAction(
         WHERE id = ${invoiceId}
       `;
       log.info('Invoice approved', { invoiceId, projectId, approvedBy: userId });
+      // GL integration: DR AR, CR Revenue
+      await postCustomerInvoiceToGL(invoiceId, projectId, userId);
       return apiResponse.success(res, { status: 'approved' });
 
     case 'send':
@@ -258,6 +261,8 @@ async function handleAction(
       `;
 
       log.info('Payment recorded', { invoiceId, projectId, amount: body.amount, newStatus });
+      // GL integration: DR Bank, CR AR
+      await postCustomerPaymentToGL(invoiceId, body.amount, projectId, userId);
       return apiResponse.success(res, { amountPaid: newAmountPaid, status: newStatus });
 
     case 'cancel':
