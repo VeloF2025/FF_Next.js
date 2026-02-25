@@ -36,24 +36,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleList(req: NextApiRequest, res: NextApiResponse) {
-  const projectId = req.query.projectId as string || '';
-  const testType = req.query.testType as string || '';
-  const verdict = req.query.verdict as string || '';
-  const search = req.query.search as string || '';
-  const workspaceId = req.query.workspaceId as string || '';
-  const assetId = req.query.assetId as string || '';
+  const projectId = (req.query.projectId as string) || null;
+  const testType = (req.query.testType as string) || null;
+  const verdict = (req.query.verdict as string) || null;
+  const search = (req.query.search as string) || null;
+  const workspaceId = (req.query.workspaceId as string) || null;
+  const assetId = (req.query.assetId as string) || null;
   const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
   const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize as string || '50', 10)));
   const offset = (page - 1) * pageSize;
+  const searchPattern = search ? `%${search}%` : null;
 
-  const hasProject = !!projectId;
-  const hasTestType = !!testType;
-  const hasVerdict = !!verdict;
-  const hasSearch = !!search;
-  const hasWorkspace = !!workspaceId;
-  const hasAsset = !!assetId;
-  const searchPattern = hasSearch ? `%${search}%` : '';
-
+  // Use null-check pattern: (${val} IS NULL OR column = ${val})
+  // When val is null, IS NULL is TRUE so the clause is skipped (no filter)
+  // When val has a value, IS NULL is FALSE so the equality check runs
   const rows = await sql`
     SELECT
       r.id, r.exfo_result_id, r.exfo_workspace_id,
@@ -73,13 +69,12 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
     FROM exfo_test_results r
     LEFT JOIN projects p ON p.id = r.project_id
     LEFT JOIN assets a ON a.id = r.asset_id
-    WHERE 1=1
-      AND (NOT ${hasProject} OR r.project_id = ${projectId}::UUID)
-      AND (NOT ${hasTestType} OR r.test_type = ${testType})
-      AND (NOT ${hasVerdict} OR r.global_verdict = ${verdict})
-      AND (NOT ${hasWorkspace} OR r.exfo_workspace_id = ${workspaceId})
-      AND (NOT ${hasAsset} OR r.asset_id = ${assetId}::UUID)
-      AND (NOT ${hasSearch} OR (
+    WHERE (${projectId}::UUID IS NULL OR r.project_id = ${projectId}::UUID)
+      AND (${testType}::TEXT IS NULL OR r.test_type = ${testType})
+      AND (${verdict}::TEXT IS NULL OR r.global_verdict = ${verdict})
+      AND (${workspaceId}::TEXT IS NULL OR r.exfo_workspace_id = ${workspaceId})
+      AND (${assetId}::UUID IS NULL OR r.asset_id = ${assetId}::UUID)
+      AND (${searchPattern}::TEXT IS NULL OR (
         r.test_name ILIKE ${searchPattern}
         OR r.job_name ILIKE ${searchPattern}
         OR r.cable_id ILIKE ${searchPattern}
@@ -92,13 +87,12 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
 
   const countRows = await sql`
     SELECT COUNT(*) as total FROM exfo_test_results r
-    WHERE 1=1
-      AND (NOT ${hasProject} OR r.project_id = ${projectId}::UUID)
-      AND (NOT ${hasTestType} OR r.test_type = ${testType})
-      AND (NOT ${hasVerdict} OR r.global_verdict = ${verdict})
-      AND (NOT ${hasWorkspace} OR r.exfo_workspace_id = ${workspaceId})
-      AND (NOT ${hasAsset} OR r.asset_id = ${assetId}::UUID)
-      AND (NOT ${hasSearch} OR (
+    WHERE (${projectId}::UUID IS NULL OR r.project_id = ${projectId}::UUID)
+      AND (${testType}::TEXT IS NULL OR r.test_type = ${testType})
+      AND (${verdict}::TEXT IS NULL OR r.global_verdict = ${verdict})
+      AND (${workspaceId}::TEXT IS NULL OR r.exfo_workspace_id = ${workspaceId})
+      AND (${assetId}::UUID IS NULL OR r.asset_id = ${assetId}::UUID)
+      AND (${searchPattern}::TEXT IS NULL OR (
         r.test_name ILIKE ${searchPattern}
         OR r.job_name ILIKE ${searchPattern}
         OR r.cable_id ILIKE ${searchPattern}
@@ -116,8 +110,7 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handleStats(req: NextApiRequest, res: NextApiResponse) {
-  const projectId = req.query.projectId as string || '';
-  const hasProject = !!projectId;
+  const projectId = (req.query.projectId as string) || null;
 
   const stats = await sql`
     SELECT
@@ -132,15 +125,14 @@ async function handleStats(req: NextApiRequest, res: NextApiResponse) {
       MIN(test_date_time) as earliest_test,
       MAX(test_date_time) as latest_test
     FROM exfo_test_results
-    WHERE (NOT ${hasProject} OR project_id = ${projectId}::UUID)
+    WHERE (${projectId}::UUID IS NULL OR project_id = ${projectId}::UUID)
   `;
 
   return apiResponse.success(res, stats[0] || {});
 }
 
 async function handleEquipment(req: NextApiRequest, res: NextApiResponse) {
-  const projectId = req.query.projectId as string || '';
-  const hasProject = !!projectId;
+  const projectId = (req.query.projectId as string) || null;
 
   const equipment = await sql`
     SELECT
@@ -156,7 +148,7 @@ async function handleEquipment(req: NextApiRequest, res: NextApiResponse) {
     FROM exfo_test_results r
     LEFT JOIN assets a ON a.id = r.asset_id
     WHERE unit_a_serial IS NOT NULL
-      AND (NOT ${hasProject} OR r.project_id = ${projectId}::UUID)
+      AND (${projectId}::UUID IS NULL OR r.project_id = ${projectId}::UUID)
     GROUP BY unit_a_serial, unit_a_model, r.asset_id, a.name
     ORDER BY test_count DESC
   `;
