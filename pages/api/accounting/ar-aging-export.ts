@@ -17,7 +17,7 @@ function csvCell(value: string): string {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
 
   try {
     const asAtDate = req.query.as_at_date ? String(req.query.as_at_date) : undefined;

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, Loader2, AlertCircle, Download } from 'lucide-react';
 import type { AgingBucket } from '@/modules/accounting/types/ap.types';
 
 function formatCurrency(amount: number): string {
@@ -37,6 +37,12 @@ export default function ARAgingPage() {
 
   useEffect(() => { loadAging(); }, [loadAging]);
 
+  function handleExport() {
+    const params = new URLSearchParams();
+    if (asAtDate) params.set('as_at_date', asAtDate);
+    window.location.href = `/api/accounting/ar-aging-export?${params}`;
+  }
+
   const totals = buckets.reduce(
     (acc, b) => ({
       current: acc.current + (b.current || 0),
@@ -55,16 +61,22 @@ export default function ARAgingPage() {
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <Clock className="h-6 w-6 text-emerald-500" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Clock className="h-6 w-6 text-emerald-500" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">AR Aging Report</h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Accounts Receivable by aging period
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">AR Aging Report</h1>
-                <p className="text-sm text-[var(--ff-text-secondary)]">
-                  Accounts Receivable by aging period
-                </p>
-              </div>
+              <button onClick={handleExport} disabled={buckets.length === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 text-sm font-medium disabled:opacity-50">
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
             </div>
           </div>
         </div>

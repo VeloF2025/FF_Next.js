@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import type { BalanceSheetReport } from '@/modules/accounting/types/gl.types';
 import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
@@ -58,6 +58,13 @@ export default function BalanceSheetPage() {
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
+  function handleExport() {
+    if (!asAtDate) return;
+    const params = new URLSearchParams({ as_at_date: asAtDate });
+    if (costCentreId) params.set('cost_centre_id', costCentreId);
+    window.open(`/api/accounting/balance-sheet-export?${params}`, '_blank');
+  }
+
   const balanced = report ? Math.abs(report.totalAssets - (report.totalLiabilities + report.totalEquity)) < 0.02 : false;
   const drillDownStart = (asAtDate ?? '').slice(0, 4) + '-01-01';
   const drillDownEnd = asAtDate ?? '';
@@ -79,11 +86,17 @@ export default function BalanceSheetPage() {
             <Link href="/accounting?tab=reports" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-2">
               <ArrowLeft className="h-4 w-4" /> Back to Reports
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <BarChart3 className="h-6 w-6 text-blue-500" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <BarChart3 className="h-6 w-6 text-blue-500" />
+                </div>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Balance Sheet</h1>
               </div>
-              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Balance Sheet</h1>
+              <button onClick={handleExport} disabled={!report}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
             </div>
           </div>
         </div>

@@ -22,7 +22,7 @@ function csvVal(value: string | number): string {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   const periodStart = req.query.period_start as string;
   const periodEnd = req.query.period_end as string;

@@ -25,7 +25,7 @@ function csvVal(value: string | number): string {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   const period = (req.query.period as string) || 'ytd';
 
@@ -36,8 +36,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const now = new Date();
 
     if (period === 'current') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      endDate = now.toISOString().split('T')[0];
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]!;
+      endDate = now.toISOString().split('T')[0]!;
     } else {
       const [fy] = await sql`
         SELECT MIN(start_date) AS start_date, MAX(end_date) AS end_date
@@ -49,10 +49,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           LIMIT 1
         )
       `;
-      startDate = fy?.start_date?.toString().split('T')[0] || `${now.getFullYear()}-03-01`;
-      endDate = period === 'full_year'
-        ? (fy?.end_date?.toString().split('T')[0] || `${now.getFullYear() + 1}-02-28`)
-        : now.toISOString().split('T')[0];
+      startDate = (fy?.start_date?.toString().split('T')[0] ?? `${now.getFullYear()}-03-01`) as string;
+      endDate = (period === 'full_year'
+        ? (fy?.end_date?.toString().split('T')[0] ?? `${now.getFullYear() + 1}-02-28`)
+        : now.toISOString().split('T')[0]) as string;
     }
 
     // Load budget amounts — from accounting_budgets table, falling back to app_settings
@@ -74,7 +74,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const row of budgetRows) {
         let total = 0;
         for (let m = startMonth; m <= endMonth; m++) {
-          total += Number(row[monthCols[m]] || 0);
+          const col = monthCols[m] as string;
+          total += Number(row[col] || 0);
         }
         budgets[String(row.account_code)] = total;
         budgets[String(row.gl_account_id)] = total;

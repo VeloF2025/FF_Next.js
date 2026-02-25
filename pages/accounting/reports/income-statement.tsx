@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, Loader2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, AlertCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import type { IncomeStatementReport, IncomeStatementLineItem } from '@/modules/accounting/types/gl.types';
 import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
@@ -43,6 +43,12 @@ export default function IncomeStatementPage() {
       .then(json => setCostCentres(json.data?.items || json.data || []))
       .catch(() => {});
   }, []);
+
+  function handleExport() {
+    const params = new URLSearchParams({ period_start: periodStart, period_end: periodEnd });
+    if (costCentreId) params.set('cost_centre_id', costCentreId);
+    window.open(`/api/accounting/income-statement-export?${params}`, '_blank');
+  }
 
   function toggleAccount(code: string) {
     setExpandedAccount(prev => (prev === code ? null : code));
@@ -85,11 +91,17 @@ export default function IncomeStatementPage() {
             <Link href="/accounting?tab=reports" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-2">
               <ArrowLeft className="h-4 w-4" /> Back to Reports
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <BarChart3 className="h-6 w-6 text-emerald-500" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <BarChart3 className="h-6 w-6 text-emerald-500" />
+                </div>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Income Statement</h1>
               </div>
-              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Income Statement</h1>
+              <button onClick={handleExport} disabled={!report}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium disabled:opacity-50">
+                <Download className="h-4 w-4" /> Export CSV
+              </button>
             </div>
           </div>
         </div>

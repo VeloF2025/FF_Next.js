@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, AlertCircle, Download } from 'lucide-react';
 
 interface Txn {
   date: string;
@@ -75,6 +75,14 @@ export default function AccountTransactionsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function handleExport() {
+    const params = new URLSearchParams();
+    params.set('account_code', accountCode);
+    params.set('period_start', periodStart ?? '');
+    params.set('period_end', periodEnd ?? '');
+    window.location.href = `/api/accounting/account-transactions-export?${params}`;
+  }
+
   const totalDr = report?.transactions.reduce((s, t) => s + t.debit, 0) || 0;
   const totalCr = report?.transactions.reduce((s, t) => s + t.credit, 0) || 0;
 
@@ -85,9 +93,15 @@ export default function AccountTransactionsPage() {
           <Link href="/accounting/reports" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-2">
             <ArrowLeft className="h-4 w-4" /> Back to Reports
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-violet-500/10"><BookOpen className="h-6 w-6 text-violet-500" /></div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Account Transactions</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-violet-500/10"><BookOpen className="h-6 w-6 text-violet-500" /></div>
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Account Transactions</h1>
+            </div>
+            <button onClick={handleExport} disabled={!report || !accountCode}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm font-medium disabled:opacity-50">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
           </div>
         </div>
 

@@ -21,7 +21,7 @@ function csvVal(value: string | number): string {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   const asAtDate = req.query.as_at_date as string;
   const costCentreId = req.query.cost_centre_id as string | undefined;

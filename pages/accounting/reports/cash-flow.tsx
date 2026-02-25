@@ -78,9 +78,13 @@ export default function CashFlowPage() {
                   </p>
                 </div>
               </div>
-              <button className="px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg flex items-center gap-2 text-sm border border-[var(--ff-border-light)]">
-                <Download className="h-4 w-4" />
-                Export PDF
+              <button onClick={() => {
+                if (!startDate || !endDate) return;
+                const params = new URLSearchParams({ period_start: startDate, period_end: endDate });
+                window.open(`/api/accounting/cash-flow-export?${params}`, '_blank');
+              }} disabled={!report}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 text-sm font-medium disabled:opacity-50">
+                <Download className="h-4 w-4" /> Export CSV
               </button>
             </div>
           </div>

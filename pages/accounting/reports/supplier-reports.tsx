@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, ShoppingCart, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Loader2, AlertCircle, Download } from 'lucide-react';
 
 interface Row {
   supplierId: string;
@@ -49,6 +49,13 @@ export default function SupplierReportsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function handleExport() {
+    const params = new URLSearchParams();
+    params.set('period_start', periodStart ?? '');
+    params.set('period_end', periodEnd ?? '');
+    window.location.href = `/api/accounting/supplier-report-export?${params}`;
+  }
+
   const totals = rows.reduce((t, r) => ({
     invoiced: t.invoiced + r.totalInvoiced,
     paid: t.paid + r.totalPaid,
@@ -63,9 +70,15 @@ export default function SupplierReportsPage() {
           <Link href="/accounting/reports" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-2">
             <ArrowLeft className="h-4 w-4" /> Back to Reports
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-500/10"><ShoppingCart className="h-6 w-6 text-orange-500" /></div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Supplier Report</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/10"><ShoppingCart className="h-6 w-6 text-orange-500" /></div>
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Supplier Report</h1>
+            </div>
+            <button onClick={handleExport} disabled={rows.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium disabled:opacity-50">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
           </div>
         </div>
 

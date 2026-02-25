@@ -19,7 +19,7 @@ function csvCell(value: string): string {
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
 
   const periodStart = req.query.period_start as string;
   const periodEnd = req.query.period_end as string;

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Shield, Loader2, AlertCircle, Download } from 'lucide-react';
 
 interface AuditRow {
   entryDate: string;
@@ -74,6 +74,13 @@ export default function AuditTrailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function handleExport() {
+    const params = new URLSearchParams();
+    params.set('period_start', periodStart ?? '');
+    params.set('period_end', periodEnd ?? '');
+    window.location.href = `/api/accounting/audit-trail-export?${params}`;
+  }
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
@@ -81,9 +88,15 @@ export default function AuditTrailPage() {
           <Link href="/accounting/reports" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] mb-2">
             <ArrowLeft className="h-4 w-4" /> Back to Reports
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/10"><Shield className="h-6 w-6 text-amber-500" /></div>
-            <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Audit Trail</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10"><Shield className="h-6 w-6 text-amber-500" /></div>
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Audit Trail</h1>
+            </div>
+            <button onClick={handleExport} disabled={rows.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium disabled:opacity-50">
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
           </div>
         </div>
 
