@@ -14,19 +14,38 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
 }
 
+interface CostCentre { id: string; code: string; name: string }
+
 export default function BalanceSheetPage() {
   const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
   const [report, setReport] = useState<BalanceSheetReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
+  const [costCentres, setCostCentres] = useState<CostCentre[]>([]);
+  const [costCentreId, setCostCentreId] = useState('');
+  const [showComparative, setShowComparative] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/accounting/cost-centres?active_only=true', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => setCostCentres(json.data?.items || json.data || []))
+      .catch(() => {});
+  }, []);
 
   const loadReport = useCallback(async () => {
     if (!asAtDate) return;
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/accounting/reports-balance-sheet?as_at_date=${asAtDate}`);
+      const params = new URLSearchParams({ as_at_date: asAtDate });
+      if (costCentreId) params.set('cost_centre_id', costCentreId);
+      if (showComparative) {
+        const d = new Date(asAtDate);
+        d.setFullYear(d.getFullYear() - 1);
+        params.set('compare_date', d.toISOString().slice(0, 10));
+      }
+      const res = await fetch(`/api/accounting/reports-balance-sheet?${params}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || 'Failed to load');
       setReport(json.data || json);
@@ -35,13 +54,22 @@ export default function BalanceSheetPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [asAtDate]);
+  }, [asAtDate, costCentreId, showComparative]);
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
   const balanced = report ? Math.abs(report.totalAssets - (report.totalLiabilities + report.totalEquity)) < 0.02 : false;
   const drillDownStart = (asAtDate ?? '').slice(0, 4) + '-01-01';
   const drillDownEnd = asAtDate ?? '';
+
+  // Shared comparative column header for section panels
+  const compHeader = showComparative ? (
+    <span className="flex items-center gap-3 text-xs text-[var(--ff-text-tertiary)] ml-auto">
+      <span className="w-24 text-right">Prior</span>
+      <span className="w-24 text-right">Current</span>
+      <span className="w-20 text-right">Variance</span>
+    </span>
+  ) : <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>;
 
   return (
     <AppLayout>
@@ -61,9 +89,27 @@ export default function BalanceSheetPage() {
         </div>
 
         <div className="p-6 max-w-4xl space-y-6">
-          <div className="flex items-center gap-4">
-            <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
-            <input type="date" value={asAtDate} onChange={e => setAsAtDate(e.target.value)} className="ff-input text-sm" />
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">As at</label>
+              <input type="date" value={asAtDate} onChange={e => setAsAtDate(e.target.value)} className="ff-input text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Cost Centre</label>
+              <select value={costCentreId} onChange={e => setCostCentreId(e.target.value)}
+                className="ff-input text-sm min-w-[160px]">
+                <option value="">All Cost Centres</option>
+                {costCentres.map(cc => (
+                  <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer select-none pb-1">
+              <input type="checkbox" checked={showComparative} onChange={e => setShowComparative(e.target.checked)}
+                className="rounded border-[var(--ff-border-light)]" />
+              Compare prior year
+            </label>
           </div>
 
           {error && (
@@ -78,7 +124,6 @@ export default function BalanceSheetPage() {
             </div>
           ) : report ? (
             <div className="space-y-4">
-              {/* Balance Check */}
               {balanced && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 text-emerald-400 text-sm">
                   <CheckCircle2 className="h-4 w-4" /> Balance sheet is balanced (A = L + E)
@@ -95,34 +140,42 @@ export default function BalanceSheetPage() {
                 <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
                   <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-blue-500/5 flex items-center">
                     <h3 className="font-semibold text-blue-400">Assets</h3>
-                    <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
+                    {compHeader}
                   </div>
                   <div className="divide-y divide-[var(--ff-border-light)]">
                     {report.assets.map(a => (
                       <div key={a.accountCode}>
-                        <button
-                          onClick={() => setExpandedAccount(expandedAccount === a.accountCode ? null : a.accountCode)}
-                          className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
-                        >
+                        <button onClick={() => setExpandedAccount(expandedAccount === a.accountCode ? null : a.accountCode)}
+                          className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer">
                           <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
-                            {expandedAccount === a.accountCode
-                              ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
-                              : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                            {expandedAccount === a.accountCode ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" /> : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
                             <span className="font-mono text-xs mr-2">{a.accountCode}</span>{a.accountName}
                           </span>
-                          <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(a.balance)}</span>
+                          {showComparative && a.priorBalance !== undefined ? (
+                            <span className="flex items-center gap-3">
+                              <span className="font-mono text-[var(--ff-text-tertiary)] text-xs w-24 text-right">{formatCurrency(a.priorBalance)}</span>
+                              <span className="font-mono text-[var(--ff-text-primary)] w-24 text-right">{formatCurrency(a.balance)}</span>
+                              <span className={`font-mono text-xs w-20 text-right ${(a.variance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {(a.variance ?? 0) >= 0 ? '+' : ''}{formatCurrency(a.variance ?? 0)}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(a.balance)}</span>
+                          )}
                         </button>
                         {expandedAccount === a.accountCode && (
                           <AccountDrillDown accountCode={a.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
                         )}
                       </div>
                     ))}
-                    {report.assets.length === 0 && (
-                      <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No asset balances</div>
-                    )}
+                    {report.assets.length === 0 && <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No asset balances</div>}
                   </div>
                   <div className="px-6 py-3 border-t border-[var(--ff-border-light)] flex justify-between bg-[var(--ff-bg-primary)]">
-                    <span className="font-semibold text-[var(--ff-text-primary)]">Total Assets</span>
+                    <span className="font-semibold text-[var(--ff-text-primary)]">Total Assets
+                      {showComparative && report.priorTotalAssets !== undefined && (
+                        <span className="text-xs text-[var(--ff-text-tertiary)] ml-2">(prior: {formatCurrency(report.priorTotalAssets)})</span>
+                      )}
+                    </span>
                     <span className="font-bold font-mono text-blue-400">{formatCurrency(report.totalAssets)}</span>
                   </div>
                 </div>
@@ -133,34 +186,42 @@ export default function BalanceSheetPage() {
                   <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
                     <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-amber-500/5 flex items-center">
                       <h3 className="font-semibold text-amber-400">Liabilities</h3>
-                      <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
+                      {compHeader}
                     </div>
                     <div className="divide-y divide-[var(--ff-border-light)]">
                       {report.liabilities.map(l => (
                         <div key={l.accountCode}>
-                          <button
-                            onClick={() => setExpandedAccount(expandedAccount === l.accountCode ? null : l.accountCode)}
-                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
-                          >
+                          <button onClick={() => setExpandedAccount(expandedAccount === l.accountCode ? null : l.accountCode)}
+                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer">
                             <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
-                              {expandedAccount === l.accountCode
-                                ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
-                                : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                              {expandedAccount === l.accountCode ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" /> : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
                               <span className="font-mono text-xs mr-2">{l.accountCode}</span>{l.accountName}
                             </span>
-                            <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(l.balance)}</span>
+                            {showComparative && l.priorBalance !== undefined ? (
+                              <span className="flex items-center gap-3">
+                                <span className="font-mono text-[var(--ff-text-tertiary)] text-xs w-24 text-right">{formatCurrency(l.priorBalance)}</span>
+                                <span className="font-mono text-[var(--ff-text-primary)] w-24 text-right">{formatCurrency(l.balance)}</span>
+                                <span className={`font-mono text-xs w-20 text-right ${(l.variance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {(l.variance ?? 0) >= 0 ? '+' : ''}{formatCurrency(l.variance ?? 0)}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(l.balance)}</span>
+                            )}
                           </button>
                           {expandedAccount === l.accountCode && (
                             <AccountDrillDown accountCode={l.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
                           )}
                         </div>
                       ))}
-                      {report.liabilities.length === 0 && (
-                        <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No liability balances</div>
-                      )}
+                      {report.liabilities.length === 0 && <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No liability balances</div>}
                     </div>
                     <div className="px-6 py-2 border-t border-[var(--ff-border-light)] flex justify-between">
-                      <span className="font-medium text-sm text-[var(--ff-text-primary)]">Total Liabilities</span>
+                      <span className="font-medium text-sm text-[var(--ff-text-primary)]">Total Liabilities
+                        {showComparative && report.priorTotalLiabilities !== undefined && (
+                          <span className="text-xs text-[var(--ff-text-tertiary)] ml-2">(prior: {formatCurrency(report.priorTotalLiabilities)})</span>
+                        )}
+                      </span>
                       <span className="font-medium font-mono text-amber-400">{formatCurrency(report.totalLiabilities)}</span>
                     </div>
                   </div>
@@ -169,34 +230,42 @@ export default function BalanceSheetPage() {
                   <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
                     <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-purple-500/5 flex items-center">
                       <h3 className="font-semibold text-purple-400">Equity</h3>
-                      <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
+                      {compHeader}
                     </div>
                     <div className="divide-y divide-[var(--ff-border-light)]">
                       {report.equity.map(e => (
                         <div key={e.accountCode}>
-                          <button
-                            onClick={() => setExpandedAccount(expandedAccount === e.accountCode ? null : e.accountCode)}
-                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
-                          >
+                          <button onClick={() => setExpandedAccount(expandedAccount === e.accountCode ? null : e.accountCode)}
+                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer">
                             <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
-                              {expandedAccount === e.accountCode
-                                ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
-                                : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                              {expandedAccount === e.accountCode ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" /> : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
                               <span className="font-mono text-xs mr-2">{e.accountCode}</span>{e.accountName}
                             </span>
-                            <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(e.balance)}</span>
+                            {showComparative && e.priorBalance !== undefined ? (
+                              <span className="flex items-center gap-3">
+                                <span className="font-mono text-[var(--ff-text-tertiary)] text-xs w-24 text-right">{formatCurrency(e.priorBalance)}</span>
+                                <span className="font-mono text-[var(--ff-text-primary)] w-24 text-right">{formatCurrency(e.balance)}</span>
+                                <span className={`font-mono text-xs w-20 text-right ${(e.variance ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {(e.variance ?? 0) >= 0 ? '+' : ''}{formatCurrency(e.variance ?? 0)}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(e.balance)}</span>
+                            )}
                           </button>
                           {expandedAccount === e.accountCode && (
                             <AccountDrillDown accountCode={e.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
                           )}
                         </div>
                       ))}
-                      {report.equity.length === 0 && (
-                        <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No equity balances</div>
-                      )}
+                      {report.equity.length === 0 && <div className="px-6 py-3 text-sm text-[var(--ff-text-tertiary)]">No equity balances</div>}
                     </div>
                     <div className="px-6 py-2 border-t border-[var(--ff-border-light)] flex justify-between">
-                      <span className="font-medium text-sm text-[var(--ff-text-primary)]">Total Equity</span>
+                      <span className="font-medium text-sm text-[var(--ff-text-primary)]">Total Equity
+                        {showComparative && report.priorTotalEquity !== undefined && (
+                          <span className="text-xs text-[var(--ff-text-tertiary)] ml-2">(prior: {formatCurrency(report.priorTotalEquity)})</span>
+                        )}
+                      </span>
                       <span className="font-medium font-mono text-purple-400">{formatCurrency(report.totalEquity)}</span>
                     </div>
                   </div>
@@ -204,9 +273,7 @@ export default function BalanceSheetPage() {
                   {/* L + E Total */}
                   <div className="px-6 py-3 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] flex justify-between">
                     <span className="font-semibold text-[var(--ff-text-primary)]">Total L + E</span>
-                    <span className="font-bold font-mono text-blue-400">
-                      {formatCurrency(report.totalLiabilities + report.totalEquity)}
-                    </span>
+                    <span className="font-bold font-mono text-blue-400">{formatCurrency(report.totalLiabilities + report.totalEquity)}</span>
                   </div>
                 </div>
               </div>

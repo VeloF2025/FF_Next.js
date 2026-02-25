@@ -285,17 +285,47 @@ export async function reverseJournalEntry(id: string, userId: string): Promise<J
   }
 }
 
-export async function getTrialBalance(fiscalPeriodId: string): Promise<TrialBalanceRow[]> {
+export async function getTrialBalance(fiscalPeriodId: string, costCentreId?: string): Promise<TrialBalanceRow[]> {
   try {
-    const rows = (await sql`SELECT * FROM get_trial_balance(${fiscalPeriodId}::UUID)`) as Row[];
-    return rows.map(r => ({
-      accountCode: String(r.account_code),
-      accountName: String(r.account_name),
-      accountType: String(r.account_type),
-      normalBalance: String(r.normal_balance) as 'debit' | 'credit',
-      debitBalance: Number(r.debit_balance),
-      creditBalance: Number(r.credit_balance),
-    }));
+    if (!costCentreId) {
+      const rows = (await sql`SELECT * FROM get_trial_balance(${fiscalPeriodId}::UUID)`) as Row[];
+      return rows.map(r => ({
+        accountCode: String(r.account_code),
+        accountName: String(r.account_name),
+        accountType: String(r.account_type),
+        normalBalance: String(r.normal_balance) as 'debit' | 'credit',
+        debitBalance: Number(r.debit_balance),
+        creditBalance: Number(r.credit_balance),
+      }));
+    }
+
+    // Direct query with cost centre filter
+    const rows = (await sql`
+      SELECT ga.account_code, ga.account_name, ga.account_type, ga.normal_balance,
+        COALESCE(SUM(jl.debit), 0) AS total_debit,
+        COALESCE(SUM(jl.credit), 0) AS total_credit
+      FROM gl_journal_lines jl
+      JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
+      JOIN gl_accounts ga ON ga.id = jl.gl_account_id
+      WHERE je.status = 'posted'
+        AND je.fiscal_period_id = ${fiscalPeriodId}::UUID
+        AND jl.cost_center_id = ${costCentreId}::UUID
+      GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.normal_balance
+      HAVING COALESCE(SUM(jl.debit), 0) != 0 OR COALESCE(SUM(jl.credit), 0) != 0
+      ORDER BY ga.account_code
+    `) as Row[];
+
+    return rows.map(r => {
+      const net = Number(r.total_debit) - Number(r.total_credit);
+      return {
+        accountCode: String(r.account_code),
+        accountName: String(r.account_name),
+        accountType: String(r.account_type),
+        normalBalance: String(r.normal_balance) as 'debit' | 'credit',
+        debitBalance: net > 0 ? net : 0,
+        creditBalance: net < 0 ? Math.abs(net) : 0,
+      };
+    });
   } catch (err) {
     log.error('Failed to get trial balance', { fiscalPeriodId, error: err }, 'accounting');
     throw err;

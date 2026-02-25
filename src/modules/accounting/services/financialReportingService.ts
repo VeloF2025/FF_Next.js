@@ -23,7 +23,7 @@ interface ReportLineItem {
   amount: number;
 }
 
-interface BalanceSheetLineItem {
+interface BSLineItem {
   accountCode: string;
   accountName: string;
   balance: number;
@@ -31,96 +31,118 @@ interface BalanceSheetLineItem {
 
 // ── Income Statement (P&L) ───────────────────────────────────────────────────
 
+interface ISOptions {
+  projectId?: string;
+  costCentreId?: string;
+}
+
+/** Fetch P&L line items for a single period. Reused for comparative calls. */
+async function fetchIncomeStatementRows(
+  periodStart: string,
+  periodEnd: string,
+  opts: ISOptions
+) {
+  const projId = opts.projectId ?? null;
+  const ccId = opts.costCentreId ?? null;
+
+  const rows = (await sql`
+    SELECT ga.account_code, ga.account_name, ga.account_type, ga.account_subtype,
+      COALESCE(SUM(jl.debit), 0) AS total_debit,
+      COALESCE(SUM(jl.credit), 0) AS total_credit
+    FROM gl_journal_lines jl
+    JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
+    JOIN gl_accounts ga ON ga.id = jl.gl_account_id
+    WHERE je.status = 'posted'
+      AND je.entry_date >= ${periodStart}
+      AND je.entry_date <= ${periodEnd}
+      AND ga.account_type IN ('revenue', 'expense')
+      AND (${projId}::TEXT IS NULL OR jl.project_id = ${projId}::UUID)
+      AND (${ccId}::TEXT IS NULL OR jl.cost_center_id = ${ccId}::UUID)
+    GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.account_subtype
+    ORDER BY ga.account_code
+  `) as Row[];
+
+  const revenue: ReportLineItem[] = [];
+  const costOfSales: ReportLineItem[] = [];
+  const operatingExpenses: ReportLineItem[] = [];
+
+  for (const r of rows) {
+    const type = String(r.account_type);
+    const subtype = r.account_subtype ? String(r.account_subtype) : '';
+    const debit = Number(r.total_debit);
+    const credit = Number(r.total_credit);
+
+    if (type === 'revenue') {
+      const amount = credit - debit;
+      if (Math.abs(amount) > 0.001) {
+        revenue.push({ accountCode: String(r.account_code), accountName: String(r.account_name), amount });
+      }
+    } else if (type === 'expense') {
+      const amount = debit - credit;
+      if (Math.abs(amount) > 0.001) {
+        const item = { accountCode: String(r.account_code), accountName: String(r.account_name), amount };
+        if (subtype === 'cost_of_sales') costOfSales.push(item);
+        else operatingExpenses.push(item);
+      }
+    }
+  }
+
+  const totalRevenue = revenue.reduce((s, i) => s + i.amount, 0);
+  const totalCostOfSales = costOfSales.reduce((s, i) => s + i.amount, 0);
+  const grossProfit = totalRevenue - totalCostOfSales;
+  const totalOperatingExpenses = operatingExpenses.reduce((s, i) => s + i.amount, 0);
+  const netProfit = grossProfit - totalOperatingExpenses;
+
+  return { revenue, costOfSales, operatingExpenses, totalRevenue, totalCostOfSales, grossProfit, totalOperatingExpenses, netProfit };
+}
+
 export async function getIncomeStatement(
   periodStart: string,
   periodEnd: string,
-  projectId?: string
+  opts: ISOptions = {},
+  comparePeriod?: { start: string; end: string }
 ): Promise<IncomeStatementReport> {
   try {
-    let rows: Row[];
+    const current = await fetchIncomeStatementRows(periodStart, periodEnd, opts);
 
-    if (projectId) {
-      rows = (await sql`
-        SELECT ga.account_code, ga.account_name, ga.account_type, ga.account_subtype,
-          COALESCE(SUM(jl.debit), 0) AS total_debit,
-          COALESCE(SUM(jl.credit), 0) AS total_credit
-        FROM gl_journal_lines jl
-        JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-        JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-        WHERE je.status = 'posted'
-          AND je.entry_date >= ${periodStart}
-          AND je.entry_date <= ${periodEnd}
-          AND ga.account_type IN ('revenue', 'expense')
-          AND jl.project_id = ${projectId}::UUID
-        GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.account_subtype
-        ORDER BY ga.account_code
-      `) as Row[];
-    } else {
-      rows = (await sql`
-        SELECT ga.account_code, ga.account_name, ga.account_type, ga.account_subtype,
-          COALESCE(SUM(jl.debit), 0) AS total_debit,
-          COALESCE(SUM(jl.credit), 0) AS total_credit
-        FROM gl_journal_lines jl
-        JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-        JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-        WHERE je.status = 'posted'
-          AND je.entry_date >= ${periodStart}
-          AND je.entry_date <= ${periodEnd}
-          AND ga.account_type IN ('revenue', 'expense')
-        GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.account_subtype
-        ORDER BY ga.account_code
-      `) as Row[];
-    }
-
-    const revenue: ReportLineItem[] = [];
-    const costOfSales: ReportLineItem[] = [];
-    const operatingExpenses: ReportLineItem[] = [];
-
-    for (const r of rows) {
-      const type = String(r.account_type);
-      const subtype = r.account_subtype ? String(r.account_subtype) : '';
-      const debit = Number(r.total_debit);
-      const credit = Number(r.total_credit);
-
-      if (type === 'revenue') {
-        // Revenue: credit - debit (revenue normal balance is credit)
-        const amount = credit - debit;
-        if (Math.abs(amount) > 0.001) {
-          revenue.push({ accountCode: String(r.account_code), accountName: String(r.account_name), amount });
-        }
-      } else if (type === 'expense') {
-        // Expense: debit - credit (expense normal balance is debit)
-        const amount = debit - credit;
-        if (Math.abs(amount) > 0.001) {
-          const item = { accountCode: String(r.account_code), accountName: String(r.account_name), amount };
-          if (subtype === 'cost_of_sales') {
-            costOfSales.push(item);
-          } else {
-            operatingExpenses.push(item);
-          }
-        }
-      }
-    }
-
-    const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0);
-    const totalCostOfSales = costOfSales.reduce((s, r) => s + r.amount, 0);
-    const grossProfit = totalRevenue - totalCostOfSales;
-    const totalOperatingExpenses = operatingExpenses.reduce((s, r) => s + r.amount, 0);
-    const netProfit = grossProfit - totalOperatingExpenses;
-
-    return {
+    const report: IncomeStatementReport = {
       periodStart,
       periodEnd,
-      projectId,
-      revenue,
-      costOfSales,
-      operatingExpenses,
-      totalRevenue,
-      totalCostOfSales,
-      grossProfit,
-      totalOperatingExpenses,
-      netProfit,
+      projectId: opts.projectId,
+      costCentreId: opts.costCentreId,
+      revenue: current.revenue,
+      costOfSales: current.costOfSales,
+      operatingExpenses: current.operatingExpenses,
+      totalRevenue: current.totalRevenue,
+      totalCostOfSales: current.totalCostOfSales,
+      grossProfit: current.grossProfit,
+      totalOperatingExpenses: current.totalOperatingExpenses,
+      netProfit: current.netProfit,
     };
+
+    if (comparePeriod) {
+      const prior = await fetchIncomeStatementRows(comparePeriod.start, comparePeriod.end, opts);
+      report.comparativePeriod = comparePeriod;
+      report.priorTotalRevenue = prior.totalRevenue;
+      report.priorTotalCostOfSales = prior.totalCostOfSales;
+      report.priorGrossProfit = prior.grossProfit;
+      report.priorTotalOperatingExpenses = prior.totalOperatingExpenses;
+      report.priorNetProfit = prior.netProfit;
+
+      const mergeLineItems = (curr: ReportLineItem[], prev: ReportLineItem[]) => {
+        const priorMap = new Map(prev.map(p => [p.accountCode, p.amount]));
+        return curr.map(c => {
+          const pa = priorMap.get(c.accountCode) ?? 0;
+          const variance = c.amount - pa;
+          return { ...c, priorAmount: pa, variance, variancePct: pa !== 0 ? (variance / Math.abs(pa)) * 100 : 0 };
+        });
+      };
+      report.revenue = mergeLineItems(current.revenue, prior.revenue);
+      report.costOfSales = mergeLineItems(current.costOfSales, prior.costOfSales);
+      report.operatingExpenses = mergeLineItems(current.operatingExpenses, prior.operatingExpenses);
+    }
+
+    return report;
   } catch (err) {
     log.error('Failed to generate income statement', { error: err }, 'accounting');
     throw err;
@@ -129,71 +151,102 @@ export async function getIncomeStatement(
 
 // ── Balance Sheet ────────────────────────────────────────────────────────────
 
-export async function getBalanceSheet(asAtDate: string): Promise<BalanceSheetReport> {
+/** Fetch balance sheet data for a single date. Reused for comparative calls. */
+async function fetchBalanceSheetData(asAtDate: string, costCentreId?: string) {
+  const ccId = costCentreId ?? null;
+
+  const rows = (await sql`
+    SELECT ga.account_code, ga.account_name, ga.account_type, ga.normal_balance,
+      COALESCE(SUM(jl.debit), 0) AS total_debit,
+      COALESCE(SUM(jl.credit), 0) AS total_credit
+    FROM gl_journal_lines jl
+    JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
+    JOIN gl_accounts ga ON ga.id = jl.gl_account_id
+    WHERE je.status = 'posted'
+      AND je.entry_date <= ${asAtDate}
+      AND ga.account_type IN ('asset', 'liability', 'equity')
+      AND ga.level >= 3
+      AND (${ccId}::TEXT IS NULL OR jl.cost_center_id = ${ccId}::UUID)
+    GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.normal_balance
+    ORDER BY ga.account_code
+  `) as Row[];
+
+  const assets: BSLineItem[] = [];
+  const liabilities: BSLineItem[] = [];
+  const equity: BSLineItem[] = [];
+
+  for (const r of rows) {
+    const type = String(r.account_type);
+    const normalBal = String(r.normal_balance);
+    const debit = Number(r.total_debit);
+    const credit = Number(r.total_credit);
+    const balance = normalBal === 'debit' ? debit - credit : credit - debit;
+    if (Math.abs(balance) < 0.01) continue;
+
+    const item: BSLineItem = { accountCode: String(r.account_code), accountName: String(r.account_name), balance };
+    if (type === 'asset') assets.push(item);
+    else if (type === 'liability') liabilities.push(item);
+    else if (type === 'equity') equity.push(item);
+  }
+
+  const retainedEarnings = await calculateRetainedEarnings(asAtDate, costCentreId);
+  if (Math.abs(retainedEarnings) > 0.01) {
+    const existing = equity.find(e => e.accountCode === '3200');
+    if (existing) existing.balance += retainedEarnings;
+    else equity.push({ accountCode: '3200', accountName: 'Retained Earnings (Current)', balance: retainedEarnings });
+  }
+
+  return { assets, liabilities, equity };
+}
+
+export async function getBalanceSheet(
+  asAtDate: string,
+  costCentreId?: string,
+  compareDate?: string
+): Promise<BalanceSheetReport> {
   try {
-    const rows = (await sql`
-      SELECT ga.account_code, ga.account_name, ga.account_type, ga.normal_balance,
-        COALESCE(SUM(jl.debit), 0) AS total_debit,
-        COALESCE(SUM(jl.credit), 0) AS total_credit
-      FROM gl_journal_lines jl
-      JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-      JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-      WHERE je.status = 'posted'
-        AND je.entry_date <= ${asAtDate}
-        AND ga.account_type IN ('asset', 'liability', 'equity')
-        AND ga.level >= 3
-      GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type, ga.normal_balance
-      ORDER BY ga.account_code
-    `) as Row[];
+    const current = await fetchBalanceSheetData(asAtDate, costCentreId);
 
-    const assets: BalanceSheetLineItem[] = [];
-    const liabilities: BalanceSheetLineItem[] = [];
-    const equity: BalanceSheetLineItem[] = [];
-
-    for (const r of rows) {
-      const type = String(r.account_type);
-      const normalBal = String(r.normal_balance);
-      const debit = Number(r.total_debit);
-      const credit = Number(r.total_credit);
-
-      // Balance = debit - credit for debit-normal, credit - debit for credit-normal
-      const balance = normalBal === 'debit' ? debit - credit : credit - debit;
-      if (Math.abs(balance) < 0.01) continue;
-
-      const item = { accountCode: String(r.account_code), accountName: String(r.account_name), balance };
-
-      if (type === 'asset') assets.push(item);
-      else if (type === 'liability') liabilities.push(item);
-      else if (type === 'equity') equity.push(item);
-    }
-
-    // Add retained earnings (net of revenue - expenses to date)
-    const retainedEarnings = await calculateRetainedEarnings(asAtDate);
-    if (Math.abs(retainedEarnings) > 0.01) {
-      const existing = equity.find(e => e.accountCode === '3200');
-      if (existing) {
-        existing.balance += retainedEarnings;
-      } else {
-        equity.push({ accountCode: '3200', accountName: 'Retained Earnings (Current)', balance: retainedEarnings });
-      }
-    }
-
-    return {
+    const report: BalanceSheetReport = {
       asAtDate,
-      assets,
-      liabilities,
-      equity,
-      totalAssets: assets.reduce((s, a) => s + a.balance, 0),
-      totalLiabilities: liabilities.reduce((s, l) => s + l.balance, 0),
-      totalEquity: equity.reduce((s, e) => s + e.balance, 0),
+      costCentreId,
+      assets: current.assets,
+      liabilities: current.liabilities,
+      equity: current.equity,
+      totalAssets: current.assets.reduce((s, a) => s + a.balance, 0),
+      totalLiabilities: current.liabilities.reduce((s, l) => s + l.balance, 0),
+      totalEquity: current.equity.reduce((s, e) => s + e.balance, 0),
     };
+
+    if (compareDate) {
+      const prior = await fetchBalanceSheetData(compareDate, costCentreId);
+      report.compareDate = compareDate;
+      report.priorTotalAssets = prior.assets.reduce((s, a) => s + a.balance, 0);
+      report.priorTotalLiabilities = prior.liabilities.reduce((s, l) => s + l.balance, 0);
+      report.priorTotalEquity = prior.equity.reduce((s, e) => s + e.balance, 0);
+
+      const mergeBSLines = (curr: BSLineItem[], prev: BSLineItem[]) => {
+        const priorMap = new Map(prev.map(p => [p.accountCode, p.balance]));
+        return curr.map(c => {
+          const pb = priorMap.get(c.accountCode) ?? 0;
+          const variance = c.balance - pb;
+          return { ...c, priorBalance: pb, variance, variancePct: pb !== 0 ? (variance / Math.abs(pb)) * 100 : 0 };
+        });
+      };
+      report.assets = mergeBSLines(current.assets, prior.assets);
+      report.liabilities = mergeBSLines(current.liabilities, prior.liabilities);
+      report.equity = mergeBSLines(current.equity, prior.equity);
+    }
+
+    return report;
   } catch (err) {
     log.error('Failed to generate balance sheet', { error: err }, 'accounting');
     throw err;
   }
 }
 
-async function calculateRetainedEarnings(asAtDate: string): Promise<number> {
+async function calculateRetainedEarnings(asAtDate: string, costCentreId?: string): Promise<number> {
+  const ccId = costCentreId ?? null;
   const rows = (await sql`
     SELECT
       COALESCE(SUM(CASE WHEN ga.account_type = 'revenue' THEN jl.credit - jl.debit ELSE 0 END), 0) AS revenue,
@@ -204,6 +257,7 @@ async function calculateRetainedEarnings(asAtDate: string): Promise<number> {
     WHERE je.status = 'posted'
       AND je.entry_date <= ${asAtDate}
       AND ga.account_type IN ('revenue', 'expense')
+      AND (${ccId}::TEXT IS NULL OR jl.cost_center_id = ${ccId}::UUID)
   `) as Row[];
 
   return Number(rows[0]!.revenue) - Number(rows[0]!.expenses);

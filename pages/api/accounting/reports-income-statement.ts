@@ -18,15 +18,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { period_start, period_end, project_id } = req.query;
+    const { period_start, period_end, project_id, cost_centre_id, compare_start, compare_end } = req.query;
     if (!period_start || !period_end) {
       return apiResponse.badRequest(res, 'period_start and period_end are required');
     }
 
+    const comparePeriod = compare_start && compare_end
+      ? { start: String(compare_start), end: String(compare_end) }
+      : undefined;
+
     const report = await getIncomeStatement(
       String(period_start),
       String(period_end),
-      project_id ? String(project_id) : undefined
+      {
+        projectId: project_id ? String(project_id) : undefined,
+        costCentreId: cost_centre_id ? String(cost_centre_id) : undefined,
+      },
+      comparePeriod
     );
     return apiResponse.success(res, report);
   } catch (err) {

@@ -18,16 +18,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const fiscalPeriodId = req.query.fiscal_period_id as string;
+    const costCentreId = req.query.cost_centre_id as string | undefined;
+    const comparePeriodId = req.query.compare_period_id as string | undefined;
     if (!fiscalPeriodId) {
       return apiResponse.badRequest(res, 'fiscal_period_id is required');
     }
 
-    const rows = await getTrialBalance(fiscalPeriodId);
+    const rows = await getTrialBalance(fiscalPeriodId, costCentreId || undefined);
     const totalDebit = rows.reduce((sum, r) => sum + r.debitBalance, 0);
     const totalCredit = rows.reduce((sum, r) => sum + r.creditBalance, 0);
 
+    if (comparePeriodId) {
+      const priorRows = await getTrialBalance(comparePeriodId, costCentreId || undefined);
+      const priorMap = new Map(priorRows.map(r => [r.accountCode, r]));
+      for (const row of rows) {
+        const prior = priorMap.get(row.accountCode);
+        row.priorDebitBalance = prior?.debitBalance ?? 0;
+        row.priorCreditBalance = prior?.creditBalance ?? 0;
+      }
+    }
+
     return apiResponse.success(res, {
       fiscalPeriodId,
+      comparePeriodId,
       rows,
       totalDebit,
       totalCredit,

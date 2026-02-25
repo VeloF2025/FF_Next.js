@@ -1,6 +1,7 @@
 /**
  * Trial Balance Page
  * Phase 5: Full trial balance with fiscal period selector + CSV export
+ * Phase 5b: Cost centre filter + comparative period selector
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,10 @@ import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 interface TBRow {
   accountCode: string; accountName: string; accountType: string;
   normalBalance: string; debitBalance: number; creditBalance: number;
+  priorDebitBalance?: number; priorCreditBalance?: number;
 }
+
+interface CostCentre { id: string; code: string; name: string }
 
 interface FiscalPeriod { id: string; periodName: string; startDate: string; endDate: string; status: string }
 
@@ -26,6 +30,17 @@ export default function TrialBalancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
+  const [costCentres, setCostCentres] = useState<CostCentre[]>([]);
+  const [costCentreId, setCostCentreId] = useState('');
+  const [comparePeriodId, setComparePeriodId] = useState('');
+
+  // Load cost centres
+  useEffect(() => {
+    fetch('/api/accounting/cost-centres?active_only=true', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => setCostCentres(json.data?.items || json.data || []))
+      .catch(() => {});
+  }, []);
 
   // Load fiscal periods
   useEffect(() => {
@@ -44,7 +59,10 @@ export default function TrialBalancePage() {
     if (!selectedPeriod) return;
     setLoading(true); setError('');
     try {
-      const res = await fetch(`/api/accounting/reports-trial-balance?fiscal_period_id=${selectedPeriod}`, { credentials: 'include' });
+      const params = new URLSearchParams({ fiscal_period_id: selectedPeriod });
+      if (costCentreId) params.set('cost_centre_id', costCentreId);
+      if (comparePeriodId) params.set('compare_period_id', comparePeriodId);
+      const res = await fetch(`/api/accounting/reports-trial-balance?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load');
       const json = await res.json();
       const data = json.data || json;
@@ -53,7 +71,7 @@ export default function TrialBalancePage() {
       setTotalCredit(Number(data.totalCredit || 0));
     } catch { setError('Failed to load trial balance'); }
     finally { setLoading(false); }
-  }, [selectedPeriod]);
+  }, [selectedPeriod, costCentreId, comparePeriodId]);
 
   useEffect(() => { loadTB(); }, [loadTB]);
 
@@ -65,8 +83,15 @@ export default function TrialBalancePage() {
   const balanced = Math.abs(totalDebit - totalCredit) < 0.02;
 
   const selectedPeriodObj = periods.find(p => p.id === selectedPeriod);
-  const drillDownStart = selectedPeriodObj?.startDate?.split('T')[0] || new Date().toISOString().split('T')[0].slice(0, 4) + '-01-01';
-  const drillDownEnd = selectedPeriodObj?.endDate?.split('T')[0] || new Date().toISOString().split('T')[0];
+  const todayStr: string = new Date().toISOString().substring(0, 10);
+  const drillDownStart: string = selectedPeriodObj?.startDate
+    ? selectedPeriodObj.startDate.substring(0, 10)
+    : todayStr.substring(0, 4) + '-01-01';
+  const drillDownEnd: string = selectedPeriodObj?.endDate
+    ? selectedPeriodObj.endDate.substring(0, 10)
+    : todayStr;
+
+  const selectClass = 'px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm';
 
   return (
     <AppLayout>
@@ -81,10 +106,24 @@ export default function TrialBalancePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <select value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)}
-                className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm">
+              {/* Primary period */}
+              <select value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)} className={selectClass}>
                 {periods.map(p => (
                   <option key={p.id} value={p.id}>{p.periodName} ({p.status})</option>
+                ))}
+              </select>
+              {/* Comparative period */}
+              <select value={comparePeriodId} onChange={e => setComparePeriodId(e.target.value)} className={selectClass}>
+                <option value="">No comparison</option>
+                {periods.filter(p => p.id !== selectedPeriod).map(p => (
+                  <option key={p.id} value={p.id}>{p.periodName}</option>
+                ))}
+              </select>
+              {/* Cost centre filter */}
+              <select value={costCentreId} onChange={e => setCostCentreId(e.target.value)} className={selectClass}>
+                <option value="">All Cost Centres</option>
+                {costCentres.map(cc => (
+                  <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>
                 ))}
               </select>
               <button onClick={handleExport} disabled={rows.length === 0}
@@ -130,11 +169,21 @@ export default function TrialBalancePage() {
           ) : (
             <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-[var(--ff-border-light)] text-left text-[var(--ff-text-secondary)]">
-                  <th className="px-4 py-3">Code</th><th className="px-4 py-3">Account</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3 text-right">Debit</th><th className="px-4 py-3 text-right">Credit</th>
-                </tr></thead>
+                <thead>
+                  <tr className="border-b border-[var(--ff-border-light)] text-left text-[var(--ff-text-secondary)]">
+                    <th className="px-4 py-3">Code</th>
+                    <th className="px-4 py-3">Account</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3 text-right">Debit</th>
+                    <th className="px-4 py-3 text-right">Credit</th>
+                    {comparePeriodId && (
+                      <>
+                        <th className="px-4 py-3 text-right text-[var(--ff-text-tertiary)]">Prior Dr</th>
+                        <th className="px-4 py-3 text-right text-[var(--ff-text-tertiary)]">Prior Cr</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
                 <tbody>
                   {rows.map(r => (
                     <React.Fragment key={r.accountCode}>
@@ -154,6 +203,16 @@ export default function TrialBalancePage() {
                         <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-xs bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)]">{r.accountType}</span></td>
                         <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.debitBalance > 0 ? fmt(r.debitBalance) : '—'}</td>
                         <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.creditBalance > 0 ? fmt(r.creditBalance) : '—'}</td>
+                        {comparePeriodId && (
+                          <>
+                            <td className="px-4 py-3 text-right text-[var(--ff-text-tertiary)] text-xs">
+                              {(r.priorDebitBalance ?? 0) > 0 ? fmt(r.priorDebitBalance ?? 0) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right text-[var(--ff-text-tertiary)] text-xs">
+                              {(r.priorCreditBalance ?? 0) > 0 ? fmt(r.priorCreditBalance ?? 0) : '—'}
+                            </td>
+                          </>
+                        )}
                       </tr>
                       {expandedAccount === r.accountCode && (
                         <AccountDrillDown
@@ -161,7 +220,7 @@ export default function TrialBalancePage() {
                           periodStart={drillDownStart}
                           periodEnd={drillDownEnd}
                           asTableRow
-                          colSpan={5}
+                          colSpan={comparePeriodId ? 7 : 5}
                         />
                       )}
                     </React.Fragment>
@@ -172,6 +231,16 @@ export default function TrialBalancePage() {
                     <td colSpan={3} className="px-4 py-3 text-[var(--ff-text-primary)]">TOTALS</td>
                     <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{fmt(totalDebit)}</td>
                     <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{fmt(totalCredit)}</td>
+                    {comparePeriodId && (
+                      <>
+                        <td className="px-4 py-3 text-right text-[var(--ff-text-tertiary)] text-xs">
+                          {fmt(rows.reduce((s, r) => s + (r.priorDebitBalance ?? 0), 0))}
+                        </td>
+                        <td className="px-4 py-3 text-right text-[var(--ff-text-tertiary)] text-xs">
+                          {fmt(rows.reduce((s, r) => s + (r.priorCreditBalance ?? 0), 0))}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 </tfoot>
               </table>

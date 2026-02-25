@@ -237,6 +237,8 @@ export interface TrialBalanceRow {
   normalBalance: 'debit' | 'credit';
   debitBalance: number;
   creditBalance: number;
+  priorDebitBalance?: number;
+  priorCreditBalance?: number;
 }
 
 export interface TrialBalanceReport {
@@ -247,28 +249,60 @@ export interface TrialBalanceReport {
   totalCredit: number;
 }
 
+export interface IncomeStatementLineItem {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+  priorAmount?: number;
+  variance?: number;
+  variancePct?: number;
+}
+
 export interface IncomeStatementReport {
   periodStart: string;
   periodEnd: string;
   projectId?: string;
-  revenue: Array<{ accountCode: string; accountName: string; amount: number }>;
-  costOfSales: Array<{ accountCode: string; accountName: string; amount: number }>;
-  operatingExpenses: Array<{ accountCode: string; accountName: string; amount: number }>;
+  costCentreId?: string;
+  revenue: IncomeStatementLineItem[];
+  costOfSales: IncomeStatementLineItem[];
+  operatingExpenses: IncomeStatementLineItem[];
   totalRevenue: number;
   totalCostOfSales: number;
   grossProfit: number;
   totalOperatingExpenses: number;
   netProfit: number;
+  // Comparative totals (populated when compare period requested)
+  comparativePeriod?: { start: string; end: string };
+  priorTotalRevenue?: number;
+  priorTotalCostOfSales?: number;
+  priorGrossProfit?: number;
+  priorTotalOperatingExpenses?: number;
+  priorNetProfit?: number;
+}
+
+export interface BalanceSheetLineItem {
+  accountCode: string;
+  accountName: string;
+  balance: number;
+  priorBalance?: number;
+  variance?: number;
+  variancePct?: number;
 }
 
 export interface BalanceSheetReport {
   asAtDate: string;
-  assets: Array<{ accountCode: string; accountName: string; balance: number }>;
-  liabilities: Array<{ accountCode: string; accountName: string; balance: number }>;
-  equity: Array<{ accountCode: string; accountName: string; balance: number }>;
+  costCentreId?: string;
+  assets: BalanceSheetLineItem[];
+  liabilities: BalanceSheetLineItem[];
+  equity: BalanceSheetLineItem[];
   totalAssets: number;
   totalLiabilities: number;
   totalEquity: number;
+  // Comparative (populated when compare date requested)
+  compareDate?: string;
+  priorTotalAssets?: number;
+  priorTotalLiabilities?: number;
+  priorTotalEquity?: number;
 }
 
 export interface VAT201Box {
