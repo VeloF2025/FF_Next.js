@@ -341,8 +341,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Return as JSON if format=json requested
     if (format === 'json') {
       return apiResponse.success(res, {
-        success: true,
-        data: rows,
+        rows,
         meta: {
           count: rows.length,
           filters: { dateFrom, dateTo, project, status },

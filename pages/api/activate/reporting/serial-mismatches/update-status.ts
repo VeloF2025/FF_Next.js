@@ -107,7 +107,6 @@ async function handler(
     });
 
     return apiResponse.success(res, {
-      success: true,
       id,
       drop_number: String(updated.drop_number),
       status: String(updated.mismatch_status),

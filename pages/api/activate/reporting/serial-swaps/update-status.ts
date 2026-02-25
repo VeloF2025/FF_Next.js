@@ -91,7 +91,6 @@ async function handler(
     `, [status, dropNumber]);
 
     return apiResponse.success(res, {
-      success: true,
       dropNumber,
       status,
       message: `Swap status updated to ${status}`,

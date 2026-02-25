@@ -72,7 +72,7 @@ async function handler(
     }
 
     if (!body.text || body.text.trim().length === 0) {
-      return apiResponse.success(res, { success: true, skipped: true });
+      return apiResponse.success(res, { skipped: true });
     }
 
     // --- Look up group to get project ---
@@ -84,7 +84,7 @@ async function handler(
 
     if (groupResult.rows.length === 0) {
       logger.warn(`Message from unknown/inactive group: ${body.group_jid}`);
-      return apiResponse.success(res, { success: true, skipped: true });
+      return apiResponse.success(res, { skipped: true });
     }
 
     const project = groupResult.rows[0].project_name;
@@ -107,7 +107,7 @@ async function handler(
         ]
       );
       logger.info(`Swap message unparseable (${body.message_id}), logged for review`);
-      return apiResponse.success(res, { success: true, skipped: true });
+      return apiResponse.success(res, { skipped: true });
     }
 
     logger.info(`Parsed swap message: ${parsed.dropNumber} -> ${parsed.newSerial} (${parsed.swapType}, ${parsed.confidence})`);
@@ -233,13 +233,10 @@ async function handler(
     logger.info(`ONT swap recorded: ${swapRecord.id} (${parsed.dropNumber} -> ${parsed.newSerial})`);
 
     return apiResponse.success(res, {
-      success: true,
-      data: {
-        id: swapRecord.id,
-        drop_number: parsed.dropNumber,
-        new_serial: parsed.newSerial,
-        status: swapRecord.status,
-      },
+      id: swapRecord.id,
+      drop_number: parsed.dropNumber,
+      new_serial: parsed.newSerial,
+      status: swapRecord.status,
       reaction: '👍',
     });
   } catch (error) {

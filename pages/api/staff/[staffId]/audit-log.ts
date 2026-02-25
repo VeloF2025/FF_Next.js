@@ -35,10 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       actionTypes: actionTypes as any,
     });
 
-    return apiResponse.success(res, {
-      success: true,
-      data: result,
-    });
+    return apiResponse.success(res, result);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     logger.error('Failed to fetch audit log', { staffId, error: errorMessage });

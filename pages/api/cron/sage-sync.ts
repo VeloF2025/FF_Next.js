@@ -72,7 +72,6 @@ export default async function handler(
     if (configResult.length === 0) {
       logger.info('Sage sync skipped - not configured or not connected');
       return apiResponse.success(res, {
-        success: true,
         message: 'Sage sync skipped - not configured or not connected',
         skipped: true,
       });
@@ -84,7 +83,6 @@ export default async function handler(
     if (config.sync_enabled === false) {
       logger.info('Sage sync skipped - sync disabled in config');
       return apiResponse.success(res, {
-        success: true,
         message: 'Sage sync skipped - sync disabled',
         skipped: true,
       });

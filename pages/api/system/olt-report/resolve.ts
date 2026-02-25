@@ -128,7 +128,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
       return apiResponse.success(res, {
-        success: true,
         action: 'resolved',
         recordId,
         drNumber,
@@ -225,7 +224,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
 
       return apiResponse.success(res, {
-        success: true,
         action: 'escalated',
         recordId,
         drNumber,

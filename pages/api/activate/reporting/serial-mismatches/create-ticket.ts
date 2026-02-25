@@ -145,7 +145,6 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
     });
 
     return apiResponse.success(res, {
-      success: true,
       ticket_id: String(ticket.id),
       ticket_title: String(ticket.title),
       ticket_status: String(ticket.status),

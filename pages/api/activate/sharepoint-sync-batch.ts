@@ -89,7 +89,6 @@ async function handler(
 
     if (drsToProcess.length === 0) {
       return apiResponse.success(res, {
-        success: true,
         processed: 0,
         succeeded: 0,
         failed: 0,

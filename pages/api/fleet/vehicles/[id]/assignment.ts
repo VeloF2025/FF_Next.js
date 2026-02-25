@@ -258,7 +258,6 @@ async function handlePost(
   });
 
   return apiResponse.created(res, {
-    success: true,
     assignment: {
       id: created.id,
       vehicleId,
@@ -319,7 +318,6 @@ async function handleDelete(
   });
 
   return apiResponse.success(res, {
-    success: true,
     message: 'Driver unassigned from vehicle',
   });
 }

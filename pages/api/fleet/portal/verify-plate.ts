@@ -397,7 +397,6 @@ async function handler(
     });
 
     return apiResponse.success(res, {
-      success: true,
       extractedPlate,
       confidence,
       vehicle: {

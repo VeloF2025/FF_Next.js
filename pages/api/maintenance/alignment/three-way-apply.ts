@@ -40,7 +40,6 @@ async function handler(
 
     if (actions.length === 0) {
       return apiResponse.success(res, {
-        success: true,
         applied: 0,
         skipped: 0,
         errors: [],

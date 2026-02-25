@@ -125,7 +125,7 @@ export default async function handler(
       });
 
       if (!extractedPlate || extractedPlate.length < 3) {
-        return apiResponse.success(res, {
+        return res.status(200).json({
           success: false,
           error: vlmResult.error || 'Could not read license plate from image. Please try again with a clearer photo.',
           extractedPlate: extractedPlate || '',
@@ -135,7 +135,7 @@ export default async function handler(
     } catch (vlmError) {
       const errorMessage = vlmError instanceof Error ? vlmError.message : 'Unknown error';
       log.error('[portal-auth] VLM extraction failed', { error: errorMessage });
-      return apiResponse.success(res, {
+      return res.status(200).json({
         success: false,
         error: `Failed to process plate image: ${errorMessage}`,
         extractedPlate: '',
@@ -181,7 +181,7 @@ export default async function handler(
     const vehicle = vehicleRows[0];
     if (!vehicle) {
       log.info('[portal-auth] No vehicle found', { extractedPlate, normalizedPlate });
-      return apiResponse.success(res, {
+      return res.status(200).json({
         success: false,
         error: `No active vehicle found with registration "${extractedPlate}". Please ensure the vehicle is registered in the system.`,
         extractedPlate,
@@ -321,7 +321,6 @@ export default async function handler(
 
     // Return success with vehicle and driver info
     return apiResponse.success(res, {
-      success: true,
       extractedPlate,
       confidence,
       session: {

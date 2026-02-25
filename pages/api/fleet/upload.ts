@@ -119,12 +119,9 @@ async function handler(
     });
 
     return apiResponse.success(res, {
-      success: true,
-      data: {
-        url: result.url,
-        path: result.path,
-        fileName: result.filename,
-      }
+      url: result.url,
+      path: result.path,
+      fileName: result.filename,
     });
   } catch (error) {
     log.error('FleetUpload', { action: 'error', error });
