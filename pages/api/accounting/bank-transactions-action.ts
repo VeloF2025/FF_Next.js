@@ -14,6 +14,7 @@ import {
   unmatchTransaction,
   excludeTransaction,
   autoMatchTransactions,
+  allocateTransaction,
 } from '@/modules/accounting/services/bankReconciliationService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -22,7 +23,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId } = req.body;
+    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description } = req.body;
+    // @ts-expect-error — auth middleware attaches user
+    const userId: string = req.user?.id || req.user?.userId || 'system';
 
     if (!action) return apiResponse.badRequest(res, 'action is required');
 
@@ -47,6 +50,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'auto_match': {
         if (!bankAccountId) return apiResponse.badRequest(res, 'bankAccountId is required');
         const result = await autoMatchTransactions(bankAccountId, reconciliationId);
+        return apiResponse.success(res, result);
+      }
+      case 'allocate': {
+        if (!bankTransactionId || !contraAccountId) {
+          return apiResponse.badRequest(res, 'bankTransactionId and contraAccountId are required');
+        }
+        const result = await allocateTransaction(bankTransactionId, contraAccountId, userId, description);
         return apiResponse.success(res, result);
       }
       default:

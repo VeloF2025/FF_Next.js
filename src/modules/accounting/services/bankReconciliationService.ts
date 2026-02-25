@@ -488,6 +488,83 @@ export async function createAdjustmentEntry(
   }
 }
 
+// ── Allocate (Sage-style "Process Bank") ────────────────────────────────────
+
+/**
+ * Allocate a bank transaction to a GL account.
+ * Creates a balanced journal entry (bank ↔ contra account) and auto-matches.
+ */
+export async function allocateTransaction(
+  bankTxId: string,
+  contraAccountId: string,
+  userId: string,
+  description?: string
+): Promise<{ journalEntryId: string; bankTransaction: BankTransaction }> {
+  // Get the bank transaction
+  const txRows = (await sql`
+    SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID
+  `) as Row[];
+  if (txRows.length === 0) throw new Error(`Bank transaction ${bankTxId} not found`);
+  const tx = txRows[0]!;
+
+  if (tx.status !== 'imported') {
+    throw new Error(`Transaction already ${tx.status} — cannot allocate`);
+  }
+
+  const amount = Math.abs(Number(tx.amount));
+  const bankAccountId = String(tx.bank_account_id);
+  const txDate = tx.transaction_date instanceof Date
+    ? tx.transaction_date.toISOString().split('T')[0]
+    : String(tx.transaction_date).split('T')[0];
+  const entryDesc = description || tx.description || 'Bank allocation';
+
+  // Money in (positive amount) = debit bank, credit contra
+  // Money out (negative amount) = debit contra, credit bank
+  const isCredit = Number(tx.amount) > 0;
+  const lines: JournalLineInput[] = isCredit
+    ? [
+        { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
+        { glAccountId: contraAccountId, debit: 0, credit: amount, description: entryDesc },
+      ]
+    : [
+        { glAccountId: contraAccountId, debit: amount, credit: 0, description: entryDesc },
+        { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
+      ];
+
+  const je = await createJournalEntry({
+    entryDate: txDate,
+    description: entryDesc,
+    source: 'bank_allocation',
+    sourceDocumentId: bankTxId,
+    lines,
+  }, userId);
+  await postJournalEntry(je.id, userId);
+
+  // Find the bank-side journal line to match against
+  const jeLines = (await sql`
+    SELECT id FROM gl_journal_lines
+    WHERE journal_entry_id = ${je.id}::UUID
+      AND gl_account_id = ${bankAccountId}::UUID
+    LIMIT 1
+  `) as Row[];
+
+  const journalLineId = jeLines.length > 0 ? String(jeLines[0]!.id) : null;
+
+  // Auto-match the bank transaction to the journal line
+  if (journalLineId) {
+    await sql`
+      UPDATE bank_transactions
+      SET status = 'matched', matched_journal_line_id = ${journalLineId}::UUID, updated_at = NOW()
+      WHERE id = ${bankTxId}::UUID
+    `;
+  }
+
+  log.info('Allocated bank transaction', { bankTxId, journalEntryId: je.id, contraAccountId }, 'accounting');
+
+  const updated = (await sql`SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID`) as Row[];
+  return { journalEntryId: je.id, bankTransaction: mapTxRow(updated[0]!) };
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 async function updateReconciledBalance(reconciliationId: string): Promise<void> {

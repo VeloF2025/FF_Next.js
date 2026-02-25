@@ -50,6 +50,7 @@ const TABS: Tab[] = [
     id: 'banking', label: 'Banking',
     items: [
       { label: 'Bank Accounts', href: '/accounting/bank-accounts' },
+      { label: 'Transactions', href: '/accounting/bank-transactions' },
       { label: 'Import Statement', href: '/accounting/bank-reconciliation/import' },
       { label: 'Reconcile', href: '/accounting/bank-reconciliation' },
       { label: 'Mapping Rules', href: '/accounting/bank-reconciliation/rules' },
