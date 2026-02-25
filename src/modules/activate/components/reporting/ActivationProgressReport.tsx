@@ -59,8 +59,9 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
   const [sortField, setSortField] = useState<SortField>('completion_percent');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Filter toggle - hide zone/pon = 0
+  // Filter toggles
   const [hideZeroValues, setHideZeroValues] = useState(true);
+  const [hideComplete, setHideComplete] = useState(false);
 
   // Fetch data
   useEffect(() => {
@@ -124,9 +125,11 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
     if (!data?.flat) return [];
     let filtered = data.flat;
 
-    // Filter out zone/pon = 0 AND rows with 0 activations if toggle is on
     if (hideZeroValues) {
       filtered = filtered.filter(row => row.zone_no > 0 && row.pon_no > 0 && row.activated > 0);
+    }
+    if (hideComplete) {
+      filtered = filtered.filter(row => row.completion_percent < 100);
     }
 
     const sorted = [...filtered];
@@ -142,24 +145,32 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
       return 0;
     });
     return sorted;
-  }, [data?.flat, sortField, sortDir, hideZeroValues]);
+  }, [data?.flat, sortField, sortDir, hideZeroValues, hideComplete]);
 
   // Filter hierarchy data
   const filteredHierarchy = useMemo(() => {
     if (!data?.hierarchy) return [];
-    if (!hideZeroValues) return data.hierarchy;
+    let projects = data.hierarchy;
 
-    return data.hierarchy.map(project => ({
-      ...project,
-      zones: project.zones
-        .filter(zone => zone.zone_no > 0 && zone.activated > 0)
-        .map(zone => ({
-          ...zone,
-          pons: zone.pons.filter(pon => pon.pon_no > 0 && pon.activated > 0),
-        }))
-        .filter(zone => zone.pons.length > 0),
-    })).filter(project => project.zones.length > 0);
-  }, [data?.hierarchy, hideZeroValues]);
+    if (hideComplete) {
+      projects = projects.filter(p => p.completion_percent < 100);
+    }
+
+    if (hideZeroValues) {
+      projects = projects.map(project => ({
+        ...project,
+        zones: project.zones
+          .filter(zone => zone.zone_no > 0 && zone.activated > 0)
+          .map(zone => ({
+            ...zone,
+            pons: zone.pons.filter(pon => pon.pon_no > 0 && pon.activated > 0),
+          }))
+          .filter(zone => zone.pons.length > 0),
+      })).filter(project => project.zones.length > 0);
+    }
+
+    return projects;
+  }, [data?.hierarchy, hideZeroValues, hideComplete]);
 
   // Summary always shows full totals - Hide Zero only affects displayed zones/PONs
   // Total Scope = all DRs in scope, Activated = all activated DRs
@@ -251,19 +262,33 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
           </div>
         </div>
 
-        {/* Hide Zero Toggle */}
-        <button
-          onClick={() => setHideZeroValues(!hideZeroValues)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
-            hideZeroValues
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-card text-muted-foreground border-border hover:bg-accent'
-          }`}
-          title={hideZeroValues ? 'Showing zones/PONs with assigned values only' : 'Click to hide Zone 0 and PON 0'}
-        >
-          {hideZeroValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          {hideZeroValues ? 'Hiding Zero' : 'Show All'}
-        </button>
+        {/* Filter Toggles */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHideComplete(!hideComplete)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              hideComplete
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-card text-muted-foreground border-border hover:bg-accent'
+            }`}
+            title={hideComplete ? 'Showing incomplete projects only' : 'Click to hide 100% complete projects'}
+          >
+            {hideComplete ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {hideComplete ? 'Hiding Complete' : 'Hide Complete'}
+          </button>
+          <button
+            onClick={() => setHideZeroValues(!hideZeroValues)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              hideZeroValues
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-card text-muted-foreground border-border hover:bg-accent'
+            }`}
+            title={hideZeroValues ? 'Showing zones/PONs with assigned values only' : 'Click to hide Zone 0 and PON 0'}
+          >
+            {hideZeroValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {hideZeroValues ? 'Hiding Zero' : 'Hide Zero'}
+          </button>
+        </div>
 
         {/* Granularity Tabs */}
         <div className="flex items-center gap-2">
@@ -294,7 +319,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
         <SummaryCard
           label="Total Scope"
           value={summary.total_scope.toLocaleString()}
-          subtext="DRs in SOW"
+          subtext="DRs in Scope"
           color="blue"
         />
         <SummaryCard

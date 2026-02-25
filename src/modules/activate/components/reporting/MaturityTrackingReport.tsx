@@ -25,6 +25,8 @@ import {
   CheckCircle2,
   Circle,
   Filter,
+  EyeOff,
+  Eye,
 } from 'lucide-react';
 import type {
   MaturityTrackingResponse,
@@ -306,25 +308,31 @@ export function MaturityTrackingReport({ projectId, projectName }: MaturityTrack
 
       {/* Filters and Export */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hideComplete}
-              onChange={(e) => setHideComplete(e.target.checked)}
-              className="rounded border-[var(--ff-border-light)]"
-            />
-            Hide Complete (100%)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hideZero}
-              onChange={(e) => setHideZero(e.target.checked)}
-              className="rounded border-[var(--ff-border-light)]"
-            />
-            Hide Zero Activations
-          </label>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setHideComplete(!hideComplete)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              hideComplete
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
+            }`}
+            title={hideComplete ? 'Showing incomplete projects only' : 'Click to hide 100% complete projects'}
+          >
+            {hideComplete ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {hideComplete ? 'Hiding Complete' : 'Hide Complete'}
+          </button>
+          <button
+            onClick={() => setHideZero(!hideZero)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
+              hideZero
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
+            }`}
+            title={hideZero ? 'Showing projects with activations only' : 'Click to hide projects with zero activations'}
+          >
+            {hideZero ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {hideZero ? 'Hiding Zero' : 'Hide Zero'}
+          </button>
         </div>
         <button
           onClick={exportCsv}
