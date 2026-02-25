@@ -208,7 +208,7 @@ function OverviewTab() {
       icon: BookOpen,
       color: '#10b981',
       subtitle: 'Active accounts in chart',
-      route: '/accounting?tab=chart-of-accounts',
+      route: '/accounting/chart-of-accounts',
     },
     {
       title: 'Journal Entries',
@@ -216,7 +216,7 @@ function OverviewTab() {
       icon: FileSpreadsheet,
       color: '#3b82f6',
       subtitle: 'Total entries',
-      route: '/accounting?tab=journal-entries',
+      route: '/accounting/journal-entries',
     },
     {
       title: 'Draft Entries',
@@ -224,7 +224,7 @@ function OverviewTab() {
       icon: FileText,
       color: '#f59e0b',
       subtitle: 'Awaiting posting',
-      route: '/accounting?tab=journal-entries',
+      route: '/accounting/journal-entries',
     },
     {
       title: 'Current Period',
@@ -232,7 +232,7 @@ function OverviewTab() {
       icon: Calendar,
       color: '#8b5cf6',
       subtitle: 'Active fiscal period',
-      route: '/accounting?tab=fiscal-periods',
+      route: '/accounting/fiscal-periods',
     },
   ];
 
@@ -257,7 +257,7 @@ function OverviewTab() {
         </Link>
 
         <Link
-          href="/accounting?tab=reports"
+          href="/accounting/trial-balance"
           className="flex items-center gap-3 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] hover:border-blue-500/50 hover:shadow-md transition-all group no-underline"
         >
           <div className="p-2 rounded-lg bg-blue-500/10">
@@ -271,7 +271,7 @@ function OverviewTab() {
         </Link>
 
         <Link
-          href="/accounting?tab=fiscal-periods"
+          href="/accounting/fiscal-periods"
           className="flex items-center gap-3 p-4 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] hover:border-purple-500/50 hover:shadow-md transition-all group no-underline"
         >
           <div className="p-2 rounded-lg bg-purple-500/10">
@@ -426,7 +426,7 @@ function OverviewTab() {
         <div className="px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Recent Journal Entries</h3>
           <Link
-            href="/accounting?tab=journal-entries"
+            href="/accounting/journal-entries"
             className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
           >
             View All
