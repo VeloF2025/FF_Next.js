@@ -187,6 +187,7 @@ export default withAuth(withErrorHandler(async (
           purchase_order_id,
           item_code,
           stock_item_id,
+          boq_item_id,
           item_description,
           quantity_ordered,
           uom,
@@ -195,8 +196,9 @@ export default withAuth(withErrorHandler(async (
           requisition_item_id
         ) VALUES (
           ${newPO.id},
-          ${`ITEM-${i + 1}`},
+          ${item.item_code || `ITEM-${i + 1}`},
           ${item.stock_item_id || null},
+          ${item.boq_item_id || null},
           ${item.item_description || 'Item'},
           ${quantity},
           ${item.uom || 'EA'},

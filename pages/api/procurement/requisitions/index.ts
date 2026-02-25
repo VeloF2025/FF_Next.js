@@ -127,7 +127,9 @@ export default withAuth(withErrorHandler(async (
             estimated_unit_price,
             estimated_total,
             suggested_supplier_id,
-            notes
+            notes,
+            boq_item_id,
+            item_type
           ) VALUES (
             ${requisition!.id},
             ${item.stockItemId || null},
@@ -138,7 +140,9 @@ export default withAuth(withErrorHandler(async (
             ${item.estimatedUnitPrice || null},
             ${estimatedTotal},
             ${item.suggestedSupplierId || null},
-            ${item.notes || null}
+            ${item.notes || null},
+            ${item.boqItemId || null},
+            ${item.itemType || 'adhoc'}
           )
         `;
       }
@@ -189,6 +193,8 @@ export default withAuth(withErrorHandler(async (
           convertedToPo: item.converted_to_po as boolean,
           rfqId: item.rfq_id as string | undefined,
           poId: item.po_id as string | undefined,
+          boqItemId: item.boq_item_id as string | undefined,
+          itemType: (item.item_type as 'boq' | 'adhoc') ?? 'adhoc',
           createdAt: item.created_at as string,
         })),
         createdAt: fullRequisition!.created_at,

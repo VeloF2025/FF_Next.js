@@ -1,6 +1,7 @@
 /**
  * Step1Requirements — Requisition creation form for the Procurement Workflow Wizard.
  * Items table is extracted into RequisitionItemsTable to respect the 300-line limit.
+ * BOQ-aware: when a project with a BOQ is selected, each item row shows a BOQ/ad-hoc toggle.
  */
 
 import { useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import type { WorkflowState } from '../useWorkflowState';
 import { RequisitionItemsTable, type FormItem } from './RequisitionItemsTable';
 import { loadStep1Draft, useStep1Draft } from './useStep1Draft';
 import { log } from '@/lib/logger';
-// calcTotal below is local and avoids importing the shared helper to keep concerns clear
+import type { BOQLineUtilization } from '@/types/procurement/boq-utilization.types';
 
 // 🟢 WORKING: constants
 const URGENCY_OPTIONS: { value: RequisitionUrgency; label: string }[] = [
@@ -34,6 +35,7 @@ export interface Step1RequirementsProps {
 function makeItem(): FormItem {
   return {
     id: crypto.randomUUID(),
+    itemType: 'adhoc',
     itemDescription: '',
     quantity: '',
     uom: 'units',
@@ -57,10 +59,12 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [boqLines, setBoqLines] = useState<BOQLineUtilization[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // Load projects list
   useEffect(() => {
     const load = async () => {
       try {
@@ -75,6 +79,28 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
     };
     load();
   }, []);
+
+  // Load BOQ utilization when project changes
+  useEffect(() => {
+    if (!projectId) {
+      setBoqLines([]);
+      return;
+    }
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/boq-utilization`);
+        const json = await res.json() as { success: boolean; data?: { lines: BOQLineUtilization[] } };
+        if (json.success && json.data) {
+          setBoqLines(json.data.lines);
+        } else {
+          setBoqLines([]);
+        }
+      } catch {
+        setBoqLines([]);
+      }
+    };
+    load();
+  }, [projectId]);
 
   // Auto-save form to localStorage whenever any field changes
   useEffect(() => {
@@ -101,13 +127,49 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
   };
 
   const updateItem = <K extends keyof FormItem>(index: number, field: K, value: FormItem[K]) => {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+    setItems((prev) => prev.map((item, i) => {
+      if (i !== index) return item;
+      // When switching from BOQ to adhoc, clear BOQ fields
+      if (field === 'itemType' && value === 'adhoc') {
+        return { ...item, itemType: 'adhoc', boqItemId: undefined, itemCode: undefined };
+      }
+      // When switching from adhoc to BOQ, clear stock description
+      if (field === 'itemType' && value === 'boq') {
+        return { ...item, itemType: 'boq', itemDescription: '', itemCode: undefined, boqItemId: undefined };
+      }
+      return { ...item, [field]: value };
+    }));
   };
 
   // Atomically patch description + uom when a stock item is selected
   const selectStock = (index: number, patch: { itemDescription: string; uom: string }) => {
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, ...patch } : item))
+    );
+  };
+
+  // Atomically patch BOQ fields when a BOQ line is selected
+  const selectBOQ = (
+    index: number,
+    patch: { boqItemId: string; itemDescription: string; itemCode: string; uom: string; quantity: number | '' }
+  ) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, boqItemId: patch.boqItemId, itemDescription: patch.itemDescription,
+              itemCode: patch.itemCode, uom: patch.uom, quantity: patch.quantity }
+          : item
+      )
+    );
+  };
+
+  const clearBOQ = (index: number) => {
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? { ...item, boqItemId: undefined, itemDescription: '', itemCode: undefined, quantity: '' }
+          : item
+      )
     );
   };
 
@@ -123,6 +185,8 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
         errors[`item_${i}_description`] = 'Description must be at least 3 characters';
       if (item.quantity !== '' && (item.quantity as number) <= 0)
         errors[`item_${i}_quantity`] = 'Quantity must be greater than 0';
+      if (item.itemType === 'boq' && !item.boqItemId)
+        errors[`item_${i}_description`] = 'Please select a BOQ line or switch to Ad-hoc';
     });
 
     if (requiredDate) {
@@ -160,10 +224,13 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
           .filter((item) => item.itemDescription.trim() && item.quantity !== '' && (item.quantity as number) > 0)
           .map((item) => ({
             itemDescription: item.itemDescription,
+            itemCode: item.itemCode || undefined,
             quantity: item.quantity as number,
             uom: item.uom,
             estimatedUnitPrice:
               item.estimatedUnitPrice !== '' ? (item.estimatedUnitPrice as number) : undefined,
+            boqItemId: item.boqItemId || undefined,
+            itemType: item.itemType,
           })),
       };
 
@@ -242,6 +309,11 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
             </div>
+            {projectId && boqLines.length > 0 && (
+              <p className="mt-1 text-xs text-purple-400">
+                {boqLines.length} BOQ lines available for this project
+              </p>
+            )}
           </div>
 
           {/* Department */}
@@ -312,10 +384,13 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
       <RequisitionItemsTable
         items={items}
         fieldErrors={fieldErrors}
+        boqLines={boqLines}
         onAdd={addItem}
         onRemove={removeItem}
         onUpdate={updateItem}
         onSelectStock={selectStock}
+        onSelectBOQ={selectBOQ}
+        onClearBOQ={clearBOQ}
       />
 
       {/* Submit */}

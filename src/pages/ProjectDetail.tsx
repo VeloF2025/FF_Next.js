@@ -4,6 +4,7 @@ import { useProject, useProjectHierarchy, useDeleteProject } from '@/hooks/usePr
 import { EnhancedSOWDisplay } from '@/components/sow/EnhancedSOWDisplay';
 import { ProjectHSTab } from '@/modules/health-safety/components';
 import BOQList from '@/components/procurement/boq/BOQList';
+import { BOQUtilizationTable } from '@/components/procurement/boq/BOQUtilizationTable';
 import { ActivationBlockersCard } from '@/modules/projects/components/activation';
 
 // Import split components
@@ -231,14 +232,20 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
       )}
 
       {activeTab === 'boq' && (
-        <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
-          <div className="p-4 border-b border-[var(--ff-border-light)]">
-            <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Bill of Quantities</h3>
-            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
-              Materials and equipment allocated to this project from BOQ imports
-            </p>
+        <div className="space-y-6">
+          {/* Utilization summary — shows ordered/received vs BOQ plan */}
+          <BOQUtilizationTable projectId={id!} />
+
+          {/* BOQ list (existing) */}
+          <div className="bg-[var(--ff-card-bg)] rounded-lg border border-[var(--ff-border-light)]">
+            <div className="p-4 border-b border-[var(--ff-border-light)]">
+              <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Bill of Quantities</h3>
+              <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+                Materials and equipment allocated to this project from BOQ imports
+              </p>
+            </div>
+            <BOQList projectId={id} />
           </div>
-          <BOQList projectId={id} />
         </div>
       )}
 
