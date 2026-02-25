@@ -1,8 +1,9 @@
 /**
- * BOQUtilizationTable — shows per-line BOQ vs ordered vs received quantities,
- * plus a non-BOQ (ad-hoc) items section at the bottom.
+ * BOQUtilizationTable — BOQ financial utilization view.
+ * Shows BOQ Value / Ordered Value / Remaining Value per line,
+ * with KPI summary cards and a progress bar at the top.
  *
- * Used on the project detail page → BOQ tab.
+ * Used on the project detail page → BOQ/Materials tab.
  */
 
 import { useEffect, useState } from 'react';
@@ -17,22 +18,51 @@ interface BOQUtilizationTableProps {
 function statusBadge(line: BOQLineUtilization) {
   switch (line.status) {
     case 'fully_ordered':
-      return <span className="inline-flex items-center gap-1 text-xs text-green-400"><span>●</span> Ordered</span>;
+      return <span className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">● Ordered</span>;
     case 'over_ordered':
-      return <span className="inline-flex items-center gap-1 text-xs text-orange-400"><span>▲</span> Over</span>;
+      return <span className="inline-flex items-center gap-1 text-xs text-orange-400 font-medium">▲ Over</span>;
     case 'partial':
-      return <span className="inline-flex items-center gap-1 text-xs text-amber-400"><span>◑</span> Partial</span>;
+      return <span className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium">◑ Partial</span>;
     default:
-      return <span className="inline-flex items-center gap-1 text-xs text-[var(--ff-text-tertiary)]"><span>○</span> Not ordered</span>;
+      return <span className="inline-flex items-center gap-1 text-xs text-[var(--ff-text-tertiary)]">○ Not ordered</span>;
   }
 }
 
-function formatQty(n: number, uom: string) {
+function fmtQty(n: number, uom: string) {
   return `${n.toLocaleString('en-ZA', { maximumFractionDigits: 2 })} ${uom}`;
 }
 
-function formatZAR(n: number) {
-  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 }).format(n);
+function fmtZAR(n: number) {
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+    maximumFractionDigits: 0,
+  }).format(n);
+}
+
+/** Stacked cell: value on top (primary), qty below (secondary) */
+function ValueCell({
+  value,
+  qty,
+  uom,
+  valueClass = 'text-[var(--ff-text-primary)]',
+  empty = false,
+}: {
+  value: number;
+  qty: number;
+  uom: string;
+  valueClass?: string;
+  empty?: boolean;
+}) {
+  if (empty || (value === 0 && qty === 0)) {
+    return <span className="text-[var(--ff-text-tertiary)]">—</span>;
+  }
+  return (
+    <div>
+      <div className={`text-sm font-medium ${valueClass}`}>{fmtZAR(value)}</div>
+      <div className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">{fmtQty(qty, uom)}</div>
+    </div>
+  );
 }
 
 export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
@@ -47,7 +77,11 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
       setError(null);
       try {
         const res = await fetch(`/api/projects/${projectId}/boq-utilization`);
-        const json = await res.json() as { success: boolean; data?: BOQUtilizationResponse; error?: { message: string } };
+        const json = await res.json() as {
+          success: boolean;
+          data?: BOQUtilizationResponse;
+          error?: { message: string };
+        };
         if (json.success && json.data) {
           setData(json.data);
         } else {
@@ -73,9 +107,7 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
   }
 
   if (error) {
-    return (
-      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">{error}</div>
-    );
+    return <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">{error}</div>;
   }
 
   if (!data || data.lines.length === 0) {
@@ -87,57 +119,80 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
   }
 
   const { summary, lines, nonBoqItems } = data;
+  const remainingValue = summary.totalBoqValue - summary.totalOrderedValue;
+  const remainingPercent = summary.totalBoqValue > 0
+    ? Math.round((remainingValue / summary.totalBoqValue) * 100)
+    : 0;
+
   const visibleLines = hideZero ? lines.filter((l) => l.boqQty > 0) : lines;
   const hiddenCount = lines.length - visibleLines.length;
 
   return (
-    <div className="space-y-6">
-      {/* Summary bar */}
-      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-        <div className="flex flex-wrap gap-6 mb-3">
-          <div>
-            <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">Total BOQ Value</p>
-            <p className="text-lg font-semibold text-[var(--ff-text-primary)]">{formatZAR(summary.totalBoqValue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">Ordered</p>
-            <p className="text-lg font-semibold text-purple-400">
-              {formatZAR(summary.totalOrderedValue)}
-              <span className="ml-1.5 text-sm font-normal text-[var(--ff-text-tertiary)]">({summary.orderedPercent}%)</span>
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">Received</p>
-            <p className="text-lg font-semibold text-green-400">
-              {formatZAR(summary.totalReceivedValue)}
-              <span className="ml-1.5 text-sm font-normal text-[var(--ff-text-tertiary)]">({summary.receivedPercent}%)</span>
-            </p>
-          </div>
-          {nonBoqItems.length > 0 && (
-            <div>
-              <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">Ad-hoc Items</p>
-              <p className="text-lg font-semibold text-amber-400">{nonBoqItems.length}</p>
-            </div>
-          )}
+    <div className="space-y-4">
+
+      {/* ── KPI Summary Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* BOQ Value */}
+        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
+          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Total BOQ Value</p>
+          <p className="text-xl font-bold text-[var(--ff-text-primary)]">{fmtZAR(summary.totalBoqValue)}</p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{summary.boqLineCount} lines</p>
         </div>
-        {/* Progress bar */}
-        <div className="h-2 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
+
+        {/* Ordered */}
+        <div className="bg-[var(--ff-bg-secondary)] border border-purple-500/30 rounded-lg p-4">
+          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Ordered</p>
+          <p className="text-xl font-bold text-purple-400">{fmtZAR(summary.totalOrderedValue)}</p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+            {summary.orderedPercent}% of BOQ · {summary.orderedLineCount} of {summary.boqLineCount} lines
+          </p>
+        </div>
+
+        {/* Remaining */}
+        <div className="bg-[var(--ff-bg-secondary)] border border-amber-500/30 rounded-lg p-4">
+          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Remaining</p>
+          <p className="text-xl font-bold text-amber-400">{fmtZAR(remainingValue)}</p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{remainingPercent}% still to order</p>
+        </div>
+
+        {/* Received */}
+        <div className="bg-[var(--ff-bg-secondary)] border border-green-500/30 rounded-lg p-4">
+          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Received</p>
+          <p className="text-xl font-bold text-green-400">{fmtZAR(summary.totalReceivedValue)}</p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{summary.receivedPercent}% of BOQ</p>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-4 py-3">
+        <div className="flex justify-between text-xs text-[var(--ff-text-tertiary)] mb-1.5">
+          <span>Ordered {summary.orderedPercent}%</span>
+          <span>Remaining {remainingPercent}%</span>
+        </div>
+        <div className="h-2.5 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden flex">
           <div
-            className="h-full bg-purple-500 rounded-full transition-all"
+            className="h-full bg-purple-500 transition-all"
             style={{ width: `${Math.min(summary.orderedPercent, 100)}%` }}
           />
+          {summary.receivedPercent > 0 && (
+            <div
+              className="h-full bg-green-500 transition-all -ml-px"
+              style={{ width: `${Math.min(summary.receivedPercent, summary.orderedPercent)}%` }}
+            />
+          )}
         </div>
-        <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
-          {summary.orderedLineCount} of {summary.boqLineCount} lines have been ordered
+        <p className="mt-1.5 text-xs text-[var(--ff-text-tertiary)]">
+          {summary.orderedLineCount} of {summary.boqLineCount} lines ordered
+          {nonBoqItems.length > 0 && ` · ${nonBoqItems.length} ad-hoc item${nonBoqItems.length > 1 ? 's' : ''} outside BOQ`}
         </p>
       </div>
 
-      {/* BOQ Lines table */}
+      {/* ── Line-item table ── */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between gap-2 p-4 border-b border-[var(--ff-border-light)]">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-purple-400" />
-            <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">BOQ Line Utilization</h4>
+            <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">BOQ Line Detail</h4>
             <span className="text-xs text-[var(--ff-text-tertiary)]">
               {visibleLines.length} of {lines.length} lines
             </span>
@@ -151,62 +206,148 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
                 : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
             }`}
           >
-            {hideZero ? `Hide zero qty (${hiddenCount})` : `Show zero qty (${hiddenCount})`}
+            {hideZero ? `Hide zero qty (${hiddenCount})` : `Show all (${hiddenCount} zero)`}
           </button>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Item Code</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Description</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Qty</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Ordered</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Outstanding</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Status</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-28">
+                  Item Code
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
+                  Description
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-36">
+                  BOQ Value
+                  <div className="text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]/70">qty</div>
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-purple-400/80 uppercase w-36">
+                  Ordered
+                  <div className="text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]/70">qty</div>
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-amber-400/80 uppercase w-36">
+                  Remaining
+                  <div className="text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]/70">qty</div>
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-green-400/80 uppercase w-36">
+                  Received
+                  <div className="text-[10px] font-normal normal-case text-[var(--ff-text-tertiary)]/70">qty</div>
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-28">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
-              {visibleLines.map((line: BOQLineUtilization) => (
-                <tr
-                  key={line.id}
-                  className={`hover:bg-[var(--ff-bg-hover)] transition-colors ${
-                    line.status === 'fully_ordered' || line.status === 'over_ordered' ? 'opacity-70' : ''
-                  }`}
-                >
-                  <td className="px-4 py-2.5">
-                    <span className="text-xs text-blue-400 font-mono">{line.itemCode ?? '—'}</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-[var(--ff-text-primary)] max-w-xs truncate">{line.description}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">{formatQty(line.boqQty, line.uom)}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">
-                    {line.orderedQty > 0 ? formatQty(line.orderedQty, line.uom) : <span className="text-[var(--ff-text-tertiary)]">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">
-                    {line.receivedQty > 0 ? formatQty(line.receivedQty, line.uom) : <span className="text-[var(--ff-text-tertiary)]">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <span className={line.outstandingQty <= 0 ? 'text-[var(--ff-text-tertiary)]' : 'text-[var(--ff-text-primary)]'}>
-                      {formatQty(Math.max(0, line.outstandingQty), line.uom)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">{statusBadge(line)}</td>
-                </tr>
-              ))}
+              {visibleLines.map((line: BOQLineUtilization) => {
+                const boqVal = line.boqValue ?? 0;
+                const ordVal = line.orderedValue ?? 0;
+                const remVal = boqVal - ordVal;
+                const recVal = line.receivedQty * (line.unitPrice ?? 0);
+
+                return (
+                  <tr
+                    key={line.id}
+                    className={`hover:bg-[var(--ff-bg-hover)] transition-colors ${
+                      line.status === 'fully_ordered' || line.status === 'over_ordered' ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-blue-400 font-mono">{line.itemCode ?? '—'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-[var(--ff-text-primary)]">
+                      <span className="line-clamp-2 text-sm leading-tight">{line.description}</span>
+                    </td>
+
+                    {/* BOQ Value + qty */}
+                    <td className="px-4 py-3 text-right">
+                      <ValueCell value={boqVal} qty={line.boqQty} uom={line.uom} empty={boqVal === 0 && line.unitPrice === null} />
+                    </td>
+
+                    {/* Ordered */}
+                    <td className="px-4 py-3 text-right">
+                      <ValueCell
+                        value={ordVal}
+                        qty={line.orderedQty}
+                        uom={line.uom}
+                        valueClass="text-purple-400"
+                        empty={line.orderedQty === 0}
+                      />
+                    </td>
+
+                    {/* Remaining */}
+                    <td className="px-4 py-3 text-right">
+                      <ValueCell
+                        value={Math.max(0, remVal)}
+                        qty={Math.max(0, line.outstandingQty)}
+                        uom={line.uom}
+                        valueClass={remVal <= 0 ? 'text-[var(--ff-text-tertiary)]' : 'text-amber-400'}
+                        empty={false}
+                      />
+                    </td>
+
+                    {/* Received */}
+                    <td className="px-4 py-3 text-right">
+                      <ValueCell
+                        value={recVal}
+                        qty={line.receivedQty}
+                        uom={line.uom}
+                        valueClass="text-green-400"
+                        empty={line.receivedQty === 0}
+                      />
+                    </td>
+
+                    <td className="px-4 py-3">{statusBadge(line)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
+
+            {/* Footer totals */}
+            <tfoot>
+              <tr className="border-t-2 border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                <td colSpan={2} className="px-4 py-3 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">
+                  Total ({visibleLines.length} lines)
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm font-semibold text-[var(--ff-text-primary)]">
+                    {fmtZAR(visibleLines.reduce((s, l) => s + (l.boqValue ?? 0), 0))}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm font-semibold text-purple-400">
+                    {fmtZAR(visibleLines.reduce((s, l) => s + (l.orderedValue ?? 0), 0))}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm font-semibold text-amber-400">
+                    {fmtZAR(visibleLines.reduce((s, l) => s + Math.max(0, (l.boqValue ?? 0) - (l.orderedValue ?? 0)), 0))}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="text-sm font-semibold text-green-400">
+                    {fmtZAR(visibleLines.reduce((s, l) => s + l.receivedQty * (l.unitPrice ?? 0), 0))}
+                  </span>
+                </td>
+                <td />
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
 
-      {/* Non-BOQ (ad-hoc) items */}
+      {/* ── Non-BOQ ad-hoc items ── */}
       {nonBoqItems.length > 0 && (
-        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 p-4 border-b border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] border border-amber-500/20 rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
             <Package className="h-4 w-4 text-amber-400" />
             <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">
-              Non-BOQ Items (Ad-hoc orders not in BOQ)
+              Ad-hoc Orders <span className="text-amber-400">({nonBoqItems.length})</span>
             </h4>
+            <span className="text-xs text-[var(--ff-text-tertiary)]">not in BOQ</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -214,9 +355,10 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
                 <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Item Code</th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Description</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Ordered</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">PO Number</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Value</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Qty Ordered</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Qty Received</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">PO</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -225,7 +367,10 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
                     <td className="px-4 py-2.5">
                       <span className="text-xs text-amber-400 font-mono">{item.itemCode ?? '—'}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-[var(--ff-text-primary)] max-w-xs truncate">{item.itemDescription}</td>
+                    <td className="px-4 py-2.5 text-[var(--ff-text-primary)]">{item.itemDescription}</td>
+                    <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">
+                      {item.totalPrice ? fmtZAR(item.totalPrice) : '—'}
+                    </td>
                     <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">{item.quantityOrdered.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-[var(--ff-text-secondary)]">{item.quantityReceived.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-blue-400 font-mono text-xs">{item.poNumber}</td>
