@@ -18,31 +18,52 @@ export default withAuth(withErrorHandler(async (
 
   if (req.method === 'GET') {
     try {
-      const { page = '1', limit = '50' } = req.query;
+      const { page = '1', limit = '50', poId } = req.query;
       const pageNum = parseInt(page as string, 10);
       const limitNum = parseInt(limit as string, 10);
       const offset = (pageNum - 1) * limitNum;
 
-      // Get GRNs with related info (simple query without filters for now)
-      const grns = await sql`
-        SELECT
-          grn.*,
-          po.po_number as purchase_order_number,
-          COALESCE(s.company_name, s.name) as supplier_name,
-          sl.name as warehouse_name
-        FROM goods_receipt_notes grn
-        LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
-        LEFT JOIN suppliers s ON grn.supplier_id = s.id
-        LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
-        ORDER BY grn.created_at DESC
-        LIMIT ${limitNum} OFFSET ${offset}
-      `;
+      // Get GRNs with related info, optionally filtered by PO
+      const grns = poId
+        ? await sql`
+            SELECT
+              grn.*,
+              po.po_number as purchase_order_number,
+              COALESCE(s.company_name, s.name) as supplier_name,
+              sl.name as warehouse_name
+            FROM goods_receipt_notes grn
+            LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
+            LEFT JOIN suppliers s ON grn.supplier_id = s.id
+            LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
+            WHERE grn.purchase_order_id = ${poId as string}
+            ORDER BY grn.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offset}
+          `
+        : await sql`
+            SELECT
+              grn.*,
+              po.po_number as purchase_order_number,
+              COALESCE(s.company_name, s.name) as supplier_name,
+              sl.name as warehouse_name
+            FROM goods_receipt_notes grn
+            LEFT JOIN purchase_orders po ON grn.purchase_order_id = po.id
+            LEFT JOIN suppliers s ON grn.supplier_id = s.id
+            LEFT JOIN stock_locations sl ON grn.warehouse_id = sl.id
+            ORDER BY grn.created_at DESC
+            LIMIT ${limitNum} OFFSET ${offset}
+          `;
 
       // Get total count
-      const countResult = await sql`
-        SELECT COUNT(*)::int as total
-        FROM goods_receipt_notes grn
-      `;
+      const countResult = poId
+        ? await sql`
+            SELECT COUNT(*)::int as total
+            FROM goods_receipt_notes grn
+            WHERE grn.purchase_order_id = ${poId as string}
+          `
+        : await sql`
+            SELECT COUNT(*)::int as total
+            FROM goods_receipt_notes grn
+          `;
 
       // Transform to list items
       const items: GRNListItem[] = grns.map((r: Record<string, unknown>) => ({
