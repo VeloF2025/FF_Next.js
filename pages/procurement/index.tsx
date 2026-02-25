@@ -24,7 +24,8 @@ import {
   Send,
   ClipboardList,
   FileInput,
-  PackageCheck
+  PackageCheck,
+  Workflow,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -214,16 +215,26 @@ export default function ProcurementPage({
           {/* Page Header */}
           <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
             <div className="px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <ShoppingCart className="h-6 w-6 text-purple-500" />
+              <div className="flex items-center justify-between flex-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <ShoppingCart className="h-6 w-6 text-purple-500" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
+                    <p className="text-sm text-[var(--ff-text-secondary)]">
+                      Manage procurement across all projects
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Procurement</h1>
-                  <p className="text-sm text-[var(--ff-text-secondary)]">
-                    Manage procurement across all projects
-                  </p>
-                </div>
+                <Link
+                  href="/procurement/workflow"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  <Workflow className="h-4 w-4" />
+                  New Procurement Workflow
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             </div>
 

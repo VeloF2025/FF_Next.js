@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
+import Link from 'next/link';
 import {
   ClipboardCheck,
   Search,
@@ -20,6 +21,7 @@ import {
   Loader2,
   Check,
   X,
+  Settings,
 } from 'lucide-react';
 import type { MyApprovalTask, WorkflowType, PendingApprovalsCount } from '@/types/procurement/approval.types';
 import { log } from '@/lib/logger';
@@ -190,14 +192,23 @@ export default function ApprovalsPage() {
                   </p>
                 </div>
               </div>
-              {summary && summary.overdue > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-red-400" />
-                  <span className="text-sm font-medium text-red-400">
-                    {summary.overdue} overdue
-                  </span>
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                {summary && summary.overdue > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 rounded-lg">
+                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                    <span className="text-sm font-medium text-red-400">
+                      {summary.overdue} overdue
+                    </span>
+                  </div>
+                )}
+                <Link
+                  href="/settings?tab=procurement"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                  Approval Settings
+                </Link>
+              </div>
             </div>
           </div>
 
