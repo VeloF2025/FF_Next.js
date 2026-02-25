@@ -1,32 +1,26 @@
 /**
  * Field Operations section configuration
+ *
+ * Single entry point — sub-navigation handled via horizontal tabs at the top of the page.
+ * Currently only Civil QA (Construction QA); more items can be added as tabs.
  */
 
-import { Smartphone, MapPin, Wrench, MessageSquare, Camera, TrendingUp, FileCheck, CheckSquare, HardHat } from 'lucide-react';
+import { HardHat } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
-  section: 'FIELD OPERATIONS',
+  section: 'Field Operations',
   sectionId: 'field-ops',
-  isCollapsible: true,
+  sectionLink: '/construction-qa',
+  isCollapsible: false,
   items: [
     {
       to: '/construction-qa',
       icon: HardHat,
-      label: 'Civil QA',
-      shortLabel: 'CQA',
+      label: 'Field Operations',
+      shortLabel: 'Field Ops',
       permissions: [],
       rbacKey: 'field',
     },
-    // QField QA deprecated — data migrated to Construction QA (2026-02-20)
-    // { to: '/qfield/qa', icon: CheckSquare, label: 'QField QA', shortLabel: 'QF QA', permissions: [], rbacKey: 'field' },
-    // Hidden items - uncomment as needed:
-    // { to: '/field', icon: Smartphone, label: 'Field App Portal', shortLabel: 'Field', permissions: [], rbacKey: 'field' },
-    // { to: '/onemap', icon: MapPin, label: 'OneMap Data Grid', shortLabel: 'OneMap', permissions: [], rbacKey: 'projects.onemap' },
-    // { to: '/nokia-equipment', icon: Wrench, label: 'Nokia Equipment', shortLabel: 'Nokia', permissions: [], rbacKey: 'field' },
-    // { to: '/wa-monitor', icon: MessageSquare, label: 'WA Monitor', shortLabel: 'WA', permissions: [], rbacKey: 'field' },
-    // { to: '/wa-monitor/dr-validation', icon: FileCheck, label: 'DR Validation', shortLabel: 'DR Valid', permissions: [], rbacKey: 'field' },
-    // { to: '/marketing-activations', icon: TrendingUp, label: 'Marketing Activations', shortLabel: 'Marketing', permissions: [], rbacKey: 'field' },
-    // { to: '/photo-review', icon: Camera, label: 'Photo Review', shortLabel: 'Photos', permissions: [], rbacKey: 'activate' },
-  ]
+  ],
 };
