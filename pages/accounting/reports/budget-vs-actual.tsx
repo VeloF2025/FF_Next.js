@@ -4,9 +4,10 @@
  * Compare budgeted amounts per GL account against actual GL balances
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { BarChart3, Loader2, AlertCircle, Download } from 'lucide-react';
+import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
+import { BarChart3, Loader2, AlertCircle, Download, ChevronDown, ChevronRight } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -30,11 +31,26 @@ interface BudgetReport {
   total_variance: number;
 }
 
+function getDrillDownDates(period: string): { start: string; end: string } {
+  const now = new Date();
+  const year = now.getFullYear();
+  const todayStr = now.toISOString().split('T')[0] ?? `${year}-01-01`;
+  if (period === 'ytd') return { start: `${year}-01-01`, end: todayStr };
+  if (period === 'full_year') return { start: `${year}-01-01`, end: `${year}-12-31` };
+  // current period = current month
+  const monthStart = new Date(year, now.getMonth(), 1);
+  const monthStartStr = monthStart.toISOString().split('T')[0] ?? `${year}-01-01`;
+  return { start: monthStartStr, end: todayStr };
+}
+
 export default function BudgetVsActualPage() {
   const [report, setReport] = useState<BudgetReport | null>(null);
   const [fiscalPeriod, setFiscalPeriod] = useState('current');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
+
+  const drillDates = getDrillDownDates(fiscalPeriod);
 
   const loadReport = useCallback(async () => {
     setIsLoading(true);
@@ -127,26 +143,47 @@ export default function BudgetVsActualPage() {
                   {report.lines.map((line) => {
                     const pct = line.budget_amount > 0 ? (line.actual_amount / line.budget_amount) * 100 : 0;
                     return (
-                      <tr key={line.account_code} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                        <td className="py-3 px-4 font-mono text-[var(--ff-text-tertiary)]">{line.account_code}</td>
-                        <td className="py-3 px-4 text-[var(--ff-text-primary)]">{line.account_name}</td>
-                        <td className="py-3 px-4 text-right text-[var(--ff-text-secondary)]">{formatCurrency(line.budget_amount)}</td>
-                        <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">{formatCurrency(line.actual_amount)}</td>
-                        <td className={`py-3 px-4 text-right font-medium ${line.variance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {formatCurrency(line.variance)}
-                        </td>
-                        <td className={`py-3 px-4 text-right text-xs ${line.variance_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {line.variance_pct.toFixed(1)}%
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="w-full h-2 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
+                      <React.Fragment key={line.account_code}>
+                        <tr
+                          onClick={() => setExpandedAccount(expandedAccount === line.account_code ? null : line.account_code)}
+                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
+                        >
+                          <td className="py-3 px-4 font-mono text-[var(--ff-text-tertiary)]">
+                            <span className="flex items-center gap-1">
+                              {expandedAccount === line.account_code
+                                ? <ChevronDown className="h-3 w-3" />
+                                : <ChevronRight className="h-3 w-3" />}
+                              {line.account_code}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-[var(--ff-text-primary)]">{line.account_name}</td>
+                          <td className="py-3 px-4 text-right text-[var(--ff-text-secondary)]">{formatCurrency(line.budget_amount)}</td>
+                          <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">{formatCurrency(line.actual_amount)}</td>
+                          <td className={`py-3 px-4 text-right font-medium ${line.variance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {formatCurrency(line.variance)}
+                          </td>
+                          <td className={`py-3 px-4 text-right text-xs ${line.variance_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {line.variance_pct.toFixed(1)}%
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="w-full h-2 bg-[var(--ff-bg-tertiary)] rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedAccount === line.account_code && (
+                          <AccountDrillDown
+                            accountCode={line.account_code}
+                            periodStart={drillDates.start}
+                            periodEnd={drillDates.end}
+                            asTableRow
+                            colSpan={7}
+                          />
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

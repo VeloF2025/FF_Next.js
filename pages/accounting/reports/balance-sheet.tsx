@@ -6,8 +6,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { BalanceSheetReport } from '@/modules/accounting/types/gl.types';
+import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -18,6 +19,7 @@ export default function BalanceSheetPage() {
   const [report, setReport] = useState<BalanceSheetReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
 
   const loadReport = useCallback(async () => {
     if (!asAtDate) return;
@@ -38,6 +40,8 @@ export default function BalanceSheetPage() {
   useEffect(() => { loadReport(); }, [loadReport]);
 
   const balanced = report ? Math.abs(report.totalAssets - (report.totalLiabilities + report.totalEquity)) < 0.02 : false;
+  const drillDownStart = (asAtDate ?? '').slice(0, 4) + '-01-01';
+  const drillDownEnd = asAtDate ?? '';
 
   return (
     <AppLayout>
@@ -89,16 +93,28 @@ export default function BalanceSheetPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Assets */}
                 <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-                  <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-blue-500/5">
+                  <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-blue-500/5 flex items-center">
                     <h3 className="font-semibold text-blue-400">Assets</h3>
+                    <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
                   </div>
                   <div className="divide-y divide-[var(--ff-border-light)]">
                     {report.assets.map(a => (
-                      <div key={a.accountCode} className="px-6 py-2 flex justify-between text-sm">
-                        <span className="text-[var(--ff-text-secondary)]">
-                          <span className="font-mono text-xs mr-2">{a.accountCode}</span>{a.accountName}
-                        </span>
-                        <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(a.balance)}</span>
+                      <div key={a.accountCode}>
+                        <button
+                          onClick={() => setExpandedAccount(expandedAccount === a.accountCode ? null : a.accountCode)}
+                          className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
+                            {expandedAccount === a.accountCode
+                              ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
+                              : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                            <span className="font-mono text-xs mr-2">{a.accountCode}</span>{a.accountName}
+                          </span>
+                          <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(a.balance)}</span>
+                        </button>
+                        {expandedAccount === a.accountCode && (
+                          <AccountDrillDown accountCode={a.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
+                        )}
                       </div>
                     ))}
                     {report.assets.length === 0 && (
@@ -115,16 +131,28 @@ export default function BalanceSheetPage() {
                 <div className="space-y-4">
                   {/* Liabilities */}
                   <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-                    <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-amber-500/5">
+                    <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-amber-500/5 flex items-center">
                       <h3 className="font-semibold text-amber-400">Liabilities</h3>
+                      <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
                     </div>
                     <div className="divide-y divide-[var(--ff-border-light)]">
                       {report.liabilities.map(l => (
-                        <div key={l.accountCode} className="px-6 py-2 flex justify-between text-sm">
-                          <span className="text-[var(--ff-text-secondary)]">
-                            <span className="font-mono text-xs mr-2">{l.accountCode}</span>{l.accountName}
-                          </span>
-                          <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(l.balance)}</span>
+                        <div key={l.accountCode}>
+                          <button
+                            onClick={() => setExpandedAccount(expandedAccount === l.accountCode ? null : l.accountCode)}
+                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
+                              {expandedAccount === l.accountCode
+                                ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
+                                : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                              <span className="font-mono text-xs mr-2">{l.accountCode}</span>{l.accountName}
+                            </span>
+                            <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(l.balance)}</span>
+                          </button>
+                          {expandedAccount === l.accountCode && (
+                            <AccountDrillDown accountCode={l.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
+                          )}
                         </div>
                       ))}
                       {report.liabilities.length === 0 && (
@@ -139,16 +167,28 @@ export default function BalanceSheetPage() {
 
                   {/* Equity */}
                   <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-                    <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-purple-500/5">
+                    <div className="px-6 py-3 border-b border-[var(--ff-border-light)] bg-purple-500/5 flex items-center">
                       <h3 className="font-semibold text-purple-400">Equity</h3>
+                      <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click to drill down</span>
                     </div>
                     <div className="divide-y divide-[var(--ff-border-light)]">
                       {report.equity.map(e => (
-                        <div key={e.accountCode} className="px-6 py-2 flex justify-between text-sm">
-                          <span className="text-[var(--ff-text-secondary)]">
-                            <span className="font-mono text-xs mr-2">{e.accountCode}</span>{e.accountName}
-                          </span>
-                          <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(e.balance)}</span>
+                        <div key={e.accountCode}>
+                          <button
+                            onClick={() => setExpandedAccount(expandedAccount === e.accountCode ? null : e.accountCode)}
+                            className="w-full px-6 py-2 flex justify-between text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer"
+                          >
+                            <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
+                              {expandedAccount === e.accountCode
+                                ? <ChevronDown className="h-3 w-3 text-[var(--ff-text-tertiary)]" />
+                                : <ChevronRight className="h-3 w-3 text-[var(--ff-text-tertiary)]" />}
+                              <span className="font-mono text-xs mr-2">{e.accountCode}</span>{e.accountName}
+                            </span>
+                            <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(e.balance)}</span>
+                          </button>
+                          {expandedAccount === e.accountCode && (
+                            <AccountDrillDown accountCode={e.accountCode} periodStart={drillDownStart} periodEnd={drillDownEnd} />
+                          )}
                         </div>
                       ))}
                       {report.equity.length === 0 && (

@@ -3,9 +3,10 @@
  * Phase 5: Full trial balance with fiscal period selector + CSV export
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Scale, Loader2, AlertCircle, Download } from 'lucide-react';
+import { Scale, Loader2, AlertCircle, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
 interface TBRow {
   accountCode: string; accountName: string; accountType: string;
@@ -24,6 +25,7 @@ export default function TrialBalancePage() {
   const [totalCredit, setTotalCredit] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
 
   // Load fiscal periods
   useEffect(() => {
@@ -62,6 +64,10 @@ export default function TrialBalancePage() {
 
   const balanced = Math.abs(totalDebit - totalCredit) < 0.02;
 
+  const selectedPeriodObj = periods.find(p => p.id === selectedPeriod);
+  const drillDownStart = selectedPeriodObj?.startDate?.split('T')[0] || new Date().toISOString().split('T')[0].slice(0, 4) + '-01-01';
+  const drillDownEnd = selectedPeriodObj?.endDate?.split('T')[0] || new Date().toISOString().split('T')[0];
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
@@ -71,7 +77,7 @@ export default function TrialBalancePage() {
               <div className="p-2 rounded-lg bg-indigo-500/10"><Scale className="h-6 w-6 text-indigo-500" /></div>
               <div>
                 <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Trial Balance</h1>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Account balances for selected fiscal period</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Account balances for selected fiscal period — Click any account to drill down</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -131,13 +137,34 @@ export default function TrialBalancePage() {
                 </tr></thead>
                 <tbody>
                   {rows.map(r => (
-                    <tr key={r.accountCode} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
-                      <td className="px-4 py-3 font-mono text-[var(--ff-text-tertiary)]">{r.accountCode}</td>
-                      <td className="px-4 py-3 text-[var(--ff-text-primary)]">{r.accountName}</td>
-                      <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-xs bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)]">{r.accountType}</span></td>
-                      <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.debitBalance > 0 ? fmt(r.debitBalance) : '—'}</td>
-                      <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.creditBalance > 0 ? fmt(r.creditBalance) : '—'}</td>
-                    </tr>
+                    <React.Fragment key={r.accountCode}>
+                      <tr
+                        onClick={() => setExpandedAccount(expandedAccount === r.accountCode ? null : r.accountCode)}
+                        className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50 cursor-pointer"
+                      >
+                        <td className="px-4 py-3 font-mono text-[var(--ff-text-tertiary)]">
+                          <span className="flex items-center gap-1">
+                            {expandedAccount === r.accountCode
+                              ? <ChevronDown className="h-3 w-3" />
+                              : <ChevronRight className="h-3 w-3" />}
+                            {r.accountCode}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--ff-text-primary)]">{r.accountName}</td>
+                        <td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-xs bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)]">{r.accountType}</span></td>
+                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.debitBalance > 0 ? fmt(r.debitBalance) : '—'}</td>
+                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{r.creditBalance > 0 ? fmt(r.creditBalance) : '—'}</td>
+                      </tr>
+                      {expandedAccount === r.accountCode && (
+                        <AccountDrillDown
+                          accountCode={r.accountCode}
+                          periodStart={drillDownStart}
+                          periodEnd={drillDownEnd}
+                          asTableRow
+                          colSpan={5}
+                        />
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
                 <tfoot>

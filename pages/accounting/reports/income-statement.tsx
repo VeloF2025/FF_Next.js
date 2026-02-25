@@ -6,8 +6,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, BarChart3, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import type { IncomeStatementReport } from '@/modules/accounting/types/gl.types';
+import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -29,6 +30,11 @@ export default function IncomeStatementPage() {
   const [report, setReport] = useState<IncomeStatementReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
+
+  function toggleAccount(code: string) {
+    setExpandedAccount(prev => (prev === code ? null : code));
+  }
 
   const loadReport = useCallback(async () => {
     if (!periodStart || !periodEnd) return;
@@ -99,11 +105,13 @@ export default function IncomeStatementPage() {
 
               <div className="divide-y divide-[var(--ff-border-light)]">
                 {/* Revenue */}
-                <Section label="Revenue" items={report.revenue} total={report.totalRevenue} color="emerald" />
+                <Section label="Revenue" items={report.revenue} total={report.totalRevenue} color="emerald"
+                  periodStart={periodStart} periodEnd={periodEnd} expandedAccount={expandedAccount} onToggleAccount={toggleAccount} />
 
                 {/* Cost of Sales */}
                 {report.costOfSales.length > 0 && (
-                  <Section label="Cost of Sales" items={report.costOfSales} total={report.totalCostOfSales} color="orange" />
+                  <Section label="Cost of Sales" items={report.costOfSales} total={report.totalCostOfSales} color="orange"
+                    periodStart={periodStart} periodEnd={periodEnd} expandedAccount={expandedAccount} onToggleAccount={toggleAccount} />
                 )}
 
                 {/* Gross Profit */}
@@ -115,7 +123,8 @@ export default function IncomeStatementPage() {
                 </div>
 
                 {/* Operating Expenses */}
-                <Section label="Operating Expenses" items={report.operatingExpenses} total={report.totalOperatingExpenses} color="red" />
+                <Section label="Operating Expenses" items={report.operatingExpenses} total={report.totalOperatingExpenses} color="red"
+                  periodStart={periodStart} periodEnd={periodEnd} expandedAccount={expandedAccount} onToggleAccount={toggleAccount} />
 
                 {/* Net Profit */}
                 <div className="px-6 py-4 flex justify-between bg-[var(--ff-bg-primary)]">
@@ -133,26 +142,48 @@ export default function IncomeStatementPage() {
   );
 }
 
-function Section({ label, items, total, color }: {
+function Section({ label, items, total, color, periodStart, periodEnd, expandedAccount, onToggleAccount }: {
   label: string;
   items: Array<{ accountCode: string; accountName: string; amount: number }>;
   total: number;
   color: string;
+  periodStart: string;
+  periodEnd: string;
+  expandedAccount: string | null;
+  onToggleAccount: (code: string) => void;
 }) {
   return (
     <div>
-      <div className={`px-6 py-2 bg-${color}-500/5`}>
+      <div className={`px-6 py-2 bg-${color}-500/5 flex items-center`}>
         <span className={`text-sm font-semibold text-${color}-400`}>{label}</span>
+        <span className="text-xs text-[var(--ff-text-tertiary)] ml-auto">Click account to expand</span>
       </div>
-      {items.map(item => (
-        <div key={item.accountCode} className="px-6 py-2 flex justify-between text-sm">
-          <span className="text-[var(--ff-text-secondary)]">
-            <span className="font-mono text-xs mr-2">{item.accountCode}</span>
-            {item.accountName}
-          </span>
-          <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(item.amount)}</span>
-        </div>
-      ))}
+      {items.map(item => {
+        const isExpanded = expandedAccount === item.accountCode;
+        return (
+          <div key={item.accountCode}>
+            <button
+              type="button"
+              onClick={() => onToggleAccount(item.accountCode)}
+              className="w-full px-6 py-2 flex justify-between items-center text-sm hover:bg-[var(--ff-bg-tertiary)] cursor-pointer text-left"
+            >
+              <span className="flex items-center gap-1 text-[var(--ff-text-secondary)]">
+                {isExpanded
+                  ? <ChevronDown className="h-3 w-3 shrink-0 text-[var(--ff-text-tertiary)]" />
+                  : <ChevronRight className="h-3 w-3 shrink-0 text-[var(--ff-text-tertiary)]" />}
+                <span className="font-mono text-xs mr-1">{item.accountCode}</span>
+                {item.accountName}
+              </span>
+              <span className="font-mono text-[var(--ff-text-primary)]">{formatCurrency(item.amount)}</span>
+            </button>
+            {isExpanded && (
+              <div className="px-6 pb-3">
+                <AccountDrillDown accountCode={item.accountCode} periodStart={periodStart} periodEnd={periodEnd} />
+              </div>
+            )}
+          </div>
+        );
+      })}
       {items.length === 0 && (
         <div className="px-6 py-2 text-sm text-[var(--ff-text-tertiary)]">No entries</div>
       )}
