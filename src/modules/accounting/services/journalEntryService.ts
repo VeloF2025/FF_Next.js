@@ -14,6 +14,7 @@ import type {
   GLEntryStatus,
   GLEntrySource,
   TrialBalanceRow,
+  VatType,
 } from '../types/gl.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,13 +169,14 @@ export async function createJournalEntry(
       await sql`
         INSERT INTO gl_journal_lines (
           journal_entry_id, gl_account_id, debit, credit,
-          description, project_id, cost_center_id
+          description, project_id, cost_center_id, vat_type
         ) VALUES (
           ${entryId}::UUID, ${line.glAccountId}::UUID,
           ${line.debit}, ${line.credit},
           ${line.description || null},
           ${line.projectId || null},
-          ${line.costCenterId || null}
+          ${line.costCenterId || null},
+          ${line.vatType || null}
         )
       `;
     }
@@ -331,6 +333,7 @@ function mapLineRow(row: Row): JournalLine {
     description: row.description ? String(row.description) : undefined,
     projectId: row.project_id ? String(row.project_id) : undefined,
     costCenterId: row.cost_center_id ? String(row.cost_center_id) : undefined,
+    vatType: row.vat_type ? String(row.vat_type) as VatType : undefined,
     createdAt: String(row.created_at),
     accountCode: row.account_code ? String(row.account_code) : undefined,
     accountName: row.account_name ? String(row.account_name) : undefined,

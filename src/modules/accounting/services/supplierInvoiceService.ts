@@ -15,7 +15,7 @@ import type {
   SupplierInvoiceStatus,
   InvoiceMatchStatus,
 } from '../types/ap.types';
-import type { JournalLineInput } from '../types/gl.types';
+import type { JournalLineInput, VatType } from '../types/gl.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
@@ -169,13 +169,14 @@ export async function createSupplierInvoice(
         INSERT INTO supplier_invoice_items (
           supplier_invoice_id, po_item_id, description, quantity,
           unit_price, tax_rate, tax_amount, line_total,
-          gl_account_id, project_id, cost_center_id
+          gl_account_id, project_id, cost_center_id, vat_classification
         ) VALUES (
           ${invoiceId}::UUID, ${item.poItemId || null}, ${item.description},
           ${item.quantity}, ${item.unitPrice}, ${item.taxRate},
           ${item.taxAmount}, ${item.lineTotal},
           ${item.glAccountId || null}, ${item.projectId || null},
-          ${item.costCenterId || null}
+          ${item.costCenterId || null},
+          ${item.vatClassification || (item.taxRate > 0 ? 'standard' : 'zero_rated')}
         )
       `;
     }
@@ -227,6 +228,7 @@ export async function approveSupplierInvoice(
         debit: invoice.taxAmount,
         credit: 0,
         description: `VAT on ${invoice.invoiceNumber}`,
+        vatType: 'standard',
       });
     }
 
@@ -388,6 +390,7 @@ function mapItemRow(row: Row): SupplierInvoiceItem {
     glAccountId: row.gl_account_id ? String(row.gl_account_id) : undefined,
     projectId: row.project_id ? String(row.project_id) : undefined,
     costCenterId: row.cost_center_id ? String(row.cost_center_id) : undefined,
+    vatClassification: row.vat_classification ? String(row.vat_classification) as VatType : undefined,
     createdAt: String(row.created_at),
   };
 }

@@ -209,64 +209,200 @@ async function calculateRetainedEarnings(asAtDate: string): Promise<number> {
   return Number(rows[0]!.revenue) - Number(rows[0]!.expenses);
 }
 
-// ── VAT Return ───────────────────────────────────────────────────────────────
+// ── VAT201 Return (SA SARS) ─────────────────────────────────────────────────
+
+interface VAT201BoxDef {
+  box: string;
+  label: string;
+  accountType: 'liability' | 'asset';
+  vatTypes: string[];
+}
+
+const OUTPUT_BOXES: VAT201BoxDef[] = [
+  { box: '1',   label: 'Standard rated supplies',           accountType: 'liability', vatTypes: ['standard'] },
+  { box: '1A',  label: 'Capital goods/services supplied',   accountType: 'liability', vatTypes: ['capital_goods'] },
+  { box: '2',   label: 'Zero-rated supplies (domestic)',    accountType: 'liability', vatTypes: ['zero_rated'] },
+  { box: '2A',  label: 'Zero-rated exports',                accountType: 'liability', vatTypes: ['export'] },
+  { box: '3',   label: 'Exempt supplies',                   accountType: 'liability', vatTypes: ['exempt'] },
+  { box: '12',  label: 'Imported services / other output',  accountType: 'liability', vatTypes: ['reverse_charge', 'imported'] },
+];
+
+const INPUT_BOXES: VAT201BoxDef[] = [
+  { box: '14',      label: 'Capital goods/services purchased', accountType: 'asset', vatTypes: ['capital_goods'] },
+  { box: '15',      label: 'Other goods/services purchased',   accountType: 'asset', vatTypes: ['standard'] },
+  { box: '14A/15A', label: 'Goods imported',                   accountType: 'asset', vatTypes: ['imported'] },
+  { box: '16',      label: 'Change in use',                    accountType: 'asset', vatTypes: ['reverse_charge'] },
+  { box: '17',      label: 'Bad debts',                        accountType: 'asset', vatTypes: ['bad_debt'] },
+  { box: '18',      label: 'Other adjustments',                accountType: 'asset', vatTypes: ['exempt', 'no_vat'] },
+];
+
+/** Line-level transaction shape used in drill-down arrays. */
+interface VATDrillDown {
+  journalEntryId: string;
+  entryNumber: string;
+  entryDate: string;
+  description: string;
+  sourceDocument?: string;
+  amount: number;
+}
+
+/** Populated VAT201 box with transactions list. */
+interface PopulatedBox {
+  box: string;
+  label: string;
+  amount: number;
+  transactions: VATDrillDown[];
+}
 
 export async function getVATReturn(
   periodStart: string,
   periodEnd: string
 ): Promise<VATReturnReport> {
   try {
-    // Output VAT (2120) — credits to this account
-    const outputRows = (await sql`
-      SELECT ga.account_code, ga.account_name,
-        COALESCE(SUM(jl.credit), 0) - COALESCE(SUM(jl.debit), 0) AS amount
+    // Fetch every posted journal line that touches a VAT-control account within the
+    // period. Two account codes are targeted: 2120 (Output VAT liability) and 1140
+    // (Input VAT asset). The account_subtype = 'tax' guard catches any additional
+    // tax sub-ledger accounts the chart of accounts may define in the future.
+    const vatLines = (await sql`
+      SELECT
+        jl.id              AS line_id,
+        jl.gl_account_id,
+        jl.debit,
+        jl.credit,
+        jl.vat_type,
+        jl.description     AS line_description,
+        je.id              AS journal_entry_id,
+        je.entry_number,
+        je.entry_date,
+        je.description     AS entry_description,
+        je.source_document_id,
+        ga.account_code,
+        ga.account_name,
+        ga.account_type
       FROM gl_journal_lines jl
       JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-      JOIN gl_accounts ga ON ga.id = jl.gl_account_id
+      JOIN gl_accounts ga        ON ga.id  = jl.gl_account_id
       WHERE je.status = 'posted'
         AND je.entry_date >= ${periodStart}
         AND je.entry_date <= ${periodEnd}
-        AND ga.account_subtype = 'tax'
-        AND ga.account_type = 'liability'
-      GROUP BY ga.id, ga.account_code, ga.account_name
-      ORDER BY ga.account_code
+        AND (
+          ga.account_code IN ('1140', '2120')
+          OR ga.account_subtype = 'tax'
+        )
+      ORDER BY je.entry_date, je.entry_number
     `) as Row[];
 
-    // Input VAT (1140) — debits to this account
-    const inputRows = (await sql`
-      SELECT ga.account_code, ga.account_name,
-        COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS amount
-      FROM gl_journal_lines jl
-      JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-      JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-      WHERE je.status = 'posted'
-        AND je.entry_date >= ${periodStart}
-        AND je.entry_date <= ${periodEnd}
-        AND (ga.account_code = '1140' OR ga.account_subtype = 'tax' AND ga.account_type = 'asset')
-      GROUP BY ga.id, ga.account_code, ga.account_name
-      ORDER BY ga.account_code
-    `) as Row[];
+    /** Build a drill-down transaction object from a raw journal line. */
+    const toDrillDown = (l: Row, signFn: (debit: number, credit: number) => number): VATDrillDown => ({
+      journalEntryId: String(l.journal_entry_id),
+      entryNumber:    String(l.entry_number),
+      entryDate:      String(l.entry_date),
+      description:    l.entry_description
+        ? String(l.entry_description)
+        : l.line_description
+          ? String(l.line_description)
+          : '',
+      sourceDocument: l.source_document_id ? String(l.source_document_id) : undefined,
+      amount: signFn(Number(l.debit), Number(l.credit)),
+    });
 
-    const outputDetails = outputRows.map((r: Row) => ({
-      accountCode: String(r.account_code),
-      accountName: String(r.account_name),
-      amount: Number(r.amount),
-    }));
-    const inputDetails = inputRows.map((r: Row) => ({
-      accountCode: String(r.account_code),
-      accountName: String(r.account_name),
-      amount: Number(r.amount),
-    }));
+    // ── Output Boxes ────────────────────────────────────────────────────────
+    const outputBoxes: PopulatedBox[] = OUTPUT_BOXES.map((boxDef) => {
+      const matching = vatLines.filter((l: Row) => {
+        const isOutput =
+          String(l.account_type) === 'liability' ||
+          String(l.account_code) === '2120';
+        const matchesType =
+          l.vat_type != null && boxDef.vatTypes.includes(String(l.vat_type));
+        return isOutput && matchesType;
+      });
 
-    const outputVAT = outputDetails.reduce((s, d) => s + d.amount, 0);
-    const inputVAT = inputDetails.reduce((s, d) => s + d.amount, 0);
+      // Output VAT: credit increases the liability; net = credit - debit.
+      const transactions = matching.map((l: Row) =>
+        toDrillDown(l, (d, c) => c - d)
+      );
+      const amount = transactions.reduce((s, t) => s + t.amount, 0);
+      return { box: boxDef.box, label: boxDef.label, amount, transactions };
+    });
+
+    // Unclassified output lines (vat_type IS NULL) default to Box 1 — standard.
+    const unclassifiedOutput = vatLines.filter((l: Row) => {
+      const isOutput =
+        String(l.account_type) === 'liability' ||
+        String(l.account_code) === '2120';
+      return isOutput && l.vat_type == null;
+    });
+    if (unclassifiedOutput.length > 0) {
+      const box1 = outputBoxes.find((b) => b.box === '1');
+      if (box1) {
+        const extra = unclassifiedOutput.map((l: Row) =>
+          toDrillDown(l, (d, c) => c - d)
+        );
+        box1.amount += extra.reduce((s, t) => s + t.amount, 0);
+        box1.transactions.push(...extra);
+      }
+    }
+
+    // ── Input Boxes ──────────────────────────────────────────────────────────
+    const inputBoxes: PopulatedBox[] = INPUT_BOXES.map((boxDef) => {
+      const matching = vatLines.filter((l: Row) => {
+        const isInput =
+          String(l.account_type) === 'asset' ||
+          String(l.account_code) === '1140';
+        const matchesType =
+          l.vat_type != null && boxDef.vatTypes.includes(String(l.vat_type));
+        return isInput && matchesType;
+      });
+
+      // Input VAT: debit increases the asset; net = debit - credit.
+      const transactions = matching.map((l: Row) =>
+        toDrillDown(l, (d, c) => d - c)
+      );
+      const amount = transactions.reduce((s, t) => s + t.amount, 0);
+      return { box: boxDef.box, label: boxDef.label, amount, transactions };
+    });
+
+    // Unclassified input lines (vat_type IS NULL) default to Box 15 — standard purchases.
+    const unclassifiedInput = vatLines.filter((l: Row) => {
+      const isInput =
+        String(l.account_type) === 'asset' ||
+        String(l.account_code) === '1140';
+      return isInput && l.vat_type == null;
+    });
+    if (unclassifiedInput.length > 0) {
+      const box15 = inputBoxes.find((b) => b.box === '15');
+      if (box15) {
+        const extra = unclassifiedInput.map((l: Row) =>
+          toDrillDown(l, (d, c) => d - c)
+        );
+        box15.amount += extra.reduce((s, t) => s + t.amount, 0);
+        box15.transactions.push(...extra);
+      }
+    }
+
+    // ── Totals ───────────────────────────────────────────────────────────────
+    const totalOutputTax = outputBoxes.reduce((s, b) => s + b.amount, 0);
+    const totalInputTax  = inputBoxes.reduce((s, b) => s + b.amount, 0);
+    const netVAT         = totalOutputTax - totalInputTax;
+
+    // Legacy compatibility fields — summarise non-zero boxes as account-like lines.
+    const outputDetails = outputBoxes
+      .filter((b) => Math.abs(b.amount) > 0.001)
+      .map((b) => ({ accountCode: b.box, accountName: b.label, amount: b.amount }));
+    const inputDetails = inputBoxes
+      .filter((b) => Math.abs(b.amount) > 0.001)
+      .map((b) => ({ accountCode: b.box, accountName: b.label, amount: b.amount }));
 
     return {
       periodStart,
       periodEnd,
-      outputVAT,
-      inputVAT,
-      netVAT: outputVAT - inputVAT,
+      outputBoxes,
+      totalOutputTax,
+      inputBoxes,
+      totalInputTax,
+      netVAT,
+      outputVAT: totalOutputTax,
+      inputVAT:  totalInputTax,
       outputDetails,
       inputDetails,
     };

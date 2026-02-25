@@ -3,6 +3,8 @@
  * Accounts Payable Type Definitions
  */
 
+import type { VatType } from './gl.types';
+
 export type SupplierInvoiceStatus =
   | 'draft'
   | 'pending_approval'
@@ -63,6 +65,7 @@ export interface SupplierInvoiceItem {
   unitPrice: number;
   taxRate: number;
   taxAmount: number;
+  vatClassification?: VatType;
   lineTotal: number;
   glAccountId?: string;
   projectId?: string;
@@ -92,6 +95,7 @@ export interface SupplierInvoiceItemInput {
   quantity: number;
   unitPrice: number;
   taxRate?: number;
+  vatClassification?: VatType;
   glAccountId?: string;
   projectId?: string;
   costCenterId?: string;

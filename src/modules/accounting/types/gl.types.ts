@@ -24,6 +24,17 @@ export type GLAccountSubtype =
   | 'other_current_liability'
   | 'other';
 
+export type VatType =
+  | 'standard'       // 15% standard rate
+  | 'zero_rated'     // 0% zero-rated supplies
+  | 'exempt'         // Exempt (no VAT, not recoverable)
+  | 'capital_goods'  // Standard-rated capital goods (separate VAT201 box)
+  | 'export'         // Zero-rated exports from RSA
+  | 'imported'       // Imported goods/services
+  | 'reverse_charge' // Domestic reverse charge (DRC)
+  | 'bad_debt'       // Bad debt recovery
+  | 'no_vat';        // No VAT applicable
+
 export type GLEntrySource =
   | 'manual'
   | 'auto_invoice'
@@ -176,6 +187,7 @@ export interface JournalLine {
   description?: string;
   projectId?: string;
   costCenterId?: string;
+  vatType?: VatType;
   createdAt: string;
   // Joined
   accountCode?: string;
@@ -198,6 +210,7 @@ export interface JournalLineInput {
   description?: string;
   projectId?: string;
   costCenterId?: string;
+  vatType?: VatType;
 }
 
 // ── Validation Results ───────────────────────────────────────────────────────
@@ -258,12 +271,36 @@ export interface BalanceSheetReport {
   totalEquity: number;
 }
 
+export interface VAT201Box {
+  box: string;
+  label: string;
+  amount: number;
+  transactions?: VAT201Transaction[];
+}
+
+export interface VAT201Transaction {
+  journalEntryId: string;
+  entryNumber: string;
+  entryDate: string;
+  description: string;
+  sourceDocument?: string;
+  amount: number;
+}
+
 export interface VATReturnReport {
   periodStart: string;
   periodEnd: string;
+  // Section A — Output Tax
+  outputBoxes: VAT201Box[];
+  totalOutputTax: number;
+  // Section B — Input Tax
+  inputBoxes: VAT201Box[];
+  totalInputTax: number;
+  // Net
+  netVAT: number;
+  // Legacy compatibility
   outputVAT: number;
   inputVAT: number;
-  netVAT: number;
   outputDetails: Array<{ accountCode: string; accountName: string; amount: number }>;
   inputDetails: Array<{ accountCode: string; accountName: string; amount: number }>;
 }
