@@ -15,6 +15,7 @@ import {
   excludeTransaction,
   autoMatchTransactions,
   allocateTransaction,
+  type AllocationType,
 } from '@/modules/accounting/services/bankReconciliationService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -23,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description } = req.body;
+    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description, allocationType, entityId } = req.body;
     // @ts-expect-error — auth middleware attaches user
     const userId: string = req.user?.id || req.user?.userId || 'system';
 
@@ -53,10 +54,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.success(res, result);
       }
       case 'allocate': {
-        if (!bankTransactionId || !contraAccountId) {
-          return apiResponse.badRequest(res, 'bankTransactionId and contraAccountId are required');
+        const aType: AllocationType = allocationType || 'account';
+        if (aType === 'account' && !contraAccountId) {
+          return apiResponse.badRequest(res, 'contraAccountId is required for account allocation');
         }
-        const result = await allocateTransaction(bankTransactionId, contraAccountId, userId, description);
+        if ((aType === 'supplier' || aType === 'customer') && !entityId) {
+          return apiResponse.badRequest(res, 'entityId is required for supplier/customer allocation');
+        }
+        if (!bankTransactionId) {
+          return apiResponse.badRequest(res, 'bankTransactionId is required');
+        }
+        const result = await allocateTransaction(
+          bankTransactionId, contraAccountId || '', userId, description, aType, entityId,
+        );
         return apiResponse.success(res, result);
       }
       default:

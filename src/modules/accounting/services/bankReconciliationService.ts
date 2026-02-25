@@ -490,15 +490,31 @@ export async function createAdjustmentEntry(
 
 // ── Allocate (Sage-style "Process Bank") ────────────────────────────────────
 
+export type AllocationType = 'account' | 'supplier' | 'customer';
+
+/** Look up a GL account by its code (e.g. '2110' for AP, '1120' for AR) */
+async function glAccountByCode(code: string): Promise<string> {
+  const rows = (await sql`
+    SELECT id FROM gl_accounts WHERE account_code = ${code} AND is_active = TRUE LIMIT 1
+  `) as Row[];
+  if (rows.length === 0) throw new Error(`GL account ${code} not found`);
+  return String(rows[0]!.id);
+}
+
 /**
- * Allocate a bank transaction to a GL account.
- * Creates a balanced journal entry (bank ↔ contra account) and auto-matches.
+ * Allocate a bank transaction — Sage Process Bank equivalent.
+ * Supports three types:
+ *   account  → DR/CR bank ↔ GL account
+ *   supplier → DR Accounts Payable (2110), CR Bank (payment out)
+ *   customer → DR Bank, CR Accounts Receivable (1120) (receipt in)
  */
 export async function allocateTransaction(
   bankTxId: string,
   contraAccountId: string,
   userId: string,
-  description?: string
+  description?: string,
+  allocType: AllocationType = 'account',
+  entityId?: string,
 ): Promise<{ journalEntryId: string; bankTransaction: BankTransaction }> {
   // Get the bank transaction
   const txRows = (await sql`
@@ -516,25 +532,53 @@ export async function allocateTransaction(
   const txDate = tx.transaction_date instanceof Date
     ? tx.transaction_date.toISOString().split('T')[0]
     : String(tx.transaction_date).split('T')[0];
-  const entryDesc = description || tx.description || 'Bank allocation';
 
-  // Money in (positive amount) = debit bank, credit contra
-  // Money out (negative amount) = debit contra, credit bank
-  const isCredit = Number(tx.amount) > 0;
-  const lines: JournalLineInput[] = isCredit
-    ? [
-        { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
-        { glAccountId: contraAccountId, debit: 0, credit: amount, description: entryDesc },
-      ]
-    : [
-        { glAccountId: contraAccountId, debit: amount, credit: 0, description: entryDesc },
-        { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
-      ];
+  let lines: JournalLineInput[];
+  let source: string;
+  let entryDesc: string;
+
+  if (allocType === 'supplier' && entityId) {
+    // Supplier payment: DR Accounts Payable, CR Bank
+    const apAccountId = await glAccountByCode('2110');
+    const supRows = (await sql`SELECT name FROM suppliers WHERE id = ${Number(entityId)}`) as Row[];
+    const supName = supRows.length > 0 ? String(supRows[0]!.name) : `Supplier #${entityId}`;
+    entryDesc = description || `Payment to ${supName}`;
+    source = 'bank_allocation_supplier';
+    lines = [
+      { glAccountId: apAccountId, debit: amount, credit: 0, description: entryDesc },
+      { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
+    ];
+  } else if (allocType === 'customer' && entityId) {
+    // Customer receipt: DR Bank, CR Accounts Receivable
+    const arAccountId = await glAccountByCode('1120');
+    const custRows = (await sql`SELECT company_name FROM clients WHERE id = ${entityId}::UUID`) as Row[];
+    const custName = custRows.length > 0 ? String(custRows[0]!.company_name) : `Customer #${entityId}`;
+    entryDesc = description || `Receipt from ${custName}`;
+    source = 'bank_allocation_customer';
+    lines = [
+      { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
+      { glAccountId: arAccountId, debit: 0, credit: amount, description: entryDesc },
+    ];
+  } else {
+    // Standard GL account allocation
+    entryDesc = description || tx.description || 'Bank allocation';
+    source = 'bank_allocation';
+    const isCredit = Number(tx.amount) > 0;
+    lines = isCredit
+      ? [
+          { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
+          { glAccountId: contraAccountId, debit: 0, credit: amount, description: entryDesc },
+        ]
+      : [
+          { glAccountId: contraAccountId, debit: amount, credit: 0, description: entryDesc },
+          { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
+        ];
+  }
 
   const je = await createJournalEntry({
     entryDate: txDate,
     description: entryDesc,
-    source: 'bank_allocation',
+    source,
     sourceDocumentId: bankTxId,
     lines,
   }, userId);
@@ -559,7 +603,9 @@ export async function allocateTransaction(
     `;
   }
 
-  log.info('Allocated bank transaction', { bankTxId, journalEntryId: je.id, contraAccountId }, 'accounting');
+  log.info('Allocated bank transaction', {
+    bankTxId, journalEntryId: je.id, allocType, entityId, contraAccountId,
+  }, 'accounting');
 
   const updated = (await sql`SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID`) as Row[];
   return { journalEntryId: je.id, bankTransaction: mapTxRow(updated[0]!) };
