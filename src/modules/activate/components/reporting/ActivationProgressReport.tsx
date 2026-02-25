@@ -269,7 +269,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
               hideComplete
                 ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-card text-muted-foreground border-border hover:bg-accent'
+                : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
             }`}
             title={hideComplete ? 'Showing incomplete projects only' : 'Click to hide 100% complete projects'}
           >
@@ -281,7 +281,7 @@ export function ActivationProgressReport({ filters, refreshKey }: ActivationProg
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors ${
               hideZeroValues
                 ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-card text-muted-foreground border-border hover:bg-accent'
+                : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
             }`}
             title={hideZeroValues ? 'Showing zones/PONs with assigned values only' : 'Click to hide Zone 0 and PON 0'}
           >
