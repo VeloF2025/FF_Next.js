@@ -515,6 +515,7 @@ export async function allocateTransaction(
   description?: string,
   allocType: AllocationType = 'account',
   entityId?: string,
+  vatCode?: string,
 ): Promise<{ journalEntryId: string; bankTransaction: BankTransaction }> {
   // Get the bank transaction
   const txRows = (await sql`
@@ -527,52 +528,84 @@ export async function allocateTransaction(
     throw new Error(`Transaction already ${tx.status} — cannot allocate`);
   }
 
-  const amount = Math.abs(Number(tx.amount));
+  const totalAmount = Math.abs(Number(tx.amount));
   const bankAccountId = String(tx.bank_account_id);
   const txDate = tx.transaction_date instanceof Date
     ? tx.transaction_date.toISOString().split('T')[0]
     : String(tx.transaction_date).split('T')[0];
+  const isSpent = Number(tx.amount) < 0;
+
+  // VAT splitting: Standard (15%) splits into net + VAT
+  const hasVat = vatCode === 'standard';
+  const vatRate = hasVat ? 15 : 0;
+  const netAmount = hasVat ? Math.round((totalAmount * 100 / 115) * 100) / 100 : totalAmount;
+  const vatAmount = hasVat ? Math.round((totalAmount - netAmount) * 100) / 100 : 0;
+  // VAT accounts: 1140 VAT Input (expenses/payments), 2120 VAT Output (sales/receipts)
+  const vatAccountCode = isSpent ? '1140' : '2120';
+  const mapVatType = vatCode === 'standard' ? 'standard' as const
+    : vatCode === 'zero_rated' ? 'zero_rated' as const
+    : vatCode === 'exempt' ? 'exempt' as const
+    : undefined;
 
   let lines: JournalLineInput[];
   let source: string;
   let entryDesc: string;
 
   if (allocType === 'supplier' && entityId) {
-    // Supplier payment: DR Accounts Payable, CR Bank
+    // Supplier payment: DR Accounts Payable, CR Bank (+ VAT Input if applicable)
     const apAccountId = await glAccountByCode('2110');
     const supRows = (await sql`SELECT name FROM suppliers WHERE id = ${Number(entityId)}`) as Row[];
     const supName = supRows.length > 0 ? String(supRows[0]!.name) : `Supplier #${entityId}`;
     entryDesc = description || `Payment to ${supName}`;
     source = 'auto_supplier_payment';
     lines = [
-      { glAccountId: apAccountId, debit: amount, credit: 0, description: entryDesc },
-      { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
+      { glAccountId: apAccountId, debit: netAmount, credit: 0, description: entryDesc, vatType: mapVatType },
+      { glAccountId: bankAccountId, debit: 0, credit: totalAmount, description: entryDesc },
     ];
+    if (hasVat) {
+      const vatAcctId = await glAccountByCode(vatAccountCode);
+      lines.splice(1, 0, { glAccountId: vatAcctId, debit: vatAmount, credit: 0, description: `VAT @ ${vatRate}%`, vatType: 'standard' });
+    }
   } else if (allocType === 'customer' && entityId) {
-    // Customer receipt: DR Bank, CR Accounts Receivable
+    // Customer receipt: DR Bank, CR Accounts Receivable (+ VAT Output if applicable)
     const arAccountId = await glAccountByCode('1120');
     const custRows = (await sql`SELECT company_name FROM clients WHERE id = ${entityId}::UUID`) as Row[];
     const custName = custRows.length > 0 ? String(custRows[0]!.company_name) : `Customer #${entityId}`;
     entryDesc = description || `Receipt from ${custName}`;
     source = 'auto_payment';
     lines = [
-      { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
-      { glAccountId: arAccountId, debit: 0, credit: amount, description: entryDesc },
+      { glAccountId: bankAccountId, debit: totalAmount, credit: 0, description: entryDesc },
+      { glAccountId: arAccountId, debit: 0, credit: netAmount, description: entryDesc, vatType: mapVatType },
     ];
+    if (hasVat) {
+      const vatAcctId = await glAccountByCode(vatAccountCode);
+      lines.push({ glAccountId: vatAcctId, debit: 0, credit: vatAmount, description: `VAT @ ${vatRate}%`, vatType: 'standard' });
+    }
   } else {
     // Standard GL account allocation
     entryDesc = description || tx.description || 'Bank allocation';
     source = 'auto_bank_recon';
-    const isCredit = Number(tx.amount) > 0;
-    lines = isCredit
-      ? [
-          { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
-          { glAccountId: contraAccountId, debit: 0, credit: amount, description: entryDesc },
-        ]
-      : [
-          { glAccountId: contraAccountId, debit: amount, credit: 0, description: entryDesc },
-          { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
-        ];
+    if (!isSpent) {
+      // Money in: DR Bank (total), CR Contra (net), CR VAT Output (vat)
+      lines = [
+        { glAccountId: bankAccountId, debit: totalAmount, credit: 0, description: entryDesc },
+        { glAccountId: contraAccountId, debit: 0, credit: netAmount, description: entryDesc, vatType: mapVatType },
+      ];
+      if (hasVat) {
+        const vatAcctId = await glAccountByCode(vatAccountCode);
+        lines.push({ glAccountId: vatAcctId, debit: 0, credit: vatAmount, description: `VAT @ ${vatRate}%`, vatType: 'standard' });
+      }
+    } else {
+      // Money out: DR Contra (net), DR VAT Input (vat), CR Bank (total)
+      lines = [
+        { glAccountId: contraAccountId, debit: netAmount, credit: 0, description: entryDesc, vatType: mapVatType },
+      ];
+      if (hasVat) {
+        const vatAcctId = await glAccountByCode(vatAccountCode);
+        lines.push({ glAccountId: vatAcctId, debit: vatAmount, credit: 0, description: `VAT @ ${vatRate}%`, vatType: 'standard' });
+      }
+      lines.push({ glAccountId: bankAccountId, debit: 0, credit: totalAmount, description: entryDesc });
+    }
   }
 
   const je = await createJournalEntry({

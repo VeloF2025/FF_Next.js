@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import {
-  BankTxTable, type AllocType, type BankTx, type SelectOption, type RowSelection,
+  BankTxTable, type AllocType, type VatCode, type BankTx, type SelectOption, type RowSelection,
 } from '@/components/accounting/BankTxTable';
 import {
   Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers,
@@ -125,6 +125,7 @@ export default function BankTransactionsPage() {
     try {
       const body: Record<string, string> = {
         action: 'allocate', bankTransactionId: txId, allocationType: sel.type,
+        vatCode: sel.vatCode || 'none',
       };
       if (sel.type === 'account') body.contraAccountId = sel.entityId;
       else body.entityId = sel.entityId;
@@ -159,6 +160,7 @@ export default function BankTransactionsPage() {
         const sel = rowSelections[txId];
         const body: Record<string, string> = {
           action: 'allocate', bankTransactionId: txId, allocationType: sel.type,
+          vatCode: sel.vatCode || 'none',
         };
         if (sel.type === 'account') body.contraAccountId = sel.entityId;
         else body.entityId = sel.entityId;
@@ -201,7 +203,7 @@ export default function BankTransactionsPage() {
   const applyBatchEdit = (entityId: string, label: string) => {
     const updates: Record<string, RowSelection> = { ...rowSelections };
     selectedIds.forEach(id => {
-      updates[id] = { type: batchType, entityId, label };
+      updates[id] = { type: batchType, entityId, label, vatCode: updates[id]?.vatCode || 'none' };
     });
     setRowSelections(updates);
     setShowBatchEdit(false);
@@ -402,12 +404,18 @@ export default function BankTransactionsPage() {
                 allSelected ? new Set() : new Set(filtered.map(t => t.id))
               )}
               onRowTypeChange={(txId, type) =>
-                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '' } }))
+                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode: prev[txId]?.vatCode || 'none' } }))
               }
               onRowEntityChange={(txId, entityId, label) =>
                 setRowSelections(prev => ({
                   ...prev,
-                  [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId, label },
+                  [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId, label, vatCode: prev[txId]?.vatCode || 'none' },
+                }))
+              }
+              onRowVatChange={(txId, vatCode) =>
+                setRowSelections(prev => ({
+                  ...prev,
+                  [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId: prev[txId]?.entityId || '', label: prev[txId]?.label || '', vatCode },
                 }))
               }
               onAccept={handleAccept}

@@ -1,12 +1,21 @@
 /**
  * Sage-style bank transaction table with inline allocation
  * Type selector: Account / Supplier / Customer — Selection dropdown changes accordingly
+ * VAT selector: No VAT / Standard 15% / Zero-Rated / Exempt
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { Check, X, Undo2, Search } from 'lucide-react';
 
 export type AllocType = 'account' | 'supplier' | 'customer';
+export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
+
+export const VAT_OPTIONS: { value: VatCode; label: string; rate: number }[] = [
+  { value: 'none', label: 'No VAT', rate: 0 },
+  { value: 'standard', label: 'Std 15%', rate: 15 },
+  { value: 'zero_rated', label: 'Zero', rate: 0 },
+  { value: 'exempt', label: 'Exempt', rate: 0 },
+];
 
 export interface BankTx {
   id: string;
@@ -28,6 +37,7 @@ export interface RowSelection {
   type: AllocType;
   entityId: string;
   label: string;
+  vatCode: VatCode;
 }
 
 interface Props {
@@ -43,6 +53,7 @@ interface Props {
   onSelectAll: () => void;
   onRowTypeChange: (txId: string, type: AllocType) => void;
   onRowEntityChange: (txId: string, entityId: string, label: string) => void;
+  onRowVatChange: (txId: string, vatCode: VatCode) => void;
   onAccept: (txId: string) => void;
   onExclude: (txId: string) => void;
   onUnmatch: (txId: string) => void;
@@ -56,7 +67,7 @@ export function BankTxTable(props: Props) {
   const {
     transactions, glAccounts, suppliers, customers,
     selectedIds, rowSelections, allSelected, tab,
-    onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange,
+    onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
     onAccept, onExclude, onUnmatch,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
@@ -212,7 +223,26 @@ export function BankTxTable(props: Props) {
                 <td className="py-2 px-2 text-xs font-mono text-[var(--ff-text-tertiary)]">
                   {tx.reference || tx.bankReference || ''}
                 </td>
-                <td className="py-2 px-2 text-xs text-[var(--ff-text-tertiary)]">No VAT</td>
+                <td className="py-2 px-2">
+                  {isNew ? (
+                    <select
+                      value={sel?.vatCode || 'none'}
+                      onChange={e => onRowVatChange(tx.id, e.target.value as VatCode)}
+                      className={`text-xs px-1 py-0.5 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] w-full ${
+                        (sel?.vatCode || 'none') === 'standard'
+                          ? 'text-cyan-400' : 'text-[var(--ff-text-primary)]'
+                      }`}
+                    >
+                      {VAT_OPTIONS.map(v => (
+                        <option key={v.value} value={v.value}>{v.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--ff-text-tertiary)]">
+                      {VAT_OPTIONS.find(v => v.value === (sel?.vatCode || 'none'))?.label || 'No VAT'}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2 px-2 text-right font-mono text-xs text-red-400">
                   {spent !== null ? fmtCurrency(spent) : ''}
                 </td>

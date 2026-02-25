@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description, allocationType, entityId } = req.body;
+    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description, allocationType, entityId, vatCode } = req.body;
     // @ts-expect-error — auth middleware attaches user
     const userId: string = req.user?.id || req.user?.userId || 'system';
 
@@ -65,7 +65,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return apiResponse.badRequest(res, 'bankTransactionId is required');
         }
         const result = await allocateTransaction(
-          bankTransactionId, contraAccountId || '', userId, description, aType, entityId,
+          bankTransactionId, contraAccountId || '', userId, description, aType, entityId, vatCode,
         );
         return apiResponse.success(res, result);
       }
