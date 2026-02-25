@@ -237,34 +237,43 @@ export default function BankTransactionsPage() {
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        {/* Header */}
+        {/* Header — bank account cards */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <h1 className="text-2xl font-bold text-[var(--ff-text-primary)] mb-3">Banking</h1>
-          <div className="flex items-center gap-8">
-            <div>
-              <label className="text-xs text-[var(--ff-text-tertiary)] block mb-1">Bank or Credit Card</label>
-              <select value={selectedBank} onChange={e => setSelectedBank(e.target.value)}
-                className="px-3 py-1.5 rounded-lg bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm">
-                {bankAccounts.map(b => (
-                  <option key={b.id} value={b.id}>{b.accountName} — {b.accountCode}</option>
-                ))}
-              </select>
-            </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {bankAccounts.map(b => {
+              const active = b.id === selectedBank;
+              return (
+                <button key={b.id} onClick={() => setSelectedBank(b.id)}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border-2 transition-all text-left ${
+                    active
+                      ? 'border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10'
+                      : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] hover:border-[var(--ff-text-tertiary)]'
+                  }`}>
+                  <div className={`w-2 h-8 rounded-full shrink-0 ${active ? 'bg-emerald-500' : 'bg-[var(--ff-border-light)]'}`} />
+                  <div>
+                    <p className={`text-sm font-semibold ${active ? 'text-emerald-400' : 'text-[var(--ff-text-primary)]'}`}>
+                      {b.accountName}
+                    </p>
+                    <p className="text-xs text-[var(--ff-text-tertiary)] font-mono">{b.accountCode}</p>
+                  </div>
+                  <div className="ml-3 text-right">
+                    <p className={`text-sm font-bold font-mono ${b.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {fmtCurrency(b.balance)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
             {bank && (
-              <>
-                <div>
-                  <p className={`text-2xl font-bold ${bank.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {fmtCurrency(bank.balance)}
-                  </p>
-                  <p className="text-xs text-[var(--ff-text-tertiary)]">Bank Balance</p>
-                </div>
-                <div>
+              <div className="ml-auto flex items-center gap-6">
+                <div className="text-right">
                   <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{total}</p>
                   <p className="text-xs text-[var(--ff-text-tertiary)]">
                     {tab === 'new' ? 'To be Reviewed' : 'Reviewed'}
                   </p>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
