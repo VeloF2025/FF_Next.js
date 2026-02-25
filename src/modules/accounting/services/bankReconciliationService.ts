@@ -589,12 +589,17 @@ async function updateReconciledBalance(reconciliationId: string): Promise<void> 
   }
 }
 
+function fmtDate(val: unknown): string {
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  return val ? String(val).split('T')[0] : '';
+}
+
 function mapTxRow(row: Row): BankTransaction {
   return {
     id: String(row.id),
     bankAccountId: String(row.bank_account_id),
-    transactionDate: String(row.transaction_date),
-    valueDate: row.value_date ? String(row.value_date) : undefined,
+    transactionDate: fmtDate(row.transaction_date),
+    valueDate: row.value_date ? fmtDate(row.value_date) : undefined,
     amount: Number(row.amount),
     description: row.description ? String(row.description) : undefined,
     reference: row.reference ? String(row.reference) : undefined,
@@ -614,7 +619,7 @@ function mapReconRow(row: Row): BankReconciliation {
   return {
     id: String(row.id),
     bankAccountId: String(row.bank_account_id),
-    statementDate: String(row.statement_date),
+    statementDate: fmtDate(row.statement_date),
     statementBalance: Number(row.statement_balance),
     glBalance: Number(row.gl_balance),
     reconciledBalance: Number(row.reconciled_balance),
