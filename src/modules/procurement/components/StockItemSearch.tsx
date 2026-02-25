@@ -8,8 +8,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { Search, X, PlusCircle } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { AddStockItemModal } from './AddStockItemModal';
 
 interface StockItemResult {
   id: string;
@@ -41,6 +42,7 @@ export function StockItemSearch({
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [showAddModal, setShowAddModal] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -138,7 +140,8 @@ export function StockItemSearch({
       setSelectedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === 'Enter' && selectedIndex >= 0) {
       e.preventDefault();
-      handleSelect(results[selectedIndex]);
+      const selected = results[selectedIndex];
+      if (selected) handleSelect(selected);
     } else if (e.key === 'Escape') {
       setIsOpen(false);
     }
@@ -161,27 +164,48 @@ export function StockItemSearch({
       {loading ? (
         <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">Searching...</div>
       ) : results.length === 0 ? (
-        <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">No items found</div>
+        <button
+          type="button"
+          onClick={() => { setIsOpen(false); setShowAddModal(true); }}
+          className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors flex items-center gap-2 border-b border-[var(--ff-border-light)]"
+        >
+          <PlusCircle className="h-4 w-4 text-purple-400 shrink-0" />
+          <span>
+            <span className="text-[var(--ff-text-secondary)]">Add </span>
+            <span className="font-medium text-[var(--ff-text-primary)]">&ldquo;{query}&rdquo;</span>
+            <span className="text-[var(--ff-text-secondary)]"> to stock catalog</span>
+          </span>
+        </button>
       ) : (
-        results.map((item, idx) => (
+        <>
+          {results.map((item, idx) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleSelect(item)}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors ${
+                idx === selectedIndex ? 'bg-[var(--ff-bg-hover)]' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-[var(--ff-text-primary)] truncate">{item.name}</span>
+                <span className="ml-2 text-xs text-[var(--ff-text-tertiary)] shrink-0">{item.uom}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-blue-400">{item.item_code}</span>
+                <span className="text-xs text-[var(--ff-text-tertiary)]">{item.category}</span>
+              </div>
+            </button>
+          ))}
           <button
-            key={item.id}
             type="button"
-            onClick={() => handleSelect(item)}
-            className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors ${
-              idx === selectedIndex ? 'bg-[var(--ff-bg-hover)]' : ''
-            }`}
+            onClick={() => { setIsOpen(false); setShowAddModal(true); }}
+            className="w-full text-left px-3 py-2 text-xs text-[var(--ff-text-tertiary)] hover:bg-[var(--ff-bg-hover)] border-t border-[var(--ff-border-light)] flex items-center gap-1.5 transition-colors"
           >
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-[var(--ff-text-primary)] truncate">{item.name}</span>
-              <span className="ml-2 text-xs text-[var(--ff-text-tertiary)] shrink-0">{item.uom}</span>
-            </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-blue-400">{item.item_code}</span>
-              <span className="text-xs text-[var(--ff-text-tertiary)]">{item.category}</span>
-            </div>
+            <PlusCircle className="h-3.5 w-3.5 text-purple-400" />
+            Not listed? Add to catalog
           </button>
-        ))
+        </>
       )}
     </div>
   );
@@ -212,6 +236,17 @@ export function StockItemSearch({
       </div>
 
       {isOpen && typeof document !== 'undefined' && createPortal(dropdownContent, document.body)}
+
+      {showAddModal && typeof document !== 'undefined' && (
+        <AddStockItemModal
+          initialName={query}
+          onClose={() => setShowAddModal(false)}
+          onCreated={(item) => {
+            setShowAddModal(false);
+            handleSelect(item);
+          }}
+        />
+      )}
     </div>
   );
 }
