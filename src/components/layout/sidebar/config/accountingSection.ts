@@ -1,14 +1,17 @@
 /**
  * Accounting section configuration
  *
- * Organized into logical groups matching Sage-style navigation:
- * General Ledger, Accounts Payable, Accounts Receivable, Banking, Reports
+ * Organized to match Sage One navigation structure:
+ * Customers, Suppliers, Banking, Accounts, Accountant's Area, Reports
  */
 
 import {
   Calculator, BookOpen, FileSpreadsheet, BarChart3,
   Receipt, Wallet, Clock, CreditCard, FileText,
   Landmark, Database, TrendingDown, TrendingUp, Upload,
+  Users, ShoppingCart, ArrowLeftRight, Settings,
+  DollarSign, FileCheck, ClipboardList, PieChart,
+  Scale, CalendarCheck, BookMarked, Banknote,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -21,104 +24,40 @@ export const accountingSection: NavSection = {
     {
       to: '/accounting',
       icon: Calculator,
-      label: 'Overview',
-      shortLabel: 'Acct',
+      label: 'Dashboard',
+      shortLabel: 'Dash',
       permissions: [],
       rbacKey: 'accounting',
     },
-    // ── General Ledger ────────────────────────────────
+    // ── Customers (Sage: Customers menu) ─────────────
     {
       to: '#',
-      icon: BookOpen,
-      label: 'General Ledger',
-      shortLabel: 'GL',
+      icon: Users,
+      label: 'Customers',
+      shortLabel: 'Cust',
       permissions: [],
       rbacKey: 'accounting',
       isGroup: true,
       subItems: [
         {
-          to: '/accounting?tab=chart-of-accounts',
-          icon: BookOpen,
-          label: 'Chart of Accounts',
-          shortLabel: 'CoA',
+          to: '/accounting/customer-invoices',
+          icon: FileText,
+          label: 'Tax Invoices',
+          shortLabel: 'Inv',
           permissions: [],
           rbacKey: 'accounting',
         },
-        {
-          to: '/accounting?tab=journal-entries',
-          icon: FileSpreadsheet,
-          label: 'Journal Entries',
-          shortLabel: 'JE',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-        {
-          to: '/accounting?tab=fiscal-periods',
-          icon: Clock,
-          label: 'Fiscal Periods',
-          shortLabel: 'FP',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-      ],
-    },
-    // ── Accounts Payable ──────────────────────────────
-    {
-      to: '#',
-      icon: TrendingDown,
-      label: 'Accounts Payable',
-      shortLabel: 'AP',
-      permissions: [],
-      rbacKey: 'accounting',
-      isGroup: true,
-      subItems: [
-        {
-          to: '/accounting/supplier-invoices',
-          icon: Receipt,
-          label: 'Supplier Invoices',
-          shortLabel: 'SI',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-        {
-          to: '/accounting/supplier-payments',
-          icon: Wallet,
-          label: 'Supplier Payments',
-          shortLabel: 'SPay',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-        {
-          to: '/accounting/ap-aging',
-          icon: Clock,
-          label: 'AP Aging',
-          shortLabel: 'APAge',
-          permissions: [],
-          rbacKey: 'accounting',
-        },
-      ],
-    },
-    // ── Accounts Receivable ───────────────────────────
-    {
-      to: '#',
-      icon: TrendingUp,
-      label: 'Accounts Receivable',
-      shortLabel: 'AR',
-      permissions: [],
-      rbacKey: 'accounting',
-      isGroup: true,
-      subItems: [
         {
           to: '/accounting/customer-payments',
           icon: CreditCard,
-          label: 'Customer Payments',
-          shortLabel: 'CPay',
+          label: 'Receipts',
+          shortLabel: 'Rcpt',
           permissions: [],
           rbacKey: 'accounting',
         },
         {
           to: '/accounting/credit-notes',
-          icon: FileText,
+          icon: FileCheck,
           label: 'Credit Notes',
           shortLabel: 'CN',
           permissions: [],
@@ -127,14 +66,66 @@ export const accountingSection: NavSection = {
         {
           to: '/accounting/ar-aging',
           icon: Clock,
-          label: 'AR Aging',
+          label: 'Aging',
           shortLabel: 'ARAge',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/customer-statements',
+          icon: ClipboardList,
+          label: 'Statements',
+          shortLabel: 'Stmt',
           permissions: [],
           rbacKey: 'accounting',
         },
       ],
     },
-    // ── Banking ───────────────────────────────────────
+    // ── Suppliers (Sage: Suppliers menu) ──────────────
+    {
+      to: '#',
+      icon: ShoppingCart,
+      label: 'Suppliers',
+      shortLabel: 'Supp',
+      permissions: [],
+      rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/supplier-invoices',
+          icon: Receipt,
+          label: 'Invoices',
+          shortLabel: 'SI',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/supplier-payments',
+          icon: Wallet,
+          label: 'Payments',
+          shortLabel: 'SPay',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/supplier-returns',
+          icon: TrendingDown,
+          label: 'Returns',
+          shortLabel: 'Ret',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/ap-aging',
+          icon: Clock,
+          label: 'Aging',
+          shortLabel: 'APAge',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
+    },
+    // ── Banking (Sage: Banking menu) ─────────────────
     {
       to: '#',
       icon: Landmark,
@@ -145,10 +136,10 @@ export const accountingSection: NavSection = {
       isGroup: true,
       subItems: [
         {
-          to: '/accounting/bank-reconciliation',
+          to: '/accounting/bank-accounts',
           icon: Landmark,
-          label: 'Bank Reconciliation',
-          shortLabel: 'Recon',
+          label: 'Bank Accounts',
+          shortLabel: 'Accts',
           permissions: [],
           rbacKey: 'accounting',
         },
@@ -160,26 +151,114 @@ export const accountingSection: NavSection = {
           permissions: [],
           rbacKey: 'accounting',
         },
+        {
+          to: '/accounting/bank-reconciliation',
+          icon: FileSpreadsheet,
+          label: 'Reconcile',
+          shortLabel: 'Recon',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/bank-transfers',
+          icon: ArrowLeftRight,
+          label: 'Transfers',
+          shortLabel: 'Xfer',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
       ],
     },
-    // ── Reports ───────────────────────────────────────
+    // ── Accounts (Sage: Accounts menu) ───────────────
     {
       to: '#',
-      icon: BarChart3,
-      label: 'Reports',
-      shortLabel: 'Reports',
+      icon: BookOpen,
+      label: 'Accounts',
+      shortLabel: 'Acct',
       permissions: [],
       rbacKey: 'accounting',
       isGroup: true,
       subItems: [
         {
-          to: '/accounting?tab=reports',
-          icon: BarChart3,
+          to: '/accounting/chart-of-accounts',
+          icon: BookOpen,
+          label: 'Chart of Accounts',
+          shortLabel: 'CoA',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/journal-entries',
+          icon: FileSpreadsheet,
+          label: 'Journal Entries',
+          shortLabel: 'JE',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/fiscal-periods',
+          icon: CalendarCheck,
+          label: 'Fiscal Periods',
+          shortLabel: 'FP',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/default-accounts',
+          icon: Settings,
+          label: 'Default Accounts',
+          shortLabel: 'Dflt',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
+    },
+    // ── Accountant's Area (Sage: Accountant's Area) ──
+    {
+      to: '#',
+      icon: Scale,
+      label: "Accountant's Area",
+      shortLabel: 'CPA',
+      permissions: [],
+      rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/trial-balance',
+          icon: Scale,
           label: 'Trial Balance',
           shortLabel: 'TB',
           permissions: [],
           rbacKey: 'accounting',
         },
+        {
+          to: '/accounting/opening-balances',
+          icon: BookMarked,
+          label: 'Opening Balances',
+          shortLabel: 'OB',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/year-end',
+          icon: CalendarCheck,
+          label: 'Year-End',
+          shortLabel: 'YE',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
+    },
+    // ── Reports (Sage: Reports menu) ─────────────────
+    {
+      to: '#',
+      icon: BarChart3,
+      label: 'Reports',
+      shortLabel: 'Rpt',
+      permissions: [],
+      rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
         {
           to: '/accounting/reports/income-statement',
           icon: BarChart3,
@@ -190,17 +269,33 @@ export const accountingSection: NavSection = {
         },
         {
           to: '/accounting/reports/balance-sheet',
-          icon: BarChart3,
+          icon: PieChart,
           label: 'Balance Sheet',
           shortLabel: 'BS',
           permissions: [],
           rbacKey: 'accounting',
         },
         {
+          to: '/accounting/reports/cash-flow',
+          icon: Banknote,
+          label: 'Cash Flow',
+          shortLabel: 'CF',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
           to: '/accounting/reports/vat-return',
-          icon: BarChart3,
+          icon: DollarSign,
           label: 'VAT Return',
           shortLabel: 'VAT',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/budget-vs-actual',
+          icon: BarChart3,
+          label: 'Budget vs Actual',
+          shortLabel: 'Budg',
           permissions: [],
           rbacKey: 'accounting',
         },
