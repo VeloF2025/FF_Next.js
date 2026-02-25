@@ -39,6 +39,7 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
   const [data, setData] = useState<BOQUtilizationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hideZero, setHideZero] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -86,6 +87,8 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
   }
 
   const { summary, lines, nonBoqItems } = data;
+  const visibleLines = hideZero ? lines.filter((l) => l.boqQty > 0) : lines;
+  const hiddenCount = lines.length - visibleLines.length;
 
   return (
     <div className="space-y-6">
@@ -131,9 +134,25 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
 
       {/* BOQ Lines table */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-        <div className="flex items-center gap-2 p-4 border-b border-[var(--ff-border-light)]">
-          <TrendingUp className="h-4 w-4 text-purple-400" />
-          <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">BOQ Line Utilization</h4>
+        <div className="flex items-center justify-between gap-2 p-4 border-b border-[var(--ff-border-light)]">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-purple-400" />
+            <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">BOQ Line Utilization</h4>
+            <span className="text-xs text-[var(--ff-text-tertiary)]">
+              {visibleLines.length} of {lines.length} lines
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHideZero((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs transition-colors border ${
+              hideZero
+                ? 'bg-purple-600/20 border-purple-500/40 text-purple-400'
+                : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
+            }`}
+          >
+            {hideZero ? `Hide zero qty (${hiddenCount})` : `Show zero qty (${hiddenCount})`}
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -149,7 +168,7 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
-              {lines.map((line: BOQLineUtilization) => (
+              {visibleLines.map((line: BOQLineUtilization) => (
                 <tr
                   key={line.id}
                   className={`hover:bg-[var(--ff-bg-hover)] transition-colors ${
