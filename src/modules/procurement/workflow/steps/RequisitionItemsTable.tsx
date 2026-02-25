@@ -5,6 +5,7 @@
 
 import { Plus, Trash2 } from 'lucide-react';
 import { calcLineTotal, formatCurrency } from './requisitionUtils';
+import { StockItemSearch } from '@/modules/procurement/components/StockItemSearch';
 
 const UOM_OPTIONS = [
   { value: 'units', label: 'Units' },
@@ -31,6 +32,8 @@ export interface RequisitionItemsTableProps {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onUpdate: <K extends keyof FormItem>(index: number, field: K, value: FormItem[K]) => void;
+  /** Called when a stock item is selected — atomically updates description + uom */
+  onSelectStock: (index: number, patch: { itemDescription: string; uom: string }) => void;
 }
 
 /** Editable items table used in the requisition creation form. */
@@ -40,6 +43,7 @@ export function RequisitionItemsTable({
   onAdd,
   onRemove,
   onUpdate,
+  onSelectStock,
 }: RequisitionItemsTableProps) {
   const estimatedTotal = items.reduce(
     (sum, item) => sum + calcLineTotal(item.quantity, item.estimatedUnitPrice),
@@ -92,12 +96,16 @@ export function RequisitionItemsTable({
             {items.map((item, index) => (
               <tr key={item.id} className="group">
                 <td className="px-3 py-2">
-                  <input
-                    type="text"
+                  <StockItemSearch
                     value={item.itemDescription}
-                    onChange={(e) => onUpdate(index, 'itemDescription', e.target.value)}
-                    placeholder="Item description"
-                    className="w-full px-3 py-1.5 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    onChange={(val) => onUpdate(index, 'itemDescription', val)}
+                    onSelect={(stock) =>
+                      onSelectStock(index, {
+                        itemDescription: stock.name,
+                        uom: stock.uom || 'units',
+                      })
+                    }
+                    placeholder="Search stock or type description..."
                   />
                   {fieldErrors[`item_${index}_description`] && (
                     <p className="mt-1 text-xs text-red-400">{fieldErrors[`item_${index}_description`]}</p>

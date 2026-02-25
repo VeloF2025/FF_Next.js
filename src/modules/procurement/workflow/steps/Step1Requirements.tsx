@@ -82,6 +82,13 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
 
+  // Atomically patch description + uom when a stock item is selected
+  const selectStock = (index: number, patch: { itemDescription: string; uom: string }) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...patch } : item))
+    );
+  };
+
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
     const validItems = items.filter(
@@ -275,6 +282,7 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
         onAdd={addItem}
         onRemove={removeItem}
         onUpdate={updateItem}
+        onSelectStock={selectStock}
       />
 
       {/* Submit */}
