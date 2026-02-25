@@ -16,7 +16,7 @@ import {
   DollarSign, FileCheck, ClipboardList, PieChart,
   Scale, CalendarCheck, BookMarked, Banknote,
   Repeat, XCircle, SlidersHorizontal, Layers,
-  RotateCcw, Percent,
+  RotateCcw, Percent, Shield,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -336,6 +336,14 @@ export const accountingSection: NavSection = {
           permissions: [],
           rbacKey: 'accounting',
         },
+        {
+          to: '/accounting/reports/audit-trail',
+          icon: Shield,
+          label: 'Audit Trail',
+          shortLabel: 'Audit',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
       ],
     },
     // ── Reports (Sage: Reports menu) ─────────────────
@@ -385,6 +393,38 @@ export const accountingSection: NavSection = {
           icon: BarChart3,
           label: 'Project Profitability',
           shortLabel: 'Profit',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/customer-reports',
+          icon: Users,
+          label: 'Customer Report',
+          shortLabel: 'CustR',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/supplier-reports',
+          icon: ShoppingCart,
+          label: 'Supplier Report',
+          shortLabel: 'SuppR',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/bank-transactions',
+          icon: Landmark,
+          label: 'Bank Transactions',
+          shortLabel: 'BankTx',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/account-transactions',
+          icon: BookOpen,
+          label: 'Account Transactions',
+          shortLabel: 'AcctTx',
           permissions: [],
           rbacKey: 'accounting',
         },
