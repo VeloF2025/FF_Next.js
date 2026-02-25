@@ -61,8 +61,7 @@ async function handler(
 
     if (records.length === 0) {
       return apiResponse.success(res, {
-        success: true,
-        data: { created: 0, skipped: pp_data_ids.length, tickets: [] },
+        created: 0, skipped: pp_data_ids.length, tickets: [],
       });
     }
 
@@ -105,12 +104,11 @@ async function handler(
     logger.info('PP Data tickets created', { created: tickets.length, skipped });
 
     return apiResponse.success(res, {
-      success: true,
-      data: { created: tickets.length, skipped, tickets },
+      created: tickets.length, skipped, tickets,
     });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
-    return apiResponse.internalError(res, error);
+    return apiResponse.internalError(res, err);
   }
 }
 

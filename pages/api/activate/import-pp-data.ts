@@ -51,22 +51,19 @@ async function handler(
     const lastImport = lastImportResult.rows[0] || null;
 
     return apiResponse.success(res, {
-      success: true,
-      data: {
-        total: parseInt(stats.total, 10),
-        activated: parseInt(stats.activated, 10),
-        located: parseInt(stats.located, 10),
-        notFound: parseInt(stats.not_found, 10),
-        projects: parseInt(stats.projects, 10),
-        ticketed: parseInt(stats.ticketed, 10),
-        lastImport: lastImport
-          ? {
-              date: lastImport.created_at,
-              filename: lastImport.filename,
-              totalRows: lastImport.total_rows,
-            }
-          : null,
-      },
+      total: parseInt(stats.total, 10),
+      activated: parseInt(stats.activated, 10),
+      located: parseInt(stats.located, 10),
+      notFound: parseInt(stats.not_found, 10),
+      projects: parseInt(stats.projects, 10),
+      ticketed: parseInt(stats.ticketed, 10),
+      lastImport: lastImport
+        ? {
+            date: lastImport.created_at,
+            filename: lastImport.filename,
+            totalRows: lastImport.total_rows,
+          }
+        : null,
     });
   }
 
@@ -105,14 +102,18 @@ async function handler(
       [...params, limit, offset]
     );
 
-    return apiResponse.success(res, {
+    // Frontend expects: data.data = records[], data.pagination = {...}
+    // apiResponse.success wraps as { success: true, data: <payload> }
+    // So we send records as a flat response and pagination alongside
+    const total = parseInt(countResult.rows[0].total, 10);
+    return res.status(200).json({
       success: true,
       data: dataResult.rows,
       pagination: {
         page,
         limit,
-        total: parseInt(countResult.rows[0].total, 10),
-        totalPages: Math.ceil(parseInt(countResult.rows[0].total, 10) / limit),
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     });
   }
@@ -236,17 +237,15 @@ async function handler(
       }
     }
 
-    return apiResponse.success(res, {
-      success: true,
-      data: row
-        ? {
-            status: row.status,
-            startedAt: row.started_at,
-            completedAt: row.completed_at,
-            ...(typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {}),
-          }
-        : null,
-    });
+    return apiResponse.success(res, row
+      ? {
+          status: row.status,
+          startedAt: row.started_at,
+          completedAt: row.completed_at,
+          ...(typeof row.details === 'string' ? JSON.parse(row.details) : row.details || {}),
+        }
+      : null,
+    );
   }
 
   return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
