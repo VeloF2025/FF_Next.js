@@ -362,18 +362,20 @@ export default function BankTransactionsPage() {
             <div className="relative">
               <input type="text" placeholder={`Search ${batchType}s...`} value={batchSearch}
                 onChange={e => setBatchSearch(e.target.value)}
-                className="pl-2 pr-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)] w-52" />
-              {batchSearch && (
-                <div className="absolute z-50 top-full left-0 mt-1 w-72 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                  {batchOptions.map(o => (
-                    <button key={o.id} onClick={() => applyBatchEdit(o.id, o.code ? `${o.code} ${o.name}` : o.name)}
-                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--ff-bg-primary)] text-xs flex items-center gap-2">
-                      {o.code && <span className="font-mono text-[var(--ff-text-tertiary)]">{o.code}</span>}
-                      <span className="text-[var(--ff-text-primary)]">{o.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                className="pl-2 pr-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)] w-52"
+                autoFocus />
+              <div className="absolute z-50 top-full left-0 mt-1 w-72 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                {batchOptions.map(o => (
+                  <button key={o.id} onClick={() => applyBatchEdit(o.id, o.code ? `${o.code} ${o.name}` : o.name)}
+                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--ff-bg-primary)] text-xs flex items-center gap-2">
+                    {o.code && <span className="font-mono text-[var(--ff-text-tertiary)]">{o.code}</span>}
+                    <span className="text-[var(--ff-text-primary)]">{o.name}</span>
+                  </button>
+                ))}
+                {batchOptions.length === 0 && (
+                  <div className="px-3 py-2 text-xs text-[var(--ff-text-tertiary)]">No results found</div>
+                )}
+              </div>
             </div>
             <button onClick={() => setShowBatchEdit(false)}
               className="text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">Cancel</button>
