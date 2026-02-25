@@ -5,10 +5,10 @@
 
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
-import { detectBankFormat, parseFNBStatement, parseStandardBankStatement, parseNedbankStatement } from '../utils/bankCsvParsers';
+import { detectBankFormat, parseFNBStatement, parseStandardBankStatement, parseNedbankStatement, parseABSAStatement } from '../utils/bankCsvParsers';
 import { runAutoMatch } from '../utils/autoMatch';
 import { createJournalEntry, postJournalEntry } from './journalEntryService';
-import type { BankTransaction, BankReconciliation, AutoMatchResult, BankFormat } from '../types/bank.types';
+import type { BankTransaction, BankReconciliation, AutoMatchResult, BankFormat, BankCsvParseResult } from '../types/bank.types';
 import type { JournalLineInput } from '../types/gl.types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,6 +35,9 @@ export async function importBankStatement(
         break;
       case 'nedbank':
         parseResult = parseNedbankStatement(csvContent);
+        break;
+      case 'absa':
+        parseResult = parseABSAStatement(csvContent);
         break;
       default:
         throw new Error('Unable to detect bank format. Please specify the bank.');
@@ -73,6 +76,54 @@ export async function importBankStatement(
   }
 }
 
+// ── Import from Pre-Parsed Result (PDF) ──────────────────────────────────────
+
+/**
+ * Persist an already-parsed set of transactions (e.g. from a PDF import).
+ * Reuses the same INSERT logic as importBankStatement so behaviour is identical.
+ */
+export async function importParsedTransactions(
+  parseResult: BankCsvParseResult,
+  bankAccountId: string,
+  statementDate: string,
+): Promise<{ batchId: string; transactionCount: number; errors: Array<{ row: number; error: string }> }> {
+  try {
+    if (parseResult.transactions.length === 0) {
+      return { batchId: '', transactionCount: 0, errors: parseResult.errors };
+    }
+
+    const batchId = crypto.randomUUID();
+
+    for (const tx of parseResult.transactions) {
+      await sql`
+        INSERT INTO bank_transactions (
+          bank_account_id, transaction_date, value_date, amount,
+          description, reference, import_batch_id
+        ) VALUES (
+          ${bankAccountId}::UUID, ${tx.transactionDate}, ${tx.valueDate || null},
+          ${tx.amount}, ${tx.description}, ${tx.reference || null}, ${batchId}::UUID
+        )
+      `;
+    }
+
+    log.info('Imported parsed bank statement', {
+      batchId,
+      format: parseResult.bankFormat,
+      count: parseResult.transactions.length,
+      statementDate,
+    }, 'accounting');
+
+    return {
+      batchId,
+      transactionCount: parseResult.transactions.length,
+      errors: parseResult.errors,
+    };
+  } catch (err) {
+    log.error('Failed to import parsed bank transactions', { error: err }, 'accounting');
+    throw err;
+  }
+}
+
 // ── Bank Transactions ────────────────────────────────────────────────────────
 
 interface BankTxFilters {
@@ -81,6 +132,7 @@ interface BankTxFilters {
   status?: string;
   fromDate?: string;
   toDate?: string;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -109,18 +161,29 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         WHERE reconciliation_id = ${filters.reconciliationId}::UUID
       `) as Row[];
     } else if (filters?.bankAccountId && filters?.status) {
+      // 🟢 WORKING: date range + full-text search via always-present params (no conditional SQL fragments)
+      const searchPattern = filters.search ? `%${filters.search}%` : '%';
+      const fromDateVal = filters.fromDate || '1900-01-01';
+      const toDateVal = filters.toDate || '2099-12-31';
       rows = (await sql`
         SELECT bt.*, ga.account_name AS bank_account_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
           AND bt.status = ${filters.status}
+          AND bt.transaction_date >= ${fromDateVal}
+          AND bt.transaction_date <= ${toDateVal}
+          AND (bt.description ILIKE ${searchPattern} OR bt.reference ILIKE ${searchPattern})
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
       countRows = (await sql`
-        SELECT COUNT(*) AS cnt FROM bank_transactions
-        WHERE bank_account_id = ${filters.bankAccountId}::UUID AND status = ${filters.status}
+        SELECT COUNT(*) AS cnt FROM bank_transactions bt
+        WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
+          AND bt.status = ${filters.status}
+          AND bt.transaction_date >= ${fromDateVal}
+          AND bt.transaction_date <= ${toDateVal}
+          AND (bt.description ILIKE ${searchPattern} OR bt.reference ILIKE ${searchPattern})
       `) as Row[];
     } else if (filters?.bankAccountId) {
       rows = (await sql`
@@ -661,6 +724,145 @@ export async function allocateTransaction(
 
   log.info('Allocated bank transaction', {
     bankTxId, journalEntryId: je.id, allocType, entityId, contraAccountId,
+  }, 'accounting');
+
+  const updated = (await sql`SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID`) as Row[];
+  return { journalEntryId: je.id, bankTransaction: mapTxRow(updated[0]!) };
+}
+
+// ── Split Allocate ───────────────────────────────────────────────────────────
+
+export interface SplitLine {
+  contraAccountId: string;
+  amount: number; // absolute amount for this line
+  description?: string;
+  vatCode?: string; // 'none' | 'standard' | 'zero_rated' | 'exempt'
+}
+
+/**
+ * Split-allocate a bank transaction across multiple GL accounts.
+ * Each split line may carry its own VAT treatment.
+ * The sum of all line amounts must equal Math.abs(tx.amount).
+ */
+export async function splitAllocateTransaction(
+  bankTxId: string,
+  lines: SplitLine[],
+  userId: string,
+): Promise<{ journalEntryId: string; bankTransaction: BankTransaction }> {
+  const txRows = (await sql`
+    SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID
+  `) as Row[];
+  if (txRows.length === 0) throw new Error(`Bank transaction ${bankTxId} not found`);
+  const tx = txRows[0]!;
+
+  if (tx.status !== 'imported') {
+    throw new Error(`Transaction already ${tx.status} — cannot split allocate`);
+  }
+
+  if (!lines || lines.length === 0) throw new Error('At least one split line is required');
+
+  const totalAmount = Math.abs(Number(tx.amount));
+  const linesTotal = lines.reduce((sum, l) => sum + Number(l.amount), 0);
+  // Allow 1-cent rounding tolerance
+  if (Math.abs(linesTotal - totalAmount) > 0.01) {
+    throw new Error(
+      `Split lines total R${linesTotal.toFixed(2)} does not equal transaction amount R${totalAmount.toFixed(2)}`
+    );
+  }
+
+  const bankAccountId = String(tx.bank_account_id);
+  const txDate = tx.transaction_date instanceof Date
+    ? tx.transaction_date.toISOString().split('T')[0]
+    : String(tx.transaction_date).split('T')[0];
+  const isSpent = Number(tx.amount) < 0;
+  const entryDesc = tx.description || 'Split bank allocation';
+  const journalLines: JournalLineInput[] = [];
+
+  // Build contra lines for each split
+  for (const line of lines) {
+    const lineAmount = Number(line.amount);
+    const hasVat = line.vatCode === 'standard';
+    const netAmount = hasVat ? Math.round((lineAmount * 100 / 115) * 100) / 100 : lineAmount;
+    const vatAmount = hasVat ? Math.round((lineAmount - netAmount) * 100) / 100 : 0;
+    const vatAccountCode = isSpent ? '1140' : '2120';
+    const lineDesc = line.description || entryDesc;
+    const mapVatType = line.vatCode === 'standard' ? 'standard' as const
+      : line.vatCode === 'zero_rated' ? 'zero_rated' as const
+      : line.vatCode === 'exempt' ? 'exempt' as const
+      : undefined;
+
+    if (isSpent) {
+      // Money out: DR contra (net), DR VAT Input (vat if standard)
+      journalLines.push({
+        glAccountId: line.contraAccountId,
+        debit: netAmount, credit: 0,
+        description: lineDesc,
+        vatType: mapVatType,
+      });
+      if (hasVat) {
+        const vatAcctId = await glAccountByCode(vatAccountCode);
+        journalLines.push({
+          glAccountId: vatAcctId,
+          debit: vatAmount, credit: 0,
+          description: `VAT @ 15%`,
+          vatType: 'standard',
+        });
+      }
+    } else {
+      // Money in: CR contra (net), CR VAT Output (vat if standard)
+      journalLines.push({
+        glAccountId: line.contraAccountId,
+        debit: 0, credit: netAmount,
+        description: lineDesc,
+        vatType: mapVatType,
+      });
+      if (hasVat) {
+        const vatAcctId = await glAccountByCode(vatAccountCode);
+        journalLines.push({
+          glAccountId: vatAcctId,
+          debit: 0, credit: vatAmount,
+          description: `VAT @ 15%`,
+          vatType: 'standard',
+        });
+      }
+    }
+  }
+
+  // Add the bank side as a single balancing line
+  if (isSpent) {
+    journalLines.push({ glAccountId: bankAccountId, debit: 0, credit: totalAmount, description: entryDesc });
+  } else {
+    journalLines.unshift({ glAccountId: bankAccountId, debit: totalAmount, credit: 0, description: entryDesc });
+  }
+
+  const je = await createJournalEntry({
+    entryDate: txDate,
+    description: entryDesc,
+    source: 'auto_bank_recon',
+    sourceDocumentId: bankTxId,
+    lines: journalLines,
+  }, userId);
+  await postJournalEntry(je.id, userId);
+
+  // Find the bank-side journal line to match against
+  const jeLines = (await sql`
+    SELECT id FROM gl_journal_lines
+    WHERE journal_entry_id = ${je.id}::UUID
+      AND gl_account_id = ${bankAccountId}::UUID
+    LIMIT 1
+  `) as Row[];
+  const journalLineId = jeLines.length > 0 ? String(jeLines[0]!.id) : null;
+
+  if (journalLineId) {
+    await sql`
+      UPDATE bank_transactions
+      SET status = 'matched', matched_journal_line_id = ${journalLineId}::UUID, updated_at = NOW()
+      WHERE id = ${bankTxId}::UUID
+    `;
+  }
+
+  log.info('Split-allocated bank transaction', {
+    bankTxId, journalEntryId: je.id, lineCount: lines.length,
   }, 'accounting');
 
   const updated = (await sql`SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID`) as Row[];

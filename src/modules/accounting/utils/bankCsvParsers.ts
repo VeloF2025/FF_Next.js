@@ -251,6 +251,69 @@ export function parseNedbankStatement(csv: string): BankCsvParseResult {
   return result;
 }
 
+// ── ABSA Parser ──────────────────────────────────────────────────────────────
+
+/**
+ * Parse ABSA bank statement CSV.
+ * Expected columns: Account Number,Date,Description1,Description2,Amount,Balance
+ * Date format: YYYY/MM/DD
+ * Amount: single column with quoted strings, negative values in parentheses or with minus sign
+ *
+ * Example row:
+ *   4087xxxxxx,2026/01/15,"POS Purchase","Woolworths Food","-1234.56","45678.90"
+ */
+export function parseABSAStatement(csv: string): BankCsvParseResult {
+  const result: BankCsvParseResult = {
+    transactions: [],
+    errors: [],
+    bankFormat: 'absa',
+  };
+
+  const lines = parseCsvLines(csv);
+  if (lines.length <= 1) return result;
+
+  // Skip header (row 0)
+  for (let i = 1; i < lines.length; i++) {
+    const fields = lines[i]!;
+    // Minimum: AccountNumber, Date, Description1, Description2, Amount
+    if (fields.length < 5) {
+      if (fields.every(f => f === '')) continue; // skip blank lines
+      result.errors.push({ row: i + 1, error: 'Insufficient columns' });
+      continue;
+    }
+
+    // Column 1 = Date (YYYY/MM/DD)
+    const date = normalizeDate(fields[1]!, 'yyyy/mm/dd');
+    if (!date) {
+      result.errors.push({ row: i + 1, error: `Invalid date: ${fields[1]}` });
+      continue;
+    }
+
+    // Column 4 = Amount (column index 4)
+    const amount = parseAmount(fields[4]!);
+    if (amount === null) {
+      result.errors.push({ row: i + 1, error: `Invalid amount: ${fields[4]}` });
+      continue;
+    }
+
+    // Combine Description1 + Description2 for a richer description
+    const desc1 = fields[2]!.trim();
+    const desc2 = fields[3]!.trim();
+    const description = desc2 ? `${desc1} ${desc2}`.trim() : desc1;
+
+    const tx: ParsedBankTransaction = {
+      transactionDate: date,
+      amount,
+      description,
+      balance: fields.length > 5 ? parseAmount(fields[5]!) ?? undefined : undefined,
+    };
+
+    result.transactions.push(tx);
+  }
+
+  return result;
+}
+
 // ── Format Detection ─────────────────────────────────────────────────────────
 
 /**
@@ -260,6 +323,11 @@ export function detectBankFormat(csv: string): BankFormat {
   if (!csv || csv.trim() === '') return 'unknown';
 
   const firstLine = csv.trim().split('\n')[0]!.toLowerCase();
+
+  // ABSA: "Account Number,Date,Description1,Description2,Amount,Balance"
+  if (firstLine.includes('account number') && firstLine.includes('description1')) {
+    return 'absa';
+  }
 
   // FNB: "Date","Description","Amount","Balance","Reference"
   if (firstLine.includes('"date"') && firstLine.includes('"amount"') && firstLine.includes('"reference"')) {

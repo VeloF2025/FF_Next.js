@@ -15,8 +15,10 @@ import {
   excludeTransaction,
   autoMatchTransactions,
   allocateTransaction,
+  splitAllocateTransaction,
   deleteTransactions,
   type AllocationType,
+  type SplitLine,
 } from '@/modules/accounting/services/bankReconciliationService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -69,6 +71,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           bankTransactionId, contraAccountId || '', userId, description, aType, entityId, vatCode,
         );
         return apiResponse.success(res, result);
+      }
+      case 'split_allocate': {
+        const { bankTransactionId: splitTxId, lines: splitLines } = req.body as {
+          bankTransactionId?: string;
+          lines?: SplitLine[];
+        };
+        if (!splitTxId || !splitLines || !Array.isArray(splitLines) || splitLines.length === 0) {
+          return apiResponse.badRequest(res, 'bankTransactionId and lines[] (non-empty) are required');
+        }
+        const splitResult = await splitAllocateTransaction(splitTxId, splitLines, userId);
+        return apiResponse.success(res, splitResult);
       }
       case 'delete': {
         const { bankTransactionIds } = req.body;

@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, Undo2, Search } from 'lucide-react';
+import { Check, X, Undo2, Search, Scissors } from 'lucide-react';
 
 export type AllocType = 'account' | 'supplier' | 'customer';
 export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
@@ -57,6 +57,7 @@ interface Props {
   onAccept: (txId: string) => void;
   onExclude: (txId: string) => void;
   onUnmatch: (txId: string) => void;
+  onSplit: (txId: string) => void;
 }
 
 function fmtCurrency(n: number): string {
@@ -68,7 +69,7 @@ export function BankTxTable(props: Props) {
     transactions, glAccounts, suppliers, customers,
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
-    onAccept, onExclude, onUnmatch,
+    onAccept, onExclude, onUnmatch, onSplit,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -254,6 +255,10 @@ export function BankTxTable(props: Props) {
                         <button onClick={() => onAccept(tx.id)} disabled={!sel?.entityId} title="Accept"
                           className="p-1 rounded hover:bg-emerald-500/10 text-emerald-400 disabled:opacity-30">
                           <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => onSplit(tx.id)} title="Split transaction"
+                          className="p-1 rounded hover:bg-purple-500/10 text-purple-400">
+                          <Scissors className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => onExclude(tx.id)} title="Exclude"
                           className="p-1 rounded hover:bg-red-500/10 text-red-400">

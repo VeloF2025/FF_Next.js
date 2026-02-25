@@ -1,7 +1,13 @@
 /**
  * Bank Statement Import API
  * POST /api/accounting/bank-transactions-import
- *   Import CSV bank statement
+ *   Import CSV or PDF bank statement
+ *
+ * Body (CSV):
+ *   { csvContent, bankAccountId, statementDate, bankFormat?, fileType?: 'csv' }
+ *
+ * Body (PDF):
+ *   { pdfBase64, bankAccountId, statementDate, bankFormat?, fileType: 'pdf' }
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -9,7 +15,8 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { importBankStatement } from '@/modules/accounting/services/bankReconciliationService';
+import { importBankStatement, importParsedTransactions } from '@/modules/accounting/services/bankReconciliationService';
+import { parseBankPdf } from '@/modules/accounting/utils/bankPdfParser';
 import type { BankFormat } from '@/modules/accounting/types/bank.types';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -18,17 +25,66 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { csvContent, bankAccountId, statementDate, bankFormat } = req.body;
+    const {
+      csvContent,
+      pdfBase64,
+      fileType,
+      bankAccountId,
+      statementDate,
+      bankFormat,
+    } = req.body as {
+      csvContent?: string;
+      pdfBase64?: string;
+      fileType?: 'csv' | 'pdf';
+      bankAccountId: string;
+      statementDate: string;
+      bankFormat?: string;
+    };
 
-    if (!csvContent || !bankAccountId || !statementDate) {
-      return apiResponse.badRequest(res, 'csvContent, bankAccountId, and statementDate are required');
+    if (!bankAccountId || !statementDate) {
+      return apiResponse.badRequest(res, 'bankAccountId and statementDate are required');
+    }
+
+    const resolvedFileType: 'csv' | 'pdf' = fileType || (pdfBase64 ? 'pdf' : 'csv');
+
+    if (resolvedFileType === 'pdf') {
+      if (!pdfBase64) {
+        return apiResponse.badRequest(res, 'pdfBase64 is required for PDF imports');
+      }
+
+      // Strip data-URL prefix if present: "data:application/pdf;base64,<data>"
+      const base64Data = pdfBase64.includes(',') ? pdfBase64.split(',')[1]! : pdfBase64;
+      const pdfBuffer = Buffer.from(base64Data, 'base64');
+
+      log.info('Starting PDF bank statement import', {
+        bankAccountId, statementDate, bankFormat, bufferSize: pdfBuffer.length,
+      }, 'accounting-api');
+
+      const parseResult = await parseBankPdf(pdfBuffer, bankFormat);
+
+      if (parseResult.errors.length > 0 && parseResult.transactions.length === 0) {
+        return apiResponse.badRequest(res, parseResult.errors[0]!.error);
+      }
+
+      const result = await importParsedTransactions(
+        parseResult,
+        String(bankAccountId),
+        String(statementDate),
+      );
+
+      return apiResponse.created(res, result);
+    }
+
+    // Default: CSV import
+    if (!csvContent) {
+      return apiResponse.badRequest(res, 'csvContent is required for CSV imports');
     }
 
     const result = await importBankStatement(
       csvContent,
       String(bankAccountId),
       String(statementDate),
-      (bankFormat || undefined) as BankFormat | undefined
+      (bankFormat || undefined) as BankFormat | undefined,
     );
 
     return apiResponse.created(res, result);

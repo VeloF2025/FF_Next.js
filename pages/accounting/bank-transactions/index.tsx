@@ -4,13 +4,14 @@
  * Full toolbar: Mark Reviewed, Delete, Batch Edit, Import, Export, Search
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import {
   BankTxTable, type AllocType, type VatCode, type BankTx, type SelectOption, type RowSelection,
 } from '@/components/accounting/BankTxTable';
+import { SplitTransactionModal } from '@/components/accounting/SplitTransactionModal';
 import {
-  Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers,
+  Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
@@ -37,12 +38,18 @@ export default function BankTransactionsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rowSelections, setRowSelections] = useState<Record<string, RowSelection>>({});
   const [showBatchEdit, setShowBatchEdit] = useState(false);
   const [batchType, setBatchType] = useState<AllocType>('account');
   const [batchSearch, setBatchSearch] = useState('');
+
+  const [splitTxId, setSplitTxId] = useState<string | null>(null);
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
@@ -78,7 +85,17 @@ export default function BankTransactionsPage() {
     }).catch(() => {});
   }, []);
 
-  // Load transactions
+  // Debounce search input — 500ms delay before firing server request
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
+  }, [searchTerm]);
+
+  // Load transactions — server-side filtering for search, dates, status
   const loadTransactions = useCallback(async () => {
     if (!selectedBank) return;
     setIsLoading(true);
@@ -89,6 +106,9 @@ export default function BankTransactionsPage() {
       const params = new URLSearchParams({
         bank_account_id: selectedBank, status, limit: String(PAGE_SIZE), offset: String(offset),
       });
+      if (fromDate) params.set('from_date', fromDate);
+      if (toDate) params.set('to_date', toDate);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       const res = await fetch(`/api/accounting/bank-transactions?${params}`);
       const json = await res.json();
       const data = json.data || json;
@@ -99,7 +119,7 @@ export default function BankTransactionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBank, tab, page]);
+  }, [selectedBank, tab, page, fromDate, toDate, debouncedSearch]);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
   useEffect(() => {
@@ -151,6 +171,10 @@ export default function BankTransactionsPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
   };
 
+  const handleSplit = (txId: string) => {
+    setSplitTxId(txId);
+  };
+
   const handleBatchAccept = async () => {
     const toAccept = Array.from(selectedIds).filter(id => rowSelections[id]?.entityId);
     if (toAccept.length === 0) { toast.error('Select transactions with accounts assigned'); return; }
@@ -185,7 +209,7 @@ export default function BankTransactionsPage() {
   };
 
   const handleExport = () => {
-    const rows = filtered.map(tx => ({
+    const rows = transactions.map(tx => ({
       Date: tx.transactionDate,
       Description: tx.description || '',
       Reference: tx.reference || '',
@@ -215,19 +239,25 @@ export default function BankTransactionsPage() {
     toast.success(`Applied ${batchType} "${label}" to ${selectedIds.size} rows`);
   };
 
-  // Search filter (client-side within current page)
-  const filtered = useMemo(() => {
-    if (!searchTerm) return transactions;
-    const t = searchTerm.toLowerCase();
-    return transactions.filter(tx =>
-      (tx.description || '').toLowerCase().includes(t) ||
-      (tx.reference || '').toLowerCase().includes(t)
-    );
-  }, [transactions, searchTerm]);
+  // Quick Win 4: Apply bank categorisation rules to current account's unreviewed transactions
+  const handleApplyRules = async () => {
+    if (!selectedBank) { toast.error('Select a bank account first'); return; }
+    try {
+      const res = await fetch('/api/accounting/bank-rules-action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ action: 'apply', bankAccountId: selectedBank }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) throw new Error(json.message || 'Apply failed');
+      const result = json.data || {};
+      toast.success(`${result.applied ?? 0} categorised, ${result.skipped ?? 0} skipped`);
+      loadTransactions();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to apply rules'); }
+  };
 
   const bank = bankAccounts.find(b => b.id === selectedBank);
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const allSelected = filtered.length > 0 && filtered.every(t => selectedIds.has(t.id));
+  const allSelected = transactions.length > 0 && transactions.every(t => selectedIds.has(t.id));
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -335,7 +365,24 @@ export default function BankTransactionsPage() {
             className="flex items-center gap-1 px-2.5 py-1 rounded border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]">
             <Download className="h-3.5 w-3.5" /> Export
           </button>
-          {/* Search */}
+          {/* Quick Win 4: Apply Rules */}
+          <button onClick={handleApplyRules} disabled={!selectedBank}
+            className="flex items-center gap-1 px-2.5 py-1 rounded border border-yellow-500/40 text-xs text-yellow-500 hover:text-yellow-400 hover:border-yellow-400 disabled:opacity-30">
+            <Zap className="h-3.5 w-3.5" /> Apply Rules
+          </button>
+          <Link href="/accounting/bank-transactions/new"
+            className="flex items-center gap-1 px-2.5 py-1 rounded border border-emerald-500/60 text-xs text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 font-medium">
+            <Plus className="h-3.5 w-3.5" /> New Transaction
+          </Link>
+          {/* Quick Win 1: Date range filter */}
+          <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
+            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }}
+              className="px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]" />
+            <span>to</span>
+            <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }}
+              className="px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]" />
+          </div>
+          {/* Quick Win 2: Server-side search (debounced 500ms) */}
           <div className="ml-auto flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--ff-text-tertiary)]" />
@@ -392,13 +439,13 @@ export default function BankTransactionsPage() {
             <div className="flex items-center gap-2 text-red-400 py-8 justify-center">
               <AlertCircle className="h-5 w-5" /><span>{error}</span>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <div className="text-center py-12 text-[var(--ff-text-secondary)]">
               No {tab === 'new' ? 'new' : 'reviewed'} transactions for this account
             </div>
           ) : (
             <BankTxTable
-              transactions={filtered}
+              transactions={transactions}
               glAccounts={glAccounts}
               suppliers={suppliers}
               customers={customers}
@@ -408,7 +455,7 @@ export default function BankTransactionsPage() {
               tab={tab}
               onToggleSelect={toggleSelect}
               onSelectAll={() => setSelectedIds(
-                allSelected ? new Set() : new Set(filtered.map(t => t.id))
+                allSelected ? new Set() : new Set(transactions.map(t => t.id))
               )}
               onRowTypeChange={(txId, type) =>
                 setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode: prev[txId]?.vatCode || 'none' } }))
@@ -428,6 +475,7 @@ export default function BankTransactionsPage() {
               onAccept={handleAccept}
               onExclude={handleExclude}
               onUnmatch={handleUnmatch}
+              onSplit={handleSplit}
             />
           )}
         </div>
@@ -471,6 +519,22 @@ export default function BankTransactionsPage() {
           </div>
         )}
       </div>
+      {/* Split Transaction Modal */}
+      {splitTxId && (() => {
+        const splitTx = transactions.find(t => t.id === splitTxId);
+        if (!splitTx) return null;
+        return (
+          <SplitTransactionModal
+            transaction={splitTx}
+            glAccounts={glAccounts}
+            onClose={() => setSplitTxId(null)}
+            onSplit={() => {
+              setSplitTxId(null);
+              loadTransactions();
+            }}
+          />
+        );
+      })()}
     </AppLayout>
   );
 }

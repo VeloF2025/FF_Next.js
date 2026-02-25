@@ -26,10 +26,12 @@ interface Rule {
 }
 
 interface GLAccount { id: string; accountCode: string; accountName: string }
+interface Supplier { id: string; name: string }
 
 export default function BankRulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState('');
@@ -38,7 +40,8 @@ export default function BankRulesPage() {
 
   const [form, setForm] = useState({
     ruleName: '', matchField: 'description', matchType: 'contains',
-    matchPattern: '', glAccountId: '', descriptionTemplate: '', priority: '100',
+    matchPattern: '', glAccountId: '', supplierId: '', vatCode: '',
+    descriptionTemplate: '', priority: '100',
   });
 
   const load = useCallback(async () => {
@@ -58,6 +61,12 @@ export default function BankRulesPage() {
         accountName: String(a.accountName || a.account_name || ''),
       })));
     });
+    fetch('/api/suppliers?status=active', { credentials: 'include' }).then(r => r.json()).then(res => {
+      const list = Array.isArray(res.data) ? res.data : [];
+      setSuppliers(list.map((s: { id: number | string; name: string }) => ({
+        id: String(s.id), name: s.name,
+      })));
+    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,6 +79,7 @@ export default function BankRulesPage() {
         body: JSON.stringify({
           ruleName: form.ruleName, matchField: form.matchField, matchType: form.matchType,
           matchPattern: form.matchPattern, glAccountId: form.glAccountId,
+          supplierId: form.supplierId || undefined,
           descriptionTemplate: form.descriptionTemplate || undefined,
           priority: Number(form.priority) || 100,
         }),
@@ -77,7 +87,7 @@ export default function BankRulesPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || 'Failed');
       setShowForm(false);
-      setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', descriptionTemplate: '', priority: '100' });
+      setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
       await load();
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
     finally { setBusy(''); }
@@ -157,7 +167,21 @@ export default function BankRulesPage() {
                 </select>
                 <input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="ff-input" placeholder="Priority (lower = first)" />
               </div>
-              <input value={form.descriptionTemplate} onChange={e => setForm(f => ({ ...f, descriptionTemplate: e.target.value }))} className="ff-input w-full" placeholder="Description template (optional, use {description} and {amount})" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Quick Win 3: Supplier dropdown */}
+                <select value={form.supplierId} onChange={e => setForm(f => ({ ...f, supplierId: e.target.value }))} className="ff-select">
+                  <option value="">No Supplier (optional)</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                {/* Quick Win 3: VAT Code select */}
+                <select value={form.vatCode} onChange={e => setForm(f => ({ ...f, vatCode: e.target.value }))} className="ff-select">
+                  <option value="">No VAT</option>
+                  <option value="standard">Standard 15%</option>
+                  <option value="zero_rated">Zero Rated</option>
+                  <option value="exempt">Exempt</option>
+                </select>
+                <input value={form.descriptionTemplate} onChange={e => setForm(f => ({ ...f, descriptionTemplate: e.target.value }))} className="ff-input" placeholder="Description template (optional)" />
+              </div>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
                 <button type="submit" disabled={busy === 'new'} className="px-6 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
@@ -174,13 +198,14 @@ export default function BankRulesPage() {
                 <th className="px-4 py-3">Match</th>
                 <th className="px-4 py-3">Pattern</th>
                 <th className="px-4 py-3">GL Account</th>
+                <th className="px-4 py-3">Supplier</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && rules.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
+                {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
+                {!loading && rules.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
                 {rules.map(rule => (
                   <tr key={rule.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
                     <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">{rule.ruleName}</td>
@@ -190,6 +215,9 @@ export default function BankRulesPage() {
                     <td className="px-4 py-3"><code className="px-2 py-0.5 rounded bg-[var(--ff-bg-primary)] text-yellow-400 text-xs">{rule.matchPattern}</code></td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs">
                       {rule.glAccountCode} — {rule.glAccountName}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs">
+                      {rule.supplierName || <span className="text-[var(--ff-text-tertiary)]">—</span>}
                     </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{rule.priority}</td>
                     <td className="px-4 py-3">
