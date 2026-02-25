@@ -12,8 +12,8 @@ export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
 
 export const VAT_OPTIONS: { value: VatCode; label: string; rate: number }[] = [
   { value: 'none', label: 'No VAT', rate: 0 },
-  { value: 'standard', label: 'Std 15%', rate: 15 },
-  { value: 'zero_rated', label: 'Zero', rate: 0 },
+  { value: 'standard', label: 'Standard 15%', rate: 15 },
+  { value: 'zero_rated', label: 'Zero Rated', rate: 0 },
   { value: 'exempt', label: 'Exempt', rate: 0 },
 ];
 
@@ -113,7 +113,7 @@ export function BankTxTable(props: Props) {
             <th className={`${TH} w-24`}>Type</th>
             <th className={`${TH} w-52`}>Selection</th>
             <th className={`${TH} w-28`}>Reference</th>
-            <th className={`${TH} w-16`}>VAT</th>
+            <th className={`${TH} w-24`}>VAT</th>
             <th className="py-2 px-2 font-medium text-right w-24">Spent</th>
             <th className="py-2 px-2 font-medium text-right w-24">Received</th>
             <th className="py-2 px-2 font-medium text-center w-16">Actions</th>
