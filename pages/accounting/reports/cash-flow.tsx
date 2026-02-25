@@ -46,6 +46,10 @@ export default function CashFlowPage() {
       const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
       const res = await fetch(`/api/accounting/reports-cash-flow?${params}`);
       const json = await res.json();
+      if (!res.ok) {
+        setError(json?.error?.message || 'Failed to load cash flow statement');
+        return;
+      }
       const data = json.data || json;
       setReport(data.report || data);
     } catch {
