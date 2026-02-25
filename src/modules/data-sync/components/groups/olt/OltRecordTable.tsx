@@ -121,6 +121,7 @@ export function OltRecordTable({
                 </th>
               )}
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Project</th>
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OLT Serial</th>
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">1Map Serial</th>
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
@@ -154,6 +155,7 @@ export function OltRecordTable({
                     </td>
                   )}
                   <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{record.drop_number}</td>
+                  <td className="py-3 px-4 text-[var(--ff-text-secondary)] text-xs truncate max-w-[140px]">{record.project || '-'}</td>
                   <td className="py-3 px-4 text-green-400 font-mono">{record.olt_serial || '-'}</td>
                   <td className={`py-3 px-4 font-mono ${isStatusMismatch(record) ? 'text-green-400' : 'text-red-400'}`}>
                     {isStatusMismatch(record)

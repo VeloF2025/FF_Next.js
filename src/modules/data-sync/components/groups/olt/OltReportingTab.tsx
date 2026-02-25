@@ -194,12 +194,13 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
                 <table className="w-full text-sm table-fixed">
                   <thead className="sticky top-0 bg-[var(--ff-bg-tertiary)]">
                     <tr className="border-b border-[var(--ff-border-light)]">
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[12%]">DR Number</th>
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">OLT Serial</th>
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[16%]">1Map Serial</th>
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Status</th>
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[30%]">Import File</th>
-                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">Date</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[10%]">DR Number</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[12%]">Project</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[15%]">OLT Serial</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[15%]">1Map Serial</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[9%]">Status</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[25%]">Import File</th>
+                      <th className="text-left py-2 px-3 text-[var(--ff-text-secondary)] font-medium w-[9%]">Date</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -209,6 +210,7 @@ export function OltReportingTab({ setError }: OltReportingTabProps) {
                       .map((record: OltRecord) => (
                         <tr key={record.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
                           <td className="py-2 px-3 text-[var(--ff-text-primary)] font-mono text-xs">{record.drop_number}</td>
+                          <td className="py-2 px-3 text-[var(--ff-text-secondary)] text-xs truncate">{record.project || '-'}</td>
                           <td className="py-2 px-3 text-green-400 font-mono text-xs truncate">{record.olt_serial || '-'}</td>
                           <td className="py-2 px-3 text-red-400 font-mono text-xs truncate">{record.wrong_onemap_serial || '-'}</td>
                           <td className="py-2 px-3">

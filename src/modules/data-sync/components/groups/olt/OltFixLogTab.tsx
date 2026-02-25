@@ -70,6 +70,7 @@ export function OltFixLogTab({
               <thead>
                 <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
                   <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">DR Number</th>
+                  <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Project</th>
                   <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OLT Serial</th>
                   {statusFilter !== 'fixed' && (
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
@@ -105,6 +106,7 @@ export function OltFixLogTab({
                   return (
                     <tr key={record.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
                       <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{record.drop_number}</td>
+                      <td className="py-3 px-4 text-[var(--ff-text-secondary)] text-xs truncate max-w-[140px]">{record.project || '-'}</td>
                       <td className="py-3 px-4 text-green-400 font-mono text-xs">{record.olt_serial || '-'}</td>
                       {statusFilter !== 'fixed' && (
                         <td className="py-3 px-4">
