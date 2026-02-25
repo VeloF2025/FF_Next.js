@@ -6,7 +6,7 @@
  * - Reports: Construction-specific analytics and reporting
  */
 
-import { HardHat, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { HardHat, ClipboardCheck, BarChart3, Radio } from 'lucide-react';
 import type { ModuleNavigationConfig } from '../../types';
 
 export const constructionQaConfig: ModuleNavigationConfig = {
@@ -22,6 +22,14 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'QA',
       icon: ClipboardCheck,
       path: '/construction-qa',
+      rbacKey: 'field',
+    },
+    {
+      id: 'otdr-testing',
+      label: 'OTDR Testing',
+      shortLabel: 'OTDR',
+      icon: Radio,
+      path: '/construction-qa/otdr',
       rbacKey: 'field',
     },
     {
