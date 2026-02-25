@@ -269,8 +269,11 @@ export async function getAccountTransactions(
       const d = Number(r.debit || 0);
       const c = Number(r.credit || 0);
       running += normalBal === 'debit' ? d - c : c - d;
+      const rawDate = r.entry_date instanceof Date
+        ? r.entry_date.toISOString().split('T')[0]
+        : String(r.entry_date || '').split('T')[0];
       return {
-        date: String(r.entry_date).split('T')[0],
+        date: rawDate,
         entryNumber: String(r.entry_number),
         description: String(r.description || ''),
         debit: d,
@@ -319,18 +322,24 @@ export async function getAuditTrail(
     const rows = (await sql`
       SELECT
         je.entry_date, je.entry_number, je.description, je.source, je.status,
-        je.total_debit, je.total_credit,
-        COALESCE(u.name, je.created_by::TEXT) AS created_by_name,
+        COALESCE(SUM(jl.debit), 0) AS total_debit,
+        COALESCE(SUM(jl.credit), 0) AS total_credit,
+        COALESCE(CONCAT_WS(' ', u.first_name, u.last_name), je.created_by::TEXT) AS created_by_name,
         je.created_at, je.posted_at
       FROM gl_journal_entries je
-      LEFT JOIN users u ON u.id = je.created_by
+      LEFT JOIN gl_journal_lines jl ON jl.journal_entry_id = je.id
+      LEFT JOIN users u ON u.id::TEXT = je.created_by::TEXT
       WHERE je.entry_date >= ${periodStart}
         AND je.entry_date <= ${periodEnd}
+      GROUP BY je.id, je.entry_date, je.entry_number, je.description,
+        je.source, je.status, u.first_name, u.last_name, je.created_by, je.created_at, je.posted_at
       ORDER BY je.created_at DESC
     `) as Row[];
 
     return rows.map((r: Row) => ({
-      entryDate: String(r.entry_date).split('T')[0],
+      entryDate: r.entry_date instanceof Date
+        ? r.entry_date.toISOString().split('T')[0]!
+        : String(r.entry_date || '').split('T')[0]!,
       entryNumber: String(r.entry_number),
       description: String(r.description || ''),
       source: String(r.source || 'manual'),

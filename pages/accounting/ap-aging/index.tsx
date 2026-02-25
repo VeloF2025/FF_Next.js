@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Clock, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, Loader2, AlertCircle, Download } from 'lucide-react';
 import type { AgingBucket } from '@/modules/accounting/types/ap.types';
 
 function formatCurrency(amount: number): string {
@@ -66,7 +66,7 @@ export default function APAgingPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
               <input
                 type="date"
@@ -74,6 +74,17 @@ export default function APAgingPage() {
                 onChange={e => setAsAtDate(e.target.value)}
                 className="ff-input text-sm"
               />
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (asAtDate) params.set('as_at_date', asAtDate);
+                  window.open(`/api/accounting/ap-aging-export?${params}`, '_blank');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
             </div>
           </div>
         </div>
