@@ -167,7 +167,7 @@ export function AccountingNav() {
 
   return (
     <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
-      <div className="flex items-center gap-0 px-2 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-0 px-2">
         {TABS.map(tab => (
           <div key={tab.id} className="relative">
             {tab.href ? (
