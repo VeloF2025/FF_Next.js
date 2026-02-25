@@ -32,7 +32,7 @@ async function getAvailableAssets() {
 async function getStaffMembers() {
   try {
     const response = await fetch(
-      `${BASE_URL}/api/staff?status=active`,
+      `${BASE_URL}/api/staff?status=ACTIVE`,
       { cache: 'no-store' }
     );
     if (!response.ok) return [];
@@ -80,7 +80,7 @@ export default async function CheckoutPage({ searchParams }: PageProps) {
             Back to Assets
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Check Out Asset</h1>
-          <p className="text-gray-600">Assign an asset to a staff member, project, or vehicle</p>
+          <p className="text-gray-600">Assign an asset to a staff member, project, vehicle, or contractor</p>
         </div>
 
         <CheckoutClient

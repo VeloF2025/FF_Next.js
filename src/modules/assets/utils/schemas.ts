@@ -62,6 +62,7 @@ const AssignmentTargetTypeSchema = z.enum([
   AssignmentTargetType.STAFF,
   AssignmentTargetType.PROJECT,
   AssignmentTargetType.VEHICLE,
+  AssignmentTargetType.CONTRACTOR,
   AssignmentTargetType.WAREHOUSE,
 ]);
 

@@ -88,6 +88,7 @@ export const AssignmentTargetType = {
   STAFF: 'staff',
   PROJECT: 'project',
   VEHICLE: 'vehicle',
+  CONTRACTOR: 'contractor',
   WAREHOUSE: 'warehouse',
 } as const;
 
@@ -109,6 +110,10 @@ export const ASSIGNMENT_TARGET_CONFIG: Record<
   [AssignmentTargetType.VEHICLE]: {
     label: 'Vehicle',
     icon: 'truck',
+  },
+  [AssignmentTargetType.CONTRACTOR]: {
+    label: 'Contractor / SMME',
+    icon: 'hard-hat',
   },
   [AssignmentTargetType.WAREHOUSE]: {
     label: 'Warehouse',

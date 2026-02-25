@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ArrowRight, Loader2, Package, User, Briefcase, Truck, ScanLine } from 'lucide-react';
+import { ArrowRight, Loader2, Package, User, Briefcase, Truck, HardHat, ScanLine } from 'lucide-react';
 import type { Asset } from '@/modules/assets/types';
 
 // Dynamic import for barcode scanner (client-side only)
@@ -41,7 +41,7 @@ interface CheckoutClientProps {
   projects: Project[];
 }
 
-type AssigneeType = 'staff' | 'project' | 'vehicle';
+type AssigneeType = 'staff' | 'project' | 'vehicle' | 'contractor';
 
 export function CheckoutClient({ assets, preselectedAssetId, staffMembers, projects }: CheckoutClientProps) {
   const router = useRouter();
@@ -56,6 +56,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
     assigneeName: '',
     projectId: '',
     vehicleReg: '',
+    contractorName: '',
     expectedReturnDate: '',
     notes: '',
   });
@@ -104,6 +105,12 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
         }
         toId = selectedProject.id;
         toName = selectedProject.name;
+      } else if (formData.assigneeType === 'contractor') {
+        if (!formData.contractorName) {
+          throw new Error('Please enter contractor/SMME name');
+        }
+        toId = crypto.randomUUID();
+        toName = formData.contractorName;
       } else {
         // Vehicle
         if (!formData.vehicleReg) {
@@ -119,8 +126,8 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
         toName,
       };
 
-      // Link project if assigning to staff and project selected
-      if (formData.assigneeType === 'staff' && formData.projectId) {
+      // Link project if assigning to staff or contractor and project selected
+      if ((formData.assigneeType === 'staff' || formData.assigneeType === 'contractor') && formData.projectId) {
         payload.projectId = formData.projectId;
       }
       if (formData.expectedReturnDate) payload.expectedReturnDate = formData.expectedReturnDate;
@@ -151,6 +158,14 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
     staff: User,
     project: Briefcase,
     vehicle: Truck,
+    contractor: HardHat,
+  };
+
+  const assigneeTypeLabels: Record<AssigneeType, string> = {
+    staff: 'Staff',
+    project: 'Project',
+    vehicle: 'Vehicle',
+    contractor: 'Contractor',
   };
 
   return (
@@ -217,8 +232,8 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Assign To *
         </label>
-        <div className="grid grid-cols-3 gap-4">
-          {(['staff', 'project', 'vehicle'] as AssigneeType[]).map((type) => {
+        <div className="grid grid-cols-4 gap-3">
+          {(['staff', 'project', 'vehicle', 'contractor'] as AssigneeType[]).map((type) => {
             const Icon = assigneeTypeIcons[type];
             return (
               <button
@@ -232,7 +247,7 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
                 }`}
               >
                 <Icon className="h-6 w-6" />
-                <span className="text-sm font-medium capitalize">{type}</span>
+                <span className="text-sm font-medium">{assigneeTypeLabels[type]}</span>
               </button>
             );
           })}
@@ -333,6 +348,47 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
         </div>
       )}
 
+      {/* Contractor/SMME Name */}
+      {formData.assigneeType === 'contractor' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Contractor / SMME Name *
+          </label>
+          <input
+            type="text"
+            name="contractorName"
+            value={formData.contractorName}
+            onChange={handleChange}
+            required
+            placeholder="e.g., Letsema Construction"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      )}
+
+      {/* Link to Project - for contractor assignments too */}
+      {formData.assigneeType === 'contractor' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Link to Project (optional)
+          </label>
+          <select
+            name="projectId"
+            value={formData.projectId}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No project link</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.project_code} - {project.name}
+                {project.client_name && ` (${project.client_name})`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Expected Return Date */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -379,7 +435,8 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
             !formData.assetId ||
             (formData.assigneeType === 'staff' && !formData.assigneeId) ||
             (formData.assigneeType === 'project' && !formData.projectId) ||
-            (formData.assigneeType === 'vehicle' && !formData.vehicleReg)
+            (formData.assigneeType === 'vehicle' && !formData.vehicleReg) ||
+            (formData.assigneeType === 'contractor' && !formData.contractorName)
           }
           className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
