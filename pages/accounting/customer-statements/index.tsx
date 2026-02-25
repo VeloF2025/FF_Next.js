@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ClipboardList, Loader2, AlertCircle, Mail, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -22,11 +23,55 @@ interface CustomerBalance {
   invoice_count: number;
 }
 
+/** Triggers a CSV download in the browser using a temporary anchor element. */
+function triggerCsvDownload(csvContent: string, filename: string): void {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+/** Builds CSV content from a list of CustomerBalance rows. */
+function buildCsv(rows: CustomerBalance[]): string {
+  const header = 'Customer,Total Invoiced,Total Paid,Balance,# Invoices,Last Payment';
+  const lines = rows.map((c) =>
+    [
+      `"${c.client_name.replace(/"/g, '""')}"`,
+      c.total_invoiced.toFixed(2),
+      c.total_paid.toFixed(2),
+      c.balance.toFixed(2),
+      c.invoice_count,
+      c.last_payment_date?.split('T')[0] ?? '',
+    ].join(',')
+  );
+  return [header, ...lines].join('\n');
+}
+
 export default function CustomerStatementsPage() {
   const [customers, setCustomers] = useState<CustomerBalance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
+
+  /** Downloads a single customer row as a CSV statement. */
+  function handleDownloadStatement(customer: CustomerBalance): void {
+    const csv = buildCsv([customer]);
+    const safeName = customer.client_name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    triggerCsvDownload(csv, `statement-${safeName}-${asAtDate}.csv`);
+  }
+
+  /** Downloads all loaded customer balances as a single CSV file. */
+  function handleDownloadAll(): void {
+    if (customers.length === 0) return;
+    const csv = buildCsv(customers);
+    triggerCsvDownload(csv, `statements-all-${asAtDate}.csv`);
+  }
 
   const loadStatements = useCallback(async () => {
     setIsLoading(true);
@@ -65,7 +110,7 @@ export default function CustomerStatementsPage() {
         </div>
 
         <div className="p-6">
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-6 flex-wrap">
             <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
             <input
               type="date"
@@ -73,6 +118,16 @@ export default function CustomerStatementsPage() {
               onChange={(e) => setAsAtDate(e.target.value)}
               className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
             />
+            {customers.length > 0 && (
+              <button
+                onClick={handleDownloadAll}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium transition-colors"
+                title="Download all customer balances as CSV"
+              >
+                <Download className="h-4 w-4" />
+                Download All
+              </button>
+            )}
           </div>
 
           {isLoading ? (
@@ -114,10 +169,18 @@ export default function CustomerStatementsPage() {
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{c.last_payment_date?.split('T')[0] || '-'}</td>
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-blue-400" title="Download PDF">
+                          <button
+                            onClick={() => handleDownloadStatement(c)}
+                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-blue-400"
+                            title="Download statement as CSV"
+                          >
                             <Download className="h-4 w-4" />
                           </button>
-                          <button className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-purple-400" title="Email Statement">
+                          <button
+                            onClick={() => toast('Email functionality coming soon', { icon: '📧' })}
+                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-purple-400"
+                            title="Email Statement"
+                          >
                             <Mail className="h-4 w-4" />
                           </button>
                         </div>

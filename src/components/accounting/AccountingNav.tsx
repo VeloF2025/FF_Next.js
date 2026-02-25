@@ -60,10 +60,10 @@ const TABS: Tab[] = [
   {
     id: 'accounts', label: 'Accounts',
     items: [
-      { label: 'Chart of Accounts', href: '/accounting/chart-of-accounts' },
-      { label: 'Journal Entries', href: '/accounting/journal-entries' },
+      { label: 'Chart of Accounts', href: '/accounting?tab=chart-of-accounts' },
+      { label: 'Journal Entries', href: '/accounting?tab=journal-entries' },
       { label: 'Recurring Journals', href: '/accounting/recurring-journals' },
-      { label: 'Fiscal Periods', href: '/accounting/fiscal-periods' },
+      { label: 'Fiscal Periods', href: '/accounting?tab=fiscal-periods' },
       { label: 'Default Accounts', href: '/accounting/default-accounts' },
     ],
   },
@@ -105,7 +105,12 @@ const TABS: Tab[] = [
 ];
 
 function getActiveTabId(pathname: string, query: Record<string, string | string[] | undefined>): string {
-  if (pathname === '/accounting') return 'dashboard';
+  if (pathname === '/accounting') {
+    if (query.tab === 'chart-of-accounts' || query.tab === 'journal-entries' || query.tab === 'fiscal-periods') {
+      return 'accounts';
+    }
+    return 'dashboard';
+  }
   if (pathname.startsWith('/accounting/sage-migration')) return 'import';
 
   if (pathname.startsWith('/accounting/customer-') ||
