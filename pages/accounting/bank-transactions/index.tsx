@@ -63,17 +63,17 @@ export default function BankTransactionsPage() {
       );
     }).catch(() => {});
 
-    fetch('/api/suppliers?status=ACTIVE').then(r => r.json()).then(json => {
+    fetch('/api/suppliers?status=active').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data) ? json.data : [];
-      setSuppliers(list.map((s: { id: string; name: string; code?: string }) => ({
+      setSuppliers(list.map((s: { id: number | string; name: string; code?: string }) => ({
         id: String(s.id), name: s.name, code: s.code,
       })));
     }).catch(() => {});
 
     fetch('/api/clients').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data) ? json.data : [];
-      setCustomers(list.map((c: { id: string; name?: string; company_name?: string }) => ({
-        id: c.id, name: c.company_name || c.name || '',
+      setCustomers(list.map((c: { id: string; name?: string; company_name?: string; companyName?: string }) => ({
+        id: c.id, name: c.company_name || c.companyName || c.name || '',
       })));
     }).catch(() => {});
   }, []);
