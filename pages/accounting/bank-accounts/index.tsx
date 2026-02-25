@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Landmark, Loader2, AlertCircle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Landmark, Loader2, AlertCircle, Plus, ArrowUpRight, ArrowDownRight, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -30,6 +31,9 @@ export default function BankAccountsPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ accountCode: '', accountName: '', description: '' });
 
   const loadAccounts = useCallback(async () => {
     setIsLoading(true);
@@ -48,6 +52,43 @@ export default function BankAccountsPage() {
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
+  const handleAdd = async () => {
+    if (!form.accountCode || !form.accountName) {
+      toast.error('Account code and name are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/accounting/chart-of-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          accountCode: form.accountCode,
+          accountName: form.accountName,
+          accountType: 'asset',
+          accountSubtype: 'bank',
+          parentAccountId: 'bf801b3b-de70-4c10-8d8f-689de8b8a9ad',
+          description: form.description || form.accountName,
+          normalBalance: 'debit',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) {
+        toast.error(json.message || json.error || 'Failed to create account');
+        return;
+      }
+      toast.success('Bank account created');
+      setShowAddModal(false);
+      setForm({ accountCode: '', accountName: '', description: '' });
+      loadAccounts();
+    } catch {
+      toast.error('Failed to create bank account');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
@@ -65,7 +106,10 @@ export default function BankAccountsPage() {
                   </p>
                 </div>
               </div>
-              <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 text-sm">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 text-sm"
+              >
                 <Plus className="h-4 w-4" />
                 Add Bank Account
               </button>
@@ -136,6 +180,82 @@ export default function BankAccountsPage() {
           )}
         </div>
       </div>
+
+      {/* Add Bank Account Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-[var(--ff-bg-secondary)] rounded-xl border border-[var(--ff-border-light)] w-full max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Add Bank Account</h2>
+              <button onClick={() => setShowAddModal(false)} className="text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Account Code *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1114"
+                  value={form.accountCode}
+                  onChange={e => setForm(f => ({ ...f, accountCode: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Account Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bank - FNB Current"
+                  value={form.accountName}
+                  onChange={e => setForm(f => ({ ...f, accountName: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="Optional description"
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <p className="text-xs text-[var(--ff-text-tertiary)]">
+                Creates a GL account under Current Assets (1100) with subtype &quot;bank&quot;.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={saving}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm flex items-center gap-2"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
