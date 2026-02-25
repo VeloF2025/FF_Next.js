@@ -45,17 +45,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         : now.toISOString().split('T')[0];
     }
 
-    // Try to load budgets from app_settings
+    // Load budgets from accounting_budgets table
+    // Determine which month columns to sum based on period
     let budgets: Record<string, number> = {};
     try {
-      const [row] = await sql`
-        SELECT value FROM app_settings WHERE key = 'accounting_budgets'
+      const fiscalYear = new Date(startDate).getFullYear();
+      const startMonth = new Date(startDate).getMonth(); // 0-based
+      const endMonth = new Date(endDate).getMonth();
+      const monthCols = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+      const budgetRows = await sql`
+        SELECT ab.gl_account_id, ga.account_code,
+          ab.jan, ab.feb, ab.mar, ab.apr, ab.may, ab.jun,
+          ab.jul, ab.aug, ab.sep, ab.oct, ab.nov, ab.dec
+        FROM accounting_budgets ab
+        JOIN gl_accounts ga ON ga.id = ab.gl_account_id
+        WHERE ab.fiscal_year = ${fiscalYear}
       `;
-      if (row?.value) {
-        budgets = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+      for (const row of budgetRows) {
+        let total = 0;
+        for (let m = startMonth; m <= endMonth; m++) {
+          total += Number(row[monthCols[m]] || 0);
+        }
+        budgets[row.account_code] = total;
+        budgets[row.gl_account_id] = total;
       }
     } catch {
-      // No budgets configured yet
+      // No budgets configured yet — fall back to app_settings
+      try {
+        const [row] = await sql`SELECT value FROM app_settings WHERE key = 'accounting_budgets'`;
+        if (row?.value) {
+          budgets = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+        }
+      } catch { /* no budgets */ }
     }
 
     // Get actual GL balances for expense and revenue accounts
