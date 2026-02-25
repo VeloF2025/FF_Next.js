@@ -47,10 +47,11 @@ export default function CheckInTemplatesPage() {
         const response = await fetch('/api/fleet/check-in/templates');
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || data.message);
-        setTemplates(data.data || data);
+        const templateList = data.data || data;
+        setTemplates(templateList);
 
         // Auto-select default template
-        const defaultTemplate = data.find((t: CheckTemplate) => t.isDefault);
+        const defaultTemplate = templateList.find((t: CheckTemplate) => t.isDefault);
         if (defaultTemplate) {
           loadTemplateDetails(defaultTemplate.id);
         }
