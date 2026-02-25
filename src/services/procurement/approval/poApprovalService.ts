@@ -10,6 +10,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -363,6 +364,9 @@ class POApprovalService {
           ${poId}, 'approved', ${notes || 'Approved'}, ${approverId}, NOW()
         )
       `;
+
+      // Post commitment to GL (non-blocking)
+      postPurchaseOrderToGL(poId, approverId).catch(() => {});
 
       log.info('PO approved', { poId, approverId, approverName });
     } catch (error) {

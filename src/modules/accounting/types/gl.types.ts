@@ -37,7 +37,9 @@ export type GLEntrySource =
   | 'auto_adjustment'
   | 'auto_vat_adjustment'
   | 'auto_batch_payment'
-  | 'auto_recurring';
+  | 'auto_recurring'
+  | 'auto_purchase_order'
+  | 'auto_depreciation';
 
 // ── Recurring Journals ────────────────────────────────────────────────────────
 

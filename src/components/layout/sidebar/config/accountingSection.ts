@@ -321,6 +321,14 @@ export const accountingSection: NavSection = {
           rbacKey: 'accounting',
         },
         {
+          to: '/accounting/depreciation',
+          icon: TrendingDown,
+          label: 'Depreciation',
+          shortLabel: 'Dep',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
           to: '/accounting/year-end',
           icon: CalendarCheck,
           label: 'Year-End',

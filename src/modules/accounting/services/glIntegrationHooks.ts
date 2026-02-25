@@ -6,6 +6,8 @@
  * - Customer invoice approved → DR AR, CR Revenue
  * - Customer payment recorded → DR Bank, CR AR
  * - GRN confirmed → DR Materials, CR AP
+ * - PO approved → DR Materials, CR AP (commitment accounting)
+ * - Asset depreciation → DR Depreciation Expense, CR Accumulated Depreciation
  */
 
 import { sql } from '@/lib/neon';
@@ -215,3 +217,6 @@ export async function postGRNToGL(
     return null;
   }
 }
+
+// Re-export Phase 4 cross-module hooks
+export { postPurchaseOrderToGL, postAssetDepreciationToGL } from './glCrossModuleHooks';
