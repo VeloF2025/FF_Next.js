@@ -110,7 +110,7 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
       .then(data => setVehicles(data.data || []))
       .catch(err => log.error('Failed to fetch vehicles', { error: err }))
       .finally(() => setVehiclesLoading(false));
-    fetch('/api/contractors?status=active', { credentials: 'include' })
+    fetch('/api/contractors', { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         const active = (data.data || []).filter((c: Contractor) => c.isActive !== false);
