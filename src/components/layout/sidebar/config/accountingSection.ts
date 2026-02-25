@@ -1,18 +1,22 @@
 /**
  * Accounting section configuration
  *
- * General Ledger, Chart of Accounts, Journal Entries, AP, Reports
+ * Organized into logical groups matching Sage-style navigation:
+ * General Ledger, Accounts Payable, Accounts Receivable, Banking, Reports
  */
 
-import { Calculator, BookOpen, FileSpreadsheet, BarChart3, Receipt, Wallet, Clock, CreditCard, FileText, Landmark, Database } from 'lucide-react';
+import {
+  Calculator, BookOpen, FileSpreadsheet, BarChart3,
+  Receipt, Wallet, Clock, CreditCard, FileText,
+  Landmark, Database, TrendingDown, TrendingUp, Upload,
+} from 'lucide-react';
 import type { NavSection } from './types';
 
 export const accountingSection: NavSection = {
-  section: 'Accounting',
+  section: 'ACCOUNTING',
   sectionId: 'accounting',
-  sectionLink: '/accounting',
   isCollapsible: true,
-  defaultExpanded: false,
+  defaultExpanded: true,
   items: [
     {
       to: '/accounting',
@@ -22,86 +26,195 @@ export const accountingSection: NavSection = {
       permissions: [],
       rbacKey: 'accounting',
     },
+    // ── General Ledger ────────────────────────────────
     {
-      to: '/accounting?tab=chart-of-accounts',
+      to: '#',
       icon: BookOpen,
-      label: 'Chart of Accounts',
-      shortLabel: 'CoA',
+      label: 'General Ledger',
+      shortLabel: 'GL',
       permissions: [],
       rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting?tab=chart-of-accounts',
+          icon: BookOpen,
+          label: 'Chart of Accounts',
+          shortLabel: 'CoA',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting?tab=journal-entries',
+          icon: FileSpreadsheet,
+          label: 'Journal Entries',
+          shortLabel: 'JE',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting?tab=fiscal-periods',
+          icon: Clock,
+          label: 'Fiscal Periods',
+          shortLabel: 'FP',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
     },
+    // ── Accounts Payable ──────────────────────────────
     {
-      to: '/accounting?tab=journal-entries',
-      icon: FileSpreadsheet,
-      label: 'Journal Entries',
-      shortLabel: 'JE',
+      to: '#',
+      icon: TrendingDown,
+      label: 'Accounts Payable',
+      shortLabel: 'AP',
       permissions: [],
       rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/supplier-invoices',
+          icon: Receipt,
+          label: 'Supplier Invoices',
+          shortLabel: 'SI',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/supplier-payments',
+          icon: Wallet,
+          label: 'Supplier Payments',
+          shortLabel: 'SPay',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/ap-aging',
+          icon: Clock,
+          label: 'AP Aging',
+          shortLabel: 'APAge',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
     },
+    // ── Accounts Receivable ───────────────────────────
     {
-      to: '/accounting/supplier-invoices',
-      icon: Receipt,
-      label: 'Supplier Invoices',
-      shortLabel: 'SI',
-      permissions: [],
-      rbacKey: 'accounting',
-    },
-    {
-      to: '/accounting/supplier-payments',
-      icon: Wallet,
-      label: 'Payments',
-      shortLabel: 'Pay',
-      permissions: [],
-      rbacKey: 'accounting',
-    },
-    {
-      to: '/accounting/ap-aging',
-      icon: Clock,
-      label: 'AP Aging',
-      shortLabel: 'Aging',
-      permissions: [],
-      rbacKey: 'accounting',
-    },
-    {
-      to: '/accounting/customer-payments',
-      icon: CreditCard,
-      label: 'Customer Payments',
-      shortLabel: 'CPay',
-      permissions: [],
-      rbacKey: 'accounting',
-    },
-    {
-      to: '/accounting/ar-aging',
-      icon: Clock,
-      label: 'AR Aging',
+      to: '#',
+      icon: TrendingUp,
+      label: 'Accounts Receivable',
       shortLabel: 'AR',
       permissions: [],
       rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/customer-payments',
+          icon: CreditCard,
+          label: 'Customer Payments',
+          shortLabel: 'CPay',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/credit-notes',
+          icon: FileText,
+          label: 'Credit Notes',
+          shortLabel: 'CN',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/ar-aging',
+          icon: Clock,
+          label: 'AR Aging',
+          shortLabel: 'ARAge',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
     },
+    // ── Banking ───────────────────────────────────────
     {
-      to: '/accounting/credit-notes',
-      icon: FileText,
-      label: 'Credit Notes',
-      shortLabel: 'CN',
-      permissions: [],
-      rbacKey: 'accounting',
-    },
-    {
-      to: '/accounting/bank-reconciliation',
+      to: '#',
       icon: Landmark,
-      label: 'Bank Recon',
-      shortLabel: 'Recon',
+      label: 'Banking',
+      shortLabel: 'Bank',
       permissions: [],
       rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting/bank-reconciliation',
+          icon: Landmark,
+          label: 'Bank Reconciliation',
+          shortLabel: 'Recon',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/bank-reconciliation/import',
+          icon: Upload,
+          label: 'Import Statement',
+          shortLabel: 'Import',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
     },
+    // ── Reports ───────────────────────────────────────
     {
-      to: '/accounting?tab=reports',
+      to: '#',
       icon: BarChart3,
       label: 'Reports',
       shortLabel: 'Reports',
       permissions: [],
       rbacKey: 'accounting',
+      isGroup: true,
+      subItems: [
+        {
+          to: '/accounting?tab=reports',
+          icon: BarChart3,
+          label: 'Trial Balance',
+          shortLabel: 'TB',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/income-statement',
+          icon: BarChart3,
+          label: 'Income Statement',
+          shortLabel: 'P&L',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/balance-sheet',
+          icon: BarChart3,
+          label: 'Balance Sheet',
+          shortLabel: 'BS',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/vat-return',
+          icon: BarChart3,
+          label: 'VAT Return',
+          shortLabel: 'VAT',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/reports/project-profitability',
+          icon: BarChart3,
+          label: 'Project Profitability',
+          shortLabel: 'Profit',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+      ],
     },
+    // ── Migration ─────────────────────────────────────
     {
       to: '/accounting/sage-migration',
       icon: Database,
