@@ -175,8 +175,13 @@ export default function BankTransactionsPage() {
 
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
-    // TODO: implement delete API endpoint
-    toast.error('Delete not yet implemented');
+    if (!confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
+    try {
+      await callAction({ action: 'delete', bankTransactionIds: Array.from(selectedIds) } as Record<string, string>);
+      toast.success(`${selectedIds.size} transaction(s) deleted`);
+      setSelectedIds(new Set());
+      loadTransactions();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Delete failed'); }
   };
 
   const handleExport = () => {

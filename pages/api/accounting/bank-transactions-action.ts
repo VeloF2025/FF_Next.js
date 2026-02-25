@@ -1,7 +1,7 @@
 /**
  * Bank Transaction Actions API
  * POST /api/accounting/bank-transactions-action
- *   action: match | unmatch | exclude | auto_match
+ *   action: match | unmatch | exclude | auto_match | allocate | delete
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,6 +15,7 @@ import {
   excludeTransaction,
   autoMatchTransactions,
   allocateTransaction,
+  deleteTransactions,
   type AllocationType,
 } from '@/modules/accounting/services/bankReconciliationService';
 
@@ -68,6 +69,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           bankTransactionId, contraAccountId || '', userId, description, aType, entityId, vatCode,
         );
         return apiResponse.success(res, result);
+      }
+      case 'delete': {
+        const { bankTransactionIds } = req.body;
+        const ids: string[] = bankTransactionIds || (bankTransactionId ? [bankTransactionId] : []);
+        if (ids.length === 0) return apiResponse.badRequest(res, 'bankTransactionId or bankTransactionIds required');
+        const deleted = await deleteTransactions(ids);
+        return apiResponse.success(res, { deleted });
       }
       default:
         return apiResponse.badRequest(res, `Unknown action: ${action}`);

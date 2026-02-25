@@ -236,6 +236,29 @@ export async function excludeTransaction(bankTxId: string): Promise<BankTransact
   }
 }
 
+// ── Delete ───────────────────────────────────────────────────────────────────
+
+/**
+ * Delete bank transactions — only imported (unallocated) transactions can be deleted.
+ * Matched/reconciled transactions must be unmatched first.
+ */
+export async function deleteTransactions(bankTxIds: string[]): Promise<number> {
+  if (bankTxIds.length === 0) return 0;
+  try {
+    const result = (await sql`
+      DELETE FROM bank_transactions
+      WHERE id = ANY(${bankTxIds}::UUID[])
+        AND status = 'imported'
+    `) as Row[];
+    const deleted = result.count ?? bankTxIds.length;
+    log.info('Deleted bank transactions', { count: deleted, ids: bankTxIds }, 'accounting');
+    return deleted;
+  } catch (err) {
+    log.error('Failed to delete bank transactions', { bankTxIds, error: err }, 'accounting');
+    throw err;
+  }
+}
+
 // ── Auto-Match ───────────────────────────────────────────────────────────────
 
 export async function autoMatchTransactions(

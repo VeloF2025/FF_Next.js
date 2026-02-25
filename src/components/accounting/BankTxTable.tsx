@@ -108,7 +108,6 @@ export function BankTxTable(props: Props) {
               <input type="checkbox" checked={allSelected} onChange={onSelectAll} className="accent-emerald-500" />
             </th>
             <th className={`${TH} w-24`}>Date</th>
-            <th className={`${TH} w-20`}>Payee</th>
             <th className={TH}>Description</th>
             <th className={`${TH} w-24`}>Type</th>
             <th className={`${TH} w-52`}>Selection</th>
@@ -140,7 +139,6 @@ export function BankTxTable(props: Props) {
                 <td className="py-2 px-2 font-mono text-xs text-[var(--ff-text-secondary)]">
                   {tx.transactionDate}
                 </td>
-                <td className="py-2 px-2 text-xs text-[var(--ff-text-tertiary)]">—</td>
                 <td className="py-2 px-2 text-[var(--ff-text-primary)]">
                   <span className="line-clamp-1 text-xs">{tx.description || '—'}</span>
                 </td>
