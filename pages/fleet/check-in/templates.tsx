@@ -46,8 +46,8 @@ export default function CheckInTemplatesPage() {
       try {
         const response = await fetch('/api/fleet/check-in/templates');
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error);
-        setTemplates(data);
+        if (!response.ok) throw new Error(data.error || data.message);
+        setTemplates(data.data || data);
 
         // Auto-select default template
         const defaultTemplate = data.find((t: CheckTemplate) => t.isDefault);
@@ -68,8 +68,8 @@ export default function CheckInTemplatesPage() {
     try {
       const response = await fetch(`/api/fleet/check-in/templates/${templateId}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setSelectedTemplate(data);
+      if (!response.ok) throw new Error(data.error || data.message);
+      setSelectedTemplate(data.data || data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load template');
     }

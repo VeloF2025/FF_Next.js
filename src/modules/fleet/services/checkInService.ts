@@ -472,55 +472,90 @@ export async function getCheckRecords(options?: {
   const limit = options?.limit || 50;
   const offset = options?.offset || 0;
 
-  // Build parameterized query conditions
-  const conditions: string[] = ['1=1'];
-  const params: (string | number)[] = [];
-  if (options?.status) {
-    params.push(options.status);
-    conditions.push(`r.status = $${params.length}`);
-  }
-  if (options?.driverId) {
-    params.push(options.driverId);
-    conditions.push(`r.driver_id = $${params.length}`);
-  }
-  if (options?.vehicleId) {
-    params.push(options.vehicleId);
-    conditions.push(`r.vehicle_id = $${params.length}`);
-  }
-  if (options?.dateFrom) {
-    params.push(options.dateFrom);
-    conditions.push(`r.check_date >= $${params.length}`);
-  }
-  if (options?.dateTo) {
-    params.push(options.dateTo);
-    conditions.push(`r.check_date <= $${params.length}`);
+  // Explicit query branches — sql.unsafe() is not available on the Neon HTTP driver
+  type RecordRow = FleetCheckRecordRow & { registration: string; make: string | null; model: string | null };
+  let rows: RecordRow[];
+  let countResult: { count: string }[];
+
+  const { status, driverId, vehicleId, dateFrom, dateTo } = options || {};
+
+  if (vehicleId && status) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.vehicle_id = ${vehicleId} AND r.status = ${status}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.vehicle_id = ${vehicleId} AND r.status = ${status}
+    ` as { count: string }[];
+  } else if (vehicleId) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.vehicle_id = ${vehicleId}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.vehicle_id = ${vehicleId}
+    ` as { count: string }[];
+  } else if (status && dateFrom && dateTo) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.status = ${status} AND r.check_date >= ${dateFrom} AND r.check_date <= ${dateTo}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.status = ${status} AND r.check_date >= ${dateFrom} AND r.check_date <= ${dateTo}
+    ` as { count: string }[];
+  } else if (status) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.status = ${status}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.status = ${status}
+    ` as { count: string }[];
+  } else if (driverId) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.driver_id = ${driverId}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.driver_id = ${driverId}
+    ` as { count: string }[];
+  } else if (dateFrom && dateTo) {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      WHERE r.check_date >= ${dateFrom} AND r.check_date <= ${dateTo}
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+      WHERE r.check_date >= ${dateFrom} AND r.check_date <= ${dateTo}
+    ` as { count: string }[];
+  } else {
+    rows = await sql`
+      SELECT r.*, v.registration, v.make, v.model
+      FROM fleet_check_records r JOIN fleet_vehicles v ON v.id = r.vehicle_id
+      ORDER BY r.check_date DESC, r.check_time DESC LIMIT ${limit} OFFSET ${offset}
+    ` as RecordRow[];
+    countResult = await sql`
+      SELECT COUNT(*)::text as count FROM fleet_check_records r
+    ` as { count: string }[];
   }
 
-  const whereClause = conditions.join(' AND ');
-  const limitIdx = params.length + 1;
-  const offsetIdx = params.length + 2;
-
-  // Get records with vehicle info
-  const rows = await sql.unsafe(
-    `SELECT
-      r.*,
-      v.registration,
-      v.make,
-      v.model
-    FROM fleet_check_records r
-    JOIN fleet_vehicles v ON v.id = r.vehicle_id
-    WHERE ${whereClause}
-    ORDER BY r.check_date DESC, r.check_time DESC
-    LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-    [...params, limit, offset]
-  ) as (FleetCheckRecordRow & { registration: string; make: string | null; model: string | null })[];
-
-  // Get total count
-  const countResult = await sql.unsafe(
-    `SELECT COUNT(*) as count FROM fleet_check_records r
-    WHERE ${whereClause}`,
-    params
-  ) as { count: string }[];
   const count = countResult[0]?.count ?? '0';
 
   // Get responses and photos for each record

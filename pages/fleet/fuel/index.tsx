@@ -234,25 +234,31 @@ export default function FuelAnalyticsPage() {
       setError(null);
 
       try {
-        const [summaryRes, vehiclesRes, anomaliesRes] = await Promise.all([
+        const [summaryRes, vehiclesRes] = await Promise.all([
           fetch(`/api/fleet/fuel/summary?period=${period}`),
           fetch(`/api/fleet/fuel/vehicles?period=${period}`),
-          fetch(`/api/fleet/fuel/anomalies?status=detected&limit=10`),
         ]);
 
-        if (!summaryRes.ok || !vehiclesRes.ok || !anomaliesRes.ok) {
+        if (!summaryRes.ok || !vehiclesRes.ok) {
           throw new Error('Failed to fetch fuel data');
         }
 
-        const [summaryData, vehiclesData, anomaliesData] = await Promise.all([
+        const [summaryData, vehiclesData] = await Promise.all([
           summaryRes.json(),
           vehiclesRes.json(),
-          anomaliesRes.json(),
         ]);
 
         setSummary(summaryData.data);
         setVehicleStats(vehiclesData.data || []);
-        setAnomalies(anomaliesData.data?.anomalies || []);
+
+        // Anomalies are non-critical — don't block the page if they fail
+        try {
+          const anomaliesRes = await fetch(`/api/fleet/fuel/anomalies?status=detected&limit=10`);
+          if (anomaliesRes.ok) {
+            const anomaliesData = await anomaliesRes.json();
+            setAnomalies(anomaliesData.data?.anomalies || []);
+          }
+        } catch { /* anomalies are supplementary */ }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load data';
         setError(message);
