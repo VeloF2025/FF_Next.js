@@ -1,11 +1,13 @@
 /**
  * StockItemSearch - Typeahead search for stock items
- * Searches /api/procurement/stock-items-search and auto-fills item details
+ * Searches /api/procurement/stock-items-search and auto-fills item details.
+ * Dropdown is portaled to document.body to escape overflow:hidden/auto containers.
  */
 
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { log } from '@/lib/logger';
 
@@ -38,6 +40,7 @@ export function StockItemSearch({
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -47,12 +50,41 @@ export function StockItemSearch({
     setQuery(value);
   }, [value]);
 
-  // Close dropdown when clicking outside
+  // Update portal position whenever dropdown opens or window scrolls/resizes
+  useEffect(() => {
+    if (!isOpen || !inputRef.current) return;
+
+    const updatePos = () => {
+      if (!inputRef.current) return;
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+      });
+    };
+
+    updatePos();
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => {
+      window.removeEventListener('scroll', updatePos, true);
+      window.removeEventListener('resize', updatePos);
+    };
+  }, [isOpen]);
+
+  // Close dropdown when clicking outside (input container or portal dropdown)
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      // Keep open if clicking inside the input container
+      if (containerRef.current?.contains(target)) return;
+      // Keep open if clicking inside the portal dropdown (data attribute check)
+      const dropdownEl = document.querySelector('[data-stock-dropdown]');
+      if (dropdownEl?.contains(target)) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -75,7 +107,7 @@ export function StockItemSearch({
         setSelectedIndex(-1);
       }
     } catch (err) {
-      log.error('Stock item search failed', err);
+      log.error('Stock item search failed', { error: err });
     } finally {
       setLoading(false);
     }
@@ -85,7 +117,6 @@ export function StockItemSearch({
     setQuery(newValue);
     onChange(newValue);
 
-    // Debounced search
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchItems(newValue), 300);
   };
@@ -121,6 +152,40 @@ export function StockItemSearch({
     inputRef.current?.focus();
   };
 
+  const dropdownContent = (
+    <div
+      data-stock-dropdown
+      style={dropdownStyle}
+      className="max-h-60 overflow-auto rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] shadow-xl"
+    >
+      {loading ? (
+        <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">Searching...</div>
+      ) : results.length === 0 ? (
+        <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">No items found</div>
+      ) : (
+        results.map((item, idx) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => handleSelect(item)}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors ${
+              idx === selectedIndex ? 'bg-[var(--ff-bg-hover)]' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-[var(--ff-text-primary)] truncate">{item.name}</span>
+              <span className="ml-2 text-xs text-[var(--ff-text-tertiary)] shrink-0">{item.uom}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-blue-400">{item.item_code}</span>
+              <span className="text-xs text-[var(--ff-text-tertiary)]">{item.category}</span>
+            </div>
+          </button>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
@@ -146,35 +211,7 @@ export function StockItemSearch({
         )}
       </div>
 
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] shadow-lg">
-          {loading ? (
-            <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">Searching...</div>
-          ) : results.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">No items found</div>
-          ) : (
-            results.map((item, idx) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSelect(item)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-[var(--ff-bg-hover)] transition-colors ${
-                  idx === selectedIndex ? 'bg-[var(--ff-bg-hover)]' : ''
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-[var(--ff-text-primary)] truncate">{item.name}</span>
-                  <span className="ml-2 text-xs text-[var(--ff-text-tertiary)] shrink-0">{item.uom}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-blue-400">{item.item_code}</span>
-                  <span className="text-xs text-[var(--ff-text-tertiary)]">{item.category}</span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-      )}
+      {isOpen && typeof document !== 'undefined' && createPortal(dropdownContent, document.body)}
     </div>
   );
 }
