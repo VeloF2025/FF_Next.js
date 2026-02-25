@@ -93,12 +93,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         m.detection_source,
         m.created_at,
         i.filename as import_filename,
-        i.project,
+        COALESCE(i.project, p.project_name) as project,
         i.imported_at,
         CONCAT(u_import.first_name, ' ', u_import.last_name) as imported_by,
         CONCAT(u_fix.first_name, ' ', u_fix.last_name) as fixed_by
       FROM olt_mismatch_records m
       LEFT JOIN olt_report_imports i ON m.import_id = i.id
+      LEFT JOIN drops d ON m.drop_number = d.drop_number
+      LEFT JOIN projects p ON d.project_id = p.id
       LEFT JOIN users u_import ON i.imported_by = u_import.id
       LEFT JOIN users u_fix ON m.fix_by = u_fix.id
       WHERE 1=1 ${dateCondition}

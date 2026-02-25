@@ -118,9 +118,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.created_at,
         i.filename as import_filename,
         i.imported_at as import_date,
-        i.project
+        COALESCE(i.project, p.project_name) as project
       FROM olt_mismatch_records r
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
+      LEFT JOIN drops d ON r.drop_number = d.drop_number
+      LEFT JOIN projects p ON d.project_id = p.id
       ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}
