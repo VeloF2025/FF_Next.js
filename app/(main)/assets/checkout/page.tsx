@@ -32,7 +32,7 @@ async function getAvailableAssets() {
 async function getStaffMembers() {
   try {
     const response = await fetch(
-      `${BASE_URL}/api/staff?status=ACTIVE`,
+      `${BASE_URL}/api/staff?status=active`,
       { cache: 'no-store' }
     );
     if (!response.ok) return [];

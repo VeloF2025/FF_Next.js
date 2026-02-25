@@ -5,10 +5,11 @@
  * Handles asset checkout form with staff/project integration
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ArrowRight, Loader2, Package, User, Briefcase, Truck, HardHat, ScanLine } from 'lucide-react';
+import { log } from '@/lib/logger';
 import type { Asset } from '@/modules/assets/types';
 
 // Dynamic import for barcode scanner (client-side only)
@@ -43,11 +44,25 @@ interface CheckoutClientProps {
 
 type AssigneeType = 'staff' | 'project' | 'vehicle' | 'contractor';
 
-export function CheckoutClient({ assets, preselectedAssetId, staffMembers, projects }: CheckoutClientProps) {
+export function CheckoutClient({ assets, preselectedAssetId, staffMembers: initialStaff, projects }: CheckoutClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<StaffMember[]>(initialStaff);
+  const [staffLoading, setStaffLoading] = useState(initialStaff.length === 0);
+
+  // Fetch staff client-side if server-side fetch returned empty (auth issue)
+  useEffect(() => {
+    if (initialStaff.length > 0) return;
+    fetch('/api/staff?status=active', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        setStaffMembers(data.data || []);
+      })
+      .catch(err => log.error('Failed to fetch staff', { error: err }))
+      .finally(() => setStaffLoading(false));
+  }, [initialStaff]);
 
   const [formData, setFormData] = useState({
     assetId: preselectedAssetId || '',
@@ -260,7 +275,12 @@ export function CheckoutClient({ assets, preselectedAssetId, staffMembers, proje
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Staff Member *
           </label>
-          {staffMembers.length === 0 ? (
+          {staffLoading ? (
+            <div className="flex items-center gap-2 p-3 text-sm text-gray-500 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading staff members...
+            </div>
+          ) : staffMembers.length === 0 ? (
             <p className="text-sm text-amber-600 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
               No active staff members found. Please add staff members first.
             </p>
