@@ -148,6 +148,14 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
+    // Accounting
+    if (path.includes('accounting')) {
+      return {
+        title: 'Accounting',
+        breadcrumbs: ['Home', 'Accounting'],
+      };
+    }
+
     // Procurement
     if (path.includes('procurement')) {
       return {

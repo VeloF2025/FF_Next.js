@@ -1,0 +1,33 @@
+/**
+ * Balance Sheet Report API
+ * GET /api/accounting/reports-balance-sheet
+ *   ?as_at_date=YYYY-MM-DD
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
+import { getBalanceSheet } from '@/modules/accounting/services/financialReportingService';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
+  }
+
+  try {
+    const { as_at_date } = req.query;
+    if (!as_at_date) {
+      return apiResponse.badRequest(res, 'as_at_date is required');
+    }
+
+    const report = await getBalanceSheet(String(as_at_date));
+    return apiResponse.success(res, report);
+  } catch (err) {
+    log.error('Failed to get balance sheet', { error: err }, 'accounting-api');
+    return apiResponse.badRequest(res, 'Failed to generate balance sheet');
+  }
+}
+
+export default withAuth(withErrorHandler(handler));

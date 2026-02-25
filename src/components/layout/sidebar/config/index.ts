@@ -8,6 +8,7 @@ export { maintenanceSection } from './maintenanceSection';
 export { peopleSection } from './peopleSection';
 export { clientsSection } from './clientsSection';
 export { procurementSection } from './procurementSection';
+export { accountingSection } from './accountingSection';
 export { contractorsSection } from './contractorsSection';
 export { assetsSection } from './assetsSection';
 export { fleetSection } from './fleetSection';

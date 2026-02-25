@@ -1,0 +1,253 @@
+/**
+ * PRD-060 Phase 6: Sage Data Importers
+ * Ledger transaction → GL journal entries
+ * Supplier invoices → AP supplier_invoices
+ */
+
+import { sql } from '@/lib/neon';
+import { log } from '@/lib/logger';
+import type { MigrationRun } from './sageMigrationService';
+import { startRun, completeRun, failRun } from './sageMigrationService';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = any;
+
+// ── Ledger Transaction Import ───────────────────────────────────────────────
+
+/**
+ * Import sage_ledger_transactions as GL journal entries
+ * Groups by document_number + transaction_date into balanced entries
+ */
+export async function importLedgerTransactions(userId: string): Promise<MigrationRun> {
+  const runId = await startRun('ledger_import', userId);
+
+  try {
+    const groups = (await sql`
+      SELECT slt.document_number, slt.transaction_date, slt.description,
+        COUNT(*) AS line_count
+      FROM sage_ledger_transactions slt
+      JOIN sage_accounts sa ON sa.sage_account_id = slt.sage_account_id
+      WHERE slt.migration_status = 'pending'
+        AND sa.gl_account_id IS NOT NULL
+      GROUP BY slt.document_number, slt.transaction_date, slt.description
+      ORDER BY slt.transaction_date
+    `) as Row[];
+
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const group of groups) {
+      try {
+        const lines = (await sql`
+          SELECT slt.id, slt.sage_account_id, slt.debit, slt.credit,
+            slt.description, slt.reference, slt.ff_project_id,
+            sa.gl_account_id
+          FROM sage_ledger_transactions slt
+          JOIN sage_accounts sa ON sa.sage_account_id = slt.sage_account_id
+          WHERE slt.document_number = ${group.document_number}
+            AND slt.transaction_date = ${group.transaction_date}
+            AND slt.migration_status = 'pending'
+            AND sa.gl_account_id IS NOT NULL
+        `) as Row[];
+
+        if (lines.length === 0) { skipped++; continue; }
+
+        const totalDebit = lines.reduce((s: number, l: Row) => s + Number(l.debit || 0), 0);
+        const totalCredit = lines.reduce((s: number, l: Row) => s + Number(l.credit || 0), 0);
+
+        if (Math.abs(totalDebit - totalCredit) > 0.02) {
+          for (const line of lines) {
+            await sql`UPDATE sage_ledger_transactions SET migration_status = 'failed' WHERE id = ${line.id}`;
+          }
+          failed++;
+          continue;
+        }
+
+        const entryRef = group.document_number
+          ? `SAGE-${group.document_number}`
+          : `SAGE-${group.transaction_date}`;
+
+        const entry = (await sql`
+          INSERT INTO gl_journal_entries (
+            entry_number, entry_date, description, source, status,
+            total_debit, total_credit, created_by
+          ) VALUES (
+            ${entryRef}, ${group.transaction_date},
+            ${group.description || `Sage import: ${entryRef}`},
+            'manual', 'posted', ${totalDebit}, ${totalCredit}, ${userId}
+          ) RETURNING id
+        `) as Row[];
+
+        const entryId = String(entry[0].id);
+
+        for (const line of lines) {
+          const debit = Number(line.debit || 0);
+          const credit = Number(line.credit || 0);
+          if (debit === 0 && credit === 0) continue;
+
+          const projectId = line.ff_project_id || null;
+          if (projectId) {
+            await sql`
+              INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description, project_id)
+              VALUES (${entryId}::UUID, ${line.gl_account_id}::UUID, ${debit}, ${credit},
+                ${line.description || group.description || ''}, ${projectId}::UUID)
+            `;
+          } else {
+            await sql`
+              INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description)
+              VALUES (${entryId}::UUID, ${line.gl_account_id}::UUID, ${debit}, ${credit},
+                ${line.description || group.description || ''})
+            `;
+          }
+
+          await sql`
+            UPDATE sage_ledger_transactions
+            SET migration_status = 'imported', gl_journal_entry_id = ${entryId}::UUID
+            WHERE id = ${line.id}
+          `;
+        }
+
+        succeeded++;
+      } catch (err) {
+        log.error('Failed to import ledger group', { docNum: group.document_number, error: err }, 'accounting');
+        failed++;
+      }
+    }
+
+    return await completeRun(runId, groups.length, succeeded, failed, skipped);
+  } catch (err) {
+    await failRun(runId, err);
+    throw err;
+  }
+}
+
+// ── Supplier Invoice Import ─────────────────────────────────────────────────
+
+/**
+ * Import sage_supplier_invoices into the new supplier_invoices table
+ */
+export async function importSupplierInvoices(userId: string): Promise<MigrationRun> {
+  const runId = await startRun('invoice_import', userId);
+
+  try {
+    const sageInvoices = (await sql`
+      SELECT id, sage_invoice_id, sage_supplier_id, invoice_number,
+        invoice_date, due_date, total_amount, outstanding_amount, status,
+        ff_purchase_order_id, supplier_id
+      FROM sage_supplier_invoices
+      WHERE migration_status = 'pending'
+      ORDER BY invoice_date
+    `) as Row[];
+
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    const apAcct = (await sql`SELECT id FROM gl_accounts WHERE account_code = '2110' LIMIT 1`) as Row[];
+    const expAcct = (await sql`SELECT id FROM gl_accounts WHERE account_code = '5100' LIMIT 1`) as Row[];
+    const apAccountId = apAcct[0]?.id;
+    const expAccountId = expAcct[0]?.id;
+
+    if (!apAccountId || !expAccountId) {
+      throw new Error('Missing AP (2110) or Expense (5100) GL accounts');
+    }
+
+    for (const inv of sageInvoices) {
+      try {
+        const totalAmount = Number(inv.total_amount || 0);
+        if (totalAmount === 0) { skipped++; continue; }
+
+        let supplierId = inv.supplier_id;
+        if (!supplierId && inv.ff_purchase_order_id) {
+          const po = (await sql`SELECT supplier_id FROM purchase_orders WHERE id = ${inv.ff_purchase_order_id}`) as Row[];
+          supplierId = po[0]?.supplier_id;
+        }
+
+        if (!supplierId) {
+          await sql`UPDATE sage_supplier_invoices SET migration_status = 'failed' WHERE id = ${inv.id}`;
+          failed++;
+          continue;
+        }
+
+        const taxRate = 15;
+        const subtotal = totalAmount / (1 + taxRate / 100);
+        const taxAmount = totalAmount - subtotal;
+
+        let projectId: string | null = null;
+        if (inv.ff_purchase_order_id) {
+          const po = (await sql`SELECT project_id FROM purchase_orders WHERE id = ${inv.ff_purchase_order_id}`) as Row[];
+          projectId = po[0]?.project_id || null;
+        }
+
+        const isPaid = inv.status === 'paid' || Number(inv.outstanding_amount || 0) === 0;
+
+        const newInv = (await sql`
+          INSERT INTO supplier_invoices (
+            invoice_number, supplier_id, purchase_order_id, project_id,
+            invoice_date, due_date, subtotal, tax_rate, tax_amount, total_amount,
+            amount_paid, status, sage_invoice_id, created_by
+          ) VALUES (
+            ${inv.invoice_number || `SAGE-${inv.sage_invoice_id}`},
+            ${supplierId}::UUID, ${inv.ff_purchase_order_id || null}, ${projectId},
+            ${inv.invoice_date}, ${inv.due_date || inv.invoice_date},
+            ${subtotal.toFixed(2)}, ${taxRate}, ${taxAmount.toFixed(2)}, ${totalAmount},
+            ${isPaid ? totalAmount : 0}, ${isPaid ? 'paid' : 'approved'},
+            ${inv.sage_invoice_id}, ${userId}
+          ) RETURNING id
+        `) as Row[];
+
+        const newInvoiceId = String(newInv[0].id);
+
+        const entry = (await sql`
+          INSERT INTO gl_journal_entries (
+            entry_number, entry_date, description, source, status,
+            total_debit, total_credit, created_by
+          ) VALUES (
+            ${`SI-SAGE-${inv.invoice_number || inv.sage_invoice_id}`},
+            ${inv.invoice_date},
+            ${`Sage import: Supplier invoice ${inv.invoice_number || inv.sage_invoice_id}`},
+            'auto_supplier_invoice', 'posted', ${totalAmount}, ${totalAmount}, ${userId}
+          ) RETURNING id
+        `) as Row[];
+
+        const entryId = String(entry[0].id);
+
+        if (projectId) {
+          await sql`
+            INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description, project_id)
+            VALUES (${entryId}::UUID, ${expAccountId}::UUID, ${totalAmount}, 0, ${`Invoice ${inv.invoice_number}`}, ${projectId}::UUID)
+          `;
+        } else {
+          await sql`
+            INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description)
+            VALUES (${entryId}::UUID, ${expAccountId}::UUID, ${totalAmount}, 0, ${`Invoice ${inv.invoice_number}`})
+          `;
+        }
+
+        await sql`
+          INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description)
+          VALUES (${entryId}::UUID, ${apAccountId}::UUID, 0, ${totalAmount}, ${`Invoice ${inv.invoice_number}`})
+        `;
+
+        await sql`UPDATE supplier_invoices SET gl_journal_entry_id = ${entryId}::UUID WHERE id = ${newInvoiceId}::UUID`;
+        await sql`
+          UPDATE sage_supplier_invoices
+          SET migration_status = 'imported', gl_supplier_invoice_id = ${newInvoiceId}::UUID
+          WHERE id = ${inv.id}
+        `;
+
+        succeeded++;
+      } catch (err) {
+        log.error('Failed to import sage invoice', { invoiceId: inv.id, error: err }, 'accounting');
+        await sql`UPDATE sage_supplier_invoices SET migration_status = 'failed' WHERE id = ${inv.id}`;
+        failed++;
+      }
+    }
+
+    return await completeRun(runId, sageInvoices.length, succeeded, failed, skipped);
+  } catch (err) {
+    await failRun(runId, err);
+    throw err;
+  }
+}

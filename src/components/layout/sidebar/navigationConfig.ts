@@ -6,6 +6,7 @@ import {
   peopleSection,
   clientsSection,
   procurementSection,
+  accountingSection,
   contractorsSection,
   assetsSection,
   fleetSection,
@@ -22,13 +23,14 @@ export const navItems: NavSection[] = [
   activateSection,        // 3. ACTIVATE - QA review of field work
   maintenanceSection,     // 4. NOC - Network Operations Centre
   procurementSection,     // 5. PROCUREMENT - Materials for projects
-  assetsSection,          // 6. ASSETS - Equipment management
-  fleetSection,           // 7. FLEET - Vehicles for field ops
-  peopleSection,          // 8. HUMAN RESOURCES - Staff
-  analyticsSection,       // 9. ANALYTICS - Performance metrics
-  communicationsSection,  // 10. COMMUNICATIONS - WhatsApp, meetings
-  fieldOperationsSection, // 11. FIELD OPERATIONS - Field App, QField QA, WA Monitor
-  systemSection,          // 12. SYSTEM - Admin tools (always last)
+  accountingSection,      // 6. ACCOUNTING - GL, Journal Entries, Reports
+  assetsSection,          // 7. ASSETS - Equipment management
+  fleetSection,           // 8. FLEET - Vehicles for field ops
+  peopleSection,          // 9. HUMAN RESOURCES - Staff
+  analyticsSection,       // 10. ANALYTICS - Performance metrics
+  communicationsSection,  // 11. COMMUNICATIONS - WhatsApp, meetings
+  fieldOperationsSection, // 12. FIELD OPERATIONS - Field App, QField QA, WA Monitor
+  systemSection,          // 13. SYSTEM - Admin tools (always last)
   // contractorsSection - MOVED to projectSection
   // clientsSection - MOVED to projectSection
 ];

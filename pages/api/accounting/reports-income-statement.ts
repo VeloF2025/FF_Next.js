@@ -1,0 +1,38 @@
+/**
+ * Income Statement (P&L) Report API
+ * GET /api/accounting/reports-income-statement
+ *   ?period_start=YYYY-MM-DD&period_end=YYYY-MM-DD
+ *   &project_id=UUID (optional)
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
+import { getIncomeStatement } from '@/modules/accounting/services/financialReportingService';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
+  }
+
+  try {
+    const { period_start, period_end, project_id } = req.query;
+    if (!period_start || !period_end) {
+      return apiResponse.badRequest(res, 'period_start and period_end are required');
+    }
+
+    const report = await getIncomeStatement(
+      String(period_start),
+      String(period_end),
+      project_id ? String(project_id) : undefined
+    );
+    return apiResponse.success(res, report);
+  } catch (err) {
+    log.error('Failed to get income statement', { error: err }, 'accounting-api');
+    return apiResponse.badRequest(res, 'Failed to generate income statement');
+  }
+}
+
+export default withAuth(withErrorHandler(handler));

@@ -1,0 +1,71 @@
+/**
+ * Credit Notes API
+ * GET  /api/accounting/credit-notes - List credit notes (with filters)
+ * POST /api/accounting/credit-notes - Create draft credit note
+ */
+
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
+import {
+  getCreditNotes,
+  createCreditNote,
+} from '@/modules/accounting/services/creditNoteService';
+import type { CreditNoteStatus } from '@/modules/accounting/types/ar.types';
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    try {
+      const { type, status, limit, offset } = req.query;
+      const result = await getCreditNotes({
+        type: type as 'customer' | 'supplier' | undefined,
+        status: status as CreditNoteStatus | undefined,
+        limit: limit ? Number(limit) : undefined,
+        offset: offset ? Number(offset) : undefined,
+      });
+      return apiResponse.success(res, result);
+    } catch (err) {
+      log.error('Failed to get credit notes', { error: err }, 'accounting-api');
+      return apiResponse.badRequest(res, 'Failed to get credit notes');
+    }
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const { type, clientId, customerInvoiceId, supplierId, supplierInvoiceId,
+        creditDate, reason, subtotal, taxRate, projectId } = req.body;
+
+      if (!type || !creditDate || subtotal === undefined) {
+        return apiResponse.badRequest(res, 'type, creditDate, and subtotal are required');
+      }
+
+      const userId = req.body.userId || (req as unknown as { user?: { id: string } }).user?.id;
+      if (!userId) return apiResponse.badRequest(res, 'userId is required');
+
+      const creditNote = await createCreditNote({
+        type,
+        clientId: clientId || undefined,
+        customerInvoiceId: customerInvoiceId || undefined,
+        supplierId: supplierId || undefined,
+        supplierInvoiceId: supplierInvoiceId || undefined,
+        creditDate,
+        reason: reason || undefined,
+        subtotal: Number(subtotal),
+        taxRate: taxRate !== undefined ? Number(taxRate) : undefined,
+        projectId: projectId || undefined,
+      }, userId);
+
+      return apiResponse.created(res, creditNote);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create credit note';
+      log.error('Failed to create credit note', { error: err }, 'accounting-api');
+      return apiResponse.badRequest(res, message);
+    }
+  }
+
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
+}
+
+export default withAuth(withErrorHandler(handler));
