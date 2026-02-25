@@ -105,7 +105,7 @@ export function StockItemSearch({
       const data = await res.json();
       if (data.success && data.data?.items) {
         setResults(data.data.items);
-        setIsOpen(data.data.items.length > 0);
+        setIsOpen(true); // open always — either shows results or "Add to catalog"
         setSelectedIndex(-1);
       }
     } catch (err) {
