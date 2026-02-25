@@ -55,6 +55,8 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
   // Direct PO path: single supplier ID
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
+  // Direct PO path: delivery address
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
 
   const [phase, setPhase] = useState<OrderPhase>('select');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -125,7 +127,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
   };
 
   const handleSubmitPo = async () => {
-    if (!selectedSupplierId) return;
+    if (!selectedSupplierId || deliveryAddress.length < 10) return;
     setPhase('submitting');
     setSubmitError(null);
     try {
@@ -134,7 +136,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ supplierId: selectedSupplierId }),
+          body: JSON.stringify({ supplierId: selectedSupplierId, deliveryAddress }),
         }
       );
       const json = await res.json() as {
@@ -222,7 +224,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
   }
 
   // ---- Select state ----
-  const canSubmit = isRfq ? selectedSupplierIds.length > 0 : Boolean(selectedSupplierId);
+  const canSubmit = isRfq ? selectedSupplierIds.length > 0 : Boolean(selectedSupplierId) && deliveryAddress.length >= 10;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -253,12 +255,29 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
           accentBg={accentBg}
         />
       ) : (
-        <PoSupplierSelect
-          suppliers={suppliers}
-          selectedId={selectedSupplierId}
-          onChange={setSelectedSupplierId}
-          accentColor={accentColor}
-        />
+        <>
+          <PoSupplierSelect
+            suppliers={suppliers}
+            selectedId={selectedSupplierId}
+            onChange={setSelectedSupplierId}
+            accentColor={accentColor}
+          />
+          <div>
+            <label style={{ fontSize: 14, fontWeight: 600, color: 'var(--ff-text-primary)', display: 'block', marginBottom: 8 }}>
+              Delivery Address <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <textarea
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
+              placeholder="e.g. Site Office, 12 Industrial Rd, Tembisa, 1628"
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', border: `1px solid ${deliveryAddress.length > 0 && deliveryAddress.length < 10 ? '#ef4444' : 'var(--ff-border-light)'}`, borderRadius: 8, background: 'var(--ff-bg-primary)', color: 'var(--ff-text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
+            />
+            {deliveryAddress.length > 0 && deliveryAddress.length < 10 && (
+              <p style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Address must be at least 10 characters</p>
+            )}
+          </div>
+        </>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
