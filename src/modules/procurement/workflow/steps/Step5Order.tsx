@@ -74,7 +74,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
     setLoadingSuppliers(true);
     setSupplierError(null);
     try {
-      const res = await fetch('/api/procurement/suppliers');
+      const res = await fetch('/api/suppliers');
       const json = await res.json() as { success: boolean; data?: Supplier[]; message?: string };
       if (!json.success) throw new Error(json.message ?? 'Failed to load suppliers');
       setSuppliers(json.data ?? []);
