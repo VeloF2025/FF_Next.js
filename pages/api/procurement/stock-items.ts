@@ -37,13 +37,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const rows = await sql`
-      INSERT INTO stock_items (item_code, name, description, category, uom, is_active)
+      INSERT INTO stock_items (item_code, name, description, category, uom, tracking_type, is_active)
       VALUES (
         ${resolvedCode ?? ('CUST-' + Math.random().toString(16).slice(2, 10).toUpperCase())},
         ${name.trim()},
         ${description?.trim() || null},
         ${category?.trim() || 'uncategorized'},
         ${uom.trim()},
+        'none',
         true
       )
       RETURNING id, item_code, name, description, category, uom, is_active
