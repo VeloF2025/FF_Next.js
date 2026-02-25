@@ -3,7 +3,7 @@
  * Shown by StockItemSearch when no matching items are found.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Loader2, PackagePlus } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { log } from '@/lib/logger';
@@ -39,9 +39,19 @@ export function AddStockItemModal({ initialName, onClose, onCreated }: AddStockI
   const [name, setName] = useState(initialName);
   const [uom, setUom] = useState('units');
   const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/procurement/stock-categories')
+      .then((r) => r.json())
+      .then((json: { success: boolean; data?: { categories: string[] } }) => {
+        if (json.success && json.data?.categories) setCategories(json.data.categories);
+      })
+      .catch((err) => log.error('Failed to load categories', { error: err }, 'AddStockItemModal'));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,14 +125,16 @@ export function AddStockItemModal({ initialName, onClose, onCreated }: AddStockI
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Category</label>
-              <input
-                type="text"
+              <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g. stringing, optical"
-                maxLength={50}
-                className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-              />
+                className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              >
+                <option value="">Select category...</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
           </div>
 
