@@ -16,7 +16,7 @@ import {
   DollarSign, FileCheck, ClipboardList, PieChart,
   Scale, CalendarCheck, BookMarked, Banknote,
   Repeat, XCircle, SlidersHorizontal, Layers,
-  RotateCcw, Percent, Shield, Zap,
+  RotateCcw, Percent, Shield, Zap, Tag, ArrowRightLeft,
 } from 'lucide-react';
 import type { NavSection } from './types';
 
@@ -300,6 +300,14 @@ export const accountingSection: NavSection = {
           permissions: [],
           rbacKey: 'accounting',
         },
+        {
+          to: '/accounting/drc-vat',
+          icon: ArrowRightLeft,
+          label: 'DRC VAT',
+          shortLabel: 'DRC',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
       ],
     },
     // ── Accountant's Area (Sage: Accountant's Area) ──
@@ -349,6 +357,22 @@ export const accountingSection: NavSection = {
           icon: Shield,
           label: 'Audit Trail',
           shortLabel: 'Audit',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/cost-centres',
+          icon: Tag,
+          label: 'Cost Centres',
+          shortLabel: 'CC',
+          permissions: [],
+          rbacKey: 'accounting',
+        },
+        {
+          to: '/accounting/budgets',
+          icon: Wallet,
+          label: 'Budgets',
+          shortLabel: 'Budg',
           permissions: [],
           rbacKey: 'accounting',
         },
