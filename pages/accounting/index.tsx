@@ -152,12 +152,31 @@ export default function AccountingPage() {
 // Overview Tab
 // =====================================================
 
+interface DashStats {
+  banks: { code: string; name: string; balance: number }[];
+  totalBankBalance: number;
+  apTotal: number;
+  arTotal: number;
+  monthRevenue: number;
+  monthExpenses: number;
+  unallocatedTx: number;
+  recentJournals: { id: string; date: string; description: string; source: string; status: string; amount: number }[];
+  // Legacy
+  totalAccounts: number;
+  totalEntries: number;
+  draftEntries: number;
+  currentPeriod: string;
+}
+
+function fmtCurrency(n: number): string {
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+}
+
 function OverviewTab() {
-  const [stats, setStats] = useState({
-    totalAccounts: 0,
-    totalEntries: 0,
-    draftEntries: 0,
-    currentPeriod: '',
+  const [stats, setStats] = useState<DashStats>({
+    banks: [], totalBankBalance: 0, apTotal: 0, arTotal: 0,
+    monthRevenue: 0, monthExpenses: 0, unallocatedTx: 0, recentJournals: [],
+    totalAccounts: 0, totalEntries: 0, draftEntries: 0, currentPeriod: '',
   });
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -169,12 +188,15 @@ function OverviewTab() {
   const loadOverviewData = async () => {
     setIsLoading(true);
     try {
-      const [accountsRes, entriesRes, periodsRes] = await Promise.all([
+      const [dashRes, accountsRes, entriesRes, periodsRes] = await Promise.all([
+        fetch('/api/accounting/dashboard-stats', { credentials: 'include' }),
         fetch('/api/accounting/chart-of-accounts'),
         fetch('/api/accounting/journal-entries'),
         fetch('/api/accounting/fiscal-periods?current=true'),
       ]);
 
+      const dashData = await dashRes.json();
+      const dash = dashData.data || dashData;
       const accountsData = await accountsRes.json();
       const entriesData = await entriesRes.json();
       const periodsData = await periodsRes.json();
@@ -185,6 +207,14 @@ function OverviewTab() {
       const period = periodsData.data || periodsData;
 
       setStats({
+        banks: dash.banks || [],
+        totalBankBalance: Number(dash.totalBankBalance || 0),
+        apTotal: Number(dash.apTotal || 0),
+        arTotal: Number(dash.arTotal || 0),
+        monthRevenue: Number(dash.monthRevenue || 0),
+        monthExpenses: Number(dash.monthExpenses || 0),
+        unallocatedTx: Number(dash.unallocatedTx || 0),
+        recentJournals: dash.recentJournals || [],
         totalAccounts: Array.isArray(accounts) ? accounts.length : 0,
         totalEntries: Array.isArray(entries) ? entries.length : 0,
         draftEntries: Array.isArray(entries) ? entries.filter((e: JournalEntry) => e.status === 'draft').length : 0,
@@ -203,28 +233,28 @@ function OverviewTab() {
 
   const statCards = [
     {
-      title: 'GL Accounts',
-      value: stats.totalAccounts,
-      icon: BookOpen,
+      title: 'Bank Balance',
+      value: isLoading ? '...' : fmtCurrency(stats.totalBankBalance),
+      icon: Landmark,
       color: '#10b981',
-      subtitle: 'Active accounts in chart',
-      route: '/accounting/chart-of-accounts',
+      subtitle: `${stats.banks.length} accounts`,
+      route: '/accounting/bank-transactions',
     },
     {
-      title: 'Journal Entries',
-      value: stats.totalEntries,
-      icon: FileSpreadsheet,
-      color: '#3b82f6',
-      subtitle: 'Total entries',
-      route: '/accounting/journal-entries',
-    },
-    {
-      title: 'Draft Entries',
-      value: stats.draftEntries,
+      title: 'Accounts Payable',
+      value: isLoading ? '...' : fmtCurrency(stats.apTotal),
       icon: FileText,
       color: '#f59e0b',
-      subtitle: 'Awaiting posting',
-      route: '/accounting/journal-entries',
+      subtitle: 'Outstanding to suppliers',
+      route: '/accounting/ap-aging',
+    },
+    {
+      title: 'Accounts Receivable',
+      value: isLoading ? '...' : fmtCurrency(stats.arTotal),
+      icon: CreditCard,
+      color: '#3b82f6',
+      subtitle: 'Owed by customers',
+      route: '/accounting/ar-aging',
     },
     {
       title: 'Current Period',
@@ -239,6 +269,79 @@ function OverviewTab() {
   return (
     <div className="space-y-6">
       <StatsGrid cards={statCards.map(c => ({ ...c, isLoading }))} columns={4} />
+
+      {/* Financial Summary Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Bank Accounts */}
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-[var(--ff-text-primary)]">Bank Accounts</h3>
+            <Link href="/accounting/bank-transactions" className="text-xs text-emerald-400 hover:underline">View all</Link>
+          </div>
+          {stats.banks.map(b => (
+            <div key={b.code} className="flex items-center justify-between py-1.5 border-b border-[var(--ff-border-light)]/50 last:border-0">
+              <div>
+                <span className="text-xs font-mono text-[var(--ff-text-tertiary)] mr-2">{b.code}</span>
+                <span className="text-xs text-[var(--ff-text-secondary)]">{b.name.replace('Bank - ', '')}</span>
+              </div>
+              <span className={`text-xs font-mono font-bold ${b.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {fmtCurrency(b.balance)}
+              </span>
+            </div>
+          ))}
+          {stats.banks.length === 0 && !isLoading && (
+            <p className="text-xs text-[var(--ff-text-tertiary)]">No bank accounts</p>
+          )}
+        </div>
+
+        {/* Month-to-Date P&L */}
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-3">Month-to-Date</h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--ff-text-secondary)]">Revenue</span>
+              <span className="text-xs font-mono font-bold text-emerald-400">{fmtCurrency(stats.monthRevenue)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--ff-text-secondary)]">Expenses</span>
+              <span className="text-xs font-mono font-bold text-red-400">{fmtCurrency(stats.monthExpenses)}</span>
+            </div>
+            <div className="border-t border-[var(--ff-border-light)] pt-2 flex items-center justify-between">
+              <span className="text-xs font-medium text-[var(--ff-text-primary)]">Net Profit</span>
+              <span className={`text-sm font-mono font-bold ${stats.monthRevenue - stats.monthExpenses >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {fmtCurrency(stats.monthRevenue - stats.monthExpenses)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Actions */}
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+          <h3 className="text-sm font-semibold text-[var(--ff-text-primary)] mb-3">Pending Actions</h3>
+          <div className="space-y-2">
+            <Link href="/accounting/bank-transactions" className="flex items-center justify-between group no-underline">
+              <span className="text-xs text-[var(--ff-text-secondary)] group-hover:text-[var(--ff-text-primary)]">Unallocated Bank Tx</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                stats.unallocatedTx > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
+              }`}>{stats.unallocatedTx}</span>
+            </Link>
+            <Link href="/accounting/journal-entries" className="flex items-center justify-between group no-underline">
+              <span className="text-xs text-[var(--ff-text-secondary)] group-hover:text-[var(--ff-text-primary)]">Draft Journal Entries</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                stats.draftEntries > 0 ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
+              }`}>{stats.draftEntries}</span>
+            </Link>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--ff-text-secondary)]">GL Accounts</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{stats.totalAccounts}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--ff-text-secondary)]">Total Journal Entries</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{stats.totalEntries}</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
