@@ -56,6 +56,7 @@ export default function ProcurementPage({
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[] | undefined>();
   const [tabBadges, setTabBadges] = useState<Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>>({
     overview: {},
+    'open-orders': {},
     requisitions: {},
     boq: {},
     rfq: {},
@@ -168,6 +169,25 @@ export default function ProcurementPage({
       query
     }, undefined, { shallow: true });
   }, [activeTab, viewMode, selectedProject, router, isMounted]);
+
+  // Load pending approvals count for the badge
+  useEffect(() => {
+    if (!isMounted) return;
+    fetch('/api/procurement/approvals/pending')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          const total: number = data.data?.summary?.total ?? 0;
+          if (total > 0) {
+            setTabBadges(prev => ({
+              ...prev,
+              approvals: { count: total, type: 'warning' as const },
+            }));
+          }
+        }
+      })
+      .catch(() => undefined);
+  }, [isMounted]);
 
   // Load data based on view mode (only after mount)
   useEffect(() => {

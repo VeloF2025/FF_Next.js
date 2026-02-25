@@ -4,6 +4,7 @@ import type { Project } from '@/types/project.types';
 
 export type ProcurementTabId =
   | 'overview'
+  | 'open-orders'
   | 'requisitions'
   | 'boq'
   | 'rfq'

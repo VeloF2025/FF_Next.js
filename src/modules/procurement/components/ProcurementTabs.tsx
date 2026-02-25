@@ -18,7 +18,8 @@ import {
   Boxes,
   ShoppingBag,
   Search,
-  CheckCircle
+  CheckCircle,
+  Inbox,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -47,6 +48,7 @@ interface Category {
 // Map sub-tab IDs to their parent category
 const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'overview': 'dashboard',
+  'open-orders': 'purchasing',
   'suppliers': 'sourcing',
   'boq': 'sourcing',
   'rfq': 'sourcing',
@@ -87,7 +89,8 @@ export function ProcurementTabs({
 
   const activeTab = propActiveTab ?? context?.activeTab ?? 'overview';
   const onTabChange = propOnTabChange ?? context?.setActiveTab ?? (() => {});
-  const tabBadges = propTabBadges ?? context?.tabBadges ?? {};
+  const emptyBadges = {} as Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>;
+  const tabBadges = propTabBadges ?? context?.tabBadges ?? emptyBadges;
   const permissions = propPermissions ?? context?.permissions;
   const isLoading = propIsLoading || context?.isLoading || false;
 
@@ -118,6 +121,7 @@ export function ProcurementTabs({
       label: 'Purchasing',
       icon: ShoppingBag,
       subTabs: [
+        { id: 'open-orders', label: 'Open Orders', icon: Inbox, path: '/procurement/open-orders' },
         { id: 'requisitions', label: 'Requisitions', icon: FileInput, permission: 'canViewRequisitions', path: '/procurement/requisitions' },
         { id: 'quotes', label: 'Quote Evaluation', icon: Quote, permission: 'canViewQuotes', path: '/procurement/rfq?tab=quotes' },
         { id: 'purchase-orders', label: 'Purchase Orders', icon: ShoppingCart, permission: 'canViewPurchaseOrders', path: '/procurement/purchase-orders' },

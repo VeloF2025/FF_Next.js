@@ -59,14 +59,18 @@ export function ProcurementPage() {
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[] | undefined>();
   const [tabBadges, setTabBadges] = useState<Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>>({
     overview: {},
+    'open-orders': {},
+    requisitions: {},
     boq: {},
     rfq: {},
     quotes: {},
     'purchase-orders': {},
+    grn: {},
     stock: {},
     'field-stock': {},
     suppliers: {},
-    reports: {}
+    approvals: {},
+    reports: {},
   });
   const [isLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -377,14 +381,18 @@ export function ProcurementPage() {
       // Clear badges when no project selected
       setTabBadges({
         overview: {},
+        'open-orders': {},
+        requisitions: {},
         boq: {},
         rfq: {},
         quotes: {},
         'purchase-orders': {},
+        grn: {},
         stock: {},
         'field-stock': {},
         suppliers: {},
-        reports: {}
+        approvals: {},
+        reports: {},
       });
     }
   }, [viewMode, selectedProject]);
