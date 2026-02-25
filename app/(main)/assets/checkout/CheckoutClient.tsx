@@ -35,6 +35,16 @@ interface Project {
   status: string;
 }
 
+interface FleetVehicle {
+  id: string;
+  registration: string;
+  vehicleType: string;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  status: string;
+}
+
 interface CheckoutClientProps {
   assets: Asset[];
   preselectedAssetId?: string;
@@ -55,6 +65,8 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
   const [projectsLoading, setProjectsLoading] = useState(initialProjects.length === 0);
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [assetsLoading, setAssetsLoading] = useState(initialAssets.length === 0);
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(true);
 
   // Client-side fallback fetches when server-side RSC fetch fails (no auth cookies)
   useEffect(() => {
@@ -82,6 +94,11 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
         .catch(err => log.error('Failed to fetch assets', { error: err }))
         .finally(() => setAssetsLoading(false));
     }
+    fetch('/api/fleet/vehicles?status=active&limit=100', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => setVehicles(data.data || []))
+      .catch(err => log.error('Failed to fetch vehicles', { error: err }))
+      .finally(() => setVehiclesLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [formData, setFormData] = useState({
@@ -149,9 +166,10 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
       } else {
         // Vehicle
         if (!formData.vehicleReg) {
-          throw new Error('Please enter vehicle registration');
+          throw new Error('Please select a vehicle');
         }
-        toId = crypto.randomUUID();
+        const selectedVehicle = vehicles.find(v => v.registration === formData.vehicleReg);
+        toId = selectedVehicle?.id || crypto.randomUUID();
         toName = formData.vehicleReg;
       }
 
@@ -370,21 +388,37 @@ export function CheckoutClient({ assets: initialAssets, preselectedAssetId, staf
         </div>
       )}
 
-      {/* Vehicle Registration */}
+      {/* Vehicle Selection */}
       {formData.assigneeType === 'vehicle' && (
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Vehicle Registration *
+            Vehicle *
           </label>
-          <input
-            type="text"
-            name="vehicleReg"
-            value={formData.vehicleReg}
-            onChange={handleChange}
-            required
-            placeholder="e.g., CA 123-456"
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500"
-          />
+          {vehiclesLoading ? (
+            <div className="flex items-center gap-2 p-3 text-sm text-gray-500 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading vehicles...
+            </div>
+          ) : vehicles.length === 0 ? (
+            <p className="text-sm text-amber-600 dark:text-amber-400 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              No active vehicles found. Please add vehicles in Fleet Management first.
+            </p>
+          ) : (
+            <select
+              name="vehicleReg"
+              value={formData.vehicleReg}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select vehicle...</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.registration}>
+                  {v.registration}{v.make || v.model ? ` - ${[v.make, v.model].filter(Boolean).join(' ')}` : ''}{v.year ? ` (${v.year})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 
