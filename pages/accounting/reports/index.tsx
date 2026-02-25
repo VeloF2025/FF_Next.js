@@ -8,6 +8,7 @@ import Link from 'next/link';
 import {
   BarChart3, PieChart, Banknote, Scale, DollarSign,
   Users, ShoppingCart, Landmark, BookOpen, Shield,
+  Clock, Receipt,
 } from 'lucide-react';
 
 interface ReportCard {
@@ -33,6 +34,8 @@ const reports: ReportCard[] = [
   { title: 'Supplier Report', description: 'Purchases by supplier with balances', href: '/accounting/reports/supplier-reports', icon: ShoppingCart, color: 'orange', category: 'Transaction Reports' },
   { title: 'Bank Transactions', description: 'Bank account activity with running balance', href: '/accounting/reports/bank-transactions', icon: Landmark, color: 'cyan', category: 'Transaction Reports' },
   { title: 'Account Transactions', description: 'GL account drill-down with running balance', href: '/accounting/reports/account-transactions', icon: BookOpen, color: 'violet', category: 'Transaction Reports' },
+  { title: 'Aged Receivables', description: 'Customer aging 30/60/90/120+ days', href: '/accounting/ar-aging', icon: Clock, color: 'rose', category: 'Transaction Reports' },
+  { title: 'Aged Payables', description: 'Supplier aging 30/60/90/120+ days', href: '/accounting/ap-aging', icon: Receipt, color: 'pink', category: 'Transaction Reports' },
   // Analysis
   { title: 'Project Profitability', description: 'Revenue and costs by project', href: '/accounting/reports/project-profitability', icon: BarChart3, color: 'teal', category: 'Analysis' },
   { title: 'Audit Trail', description: 'Full journal entry audit log', href: '/accounting/reports/audit-trail', icon: Shield, color: 'amber', category: 'Analysis' },
