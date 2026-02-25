@@ -33,7 +33,7 @@ const sql = neon(process.env.DATABASE_URL!);
  *
  * Examples:
  *   MOA.STS.1.DIS.DM.P.B756-C5P5.L14-L1
- *   GRA.STS.2.DIS.DM.P.A123-C2P3.L7-L4
+ *   MOA.STS.8.DIS.DM.P.C725-C8P6.L3-L1
  */
 export function parseTestName(name: string): ExfoParsedName {
   const result: ExfoParsedName = {
@@ -125,7 +125,6 @@ async function matchAssets(
  */
 const PROJECT_CODE_MAP: Record<string, string> = {
   'MOA': 'Mohadin',
-  'GRA': 'Grasmere',
 };
 
 /**
