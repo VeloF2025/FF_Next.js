@@ -14,7 +14,7 @@ export interface BOQLineUtilization {
   unitPrice: number | null;
   boqValue: number | null;
   orderedValue: number | null;
-  status: 'not_ordered' | 'partial' | 'fully_ordered' | 'over_ordered';
+  status: 'not_ordered' | 'partial' | 'fully_ordered' | 'over_ordered' | 'partially_received' | 'received';
 }
 
 export interface NonBOQItem {

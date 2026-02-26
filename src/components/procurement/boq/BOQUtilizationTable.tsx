@@ -17,8 +17,12 @@ interface BOQUtilizationTableProps {
 
 function statusBadge(line: BOQLineUtilization) {
   switch (line.status) {
+    case 'received':
+      return <span className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">● Received</span>;
+    case 'partially_received':
+      return <span className="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium">◐ Part Recv</span>;
     case 'fully_ordered':
-      return <span className="inline-flex items-center gap-1 text-xs text-green-400 font-medium">● Ordered</span>;
+      return <span className="inline-flex items-center gap-1 text-xs text-purple-400 font-medium">● Ordered</span>;
     case 'over_ordered':
       return <span className="inline-flex items-center gap-1 text-xs text-orange-400 font-medium">▲ Over</span>;
     case 'partial':

@@ -33,7 +33,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     return apiResponse.validationError(res, { projectId: 'Project ID is required' });
   }
 
-  // BOQ line utilization — aggregate ordered + received quantities per BOQ line
+  // BOQ line utilization — pre-aggregate PO + GRN data to avoid JOIN multiplication
+  // and filter out cancelled POs / unconfirmed GRNs
   const lines = await sql`
     SELECT
       bi.id,
@@ -45,19 +46,39 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       bi.quantity AS boq_qty,
       bi.unit_price,
       bi.total_price AS boq_value,
-      COALESCE(SUM(poi.quantity_ordered), 0) AS ordered_qty,
-      COALESCE(SUM(gri.quantity_accepted), 0) AS received_qty,
-      bi.quantity - COALESCE(SUM(poi.quantity_ordered), 0) AS outstanding_qty,
-      COALESCE(SUM(poi.quantity_ordered * poi.unit_price), 0) AS ordered_value
+      COALESCE(po_agg.total_ordered, 0) AS ordered_qty,
+      COALESCE(grn_agg.total_received, 0) AS received_qty,
+      bi.quantity - COALESCE(po_agg.total_ordered, 0) AS outstanding_qty,
+      COALESCE(po_agg.total_ordered_value, 0) AS ordered_value
     FROM boq_items bi
     JOIN boqs b ON bi.boq_id = b.id
-    LEFT JOIN purchase_order_items poi ON poi.boq_item_id = bi.id
-    LEFT JOIN goods_receipt_items gri ON gri.po_item_id = poi.id
+    LEFT JOIN (
+      SELECT
+        poi.boq_item_id,
+        SUM(poi.quantity_ordered) AS total_ordered,
+        SUM(poi.quantity_ordered * poi.unit_price) AS total_ordered_value
+      FROM purchase_order_items poi
+      JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      WHERE poi.boq_item_id IS NOT NULL
+        AND po.status NOT IN ('cancelled')
+      GROUP BY poi.boq_item_id
+    ) po_agg ON po_agg.boq_item_id = bi.id
+    LEFT JOIN (
+      SELECT
+        poi.boq_item_id,
+        SUM(gri.quantity_accepted) AS total_received
+      FROM goods_receipt_items gri
+      JOIN purchase_order_items poi ON gri.po_item_id = poi.id
+      JOIN purchase_orders po ON po.id = poi.purchase_order_id
+      JOIN goods_receipt_notes grn ON gri.grn_id = grn.id
+      WHERE poi.boq_item_id IS NOT NULL
+        AND po.status NOT IN ('cancelled')
+        AND grn.status = 'completed'
+      GROUP BY poi.boq_item_id
+    ) grn_agg ON grn_agg.boq_item_id = bi.id
     WHERE b.project_id = ${projectId}
       AND b.status NOT IN ('superseded', 'archived', 'cancelled')
       AND (bi.item_code IS NULL OR bi.item_code != 'TOTAL')
-    GROUP BY bi.id, bi.boq_id, bi.line_number, bi.item_code, bi.description,
-             bi.uom, bi.quantity, bi.unit_price, bi.total_price
     ORDER BY bi.line_number NULLS LAST, bi.description
   `;
 
@@ -84,9 +105,12 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
   // Build typed response
   const typedLines: BOQLineUtilization[] = lines.map((r) => {
     const orderedQty = Number(r.ordered_qty);
+    const receivedQty = Number(r.received_qty);
     const boqQty = Number(r.boq_qty);
     let status: BOQLineUtilization['status'] = 'not_ordered';
-    if (orderedQty > boqQty) status = 'over_ordered';
+    if (receivedQty >= boqQty && boqQty > 0) status = 'received';
+    else if (receivedQty > 0) status = 'partially_received';
+    else if (orderedQty > boqQty) status = 'over_ordered';
     else if (orderedQty >= boqQty) status = 'fully_ordered';
     else if (orderedQty > 0) status = 'partial';
 
