@@ -91,7 +91,7 @@ export function usePortalSession(): UsePortalSessionReturn {
           const data = await response.json();
           const result = data.data as PlateAuthResult;
 
-          if (response.ok && result?.success) {
+          if (response.ok && (data.success || result?.success)) {
             // Session cookie is set automatically by the API
             // Update local state with the returned data
             if (result.session) {
