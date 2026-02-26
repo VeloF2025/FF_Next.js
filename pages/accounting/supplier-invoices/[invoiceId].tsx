@@ -10,7 +10,7 @@ import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import {
   ArrowLeft, Receipt, Loader2, AlertCircle, CheckCircle2,
-  XCircle, Link2, FileText,
+  XCircle, Link2, FileText, Pencil, Save,
 } from 'lucide-react';
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/modules/accounting/types/ap.types';
 
@@ -44,6 +44,8 @@ export default function SupplierInvoiceDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ invoiceNumber: '', dueDate: '', paymentTerms: '', notes: '' });
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -111,7 +113,8 @@ export default function SupplierInvoiceDetailPage() {
     );
   }
 
-  const canApprove = invoice.status === 'draft' || invoice.status === 'pending_approval';
+  const canEdit = invoice.status === 'draft' || invoice.status === 'pending_approval';
+  const canApprove = canEdit;
   const canCancel = invoice.status !== 'paid' && invoice.status !== 'partially_paid' && invoice.status !== 'cancelled';
   const canMatch = !!invoice.purchaseOrderId;
 
@@ -135,6 +138,18 @@ export default function SupplierInvoiceDetailPage() {
               <StatusBadge status={invoice.status} />
             </div>
             <div className="flex items-center gap-2">
+              {canEdit && !editing && (
+                <button onClick={() => { setEditing(true); setEditForm({ invoiceNumber: invoice.invoiceNumber, dueDate: invoice.dueDate || '', paymentTerms: invoice.paymentTerms || '', notes: invoice.notes || '' }); }}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
+                  <Pencil className="h-4 w-4" />Edit
+                </button>
+              )}
+              {editing && (
+                <button onClick={async () => { setActionLoading('save'); try { await fetch('/api/accounting/supplier-invoices-detail', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: invoiceId, ...editForm }) }); setEditing(false); await loadInvoice(); } catch { setError('Save failed'); } setActionLoading(''); }} disabled={!!actionLoading}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium disabled:opacity-50">
+                  <Save className="h-4 w-4" />{actionLoading === 'save' ? 'Saving...' : 'Save'}
+                </button>
+              )}
               {canMatch && (
                 <button onClick={() => handleAction('match')} disabled={!!actionLoading}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
@@ -166,11 +181,25 @@ export default function SupplierInvoiceDetailPage() {
         <div className="p-6 space-y-6">
           {/* Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+              <p className="text-xs text-[var(--ff-text-tertiary)] uppercase">Invoice Date</p>
+              <p className="text-lg font-semibold mt-1 text-[var(--ff-text-primary)]">{invoice.invoiceDate}</p>
+            </div>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+              <p className="text-xs text-[var(--ff-text-tertiary)] uppercase">Due Date</p>
+              {editing ? <input type="date" value={editForm.dueDate} onChange={e => setEditForm(p => ({ ...p, dueDate: e.target.value }))} className="ff-input mt-1 text-sm w-full" />
+                : <p className="text-lg font-semibold mt-1 text-[var(--ff-text-primary)]">{invoice.dueDate || '-'}</p>}
+            </div>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+              <p className="text-xs text-[var(--ff-text-tertiary)] uppercase">Payment Terms</p>
+              {editing ? <input value={editForm.paymentTerms} onChange={e => setEditForm(p => ({ ...p, paymentTerms: e.target.value }))} className="ff-input mt-1 text-sm w-full" />
+                : <p className="text-lg font-semibold mt-1 text-[var(--ff-text-primary)]">{invoice.paymentTerms || '-'}</p>}
+            </div>
+            <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
+              <p className="text-xs text-[var(--ff-text-tertiary)] uppercase">PO Number</p>
+              <p className="text-lg font-semibold mt-1 text-[var(--ff-text-primary)]">{invoice.poNumber || '-'}</p>
+            </div>
             {[
-              { label: 'Invoice Date', value: invoice.invoiceDate },
-              { label: 'Due Date', value: invoice.dueDate || '-' },
-              { label: 'Payment Terms', value: invoice.paymentTerms || '-' },
-              { label: 'PO Number', value: invoice.poNumber || '-' },
               { label: 'Subtotal', value: formatCurrency(invoice.subtotal) },
               { label: 'VAT', value: `${formatCurrency(invoice.taxAmount)} (${invoice.taxRate}%)` },
               { label: 'Total', value: formatCurrency(invoice.totalAmount), highlight: true },
@@ -178,9 +207,7 @@ export default function SupplierInvoiceDetailPage() {
             ].map((item, i) => (
               <div key={i} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-4">
                 <p className="text-xs text-[var(--ff-text-tertiary)] uppercase">{item.label}</p>
-                <p className={`text-lg font-semibold mt-1 ${item.highlight ? 'text-emerald-500' : 'text-[var(--ff-text-primary)]'}`}>
-                  {item.value}
-                </p>
+                <p className={`text-lg font-semibold mt-1 ${item.highlight ? 'text-emerald-500' : 'text-[var(--ff-text-primary)]'}`}>{item.value}</p>
               </div>
             ))}
           </div>
