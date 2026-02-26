@@ -12,6 +12,7 @@ import BOQViewerStatistics from './BOQViewerStatistics';
 import BOQViewerFilters from './BOQViewerFilters';
 import BOQViewerTable from './BOQViewerTable';
 import BOQViewerPagination from './BOQViewerPagination';
+import BOQViewerSummary from './BOQViewerSummary';
 import BOQViewerEmptyState from './BOQViewerEmptyState';
 
 export default function BOQViewer({ 
@@ -82,7 +83,7 @@ export default function BOQViewer({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header */}
+      {/* Header with always-visible search + category filter */}
       <BOQViewerHeader
         boqData={boqData}
         mode={mode}
@@ -91,6 +92,9 @@ export default function BOQViewer({
         setShowFilters={setShowFilters}
         onExport={handleExport}
         onRefresh={loadBOQData}
+        filters={filters}
+        setFilters={setFilters}
+        filterOptions={filterOptions}
       />
 
       {/* Statistics */}
@@ -122,6 +126,13 @@ export default function BOQViewer({
             onUpdateEdit={updateEditingItem}
             onSaveEdit={saveItem}
             isSaving={isSaving}
+          />
+
+          {/* Summary Footer */}
+          <BOQViewerSummary
+            filteredItems={filteredAndSortedItems}
+            totalItems={boqData.items.length}
+            totalBOQValue={boqData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)}
           />
 
           {/* Pagination */}
