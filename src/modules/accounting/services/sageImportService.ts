@@ -70,12 +70,11 @@ export async function importLedgerTransactions(userId: string): Promise<Migratio
 
         const entry = (await sql`
           INSERT INTO gl_journal_entries (
-            entry_number, entry_date, description, source, status,
-            total_debit, total_credit, created_by
+            entry_number, entry_date, description, source, status, created_by
           ) VALUES (
             ${entryRef}, ${group.transaction_date},
             ${group.description || `Sage import: ${entryRef}`},
-            'manual', 'posted', ${totalDebit}, ${totalCredit}, ${userId}
+            'manual', 'posted', ${userId}
           ) RETURNING id
         `) as Row[];
 
@@ -125,7 +124,9 @@ export async function importLedgerTransactions(userId: string): Promise<Migratio
 // ── Supplier Invoice Import ─────────────────────────────────────────────────
 
 /**
- * Import sage_supplier_invoices into the new supplier_invoices table
+ * Import sage_supplier_invoices into the supplier_invoices table.
+ * Matches Sage's approach: invoices are standalone AP documents,
+ * no separate GL journal entries are created per invoice.
  */
 export async function importSupplierInvoices(userId: string): Promise<MigrationRun> {
   const runId = await startRun('invoice_import', userId);
@@ -133,8 +134,9 @@ export async function importSupplierInvoices(userId: string): Promise<MigrationR
   try {
     const sageInvoices = (await sql`
       SELECT id, sage_invoice_id, sage_supplier_id, invoice_number,
-        invoice_date, due_date, total_amount, outstanding_amount, status,
-        ff_purchase_order_id, supplier_id
+        invoice_date, due_date, subtotal, tax_amount, total_amount,
+        outstanding_amount, status, ff_purchase_order_id, supplier_id,
+        raw_data, line_items
       FROM sage_supplier_invoices
       WHERE migration_status = 'pending'
       ORDER BY invoice_date
@@ -143,15 +145,6 @@ export async function importSupplierInvoices(userId: string): Promise<MigrationR
     let succeeded = 0;
     let failed = 0;
     let skipped = 0;
-
-    const apAcct = (await sql`SELECT id FROM gl_accounts WHERE account_code = '2110' LIMIT 1`) as Row[];
-    const expAcct = (await sql`SELECT id FROM gl_accounts WHERE account_code = '5100' LIMIT 1`) as Row[];
-    const apAccountId = apAcct[0]?.id;
-    const expAccountId = expAcct[0]?.id;
-
-    if (!apAccountId || !expAccountId) {
-      throw new Error('Missing AP (2110) or Expense (5100) GL accounts');
-    }
 
     for (const inv of sageInvoices) {
       try {
@@ -170,9 +163,11 @@ export async function importSupplierInvoices(userId: string): Promise<MigrationR
           continue;
         }
 
-        const taxRate = 15;
-        const subtotal = totalAmount / (1 + taxRate / 100);
-        const taxAmount = totalAmount - subtotal;
+        const subtotal = Number(inv.subtotal || 0) || totalAmount / 1.15;
+        const taxAmount = Number(inv.tax_amount || 0) || totalAmount - subtotal;
+        const taxRate = subtotal > 0
+          ? Math.round((taxAmount / subtotal) * 100 * 100) / 100
+          : 15;
 
         let projectId: string | null = null;
         if (inv.ff_purchase_order_id) {
@@ -182,55 +177,62 @@ export async function importSupplierInvoices(userId: string): Promise<MigrationR
 
         const isPaid = inv.status === 'paid' || Number(inv.outstanding_amount || 0) === 0;
 
+        // Extract reference from raw_data if available
+        const rawObj = parseJson(inv.raw_data);
+        const reference = rawObj?.Reference || null;
+
         const newInv = (await sql`
           INSERT INTO supplier_invoices (
             invoice_number, supplier_id, purchase_order_id, project_id,
             invoice_date, due_date, subtotal, tax_rate, tax_amount, total_amount,
-            amount_paid, status, sage_invoice_id, created_by
+            amount_paid, status, sage_invoice_id, reference, created_by
           ) VALUES (
             ${inv.invoice_number || `SAGE-${inv.sage_invoice_id}`},
-            ${supplierId}::UUID, ${inv.ff_purchase_order_id || null}, ${projectId},
+            ${supplierId}, ${inv.ff_purchase_order_id || null}, ${projectId},
             ${inv.invoice_date}, ${inv.due_date || inv.invoice_date},
             ${subtotal.toFixed(2)}, ${taxRate}, ${taxAmount.toFixed(2)}, ${totalAmount},
             ${isPaid ? totalAmount : 0}, ${isPaid ? 'paid' : 'approved'},
-            ${inv.sage_invoice_id}, ${userId}
+            ${inv.sage_invoice_id}, ${reference}, ${userId}
           ) RETURNING id
         `) as Row[];
 
         const newInvoiceId = String(newInv[0].id);
 
-        const entry = (await sql`
-          INSERT INTO gl_journal_entries (
-            entry_number, entry_date, description, source, status,
-            total_debit, total_credit, created_by
-          ) VALUES (
-            ${`SI-SAGE-${inv.invoice_number || inv.sage_invoice_id}`},
-            ${inv.invoice_date},
-            ${`Sage import: Supplier invoice ${inv.invoice_number || inv.sage_invoice_id}`},
-            'auto_supplier_invoice', 'posted', ${totalAmount}, ${totalAmount}, ${userId}
-          ) RETURNING id
-        `) as Row[];
+        // Insert line items from raw_data
+        const lines = parseRawData(inv.raw_data, inv.line_items);
+        if (lines && Array.isArray(lines) && lines.length > 0) {
+          for (const line of lines) {
+            const qty = Number(line.Quantity || 1);
+            const price = Number(line.UnitPriceExclusive || 0);
+            const lineTax = Number(line.Tax || 0);
+            const lineTotal = Number(line.Exclusive || line.Total || price * qty);
+            const lineTaxPct = Number(line.TaxPercentage || 0) * 100;
 
-        const entryId = String(entry[0].id);
-
-        if (projectId) {
-          await sql`
-            INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description, project_id)
-            VALUES (${entryId}::UUID, ${expAccountId}::UUID, ${totalAmount}, 0, ${`Invoice ${inv.invoice_number}`}, ${projectId}::UUID)
-          `;
-        } else {
-          await sql`
-            INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description)
-            VALUES (${entryId}::UUID, ${expAccountId}::UUID, ${totalAmount}, 0, ${`Invoice ${inv.invoice_number}`})
-          `;
+            if (projectId) {
+              await sql`
+                INSERT INTO supplier_invoice_items (
+                  supplier_invoice_id, description, quantity, unit_price,
+                  tax_rate, tax_amount, line_total, project_id
+                ) VALUES (
+                  ${newInvoiceId}::UUID, ${line.Description || 'Line item'},
+                  ${qty}, ${price}, ${lineTaxPct}, ${lineTax}, ${lineTotal},
+                  ${projectId}::UUID
+                )
+              `;
+            } else {
+              await sql`
+                INSERT INTO supplier_invoice_items (
+                  supplier_invoice_id, description, quantity, unit_price,
+                  tax_rate, tax_amount, line_total
+                ) VALUES (
+                  ${newInvoiceId}::UUID, ${line.Description || 'Line item'},
+                  ${qty}, ${price}, ${lineTaxPct}, ${lineTax}, ${lineTotal}
+                )
+              `;
+            }
+          }
         }
 
-        await sql`
-          INSERT INTO gl_journal_lines (journal_entry_id, gl_account_id, debit, credit, description)
-          VALUES (${entryId}::UUID, ${apAccountId}::UUID, 0, ${totalAmount}, ${`Invoice ${inv.invoice_number}`})
-        `;
-
-        await sql`UPDATE supplier_invoices SET gl_journal_entry_id = ${entryId}::UUID WHERE id = ${newInvoiceId}::UUID`;
         await sql`
           UPDATE sage_supplier_invoices
           SET migration_status = 'imported', gl_supplier_invoice_id = ${newInvoiceId}::UUID
@@ -250,4 +252,27 @@ export async function importSupplierInvoices(userId: string): Promise<MigrationR
     await failRun(runId, err);
     throw err;
   }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseRawData(rawData: unknown, lineItems: unknown): any[] | null {
+  // Try raw_data.Lines first (full Sage response with includeDetail)
+  const raw = parseJson(rawData);
+  if (raw?.Lines && Array.isArray(raw.Lines) && raw.Lines.length > 0) {
+    return raw.Lines;
+  }
+  // Fall back to line_items JSONB column
+  const items = parseJson(lineItems);
+  if (Array.isArray(items) && items.length > 0) return items;
+  return null;
+}
+
+function parseJson(val: unknown): Record<string, unknown> | null {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return val as Record<string, unknown>;
 }

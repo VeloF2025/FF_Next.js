@@ -26,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       invoices = await sql`
         SELECT
           ci.id, ci.invoice_number, ci.project_id, ci.client_id,
-          ci.total_amount, ci.amount_paid, ci.status,
+          ci.total_amount, ci.amount_paid, ci.status, ci.reference,
           ci.invoice_date, ci.due_date, ci.sent_at, ci.paid_at,
           c.company_name as client_name,
           p.project_name as project_name
@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       invoices = await sql`
         SELECT
           ci.id, ci.invoice_number, ci.project_id, ci.client_id,
-          ci.total_amount, ci.amount_paid, ci.status,
+          ci.total_amount, ci.amount_paid, ci.status, ci.reference,
           ci.invoice_date, ci.due_date, ci.sent_at, ci.paid_at,
           c.company_name as client_name,
           p.project_name as project_name

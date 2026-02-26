@@ -62,12 +62,11 @@ export async function postCustomerInvoiceToGL(
     // Create journal entry: DR AR (total), CR Revenue (subtotal), CR VAT Output (tax)
     const entry = (await sql`
       INSERT INTO gl_journal_entries (
-        entry_number, entry_date, description, source, status,
-        total_debit, total_credit, created_by
+        entry_number, entry_date, description, source, status, created_by
       ) VALUES (
         ${`CI-${inv[0].invoice_number}`}, CURRENT_DATE,
         ${`Customer invoice ${inv[0].invoice_number} approved`},
-        'auto_invoice', 'posted', ${totalAmount}, ${totalAmount}, ${userId}
+        'auto_invoice', 'posted', ${userId}
       ) RETURNING id
     `) as Row[];
 
@@ -129,12 +128,11 @@ export async function postCustomerPaymentToGL(
     // DR Bank, CR AR
     const entry = (await sql`
       INSERT INTO gl_journal_entries (
-        entry_number, entry_date, description, source, status,
-        total_debit, total_credit, created_by
+        entry_number, entry_date, description, source, status, created_by
       ) VALUES (
         ${`CPAY-${inv[0].invoice_number}-${Date.now()}`}, CURRENT_DATE,
         ${`Payment received for invoice ${inv[0].invoice_number}`},
-        'auto_payment', 'posted', ${paymentAmount}, ${paymentAmount}, ${userId}
+        'auto_payment', 'posted', ${userId}
       ) RETURNING id
     `) as Row[];
 
@@ -177,12 +175,11 @@ export async function postGRNToGL(
     // DR Materials/Inventory, CR AP
     const entry = (await sql`
       INSERT INTO gl_journal_entries (
-        entry_number, entry_date, description, source, status,
-        total_debit, total_credit, created_by
+        entry_number, entry_date, description, source, status, created_by
       ) VALUES (
         ${`GRN-${grnNumber}`}, CURRENT_DATE,
         ${`GRN ${grnNumber} confirmed — goods received`},
-        'auto_grn', 'posted', ${totalValue}, ${totalValue}, ${userId}
+        'auto_grn', 'posted', ${userId}
       ) RETURNING id
     `) as Row[];
 

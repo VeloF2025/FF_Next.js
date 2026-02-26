@@ -51,12 +51,11 @@ export async function postPurchaseOrderToGL(
 
     const entry = (await sql`
       INSERT INTO gl_journal_entries (
-        entry_number, entry_date, description, source, status,
-        total_debit, total_credit, created_by
+        entry_number, entry_date, description, source, status, created_by
       ) VALUES (
         ${`PO-${po[0].po_number}`}, CURRENT_DATE,
         ${`Purchase order ${po[0].po_number} approved — commitment`},
-        'auto_purchase_order', 'posted', ${totalAmount}, ${totalAmount}, ${userId}
+        'auto_purchase_order', 'posted', ${userId}
       ) RETURNING id
     `) as Row[];
 
@@ -128,12 +127,11 @@ export async function postAssetDepreciationToGL(
 
     const entry = (await sql`
       INSERT INTO gl_journal_entries (
-        entry_number, entry_date, description, source, status,
-        total_debit, total_credit, created_by
+        entry_number, entry_date, description, source, status, created_by
       ) VALUES (
         ${`DEP-${asset[0].asset_number}-${new Date().toISOString().slice(0, 7)}`}, CURRENT_DATE,
         ${`Depreciation: ${asset[0].name} (${asset[0].asset_number})`},
-        'auto_depreciation', 'posted', ${depreciationAmount}, ${depreciationAmount}, ${userId}
+        'auto_depreciation', 'posted', ${userId}
       ) RETURNING id
     `) as Row[];
 

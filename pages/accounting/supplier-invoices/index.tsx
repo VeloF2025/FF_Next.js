@@ -7,8 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import {
-  Receipt, Plus, Loader2, AlertCircle, ChevronRight,
-  Search, Filter,
+  Receipt, Plus, Loader2, AlertCircle, ChevronRight, Filter,
 } from 'lucide-react';
 import type { SupplierInvoice, SupplierInvoiceStatus } from '@/modules/accounting/types/ap.types';
 
@@ -56,6 +55,13 @@ function MatchBadge({ status }: { status: string }) {
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
+}
+
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export default function SupplierInvoicesPage() {
@@ -154,31 +160,42 @@ export default function SupplierInvoicesPage() {
                   <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
                     <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Invoice #</th>
                     <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Supplier</th>
+                    <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Reference</th>
                     <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Date</th>
                     <th className="ff-table-header px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Total</th>
-                    <th className="ff-table-header px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Balance</th>
+                    <th className="ff-table-header px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Outstanding</th>
                     <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Status</th>
-                    <th className="ff-table-header px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-secondary)] uppercase">Match</th>
                     <th className="ff-table-header px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--ff-border-light)]">
-                  {invoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-[var(--ff-bg-tertiary)] transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">{inv.invoiceNumber}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">{inv.supplierName || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">{inv.invoiceDate}</td>
-                      <td className="px-4 py-3 text-sm text-right font-mono text-[var(--ff-text-primary)]">{formatCurrency(inv.totalAmount)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-mono text-[var(--ff-text-primary)]">{formatCurrency(inv.balance)}</td>
-                      <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
-                      <td className="px-4 py-3"><MatchBadge status={inv.matchStatus} /></td>
-                      <td className="px-4 py-3 text-right">
-                        <Link href={`/accounting/supplier-invoices/${inv.id}`} className="text-emerald-600 hover:text-emerald-700">
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {invoices.map(inv => {
+                    const outstanding = inv.balance ?? (inv.totalAmount - (inv.amountPaid || 0));
+                    return (
+                      <tr key={inv.id} className="hover:bg-[var(--ff-bg-tertiary)] transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">
+                          <Link href={`/accounting/supplier-invoices/${inv.id}`} className="hover:text-emerald-400 transition-colors">
+                            {inv.invoiceNumber}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)]">{inv.supplierName || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--ff-text-tertiary)] max-w-[240px] truncate" title={inv.reference}>
+                          {inv.reference || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--ff-text-secondary)] whitespace-nowrap">{formatDate(inv.invoiceDate)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-mono text-[var(--ff-text-primary)]">{formatCurrency(inv.totalAmount)}</td>
+                        <td className={`px-4 py-3 text-sm text-right font-mono ${outstanding > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {formatCurrency(outstanding)}
+                        </td>
+                        <td className="px-4 py-3"><StatusBadge status={inv.status} /></td>
+                        <td className="px-4 py-3 text-right">
+                          <Link href={`/accounting/supplier-invoices/${inv.id}`} className="text-emerald-600 hover:text-emerald-700">
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

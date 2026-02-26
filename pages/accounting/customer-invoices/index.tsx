@@ -13,6 +13,13 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
 }
 
+function formatDate(dateStr: string | undefined): string {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 interface Invoice {
   id: string;
   invoice_number: string;
@@ -22,6 +29,7 @@ interface Invoice {
   total_amount: number;
   amount_paid: number;
   status: string;
+  reference?: string;
   invoice_date: string;
   due_date?: string;
 }
@@ -117,40 +125,43 @@ export default function CustomerInvoicesPage() {
                   <tr className="border-b border-[var(--ff-border-light)]">
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Invoice #</th>
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Client</th>
-                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Project</th>
+                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Reference</th>
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Date</th>
                     <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Amount</th>
-                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Paid</th>
+                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Outstanding</th>
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
-                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Balance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((inv) => (
-                    <tr key={inv.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                      <td className="py-3 px-4 font-mono">
-                        <Link href={`/accounting/customer-invoices/${inv.id}`} className="text-blue-400 hover:text-blue-300">{inv.invoice_number}</Link>
-                      </td>
-                      <td className="py-3 px-4 text-[var(--ff-text-primary)]">{inv.client_name || '-'}</td>
-                      <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{inv.project_name || '-'}</td>
-                      <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{inv.invoice_date?.split('T')[0]}</td>
-                      <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">{formatCurrency(Number(inv.total_amount))}</td>
-                      <td className="py-3 px-4 text-right text-emerald-400">{formatCurrency(Number(inv.amount_paid))}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
-                          inv.status === 'overdue' ? 'bg-red-500/10 text-red-400' :
-                          inv.status === 'sent' ? 'bg-blue-500/10 text-blue-400' :
-                          'bg-yellow-500/10 text-yellow-400'
-                        }`}>
-                          {inv.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-[var(--ff-text-primary)]">
-                        {formatCurrency(Number(inv.total_amount) - Number(inv.amount_paid))}
-                      </td>
-                    </tr>
-                  ))}
+                  {invoices.map((inv) => {
+                    const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
+                    return (
+                      <tr key={inv.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
+                        <td className="py-3 px-4 font-mono">
+                          <Link href={`/accounting/customer-invoices/${inv.id}`} className="text-blue-400 hover:text-blue-300">{inv.invoice_number}</Link>
+                        </td>
+                        <td className="py-3 px-4 text-[var(--ff-text-primary)]">{inv.client_name || '-'}</td>
+                        <td className="py-3 px-4 text-[var(--ff-text-tertiary)] max-w-[240px] truncate" title={inv.reference}>
+                          {inv.reference || inv.project_name || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-[var(--ff-text-secondary)] whitespace-nowrap">{formatDate(inv.invoice_date)}</td>
+                        <td className="py-3 px-4 text-right font-mono text-[var(--ff-text-primary)]">{formatCurrency(Number(inv.total_amount))}</td>
+                        <td className={`py-3 px-4 text-right font-mono ${outstanding > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {formatCurrency(outstanding)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
+                            inv.status === 'overdue' ? 'bg-red-500/10 text-red-400' :
+                            inv.status === 'sent' ? 'bg-blue-500/10 text-blue-400' :
+                            'bg-yellow-500/10 text-yellow-400'
+                          }`}>
+                            {inv.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
