@@ -1,6 +1,6 @@
 /**
  * Step6Receive — Goods Receipt Note (GRN) tracker
- * Checks GRN status for the PO, allows recording delivery or skipping.
+ * Checks GRN status for the PO. GRN is mandatory — no skip allowed.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -82,10 +82,6 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
     onComplete({ grnId: firstGrn.id, grnStatus: 'confirmed' });
   };
 
-  const handleSkip = () => {
-    onComplete({ grnStatus: 'pending' });
-  };
-
   const handleRecordDelivery = () => {
     void router.push(`/procurement/grn/new?poId=${state.poId}`);
   };
@@ -104,9 +100,6 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={onBack} style={backBtnStyle}>
             <ArrowLeft style={{ width: 16, height: 16 }} /> Back
-          </button>
-          <button onClick={() => onComplete({ grnStatus: 'pending' })} style={primaryBtnStyle('#16a34a')}>
-            Skip to Payment <ArrowRight style={{ width: 16, height: 16 }} />
           </button>
         </div>
       </div>
@@ -210,15 +203,6 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
         </button>
       </div>
 
-      {/* Skip link */}
-      <div style={{ textAlign: 'center' }}>
-        <button
-          onClick={handleSkip}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--ff-text-tertiary)', textDecoration: 'underline' }}
-        >
-          Skip (goods not required)
-        </button>
-      </div>
     </div>
   );
 };
