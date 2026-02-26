@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { ArrowRightLeft, Loader2, Check } from 'lucide-react';
 
 interface Invoice {
@@ -57,6 +58,7 @@ export default function DRCVatPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <div className="flex items-center gap-3">

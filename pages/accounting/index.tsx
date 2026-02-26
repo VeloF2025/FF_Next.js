@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { EnhancedStatCard, StatsGrid } from '@/components/dashboard/EnhancedStatCard';
 import { log } from '@/lib/logger';
 import Link from 'next/link';
@@ -68,6 +69,7 @@ export default function AccountingPage() {
   if (!isMounted) {
     return (
       <AppLayout>
+      <AccountingNav />
         <div className="min-h-screen bg-[var(--ff-bg-primary)] flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mx-auto mb-2" />

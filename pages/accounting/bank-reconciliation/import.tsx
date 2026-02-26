@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Loader2, AlertCircle, CheckCircle2, Landmark, FileText } from 'lucide-react';
 
@@ -164,6 +165,7 @@ export default function BankStatementImportPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">

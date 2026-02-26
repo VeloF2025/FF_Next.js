@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import {
   ArrowLeft, Database, ArrowRightLeft, FileSpreadsheet, Receipt,
@@ -95,6 +96,7 @@ export default function SageMigrationPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">

@@ -4,6 +4,7 @@
  */
 
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import {
   BarChart3, PieChart, Banknote, Scale, DollarSign,
@@ -46,6 +47,7 @@ const categories = [...new Set(reports.map(r => r.category))];
 export default function ReportsHubPage() {
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <div className="flex items-center gap-3">

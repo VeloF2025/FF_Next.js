@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import {
   BankTxTable, type AllocType, type VatCode, type BankTx, type SelectOption, type RowSelection,
 } from '@/components/accounting/BankTxTable';
@@ -371,6 +372,7 @@ export default function BankTransactionsPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Header — bank account cards */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">

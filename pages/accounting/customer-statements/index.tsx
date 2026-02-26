@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { ClipboardList, Loader2, AlertCircle, Mail, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -92,6 +93,7 @@ export default function CustomerStatementsPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
