@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, ClipboardList, Loader2, AlertCircle, Download } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Loader2, AlertCircle, Download, FileText } from 'lucide-react';
+import { generateStatementPdf } from '@/modules/accounting/utils/statementPdf';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -109,6 +110,27 @@ export default function CustomerStatementDetailPage() {
     URL.revokeObjectURL(url);
   }
 
+  function handleDownloadPDF() {
+    if (!client || !summary || transactions.length === 0) return;
+    const blob = generateStatementPdf({
+      clientName: client.name,
+      clientEmail: client.email || undefined,
+      clientPhone: client.phone || undefined,
+      asAtDate: new Date().toISOString().split('T')[0],
+      totalInvoiced: summary.totalInvoiced,
+      totalPaid: summary.totalPaid,
+      totalCredits: summary.totalCredits,
+      balanceOutstanding: summary.balance,
+      transactions,
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `statement-${client.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
@@ -132,10 +154,16 @@ export default function CustomerStatementDetailPage() {
                 </div>
               </div>
               {transactions.length > 0 && (
-                <button onClick={handleExportCSV}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium">
-                  <Download className="h-4 w-4" /> Export CSV
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleDownloadPDF}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-sm font-medium">
+                    <FileText className="h-4 w-4" /> Download PDF
+                  </button>
+                  <button onClick={handleExportCSV}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium">
+                    <Download className="h-4 w-4" /> Export CSV
+                  </button>
+                </div>
               )}
             </div>
           </div>

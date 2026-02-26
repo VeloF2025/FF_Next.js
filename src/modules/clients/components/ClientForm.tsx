@@ -19,7 +19,8 @@ import {
   CompanyDetailsSection,
   AddressSection,
   FinancialSection,
-  CommunicationSection
+  CommunicationSection,
+  AccountManagementSection
 } from './ClientFormSections';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { log } from '@/lib/logger';
@@ -92,6 +93,8 @@ export function ClientForm() {
         creditLimit: client.creditLimit,
         paymentTerms: client.paymentTerms,
         creditRating: client.creditRating,
+        salesRepresentativeId: client.salesRepresentativeId || undefined,
+        accountManagerId: client.accountManagerId || undefined,
         preferredContactMethod: client.preferredContactMethod,
         communicationLanguage: client.communicationLanguage,
         timezone: client.timezone,
@@ -172,11 +175,16 @@ export function ClientForm() {
             handleInputChange={handleInputChange} 
           />
           
-          <FinancialSection 
-            formData={formData} 
+          <FinancialSection
+            formData={formData}
             handleInputChange={handleInputChange}
           />
-          
+
+          <AccountManagementSection
+            formData={formData}
+            handleInputChange={handleInputChange}
+          />
+
           <CommunicationSection 
             formData={formData} 
             handleInputChange={handleInputChange}

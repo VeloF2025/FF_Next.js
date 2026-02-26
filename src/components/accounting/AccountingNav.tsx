@@ -35,6 +35,8 @@ const TABS: Tab[] = [
       { label: 'Debtors Manager', href: '/accounting/debtors-manager' },
       { label: 'Aging', href: '/accounting/ar-aging' },
       { label: 'Statements', href: '/accounting/customer-statements' },
+      { label: 'Statement Run', href: '/accounting/statement-run' },
+      { label: 'Dunning', href: '/accounting/dunning' },
     ],
   },
   {
@@ -122,6 +124,8 @@ function getActiveTabId(pathname: string, query: Record<string, string | string[
       pathname.startsWith('/accounting/write-offs') ||
       pathname.startsWith('/accounting/debtors-manager') ||
       pathname.startsWith('/accounting/ar-aging') ||
+      pathname.startsWith('/accounting/statement-run') ||
+      pathname.startsWith('/accounting/dunning') ||
       (pathname.startsWith('/accounting/adjustments') && query.type === 'customer')) {
     return 'customers';
   }
