@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountingNav } from '@/components/accounting/AccountingNav';
-import { RotateCcw, Plus, Pause, Play, XCircle, Zap, Loader2, Trash2 } from 'lucide-react';
+import { RotateCcw, Plus, Pause, Play, XCircle, Zap, Loader2, Trash2, Pencil, Save, Download } from 'lucide-react';
 
 interface RecurringJournal {
   id: string; templateName: string; description?: string; frequency: string;
@@ -32,6 +32,7 @@ export default function RecurringJournalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [editId, setEditId] = useState('');
   const [form, setForm] = useState({ templateName: '', description: '', frequency: 'monthly', nextRunDate: '' });
   const [formLines, setFormLines] = useState([{ key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }]);
 
@@ -66,31 +67,54 @@ export default function RecurringJournalsPage() {
     await load(); setBusy('');
   };
 
+  const startEdit = (item: RecurringJournal) => {
+    setEditId(item.id);
+    setForm({ templateName: item.templateName, description: item.description || '', frequency: item.frequency, nextRunDate: item.nextRunDate?.split('T')[0] || '' });
+    setShowForm(true);
+  };
+
+  const resetForm = () => {
+    setEditId('');
+    setShowForm(false);
+    setForm({ templateName: '', description: '', frequency: 'monthly', nextRunDate: '' });
+    setFormLines([{ key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (Math.abs(totalDebit - totalCredit) > 0.01) { setError('Lines must balance (DR = CR)'); return; }
+    if (!editId && Math.abs(totalDebit - totalCredit) > 0.01) { setError('Lines must balance (DR = CR)'); return; }
     setBusy('new');
     try {
+      const method = editId ? 'PUT' : 'POST';
+      const payload = editId
+        ? { id: editId, templateName: form.templateName, description: form.description, frequency: form.frequency, nextRunDate: form.nextRunDate }
+        : {
+            templateName: form.templateName, description: form.description,
+            frequency: form.frequency, nextRunDate: form.nextRunDate,
+            lines: formLines.filter(l => l.glAccountId && (l.debit > 0 || l.credit > 0)).map(l => ({
+              glAccountId: l.glAccountId, debit: l.debit || 0, credit: l.credit || 0, description: l.description,
+            })),
+          };
       const res = await fetch('/api/accounting/recurring-journals', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          templateName: form.templateName, description: form.description,
-          frequency: form.frequency, nextRunDate: form.nextRunDate,
-          lines: formLines.filter(l => l.glAccountId && (l.debit > 0 || l.credit > 0)).map(l => ({
-            glAccountId: l.glAccountId, debit: l.debit || 0, credit: l.credit || 0, description: l.description,
-          })),
-        }),
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || 'Failed');
-      setShowForm(false);
-      setForm({ templateName: '', description: '', frequency: 'monthly', nextRunDate: '' });
-      setFormLines([{ key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }]);
+      resetForm();
       await load();
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
     finally { setBusy(''); }
+  };
+
+  const exportCSV = () => {
+    const headers = ['Template', 'Frequency', 'Next Run', 'Amount', 'Runs', 'Status'];
+    const rows = items.map(i => [i.templateName, i.frequency, i.nextRunDate?.split('T')[0] || '', i.totalAmount, i.runCount, i.status]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `recurring-journals-${new Date().toISOString().split('T')[0]}.csv`; a.click();
   };
 
   return (
@@ -103,9 +127,16 @@ export default function RecurringJournalsPage() {
               <div className="p-2 rounded-lg bg-teal-500/10"><RotateCcw className="h-6 w-6 text-teal-500" /></div>
               <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Recurring Journals</h1>
             </div>
-            <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium">
-              <Plus className="h-4 w-4" /> New Template
-            </button>
+            <div className="flex items-center gap-2">
+              {items.length > 0 && (
+                <button onClick={exportCSV} className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-lg hover:bg-[var(--ff-bg-primary)] text-sm">
+                  <Download className="h-4 w-4" /> CSV
+                </button>
+              )}
+              <button onClick={() => { resetForm(); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium">
+                <Plus className="h-4 w-4" /> New Template
+              </button>
+            </div>
           </div>
         </div>
 
@@ -114,7 +145,7 @@ export default function RecurringJournalsPage() {
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Recurring Journal</h2>
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">{editId ? 'Edit Recurring Journal' : 'New Recurring Journal'}</h2>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <input value={form.templateName} onChange={e => setForm(f => ({ ...f, templateName: e.target.value }))} className="ff-input" placeholder="Template Name *" required />
                 <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="ff-input" placeholder="Description" />
@@ -124,35 +155,37 @@ export default function RecurringJournalsPage() {
                 </select>
                 <input type="date" value={form.nextRunDate} onChange={e => setForm(f => ({ ...f, nextRunDate: e.target.value }))} className="ff-input" required />
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Journal Lines</span>
-                  <button type="button" onClick={() => setFormLines(p => [...p, { key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }])} className="text-sm text-teal-500 hover:text-teal-400 flex items-center gap-1"><Plus className="h-3 w-3" /> Add Line</button>
-                </div>
-                {formLines.map(line => (
-                  <div key={line.key} className="flex items-center gap-2">
-                    <select value={line.glAccountId} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, glAccountId: e.target.value } : l))} className="ff-select flex-1">
-                      <option value="">Account *</option>
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
-                    </select>
-                    <input type="number" step="0.01" min="0" value={line.debit || ''} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, debit: Number(e.target.value), credit: 0 } : l))} className="ff-input w-28" placeholder="Debit" />
-                    <input type="number" step="0.01" min="0" value={line.credit || ''} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, credit: Number(e.target.value), debit: 0 } : l))} className="ff-input w-28" placeholder="Credit" />
-                    <input value={line.description} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, description: e.target.value } : l))} className="ff-input w-40" placeholder="Desc" />
-                    {formLines.length > 1 && <button type="button" onClick={() => setFormLines(p => p.filter(l => l.key !== line.key))} className="p-1 text-red-400"><Trash2 className="h-4 w-4" /></button>}
+              {!editId && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-[var(--ff-text-secondary)]">Journal Lines</span>
+                    <button type="button" onClick={() => setFormLines(p => [...p, { key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }])} className="text-sm text-teal-500 hover:text-teal-400 flex items-center gap-1"><Plus className="h-3 w-3" /> Add Line</button>
                   </div>
-                ))}
-                <div className="flex justify-end gap-4 text-sm">
-                  <span className="text-[var(--ff-text-secondary)]">DR: {fmt(totalDebit)}</span>
-                  <span className="text-[var(--ff-text-secondary)]">CR: {fmt(totalCredit)}</span>
-                  <span className={Math.abs(totalDebit - totalCredit) < 0.01 ? 'text-emerald-400' : 'text-red-400'}>
-                    Diff: {fmt(totalDebit - totalCredit)}
-                  </span>
+                  {formLines.map(line => (
+                    <div key={line.key} className="flex items-center gap-2">
+                      <select value={line.glAccountId} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, glAccountId: e.target.value } : l))} className="ff-select flex-1">
+                        <option value="">Account *</option>
+                        {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
+                      </select>
+                      <input type="number" step="0.01" min="0" value={line.debit || ''} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, debit: Number(e.target.value), credit: 0 } : l))} className="ff-input w-28" placeholder="Debit" />
+                      <input type="number" step="0.01" min="0" value={line.credit || ''} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, credit: Number(e.target.value), debit: 0 } : l))} className="ff-input w-28" placeholder="Credit" />
+                      <input value={line.description} onChange={e => setFormLines(p => p.map(l => l.key === line.key ? { ...l, description: e.target.value } : l))} className="ff-input w-40" placeholder="Desc" />
+                      {formLines.length > 1 && <button type="button" onClick={() => setFormLines(p => p.filter(l => l.key !== line.key))} className="p-1 text-red-400"><Trash2 className="h-4 w-4" /></button>}
+                    </div>
+                  ))}
+                  <div className="flex justify-end gap-4 text-sm">
+                    <span className="text-[var(--ff-text-secondary)]">DR: {fmt(totalDebit)}</span>
+                    <span className="text-[var(--ff-text-secondary)]">CR: {fmt(totalCredit)}</span>
+                    <span className={Math.abs(totalDebit - totalCredit) < 0.01 ? 'text-emerald-400' : 'text-red-400'}>
+                      Diff: {fmt(totalDebit - totalCredit)}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
+                <button type="button" onClick={resetForm} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
                 <button type="submit" disabled={busy === 'new'} className="px-6 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  {busy === 'new' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
+                  {busy === 'new' ? <Loader2 className="h-4 w-4 animate-spin" /> : editId ? <><Save className="h-4 w-4 inline mr-1" />Save</> : 'Create'}
                 </button>
               </div>
             </form>
@@ -184,7 +217,10 @@ export default function RecurringJournalsPage() {
                           <button onClick={() => doAction('generate', item.id)} disabled={busy === item.id} className="p-1 text-emerald-400 hover:text-emerald-300" title="Generate Now"><Zap className="h-4 w-4" /></button>
                         </>}
                         {item.status === 'paused' && <button onClick={() => doAction('resume', item.id)} disabled={busy === item.id} className="p-1 text-emerald-400 hover:text-emerald-300" title="Resume"><Play className="h-4 w-4" /></button>}
-                        {(item.status === 'active' || item.status === 'paused') && <button onClick={() => doAction('cancel', item.id)} disabled={busy === item.id} className="p-1 text-red-400 hover:text-red-300" title="Cancel"><XCircle className="h-4 w-4" /></button>}
+                        {(item.status === 'active' || item.status === 'paused') && <>
+                          <button onClick={() => startEdit(item)} disabled={busy === item.id} className="p-1 text-blue-400 hover:text-blue-300" title="Edit"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => doAction('cancel', item.id)} disabled={busy === item.id} className="p-1 text-red-400 hover:text-red-300" title="Cancel"><XCircle className="h-4 w-4" /></button>
+                        </>}
                       </div>
                     </td>
                   </tr>

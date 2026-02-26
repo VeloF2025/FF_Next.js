@@ -8,7 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import {
-  FileText, Plus, Loader2, AlertCircle, ChevronRight, Filter,
+  FileText, Plus, Loader2, AlertCircle, ChevronRight, Filter, Download,
 } from 'lucide-react';
 import type { CreditNote, CreditNoteStatus } from '@/modules/accounting/types/ar.types';
 
@@ -85,6 +85,20 @@ export default function CreditNotesPage() {
 
   useEffect(() => { loadCreditNotes(); }, [loadCreditNotes]);
 
+  const exportCSV = () => {
+    const headers = ['CN #', 'Type', 'Client/Supplier', 'Invoice', 'Date', 'Amount', 'Status'];
+    const rows = creditNotes.map(cn => [
+      cn.creditNoteNumber, cn.type,
+      cn.type === 'customer' ? cn.clientName : cn.supplierName || '',
+      cn.invoiceNumber || '', new Date(cn.creditDate).toLocaleDateString('en-ZA'),
+      cn.totalAmount, cn.status,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `credit-notes-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+  };
+
   return (
     <AppLayout>
       <AccountingNav />
@@ -103,12 +117,19 @@ export default function CreditNotesPage() {
                 </p>
               </div>
             </div>
-            <Link
-              href="/accounting/credit-notes/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="h-4 w-4" /> New Credit Note
-            </Link>
+            <div className="flex items-center gap-2">
+              {creditNotes.length > 0 && (
+                <button onClick={exportCSV} className="inline-flex items-center gap-2 px-3 py-2 border border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] rounded-lg hover:bg-[var(--ff-bg-primary)] text-sm">
+                  <Download className="h-4 w-4" /> CSV
+                </button>
+              )}
+              <Link
+                href="/accounting/credit-notes/new"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="h-4 w-4" /> New Credit Note
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -163,7 +184,7 @@ export default function CreditNotesPage() {
                 </thead>
                 <tbody>
                   {creditNotes.map(cn => (
-                    <tr key={cn.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)] transition-colors">
+                    <tr key={cn.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)] transition-colors cursor-pointer" onClick={() => window.location.href = `/accounting/credit-notes/${cn.id}`}>
                       <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{cn.creditNoteNumber}</td>
                       <td className="px-4 py-3"><TypeBadge type={cn.type} /></td>
                       <td className="px-4 py-3 text-[var(--ff-text-primary)]">
