@@ -27,6 +27,14 @@ interface ProjectOption {
   project_code: string;
 }
 
+interface CostCenterOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+type SpendType = 'project' | 'cost_centre';
+
 export interface Step1RequirementsProps {
   state: WorkflowState;
   onComplete: (update: Partial<WorkflowState>) => void;
@@ -50,7 +58,9 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
   // Restore from draft if the step hasn't been submitted yet
   const draft = state.requisitionId ? null : loadStep1Draft();
 
+  const [spendType, setSpendType] = useState<SpendType>(draft?.costCenterId ? 'cost_centre' : 'project');
   const [projectId, setProjectId] = useState(draft?.projectId ?? state.projectId ?? '');
+  const [costCenterId, setCostCenterId] = useState(draft?.costCenterId ?? '');
   const [department, setDepartment] = useState(draft?.department ?? '');
   const [requiredDate, setRequiredDate] = useState(draft?.requiredDate ?? '');
   const [urgency, setUrgency] = useState<RequisitionUrgency>((draft?.urgency as RequisitionUrgency) ?? 'normal');
@@ -58,7 +68,9 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
   const [items, setItems] = useState<FormItem[]>(draft?.items ?? [makeItem()]);
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [costCentres, setCostCentres] = useState<CostCenterOption[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [isLoadingCC, setIsLoadingCC] = useState(true);
   const [boqLines, setBoqLines] = useState<BOQLineUtilization[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +87,24 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
         log.error('Failed to load projects', { err }, 'Step1Requirements');
       } finally {
         setIsLoadingProjects(false);
+      }
+    };
+    load();
+  }, []);
+
+  // Load cost centres list
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/procurement/cost-centers?is_active=true&limit=200');
+        const json = (await res.json()) as { success: boolean; data?: { items?: CostCenterOption[]; tree?: CostCenterOption[] } };
+        if (json.success && json.data) {
+          setCostCentres(json.data.items ?? json.data.tree ?? []);
+        }
+      } catch (err) {
+        log.error('Failed to load cost centres', { err }, 'Step1Requirements');
+      } finally {
+        setIsLoadingCC(false);
       }
     };
     load();
@@ -105,14 +135,16 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
   // Auto-save form to localStorage whenever any field changes
   useEffect(() => {
     if (state.requisitionId) return; // already submitted — don't overwrite cleared draft
-    saveDraft({ projectId, department, requiredDate, urgency, notes, items });
-  }, [projectId, department, requiredDate, urgency, notes, items, saveDraft, state.requisitionId]);
+    saveDraft({ projectId, costCenterId, department, requiredDate, urgency, notes, items });
+  }, [projectId, costCenterId, department, requiredDate, urgency, notes, items, saveDraft, state.requisitionId]);
 
   const getMinDate = () => new Date().toISOString().split('T')[0];
 
   const handleClearDraft = () => {
     clearDraft();
+    setSpendType('project');
     setProjectId('');
+    setCostCenterId('');
     setDepartment('');
     setRequiredDate('');
     setUrgency('normal');
@@ -175,6 +207,14 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
 
   const validate = (): boolean => {
     const errors: Record<string, string> = {};
+
+    // Require cost allocation
+    if (spendType === 'project' && !projectId) {
+      errors.projectId = 'Please select a project';
+    } else if (spendType === 'cost_centre' && !costCenterId) {
+      errors.costCenterId = 'Please select a cost centre';
+    }
+
     const validItems = items.filter(
       (item) => item.itemDescription.trim() && item.quantity !== '' && (item.quantity as number) > 0,
     );
@@ -228,7 +268,8 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
     setIsSubmitting(true);
     try {
       const payload = {
-        projectId: projectId || undefined,
+        projectId: spendType === 'project' ? (projectId || undefined) : undefined,
+        costCenterId: spendType === 'cost_centre' ? (costCenterId || undefined) : undefined,
         department: department || undefined,
         requiredDate: requiredDate || undefined,
         urgency,
@@ -304,30 +345,99 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
         <h3 className="text-base font-medium text-[var(--ff-text-primary)] mb-4">Requisition Details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Project select */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-              Project (Optional)
+
+          {/* Spend allocation type toggle */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
+              Cost Allocation <span className="text-red-400">*</span>
             </label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                disabled={isLoadingProjects}
-                className="w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setSpendType('project'); setCostCenterId(''); }}
+                className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  spendType === 'project'
+                    ? 'bg-purple-600/20 border-purple-500/50 text-purple-400'
+                    : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
+                }`}
               >
-                <option value="">Select a project</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+                <Building2 className="inline h-4 w-4 mr-2 -mt-0.5" />
+                Project Spend
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSpendType('cost_centre'); setProjectId(''); setBoqLines([]); }}
+                className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  spendType === 'cost_centre'
+                    ? 'bg-blue-600/20 border-blue-500/50 text-blue-400'
+                    : 'bg-[var(--ff-bg-tertiary)] border-[var(--ff-border-light)] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]'
+                }`}
+              >
+                <Building2 className="inline h-4 w-4 mr-2 -mt-0.5" />
+                Operational / Cost Centre
+              </button>
             </div>
-            {projectId && boqLines.length > 0 && (
-              <p className="mt-1 text-xs text-purple-400">
-                {boqLines.length} BOQ lines available for this project
-              </p>
-            )}
           </div>
+
+          {/* Project select — only when spendType === 'project' */}
+          {spendType === 'project' && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                Project <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                <select
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  disabled={isLoadingProjects}
+                  className={`w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none ${
+                    fieldErrors.projectId ? 'border-red-500/50' : 'border-[var(--ff-border-light)]'
+                  }`}
+                >
+                  <option value="">Select a project</option>
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+              </div>
+              {fieldErrors.projectId && <p className="mt-1 text-xs text-red-400">{fieldErrors.projectId}</p>}
+              {projectId && boqLines.length > 0 && (
+                <p className="mt-1 text-xs text-purple-400">
+                  {boqLines.length} BOQ lines available for this project
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Cost centre select — only when spendType === 'cost_centre' */}
+          {spendType === 'cost_centre' && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
+                Cost Centre <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                <select
+                  value={costCenterId}
+                  onChange={(e) => setCostCenterId(e.target.value)}
+                  disabled={isLoadingCC}
+                  className={`w-full pl-10 pr-10 py-2 bg-[var(--ff-bg-tertiary)] border rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 appearance-none ${
+                    fieldErrors.costCenterId ? 'border-red-500/50' : 'border-[var(--ff-border-light)]'
+                  }`}
+                >
+                  <option value="">Select a cost centre</option>
+                  {costCentres.map((cc) => <option key={cc.id} value={cc.id}>{cc.code} — {cc.name}</option>)}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+              </div>
+              {fieldErrors.costCenterId && <p className="mt-1 text-xs text-red-400">{fieldErrors.costCenterId}</p>}
+              {costCentres.length === 0 && !isLoadingCC && (
+                <p className="mt-1 text-xs text-amber-400">
+                  No cost centres configured yet. Go to Procurement → Cost Centers to create them.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Department */}
           <div>

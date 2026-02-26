@@ -12,6 +12,7 @@ const DEBOUNCE_MS = 600;
 
 export interface Step1DraftData {
   projectId: string;
+  costCenterId?: string;
   department: string;
   requiredDate: string;
   urgency: string;

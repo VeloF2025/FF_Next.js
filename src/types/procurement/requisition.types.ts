@@ -21,8 +21,9 @@ export interface PurchaseRequisition {
   id: string;
   requisitionNumber: string;
 
-  // Context
+  // Cost allocation — must have either projectId or costCenterId
   projectId?: string;
+  costCenterId?: string;
   department?: string;
 
   // Requestor
@@ -94,6 +95,7 @@ export interface PurchaseRequisitionItem {
 
 export interface CreateRequisitionRequest {
   projectId?: string;
+  costCenterId?: string;
   department?: string;
   requiredDate?: string;
   urgency?: RequisitionUrgency;
@@ -152,6 +154,9 @@ export interface RequisitionListItem {
   requisitionNumber: string;
   projectId?: string;
   projectName?: string;
+  costCenterId?: string;
+  costCenterName?: string;
+  costCenterCode?: string;
   department?: string;
   requestedByName?: string;
   requestedDate: string;

@@ -17,6 +17,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Building2,
   ChevronRight,
   Plus,
   Package,
@@ -70,6 +71,8 @@ interface PipelineThread {
   projectId: string | null;
   projectName: string | null;
   projectCode: string | null;
+  costCenterName: string | null;
+  costCenterCode: string | null;
   requisitionId: string | null;
   requisitionNumber: string | null;
   poId: string | null;
@@ -212,6 +215,7 @@ export default function PipelinesPage() {
       t.threadNumber.toLowerCase().includes(q) ||
       (t.title ?? '').toLowerCase().includes(q) ||
       (t.projectName ?? '').toLowerCase().includes(q) ||
+      (t.costCenterName ?? '').toLowerCase().includes(q) ||
       (t.projectCode ?? '').toLowerCase().includes(q) ||
       (t.requisitionNumber ?? '').toLowerCase().includes(q) ||
       (t.poNumber ?? '').toLowerCase().includes(q);
@@ -394,10 +398,20 @@ export default function PipelinesPage() {
                         {thread.title && (
                           <span className="text-[var(--ff-text-secondary)]">{thread.title}</span>
                         )}
-                        {thread.projectName && (
+                        {thread.projectName ? (
                           <span className="flex items-center gap-1">
                             <Package className="h-3 w-3" />
                             {thread.projectCode ? `${thread.projectCode} — ` : ''}{thread.projectName}
+                          </span>
+                        ) : thread.costCenterName ? (
+                          <span className="flex items-center gap-1 text-blue-400">
+                            <Building2 className="h-3 w-3" />
+                            {thread.costCenterCode ? `${thread.costCenterCode} — ` : ''}{thread.costCenterName}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-amber-400">
+                            <AlertCircle className="h-3 w-3" />
+                            No allocation
                           </span>
                         )}
                         <span>Updated {formatDate(thread.updatedAt)}</span>

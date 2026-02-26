@@ -29,6 +29,8 @@ async function fetchThreadsBothFilters(status: string, projectId: string) {
       t.project_id,
       p.project_name,
       p.project_code,
+      cc.name as cost_center_name,
+      cc.code as cost_center_code,
       t.requisition_id,
       pr.requisition_number,
       t.po_id,
@@ -49,6 +51,7 @@ async function fetchThreadsBothFilters(status: string, projectId: string) {
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
+    LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
     WHERE t.status = ${status}
       AND t.project_id = ${projectId}
     ORDER BY
@@ -66,6 +69,8 @@ async function fetchThreadsByStatus(status: string) {
       t.project_id,
       p.project_name,
       p.project_code,
+      cc.name as cost_center_name,
+      cc.code as cost_center_code,
       t.requisition_id,
       pr.requisition_number,
       t.po_id,
@@ -86,6 +91,7 @@ async function fetchThreadsByStatus(status: string) {
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
+    LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
     WHERE t.status = ${status}
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
@@ -102,6 +108,8 @@ async function fetchThreadsByProject(projectId: string) {
       t.project_id,
       p.project_name,
       p.project_code,
+      cc.name as cost_center_name,
+      cc.code as cost_center_code,
       t.requisition_id,
       pr.requisition_number,
       t.po_id,
@@ -122,6 +130,7 @@ async function fetchThreadsByProject(projectId: string) {
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
+    LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
     WHERE t.project_id = ${projectId}
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
@@ -138,6 +147,8 @@ async function fetchAllThreads() {
       t.project_id,
       p.project_name,
       p.project_code,
+      cc.name as cost_center_name,
+      cc.code as cost_center_code,
       t.requisition_id,
       pr.requisition_number,
       t.po_id,
@@ -158,6 +169,7 @@ async function fetchAllThreads() {
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
+    LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
       t.updated_at DESC
@@ -188,6 +200,8 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       projectId: r['project_id'] as string | null,
       projectName: r['project_name'] as string | null,
       projectCode: r['project_code'] as string | null,
+      costCenterName: r['cost_center_name'] as string | null,
+      costCenterCode: r['cost_center_code'] as string | null,
       requisitionId: r['requisition_id'] as string | null,
       requisitionNumber: r['requisition_number'] as string | null,
       poId: r['po_id'] as string | null,

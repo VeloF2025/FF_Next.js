@@ -32,9 +32,12 @@ export default withAuth(withErrorHandler(async (
         SELECT
           pr.*,
           p.project_name as project_name,
+          cc.name as cost_center_name,
+          cc.code as cost_center_code,
           (SELECT COUNT(*) FROM purchase_requisition_items WHERE requisition_id = pr.id)::int as item_count
         FROM purchase_requisitions pr
         LEFT JOIN projects p ON pr.project_id = p.id
+        LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
         ORDER BY pr.created_at DESC
         LIMIT ${limitNum} OFFSET ${offsetNum}
       `;
@@ -51,6 +54,9 @@ export default withAuth(withErrorHandler(async (
         requisitionNumber: r.requisition_number as string,
         projectId: r.project_id as string | undefined,
         projectName: r.project_name as string | undefined,
+        costCenterId: r.cost_center_id as string | undefined,
+        costCenterName: r.cost_center_name as string | undefined,
+        costCenterCode: r.cost_center_code as string | undefined,
         department: r.department as string | undefined,
         requestedByName: r.requested_by_name as string | undefined,
         requestedDate: r.requested_date as string,
@@ -90,6 +96,7 @@ export default withAuth(withErrorHandler(async (
       const [requisition] = await sql`
         INSERT INTO purchase_requisitions (
           project_id,
+          cost_center_id,
           department,
           requested_by,
           requested_by_name,
@@ -99,6 +106,7 @@ export default withAuth(withErrorHandler(async (
           status
         ) VALUES (
           ${body.projectId || null},
+          ${body.costCenterId || null},
           ${body.department || null},
           ${userId},
           ${userName},
@@ -167,6 +175,7 @@ export default withAuth(withErrorHandler(async (
         id: fullRequisition!.id,
         requisitionNumber: fullRequisition!.requisition_number,
         projectId: fullRequisition!.project_id,
+        costCenterId: fullRequisition!.cost_center_id,
         department: fullRequisition!.department,
         requestedBy: fullRequisition!.requested_by,
         requestedByName: fullRequisition!.requested_by_name,
