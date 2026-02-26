@@ -20,6 +20,7 @@ import {
   Search,
   CheckCircle,
   Inbox,
+  GitBranch,
 } from 'lucide-react';
 import type {
   ProcurementTabId,
@@ -48,6 +49,7 @@ interface Category {
 // Map sub-tab IDs to their parent category
 const tabToCategoryMap: Record<ProcurementTabId, CategoryId> = {
   'overview': 'dashboard',
+  'pipelines': 'purchasing',
   'open-orders': 'purchasing',
   'suppliers': 'sourcing',
   'boq': 'sourcing',
@@ -121,6 +123,7 @@ export function ProcurementTabs({
       label: 'Purchasing',
       icon: ShoppingBag,
       subTabs: [
+        { id: 'pipelines', label: 'Pipelines', icon: GitBranch, path: '/procurement/pipelines' },
         { id: 'open-orders', label: 'Open Orders', icon: Inbox, path: '/procurement/open-orders' },
         { id: 'requisitions', label: 'Requisitions', icon: FileInput, permission: 'canViewRequisitions', path: '/procurement/requisitions' },
         { id: 'quotes', label: 'Quote Evaluation', icon: Quote, permission: 'canViewQuotes', path: '/procurement/rfq?tab=quotes' },

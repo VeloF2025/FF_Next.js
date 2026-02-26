@@ -66,6 +66,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[] | undefined>();
   const [tabBadges, setTabBadges] = useState<Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>>({
     overview: {},
+    pipelines: {},
     'open-orders': {},
     requisitions: {},
     boq: {},
@@ -79,7 +80,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
     approvals: {},
     reports: {},
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -237,6 +238,7 @@ export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) 
       // Clear badges when no project selected
       setTabBadges({
         overview: {},
+        pipelines: {},
         'open-orders': {},
         requisitions: {},
         boq: {},

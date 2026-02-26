@@ -56,6 +56,7 @@ export default function ProcurementPage({
   const [projectSummaries, setProjectSummaries] = useState<ProjectSummary[] | undefined>();
   const [tabBadges, setTabBadges] = useState<Record<ProcurementTabId, { count?: number; type?: 'info' | 'warning' | 'error' | 'success' }>>({
     overview: {},
+    pipelines: {},
     'open-orders': {},
     requisitions: {},
     boq: {},

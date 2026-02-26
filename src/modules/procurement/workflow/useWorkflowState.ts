@@ -11,6 +11,9 @@ import { log } from '@/lib/logger';
 export interface WorkflowState {
   currentStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   strategy?: 'rfq' | 'direct_po';
+  /** Pipeline thread (DB-backed tracking) */
+  threadId?: string;
+  threadNumber?: string;
   /** Step 1 */
   requisitionId?: string;
   requisitionNumber?: string;
@@ -81,8 +84,19 @@ function buildInitialState(
   urlStep: StepNumber | undefined,
   urlReqId: string | undefined,
   urlApprovalId: string | undefined,
+  urlThreadId: string | undefined,
 ): WorkflowState {
   const base: WorkflowState = persisted ?? { ...DEFAULT_STATE };
+
+  // If a threadId is provided via URL and differs from persisted, load the thread from DB
+  if (urlThreadId && urlThreadId !== base.threadId) {
+    return {
+      ...DEFAULT_STATE,
+      threadId: urlThreadId,
+      currentStep: urlStep ?? 1,
+    };
+  }
+
   return {
     ...base,
     currentStep: urlStep ?? base.currentStep,
@@ -119,8 +133,11 @@ export function useWorkflowState(): UseWorkflowStateReturn {
     const urlApprovalId = router.query.approvalId
       ? String(Array.isArray(router.query.approvalId) ? router.query.approvalId[0] : router.query.approvalId)
       : undefined;
+    const urlThreadId = router.query.threadId
+      ? String(Array.isArray(router.query.threadId) ? router.query.threadId[0] : router.query.threadId)
+      : undefined;
 
-    return buildInitialState(loadPersistedState(), urlStep, urlReqId, urlApprovalId);
+    return buildInitialState(loadPersistedState(), urlStep, urlReqId, urlApprovalId, urlThreadId);
   });
 
   // Re-hydrate once router is ready (query may be empty on first render with SSR)
@@ -134,10 +151,13 @@ export function useWorkflowState(): UseWorkflowStateReturn {
     const urlApprovalId = router.query.approvalId
       ? String(Array.isArray(router.query.approvalId) ? router.query.approvalId[0] : router.query.approvalId)
       : undefined;
+    const urlThreadId = router.query.threadId
+      ? String(Array.isArray(router.query.threadId) ? router.query.threadId[0] : router.query.threadId)
+      : undefined;
 
-    if (!urlStep && !urlReqId && !urlApprovalId) return;
+    if (!urlStep && !urlReqId && !urlApprovalId && !urlThreadId) return;
 
-    setRawState((prev) => buildInitialState(prev, urlStep, urlReqId, urlApprovalId));
+    setRawState((prev) => buildInitialState(prev, urlStep, urlReqId, urlApprovalId, urlThreadId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady]);
 
