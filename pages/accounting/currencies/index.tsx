@@ -31,7 +31,7 @@ export default function CurrenciesPage() {
         fetch('/api/accounting/currencies', { credentials: 'include' }),
         fetch('/api/accounting/currencies?active=false', { credentials: 'include' }),
         fetch('/api/accounting/exchange-rates?limit=50', { credentials: 'include' }),
-        fetch('/api/accounting/currencies/settings?key=reporting_currency', { credentials: 'include' }),
+        fetch('/api/accounting/accounting-settings?key=reporting_currency', { credentials: 'include' }),
       ]);
 
       const activeCurrJson = await activeCurrRes.json();

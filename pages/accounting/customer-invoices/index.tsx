@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { FileText, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
+import { AccountingNav } from '@/components/accounting/AccountingNav';
+import { FileText, Loader2, AlertCircle, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 function formatCurrency(amount: number): string {
@@ -55,6 +56,7 @@ export default function CustomerInvoicesPage() {
 
   return (
     <AppLayout>
+      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
@@ -70,6 +72,9 @@ export default function CustomerInvoicesPage() {
                   </p>
                 </div>
               </div>
+              <Link href="/accounting/customer-invoices/new" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm">
+                <Plus className="h-4 w-4" /> New Invoice
+              </Link>
             </div>
           </div>
         </div>
@@ -119,13 +124,15 @@ export default function CustomerInvoicesPage() {
                     <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Amount</th>
                     <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Paid</th>
                     <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
-                    <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium"></th>
+                    <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Balance</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map((inv) => (
                     <tr key={inv.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                      <td className="py-3 px-4 text-[var(--ff-text-primary)] font-mono">{inv.invoice_number}</td>
+                      <td className="py-3 px-4 font-mono">
+                        <Link href={`/accounting/customer-invoices/${inv.id}`} className="text-blue-400 hover:text-blue-300">{inv.invoice_number}</Link>
+                      </td>
                       <td className="py-3 px-4 text-[var(--ff-text-primary)]">{inv.client_name || '-'}</td>
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{inv.project_name || '-'}</td>
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{inv.invoice_date?.split('T')[0]}</td>
@@ -141,13 +148,8 @@ export default function CustomerInvoicesPage() {
                           {inv.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <Link
-                          href={`/projects/${inv.project_id}/finance?invoiceId=${inv.id}`}
-                          className="text-blue-400 hover:text-blue-300"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Link>
+                      <td className="py-3 px-4 text-right font-mono text-[var(--ff-text-primary)]">
+                        {formatCurrency(Number(inv.total_amount) - Number(inv.amount_paid))}
                       </td>
                     </tr>
                   ))}
