@@ -66,6 +66,20 @@ export async function getCreditNotes(filters?: CreditNoteFilters): Promise<{
   }
 }
 
+export async function getCreditNoteById(id: string): Promise<CreditNote | null> {
+  const rows = (await sql`
+    SELECT cn.*, c.company_name AS client_name, s.name AS supplier_name,
+      COALESCE(ci.invoice_number, si.invoice_number) AS invoice_number
+    FROM credit_notes cn
+    LEFT JOIN clients c ON c.id = cn.client_id
+    LEFT JOIN suppliers s ON s.id = cn.supplier_id
+    LEFT JOIN customer_invoices ci ON ci.id = cn.customer_invoice_id
+    LEFT JOIN supplier_invoices si ON si.id = cn.supplier_invoice_id
+    WHERE cn.id = ${id}::UUID
+  `) as Row[];
+  return rows.length > 0 ? mapRow(rows[0]) : null;
+}
+
 export async function createCreditNote(
   input: CreditNoteCreateInput,
   userId: string

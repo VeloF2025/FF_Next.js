@@ -11,6 +11,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getCreditNotes,
+  getCreditNoteById,
   createCreditNote,
 } from '@/modules/accounting/services/creditNoteService';
 import type { CreditNoteStatus } from '@/modules/accounting/types/ar.types';
@@ -18,7 +19,12 @@ import type { CreditNoteStatus } from '@/modules/accounting/types/ar.types';
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const { type, status, limit, offset } = req.query;
+      const { id, type, status, limit, offset } = req.query;
+      if (id) {
+        const note = await getCreditNoteById(id as string);
+        if (!note) return apiResponse.notFound(res, 'Credit Note', id as string);
+        return apiResponse.success(res, note);
+      }
       const result = await getCreditNotes({
         type: type as 'customer' | 'supplier' | undefined,
         status: status as CreditNoteStatus | undefined,
