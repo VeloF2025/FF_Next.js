@@ -9,11 +9,19 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { getBatches, createBatch } from '@/modules/accounting/services/batchPaymentService';
+import { getBatches, getBatchById, createBatch } from '@/modules/accounting/services/batchPaymentService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
-    const { status, limit, offset } = req.query;
+    const { id, status, limit, offset } = req.query;
+
+    // Single batch by ID
+    if (id) {
+      const batch = await getBatchById(id as string);
+      if (!batch) return apiResponse.notFound(res, 'Batch', id as string);
+      return apiResponse.success(res, batch);
+    }
+
     const result = await getBatches({
       status: status as string,
       limit: limit ? Number(limit) : undefined,

@@ -11,6 +11,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getSupplierPayments,
+  getSupplierPaymentById,
   createSupplierPayment,
 } from '@/modules/accounting/services/supplierPaymentService';
 import type { PaymentStatus } from '@/modules/accounting/types/ap.types';
@@ -18,7 +19,15 @@ import type { PaymentStatus } from '@/modules/accounting/types/ap.types';
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const { status, supplier_id, limit, offset } = req.query;
+      const { id, status, supplier_id, limit, offset } = req.query;
+
+      // Single payment by ID
+      if (id) {
+        const payment = await getSupplierPaymentById(id as string);
+        if (!payment) return apiResponse.notFound(res, 'Payment', id as string);
+        return apiResponse.success(res, payment);
+      }
+
       const result = await getSupplierPayments({
         status: status as PaymentStatus | undefined,
         supplierId: supplier_id ? Number(supplier_id) : undefined,

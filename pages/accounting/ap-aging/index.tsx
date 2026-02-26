@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import Link from 'next/link';
 import { Clock, Loader2, AlertCircle, Download } from 'lucide-react';
 import type { AgingBucket } from '@/modules/accounting/types/ap.types';
 
@@ -140,7 +141,11 @@ export default function APAgingPage() {
                 <tbody className="divide-y divide-[var(--ff-border-light)]">
                   {buckets.map(b => (
                     <tr key={b.entityId} className="hover:bg-[var(--ff-bg-tertiary)] transition-colors">
-                      <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">{b.entityName}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-[var(--ff-text-primary)]">
+                        <Link href={`/accounting/supplier-statements/${b.entityId}`} className="hover:text-emerald-400 transition-colors">
+                          {b.entityName}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-sm text-right font-mono text-emerald-500">{b.current > 0 ? formatCurrency(b.current) : '-'}</td>
                       <td className="px-4 py-3 text-sm text-right font-mono text-amber-500">{b.days30 > 0 ? formatCurrency(b.days30) : '-'}</td>
                       <td className="px-4 py-3 text-sm text-right font-mono text-orange-500">{b.days60 > 0 ? formatCurrency(b.days60) : '-'}</td>

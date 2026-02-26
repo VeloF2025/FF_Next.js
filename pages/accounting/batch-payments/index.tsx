@@ -74,7 +74,11 @@ export default function BatchPaymentsPage() {
                 {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No batch payments</td></tr>}
                 {items.map(item => (
                   <tr key={item.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
-                    <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">{item.batchNumber}</td>
+                    <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">
+                      <Link href={`/accounting/batch-payments/${item.id}`} className="hover:text-indigo-400 transition-colors">
+                        {item.batchNumber}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.batchDate?.split('T')[0]}</td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.paymentCount}</td>
                     <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{fmt(item.totalAmount)}</td>

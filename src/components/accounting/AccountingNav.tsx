@@ -48,6 +48,7 @@ const TABS: Tab[] = [
       { label: 'Returns', href: '/accounting/supplier-returns' },
       { label: 'Adjustments', href: '/accounting/adjustments?type=supplier' },
       { label: 'Aging', href: '/accounting/ap-aging' },
+      { label: 'Statements', href: '/accounting/supplier-statements' },
     ],
   },
   {
