@@ -9,7 +9,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Loader2, AlertCircle, CheckCircle2, Landmark, FileText } from 'lucide-react';
 
-interface BankAccount { id: string; account_code: string; account_name: string }
+interface BankAccount { id: string; account_code: string; account_name: string; bank_account_number?: string | null }
 
 type FileType = 'csv' | 'pdf' | 'ofx' | 'qif';
 
@@ -59,10 +59,13 @@ export default function BankStatementImportPage() {
             account_code?: string;
             accountName?: string;
             account_name?: string;
+            bankAccountNumber?: string;
+            bank_account_number?: string;
           }) => ({
             id: a.id,
             account_code: a.accountCode || a.account_code || '',
             account_name: a.accountName || a.account_name || '',
+            bank_account_number: a.bankAccountNumber || a.bank_account_number || null,
           })),
         );
       });
@@ -234,7 +237,10 @@ export default function BankStatementImportPage() {
                   >
                     <option value="">Select bank account...</option>
                     {bankAccounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.account_code} — {a.account_name}</option>
+                      <option key={a.id} value={a.id}>
+                        {a.account_code} — {a.account_name}
+                        {a.bank_account_number ? ` (****${a.bank_account_number.slice(-4)})` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

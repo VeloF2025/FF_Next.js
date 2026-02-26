@@ -24,7 +24,7 @@ function fmtCurrency(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 }
 
-interface BankAcct { id: string; accountCode: string; accountName: string; balance: number; }
+interface BankAcct { id: string; accountCode: string; accountName: string; bankAccountNumber?: string | null; balance: number; }
 type Tab = 'new' | 'reviewed' | 'excluded';
 const PAGE_SIZE = 25;
 
@@ -390,7 +390,10 @@ export default function BankTransactionsPage() {
                     <p className={`text-sm font-semibold ${active ? 'text-emerald-400' : 'text-[var(--ff-text-primary)]'}`}>
                       {b.accountName}
                     </p>
-                    <p className="text-xs text-[var(--ff-text-tertiary)] font-mono">{b.accountCode}</p>
+                    <p className="text-xs text-[var(--ff-text-tertiary)] font-mono">
+                      {b.accountCode}
+                      {b.bankAccountNumber && <span className="ml-1.5 text-[var(--ff-text-tertiary)]">| ****{b.bankAccountNumber.slice(-4)}</span>}
+                    </p>
                   </div>
                   <div className="ml-3 text-right">
                     <p className={`text-sm font-bold font-mono ${b.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>

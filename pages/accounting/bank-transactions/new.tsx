@@ -15,7 +15,7 @@ type AllocType = 'account' | 'supplier' | 'customer';
 type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
 
 interface SelectOption { id: string; name: string; code?: string; }
-interface BankAcct { id: string; accountCode: string; accountName: string; }
+interface BankAcct { id: string; accountCode: string; accountName: string; bankAccountNumber?: string | null; }
 interface FormState {
   bankAccountId: string; date: string; reference: string; description: string;
   amount: string; allocationType: AllocType; contraAccountId: string; entityId: string; vatCode: VatCode;
@@ -190,7 +190,10 @@ export default function NewBankTransactionPage() {
                     className={INPUT_CLS} required>
                     <option value="">Select bank account…</option>
                     {bankAccounts.map(b => (
-                      <option key={b.id} value={b.id}>{b.accountCode} — {b.accountName}</option>
+                      <option key={b.id} value={b.id}>
+                        {b.accountCode} — {b.accountName}
+                        {b.bankAccountNumber ? ` (****${b.bankAccountNumber.slice(-4)})` : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

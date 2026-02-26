@@ -233,6 +233,7 @@ function mapRow(row: any): GLAccount {
     normalBalance: String(row.normal_balance) as 'debit' | 'credit',
     level: Number(row.level),
     displayOrder: Number(row.display_order),
+    bankAccountNumber: row.bank_account_number ? String(row.bank_account_number) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

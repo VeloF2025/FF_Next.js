@@ -11,8 +11,25 @@ import { log } from '@/lib/logger';
 import { sql } from '@/lib/neon';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'PUT') {
+    try {
+      const { id, bankAccountNumber } = req.body;
+      if (!id) return apiResponse.badRequest(res, 'id is required');
+      await sql`
+        UPDATE gl_accounts
+        SET bank_account_number = ${bankAccountNumber || null},
+            updated_at = NOW()
+        WHERE id = ${id} AND account_subtype = 'bank'
+      `;
+      return apiResponse.success(res, { updated: true });
+    } catch (err) {
+      log.error('Failed to update bank account', { error: err }, 'accounting-api');
+      return apiResponse.badRequest(res, 'Failed to update bank account');
+    }
+  }
+
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT']);
   }
 
   try {
@@ -23,6 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ga.account_name,
         ga.description,
         ga.is_active,
+        ga.bank_account_number,
         COALESCE(s.txn_count, 0) AS txn_count,
         COALESCE(s.total_debits, 0) AS total_debits,
         COALESCE(s.total_credits, 0) AS total_credits,
@@ -50,6 +68,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       accountCode: r.account_code,
       accountName: r.account_name,
       description: r.description,
+      bankAccountNumber: r.bank_account_number || null,
       isActive: r.is_active,
       txnCount: Number(r.txn_count),
       totalDebits: Number(r.total_debits),

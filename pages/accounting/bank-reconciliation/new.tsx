@@ -9,7 +9,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Landmark, Loader2 } from 'lucide-react';
 
-interface BankAccount { id: string; account_code: string; account_name: string }
+interface BankAccount { id: string; account_code: string; account_name: string; bank_account_number?: string | null }
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -33,10 +33,11 @@ export default function NewReconciliationPage() {
       .then(res => {
         const data = res.data || res;
         const accounts = Array.isArray(data) ? data : data.accounts || [];
-        setBankAccounts(accounts.map((a: { id: string; accountCode?: string; account_code?: string; accountName?: string; account_name?: string }) => ({
+        setBankAccounts(accounts.map((a: { id: string; accountCode?: string; account_code?: string; accountName?: string; account_name?: string; bankAccountNumber?: string; bank_account_number?: string }) => ({
           id: a.id,
           account_code: a.accountCode || a.account_code || '',
           account_name: a.accountName || a.account_name || '',
+          bank_account_number: a.bankAccountNumber || a.bank_account_number || null,
         })));
       });
   }, []);
@@ -104,7 +105,10 @@ export default function NewReconciliationPage() {
               >
                 <option value="">Select bank account...</option>
                 {bankAccounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.account_code} — {a.account_name}</option>
+                  <option key={a.id} value={a.id}>
+                    {a.account_code} — {a.account_name}
+                    {a.bank_account_number ? ` (****${a.bank_account_number.slice(-4)})` : ''}
+                  </option>
                 ))}
               </select>
             </div>

@@ -132,6 +132,8 @@ export interface GLAccount {
   normalBalance: 'debit' | 'credit';
   level: number;
   displayOrder: number;
+  /** Actual bank account number (only for bank-subtype accounts) */
+  bankAccountNumber?: string;
   createdAt: string;
   updatedAt: string;
   // Tree display

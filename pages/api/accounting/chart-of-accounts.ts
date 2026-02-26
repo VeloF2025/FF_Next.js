@@ -13,6 +13,7 @@ import {
   getChartOfAccounts,
   getAccountTree,
   createAccount,
+  updateAccount,
 } from '@/modules/accounting/services/chartOfAccountsService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -61,8 +62,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  res.setHeader('Allow', ['GET', 'POST']);
-  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
+  if (req.method === 'PUT') {
+    try {
+      const { id, accountName, description, isActive, displayOrder } = req.body;
+      if (!id) return apiResponse.badRequest(res, 'id is required');
+      const updated = await updateAccount(id, { accountName, description, isActive, displayOrder });
+      return apiResponse.success(res, updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update account';
+      log.error('Failed to update account', { error: err }, 'accounting-api');
+      return apiResponse.badRequest(res, message);
+    }
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PUT']);
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT']);
 }
 
 export default withAuth(withErrorHandler(handler));
