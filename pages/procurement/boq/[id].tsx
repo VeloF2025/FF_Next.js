@@ -257,9 +257,14 @@ export default function BOQDetailPage() {
     [items]
   );
 
+  // NEW: Calculate specific hidden counts for better UI feedback
+  const itemsAfterZeros = items.filter(item => !hideZeros || (item.quantity !== 0 || item.totalPrice !== 0));
+  const hiddenByZeros = hideZeros ? items.length - itemsAfterZeros.length : 0;
+  const hiddenByAllFilters = items.length - displayItems.length;
+
   // NEW: Calculate filtered count
   const filteredCount = displayItems.length;
-  const totalCount = hideZeros ? items.filter(i => i.quantity !== 0 || i.totalPrice !== 0).length : items.length;
+  const totalCount = hideZeros ? itemsAfterZeros.length : items.length;
 
   // NEW: Calculate percentage of BOQ
   const percentageOfTotal = allItemsTotalValue > 0 ? ((totalValue / allItemsTotalValue) * 100).toFixed(1) : '0.0';

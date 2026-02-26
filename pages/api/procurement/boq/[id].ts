@@ -6,6 +6,25 @@ import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Infer category from item code/description using actual stock_categories names
+function inferCategory(code: string, description: string): string {
+  const text = `${code} ${description}`.toLowerCase();
+  if (text.includes('ont') && !text.includes('pigtail')) return 'ONT Devices';
+  if (text.includes('router')) return 'Routers';
+  if (text.includes('ups') || text.includes('battery')) return 'Mini UPS';
+  if (text.includes('drop')) return 'Drop Cables';
+  if (/cable|fibre|fiber|aerial|adss|trench|mb-sm/.test(text)) return 'Fiber Cables';
+  if (/connector|lcapc|scapc|pigtail|midcoupler|coupler|splitter|splice|protector/.test(text)) return 'Connectors';
+  if (text.startsWith('cons-') || /consumable|label|cement|tar|tape|alcohol|wipe|kim|clip|screw|gland|pck|ext-5|adapt|caution|spray|wallplug/.test(text)) return 'Consumables';
+  if (/tool|wrench/.test(text)) return 'Tools';
+  if (/ppe|safety|helmet|glove|vest/.test(text)) return 'Personal Protective Equipment';
+  if (/pole|creosote|stay|guy|mast/.test(text)) return 'Consumables';
+  if (/encl-|enclosure|joint|dome|fdt|nap|closure/.test(text)) return 'Connectors';
+  if (/hook|bracket|slack|buckle|deadend|dead-end|tangent|tag|dress-/.test(text)) return 'Consumables';
+  if (/manhole|chamber|duct|conduit|pipe|hdpe|corr|coupling|endcap|microduct/.test(text)) return 'Consumables';
+  return 'Consumables';
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
 
@@ -37,11 +56,15 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     const boq = boqResult[0]!;
 
-    // Get BOQ items
+    // Get BOQ items with stock category names (via mapped stock items)
     const items = await sql`
-      SELECT * FROM boq_items
-      WHERE boq_id::text = ${id}
-      ORDER BY line_number
+      SELECT bi.*,
+        sc.name as stock_category_name
+      FROM boq_items bi
+      LEFT JOIN stock_items si ON bi.stock_item_id = si.id
+      LEFT JOIN stock_categories sc ON si.category_id = sc.id
+      WHERE bi.boq_id::text = ${id}
+      ORDER BY bi.line_number
     `;
 
     const transformedBoq = {
@@ -67,7 +90,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         uom: item.uom || 'Each',
         unitPrice: Number(item.unit_price) || 0,
         totalPrice: Number(item.total_price) || 0,
-        category: item.category || 'Materials',
+        category: item.stock_category_name || inferCategory(item.item_code || '', item.description || ''),
         stockItemId: item.stock_item_id || null,
         stockMatchMethod: item.stock_match_method || null,
         stockMatchConfidence: item.stock_match_confidence != null ? Number(item.stock_match_confidence) : null,
