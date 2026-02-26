@@ -62,7 +62,7 @@ export default function JournalEntryDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ id: entry.id, action, userId: 'system' }),
+        body: JSON.stringify({ id: entry.id, action }),
       });
       if (!res.ok) {
         const errData = await res.json();

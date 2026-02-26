@@ -21,9 +21,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { id, action, userId } = req.body;
-    if (!id || !action || !userId) {
-      return apiResponse.badRequest(res, 'id, action, and userId are required');
+    const { id, action } = req.body;
+    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
+    if (!id || !action) {
+      return apiResponse.badRequest(res, 'id and action are required');
+    }
+    if (!userId) {
+      return apiResponse.badRequest(res, 'userId is required (login or provide in body)');
     }
 
     let result;
