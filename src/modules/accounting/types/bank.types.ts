@@ -39,6 +39,10 @@ export interface BankTransaction {
   matchedJournalLineId?: string;
   reconciliationId?: string;
   importBatchId?: string;
+  /** Contextual reason recorded when this transaction was excluded */
+  excludeReason?: string;
+  /** Free-text notes attached to this transaction */
+  notes?: string;
   createdAt: string;
   updatedAt: string;
   // Joined

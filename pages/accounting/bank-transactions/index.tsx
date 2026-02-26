@@ -10,6 +10,7 @@ import {
   BankTxTable, type AllocType, type VatCode, type BankTx, type SelectOption, type RowSelection,
 } from '@/components/accounting/BankTxTable';
 import { SplitTransactionModal } from '@/components/accounting/SplitTransactionModal';
+import { ExcludeReasonModal } from '@/components/accounting/ExcludeReasonModal';
 import {
   Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus,
 } from 'lucide-react';
@@ -21,8 +22,15 @@ function fmtCurrency(n: number): string {
 }
 
 interface BankAcct { id: string; accountCode: string; accountName: string; balance: number; }
-type Tab = 'new' | 'reviewed';
+type Tab = 'new' | 'reviewed' | 'excluded';
 const PAGE_SIZE = 25;
+
+/** Maps UI tabs to bank_transactions.status values */
+function tabToStatus(tab: Tab): string {
+  if (tab === 'new') return 'imported';
+  if (tab === 'excluded') return 'excluded';
+  return 'matched';
+}
 
 export default function BankTransactionsPage() {
   const [transactions, setTransactions] = useState<BankTx[]>([]);
@@ -41,7 +49,12 @@ export default function BankTransactionsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  /** Minimum transaction amount filter (Rand value, empty = no lower bound) */
+  const [fromAmount, setFromAmount] = useState('');
+  /** Maximum transaction amount filter (Rand value, empty = no upper bound) */
+  const [toAmount, setToAmount] = useState('');
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const amountDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rowSelections, setRowSelections] = useState<Record<string, RowSelection>>({});
@@ -50,6 +63,8 @@ export default function BankTransactionsPage() {
   const [batchSearch, setBatchSearch] = useState('');
 
   const [splitTxId, setSplitTxId] = useState<string | null>(null);
+  /** ID of transaction awaiting an exclusion reason — shows ExcludeReasonModal when set */
+  const [excludingTxId, setExcludingTxId] = useState<string | null>(null);
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
@@ -95,19 +110,21 @@ export default function BankTransactionsPage() {
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, [searchTerm]);
 
-  // Load transactions — server-side filtering for search, dates, status
+  // Load transactions — server-side filtering for search, dates, amount range, status
   const loadTransactions = useCallback(async () => {
     if (!selectedBank) return;
     setIsLoading(true);
     setError('');
     try {
-      const status = tab === 'new' ? 'imported' : 'matched';
+      const status = tabToStatus(tab);
       const offset = (page - 1) * PAGE_SIZE;
       const params = new URLSearchParams({
         bank_account_id: selectedBank, status, limit: String(PAGE_SIZE), offset: String(offset),
       });
       if (fromDate) params.set('from_date', fromDate);
       if (toDate) params.set('to_date', toDate);
+      if (fromAmount) params.set('from_amount', fromAmount);
+      if (toAmount) params.set('to_amount', toAmount);
       if (debouncedSearch) params.set('search', debouncedSearch);
       const res = await fetch(`/api/accounting/bank-transactions?${params}`);
       const json = await res.json();
@@ -119,7 +136,7 @@ export default function BankTransactionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBank, tab, page, fromDate, toDate, debouncedSearch]);
+  }, [selectedBank, tab, page, fromDate, toDate, fromAmount, toAmount, debouncedSearch]);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
   useEffect(() => {
@@ -155,12 +172,21 @@ export default function BankTransactionsPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
   };
 
-  const handleExclude = async (txId: string) => {
+  /** Opens the ExcludeReasonModal — actual API call happens in handleExcludeConfirm */
+  const handleExclude = (txId: string) => {
+    setExcludingTxId(txId);
+  };
+
+  /** Called by ExcludeReasonModal on confirm — posts to API with reason then reloads */
+  const handleExcludeConfirm = async (reason: string) => {
+    if (!excludingTxId) return;
+    const txId = excludingTxId;
+    setExcludingTxId(null);
     try {
-      await callAction({ action: 'exclude', bankTransactionId: txId });
-      toast.success('Excluded');
+      await callAction({ action: 'exclude', bankTransactionId: txId, excludeReason: reason });
+      toast.success('Transaction excluded');
       loadTransactions();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to exclude'); }
   };
 
   const handleUnmatch = async (txId: string) => {
@@ -173,6 +199,31 @@ export default function BankTransactionsPage() {
 
   const handleSplit = (txId: string) => {
     setSplitTxId(txId);
+  };
+
+  /**
+   * Save notes/memo for a single bank transaction.
+   * Updates local state optimistically so the cell does not flicker.
+   */
+  const handleUpdateNotes = async (txId: string, notes: string) => {
+    // Optimistic local update — keep UI in sync without a reload
+    setTransactions(prev =>
+      prev.map(tx => tx.id === txId ? { ...tx, notes: notes || undefined } : tx)
+    );
+    try {
+      const res = await fetch('/api/accounting/bank-transactions-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'update_notes', bankTransactionId: txId, notes }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to save note');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to save note');
+      // Revert optimistic update on error
+      loadTransactions();
+    }
   };
 
   const handleBatchAccept = async () => {
@@ -199,13 +250,29 @@ export default function BankTransactionsPage() {
 
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
     try {
       await callAction({ action: 'delete', bankTransactionIds: Array.from(selectedIds) } as Record<string, string>);
       toast.success(`${selectedIds.size} transaction(s) deleted`);
       setSelectedIds(new Set());
       loadTransactions();
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Delete failed'); }
+  };
+
+  const handleBulkAccept = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Mark ${selectedIds.size} transaction(s) as reviewed? No journal entries will be created.`)) return;
+    try {
+      const res = await fetch('/api/accounting/bank-transactions-action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ action: 'bulk_accept', bankTransactionIds: Array.from(selectedIds) }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) throw new Error(json.message || 'Bulk accept failed');
+      toast.success(`${json.data?.accepted ?? selectedIds.size} transaction(s) marked as reviewed`);
+      setSelectedIds(new Set());
+      loadTransactions();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Bulk accept failed'); }
   };
 
   const handleExport = () => {
@@ -307,7 +374,7 @@ export default function BankTransactionsPage() {
                 <div className="text-right">
                   <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{total}</p>
                   <p className="text-xs text-[var(--ff-text-tertiary)]">
-                    {tab === 'new' ? 'To be Reviewed' : 'Reviewed'}
+                    {tab === 'new' ? 'To be Reviewed' : tab === 'excluded' ? 'Excluded' : 'Reviewed'}
                   </p>
                 </div>
               </div>
@@ -318,14 +385,16 @@ export default function BankTransactionsPage() {
         {/* Tabs */}
         <div className="px-6 border-b border-[var(--ff-border-light)]">
           <div className="flex gap-0">
-            {(['new', 'reviewed'] as Tab[]).map(t => (
+            {(['new', 'reviewed', 'excluded'] as Tab[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   tab === t
-                    ? 'border-emerald-500 text-emerald-400'
+                    ? t === 'excluded'
+                      ? 'border-red-500 text-red-400'
+                      : 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}>
-                {t === 'new' ? 'New Transactions' : 'Reviewed Transactions'}
+                {t === 'new' ? 'New Transactions' : t === 'excluded' ? 'Excluded' : 'Reviewed Transactions'}
               </button>
             ))}
           </div>
@@ -344,6 +413,12 @@ export default function BankTransactionsPage() {
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-30">
                 <CheckCheck className="h-3.5 w-3.5" /> Mark as Reviewed
               </button>
+              {selectedIds.size > 0 && (
+                <button onClick={handleBulkAccept}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20">
+                  <CheckCheck className="h-3.5 w-3.5" /> Batch Accept
+                </button>
+              )}
               <button onClick={handleBatchDelete}
                 disabled={selectedIds.size === 0}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-30">
@@ -374,13 +449,42 @@ export default function BankTransactionsPage() {
             className="flex items-center gap-1 px-2.5 py-1 rounded border border-emerald-500/60 text-xs text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 font-medium">
             <Plus className="h-3.5 w-3.5" /> New Transaction
           </Link>
-          {/* Quick Win 1: Date range filter */}
+          {/* Date range filter */}
           <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
             <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }}
               className="px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]" />
             <span>to</span>
             <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }}
               className="px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]" />
+          </div>
+          {/* Amount range filter */}
+          <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
+            <span className="shrink-0">Min R</span>
+            <input
+              type="number"
+              step="0.01"
+              value={fromAmount}
+              onChange={e => {
+                setFromAmount(e.target.value);
+                if (amountDebounceTimer.current) clearTimeout(amountDebounceTimer.current);
+                amountDebounceTimer.current = setTimeout(() => setPage(1), 500);
+              }}
+              placeholder="0"
+              className="w-20 px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]"
+            />
+            <span className="shrink-0">Max R</span>
+            <input
+              type="number"
+              step="0.01"
+              value={toAmount}
+              onChange={e => {
+                setToAmount(e.target.value);
+                if (amountDebounceTimer.current) clearTimeout(amountDebounceTimer.current);
+                amountDebounceTimer.current = setTimeout(() => setPage(1), 500);
+              }}
+              placeholder="any"
+              className="w-20 px-2 py-1 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-primary)]"
+            />
           </div>
           {/* Quick Win 2: Server-side search (debounced 500ms) */}
           <div className="ml-auto flex items-center gap-2">
@@ -441,7 +545,7 @@ export default function BankTransactionsPage() {
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-12 text-[var(--ff-text-secondary)]">
-              No {tab === 'new' ? 'new' : 'reviewed'} transactions for this account
+              No {tab === 'new' ? 'new' : tab === 'excluded' ? 'excluded' : 'reviewed'} transactions for this account
             </div>
           ) : (
             <BankTxTable
@@ -476,6 +580,7 @@ export default function BankTransactionsPage() {
               onExclude={handleExclude}
               onUnmatch={handleUnmatch}
               onSplit={handleSplit}
+              onUpdateNotes={handleUpdateNotes}
             />
           )}
         </div>
@@ -532,6 +637,18 @@ export default function BankTransactionsPage() {
               setSplitTxId(null);
               loadTransactions();
             }}
+          />
+        );
+      })()}
+      {/* Exclude Reason Modal */}
+      {excludingTxId && (() => {
+        const excludeTx = transactions.find(t => t.id === excludingTxId);
+        if (!excludeTx) return null;
+        return (
+          <ExcludeReasonModal
+            transaction={excludeTx}
+            onClose={() => setExcludingTxId(null)}
+            onExclude={(reason) => handleExcludeConfirm(reason)}
           />
         );
       })()}

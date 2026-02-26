@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play } from 'lucide-react';
+import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil } from 'lucide-react';
 
 interface Rule {
   id: string;
@@ -37,6 +37,7 @@ export default function BankRulesPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: number } | null>(null);
+  const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
   const [form, setForm] = useState({
     ruleName: '', matchField: 'description', matchType: 'contains',
@@ -69,25 +70,59 @@ export default function BankRulesPage() {
     });
   }, []);
 
+  const resetForm = () => {
+    setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
+    setEditingRule(null);
+    setShowForm(false);
+  };
+
+  const handleEdit = (rule: Rule) => {
+    setForm({
+      ruleName: rule.ruleName,
+      matchField: rule.matchField,
+      matchType: rule.matchType,
+      matchPattern: rule.matchPattern,
+      glAccountId: rule.glAccountId,
+      supplierId: rule.supplierId || '',
+      vatCode: '',
+      descriptionTemplate: rule.descriptionTemplate || '',
+      priority: String(rule.priority),
+    });
+    setEditingRule(rule);
+    setShowForm(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setBusy('new');
     try {
-      const res = await fetch('/api/accounting/bank-rules', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          ruleName: form.ruleName, matchField: form.matchField, matchType: form.matchType,
-          matchPattern: form.matchPattern, glAccountId: form.glAccountId,
-          supplierId: form.supplierId || undefined,
-          descriptionTemplate: form.descriptionTemplate || undefined,
-          priority: Number(form.priority) || 100,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Failed');
-      setShowForm(false);
-      setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
+      const payload = {
+        ruleName: form.ruleName, matchField: form.matchField, matchType: form.matchType,
+        matchPattern: form.matchPattern, glAccountId: form.glAccountId,
+        supplierId: form.supplierId || undefined,
+        descriptionTemplate: form.descriptionTemplate || undefined,
+        priority: Number(form.priority) || 100,
+      };
+
+      if (editingRule) {
+        const res = await fetch('/api/accounting/bank-rules-action', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ action: 'update', id: editingRule.id, ...payload }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Failed to update rule');
+      } else {
+        const res = await fetch('/api/accounting/bank-rules', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || 'Failed to create rule');
+      }
+
+      resetForm();
       await load();
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
     finally { setBusy(''); }
@@ -127,7 +162,7 @@ export default function BankRulesPage() {
                 disabled={!!busy} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium disabled:opacity-50">
                 {busy === 'apply' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Apply Rules
               </button>
-              <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
+              <button onClick={() => { resetForm(); setShowForm(v => !v); }} className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
                 <Plus className="h-4 w-4" /> New Rule
               </button>
             </div>
@@ -144,7 +179,9 @@ export default function BankRulesPage() {
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">New Categorisation Rule</h2>
+              <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">
+                {editingRule ? 'Edit Categorisation Rule' : 'New Categorisation Rule'}
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input value={form.ruleName} onChange={e => setForm(f => ({ ...f, ruleName: e.target.value }))} className="ff-input" placeholder="Rule Name *" required />
                 <select value={form.matchField} onChange={e => setForm(f => ({ ...f, matchField: e.target.value }))} className="ff-select">
@@ -183,9 +220,9 @@ export default function BankRulesPage() {
                 <input value={form.descriptionTemplate} onChange={e => setForm(f => ({ ...f, descriptionTemplate: e.target.value }))} className="ff-input" placeholder="Description template (optional)" />
               </div>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
+                <button type="button" onClick={resetForm} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)]">Cancel</button>
                 <button type="submit" disabled={busy === 'new'} className="px-6 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  {busy === 'new' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Rule'}
+                  {busy === 'new' ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingRule ? 'Save Changes' : 'Create Rule')}
                 </button>
               </div>
             </form>
@@ -227,6 +264,9 @@ export default function BankRulesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
+                        <button onClick={() => handleEdit(rule)} disabled={!!busy} className="p-1 text-[var(--ff-text-secondary)] hover:text-yellow-400" title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </button>
                         <button onClick={() => doAction('toggle', rule.id, { isActive: !rule.isActive })} disabled={busy === rule.id} className="p-1 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]" title={rule.isActive ? 'Disable' : 'Enable'}>
                           {rule.isActive ? <ToggleRight className="h-4 w-4 text-emerald-400" /> : <ToggleLeft className="h-4 w-4" />}
                         </button>

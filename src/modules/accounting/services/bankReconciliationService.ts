@@ -132,6 +132,10 @@ interface BankTxFilters {
   status?: string;
   fromDate?: string;
   toDate?: string;
+  /** Minimum transaction amount (inclusive). Defaults to unbounded when absent. */
+  fromAmount?: string;
+  /** Maximum transaction amount (inclusive). Defaults to unbounded when absent. */
+  toAmount?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -161,10 +165,12 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         WHERE reconciliation_id = ${filters.reconciliationId}::UUID
       `) as Row[];
     } else if (filters?.bankAccountId && filters?.status) {
-      // 🟢 WORKING: date range + full-text search via always-present params (no conditional SQL fragments)
+      // 🟢 WORKING: date range + amount range + full-text search via always-present params (no conditional SQL fragments)
       const searchPattern = filters.search ? `%${filters.search}%` : '%';
       const fromDateVal = filters.fromDate || '1900-01-01';
       const toDateVal = filters.toDate || '2099-12-31';
+      const fromAmountVal = filters.fromAmount || '-999999999';
+      const toAmountVal = filters.toAmount || '999999999';
       rows = (await sql`
         SELECT bt.*, ga.account_name AS bank_account_name
         FROM bank_transactions bt
@@ -173,6 +179,8 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
           AND bt.status = ${filters.status}
           AND bt.transaction_date >= ${fromDateVal}
           AND bt.transaction_date <= ${toDateVal}
+          AND bt.amount >= ${fromAmountVal}::NUMERIC
+          AND bt.amount <= ${toAmountVal}::NUMERIC
           AND (bt.description ILIKE ${searchPattern} OR bt.reference ILIKE ${searchPattern})
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -183,6 +191,8 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
           AND bt.status = ${filters.status}
           AND bt.transaction_date >= ${fromDateVal}
           AND bt.transaction_date <= ${toDateVal}
+          AND bt.amount >= ${fromAmountVal}::NUMERIC
+          AND bt.amount <= ${toAmountVal}::NUMERIC
           AND (bt.description ILIKE ${searchPattern} OR bt.reference ILIKE ${searchPattern})
       `) as Row[];
     } else if (filters?.bankAccountId) {
@@ -285,13 +295,16 @@ export async function unmatchTransaction(bankTxId: string): Promise<BankTransact
   }
 }
 
-export async function excludeTransaction(bankTxId: string): Promise<BankTransaction> {
+export async function excludeTransaction(bankTxId: string, reason?: string): Promise<BankTransaction> {
   try {
     const rows = (await sql`
-      UPDATE bank_transactions SET status = 'excluded'
-      WHERE id = ${bankTxId}::UUID RETURNING *
+      UPDATE bank_transactions
+      SET status = 'excluded', exclude_reason = ${reason || null}
+      WHERE id = ${bankTxId}::UUID
+      RETURNING *
     `) as Row[];
     if (rows.length === 0) throw new Error(`Bank transaction ${bankTxId} not found`);
+    log.info('Excluded bank transaction', { bankTxId, reason }, 'accounting');
     return mapTxRow(rows[0]!);
   } catch (err) {
     log.error('Failed to exclude bank transaction', { bankTxId, error: err }, 'accounting');
@@ -318,6 +331,28 @@ export async function deleteTransactions(bankTxIds: string[]): Promise<number> {
     return deleted;
   } catch (err) {
     log.error('Failed to delete bank transactions', { bankTxIds, error: err }, 'accounting');
+    throw err;
+  }
+}
+
+// ── Bulk Accept ──────────────────────────────────────────────────────────────
+
+/**
+ * Mark a batch of imported transactions as 'matched' without creating journal entries.
+ * Used for the Bulk Accept toolbar action — accepts transactions that don't need GL allocation.
+ */
+export async function bulkAcceptTransactions(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  try {
+    const result = (await sql`
+      UPDATE bank_transactions SET status = 'matched', updated_at = NOW()
+      WHERE id = ANY(${ids}::UUID[]) AND status = 'imported'
+    `) as Row[];
+    const count = (result as unknown as { count?: number }).count ?? ids.length;
+    log.info('Bulk accepted bank transactions', { count, ids }, 'accounting');
+    return count;
+  } catch (err) {
+    log.error('Failed to bulk accept bank transactions', { ids, error: err }, 'accounting');
     throw err;
   }
 }
@@ -912,6 +947,8 @@ function mapTxRow(row: Row): BankTransaction {
     matchedJournalLineId: row.matched_journal_line_id ? String(row.matched_journal_line_id) : undefined,
     reconciliationId: row.reconciliation_id ? String(row.reconciliation_id) : undefined,
     importBatchId: row.import_batch_id ? String(row.import_batch_id) : undefined,
+    excludeReason: row.exclude_reason ? String(row.exclude_reason) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     bankAccountName: row.bank_account_name ? String(row.bank_account_name) : undefined,

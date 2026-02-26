@@ -8,7 +8,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { deleteRule, toggleRule, applyRules } from '@/modules/accounting/services/bankRulesService';
+import { deleteRule, toggleRule, applyRules, updateRule } from '@/modules/accounting/services/bankRulesService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
@@ -28,10 +28,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await toggleRule(id, isActive !== false);
         return apiResponse.success(res, { toggled: true });
 
-      case 'apply':
+      case 'update': {
+        if (!id) return apiResponse.badRequest(res, 'id required');
+        const updated = await updateRule(id, req.body);
+        return apiResponse.success(res, updated);
+      }
+
+      case 'apply': {
         if (!bankAccountId) return apiResponse.badRequest(res, 'bankAccountId required');
         const result = await applyRules(bankAccountId, userId);
         return apiResponse.success(res, result);
+      }
 
       default:
         return apiResponse.badRequest(res, `Unknown action: ${action}`);

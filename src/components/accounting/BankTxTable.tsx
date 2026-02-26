@@ -2,6 +2,7 @@
  * Sage-style bank transaction table with inline allocation
  * Type selector: Account / Supplier / Customer — Selection dropdown changes accordingly
  * VAT selector: No VAT / Standard 15% / Zero-Rated / Exempt
+ * Notes: inline-editable per row, saved on blur
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -25,6 +26,10 @@ export interface BankTx {
   bankReference?: string;
   amount: number;
   status: string;
+  /** Reason recorded when this transaction was excluded */
+  excludeReason?: string;
+  /** User-editable memo field from bank_transactions.notes */
+  notes?: string;
 }
 
 export interface SelectOption {
@@ -48,7 +53,7 @@ interface Props {
   selectedIds: Set<string>;
   rowSelections: Record<string, RowSelection>;
   allSelected: boolean;
-  tab: 'new' | 'reviewed';
+  tab: 'new' | 'reviewed' | 'excluded';
   onToggleSelect: (id: string) => void;
   onSelectAll: () => void;
   onRowTypeChange: (txId: string, type: AllocType) => void;
@@ -58,10 +63,67 @@ interface Props {
   onExclude: (txId: string) => void;
   onUnmatch: (txId: string) => void;
   onSplit: (txId: string) => void;
+  /** Called when the user finishes editing the notes field for a row */
+  onUpdateNotes?: (txId: string, notes: string) => void;
 }
 
 function fmtCurrency(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
+}
+
+/**
+ * Inline-editable notes cell.
+ * Renders as gray placeholder text when empty, saves on blur.
+ */
+function NotesCell({
+  txId, initialValue, onSave,
+}: {
+  txId: string;
+  initialValue: string;
+  onSave: (txId: string, value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initialValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep local value in sync if parent reloads transactions
+  useEffect(() => { setValue(initialValue); }, [initialValue]);
+
+  function handleBlur() {
+    setEditing(false);
+    if (value !== initialValue) {
+      onSave(txId, value);
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={e => { if (e.key === 'Enter') inputRef.current?.blur(); if (e.key === 'Escape') { setValue(initialValue); setEditing(false); } }}
+        className="w-full px-1 py-0.5 rounded bg-[var(--ff-bg-primary)] border border-blue-500/60 text-xs text-[var(--ff-text-primary)] focus:outline-none"
+        placeholder="Add note..."
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="text-xs truncate max-w-[140px] block text-left hover:text-[var(--ff-text-primary)] transition-colors"
+      title={value || 'Click to add note'}
+    >
+      {value
+        ? <span className="text-[var(--ff-text-secondary)]">{value}</span>
+        : <span className="text-[var(--ff-text-tertiary)] italic">Add note...</span>
+      }
+    </button>
+  );
 }
 
 export function BankTxTable(props: Props) {
@@ -69,7 +131,7 @@ export function BankTxTable(props: Props) {
     transactions, glAccounts, suppliers, customers,
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
-    onAccept, onExclude, onUnmatch, onSplit,
+    onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -110,6 +172,7 @@ export function BankTxTable(props: Props) {
             </th>
             <th className={`${TH} w-24`}>Date</th>
             <th className={TH}>Description</th>
+            <th className={`${TH} w-36`}>Notes</th>
             <th className={`${TH} w-24`}>Type</th>
             <th className={`${TH} w-52`}>Selection</th>
             <th className={`${TH} w-28`}>Reference</th>
@@ -129,10 +192,12 @@ export function BankTxTable(props: Props) {
             const received = tx.amount > 0 ? tx.amount : null;
             const options = filterOptions(getOptionsForType(rowType), isOpen ? search : '');
 
+            const isExcluded = tx.status === 'excluded';
+
             return (
               <tr key={tx.id} className={`border-b border-[var(--ff-border-light)]/50 hover:bg-[var(--ff-bg-secondary)]/50 ${
                 isOpen ? 'bg-blue-500/5' : ''
-              }`}>
+              } ${isExcluded ? 'opacity-60' : ''}`}>
                 <td className="py-2 px-2">
                   <input type="checkbox" checked={selectedIds.has(tx.id)}
                     onChange={() => onToggleSelect(tx.id)} className="accent-emerald-500" />
@@ -142,6 +207,18 @@ export function BankTxTable(props: Props) {
                 </td>
                 <td className="py-2 px-2 text-[var(--ff-text-primary)]">
                   <span className="line-clamp-1 text-xs">{tx.description || '—'}</span>
+                </td>
+                {/* Notes — inline editable */}
+                <td className="py-2 px-2">
+                  {onUpdateNotes ? (
+                    <NotesCell
+                      txId={tx.id}
+                      initialValue={tx.notes || ''}
+                      onSave={onUpdateNotes}
+                    />
+                  ) : (
+                    <span className="text-xs text-[var(--ff-text-tertiary)]">{tx.notes || ''}</span>
+                  )}
                 </td>
                 {/* Type dropdown — Account / Supplier / Customer */}
                 <td className="py-2 px-2">
@@ -249,29 +326,45 @@ export function BankTxTable(props: Props) {
                   {received !== null ? fmtCurrency(received) : ''}
                 </td>
                 <td className="py-2 px-2 text-center">
-                  <div className="flex items-center gap-0.5 justify-center">
-                    {isNew ? (
-                      <>
-                        <button onClick={() => onAccept(tx.id)} disabled={!sel?.entityId} title="Accept"
-                          className="p-1 rounded hover:bg-emerald-500/10 text-emerald-400 disabled:opacity-30">
-                          <Check className="h-3.5 w-3.5" />
+                  {isExcluded ? (
+                    /* Excluded tab: show reason badge spanning the actions column */
+                    <div className="flex items-center gap-1 justify-center">
+                      {tx.excludeReason ? (
+                        <span
+                          title={tx.excludeReason}
+                          className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 max-w-[120px] truncate inline-block"
+                        >
+                          {tx.excludeReason}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--ff-text-tertiary)] italic">Excluded</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-0.5 justify-center">
+                      {isNew ? (
+                        <>
+                          <button onClick={() => onAccept(tx.id)} disabled={!sel?.entityId} title="Accept"
+                            className="p-1 rounded hover:bg-emerald-500/10 text-emerald-400 disabled:opacity-30">
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => onSplit(tx.id)} title="Split transaction"
+                            className="p-1 rounded hover:bg-purple-500/10 text-purple-400">
+                            <Scissors className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => onExclude(tx.id)} title="Exclude"
+                            className="p-1 rounded hover:bg-red-500/10 text-red-400">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => onUnmatch(tx.id)} title="Undo allocation"
+                          className="p-1 rounded hover:bg-amber-500/10 text-amber-400">
+                          <Undo2 className="h-3.5 w-3.5" />
                         </button>
-                        <button onClick={() => onSplit(tx.id)} title="Split transaction"
-                          className="p-1 rounded hover:bg-purple-500/10 text-purple-400">
-                          <Scissors className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => onExclude(tx.id)} title="Exclude"
-                          className="p-1 rounded hover:bg-red-500/10 text-red-400">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => onUnmatch(tx.id)} title="Undo allocation"
-                        className="p-1 rounded hover:bg-amber-500/10 text-amber-400">
-                        <Undo2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </td>
               </tr>
             );

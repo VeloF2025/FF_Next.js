@@ -16,13 +16,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { bank_account_id, reconciliation_id, status, from_date, to_date, search, limit, offset } = req.query;
+    const {
+      bank_account_id, reconciliation_id, status,
+      from_date, to_date, from_amount, to_amount,
+      search, limit, offset,
+    } = req.query;
     const result = await getBankTransactions({
       bankAccountId: bank_account_id ? String(bank_account_id) : undefined,
       reconciliationId: reconciliation_id ? String(reconciliation_id) : undefined,
       status: status ? String(status) : undefined,
       fromDate: from_date ? String(from_date) : undefined,
       toDate: to_date ? String(to_date) : undefined,
+      fromAmount: from_amount ? String(from_amount) : undefined,
+      toAmount: to_amount ? String(to_amount) : undefined,
       search: search ? String(search) : undefined,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,

@@ -1,7 +1,7 @@
 /**
  * Bank Transaction Actions API
  * POST /api/accounting/bank-transactions-action
- *   action: match | unmatch | exclude | auto_match | allocate | delete
+ *   action: match | unmatch | exclude | auto_match | allocate | delete | update_notes
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -9,6 +9,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { sql } from '@/lib/neon';
 import {
   matchTransaction,
   unmatchTransaction,
@@ -17,6 +18,7 @@ import {
   allocateTransaction,
   splitAllocateTransaction,
   deleteTransactions,
+  bulkAcceptTransactions,
   type AllocationType,
   type SplitLine,
 } from '@/modules/accounting/services/bankReconciliationService';
@@ -27,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description, allocationType, entityId, vatCode } = req.body;
+    const { action, bankTransactionId, journalLineId, bankAccountId, reconciliationId, contraAccountId, description, allocationType, entityId, vatCode, excludeReason } = req.body;
     // @ts-expect-error — auth middleware attaches user
     const userId: string = req.user?.id || req.user?.userId || 'system';
 
@@ -48,7 +50,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
       case 'exclude': {
         if (!bankTransactionId) return apiResponse.badRequest(res, 'bankTransactionId is required');
-        const tx = await excludeTransaction(bankTransactionId);
+        const tx = await excludeTransaction(
+          bankTransactionId,
+          typeof excludeReason === 'string' ? excludeReason : undefined,
+        );
         return apiResponse.success(res, tx);
       }
       case 'auto_match': {
@@ -89,6 +94,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (ids.length === 0) return apiResponse.badRequest(res, 'bankTransactionId or bankTransactionIds required');
         const deleted = await deleteTransactions(ids);
         return apiResponse.success(res, { deleted });
+      }
+      case 'bulk_accept': {
+        const { bankTransactionIds: bulkIds } = req.body;
+        const ids: string[] = Array.isArray(bulkIds) ? bulkIds : [];
+        if (ids.length === 0) return apiResponse.badRequest(res, 'bankTransactionIds (array) required');
+        const accepted = await bulkAcceptTransactions(ids);
+        return apiResponse.success(res, { accepted });
+      }
+      case 'update_notes': {
+        if (!bankTransactionId) return apiResponse.badRequest(res, 'bankTransactionId required');
+        const { notes } = req.body as { notes?: string };
+        await sql`
+          UPDATE bank_transactions
+          SET notes = ${notes || null}, updated_at = NOW()
+          WHERE id = ${bankTransactionId}::UUID
+        `;
+        log.info('Updated bank transaction notes', { bankTransactionId }, 'accounting-api');
+        return apiResponse.success(res, { updated: true });
       }
       default:
         return apiResponse.badRequest(res, `Unknown action: ${action}`);
