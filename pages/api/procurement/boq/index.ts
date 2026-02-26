@@ -34,9 +34,11 @@ export default withAuth(async (
         // Get BOQ items if we have BOQs
         if (boqData.length > 0) {
           items = await sql`
-            SELECT * FROM boq_items 
-            WHERE project_id = ${projectId}
-            ORDER BY line_number
+            SELECT bi.*, bc.name as budget_category_name
+            FROM boq_items bi
+            LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
+            WHERE bi.project_id = ${projectId}
+            ORDER BY bi.line_number
           `;
         } else {
           items = [];
@@ -64,9 +66,11 @@ export default withAuth(async (
         if (boqData.length > 0) {
           const boqIds = boqData.map(b => b.id);
           items = await sql`
-            SELECT * FROM boq_items
-            WHERE boq_id = ANY(${boqIds})
-            ORDER BY line_number
+            SELECT bi.*, bc.name as budget_category_name
+            FROM boq_items bi
+            LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
+            WHERE bi.boq_id = ANY(${boqIds})
+            ORDER BY bi.line_number
             LIMIT 500
           `;
         } else {
@@ -86,7 +90,7 @@ export default withAuth(async (
         quantity: Number(item.quantity),
         unitPrice: item.unit_price ? Number(item.unit_price) : 0,
         totalPrice: item.total_price ? Number(item.total_price) : 0,
-        category: item.category || 'Materials',
+        category: item.budget_category_name || item.category || 'Uncategorized',
         mappingStatus: item.mapping_status || 'pending',
         procurementStatus: item.procurement_status || 'pending',
         createdAt: item.created_at || new Date(),

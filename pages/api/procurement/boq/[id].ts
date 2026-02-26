@@ -50,10 +50,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     const boq = boqResult[0]!;
 
-    // Get BOQ items (category is stored directly on boq_items)
+    // Get BOQ items with budget category names
     const items = await sql`
-      SELECT bi.*
+      SELECT bi.*, bc.name as budget_category_name
       FROM boq_items bi
+      LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
       WHERE bi.boq_id::text = ${id}
       ORDER BY bi.line_number
     `;
@@ -81,7 +82,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         uom: item.uom || 'Each',
         unitPrice: Number(item.unit_price) || 0,
         totalPrice: Number(item.total_price) || 0,
-        category: item.category || inferCategory(item.item_code || '', item.description || ''),
+        category: item.budget_category_name || item.category || 'Uncategorized',
         stockItemId: item.stock_item_id || null,
         stockMatchMethod: item.stock_match_method || null,
         stockMatchConfidence: item.stock_match_confidence != null ? Number(item.stock_match_confidence) : null,
