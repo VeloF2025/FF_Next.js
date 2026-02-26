@@ -181,7 +181,20 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
     if (validItems.length === 0) errors.items = 'At least one valid item is required';
 
     items.forEach((item, i) => {
-      if (item.itemDescription.trim() && item.itemDescription.length < 3)
+      const hasDesc = item.itemDescription.trim().length > 0;
+      const hasQty = item.quantity !== '' && (item.quantity as number) > 0;
+      const hasPrice = item.estimatedUnitPrice !== '' && (item.estimatedUnitPrice as number) > 0;
+      const hasAnyField = hasDesc || hasQty || hasPrice || !!item.boqItemId;
+
+      // Flag partially-filled rows — prevents silent drop at submit
+      if (hasAnyField && !hasDesc) {
+        errors[`item_${i}_description`] = 'Description is required';
+      }
+      if (hasAnyField && !hasQty) {
+        errors[`item_${i}_quantity`] = 'Quantity is required';
+      }
+
+      if (hasDesc && item.itemDescription.length < 3)
         errors[`item_${i}_description`] = 'Description must be at least 3 characters';
       if (item.quantity !== '' && (item.quantity as number) <= 0)
         errors[`item_${i}_quantity`] = 'Quantity must be greater than 0';
