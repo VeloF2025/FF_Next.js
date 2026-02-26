@@ -3,13 +3,13 @@
  * View, edit, and manage a specific Bill of Quantities
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
 import {
   ArrowLeft, FileText, Calendar, Package, Edit2, Save, X,
   Trash2, Download, Loader2, XCircle, CheckCircle, Clock,
-  User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight,
+  User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight, Search, Filter,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import StockItemMapper from '@/components/procurement/boq/StockItemMapper';
@@ -127,6 +127,13 @@ export default function BOQDetailPage() {
   const [changeCount, setChangeCount] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
 
+  // NEW: Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (id && typeof id === 'string') {
       fetchBOQ(id);
@@ -184,16 +191,78 @@ export default function BOQDetailPage() {
     }
   };
 
-  // Filtered items based on hideZeros toggle
-  const displayItems = useMemo(() => {
-    if (!hideZeros) return items;
-    return items.filter(item => item.quantity !== 0 || item.totalPrice !== 0);
-  }, [items, hideZeros]);
+  // NEW: Debounce search term
+  useEffect(() => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchTerm]);
+
+  // NEW: Extract unique categories from items
+  const availableCategories = useMemo(() => {
+    const categories = new Set<string>();
+    items.forEach(item => {
+      if (item.category && item.category.trim()) {
+        categories.add(item.category);
+      }
+    });
+    return Array.from(categories).sort();
+  }, [items]);
+
+  // NEW: Filter items based on search and category
+  const filteredAndDisplayItems = useMemo(() => {
+    let filtered = items;
+
+    // Apply hideZeros filter
+    if (hideZeros) {
+      filtered = filtered.filter(item => item.quantity !== 0 || item.totalPrice !== 0);
+    }
+
+    // Apply search filter (search across Code and Description)
+    if (debouncedSearchTerm) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(item => {
+        const code = (item.itemCode || '').toLowerCase();
+        const description = (item.description || '').toLowerCase();
+        return code.includes(searchLower) || description.includes(searchLower);
+      });
+    }
+
+    // Apply category filter
+    if (selectedCategories.size > 0) {
+      filtered = filtered.filter(item => selectedCategories.has(item.category));
+    }
+
+    return filtered;
+  }, [items, hideZeros, debouncedSearchTerm, selectedCategories]);
+
+  // Legacy name for displayItems (used in rest of component)
+  const displayItems = filteredAndDisplayItems;
 
   const totalValue = useMemo(() =>
     displayItems.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0),
     [displayItems]
   );
+
+  // NEW: Calculate total value of all items (for percentage calculation)
+  const allItemsTotalValue = useMemo(() =>
+    items.reduce((sum, item) => sum + (item.totalPrice || item.quantity * (item.unitPrice || 0)), 0),
+    [items]
+  );
+
+  // NEW: Calculate filtered count
+  const filteredCount = displayItems.length;
+  const totalCount = hideZeros ? items.filter(i => i.quantity !== 0 || i.totalPrice !== 0).length : items.length;
+
+  // NEW: Calculate percentage of BOQ
+  const percentageOfTotal = allItemsTotalValue > 0 ? ((totalValue / allItemsTotalValue) * 100).toFixed(1) : '0.0';
 
   // Edit handlers
   const startEditing = () => {
@@ -258,10 +327,35 @@ export default function BOQDetailPage() {
   };
 
   // Excel download
-  const handleExcelDownload = useCallback(() => {
-    if (!boq || items.length === 0) return;
+  // NEW: Toggle category selection
+  const handleToggleCategory = (category: string) => {
+    setSelectedCategories(prev => {
+      const updated = new Set(prev);
+      if (updated.has(category)) {
+        updated.delete(category);
+      } else {
+        updated.add(category);
+      }
+      return updated;
+    });
+  };
 
-    const wsData = items.map((item, idx) => ({
+  // NEW: Clear all filters
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setSelectedCategories(new Set());
+    setShowCategoryDropdown(false);
+  };
+
+  // NEW: Check if any filters are active
+  const hasActiveFilters = searchTerm.length > 0 || selectedCategories.size > 0;
+
+  const handleExcelDownload = useCallback(() => {
+    if (!boq || displayItems.length === 0) return;
+
+    // NEW: Use filtered items instead of all items
+    const wsData = displayItems.map((item, idx) => ({
       '#': item.lineNumber || idx + 1,
       'Code': item.itemCode || '',
       'Description': item.description,
@@ -284,8 +378,8 @@ export default function BOQDetailPage() {
     XLSX.utils.book_append_sheet(wb, ws, 'BOQ Items');
     const fileName = `${boq.title || 'BOQ'}_v${boq.version}_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
-    notificationService.success('Excel file downloaded');
-  }, [boq, items]);
+    notificationService.success(`Excel file downloaded (${displayItems.length} items)`);
+  }, [boq, displayItems]);
 
   const handleDelete = async () => {
     if (!boq) return;
@@ -431,13 +525,110 @@ export default function BOQDetailPage() {
 
           {/* Items Table - Full Width */}
           <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-            {/* Toolbar */}
-            <div className="px-6 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-4">
+            {/* NEW: Enhanced Toolbar with Search and Category Filter */}
+            <div className="px-6 py-4 border-b border-[var(--ff-border-light)] space-y-4">
+              {/* Top row: Title and Actions */}
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">
                   Items ({displayItems.length}{hiddenCount > 0 ? ` of ${items.length}` : ''})
                 </h3>
-                <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer select-none">
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={cancelEditing} disabled={isSaving}>
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button size="sm" onClick={saveEdits} disabled={isSaving || editedItems.size === 0}>
+                        {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                        Save ({editedItems.size})
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" onClick={startEditing}>
+                        <Edit2 className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleExcelDownload}>
+                        <Download className="h-4 w-4 mr-1" />
+                        Excel
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* NEW: Second row: Search, Filter, and Toggle */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[220px] max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                  <input
+                    type="text"
+                    placeholder="Search code or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-8 py-2 text-sm bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                      selectedCategories.size > 0
+                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                        : 'bg-[var(--ff-bg-primary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" />
+                    Category {selectedCategories.size > 0 && `(${selectedCategories.size})`}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showCategoryDropdown && (
+                    <div className="absolute top-full right-0 mt-1 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-lg z-10 min-w-[200px] max-h-[300px] overflow-y-auto">
+                      {availableCategories.length === 0 ? (
+                        <div className="px-4 py-2 text-sm text-[var(--ff-text-tertiary)]">No categories</div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setSelectedCategories(new Set())}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-secondary)] border-b border-[var(--ff-border-light)]"
+                          >
+                            Clear All
+                          </button>
+                          {availableCategories.map(category => (
+                            <label
+                              key={category}
+                              className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedCategories.has(category)}
+                                onChange={() => handleToggleCategory(category)}
+                                className="rounded border-gray-500 bg-transparent text-blue-500 focus:ring-blue-500"
+                              />
+                              {category}
+                            </label>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Hide Zero Values Toggle */}
+                <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer select-none px-3 py-2 hover:text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]">
                   <input
                     type="checkbox"
                     checked={hideZeros}
@@ -445,33 +636,19 @@ export default function BOQDetailPage() {
                     className="rounded border-gray-500 bg-transparent text-blue-500 focus:ring-blue-500"
                   />
                   {hideZeros ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  Hide zero values
-                  {hiddenCount > 0 && <span className="text-xs text-yellow-400">({hiddenCount} hidden)</span>}
+                  Hide zeros
+                  {hiddenCount > 0 && <span className="text-xs text-yellow-400">({hiddenCount})</span>}
                 </label>
-              </div>
-              <div className="flex items-center gap-2">
-                {isEditing ? (
-                  <>
-                    <Button variant="outline" size="sm" onClick={cancelEditing} disabled={isSaving}>
-                      <X className="h-4 w-4 mr-1" />
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={saveEdits} disabled={isSaving || editedItems.size === 0}>
-                      {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                      Save ({editedItems.size})
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="outline" size="sm" onClick={startEditing}>
-                      <Edit2 className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleExcelDownload}>
-                      <Download className="h-4 w-4 mr-1" />
-                      Excel
-                    </Button>
-                  </>
+
+                {/* Clear Filters Button */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5 inline mr-1" />
+                    Clear Filters
+                  </button>
                 )}
               </div>
             </div>
@@ -574,6 +751,47 @@ export default function BOQDetailPage() {
                 </table>
               )}
             </div>
+
+            {/* NEW: Summary Footer */}
+            {displayItems.length > 0 && (hasActiveFilters || hideZeros) && (
+              <div className="px-6 py-4 border-t border-[var(--ff-border-light)] bg-blue-500/5 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-6 flex-wrap">
+                  {/* Filtered Count */}
+                  <div>
+                    <span className="text-sm text-[var(--ff-text-secondary)]">Filtered Items:</span>
+                    <span className="ml-2 text-sm font-semibold text-[var(--ff-text-primary)]">
+                      {filteredCount} of {totalCount}
+                    </span>
+                  </div>
+
+                  {/* Filtered Total Value */}
+                  <div>
+                    <span className="text-sm text-[var(--ff-text-secondary)]">Filtered Total:</span>
+                    <span className="ml-2 text-sm font-semibold text-[var(--ff-text-primary)]">
+                      {formatCurrency(totalValue)}
+                    </span>
+                  </div>
+
+                  {/* Percentage of Total */}
+                  <div>
+                    <span className="text-sm text-[var(--ff-text-secondary)]">% of BOQ:</span>
+                    <span className="ml-2 text-sm font-semibold text-blue-400">
+                      {percentageOfTotal}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button in Footer */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-3 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/30 rounded hover:bg-blue-500/20 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {/* Stock Item Mapping */}
           <StockItemMapper

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatDisplayDateLong } from '@/utils/dateFormat';
-import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp } from 'lucide-react';
+import { Calendar, FolderOpen, Users, CheckCircle, AlertTriangle, MapPin, TrendingUp, BarChart3, FileText, Clock, Target, PieChart, Activity } from 'lucide-react';
+import Link from 'next/link';
 import { ProjectOverviewCard } from './components/ProjectOverviewCard';
 import { RecentActivityFeed } from './components/RecentActivityFeed';
 import { QuickActions } from './components/QuickActions';
@@ -153,6 +154,46 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Executive Reports */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="w-5 h-5 text-primary-400" />
+          <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Executive Reports</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[
+            { title: 'Progress Today', icon: Activity, color: 'bg-blue-500/20 text-blue-400', route: '/reports/progress-today' },
+            { title: 'Report 2', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/reports/placeholder-2' },
+            { title: 'Report 3', icon: Target, color: 'bg-purple-500/20 text-purple-400', route: '/reports/placeholder-3' },
+            { title: 'Report 4', icon: PieChart, color: 'bg-amber-500/20 text-amber-400', route: '/reports/placeholder-4' },
+            { title: 'Report 5', icon: Clock, color: 'bg-cyan-500/20 text-cyan-400', route: '/reports/placeholder-5' },
+            { title: 'Report 6', icon: TrendingUp, color: 'bg-rose-500/20 text-rose-400', route: '/reports/placeholder-6' },
+          ].map((report) => {
+            const Icon = report.icon;
+            return (
+              <Link
+                key={report.title}
+                href={report.route}
+                className="group bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-5 hover:border-primary-500/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              >
+                <div className={`w-10 h-10 rounded-lg ${report.color.split(' ')[0]} flex items-center justify-center mb-3`}>
+                  <Icon className={`w-5 h-5 ${report.color.split(' ')[1]}`} />
+                </div>
+                <h3 className="text-sm font-medium text-[var(--ff-text-primary)] group-hover:text-primary-400 transition-colors">
+                  {report.title}
+                </h3>
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                  {report.title === 'Progress Today' ? 'Daily progress overview' : 'Coming soon'}
+                </p>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-[var(--ff-border-light)]" />
 
       {/* Enhanced Stats Grid */}
       <StatsGrid 
