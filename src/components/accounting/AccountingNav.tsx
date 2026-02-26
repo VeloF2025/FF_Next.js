@@ -25,12 +25,14 @@ const TABS: Tab[] = [
   {
     id: 'customers', label: 'Customers',
     items: [
+      { label: 'Quotes', href: '/accounting/customer-quotes' },
       { label: 'Tax Invoices', href: '/accounting/customer-invoices' },
       { label: 'Recurring Invoices', href: '/accounting/recurring-invoices' },
       { label: 'Receipts', href: '/accounting/customer-payments' },
       { label: 'Credit Notes', href: '/accounting/credit-notes' },
       { label: 'Write-Offs', href: '/accounting/write-offs' },
       { label: 'Adjustments', href: '/accounting/adjustments?type=customer' },
+      { label: 'Debtors Manager', href: '/accounting/debtors-manager' },
       { label: 'Aging', href: '/accounting/ar-aging' },
       { label: 'Statements', href: '/accounting/customer-statements' },
     ],
@@ -65,6 +67,7 @@ const TABS: Tab[] = [
       { label: 'Recurring Journals', href: '/accounting/recurring-journals' },
       { label: 'Fiscal Periods', href: '/accounting?tab=fiscal-periods' },
       { label: 'Default Accounts', href: '/accounting/default-accounts' },
+      { label: 'Currencies', href: '/accounting/currencies' },
     ],
   },
   {
@@ -117,6 +120,7 @@ function getActiveTabId(pathname: string, query: Record<string, string | string[
       pathname.startsWith('/accounting/recurring-invoices') ||
       pathname.startsWith('/accounting/credit-notes') ||
       pathname.startsWith('/accounting/write-offs') ||
+      pathname.startsWith('/accounting/debtors-manager') ||
       pathname.startsWith('/accounting/ar-aging') ||
       (pathname.startsWith('/accounting/adjustments') && query.type === 'customer')) {
     return 'customers';
@@ -132,7 +136,8 @@ function getActiveTabId(pathname: string, query: Record<string, string | string[
       pathname.startsWith('/accounting/journal-entries') ||
       pathname.startsWith('/accounting/recurring-journals') ||
       pathname.startsWith('/accounting/fiscal-periods') ||
-      pathname.startsWith('/accounting/default-accounts')) {
+      pathname.startsWith('/accounting/default-accounts') ||
+      pathname.startsWith('/accounting/currencies')) {
     return 'accounts';
   }
   if (pathname.startsWith('/accounting/vat-') ||
