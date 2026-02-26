@@ -5,7 +5,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import { ArrowLeft, FileText, Loader2, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 
@@ -59,14 +58,13 @@ export default function CreditNoteDetailPage() {
     finally { setActionLoading(''); }
   };
 
-  if (loading) return <AppLayout><AccountingNav /><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div></AppLayout>;
-  if (!note) return <AppLayout><AccountingNav /><div className="flex items-center justify-center min-h-[60vh] flex-col"><AlertCircle className="h-8 w-8 text-red-400 mb-2" /><p className="text-[var(--ff-text-secondary)]">{error || 'Not found'}</p></div></AppLayout>;
+  if (loading) return <AppLayout><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div></AppLayout>;
+  if (!note) return <AppLayout><div className="flex items-center justify-center min-h-[60vh] flex-col"><AlertCircle className="h-8 w-8 text-red-400 mb-2" /><p className="text-[var(--ff-text-secondary)]">{error || 'Not found'}</p></div></AppLayout>;
 
   const entityName = note.type === 'customer' ? note.clientName : note.supplierName;
 
   return (
     <AppLayout>
-      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <Link href="/accounting/credit-notes" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-blue-400 mb-3">

@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import Link from 'next/link';
 import { ArrowLeft, Wallet, Loader2, Plus, Trash2 } from 'lucide-react';
 
@@ -115,7 +114,6 @@ export default function NewSupplierPaymentPage() {
 
   return (
     <AppLayout>
-      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <Link href="/accounting/supplier-payments" className="inline-flex items-center gap-1 text-sm text-[var(--ff-text-secondary)] hover:text-emerald-600 mb-3">

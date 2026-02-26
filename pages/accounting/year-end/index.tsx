@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { CalendarCheck, Loader2, AlertCircle, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
@@ -72,7 +71,6 @@ export default function YearEndPage() {
 
   return (
     <AppLayout>
-      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">

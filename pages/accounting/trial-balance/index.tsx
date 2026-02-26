@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { Scale, Loader2, AlertCircle, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { AccountDrillDown } from '@/components/accounting/AccountDrillDown';
 
@@ -96,7 +95,6 @@ export default function TrialBalancePage() {
 
   return (
     <AppLayout>
-      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
           <div className="flex items-center justify-between">

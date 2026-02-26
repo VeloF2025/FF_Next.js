@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { DollarSign, Loader2, AlertCircle, Plus, RefreshCw } from 'lucide-react';
 import { CurrencyList } from '@/components/accounting/currencies/CurrencyList';
 import { ExchangeRatesPanel } from '@/components/accounting/currencies/ExchangeRatesPanel';
@@ -64,7 +63,6 @@ export default function CurrenciesPage() {
 
   return (
     <AppLayout>
-      <AccountingNav />
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         {/* Page header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">

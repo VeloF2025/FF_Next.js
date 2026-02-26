@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AccountingNav } from '@/components/accounting/AccountingNav';
 import { Loader2, AlertCircle, Users, TrendingDown, Clock, Percent, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import type {
   DebtorSummary,
@@ -148,7 +147,6 @@ export default function DebtorsManagerPage() {
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        <AccountingNav />
 
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
