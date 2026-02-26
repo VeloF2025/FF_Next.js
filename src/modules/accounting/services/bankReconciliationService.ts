@@ -5,7 +5,9 @@
 
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
-import { detectBankFormat, parseFNBStatement, parseStandardBankStatement, parseNedbankStatement, parseABSAStatement } from '../utils/bankCsvParsers';
+import { detectBankFormat, parseFNBStatement, parseStandardBankStatement, parseNedbankStatement, parseABSAStatement, parseCapitecStatement } from '../utils/bankCsvParsers';
+import { parseOfxStatement } from '../utils/bankOfxParser';
+import { parseQifStatement } from '../utils/bankQifParser';
 import { runAutoMatch } from '../utils/autoMatch';
 import { createJournalEntry, postJournalEntry } from './journalEntryService';
 import type { BankTransaction, BankReconciliation, AutoMatchResult, BankFormat, BankCsvParseResult } from '../types/bank.types';
@@ -38,6 +40,15 @@ export async function importBankStatement(
         break;
       case 'absa':
         parseResult = parseABSAStatement(csvContent);
+        break;
+      case 'capitec':
+        parseResult = parseCapitecStatement(csvContent);
+        break;
+      case 'ofx':
+        parseResult = parseOfxStatement(csvContent);
+        break;
+      case 'qif':
+        parseResult = parseQifStatement(csvContent);
         break;
       default:
         throw new Error('Unable to detect bank format. Please specify the bank.');
@@ -902,6 +913,56 @@ export async function splitAllocateTransaction(
 
   const updated = (await sql`SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID`) as Row[];
   return { journalEntryId: je.id, bankTransaction: mapTxRow(updated[0]!) };
+}
+
+// ── Reverse Reconciled ───────────────────────────────────────────────────────
+
+/**
+ * Reverse a matched or reconciled bank transaction.
+ * - If a journal entry was created, it is reversed via reverseJournalEntry.
+ * - The bank transaction is reset to 'imported' with all links cleared.
+ */
+export async function reverseReconciledTransaction(bankTxId: string, userId: string): Promise<void> {
+  // 1. Fetch the bank transaction
+  const txRows = (await sql`
+    SELECT * FROM bank_transactions WHERE id = ${bankTxId}::UUID
+  `) as Row[];
+  const tx = txRows[0];
+  if (!tx) throw new Error('Transaction not found');
+  if (tx.status !== 'matched' && tx.status !== 'reconciled') {
+    throw new Error('Can only reverse matched or reconciled transactions');
+  }
+
+  // 2. If there is a matched journal line, reverse the parent journal entry
+  if (tx.matched_journal_line_id) {
+    const jlRows = (await sql`
+      SELECT journal_entry_id FROM gl_journal_lines WHERE id = ${tx.matched_journal_line_id}::UUID
+    `) as Row[];
+    if (jlRows.length > 0 && jlRows[0]!.journal_entry_id) {
+      const { reverseJournalEntry } = await import('./journalEntryService');
+      try {
+        await reverseJournalEntry(String(jlRows[0]!.journal_entry_id), userId);
+      } catch (e) {
+        throw new Error(`Cannot reverse: ${e instanceof Error ? e.message : 'Journal reversal failed'}`);
+      }
+    }
+  }
+
+  // 3. Reset bank transaction to imported and clear all link fields
+  await sql`
+    UPDATE bank_transactions
+    SET status = 'imported',
+        matched_journal_line_id = NULL,
+        reconciliation_id = NULL,
+        linked_po_id = NULL,
+        linked_asset_id = NULL,
+        linked_fleet_fuel_id = NULL,
+        linked_fleet_service_id = NULL,
+        updated_at = NOW()
+    WHERE id = ${bankTxId}::UUID
+  `;
+
+  log.info('Reversed reconciled bank transaction', { bankTxId, userId }, 'accounting');
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

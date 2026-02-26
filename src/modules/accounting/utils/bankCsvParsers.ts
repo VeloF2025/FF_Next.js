@@ -6,6 +6,8 @@
  * - FNB (First National Bank)
  * - Standard Bank
  * - Nedbank
+ * - ABSA
+ * - Capitec
  */
 
 import type { ParsedBankTransaction, BankCsvParseResult, BankFormat } from '../types/bank.types';
@@ -314,15 +316,90 @@ export function parseABSAStatement(csv: string): BankCsvParseResult {
   return result;
 }
 
+// ── Capitec Parser ────────────────────────────────────────────────────────────
+
+/**
+ * Parse Capitec bank statement CSV.
+ * Expected columns: Date,Description,Debit,Credit,Balance
+ * Date format: DD/MM/YYYY
+ * Separate debit/credit columns (similar to Standard Bank but different header casing)
+ */
+export function parseCapitecStatement(csv: string): BankCsvParseResult {
+  const result: BankCsvParseResult = {
+    transactions: [],
+    errors: [],
+    bankFormat: 'capitec',
+  };
+
+  const lines = parseCsvLines(csv);
+  if (lines.length <= 1) return result;
+
+  for (let i = 1; i < lines.length; i++) {
+    const fields = lines[i]!;
+    // Skip blank lines
+    if (fields.every(f => f === '')) continue;
+    if (fields.length < 4) {
+      result.errors.push({ row: i + 1, error: 'Insufficient columns' });
+      continue;
+    }
+
+    const date = normalizeDate(fields[0]!, 'dd/mm/yyyy');
+    if (!date) {
+      result.errors.push({ row: i + 1, error: `Invalid date: ${fields[0]}` });
+      continue;
+    }
+
+    const debit = parseAmount(fields[2]!);
+    const credit = parseAmount(fields[3]!);
+
+    let amount: number;
+    if (credit !== null && credit > 0) {
+      amount = credit;
+    } else if (debit !== null && debit > 0) {
+      amount = -debit;
+    } else if (credit === null && debit === null) {
+      result.errors.push({ row: i + 1, error: 'No debit or credit amount' });
+      continue;
+    } else {
+      amount = 0;
+    }
+
+    const tx: ParsedBankTransaction = {
+      transactionDate: date,
+      amount,
+      description: fields[1]!.trim(),
+      balance: fields.length > 4 ? parseAmount(fields[4]!) ?? undefined : undefined,
+    };
+
+    result.transactions.push(tx);
+  }
+
+  return result;
+}
+
 // ── Format Detection ─────────────────────────────────────────────────────────
 
 /**
  * Detect bank format from CSV header line.
+ * Returns 'ofx' or 'qif' when the content matches those non-CSV formats.
  */
 export function detectBankFormat(csv: string): BankFormat {
   if (!csv || csv.trim() === '') return 'unknown';
 
-  const firstLine = csv.trim().split('\n')[0]!.toLowerCase();
+  const trimmed = csv.trim();
+
+  // OFX: starts with OFXHEADER: or <OFX>
+  if (trimmed.startsWith('OFXHEADER:') || trimmed.startsWith('<OFX>') || trimmed.startsWith('<ofx>')) {
+    return 'ofx';
+  }
+
+  // QIF: first non-blank line starts with !Type: or !Account
+  const firstNonBlank = trimmed.split('\n').find(l => l.trim().length > 0) ?? '';
+  if (firstNonBlank.startsWith('!Type:') || firstNonBlank.startsWith('!Account') || firstNonBlank.startsWith('!type:')) {
+    return 'qif';
+  }
+
+  const firstLine = trimmed.split('\n')[0]!.toLowerCase();
 
   // ABSA: "Account Number,Date,Description1,Description2,Amount,Balance"
   if (firstLine.includes('account number') && firstLine.includes('description1')) {
@@ -339,7 +416,28 @@ export function detectBankFormat(csv: string): BankFormat {
     return 'nedbank';
   }
 
-  // Standard Bank: Date,Description,Debit,Credit,Balance
+  // Capitec: Date,Description,Debit,Credit,Balance (no extra qualifier columns)
+  // Must be checked before Standard Bank since header is similar but Capitec has no extra columns.
+  if (
+    firstLine.includes('date') &&
+    firstLine.includes('description') &&
+    firstLine.includes('debit') &&
+    firstLine.includes('credit') &&
+    firstLine.includes('balance') &&
+    !firstLine.includes('transaction date') &&
+    !firstLine.includes('value date')
+  ) {
+    // Disambiguate: Standard Bank may include "Batch No" or similar extra fields.
+    // Capitec typically has exactly 5 columns; Standard Bank also 5 — default to capitec
+    // when header exactly matches Date,Description,Debit,Credit,Balance.
+    const cols = firstLine.split(',').map(s => s.trim().replace(/"/g, ''));
+    if (cols.length === 5 && cols[0] === 'date' && cols[1] === 'description') {
+      return 'capitec';
+    }
+    return 'standard_bank';
+  }
+
+  // Standard Bank: Date,Description,Debit,Credit,Balance (fallback for variations)
   if (firstLine.includes('date') && firstLine.includes('debit') && firstLine.includes('credit')) {
     return 'standard_bank';
   }

@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, Undo2, Search, Scissors } from 'lucide-react';
+import { Check, X, Undo2, Search, Scissors, SearchCheck, RotateCcw, Paperclip } from 'lucide-react';
 
 export type AllocType = 'account' | 'supplier' | 'customer';
 export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
@@ -65,6 +65,9 @@ interface Props {
   onSplit: (txId: string) => void;
   /** Called when the user finishes editing the notes field for a row */
   onUpdateNotes?: (txId: string, notes: string) => void;
+  onFindMatch?: (txId: string) => void;
+  onReverse?: (txId: string) => void;
+  onAttachments?: (txId: string) => void;
 }
 
 function fmtCurrency(n: number): string {
@@ -132,6 +135,7 @@ export function BankTxTable(props: Props) {
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
     onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,
+    onFindMatch, onReverse, onAttachments,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -348,20 +352,46 @@ export function BankTxTable(props: Props) {
                             className="p-1 rounded hover:bg-emerald-500/10 text-emerald-400 disabled:opacity-30">
                             <Check className="h-3.5 w-3.5" />
                           </button>
+                          {onFindMatch && (
+                            <button onClick={() => onFindMatch(tx.id)} title="Find & Match"
+                              className="p-1 rounded hover:bg-blue-500/10 text-blue-400">
+                              <SearchCheck className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           <button onClick={() => onSplit(tx.id)} title="Split transaction"
                             className="p-1 rounded hover:bg-purple-500/10 text-purple-400">
                             <Scissors className="h-3.5 w-3.5" />
                           </button>
+                          {onAttachments && (
+                            <button onClick={() => onAttachments(tx.id)} title="Attachments"
+                              className="p-1 rounded hover:bg-gray-500/10 text-[var(--ff-text-tertiary)]">
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           <button onClick={() => onExclude(tx.id)} title="Exclude"
                             className="p-1 rounded hover:bg-red-500/10 text-red-400">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => onUnmatch(tx.id)} title="Undo allocation"
-                          className="p-1 rounded hover:bg-amber-500/10 text-amber-400">
-                          <Undo2 className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          <button onClick={() => onUnmatch(tx.id)} title="Undo allocation"
+                            className="p-1 rounded hover:bg-amber-500/10 text-amber-400">
+                            <Undo2 className="h-3.5 w-3.5" />
+                          </button>
+                          {onReverse && tx.status === 'reconciled' && (
+                            <button onClick={() => onReverse(tx.id)} title="Reverse reconciled"
+                              className="p-1 rounded hover:bg-red-500/10 text-red-400">
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {onAttachments && (
+                            <button onClick={() => onAttachments(tx.id)} title="Attachments"
+                              className="p-1 rounded hover:bg-gray-500/10 text-[var(--ff-text-tertiary)]">
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

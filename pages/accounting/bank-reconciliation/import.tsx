@@ -11,7 +11,7 @@ import { ArrowLeft, Upload, Loader2, AlertCircle, CheckCircle2, Landmark, FileTe
 
 interface BankAccount { id: string; account_code: string; account_name: string }
 
-type FileType = 'csv' | 'pdf';
+type FileType = 'csv' | 'pdf' | 'ofx' | 'qif';
 
 interface ImportForm {
   bankAccountId: string;
@@ -72,11 +72,14 @@ export default function BankStatementImportPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
-    const isCsv = file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv';
+    const lower = file.name.toLowerCase();
+    const isPdf = lower.endsWith('.pdf') || file.type === 'application/pdf';
+    const isCsv = lower.endsWith('.csv') || file.type === 'text/csv';
+    const isOfx = lower.endsWith('.ofx') || lower.endsWith('.qfx');
+    const isQif = lower.endsWith('.qif');
 
-    if (!isPdf && !isCsv) {
-      setError('Only CSV and PDF files are supported.');
+    if (!isPdf && !isCsv && !isOfx && !isQif) {
+      setError('Only CSV, PDF, OFX, and QIF files are supported.');
       return;
     }
 
@@ -95,21 +98,26 @@ export default function BankStatementImportPage() {
       };
       reader.readAsDataURL(file);
     } else {
+      // CSV, OFX, and QIF are all read as text
+      const detectedFileType: FileType = isOfx ? 'ofx' : isQif ? 'qif' : 'csv';
       const reader = new FileReader();
       reader.onload = (ev) => {
+        const content = ev.target?.result as string || '';
         setForm(f => ({
           ...f,
-          csvContent: ev.target?.result as string || '',
+          csvContent: content,
           pdfBase64: '',
           fileName: file.name,
-          fileType: 'csv',
+          fileType: detectedFileType,
+          // Auto-set bankFormat for OFX/QIF since format is unambiguous
+          bankFormat: isOfx ? 'ofx' : isQif ? 'qif' : f.bankFormat,
         }));
       };
       reader.readAsText(file);
     }
   };
 
-  const hasFile = form.fileType === 'csv' ? !!form.csvContent : !!form.pdfBase64;
+  const hasFile = form.fileType === 'pdf' ? !!form.pdfBase64 : !!form.csvContent;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,6 +136,7 @@ export default function BankStatementImportPage() {
       if (form.fileType === 'pdf') {
         body.pdfBase64 = form.pdfBase64;
       } else {
+        // csv, ofx, and qif all send csvContent (raw text)
         body.csvContent = form.csvContent;
       }
 
@@ -148,7 +157,7 @@ export default function BankStatementImportPage() {
     }
   };
 
-  const csvRowCount = form.fileType === 'csv' ? form.csvContent.split('\n').length - 1 : 0;
+  const csvRowCount = form.fileType === 'csv' ? Math.max(0, form.csvContent.split('\n').length - 1) : 0;
 
   return (
     <AppLayout>
@@ -253,10 +262,17 @@ export default function BankStatementImportPage() {
                     className="ff-select w-full"
                   >
                     <option value="auto">Auto-detect</option>
-                    <option value="absa">ABSA</option>
-                    <option value="fnb">FNB</option>
-                    <option value="standard_bank">Standard Bank</option>
-                    <option value="nedbank">Nedbank</option>
+                    <optgroup label="CSV Formats">
+                      <option value="absa">ABSA</option>
+                      <option value="capitec">Capitec</option>
+                      <option value="fnb">FNB</option>
+                      <option value="standard_bank">Standard Bank</option>
+                      <option value="nedbank">Nedbank</option>
+                    </optgroup>
+                    <optgroup label="Other Formats">
+                      <option value="ofx">OFX / QFX (Open Financial Exchange)</option>
+                      <option value="qif">QIF (Quicken Interchange Format)</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -273,11 +289,11 @@ export default function BankStatementImportPage() {
                 )}
                 <label className="block">
                   <span className="text-emerald-500 hover:text-emerald-400 cursor-pointer font-medium">
-                    Choose CSV or PDF file
+                    Choose CSV, PDF, OFX, or QIF file
                   </span>
                   <input
                     type="file"
-                    accept=".csv,.pdf"
+                    accept=".csv,.pdf,.ofx,.qfx,.qif"
                     onChange={handleFileChange}
                     className="hidden"
                   />
@@ -293,13 +309,25 @@ export default function BankStatementImportPage() {
                   </p>
                 ) : null}
                 <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
-                  Supports ABSA, FNB, Standard Bank, and Nedbank CSV and PDF formats
+                  Supports CSV (ABSA, Capitec, FNB, Standard Bank, Nedbank), PDF, OFX/QFX, and QIF formats
                 </p>
               </div>
 
               {form.fileType === 'csv' && form.csvContent && (
                 <div className="text-sm text-[var(--ff-text-secondary)]">
                   {csvRowCount} data row{csvRowCount !== 1 ? 's' : ''} detected
+                </div>
+              )}
+
+              {form.fileType === 'ofx' && form.csvContent && (
+                <div className="text-sm text-[var(--ff-text-secondary)]">
+                  OFX file loaded — transactions will be extracted on import
+                </div>
+              )}
+
+              {form.fileType === 'qif' && form.csvContent && (
+                <div className="text-sm text-[var(--ff-text-secondary)]">
+                  QIF file loaded — transactions will be extracted on import
                 </div>
               )}
 

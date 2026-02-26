@@ -5,7 +5,7 @@
 
 export type BankTxStatus = 'imported' | 'matched' | 'reconciled' | 'excluded';
 export type BankReconStatus = 'in_progress' | 'completed';
-export type BankFormat = 'fnb' | 'standard_bank' | 'nedbank' | 'absa' | 'unknown';
+export type BankFormat = 'fnb' | 'standard_bank' | 'nedbank' | 'absa' | 'capitec' | 'ofx' | 'qif' | 'unknown';
 
 // ── Parsed Bank Transaction ──────────────────────────────────────────────────
 

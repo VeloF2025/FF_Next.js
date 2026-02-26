@@ -19,6 +19,7 @@ import {
   splitAllocateTransaction,
   deleteTransactions,
   bulkAcceptTransactions,
+  reverseReconciledTransaction,
   type AllocationType,
   type SplitLine,
 } from '@/modules/accounting/services/bankReconciliationService';
@@ -112,6 +113,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         log.info('Updated bank transaction notes', { bankTransactionId }, 'accounting-api');
         return apiResponse.success(res, { updated: true });
+      }
+      case 'reverse': {
+        if (!bankTransactionId) return apiResponse.badRequest(res, 'bankTransactionId required');
+        await reverseReconciledTransaction(bankTransactionId, userId);
+        return apiResponse.success(res, { reversed: true });
       }
       default:
         return apiResponse.badRequest(res, `Unknown action: ${action}`);

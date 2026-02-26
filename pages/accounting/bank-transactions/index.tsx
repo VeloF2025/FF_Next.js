@@ -11,8 +11,11 @@ import {
 } from '@/components/accounting/BankTxTable';
 import { SplitTransactionModal } from '@/components/accounting/SplitTransactionModal';
 import { ExcludeReasonModal } from '@/components/accounting/ExcludeReasonModal';
+import { FindMatchModal } from '@/components/accounting/FindMatchModal';
+import { BankTxAttachmentsModal } from '@/components/accounting/BankTxAttachmentsModal';
+import { StatementBalanceWidget } from '@/components/accounting/StatementBalanceWidget';
 import {
-  Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus,
+  Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus, FileText,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
@@ -65,6 +68,8 @@ export default function BankTransactionsPage() {
   const [splitTxId, setSplitTxId] = useState<string | null>(null);
   /** ID of transaction awaiting an exclusion reason — shows ExcludeReasonModal when set */
   const [excludingTxId, setExcludingTxId] = useState<string | null>(null);
+  const [findMatchTxId, setFindMatchTxId] = useState<string | null>(null);
+  const [attachmentsTxId, setAttachmentsTxId] = useState<string | null>(null);
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
@@ -322,6 +327,32 @@ export default function BankTransactionsPage() {
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to apply rules'); }
   };
 
+  const handleReverse = async (txId: string) => {
+    if (!window.confirm('Reverse this reconciled transaction? The associated journal entry will also be reversed.')) return;
+    try {
+      await callAction({ action: 'reverse', bankTransactionId: txId });
+      toast.success('Transaction reversed');
+      loadTransactions();
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Reverse failed'); }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!selectedBank) return;
+    try {
+      const res = await fetch(`/api/accounting/bank-reconciliation-report?bankAccountId=${selectedBank}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Failed');
+      const data = json.data || json;
+      const { generateReconReport } = await import('@/modules/accounting/utils/reconReportPdf');
+      const blob = generateReconReport(data);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `recon-report-${bank?.accountCode || 'bank'}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+      toast.success('Report downloaded');
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Report failed'); }
+  };
+
   const bank = bankAccounts.find(b => b.id === selectedBank);
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const allSelected = transactions.length > 0 && transactions.every(t => selectedIds.has(t.id));
@@ -370,7 +401,8 @@ export default function BankTransactionsPage() {
               );
             })}
             {bank && (
-              <div className="ml-auto flex items-center gap-6">
+              <div className="ml-auto flex items-center gap-4">
+                <StatementBalanceWidget bankAccountId={selectedBank} glBalance={bank.balance} />
                 <div className="text-right">
                   <p className="text-2xl font-bold text-[var(--ff-text-primary)]">{total}</p>
                   <p className="text-xs text-[var(--ff-text-tertiary)]">
@@ -449,6 +481,10 @@ export default function BankTransactionsPage() {
             className="flex items-center gap-1 px-2.5 py-1 rounded border border-emerald-500/60 text-xs text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 font-medium">
             <Plus className="h-3.5 w-3.5" /> New Transaction
           </Link>
+          <button onClick={handleDownloadReport} disabled={!selectedBank}
+            className="flex items-center gap-1 px-2.5 py-1 rounded border border-[var(--ff-border-light)] text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-30">
+            <FileText className="h-3.5 w-3.5" /> Recon Report
+          </button>
           {/* Date range filter */}
           <div className="flex items-center gap-1 text-xs text-[var(--ff-text-secondary)]">
             <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1); }}
@@ -581,6 +617,9 @@ export default function BankTransactionsPage() {
               onUnmatch={handleUnmatch}
               onSplit={handleSplit}
               onUpdateNotes={handleUpdateNotes}
+              onFindMatch={(txId) => setFindMatchTxId(txId)}
+              onReverse={handleReverse}
+              onAttachments={(txId) => setAttachmentsTxId(txId)}
             />
           )}
         </div>
@@ -652,6 +691,26 @@ export default function BankTransactionsPage() {
           />
         );
       })()}
+      {/* Find & Match Modal */}
+      {findMatchTxId && (() => {
+        const matchTx = transactions.find(t => t.id === findMatchTxId);
+        if (!matchTx) return null;
+        return (
+          <FindMatchModal
+            transaction={{ id: matchTx.id, description: matchTx.description || '', amount: matchTx.amount, transactionDate: matchTx.transactionDate }}
+            onClose={() => setFindMatchTxId(null)}
+            onMatch={() => { setFindMatchTxId(null); loadTransactions(); }}
+          />
+        );
+      })()}
+      {/* Attachments Modal */}
+      {attachmentsTxId && (
+        <BankTxAttachmentsModal
+          bankTransactionId={attachmentsTxId}
+          transactionDescription={transactions.find(t => t.id === attachmentsTxId)?.description}
+          onClose={() => setAttachmentsTxId(null)}
+        />
+      )}
     </AppLayout>
   );
 }
