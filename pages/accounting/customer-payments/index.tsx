@@ -136,7 +136,11 @@ export default function CustomerPaymentsPage() {
                 <tbody>
                   {payments.map(p => (
                     <tr key={p.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)] transition-colors">
-                      <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{p.paymentNumber}</td>
+                      <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">
+                        <Link href={`/accounting/customer-payments/${p.id}`} className="hover:text-emerald-400 transition-colors">
+                          {p.paymentNumber}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-[var(--ff-text-primary)]">{p.clientName || '—'}</td>
                       <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                         {new Date(p.paymentDate).toLocaleDateString('en-ZA')}
@@ -147,7 +151,9 @@ export default function CustomerPaymentsPage() {
                       <td className="px-4 py-3 text-[var(--ff-text-secondary)] uppercase text-xs">{p.paymentMethod}</td>
                       <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
                       <td className="px-4 py-3 text-right">
-                        <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                        <Link href={`/accounting/customer-payments/${p.id}`}>
+                          <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)] hover:text-emerald-400" />
+                        </Link>
                       </td>
                     </tr>
                   ))}

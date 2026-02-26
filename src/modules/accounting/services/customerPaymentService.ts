@@ -5,7 +5,7 @@
 
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
-import { createJournalEntry, postJournalEntry } from './journalEntryService';
+import { createJournalEntry, postJournalEntry, reverseJournalEntry } from './journalEntryService';
 import { getAccountByCode } from './chartOfAccountsService';
 import type {
   CustomerPayment,
@@ -207,6 +207,55 @@ export async function confirmCustomerPayment(
     return mapPaymentRow(updated[0]!);
   } catch (err) {
     log.error('Failed to confirm customer payment', { id, error: err }, 'accounting');
+    throw err;
+  }
+}
+
+export async function cancelCustomerPayment(
+  id: string,
+  userId: string,
+  reason?: string
+): Promise<CustomerPayment> {
+  try {
+    const payment = await getCustomerPaymentById(id);
+    if (!payment) throw new Error(`Payment ${id} not found`);
+    if (payment.status !== 'confirmed') {
+      throw new Error(`Cannot cancel payment with status: ${payment.status}`);
+    }
+
+    // Reverse GL journal entry
+    if (payment.glJournalEntryId) {
+      await reverseJournalEntry(payment.glJournalEntryId, userId);
+    }
+
+    // Reverse invoice balance updates
+    for (const alloc of payment.allocations) {
+      await sql`
+        UPDATE customer_invoices
+        SET amount_paid = GREATEST(0, amount_paid - ${alloc.amountAllocated})
+        WHERE id = ${alloc.invoiceId}::UUID
+      `;
+      await sql`
+        UPDATE customer_invoices SET status = CASE
+          WHEN amount_paid <= 0.01 THEN 'approved'
+          WHEN amount_paid < total_amount THEN 'partially_paid'
+          ELSE status
+        END, paid_at = CASE WHEN amount_paid <= 0.01 THEN NULL ELSE paid_at END
+        WHERE id = ${alloc.invoiceId}::UUID
+      `;
+    }
+
+    const updated = (await sql`
+      UPDATE customer_payments
+      SET status = 'cancelled', cancelled_by = ${userId}::UUID,
+          cancelled_at = NOW(), cancel_reason = ${reason || null}
+      WHERE id = ${id} RETURNING *
+    `) as Row[];
+
+    log.info('Cancelled customer payment', { id, reason }, 'accounting');
+    return mapPaymentRow(updated[0]!);
+  } catch (err) {
+    log.error('Failed to cancel customer payment', { id, error: err }, 'accounting');
     throw err;
   }
 }

@@ -11,6 +11,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getCustomerPayments,
+  getCustomerPaymentById,
   createCustomerPayment,
 } from '@/modules/accounting/services/customerPaymentService';
 import type { CustomerPaymentStatus } from '@/modules/accounting/types/ar.types';
@@ -18,7 +19,15 @@ import type { CustomerPaymentStatus } from '@/modules/accounting/types/ar.types'
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const { status, client_id, limit, offset } = req.query;
+      const { id, status, client_id, limit, offset } = req.query;
+
+      // Single payment by ID
+      if (id) {
+        const payment = await getCustomerPaymentById(String(id));
+        if (!payment) return apiResponse.notFound(res, 'Payment', String(id));
+        return apiResponse.success(res, payment);
+      }
+
       const result = await getCustomerPayments({
         status: status as CustomerPaymentStatus | undefined,
         clientId: client_id ? String(client_id) : undefined,

@@ -6,8 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ClipboardList, Loader2, AlertCircle, Mail, Download } from 'lucide-react';
-import toast from 'react-hot-toast';
+import Link from 'next/link';
+import { ClipboardList, Loader2, AlertCircle, Download, ChevronRight } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -58,13 +58,6 @@ export default function CustomerStatementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
-
-  /** Downloads a single customer row as a CSV statement. */
-  function handleDownloadStatement(customer: CustomerBalance): void {
-    const csv = buildCsv([customer]);
-    const safeName = customer.client_name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    triggerCsvDownload(csv, `statement-${safeName}-${asAtDate}.csv`);
-  }
 
   /** Downloads all loaded customer balances as a single CSV file. */
   function handleDownloadAll(): void {
@@ -161,29 +154,21 @@ export default function CustomerStatementsPage() {
                 <tbody>
                   {customers.map((c) => (
                     <tr key={c.client_id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                      <td className="py-3 px-4 text-[var(--ff-text-primary)] font-medium">{c.client_name}</td>
+                      <td className="py-3 px-4 text-[var(--ff-text-primary)] font-medium">
+                        <Link href={`/accounting/customer-statements/${c.client_id}`} className="hover:text-purple-400 transition-colors">
+                          {c.client_name}
+                        </Link>
+                      </td>
                       <td className="py-3 px-4 text-right text-[var(--ff-text-primary)]">{formatCurrency(c.total_invoiced)}</td>
                       <td className="py-3 px-4 text-right text-emerald-400">{formatCurrency(c.total_paid)}</td>
                       <td className="py-3 px-4 text-right font-medium text-[var(--ff-text-primary)]">{formatCurrency(c.balance)}</td>
                       <td className="py-3 px-4 text-center text-[var(--ff-text-secondary)]">{c.invoice_count}</td>
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{c.last_payment_date?.split('T')[0] || '-'}</td>
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleDownloadStatement(c)}
-                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-blue-400"
-                            title="Download statement as CSV"
-                          >
-                            <Download className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => toast('Email functionality coming soon', { icon: '📧' })}
-                            className="p-1.5 rounded hover:bg-[var(--ff-bg-tertiary)] text-purple-400"
-                            title="Email Statement"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </button>
-                        </div>
+                        <Link href={`/accounting/customer-statements/${c.client_id}`}
+                          className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm">
+                          View <ChevronRight className="h-4 w-4" />
+                        </Link>
                       </td>
                     </tr>
                   ))}

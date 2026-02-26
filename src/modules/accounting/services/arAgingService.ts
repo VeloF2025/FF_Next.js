@@ -37,6 +37,29 @@ export async function getARAging(asAtDate?: string): Promise<AgingBucket[]> {
       balance: Number(r.balance),
     }));
 
+    // Include unallocated credit notes as negative balances
+    const cnRows = (await sql`
+      SELECT cn.id, cn.client_id AS entity_id, c.company_name AS entity_name,
+        cn.credit_date AS due_date, cn.total_amount, 0 AS amount_paid,
+        -cn.total_amount AS balance
+      FROM credit_notes cn
+      JOIN clients c ON c.id = cn.client_id
+      WHERE cn.type = 'customer' AND cn.status = 'approved'
+        AND cn.customer_invoice_id IS NULL
+    `) as Row[];
+
+    for (const r of cnRows) {
+      invoices.push({
+        id: String(r.id),
+        entityId: String(r.entity_id),
+        entityName: String(r.entity_name),
+        dueDate: String(r.due_date),
+        totalAmount: Number(r.total_amount),
+        amountPaid: Number(r.amount_paid),
+        balance: Number(r.balance),
+      });
+    }
+
     return calculateAgingBuckets(invoices, asAt);
   } catch (err) {
     log.error('Failed to get AR aging', { error: err }, 'accounting');

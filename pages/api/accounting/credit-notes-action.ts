@@ -9,7 +9,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { approveCreditNote } from '@/modules/accounting/services/creditNoteService';
+import { approveCreditNote, cancelCreditNote } from '@/modules/accounting/services/creditNoteService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -17,7 +17,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { action, creditNoteId, userId: bodyUserId } = req.body;
+    const { action, creditNoteId, userId: bodyUserId, reason } = req.body;
     const userId = bodyUserId || (req as unknown as { user?: { id: string } }).user?.id;
 
     if (!action || !creditNoteId) {
@@ -30,6 +30,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'approve': {
         const creditNote = await approveCreditNote(creditNoteId, userId);
         return apiResponse.success(res, creditNote);
+      }
+      case 'cancel': {
+        const cancelled = await cancelCreditNote(creditNoteId, userId, reason);
+        return apiResponse.success(res, cancelled);
       }
       default:
         return apiResponse.badRequest(res, `Unknown action: ${action}`);
