@@ -95,14 +95,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     // Valid step column names (whitelist to prevent SQL injection)
     const validStepColumns = new Set([
-      'civil_step_01_foundation', 'civil_step_02_full_pole', 'civil_step_03_pole_label',
-      'civil_step_04_cca_tag', 'civil_step_05_vertical', 'civil_step_06_guy_wires',
-      'civil_step_07_slack_bracket',
+      // Civil — Pole Install Capture Checklist (8 steps)
+      'civil_step_01_before_photo', 'civil_step_02_during_photo', 'civil_step_03_depth_photo',
+      'civil_step_04_end_plates', 'civil_step_05_compaction', 'civil_step_06_level_check',
+      'civil_step_07_after_photo', 'civil_step_08_signature',
+      // Optical — Cable Stringing (6 steps, unchanged)
       'optical_step_01_cable_route', 'optical_step_02_attachment', 'optical_step_03_slack_coil',
       'optical_step_04_cable_label', 'optical_step_05_no_backfeed', 'optical_step_06_sag_ok',
-      'splicing_step_01_dome_closed', 'splicing_step_02_slack_bracket',
-      'splicing_step_03_emergency_loop', 'splicing_step_04_backhaul_sep',
-      'splicing_step_05_tray_org', 'splicing_step_06_heat_shrinks', 'splicing_step_07_dome_label',
+      // Splicing — Distribution Dome (8 steps)
+      'splicing_step_01_dome_on_pole', 'splicing_step_02_dome_label',
+      'splicing_step_03_open_dome', 'splicing_step_04_splice_protectors',
+      'splicing_step_05_slack_management', 'splicing_step_06_strength_members',
+      'splicing_step_07_seals_dustcaps', 'splicing_step_08_pole_id',
+      // Splicing — Main Joint (6 steps, numbered 11-16)
+      'splicing_step_11_cable_entries', 'splicing_step_12_strength_members',
+      'splicing_step_13_tube_routing', 'splicing_step_14_tray_entries',
+      'splicing_step_15_coiling_protectors', 'splicing_step_16_readable_labels',
     ]);
 
     const updatedFields: string[] = [];

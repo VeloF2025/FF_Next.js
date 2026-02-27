@@ -473,16 +473,18 @@ function getStepColumn(discipline: Discipline, step: number): string {
   const pad = String(step).padStart(2, '0');
   const stepNames: Record<string, Record<number, string>> = {
     civil: {
-      1: 'foundation', 2: 'full_pole', 3: 'pole_label', 4: 'cca_tag',
-      5: 'vertical', 6: 'guy_wires', 7: 'slack_bracket',
+      1: 'before_photo', 2: 'during_photo', 3: 'depth_photo', 4: 'end_plates',
+      5: 'compaction', 6: 'level_check', 7: 'after_photo', 8: 'signature',
     },
     optical: {
       1: 'cable_route', 2: 'attachment', 3: 'slack_coil',
       4: 'cable_label', 5: 'no_backfeed', 6: 'sag_ok',
     },
     splicing: {
-      1: 'dome_closed', 2: 'slack_bracket', 3: 'emergency_loop',
-      4: 'backhaul_sep', 5: 'tray_org', 6: 'heat_shrinks', 7: 'dome_label',
+      1: 'dome_on_pole', 2: 'dome_label', 3: 'open_dome', 4: 'splice_protectors',
+      5: 'slack_management', 6: 'strength_members', 7: 'seals_dustcaps', 8: 'pole_id',
+      11: 'cable_entries', 12: 'strength_members', 13: 'tube_routing',
+      14: 'tray_entries', 15: 'coiling_protectors', 16: 'readable_labels',
     },
   };
   return `${discipline}_step_${pad}_${stepNames[discipline]?.[step] || 'unknown'}`;
