@@ -200,9 +200,19 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
       return result;
     }
 
+    // Deduplicate by photo_key (multiple qfield_photo_validations can reference same photo)
+    const seenKeys = new Set<string>();
+    const uniquePhotos = photos.filter(p => {
+      const pk = p.photo_key as string;
+      if (seenKeys.has(pk)) return false;
+      seenKeys.add(pk);
+      return true;
+    });
+    result.photosFound = uniquePhotos.length;
+
     // Group photos by feature_type + feature_id for review creation
     const byFeature = new Map<string, typeof photos>();
-    for (const photo of photos) {
+    for (const photo of uniquePhotos) {
       const ft = photo.feature_type as string || 'pole';
       const key = `${ft}::${photo.feature_id}`;
       if (!byFeature.has(key)) byFeature.set(key, []);
