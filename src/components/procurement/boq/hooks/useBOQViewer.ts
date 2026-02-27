@@ -27,6 +27,7 @@ export const useBOQViewer = (
   const { context } = useProcurementContext();
   const [boqData, setBOQData] = useState<BOQWithItems | null>(null);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [sortField, setSortField] = useState<SortField>('lineNumber');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -42,6 +43,14 @@ export const useBOQViewer = (
   useEffect(() => {
     loadBOQData();
   }, [boqId, context]);
+
+  // Debounce search (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
 
   const loadBOQData = useCallback(async () => {
     if (!context) return;
@@ -73,9 +82,9 @@ export const useBOQViewer = (
     if (!boqData) return [];
 
     const filtered = boqData.items.filter(item => {
-      // Search filter
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
+      // Search filter (debounced)
+      if (debouncedSearch) {
+        const searchTerm = debouncedSearch.toLowerCase();
         if (
           !item.description.toLowerCase().includes(searchTerm) &&
           !(item.itemCode?.toLowerCase().includes(searchTerm)) &&
@@ -89,7 +98,7 @@ export const useBOQViewer = (
       if (filters.mappingStatus && item.mappingStatus !== filters.mappingStatus) return false;
       if (filters.procurementStatus && item.procurementStatus !== filters.procurementStatus) return false;
       if (filters.phase && item.phase !== filters.phase) return false;
-      if (filters.category && item.category !== filters.category) return false;
+      if (filters.categories.length > 0 && !filters.categories.includes(item.category || '')) return false;
 
       // Issues filter
       if (filters.hasIssues !== null) {
@@ -142,7 +151,7 @@ export const useBOQViewer = (
     });
 
     return filtered;
-  }, [boqData, filters, sortField, sortDirection]);
+  }, [boqData, debouncedSearch, filters.mappingStatus, filters.procurementStatus, filters.phase, filters.categories, filters.hasIssues, sortField, sortDirection]);
 
   // Paginated items
   const paginatedItems = useMemo(() => {

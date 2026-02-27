@@ -14,6 +14,7 @@ import BOQViewerTable from './BOQViewerTable';
 import BOQViewerPagination from './BOQViewerPagination';
 import BOQViewerSummary from './BOQViewerSummary';
 import BOQViewerEmptyState from './BOQViewerEmptyState';
+import BOQViewerSummaryFooter from './BOQViewerSummaryFooter';
 
 export default function BOQViewer({ 
   boqId, 
@@ -49,10 +50,12 @@ export default function BOQViewer({
     totalPages
   } = useBOQViewer(boqId, initialMode, onItemUpdate);
 
-  // Handle export
+  // Handle export (uses filtered items)
   const handleExport = () => {
     if (!boqData) return;
-    exportBOQToCSV(boqData, filteredAndSortedItems, visibleColumns);
+    // Export only filtered items, not the entire BOQ
+    const exportData = { ...boqData, items: filteredAndSortedItems };
+    exportBOQToCSV(exportData, filteredAndSortedItems, visibleColumns);
   };
 
   // Clear filters
@@ -113,7 +116,7 @@ export default function BOQViewer({
 
       {/* Table */}
       {filteredAndSortedItems.length > 0 ? (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
           <BOQViewerTable
             items={paginatedItems}
             mode={mode}
@@ -142,6 +145,12 @@ export default function BOQViewer({
             totalItems={boqData.items.length}
             filteredItems={filteredAndSortedItems.length}
             onPageChange={setCurrentPage}
+          />
+
+          {/* Summary Footer */}
+          <BOQViewerSummaryFooter
+            boqData={boqData}
+            filteredItems={filteredAndSortedItems}
           />
         </div>
       ) : (

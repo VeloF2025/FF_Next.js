@@ -109,7 +109,7 @@ export default function BOQViewerHeader({
 
         {/* Category filter */}
         <select
-          value={filters.category}
+          value={Array.isArray(filters.category) ? filters.category[0] || '' : filters.category}
           onChange={(e) => setFilters({ ...filters, category: e.target.value })}
           className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm min-w-[160px]"
         >

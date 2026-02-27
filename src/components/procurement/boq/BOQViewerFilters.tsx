@@ -80,17 +80,35 @@ export default function BOQViewerFilters({
           ))}
         </select>
 
-        {/* Category */}
-        <select
-          value={filters.category}
-          onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-          className="px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
-        >
-          <option value="">All Categories</option>
-          {filterOptions.categories.map(category => (
-            <option key={category} value={category}>{category}</option>
-          ))}
-        </select>
+        {/* Category Multi-Select */}
+        <div className="md:col-span-1">
+          <div className="relative group">
+            <button className="w-full px-3 py-2 border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm text-left">
+              {filters.categories.length === 0 
+                ? 'All Categories' 
+                : `${filters.categories.length} selected`}
+            </button>
+            <div className="absolute left-0 right-0 mt-1 bg-[var(--ff-bg-secondary)] rounded-md shadow-lg border border-[var(--ff-border-light)] hidden group-hover:block z-10 max-h-64 overflow-y-auto">
+              {filterOptions.categories.map(category => (
+                <label key={category} className="flex items-center px-3 py-2 hover:bg-[var(--ff-bg-hover)]">
+                  <input
+                    type="checkbox"
+                    checked={filters.categories.includes(category)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFilters({ ...filters, categories: [...filters.categories, category] });
+                      } else {
+                        setFilters({ ...filters, categories: filters.categories.filter(c => c !== category) });
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">{category}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between">

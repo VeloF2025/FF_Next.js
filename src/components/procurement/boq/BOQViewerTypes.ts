@@ -17,7 +17,7 @@ export interface FilterState {
   mappingStatus: BOQItemMappingStatusType | '';
   procurementStatus: ProcurementStatusType | '';
   phase: string;
-  category: string;
+  categories: string[]; // Multi-select support
   hasIssues: boolean | null;
 }
 
@@ -34,7 +34,7 @@ export const INITIAL_FILTERS: FilterState = {
   mappingStatus: '',
   procurementStatus: '',
   phase: '',
-  category: '',
+  categories: [],
   hasIssues: null
 };
 
