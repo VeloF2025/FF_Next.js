@@ -74,6 +74,18 @@ return apiResponse.notFound(res, 'Resource', id);
 - Nested dynamic routes fail in Vercel - flatten them
 - **NO conditional SQL fragments** - `${cond ? sql`AND x` : sql``}` breaks Neon - use explicit query branches
 
+## Database Backup
+
+| What | Command | Schedule |
+|------|---------|----------|
+| **Weekly pg_dump** | `bash scripts/db-backup.sh` | Sunday 02:00 SAST (cron on Velocity) |
+| **Pre-migration snapshot** | `bash scripts/db-snapshot.sh <num> "desc"` | Before EVERY migration |
+| **Backup verification** | `bash scripts/db-backup-verify.sh` | Monday 08:00 SAST (cron on Velocity) |
+
+- **Backups:** `/home/velo/backups/neon/fibreflow-YYYY-MM-DD.sql.gz` (4 weekly rolling)
+- **Neon PITR:** 30-day restore window (Scale plan)
+- **Recovery runbook:** See `~/.openclaw/shared/kb/fibreflow/architecture/deployment.md` §17
+
 ## Module Documentation
 
 Detailed module docs live in `.claude/modules/`. Key modules:
