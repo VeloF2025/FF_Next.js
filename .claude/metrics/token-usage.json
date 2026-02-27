@@ -225,6 +225,17 @@
         "mcp__chrome-devtools__take_screenshot": 2,
         "mcp__chrome-devtools__take_snapshot": 1
       }
+    },
+    "0b682871-5297-40a6-872c-53d9573e2204": {
+      "session_id": "0b682871-5297-40a6-872c-53d9573e2204",
+      "started_at": "2026-02-27T10:49:20.262Z",
+      "total_input_tokens": 128,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.000384,
+      "tool_calls": 2,
+      "tools_used": {
+        "Bash": 2
+      }
     }
   }
 }
