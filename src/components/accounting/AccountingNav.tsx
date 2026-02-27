@@ -31,7 +31,7 @@ function FlatDropdown({ items, asPath, onClose }: { items: DropdownItem[]; asPat
   );
 }
 
-/** Sage-style flyout dropdown with section rows that expand sub-menus to the right */
+/** Sage-style flyout: left panel with sections, sub-menu appears aligned to hovered row */
 function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; onClose: () => void }) {
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,9 +47,9 @@ function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; on
   );
 
   return (
-    <div className="absolute top-full left-0 flex z-40">
-      {/* Left panel: top actions + section names */}
-      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-bl-lg shadow-xl min-w-[200px] py-1">
+    <div className="absolute top-full left-0 z-40">
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[200px] py-1">
+        {/* Top-level actions (Add a Customer, etc.) */}
         {tab.topItems?.map(item => (
           <Link key={item.href} href={item.href} onClick={onClose}
             className="block px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)] transition-colors">
@@ -60,48 +60,51 @@ function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; on
           <div className="border-t border-[var(--ff-border-light)] my-1" />
         )}
 
+        {/* Section rows — each is relative so sub-menu anchors to it */}
         {sections.map(section => {
           const isHovered = hoveredSection === section.section;
           const isActive = activeSection?.section === section.section && !hoveredSection;
           return (
             <div
               key={section.section}
+              className="relative"
               onMouseEnter={() => { clearTimer(); setHoveredSection(section.section); }}
               onMouseLeave={delayedClose}
-              className={`flex items-center justify-between px-4 py-2.5 text-sm cursor-default transition-colors ${
-                isHovered
-                  ? 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]'
-                  : isActive ? 'text-emerald-400' : 'text-[var(--ff-text-secondary)]'
-              }`}
             >
-              <span className="font-medium">{section.section}</span>
-              <ChevronRight className="h-3.5 w-3.5 ml-4 flex-shrink-0" />
+              <div
+                className={`flex items-center justify-between px-4 py-2.5 text-sm cursor-default transition-colors ${
+                  isHovered
+                    ? 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]'
+                    : isActive ? 'text-emerald-400' : 'text-[var(--ff-text-secondary)]'
+                }`}
+              >
+                <span className="font-medium">{section.section}</span>
+                <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" />
+              </div>
+
+              {/* Sub-menu: positioned to the right, top-aligned with this row */}
+              {isHovered && (
+                <div
+                  onMouseEnter={clearTimer}
+                  onMouseLeave={delayedClose}
+                  className="absolute left-full top-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-r-lg shadow-xl min-w-[210px] py-1"
+                >
+                  {section.items.map(item => (
+                    <Link key={item.href} href={item.href} onClick={onClose}
+                      className={`block px-4 py-2 text-sm whitespace-nowrap transition-colors ${
+                        isLinkActive(item.href, asPath)
+                          ? 'text-emerald-400 bg-emerald-500/10'
+                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
+                      }`}>
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
-
-      {/* Right panel: sub-items for hovered section */}
-      {hoveredSection && (
-        <div
-          onMouseEnter={clearTimer}
-          onMouseLeave={delayedClose}
-          className="bg-[var(--ff-bg-secondary)] border border-l-0 border-[var(--ff-border-light)] rounded-br-lg shadow-xl min-w-[200px] py-1"
-        >
-          {sections
-            .find(s => s.section === hoveredSection)
-            ?.items.map(item => (
-              <Link key={item.href} href={item.href} onClick={onClose}
-                className={`block px-4 py-2 text-sm transition-colors ${
-                  isLinkActive(item.href, asPath)
-                    ? 'text-emerald-400 bg-emerald-500/10'
-                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
-                }`}>
-                {item.label}
-              </Link>
-            ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -122,39 +125,39 @@ export function AccountingNav() {
 
   useEffect(() => { setOpenTab(null); }, [router.pathname]);
 
-  const hasFlyout = (tab: Tab) => tab.items?.some(isFlyout) ?? false;
+  const hasFlyout = (t: Tab) => t.items?.some(isFlyout) ?? false;
 
   return (
     <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
       <div className="flex items-center gap-0 px-2">
-        {TABS.map(tab => (
-          <div key={tab.id} className="relative">
-            {tab.href ? (
-              <Link href={tab.href}
+        {TABS.map(t => (
+          <div key={t.id} className="relative">
+            {t.href ? (
+              <Link href={t.href}
                 className={`block px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.id
+                  activeTab === t.id
                     ? 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}>
-                {tab.label}
+                {t.label}
               </Link>
             ) : (
               <button
-                onClick={() => setOpenTab(openTab === tab.id ? null : tab.id)}
+                onClick={() => setOpenTab(openTab === t.id ? null : t.id)}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors inline-flex items-center gap-1 ${
-                  activeTab === tab.id
+                  activeTab === t.id
                     ? 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}>
-                {tab.label}
-                <ChevronDown className={`h-3 w-3 transition-transform ${openTab === tab.id ? 'rotate-180' : ''}`} />
+                {t.label}
+                <ChevronDown className={`h-3 w-3 transition-transform ${openTab === t.id ? 'rotate-180' : ''}`} />
               </button>
             )}
 
-            {tab.items && openTab === tab.id && (
-              hasFlyout(tab)
-                ? <FlyoutDropdown tab={tab} asPath={router.asPath} onClose={() => setOpenTab(null)} />
-                : <FlatDropdown items={tab.items as DropdownItem[]} asPath={router.asPath} onClose={() => setOpenTab(null)} />
+            {t.items && openTab === t.id && (
+              hasFlyout(t)
+                ? <FlyoutDropdown tab={t} asPath={router.asPath} onClose={() => setOpenTab(null)} />
+                : <FlatDropdown items={t.items as DropdownItem[]} asPath={router.asPath} onClose={() => setOpenTab(null)} />
             )}
           </div>
         ))}
