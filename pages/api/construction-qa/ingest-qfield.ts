@@ -4,6 +4,8 @@
  * Triggers ingestion of QField photos into the Construction QA system.
  * Reads from qfield_photo_validations and creates review + photo records.
  *
+ * Auth: session cookie OR x-cron-secret header (for cron jobs)
+ *
  * Body: { projectId?, discipline?, sinceDate?, dryRun? }
  *   - projectId: FibreFlow project UUID (optional — omit to ingest ALL mapped projects)
  *   - discipline: 'civil' | 'optical' | 'splicing' | 'all' (default: 'all')
@@ -15,11 +17,18 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { ingestQFieldPhotos, ingestAllQFieldPhotos } from '@/modules/construction-qa/services/qfieldIngestionService';
-import { withAuth } from '@/lib/auth/middleware';
+
+const CRON_SECRET = process.env.CRON_SECRET || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['POST']);
+  }
+
+  // Auth: cron secret or session cookie
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  if (cronSecret !== CRON_SECRET && !req.headers.cookie) {
+    return apiResponse.unauthorized(res, 'Invalid cron secret');
   }
 
   try {
@@ -48,4 +57,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default handler;
