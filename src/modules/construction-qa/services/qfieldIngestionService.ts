@@ -25,6 +25,14 @@ const WORK_TYPE_MAP: Record<string, { discipline: Discipline; featureType: Featu
   pole_installation: { discipline: 'civil', featureType: 'pole' },
   cable_stringing: { discipline: 'optical', featureType: 'cable_span' },
   dome_joint: { discipline: 'splicing', featureType: 'joint' },
+  activation: { discipline: 'civil', featureType: 'pole' }, // default — overridden per-row below
+};
+
+/** Map feature_type string to discipline (used for activation rows with mixed types) */
+const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureType: FeatureType }> = {
+  pole: { discipline: 'civil', featureType: 'pole' },
+  cable_span: { discipline: 'optical', featureType: 'cable_span' },
+  joint: { discipline: 'splicing', featureType: 'joint' },
 };
 
 /**
@@ -192,10 +200,11 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
       return result;
     }
 
-    // Group photos by feature_id for review creation
+    // Group photos by feature_type + feature_id for review creation
     const byFeature = new Map<string, typeof photos>();
     for (const photo of photos) {
-      const key = `${photo.work_type}::${photo.feature_id}`;
+      const ft = photo.feature_type as string || 'pole';
+      const key = `${ft}::${photo.feature_id}`;
       if (!byFeature.has(key)) byFeature.set(key, []);
       byFeature.get(key)!.push(photo);
     }
@@ -205,7 +214,12 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
       try {
         const sample = featurePhotos[0];
         if (!sample) continue;
-        const mapping = WORK_TYPE_MAP[sample.work_type as string];
+
+        // For activation work_type, derive discipline from actual feature_type
+        const rowFeatureType = sample.feature_type as string;
+        const mapping = (sample.work_type === 'activation' && rowFeatureType && FEATURE_TYPE_DISCIPLINE[rowFeatureType])
+          ? FEATURE_TYPE_DISCIPLINE[rowFeatureType]
+          : WORK_TYPE_MAP[sample.work_type as string];
         if (!mapping) continue;
 
         // Upsert the review record
