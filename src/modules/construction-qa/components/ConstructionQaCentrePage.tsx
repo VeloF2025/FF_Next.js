@@ -211,7 +211,7 @@ export function ConstructionQaCentrePage() {
   ], [stats, filters.discipline]);
 
   const handleRowClick = (feature: FeatureRow) => {
-    router.push(`/construction-qa/${feature.id}`);
+    router.push(`/field-ops/${feature.id}`);
   };
 
   // Debounced search

@@ -1323,9 +1323,9 @@ The Field App Portal integrates with:
 ### 5.5 Construction QA
 The Construction QA module provides structured quality assurance workflows for civil, optical, and splicing activities on fiber network construction projects. It integrates with QField for photo capture, the VLM AI service for automated photo validation, and WhatsApp for team feedback.
 
-**Navigation:** Sidebar → **Construction QA**
+**Navigation:** Sidebar → **Field Operations**
 
-**Route:** \`/construction-qa\`
+**Route:** \`/field-ops\`
 
 #### Overview
 

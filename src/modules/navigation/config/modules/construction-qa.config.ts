@@ -13,7 +13,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
   moduleId: 'construction-qa',
   moduleName: 'Civil QA',
   description: 'Civil, optical, and splicing quality assurance',
-  basePath: '/construction-qa',
+  basePath: '/field-ops',
   icon: HardHat,
   tabs: [
     {
@@ -21,7 +21,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       label: 'QA Centre',
       shortLabel: 'QA',
       icon: ClipboardCheck,
-      path: '/construction-qa',
+      path: '/field-ops',
       rbacKey: 'field',
     },
     {
@@ -29,7 +29,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       label: 'OTDR Testing',
       shortLabel: 'OTDR',
       icon: Radio,
-      path: '/construction-qa/otdr',
+      path: '/field-ops/otdr',
       rbacKey: 'field',
     },
     {
@@ -37,7 +37,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       label: 'Reports',
       shortLabel: 'Reports',
       icon: BarChart3,
-      path: '/construction-qa/reports',
+      path: '/field-ops/reports',
       rbacKey: 'field',
     },
   ],

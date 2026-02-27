@@ -281,7 +281,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
         <h2 className="text-xl font-bold text-white mb-2">Review Not Found</h2>
         <p className="text-gray-400 mb-6">{error || 'This review does not exist.'}</p>
         <button
-          onClick={() => router.push('/construction-qa')}
+          onClick={() => router.push('/field-ops')}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           Back to QA Centre
@@ -298,7 +298,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => router.push('/construction-qa')}
+          onClick={() => router.push('/field-ops')}
           className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-gray-400" />

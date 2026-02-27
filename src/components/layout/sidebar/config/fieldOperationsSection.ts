@@ -11,11 +11,11 @@ import type { NavSection } from './types';
 export const fieldOperationsSection: NavSection = {
   section: 'Field Operations',
   sectionId: 'field-ops',
-  sectionLink: '/construction-qa',
+  sectionLink: '/field-ops',
   isCollapsible: false,
   items: [
     {
-      to: '/construction-qa',
+      to: '/field-ops',
       icon: HardHat,
       label: 'Field Operations',
       shortLabel: 'Field Ops',

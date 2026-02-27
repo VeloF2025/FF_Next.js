@@ -6,5 +6,5 @@ import { redirect } from 'next/navigation';
  * This page now redirects to /construction-qa.
  */
 export default function QFieldQaPage() {
-  redirect('/construction-qa');
+  redirect('/field-ops');
 }
