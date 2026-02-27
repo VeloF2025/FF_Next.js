@@ -10,6 +10,7 @@
  * - rfosCompleted: PON stages reaching 'rfo' overall_stage today
  * - atpsCompleted: ATP tests passed today (pon_stage_tracking)
  * - totalInstalls: DR installs submitted today (dr_photo_unified_reviews)
+ * - totalActivated: OES activations today (day-lagged from FiberTime)
  * - asOfDate: ISO date string for "today"
  */
 
@@ -29,6 +30,7 @@ export interface ProgressTodayResponse {
     rfosCompleted: number;
     atpsCompleted: number;
     totalInstalls: number;
+    totalActivated: number;
   };
   previousDay: {
     polesPlanted: number;
@@ -36,6 +38,7 @@ export interface ProgressTodayResponse {
     rfosCompleted: number;
     atpsCompleted: number;
     totalInstalls: number;
+    totalActivated: number;
   };
 }
 
@@ -59,6 +62,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       atpsYesterday,
       installsToday,
       installsYesterday,
+      activatedToday,
+      activatedYesterday,
     ] = await Promise.all([
       // Poles planted today
       sql`SELECT COUNT(*) as count FROM poles WHERE installation_date = CURRENT_DATE`,
@@ -76,9 +81,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       sql`SELECT COUNT(*) as count FROM pon_stage_tracking WHERE atp_last_date = CURRENT_DATE`,
       sql`SELECT COUNT(*) as count FROM pon_stage_tracking WHERE atp_last_date = CURRENT_DATE - INTERVAL '1 day'`,
 
-      // Total installs today (DR submissions)
+      // Total installs today (DR submissions via WhatsApp)
       sql`SELECT COUNT(*) as count FROM dr_photo_unified_reviews WHERE submitted_date::date = CURRENT_DATE`,
       sql`SELECT COUNT(*) as count FROM dr_photo_unified_reviews WHERE submitted_date::date = CURRENT_DATE - INTERVAL '1 day'`,
+
+      // OES Activations (day-lagged — imported from FiberTime OES report)
+      sql`SELECT COUNT(*) as count FROM oes_activations WHERE activation_date::date = CURRENT_DATE`,
+      sql`SELECT COUNT(*) as count FROM oes_activations WHERE activation_date::date = CURRENT_DATE - INTERVAL '1 day'`,
     ]);
 
     const response: ProgressTodayResponse = {
@@ -89,6 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         rfosCompleted: Number(rfosToday[0].count),
         atpsCompleted: Number(atpsToday[0].count),
         totalInstalls: Number(installsToday[0].count),
+        totalActivated: Number(activatedToday[0].count),
       },
       previousDay: {
         polesPlanted: Number(polesYesterday[0].count),
@@ -96,6 +106,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         rfosCompleted: Number(rfosYesterday[0].count),
         atpsCompleted: Number(atpsYesterday[0].count),
         totalInstalls: Number(installsYesterday[0].count),
+        totalActivated: Number(activatedYesterday[0].count),
       },
     };
 
