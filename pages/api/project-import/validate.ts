@@ -46,7 +46,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
   try {
     const { projectId, dataType, fileData } = req.body as ValidateRequestBody;
@@ -90,7 +90,7 @@ async function handler(
 
     if (!resolvedDataType) {
       // Return partial validation with suggestions
-      return res.status(200).json({
+      return apiResponse.success(res, {
         valid: false,
         detectedDataType: null,
         tableName: null,
