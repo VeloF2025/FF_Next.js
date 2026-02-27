@@ -35,15 +35,17 @@ FibreFlow uses a **three-environment setup** with time-gated deployments to prot
 
 **Rationale**: People are actively using staging and production during business hours. Breaking these environments causes downtime for the team.
 
-## Git Strategy
+## Git Strategy — Feature Branch Workflow (MANDATORY from 2026-02-27)
 
 ```
-feature/name  →  master  →  deploy to dev  →  promote to staging  →  promote to production
+feature/<name>  →  push branch  →  deploy to dev  →  Hein approves  →  merge to master  →  promote to staging  →  promote to production
 ```
 
-- **Single branch**: `master` — all work merges here
+- **Protected branch**: `master` — NO direct commits, NO `ALLOW_MASTER_PUSH=1`
 - **Feature branches**: `feature/<name>`, `fix/<name>`, `refactor/<name>`
-- **No `develop` branch** — dev environment deploys from `master`
+- **All new code** goes on a feature branch first
+- **Merge to master** ONLY after Hein approves testing on dev
+- **No `develop` branch** — dev environment deploys from the feature branch
 
 ## Deployment Flow
 
@@ -54,13 +56,18 @@ npm run lint && npm run type-check  # Quality checks
 npm test                            # Run tests
 ```
 
-### Step 2: Deploy to Dev (During Business Hours)
+### Step 2: Push Feature Branch & Deploy to Dev
 ```bash
-# Push to master
-git push origin master
+# Create feature branch (if not already on one)
+git checkout -b feature/<name>
 
-# Deploy to dev
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+# Commit and push the feature branch
+git add <files>
+git commit -m "feat: description"
+git push origin feature/<name>
+
+# Deploy feature branch to dev
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Verify
 curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in
@@ -69,9 +76,25 @@ curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in
 
 Test thoroughly at https://dev.fibreflow.app
 
-### Step 3: Promote to Staging (After Hours Only)
+### Step 3: Get Hein's Approval
+**CRITICAL**: Do NOT merge to master without Hein's explicit approval after testing on dev.
+
+### Step 4: Merge to Master (After Approval)
 ```bash
-# Get the exact commit running on dev
+# Merge feature branch to master
+git checkout master
+git pull origin master
+git merge feature/<name>
+git push origin master
+
+# Clean up feature branch
+git branch -d feature/<name>
+git push origin --delete feature/<name>
+```
+
+### Step 5: Promote to Staging (After Hours Only)
+```bash
+# Get the exact commit running on dev (now on master)
 DEV_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git rev-parse HEAD")
 
 # Deploy that EXACT commit to staging
@@ -81,7 +104,7 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && 
 curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app/sign-in
 ```
 
-### Step 4: Promote to Production (After Hours Only)
+### Step 6: Promote to Production (After Hours Only)
 ```bash
 # Get the exact commit running on staging
 STG_COMMIT=$(ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git rev-parse HEAD")
@@ -162,8 +185,9 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-fa
 
 - [ ] Changes tested locally (`npm run build`)
 - [ ] Lint and type-check pass (`npm run lint && npm run type-check`)
-- [ ] Changes committed and pushed to `master`
-- [ ] Deployed to dev.fibreflow.app and tested
+- [ ] Changes committed and pushed to feature branch (NOT master)
+- [ ] Feature branch deployed to dev.fibreflow.app and tested
+- [ ] Hein approved the feature on dev
 - [ ] Current time is after 17:00 SAST (for staging/production)
 - [ ] User approval obtained (for production)
 
@@ -194,10 +218,13 @@ Only use for critical issues affecting users NOW. Must have explicit user approv
 
 ## Rules for AI Agents
 
-1. **NEVER deploy to staging or production during business hours** (08:00–17:00 SAST Mon–Fri) unless the user explicitly requests an emergency override
-2. **Always deploy to dev first** — test there before promoting
-3. **Promotions use the EXACT commit** from the source environment
-4. **Ask the user before using --force** — never override the time gate autonomously
-5. **All environments share the production database** — schema migrations affect everyone immediately
-6. **Use systemd** (not PM2) for process management
-7. **Use SSH key auth** (not sshpass) — connect as `velo@100.96.203.105`
+1. **NEVER push directly to master** — all code goes on feature branches first
+2. **NEVER use `ALLOW_MASTER_PUSH=1`** — this bypass is banned
+3. **NEVER deploy to staging or production during business hours** (08:00–17:00 SAST Mon–Fri) unless the user explicitly requests an emergency override
+4. **Always deploy feature branch to dev first** — test there before merging to master
+5. **Merge to master ONLY after Hein approves** on dev
+6. **Promotions use the EXACT commit** from the source environment
+7. **Ask the user before using --force** — never override the time gate autonomously
+8. **All environments share the production database** — schema migrations affect everyone immediately
+9. **Use systemd** (not PM2) for process management
+10. **Use SSH key auth** (not sshpass) — connect as `velo@100.96.203.105`

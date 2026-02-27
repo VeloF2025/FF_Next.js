@@ -65,7 +65,7 @@ ssh root@72.61.197.178
 
 | Task | Command |
 |------|---------|
-| **Deploy to dev** | `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build && echo 'velo2026' \| sudo -S systemctl restart fibreflow-dev.service"` |
+| **Deploy to dev** | `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' \| sudo -S systemctl restart fibreflow-dev.service"` |
 | **Check all services** | `ssh velo@100.96.203.105 "systemctl is-active fibreflow-dev fibreflow fibreflow-production"` |
 | **View dev logs** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S journalctl -u fibreflow-dev -n 50"` |
 | **View staging logs** | `ssh velo@100.96.203.105 "echo 'velo2026' \| sudo -S journalctl -u fibreflow -n 50"` |
@@ -100,7 +100,7 @@ bash scripts/deploy-gate.sh status
 
 ```
 /home/velo/
-├── fibreflow-dev/             # Dev (master branch, port 3005)
+├── fibreflow-dev/             # Dev (feature branch, port 3005)
 │   ├── .env.local
 │   ├── package.json
 │   └── .next/
@@ -117,13 +117,20 @@ bash scripts/deploy-gate.sh status
 
 ## Deployment Workflows
 
-### Deploy to Dev (Business Hours OK)
+### Deploy Feature Branch to Dev (Business Hours OK)
+
+**IMPORTANT**: Dev deploys from the feature branch, NOT master. All code goes on feature branches first.
 
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+# Deploy feature branch to dev
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
+
+**After Hein approves on dev**: merge feature branch to master, then promote master → staging → production.
+
+**NEVER push directly to master. NEVER use ALLOW_MASTER_PUSH=1.**
 
 ### Promote Dev → Staging (After Hours Only)
 

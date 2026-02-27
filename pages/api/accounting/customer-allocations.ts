@@ -26,39 +26,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       let rows;
       if (paymentId) {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
+          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount_allocated AS amount,
+            cpa.created_at AS allocated_at, cp.payment_number, ci.invoice_number,
             c.company_name AS client_name
           FROM customer_payment_allocations cpa
           JOIN customer_payments cp ON cp.id = cpa.payment_id
           JOIN customer_invoices ci ON ci.id = cpa.invoice_id
           JOIN clients c ON c.id = cp.client_id
           WHERE cpa.payment_id = ${paymentId}
-          ORDER BY cpa.allocated_at DESC
+          ORDER BY cpa.created_at DESC
         `;
       } else if (clientId) {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
+          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount_allocated AS amount,
+            cpa.created_at AS allocated_at, cp.payment_number, ci.invoice_number,
             c.company_name AS client_name
           FROM customer_payment_allocations cpa
           JOIN customer_payments cp ON cp.id = cpa.payment_id
           JOIN customer_invoices ci ON ci.id = cpa.invoice_id
           JOIN clients c ON c.id = cp.client_id
           WHERE cp.client_id = ${clientId}
-          ORDER BY cpa.allocated_at DESC
+          ORDER BY cpa.created_at DESC
           LIMIT 200
         `;
       } else {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
+          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount_allocated AS amount,
+            cpa.created_at AS allocated_at, cp.payment_number, ci.invoice_number,
             c.company_name AS client_name
           FROM customer_payment_allocations cpa
           JOIN customer_payments cp ON cp.id = cpa.payment_id
           JOIN customer_invoices ci ON ci.id = cpa.invoice_id
           JOIN clients c ON c.id = cp.client_id
-          ORDER BY cpa.allocated_at DESC
+          ORDER BY cpa.created_at DESC
           LIMIT 200
         `;
       }
@@ -132,7 +132,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Insert allocation record
         await sql`
-          INSERT INTO customer_payment_allocations (payment_id, invoice_id, amount)
+          INSERT INTO customer_payment_allocations (payment_id, invoice_id, amount_allocated)
           VALUES (${paymentId}, ${alloc.invoiceId}, ${alloc.amount})
         `;
 

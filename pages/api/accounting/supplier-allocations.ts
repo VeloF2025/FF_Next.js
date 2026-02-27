@@ -26,39 +26,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       let rows;
       if (paymentId) {
         rows = await sql`
-          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
-            spa.allocated_at, sp.payment_number, si.invoice_number,
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount_allocated AS amount,
+            spa.created_at AS allocated_at, sp.payment_number, si.invoice_number,
             s.company_name AS supplier_name
           FROM supplier_payment_allocations spa
           JOIN supplier_payments sp ON sp.id = spa.payment_id
           JOIN supplier_invoices si ON si.id = spa.invoice_id
           JOIN suppliers s ON s.id = sp.supplier_id
           WHERE spa.payment_id = ${paymentId}
-          ORDER BY spa.allocated_at DESC
+          ORDER BY spa.created_at DESC
         `;
       } else if (supplierId) {
         rows = await sql`
-          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
-            spa.allocated_at, sp.payment_number, si.invoice_number,
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount_allocated AS amount,
+            spa.created_at AS allocated_at, sp.payment_number, si.invoice_number,
             s.company_name AS supplier_name
           FROM supplier_payment_allocations spa
           JOIN supplier_payments sp ON sp.id = spa.payment_id
           JOIN supplier_invoices si ON si.id = spa.invoice_id
           JOIN suppliers s ON s.id = sp.supplier_id
           WHERE sp.supplier_id = ${supplierId}
-          ORDER BY spa.allocated_at DESC
+          ORDER BY spa.created_at DESC
           LIMIT 200
         `;
       } else {
         rows = await sql`
-          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
-            spa.allocated_at, sp.payment_number, si.invoice_number,
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount_allocated AS amount,
+            spa.created_at AS allocated_at, sp.payment_number, si.invoice_number,
             s.company_name AS supplier_name
           FROM supplier_payment_allocations spa
           JOIN supplier_payments sp ON sp.id = spa.payment_id
           JOIN supplier_invoices si ON si.id = spa.invoice_id
           JOIN suppliers s ON s.id = sp.supplier_id
-          ORDER BY spa.allocated_at DESC
+          ORDER BY spa.created_at DESC
           LIMIT 200
         `;
       }
@@ -127,7 +127,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         await sql`
-          INSERT INTO supplier_payment_allocations (payment_id, invoice_id, amount)
+          INSERT INTO supplier_payment_allocations (payment_id, invoice_id, amount_allocated)
           VALUES (${paymentId}, ${alloc.invoiceId}, ${alloc.amount})
         `;
 

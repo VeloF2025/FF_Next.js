@@ -40,9 +40,9 @@ You are a full-stack software developer specialized in the **FibreFlow tech stac
 | 3 | **Plan Database** | 10-20 min | Write migration script, document schema |
 | 4 | **Implement Feature** | 30-120 min | Follow modular architecture, keep files <300 lines |
 | 5 | **Test Locally** | 10-15 min | `npm run build && PORT=3005 npm start` |
-| 6 | **Deploy to DEV** | 3-5 min | Merge to develop, deploy to dev.fibreflow.app |
-| 7 | **User Approval** | Variable | Wait for user confirmation |
-| 8 | **Deploy to PROD** | 3-5 min | Merge to master, deploy to app.fibreflow.app |
+| 6 | **Deploy to DEV** | 3-5 min | Push feature branch, deploy to dev.fibreflow.app |
+| 7 | **Hein Approval** | Variable | Wait for Hein's approval on dev |
+| 8 | **Merge to Master** | 3-5 min | Merge feature branch to master after approval |
 | 9 | **Update Docs** | 5-10 min | CHANGELOG.md, page logs, DATABASE_TABLES.md |
 | 10 | **Verify** | 5-10 min | Check logs, test production, confirm with user |
 
@@ -259,10 +259,12 @@ const result = await sql`
 **CRITICAL**: Never use an ORM. Always write direct SQL queries.
 
 ### Deployment
-- **Production**: https://app.fibreflow.app (master branch, port 3005)
-- **Development**: https://dev.fibreflow.app (develop branch, port 3006)
-- **Server**: VPS (72.60.17.245), PM2 process manager
-- **Workflow**: Feature branch → develop → test on dev site → master → production
+- **Production**: https://app.fibreflow.app (master branch, port 3000)
+- **Staging**: https://vf.fibreflow.app (port 3006)
+- **Development**: https://dev.fibreflow.app (feature branch, port 3005)
+- **Server**: Velocity (100.96.203.105), systemd process manager
+- **Workflow**: Feature branch → push → deploy to dev → Hein approves → merge to master → promote staging → promote production
+- **NEVER push directly to master. NEVER use ALLOW_MASTER_PUSH=1.**
 
 ## Implementation Workflow
 
@@ -350,32 +352,33 @@ PORT=3005 npm start
 
 ### 5. Deploy to Development
 ```bash
-# Commit to feature branch
-git add .
+# Commit and push feature branch
+git add <files>
 git commit -m "feat: description"
+git push origin feature/<name>
 
-# Merge to develop
-git checkout develop
-git merge feature/branch-name
-git push origin develop
-
-# Deploy to dev site
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
+# Deploy feature branch to dev
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 ```
 
 Test at https://dev.fibreflow.app
 
-### 6. Deploy to Production (After User Approval)
+### 6. Get Hein's Approval
+**CRITICAL**: Do NOT merge to master without Hein's explicit approval after testing on dev.
+
+### 7. Merge to Master & Promote (After Approval)
 ```bash
-# Merge to master
+# Merge feature branch to master
 git checkout master
-git merge develop
+git pull origin master
+git merge feature/<name>
 git push origin master
 
-# Deploy to production
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
+# Promote to staging (after hours only, with Hein's approval)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+
+# Promote to production (after hours only, with Hein's approval)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 Verify at https://app.fibreflow.app

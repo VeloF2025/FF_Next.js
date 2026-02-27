@@ -141,20 +141,15 @@ PORT=3005 npm start
 # - Error handling works
 ```
 
-### 6. Deploy to Development Environment
+### 6. Deploy Feature Branch to Dev
 ```bash
-# Commit changes to feature branch
-git add .
+# Commit and push feature branch
+git add <files>
 git commit -m "feat: description of changes"
+git push origin feature/<name>
 
-# Merge to develop
-git checkout develop
-git merge feature/branch-name
-git push origin develop
-
-# Deploy to dev.fibreflow.app
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
+# Deploy feature branch to dev.fibreflow.app
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git fetch origin && git checkout feature/<name> && git pull origin feature/<name> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 
 # Test at https://dev.fibreflow.app
 ```
@@ -168,22 +163,27 @@ sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245
 - [ ] Error handling displays user-friendly messages
 - [ ] Mobile responsive (test in DevTools)
 
-### 7. Get User Approval
-**CRITICAL**: Do NOT deploy to production without user approval after testing on dev.fibreflow.app.
+### 7. Get Hein's Approval
+**CRITICAL**: Do NOT merge to master without Hein's explicit approval after testing on dev.fibreflow.app.
 
-### 8. Deploy to Production (After Approval)
+### 8. Merge to Master & Promote (After Approval)
 ```bash
-# Merge to master
+# Merge feature branch to master
 git checkout master
-git merge develop
+git pull origin master
+git merge feature/<name>
 git push origin master
 
-# Deploy to app.fibreflow.app
-sshpass -p '$VPS_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no root@72.60.17.245 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
+# Promote to staging (after hours only, with Hein's approval)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+
+# Promote to production (after hours only, with Hein's approval)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 
 # Verify at https://app.fibreflow.app
 ```
+
+**NEVER push directly to master. NEVER use ALLOW_MASTER_PUSH=1.**
 
 ### 9. Update Documentation
 ```bash
@@ -320,5 +320,5 @@ Implementation is complete when:
 - ✅ User approved for production deployment
 - ✅ Deployed to production successfully
 - ✅ Documentation updated (CHANGELOG, page logs, DATABASE_TABLES if needed)
-- ✅ No errors in PM2 logs: `pm2 logs fibreflow-prod --lines 50`
+- ✅ No errors in systemd logs: `journalctl -u fibreflow-production -n 50`
 - ✅ Feature verified working in production
