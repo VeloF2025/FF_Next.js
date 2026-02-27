@@ -1,7 +1,7 @@
 /**
- * Customer Receipt Allocations API
+ * Supplier Payment Allocations API
  * GET  — List existing allocations (audit trail)
- * POST — Allocate receipts against outstanding invoices
+ * POST — Allocate payments against outstanding supplier invoices
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21,51 +21,51 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const paymentId = req.query.payment_id as string | undefined;
-      const clientId = req.query.client_id as string | undefined;
+      const supplierId = req.query.supplier_id as string | undefined;
 
       let rows;
       if (paymentId) {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
-            c.company_name AS client_name
-          FROM customer_payment_allocations cpa
-          JOIN customer_payments cp ON cp.id = cpa.payment_id
-          JOIN customer_invoices ci ON ci.id = cpa.invoice_id
-          JOIN clients c ON c.id = cp.client_id
-          WHERE cpa.payment_id = ${paymentId}
-          ORDER BY cpa.allocated_at DESC
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
+            spa.allocated_at, sp.payment_number, si.invoice_number,
+            s.company_name AS supplier_name
+          FROM supplier_payment_allocations spa
+          JOIN supplier_payments sp ON sp.id = spa.payment_id
+          JOIN supplier_invoices si ON si.id = spa.invoice_id
+          JOIN suppliers s ON s.id = sp.supplier_id
+          WHERE spa.payment_id = ${paymentId}
+          ORDER BY spa.allocated_at DESC
         `;
-      } else if (clientId) {
+      } else if (supplierId) {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
-            c.company_name AS client_name
-          FROM customer_payment_allocations cpa
-          JOIN customer_payments cp ON cp.id = cpa.payment_id
-          JOIN customer_invoices ci ON ci.id = cpa.invoice_id
-          JOIN clients c ON c.id = cp.client_id
-          WHERE cp.client_id = ${clientId}
-          ORDER BY cpa.allocated_at DESC
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
+            spa.allocated_at, sp.payment_number, si.invoice_number,
+            s.company_name AS supplier_name
+          FROM supplier_payment_allocations spa
+          JOIN supplier_payments sp ON sp.id = spa.payment_id
+          JOIN supplier_invoices si ON si.id = spa.invoice_id
+          JOIN suppliers s ON s.id = sp.supplier_id
+          WHERE sp.supplier_id = ${supplierId}
+          ORDER BY spa.allocated_at DESC
           LIMIT 200
         `;
       } else {
         rows = await sql`
-          SELECT cpa.id, cpa.payment_id, cpa.invoice_id, cpa.amount,
-            cpa.allocated_at, cp.payment_number, ci.invoice_number,
-            c.company_name AS client_name
-          FROM customer_payment_allocations cpa
-          JOIN customer_payments cp ON cp.id = cpa.payment_id
-          JOIN customer_invoices ci ON ci.id = cpa.invoice_id
-          JOIN clients c ON c.id = cp.client_id
-          ORDER BY cpa.allocated_at DESC
+          SELECT spa.id, spa.payment_id, spa.invoice_id, spa.amount,
+            spa.allocated_at, sp.payment_number, si.invoice_number,
+            s.company_name AS supplier_name
+          FROM supplier_payment_allocations spa
+          JOIN supplier_payments sp ON sp.id = spa.payment_id
+          JOIN supplier_invoices si ON si.id = spa.invoice_id
+          JOIN suppliers s ON s.id = sp.supplier_id
+          ORDER BY spa.allocated_at DESC
           LIMIT 200
         `;
       }
 
       return apiResponse.success(res, rows);
     } catch (err) {
-      log.error('Failed to get customer allocations', { error: err });
+      log.error('Failed to get supplier allocations', { error: err });
       return apiResponse.badRequest(res, 'Failed to get allocations');
     }
   }
@@ -82,17 +82,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, 'allocations array is required');
       }
 
-      // Validate allocation items
       for (const alloc of allocations) {
         if (!alloc.invoiceId || !alloc.amount || alloc.amount <= 0) {
           return apiResponse.badRequest(res, 'Each allocation needs invoiceId and positive amount');
         }
       }
 
-      // Fetch payment
       const paymentRows = await sql`
-        SELECT id, client_id, total_amount, allocated_amount, status
-        FROM customer_payments WHERE id = ${paymentId}
+        SELECT id, supplier_id, total_amount, allocated_amount, status
+        FROM supplier_payments WHERE id = ${paymentId}
       `;
       const payment = paymentRows[0];
       if (!payment) return apiResponse.notFound(res, 'Payment', paymentId);
@@ -108,41 +106,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, `Allocation total (${allocTotal}) exceeds available balance (${(totalPayment - currentAllocated).toFixed(2)})`);
       }
 
-      // Process each allocation
       const results: { invoiceId: string; amount: number; newStatus: string }[] = [];
 
       for (const alloc of allocations) {
-        // Validate invoice belongs to same client
         const invoiceRows = await sql`
-          SELECT id, client_id, total, amount_paid, status
-          FROM customer_invoices WHERE id = ${alloc.invoiceId}
+          SELECT id, supplier_id, total_amount, amount_paid, status
+          FROM supplier_invoices WHERE id = ${alloc.invoiceId}
         `;
         const invoice = invoiceRows[0];
         if (!invoice) {
           return apiResponse.badRequest(res, `Invoice ${alloc.invoiceId} not found`);
         }
-        if (invoice.client_id !== payment.client_id) {
-          return apiResponse.badRequest(res, `Invoice ${alloc.invoiceId} belongs to a different client`);
+        if (invoice.supplier_id !== payment.supplier_id) {
+          return apiResponse.badRequest(res, `Invoice ${alloc.invoiceId} belongs to a different supplier`);
         }
 
-        const outstanding = Number(invoice.total) - Number(invoice.amount_paid || 0);
+        const outstanding = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
         if (alloc.amount > outstanding + 0.01) {
           return apiResponse.badRequest(res, `Allocation ${alloc.amount} exceeds outstanding ${outstanding.toFixed(2)} for invoice ${alloc.invoiceId}`);
         }
 
-        // Insert allocation record
         await sql`
-          INSERT INTO customer_payment_allocations (payment_id, invoice_id, amount)
+          INSERT INTO supplier_payment_allocations (payment_id, invoice_id, amount)
           VALUES (${paymentId}, ${alloc.invoiceId}, ${alloc.amount})
         `;
 
-        // Update invoice amount_paid
         const newPaid = Number(invoice.amount_paid || 0) + alloc.amount;
-        const invoiceTotal = Number(invoice.total);
+        const invoiceTotal = Number(invoice.total_amount);
         const newStatus = newPaid >= invoiceTotal - 0.01 ? 'paid' : 'partially_paid';
 
         await sql`
-          UPDATE customer_invoices
+          UPDATE supplier_invoices
           SET amount_paid = ${newPaid}, status = ${newStatus}
           WHERE id = ${alloc.invoiceId}
         `;
@@ -150,17 +144,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         results.push({ invoiceId: alloc.invoiceId, amount: alloc.amount, newStatus });
       }
 
-      // Update payment allocated_amount
       const newAllocated = currentAllocated + allocTotal;
       const paymentStatus = newAllocated >= totalPayment - 0.01 ? 'reconciled' : 'confirmed';
 
       await sql`
-        UPDATE customer_payments
+        UPDATE supplier_payments
         SET allocated_amount = ${newAllocated}, status = ${paymentStatus}
         WHERE id = ${paymentId}
       `;
 
-      log.info('Customer allocations created', {
+      log.info('Supplier allocations created', {
         paymentId,
         count: results.length,
         total: allocTotal,
@@ -174,7 +167,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Allocation failed';
-      log.error('Customer allocation failed', { error: err });
+      log.error('Supplier allocation failed', { error: err });
       return apiResponse.badRequest(res, message);
     }
   }
