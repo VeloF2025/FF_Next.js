@@ -1,7 +1,7 @@
 /**
  * Sage-style horizontal navigation bar for accounting pages
- * Tabs with dropdown menus; Customers/Suppliers use flyout sub-menus
- * that expand to the right on hover (matching Sage's UX pattern)
+ * Tabs with dropdown menus; supports up to three-level flyout nesting
+ * (e.g. Accountant's Area → Reports → Management Reports → Income Statement)
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -10,20 +10,70 @@ import Link from 'next/link';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   TABS, getActiveTabId, isLinkActive, isFlyout,
-  type Tab, type DropdownItem,
+  type Tab, type DropdownItem, type NavItem,
 } from './accountingNavConfig';
 
-/** Simple flat dropdown (Banking, Accounts, VAT, etc.) */
+const linkCls = (active: boolean) =>
+  `block px-4 py-2 text-sm whitespace-nowrap transition-colors ${
+    active
+      ? 'text-emerald-400 bg-emerald-500/10'
+      : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
+  }`;
+
+const sectionCls = (hovered: boolean, active: boolean) =>
+  `flex items-center justify-between px-4 py-2.5 text-sm cursor-default transition-colors ${
+    hovered
+      ? 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]'
+      : active ? 'text-emerald-400' : 'text-[var(--ff-text-secondary)]'
+  }`;
+
+const panelCls = 'absolute left-full top-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-r-lg shadow-xl min-w-[210px] py-1';
+
+/** Renders a list of NavItems — links for DropdownItem, hoverable sub-sections for FlyoutSection */
+function SubMenuItems({ items, asPath, onClose }: { items: NavItem[]; asPath: string; onClose: () => void }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  const delayed = () => { timerRef.current = setTimeout(() => setHovered(null), 150); };
+  useEffect(() => () => clear(), []);
+
+  return (
+    <>
+      {items.map(item => {
+        if (!isFlyout(item)) {
+          return (
+            <Link key={item.href} href={item.href} onClick={onClose} className={linkCls(isLinkActive(item.href, asPath))}>
+              {item.label}
+            </Link>
+          );
+        }
+        const isHov = hovered === item.section;
+        return (
+          <div key={item.section} className="relative"
+            onMouseEnter={() => { clear(); setHovered(item.section); }}
+            onMouseLeave={delayed}>
+            <div className={sectionCls(isHov, false)}>
+              <span className="font-medium">{item.section}</span>
+              <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" />
+            </div>
+            {isHov && (
+              <div onMouseEnter={clear} onMouseLeave={delayed} className={panelCls}>
+                <SubMenuItems items={item.items} asPath={asPath} onClose={onClose} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** Simple flat dropdown (no flyout sections) */
 function FlatDropdown({ items, asPath, onClose }: { items: DropdownItem[]; asPath: string; onClose: () => void }) {
   return (
     <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40">
       {items.map(item => (
-        <Link key={item.href} href={item.href} onClick={onClose}
-          className={`block px-4 py-2 text-sm transition-colors ${
-            isLinkActive(item.href, asPath)
-              ? 'text-emerald-400 bg-emerald-500/10'
-              : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
-          }`}>
+        <Link key={item.href} href={item.href} onClick={onClose} className={linkCls(isLinkActive(item.href, asPath))}>
           {item.label}
         </Link>
       ))}
@@ -35,21 +85,15 @@ function FlatDropdown({ items, asPath, onClose }: { items: DropdownItem[]; asPat
 function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; onClose: () => void }) {
   const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const clearTimer = () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
   const delayedClose = () => { timeoutRef.current = setTimeout(() => setHoveredSection(null), 150); };
-
   useEffect(() => () => clearTimer(), []);
 
   const sections = (tab.items || []).filter(isFlyout);
-  const activeSection = sections.find(s =>
-    s.items.some(item => isLinkActive(item.href, asPath))
-  );
 
   return (
     <div className="absolute top-full left-0 z-40">
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[200px] py-1">
-        {/* Top-level actions (Add a Customer, etc.) */}
         {tab.topItems?.map(item => (
           <Link key={item.href} href={item.href} onClick={onClose}
             className="block px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)] transition-colors">
@@ -60,45 +104,19 @@ function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; on
           <div className="border-t border-[var(--ff-border-light)] my-1" />
         )}
 
-        {/* Section rows — each is relative so sub-menu anchors to it */}
         {sections.map(section => {
           const isHovered = hoveredSection === section.section;
-          const isActive = activeSection?.section === section.section && !hoveredSection;
           return (
-            <div
-              key={section.section}
-              className="relative"
+            <div key={section.section} className="relative"
               onMouseEnter={() => { clearTimer(); setHoveredSection(section.section); }}
-              onMouseLeave={delayedClose}
-            >
-              <div
-                className={`flex items-center justify-between px-4 py-2.5 text-sm cursor-default transition-colors ${
-                  isHovered
-                    ? 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]'
-                    : isActive ? 'text-emerald-400' : 'text-[var(--ff-text-secondary)]'
-                }`}
-              >
+              onMouseLeave={delayedClose}>
+              <div className={sectionCls(isHovered, false)}>
                 <span className="font-medium">{section.section}</span>
                 <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" />
               </div>
-
-              {/* Sub-menu: positioned to the right, top-aligned with this row */}
               {isHovered && (
-                <div
-                  onMouseEnter={clearTimer}
-                  onMouseLeave={delayedClose}
-                  className="absolute left-full top-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-r-lg shadow-xl min-w-[210px] py-1"
-                >
-                  {section.items.map(item => (
-                    <Link key={item.href} href={item.href} onClick={onClose}
-                      className={`block px-4 py-2 text-sm whitespace-nowrap transition-colors ${
-                        isLinkActive(item.href, asPath)
-                          ? 'text-emerald-400 bg-emerald-500/10'
-                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
-                      }`}>
-                      {item.label}
-                    </Link>
-                  ))}
+                <div onMouseEnter={clearTimer} onMouseLeave={delayedClose} className={panelCls}>
+                  <SubMenuItems items={section.items} asPath={asPath} onClose={onClose} />
                 </div>
               )}
             </div>

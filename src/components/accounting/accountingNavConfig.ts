@@ -9,7 +9,7 @@ export interface DropdownItem {
 
 export interface FlyoutSection {
   section: string;
-  items: DropdownItem[];
+  items: NavItem[];
 }
 
 export type NavItem = DropdownItem | FlyoutSection;
@@ -232,18 +232,49 @@ export const TABS: Tab[] = [
   },
   {
     id: 'accountants', label: "Accountant's Area",
+    topItems: [
+      { label: 'Process Journal Entries', href: '/accounting?tab=journal-entries' },
+      { label: 'Recurring Journal Entries', href: '/accounting/recurring-journals' },
+    ],
     items: [
+      {
+        section: 'VAT',
+        items: [
+          { label: 'VAT Return', href: '/accounting/reports/vat-return' },
+          { label: 'VAT Adjustments', href: '/accounting/vat-adjustments' },
+          { label: 'DRC VAT', href: '/accounting/drc-vat' },
+        ],
+      },
       {
         section: 'Reports',
         items: [
-          { label: 'Trial Balance', href: '/accounting/trial-balance' },
-          { label: 'Audit Trail', href: '/accounting/reports/audit-trail' },
+          {
+            section: 'Management Reports',
+            items: [
+              { label: 'Income Statement', href: '/accounting/reports/income-statement' },
+              { label: 'Balance Sheet', href: '/accounting/reports/balance-sheet' },
+              { label: 'Trial Balance', href: '/accounting/trial-balance' },
+              { label: 'Budget vs Actual', href: '/accounting/reports/budget-vs-actual' },
+            ],
+          },
+          {
+            section: 'Transaction Reports',
+            items: [
+              { label: 'Account Transactions', href: '/accounting/reports/account-transactions' },
+            ],
+          },
+          {
+            section: 'Audit Reports',
+            items: [
+              { label: 'Opening Balances', href: '/accounting/opening-balances' },
+              { label: 'Audit Trail', href: '/accounting/reports/audit-trail' },
+            ],
+          },
         ],
       },
       {
         section: 'Transactions',
         items: [
-          { label: 'Opening Balances', href: '/accounting/opening-balances' },
           { label: 'Depreciation', href: '/accounting/depreciation' },
           { label: 'Year-End', href: '/accounting/year-end' },
         ],
