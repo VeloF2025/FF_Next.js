@@ -40,7 +40,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       sc.*,
       pc.name as parent_name,
       pc.code as parent_code,
-      (SELECT COUNT(*)::int FROM stock_items WHERE category_id = sc.id) as item_count
+      (SELECT COUNT(*)::int FROM stock_items WHERE LOWER(category) = LOWER(sc.code)) as item_count
     FROM stock_categories sc
     LEFT JOIN stock_categories pc ON sc.parent_id = pc.id
     WHERE 1=1

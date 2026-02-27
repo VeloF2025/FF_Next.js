@@ -102,16 +102,19 @@ export interface UpdateStockItemInput extends Partial<CreateStockItemInput> {
 // Category colors for badges
 export const CATEGORY_COLORS: Record<string, string> = {
   activations: 'bg-green-500/20 text-green-400',
-  backhaul: 'bg-blue-500/20 text-blue-400',
-  optical: 'bg-purple-500/20 text-purple-400',
+  backhaul: 'bg-cyan-500/20 text-cyan-400',
+  optics: 'bg-purple-500/20 text-purple-400',
   poles: 'bg-yellow-500/20 text-yellow-400',
   stringing: 'bg-orange-500/20 text-orange-400',
-  fibertime: 'bg-cyan-500/20 text-cyan-400',
+  consumable: 'bg-gray-500/20 text-gray-400',
   tools: 'bg-red-500/20 text-red-400',
+  fibertime: 'bg-teal-500/20 text-teal-400',
   services: 'bg-indigo-500/20 text-indigo-400',
-  goods: 'bg-gray-500/20 text-gray-400',
-  expenses: 'bg-pink-500/20 text-pink-400',
-  boq: 'bg-teal-500/20 text-teal-400',
+  goods: 'bg-pink-500/20 text-pink-400',
+  expenses: 'bg-rose-500/20 text-rose-400',
+  mechanical: 'bg-amber-500/20 text-amber-400',
+  boq: 'bg-emerald-500/20 text-emerald-400',
+  uncategorized: 'bg-slate-500/20 text-slate-400',
 };
 
 export const TRACKING_TYPE_LABELS: Record<string, string> = {
