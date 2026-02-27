@@ -164,7 +164,9 @@ function groupExact(photos) {
     if (!p.hash) continue;
     (map[p.hash] ??= []).push(p);
   }
-  return Object.values(map).filter(g => new Set(g.map(p => p.drNumber)).size >= 2);
+  return Object.values(map)
+    .filter(g => new Set(g.map(p => p.drNumber)).size >= 2)
+    .map(g => ({ photos: g }));
 }
 
 function findPairs(photos, exactHashes) {
