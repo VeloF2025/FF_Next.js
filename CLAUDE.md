@@ -23,16 +23,18 @@ src/
 
 ## Database Configuration
 
-**Neon Branching Setup:**
-| Environment | Branch | Endpoint |
-|-------------|--------|----------|
-| **Production** | `production` | `ep-dry-night-a9qyh4sj` |
-| **Development** | `hein-dev` | `ep-aged-poetry-a9bbd8e9` |
+**Single Production Database (all environments):**
+| Detail | Value |
+|--------|-------|
+| **Provider** | Neon PostgreSQL |
+| **Branch** | `production` |
+| **Endpoint** | `ep-dry-night-a9qyh4sj` |
 
-**Connection Strings:** See `.claude/credentials.local.md` (gitignored, never committed)
+All environments (dev, staging, production, local) share this database. Schema migrations affect everyone immediately.
+
+**Connection String:** See `.claude/credentials.local.md` (gitignored, never committed)
 ```bash
-# PRODUCTION - endpoint: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
-# DEVELOPMENT - endpoint: ep-aged-poetry-a9bbd8e9.gwc.azure.neon.tech
+# endpoint: ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech
 ```
 
 **Two Drop Tables - DO NOT CONFUSE:**
@@ -121,11 +123,13 @@ ssh root@72.61.197.178     # VPS (WhatsApp services)
 | **After hours** + weekends | Allowed | Promote from dev | Promote from staging |
 | **Emergency** (any time) | Allowed | `--force` required | `--force` required |
 
+**Hein's approval is required for ALL staging and production deployments. Never deploy to staging or production without explicit approval from Hein.**
+
 **Workflow:**
 1. During the day: deploy to **dev only** (`/deploy` or `/deploy dev`)
-2. After hours: promote dev → staging (`/deploy staging`)
-3. After hours: promote staging → production (`/deploy production`)
-4. Emergency: `/deploy staging --force` (requires explicit user confirmation)
+2. After hours (with Hein's approval): promote dev → staging (`/deploy staging`)
+3. After hours (with Hein's approval): promote staging → production (`/deploy production`)
+4. Emergency: `/deploy staging --force` (requires Hein to confirm)
 
 **Deploy Scripts:**
 ```bash

@@ -17,11 +17,13 @@ Environment-aware deployment with time-gating. During business hours (08:00-17:0
 
 ## Deployment Rules
 
+**Hein's approval is required for ALL staging and production deployments. Never deploy without his explicit go-ahead.**
+
 | Time Window | Dev | Staging | Production |
 |-------------|-----|---------|------------|
 | **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | BLOCKED | BLOCKED |
-| **After hours** + weekends | Allowed | Allowed (promote from dev) | Allowed (promote from staging) |
-| **Emergency** (any time) | Allowed | `--force` required | `--force` required |
+| **After hours** + weekends (with Hein's approval) | Allowed | Promote from dev | Promote from staging |
+| **Emergency** (any time, Hein must confirm) | Allowed | `--force` required | `--force` required |
 
 ## Workflow
 
@@ -36,9 +38,10 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master &
 4. Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
 5. Test on https://dev.fibreflow.app
 
-### After hours: Promote to staging
+### After hours: Promote to staging (requires Hein's approval)
 
-1. Check current time — must be after 17:00 SAST or weekend
+1. **Get Hein's explicit approval before proceeding**
+2. Check current time — must be after 17:00 SAST or weekend
 2. Verify dev is healthy: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
 3. Get dev commit: `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git rev-parse --short HEAD"`
 4. Promote exact commit to staging:
@@ -47,9 +50,10 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && 
 ```
 5. Verify: `curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app/sign-in`
 
-### After hours: Promote to production
+### After hours: Promote to production (requires Hein's approval)
 
-1. Verify staging is healthy first
+1. **Get Hein's explicit approval before proceeding**
+2. Verify staging is healthy first
 2. Get staging commit: `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git rev-parse --short HEAD"`
 3. Promote exact commit to production:
 ```bash
