@@ -110,10 +110,6 @@ export const CATEGORY_COLORS: Record<string, string> = {
   tools: 'bg-red-500/20 text-red-400',
   fibertime: 'bg-teal-500/20 text-teal-400',
   services: 'bg-indigo-500/20 text-indigo-400',
-  goods: 'bg-pink-500/20 text-pink-400',
-  expenses: 'bg-rose-500/20 text-rose-400',
-  mechanical: 'bg-amber-500/20 text-amber-400',
-  boq: 'bg-emerald-500/20 text-emerald-400',
   uncategorized: 'bg-slate-500/20 text-slate-400',
 };
 
