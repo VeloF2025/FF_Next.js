@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { RequisitionListItem, RequisitionStatus, RequisitionUrgency } from '@/types/procurement/requisition.types';
 import { log } from '@/lib/logger';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 const statusConfig: Record<RequisitionStatus, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
@@ -110,13 +111,22 @@ export default function RequisitionsPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => router.push('/procurement/requisitions/new')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New Requisition
-              </button>
+              <div className="flex items-center gap-2">
+                <ExportCSVButton
+                  endpoint="/api/procurement/requisitions-export"
+                  params={{
+                    search: searchTerm || undefined,
+                  }}
+                  filenamePrefix="requisitions"
+                />
+                <button
+                  onClick={() => router.push('/procurement/requisitions/new')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Requisition
+                </button>
+              </div>
             </div>
           </div>
 

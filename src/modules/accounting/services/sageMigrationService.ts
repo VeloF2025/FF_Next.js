@@ -8,6 +8,7 @@ import { log } from '@/lib/logger';
 
 // Re-export importers so API routes import from one place
 export { importLedgerTransactions, importSupplierInvoices } from './sageImportService';
+export { importCustomerInvoices } from './sageCustomerImportService';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
@@ -18,6 +19,7 @@ export interface MigrationStatus {
   accounts: { sageTotal: number; mapped: number; unmapped: number; autoMapped: number };
   ledger: { sageTotal: number; imported: number; pending: number; failed: number; dateRange: { earliest: string | null; latest: string | null } };
   invoices: { sageTotal: number; imported: number; pending: number; failed: number };
+  customerInvoices: { sageTotal: number; imported: number; pending: number; failed: number };
   lastRuns: MigrationRun[];
 }
 
@@ -105,6 +107,18 @@ export async function getMigrationStatus(): Promise<MigrationStatus> {
       FROM sage_supplier_invoices
     `) as Row[];
 
+    let customerInvoiceStats: Row[] = [{ total: 0, imported: 0, pending: 0, failed: 0 }];
+    try {
+      customerInvoiceStats = (await sql`
+        SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE migration_status = 'imported') AS imported,
+          COUNT(*) FILTER (WHERE migration_status = 'pending') AS pending,
+          COUNT(*) FILTER (WHERE migration_status = 'failed') AS failed
+        FROM sage_customer_invoices
+      `) as Row[];
+    } catch {
+      // Table may not exist yet if migration 212 hasn't run
+    }
+
     const runs = (await sql`
       SELECT id, run_type, status, total_records, processed, succeeded, failed, skipped,
         started_at, completed_at
@@ -124,6 +138,12 @@ export async function getMigrationStatus(): Promise<MigrationStatus> {
       invoices: {
         sageTotal: Number(invoiceStats[0]?.total || 0), imported: Number(invoiceStats[0]?.imported || 0),
         pending: Number(invoiceStats[0]?.pending || 0), failed: Number(invoiceStats[0]?.failed || 0),
+      },
+      customerInvoices: {
+        sageTotal: Number(customerInvoiceStats[0]?.total || 0),
+        imported: Number(customerInvoiceStats[0]?.imported || 0),
+        pending: Number(customerInvoiceStats[0]?.pending || 0),
+        failed: Number(customerInvoiceStats[0]?.failed || 0),
       },
       lastRuns: runs.map((r: Row) => ({
         id: String(r.id), runType: String(r.run_type), status: String(r.status),
@@ -274,12 +294,16 @@ export async function generateComparison(userId: string): Promise<ComparisonRepo
 
 // ── Reset ───────────────────────────────────────────────────────────────────
 
-export async function resetMigration(runType: 'accounts' | 'ledger' | 'invoices'): Promise<void> {
+export async function resetMigration(
+  runType: 'accounts' | 'ledger' | 'invoices' | 'customer_invoices'
+): Promise<void> {
   if (runType === 'accounts') {
     await sql`UPDATE sage_accounts SET gl_account_id = NULL, mapping_status = 'unmapped', mapping_notes = NULL`;
   } else if (runType === 'ledger') {
     await sql`UPDATE sage_ledger_transactions SET migration_status = 'pending', gl_journal_entry_id = NULL`;
   } else if (runType === 'invoices') {
     await sql`UPDATE sage_supplier_invoices SET migration_status = 'pending', gl_supplier_invoice_id = NULL`;
+  } else if (runType === 'customer_invoices') {
+    await sql`UPDATE sage_customer_invoices SET migration_status = 'pending', gl_customer_invoice_id = NULL`;
   }
 }

@@ -83,6 +83,43 @@ export interface SageSupplier {
   Modified?: string;
 }
 
+export interface SageCustomer {
+  ID: string;
+  Name: string;
+  Category?: { ID: string; Description: string };
+  TaxReference?: string;
+  ContactName?: string;
+  Telephone?: string;
+  Fax?: string;
+  Mobile?: string;
+  Email?: string;
+  WebAddress?: string;
+  Active: boolean;
+  Balance?: number;
+  CreditLimit?: number;
+  PostalAddress01?: string;
+  PostalAddress02?: string;
+  PostalAddress03?: string;
+  PostalAddress04?: string;
+  PostalAddress05?: string;
+  DeliveryAddress01?: string;
+  DeliveryAddress02?: string;
+  DeliveryAddress03?: string;
+  DeliveryAddress04?: string;
+  DeliveryAddress05?: string;
+  AutoAllocateToOldestInvoice?: boolean;
+  DefaultDiscountPercentage?: number;
+  DefaultTaxTypeID?: string;
+  DueDateMethodId?: number;
+  DueDateMethodValue?: number;
+  CurrencyId?: string;
+  CurrencySymbol?: string;
+  HasActivity?: boolean;
+  DefaultAccount?: { ID: string; Name: string };
+  Created?: string;
+  Modified?: string;
+}
+
 export interface SageSupplierInvoice {
   ID: string;
   DueDate: string;
@@ -94,6 +131,48 @@ export interface SageSupplierInvoice {
   SupplierID: string;
   SupplierName: string;
   Supplier?: SageSupplier;
+  Modified?: string;
+  Created?: string;
+  Date: string;
+  Inclusive: boolean;
+  DiscountPercentage?: number;
+  TaxReference?: string;
+  DocumentNumber?: string;
+  Reference?: string;
+  Message?: string;
+  Discount?: number;
+  Exclusive?: number;
+  Tax?: number;
+  Rounding?: number;
+  Total?: number;
+  AmountDue?: number;
+  PostalAddress01?: string;
+  PostalAddress02?: string;
+  PostalAddress03?: string;
+  PostalAddress04?: string;
+  PostalAddress05?: string;
+  DeliveryAddress01?: string;
+  DeliveryAddress02?: string;
+  DeliveryAddress03?: string;
+  DeliveryAddress04?: string;
+  DeliveryAddress05?: string;
+  Printed?: boolean;
+  TaxPeriodId?: string;
+  Editable?: boolean;
+  Lines?: SageInvoiceLine[];
+}
+
+export interface SageCustomerInvoice {
+  ID: string;
+  DueDate: string;
+  Paid: boolean;
+  Status: string;
+  FromDocument?: string;
+  Locked: boolean;
+  HasAdditionalCost: boolean;
+  CustomerID: string;
+  CustomerName: string;
+  Customer?: SageCustomer;
   Modified?: string;
   Created?: string;
   Date: string;
@@ -496,6 +575,36 @@ export class SageClient {
   }
 
   // ==========================================================================
+  // Customers
+  // ==========================================================================
+
+  /**
+   * Get all customers
+   */
+  async getCustomers(options?: {
+    skip?: number;
+    take?: number;
+    filter?: string;
+  }): Promise<SageApiResponse<SageCustomer>> {
+    const params = new URLSearchParams();
+    if (options?.skip) params.append('$skip', String(options.skip));
+    if (options?.take) params.append('$top', String(options.take));
+    if (options?.filter) params.append('$filter', options.filter);
+
+    const query = params.toString();
+    const endpoint = `Customer/Get${query ? `?${query}` : ''}`;
+
+    return this.get<SageApiResponse<SageCustomer>>(endpoint);
+  }
+
+  /**
+   * Get customer by ID
+   */
+  async getCustomer(id: string): Promise<SageCustomer> {
+    return this.get<SageCustomer>(`Customer/Get/${id}`);
+  }
+
+  // ==========================================================================
   // Supplier Invoices
   // ==========================================================================
 
@@ -536,6 +645,51 @@ export class SageClient {
    */
   async getSupplierInvoice(id: string): Promise<SageSupplierInvoice> {
     return this.get<SageSupplierInvoice>(`SupplierInvoice/Get/${id}`);
+  }
+
+  // ==========================================================================
+  // Customer Invoices (Tax Invoices)
+  // ==========================================================================
+
+  /**
+   * Get customer invoices (Tax Invoices in Sage SA)
+   */
+  async getCustomerInvoices(options?: {
+    skip?: number;
+    take?: number;
+    filter?: string;
+    includeDetail?: boolean;
+  }): Promise<SageApiResponse<SageCustomerInvoice>> {
+    const params = new URLSearchParams();
+    if (options?.skip) params.append('$skip', String(options.skip));
+    if (options?.take) params.append('$top', String(options.take));
+    if (options?.filter) params.append('$filter', options.filter);
+    if (options?.includeDetail) params.append('$includeDetail', 'true');
+
+    const query = params.toString();
+    const endpoint = `TaxInvoice/Get${query ? `?${query}` : ''}`;
+
+    return this.get<SageApiResponse<SageCustomerInvoice>>(endpoint);
+  }
+
+  /**
+   * Get customer invoices modified since a date
+   */
+  async getCustomerInvoicesSince(
+    since: Date
+  ): Promise<SageApiResponse<SageCustomerInvoice>> {
+    const isoDate = since.toISOString();
+    return this.getCustomerInvoices({
+      filter: `Modified gt datetime'${isoDate}'`,
+      includeDetail: true,
+    });
+  }
+
+  /**
+   * Get customer invoice by ID
+   */
+  async getCustomerInvoice(id: string): Promise<SageCustomerInvoice> {
+    return this.get<SageCustomerInvoice>(`TaxInvoice/Get/${id}`);
   }
 
   // ==========================================================================

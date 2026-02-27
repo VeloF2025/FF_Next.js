@@ -9,6 +9,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { useRouter } from 'next/router';
 import { PermissionGate } from '@/components/PermissionGate';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 export function SuppliersPage() {
   const router = useRouter();
@@ -69,15 +70,27 @@ export function SuppliersPage() {
             Manage suppliers, products, and performance tracking
           </p>
         </div>
-        <PermissionGate permission="procurement.sourcing" action="create">
-          <Button
-            onClick={handleCreate}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Supplier
-          </Button>
-        </PermissionGate>
+        <div className="flex items-center gap-2">
+          <ExportCSVButton
+            endpoint="/api/suppliers/suppliers-export"
+            params={{
+              status: statusFilter !== 'all' ? statusFilter : undefined,
+              category: categoryFilter !== 'all' ? categoryFilter : undefined,
+              isPreferred: showPreferredOnly ? 'true' : undefined,
+              search: searchTerm || undefined,
+            }}
+            filenamePrefix="suppliers"
+          />
+          <PermissionGate permission="procurement.sourcing" action="create">
+            <Button
+              onClick={handleCreate}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Supplier
+            </Button>
+          </PermissionGate>
+        </div>
       </div>
 
       {/* Filters */}

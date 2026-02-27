@@ -27,6 +27,7 @@ import {
   Package,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 function formatZAR(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', minimumFractionDigits: 0 }).format(amount);
@@ -151,16 +152,22 @@ export default function OpenOrdersPage() {
         {/* Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Inbox className="h-6 w-6 text-purple-400" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <Inbox className="h-6 w-6 text-purple-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">Open Orders</h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    All active purchase requisitions and purchase orders
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-semibold text-[var(--ff-text-primary)]">Open Orders</h1>
-                <p className="text-sm text-[var(--ff-text-secondary)]">
-                  All active purchase requisitions and purchase orders
-                </p>
-              </div>
+              <ExportCSVButton
+                endpoint="/api/procurement/open-orders-export"
+                filenamePrefix="open-orders"
+              />
             </div>
           </div>
           <div className="px-6 border-t border-[var(--ff-border-light)]">

@@ -15,6 +15,7 @@ import {
   mapAccount,
   importLedgerTransactions,
   importSupplierInvoices,
+  importCustomerInvoices,
   generateComparison,
   resetMigration,
 } from '@/modules/accounting/services/sageMigrationService';
@@ -57,6 +58,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, run);
     }
 
+    case 'import_customer_invoices': {
+      const run = await importCustomerInvoices(userId);
+      return apiResponse.success(res, run);
+    }
+
     case 'compare': {
       const report = await generateComparison(userId);
       return apiResponse.success(res, report);
@@ -64,8 +70,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     case 'reset': {
       const { resetType } = req.body;
-      if (!resetType || !['accounts', 'ledger', 'invoices'].includes(resetType)) {
-        return apiResponse.badRequest(res, 'resetType must be accounts, ledger, or invoices');
+      if (!resetType || !['accounts', 'ledger', 'invoices', 'customer_invoices'].includes(resetType)) {
+        return apiResponse.badRequest(res, 'resetType must be accounts, ledger, invoices, or customer_invoices');
       }
       await resetMigration(resetType);
       return apiResponse.success(res, { reset: resetType });

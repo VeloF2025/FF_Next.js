@@ -20,6 +20,8 @@ export {
   type SageCompany,
   type SageApiResponse,
   type SageApiError,
+  type SageCustomer,
+  type SageCustomerInvoice,
   type SageAnalysisType,
   type SageAnalysisCategory,
   type SageAccountCategory,
@@ -37,10 +39,19 @@ export {
 } from './entities/supplierSync';
 
 export {
+  pullCustomersFromSage,
+  manuallyMapCustomer,
+} from './entities/customerSync';
+
+export {
   pullInvoicesFromSage,
   getUnmatchedInvoices,
   manuallyMatchInvoice,
 } from './entities/invoiceSync';
+
+export {
+  pullCustomerInvoicesFromSage,
+} from './entities/customerInvoiceSync';
 
 export {
   pullPaymentsFromSage,

@@ -17,6 +17,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 // Types
 type POStatus =
@@ -147,13 +148,23 @@ export default function PurchaseOrdersPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => router.push('/procurement/purchase-orders/new')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New Purchase Order
-              </button>
+              <div className="flex items-center gap-2">
+                <ExportCSVButton
+                  endpoint="/api/procurement/purchase-orders-export"
+                  params={{
+                    status: statusFilter !== 'all' ? statusFilter : undefined,
+                    search: searchTerm || undefined,
+                  }}
+                  filenamePrefix="purchase-orders"
+                />
+                <button
+                  onClick={() => router.push('/procurement/purchase-orders/new')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Purchase Order
+                </button>
+              </div>
             </div>
           </div>
 

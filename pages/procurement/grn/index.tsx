@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { GRNListItem, GRNStatus, InspectionStatus } from '@/types/procurement/grn.types';
 import { log } from '@/lib/logger';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 const statusConfig: Record<GRNStatus, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
@@ -114,13 +115,22 @@ export default function GRNListPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => router.push('/procurement/grn/new')}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New GRN
-              </button>
+              <div className="flex items-center gap-2">
+                <ExportCSVButton
+                  endpoint="/api/procurement/grn-export"
+                  params={{
+                    status: statusFilter !== 'all' ? statusFilter : undefined,
+                  }}
+                  filenamePrefix="grn-register"
+                />
+                <button
+                  onClick={() => router.push('/procurement/grn/new')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  New GRN
+                </button>
+              </div>
             </div>
           </div>
 

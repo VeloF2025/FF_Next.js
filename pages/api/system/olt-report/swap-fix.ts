@@ -490,6 +490,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     return apiResponse.success(res, {
+      success: true,
       scenario,
       drA: { drNumber: drANumber, fixed: true, oldValue: drAOldValue, newValue: drACorrectSerial },
       drB: {

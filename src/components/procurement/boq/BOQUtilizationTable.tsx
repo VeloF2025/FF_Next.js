@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, TrendingUp, Package } from 'lucide-react';
 import type { BOQUtilizationResponse, BOQLineUtilization, NonBOQItem } from '@/types/procurement/boq-utilization.types';
 import { log } from '@/lib/logger';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 interface BOQUtilizationTableProps {
   projectId: string;
@@ -133,6 +134,14 @@ export function BOQUtilizationTable({ projectId }: BOQUtilizationTableProps) {
 
   return (
     <div className="space-y-4">
+
+      {/* ── Export Button ── */}
+      <div className="flex justify-end">
+        <ExportCSVButton
+          endpoint={`/api/projects/${projectId}/boq-utilization-export`}
+          filenamePrefix="boq-utilization"
+        />
+      </div>
 
       {/* ── KPI Summary Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
