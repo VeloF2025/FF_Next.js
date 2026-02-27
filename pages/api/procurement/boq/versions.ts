@@ -33,7 +33,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN boq_items bi ON bi.boq_id = b.id
       WHERE b.project_id = ${projectId}
       GROUP BY b.id
-      ORDER BY b.version::numeric DESC
+      ORDER BY NULLIF(regexp_replace(b.version, '[^0-9]', '', 'g'), '')::numeric DESC NULLS LAST
     `;
 
     return apiResponse.success(res, {

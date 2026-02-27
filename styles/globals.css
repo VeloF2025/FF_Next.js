@@ -1,5 +1,7 @@
 /* Import custom scrollbar styles */
 @import './sidebar-scrollbar.css';
+/* Import design system (ff-* classes) */
+@import './design-system.css';
 
 @tailwind base;
 @tailwind components;

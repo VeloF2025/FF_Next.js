@@ -253,6 +253,54 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
+    // Activate (DR QA)
+    if (path.includes('activate')) {
+      return {
+        title: 'Activate',
+        breadcrumbs: ['Home', 'Activate'],
+      };
+    }
+
+    // NOC (Maintenance)
+    if (path.includes('noc') || path.includes('maintenance')) {
+      return {
+        title: 'NOC',
+        breadcrumbs: ['Home', 'NOC'],
+      };
+    }
+
+    // Assets
+    if (path.includes('assets')) {
+      return {
+        title: 'Asset Management',
+        breadcrumbs: ['Home', 'Assets'],
+      };
+    }
+
+    // Fleet
+    if (path.includes('fleet')) {
+      return {
+        title: 'Fleet Management',
+        breadcrumbs: ['Home', 'Fleet'],
+      };
+    }
+
+    // Civil QA
+    if (path.includes('civil') || path.includes('qfield')) {
+      return {
+        title: 'Civil QA',
+        breadcrumbs: ['Home', 'Civil QA'],
+      };
+    }
+
+    // System Health
+    if (path.includes('system-health') || path.includes('health')) {
+      return {
+        title: 'System Health',
+        breadcrumbs: ['Home', 'System Health'],
+      };
+    }
+
     // Default
     return {
       title: 'FibreFlow',
