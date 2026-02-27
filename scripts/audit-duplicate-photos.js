@@ -3,17 +3,24 @@
  * Duplicate Photo Audit Script
  *
  * Detects photos reused across multiple DRs in the Activate QA Centre.
- * Strategy: pre-filter by file size from DB metadata, then download only
- * size-matched candidates to compare SHA256 + dHash. This avoids downloading
- * all 100k+ photos and works from any machine.
+ *
+ * Two modes:
+ *   Default     — pre-filter by file size from DB metadata, download only size-matched
+ *                 candidates (fast, works from any machine with proxy access)
+ *   --full-scan — download ALL photos (use on Velocity server where :8003 is localhost)
  *
  * Usage:
  *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js
+ *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --full-scan
+ *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --full-scan --skip-vlm
  *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --skip-vlm
  *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --use-proxy
  *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --limit 200
  *   DATABASE_URL='...' node scripts/audit-duplicate-photos.js --project "Sonstraal"
  *
+ * --full-scan  Download ALL photos (not just size-matched candidates). Run this on the
+ *              Velocity server (100.96.203.105) where photo API is on localhost:8003.
+ *              Automatically uses concurrency=50 and timeout=5s.
  * --use-proxy  Route photo downloads through dev.fibreflow.app (use when
  *              Velocity server is not directly reachable)
  *
@@ -34,9 +41,8 @@ const WA_PHOTO_BASE  = 'http://72.61.197.178:8866';
 const WA_PATH_PFX    = '/var/lib/docker/volumes/boss-vps_dr_photos/_data/';
 const VLM_URL        = 'http://100.96.203.105:8100/v1/chat/completions';
 const VLM_MODEL      = 'Qwen/Qwen3-VL-8B-Instruct';
-const DL_CONCURRENCY = 10;
 const VLM_CONCURRENCY= 2;
-const PHOTO_TIMEOUT  = 10_000;
+// Concurrency / timeout adjusted per-mode in main()
 const VLM_TIMEOUT    = 60_000;
 const DHASH_HIGH     = 10;   // ≤ this = HIGH confidence duplicate
 const DHASH_BORDER   = 15;   // ≤ this = BORDERLINE (VLM decides)
@@ -48,6 +54,11 @@ const PROJECT   = getArg('--project');
 const LIMIT     = getArg('--limit') ? parseInt(getArg('--limit')) : null;
 const SKIP_VLM  = args.includes('--skip-vlm');
 const USE_PROXY = args.includes('--use-proxy');
+const FULL_SCAN = args.includes('--full-scan');
+
+// In full-scan mode use server-optimised settings (direct localhost access)
+const DL_CONCURRENCY = FULL_SCAN ? 50 : 10;
+const PHOTO_TIMEOUT  = FULL_SCAN ? 5_000 : 10_000;
 
 if (!process.env.DATABASE_URL) { console.error('ERROR: DATABASE_URL required'); process.exit(1); }
 const sql = neon(process.env.DATABASE_URL);
@@ -181,7 +192,7 @@ const fmtDate = (d) => d ? new Date(d).toISOString().split('T')[0] : '—';
 const stepLabel = (s) => s ? `${s} — ${STEP_NAMES[s] || '?'}` : '—';
 const photoRow = (p) => `| ${p.drNumber} | ${p.project || '—'} | ${fmtDate(p.date)} | ${p.source} | ${stepLabel(p.step)} |`;
 
-function buildReport({ totalDrs, totalPhotos, candidates, failed, exact, perceptual }) {
+function buildReport({ totalDrs, totalPhotos, candidates, failed, fullScan, exact, perceptual }) {
   const today = new Date().toISOString().split('T')[0];
   const exactDrs   = new Set(exact.flatMap(g => g.photos.map(p => p.drNumber)));
   const percepDrs  = new Set(perceptual.flatMap(g => g.photos.map(p => p.drNumber)));
@@ -190,12 +201,17 @@ function buildReport({ totalDrs, totalPhotos, candidates, failed, exact, percept
   let md = `# Duplicate Photo Audit\n\n`;
   md += `**Generated:** ${today}  \n`;
   md += `**Scope:** All time — OneMap + WhatsApp photos  \n`;
+  md += `**Scan mode:** ${fullScan ? 'Full scan (all photos)' : 'Size pre-filter (candidates only)'}  \n`;
   if (PROJECT)  md += `**Project filter:** ${PROJECT}  \n`;
   if (SKIP_VLM) md += `**VLM:** Skipped (hash-only run)  \n`;
   md += `\n`;
   md += `**DRs scanned:** ${totalDrs.toLocaleString()}  \n`;
   md += `**Total photos in DB:** ${totalPhotos.toLocaleString()}  \n`;
-  md += `**Size-matched candidates downloaded:** ${candidates.toLocaleString()}  \n`;
+  if (fullScan) {
+    md += `**Photos downloaded:** ${candidates.toLocaleString()}  \n`;
+  } else {
+    md += `**Size-matched candidates downloaded:** ${candidates.toLocaleString()}  \n`;
+  }
   if (failed > 0) md += `**Download failures:** ${failed.toLocaleString()}  \n`;
   md += `\n---\n\n## Summary\n\n`;
   md += `| Category | Groups | DRs Affected |\n|---|---|---|\n`;
@@ -241,14 +257,16 @@ async function main() {
   console.log('║        DUPLICATE PHOTO AUDIT — Activate QA Centre           ║');
   console.log('╚══════════════════════════════════════════════════════════════╝\n');
   console.log(`Timestamp  : ${new Date().toISOString()}`);
+  console.log(`Mode       : ${FULL_SCAN ? 'FULL SCAN (all photos)' : 'size pre-filter (candidates only)'}`);
   console.log(`Photo route: ${USE_PROXY ? 'proxy (dev.fibreflow.app)' : 'direct (100.96.203.105:8003)'}`);
+  console.log(`Concurrency: ${DL_CONCURRENCY} | Timeout: ${PHOTO_TIMEOUT / 1000}s`);
   if (PROJECT)  console.log(`Project    : ${PROJECT}`);
   if (LIMIT)    console.log(`DR limit   : ${LIMIT}`);
   if (SKIP_VLM) console.log(`VLM        : skipped`);
   console.log('');
 
-  // ── Phase 1: Query & pre-filter by size ─────────────────────────────────────
-  console.log('Phase 1 — Querying database & pre-filtering by size...');
+  // ── Phase 1: Query DB (+ optional size pre-filter) ──────────────────────────
+  console.log(`Phase 1 — Querying database${FULL_SCAN ? '' : ' & pre-filtering by size'}...`);
 
   const oneMapRows = PROJECT
     ? await sql`SELECT drop_number,project,submitted_date,photos_metadata
@@ -298,33 +316,36 @@ async function main() {
   const totalDrs = new Set(allPhotos.map(p => p.drNumber)).size;
   console.log(`  ${totalDrs} DRs | ${allPhotos.length} photos in DB`);
 
-  // Pre-filter: group by (step, size) — only download photos sharing a size with another DR
-  const sizeGroups = {};
-  let noSize = 0;
-  for (const p of allPhotos) {
-    if (!p.size) { noSize++; continue; }
-    const key = `${p.step ?? 'x'}:${p.size}`;
-    (sizeGroups[key] ??= []).push(p);
-  }
-
-  // Candidates = photos in groups where 2+ DRs share the same step+size
-  const candidates = [];
+  let candidates;
   let sizeMatchGroups = 0;
-  for (const group of Object.values(sizeGroups)) {
-    const drs = new Set(group.map(p => p.drNumber));
-    if (drs.size >= 2) {
-      candidates.push(...group);
-      sizeMatchGroups++;
-    }
-  }
 
-  console.log(`  Size-matched candidates: ${candidates.length} photos across ${sizeMatchGroups} size groups`);
-  if (noSize > 0) console.log(`  Photos without size metadata (skipped): ${noSize}`);
+  if (FULL_SCAN) {
+    // Full scan: download every photo — most thorough, run on Velocity server
+    candidates = allPhotos;
+    console.log(`  Full scan: ${candidates.length} photos queued for download`);
+  } else {
+    // Pre-filter: group by (step, size) — only download photos sharing a size with another DR
+    const sizeGroups = {};
+    let noSize = 0;
+    for (const p of allPhotos) {
+      if (!p.size) { noSize++; continue; }
+      const key = `${p.step ?? 'x'}:${p.size}`;
+      (sizeGroups[key] ??= []).push(p);
+    }
+    candidates = [];
+    for (const group of Object.values(sizeGroups)) {
+      const drs = new Set(group.map(p => p.drNumber));
+      if (drs.size >= 2) { candidates.push(...group); sizeMatchGroups++; }
+    }
+    console.log(`  Size-matched candidates: ${candidates.length} photos across ${sizeMatchGroups} size groups`);
+    if (noSize > 0) console.log(`  Photos without size metadata (skipped): ${noSize}`);
+  }
   console.log('');
 
   if (candidates.length === 0) {
-    console.log('No size-matched candidates found — no exact duplicates possible.');
-    const md = buildReport({ totalDrs, totalPhotos: allPhotos.length, candidates: 0, failed: 0, exact: [], perceptual: [] });
+    console.log('No candidates found — no duplicates possible.');
+    const md = buildReport({ totalDrs, totalPhotos: allPhotos.length, candidates: 0, failed: 0,
+      fullScan: FULL_SCAN, exact: [], perceptual: [] });
     const reportsDir = path.join(__dirname, '..', 'reports');
     if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
     const today = new Date().toISOString().split('T')[0];
@@ -334,14 +355,16 @@ async function main() {
     return;
   }
 
-  // ── Phase 2: Download & hash candidates only ──────────────────────────────
-  console.log(`Phase 2 — Downloading ${candidates.length} candidates (concurrency: ${DL_CONCURRENCY})...`);
+  // ── Phase 2: Download & hash ───────────────────────────────────────────────
+  const phase2Label = FULL_SCAN ? `all ${candidates.length} photos` : `${candidates.length} candidates`;
+  console.log(`Phase 2 — Downloading ${phase2Label} (concurrency: ${DL_CONCURRENCY})...`);
   let done = 0, failed = 0;
 
   const hashed = await withConcurrency(candidates, async (p) => {
     const buf = await download(p.url);
     done++;
-    if (done % 10 === 0 || done === candidates.length)
+    const interval = FULL_SCAN ? 500 : 10;
+    if (done % interval === 0 || done === candidates.length)
       process.stdout.write(`  ${done}/${candidates.length}...\r`);
     if (!buf) { failed++; return null; }
     const [h, dh] = await Promise.all([Promise.resolve(sha256(buf)), dHash(buf)]);
@@ -398,7 +421,7 @@ async function main() {
   // ── Phase 5: Report ────────────────────────────────────────────────────────
   console.log('Phase 5 — Writing report...');
   const md = buildReport({ totalDrs, totalPhotos: allPhotos.length, candidates: candidates.length,
-    failed, exact: exactGroups, perceptual: percepPairs });
+    failed, fullScan: FULL_SCAN, exact: exactGroups, perceptual: percepPairs });
 
   const reportsDir = path.join(__dirname, '..', 'reports');
   if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir, { recursive: true });
@@ -411,7 +434,7 @@ async function main() {
   console.log(`\n${'═'.repeat(52)}`);
   console.log(`  DRs scanned              : ${totalDrs}`);
   console.log(`  Total photos in DB       : ${allPhotos.length}`);
-  console.log(`  Size-matched candidates  : ${candidates.length}`);
+  console.log(`  Photos downloaded        : ${candidates.length} ${FULL_SCAN ? '(full scan)' : '(size-matched)'}`);
   console.log(`  Exact duplicate groups   : ${exactGroups.length}`);
   console.log(`  Perceptual dup pairs     : ${percepPairs.length}`);
   console.log(`  Total DRs affected       : ${allAff.size}`);
