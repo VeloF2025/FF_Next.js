@@ -101,58 +101,66 @@ export interface ChecklistStep {
 }
 
 /**
- * Seven-step checklist for civil (pole planting) discipline.
- * Steps 6 and 7 are conditional.
+ * Eight-step checklist for civil (pole planting) discipline.
+ * Aligned with Velocity Fibre Pole Install Capture Checklist.
+ * Phase A: Pre-Install (1-5), Phase B: Installation (6-7), Phase C: Assets (8).
  */
 export const CIVIL_CHECKLIST: readonly ChecklistStep[] = [
   {
     step: 1,
-    label: 'Foundation / Base',
+    label: 'Before Photo',
     required: true,
-    vlmCheck: 'Foundation concrete/backfill visible at pole base',
-    notes: 'CCA H4 SANS 754 compliance — photograph before backfill is complete',
+    vlmCheck: 'Ground markings visible (circle/square/X) indicating pole hole location',
+    notes: 'Phase A Pre-Install — mark out ground before digging',
   },
   {
     step: 2,
-    label: 'Full Pole Visible',
+    label: 'During Photo',
     required: true,
-    vlmCheck: 'Pole visible from base to top in one frame',
-    notes: 'No obstructions blocking more than 20% of pole height',
+    vlmCheck: 'Staff digging hole or compaction process in progress',
+    notes: 'Phase A Pre-Install — shows active work on the hole',
   },
   {
     step: 3,
-    label: 'Pole Label',
+    label: 'Depth Photo',
     required: true,
-    vlmCheck: 'Pole number tag readable — AI cross-refs QField pole_number',
-    notes: 'Aluminium or durable plastic tag affixed 1.5–2.5 m above ground',
+    vlmCheck: 'Measuring tape or ruler in hole showing depth measurement',
+    notes: 'Phase A Pre-Install — tape measure is key visual indicator',
   },
   {
     step: 4,
-    label: 'CCA H4 Tag',
+    label: 'End Plates',
     required: true,
-    vlmCheck: 'Copper/chrome/arsenic treatment tag present (SANS 754)',
-    notes: 'Tag stamped with "CCA H4" — usually near base or pole label',
+    vlmCheck: 'End plates visible and clear on pole',
+    notes: 'Phase A Pre-Install — metal plates at base or top of pole',
   },
   {
     step: 5,
-    label: 'Vertical Alignment',
+    label: 'Compaction / Backfill',
     required: true,
-    vlmCheck: 'Pole is plumb — AI estimates lean in degrees',
-    notes: 'Max 2° from vertical; corner poles under tension allowed up to 5°',
+    vlmCheck: 'Sand+cement mix around pole base, compacted — NOT a heap',
+    notes: 'Phase A Pre-Install — mixed material, not separate piles',
   },
   {
     step: 6,
-    label: 'Guy Wires / Stays',
-    required: false,
-    vlmCheck: 'Stay wires visible and tensioned if pole >9 m or on corner',
-    notes: 'Skip for single-line straight runs under 9 m',
+    label: 'Level Check',
+    required: true,
+    vlmCheck: 'Spirit level (bubble level) held against pole visible',
+    notes: 'Phase B Installation — spirit level tool is key indicator',
   },
   {
     step: 7,
-    label: 'Slack Bracket',
-    required: false,
-    vlmCheck: 'Slack bracket mounted if pole is a breakout point',
-    notes: 'Cross-ref QField dome_joint field to determine applicability',
+    label: 'After Photo',
+    required: true,
+    vlmCheck: 'Full pole standing upright, wide shot from distance',
+    notes: 'Phase B Installation — may include ground-level + standing-back view',
+  },
+  {
+    step: 8,
+    label: 'Signature',
+    required: true,
+    vlmCheck: 'Contractor signature or sign-off sheet visible',
+    notes: 'Phase C Assets — signature present for all installations',
   },
 ] as const;
 
@@ -206,73 +214,133 @@ export const OPTICAL_CHECKLIST: readonly ChecklistStep[] = [
 ] as const;
 
 /**
- * Seven-step checklist for splicing (dome joint) discipline.
- * All seven steps are always required.
+ * Splicing checklist — Distribution Dome (8 steps).
+ * Aligned with Velocity Fibre Optical Checklist Phase A.
  */
-export const SPLICING_CHECKLIST: readonly ChecklistStep[] = [
+export const SPLICING_DOME_CHECKLIST: readonly ChecklistStep[] = [
   {
     step: 1,
-    label: 'Dome Enclosure Closed',
+    label: 'Dome on Pole',
     required: true,
-    vlmCheck: 'Dome body and lid both visible, fully sealed',
-    notes: 'No open or cracked domes — entry ports must be sealed',
+    vlmCheck: 'Wide shot of splice dome installed on pole',
+    notes: 'Phase A Distribution Dome — full dome visible in position',
   },
   {
     step: 2,
-    label: 'Slack Bracket Mounted',
+    label: 'Dome Label',
     required: true,
-    vlmCheck: 'Dome mounted on slack bracket at pole',
-    notes: 'Not dangling from cable — must be on dedicated bracket',
+    vlmCheck: 'Dome label with Pole ID / Fibre ID clearly readable',
+    notes: 'Phase A Distribution Dome — close-up of label text',
   },
   {
     step: 3,
-    label: 'Emergency Loop',
+    label: 'Open Dome',
     required: true,
-    vlmCheck: 'Emergency fiber loop visible below dome — minimum 1 m',
-    notes: 'Required for future splice access without cable tension',
+    vlmCheck: 'Fibre routing and tray layout visible inside open dome',
+    notes: 'Phase A Distribution Dome — interior of dome visible',
   },
   {
     step: 4,
-    label: 'Backhaul Fiber Separated',
+    label: 'Splice Protectors',
     required: true,
-    vlmCheck: 'Backhaul/feeder enters separately from distribution cable',
-    notes: 'Must be labelled or colour-coded for identification',
+    vlmCheck: 'Splice protectors fitted correctly over fibre splices',
+    notes: 'Phase A Distribution Dome — close-up inside dome',
   },
   {
     step: 5,
-    label: 'Splice Tray Organized',
+    label: 'Slack Management',
     required: true,
-    vlmCheck: 'Splice tray(s) visible and organized before dome closure',
-    notes: 'Photograph taken before dome is sealed',
+    vlmCheck: 'Neat fibre loops and cable organization within dome',
+    notes: 'Phase A Distribution Dome — slack cables managed',
   },
   {
     step: 6,
-    label: 'Heat Shrinks Visible',
+    label: 'Strength Members',
     required: true,
-    vlmCheck: 'All splices have heat shrink protection',
-    notes: 'Photograph taken before dome is sealed',
+    vlmCheck: 'Strength members (aramid/steel) secured inside dome',
+    notes: 'Phase A Distribution Dome — properly fastened',
   },
   {
     step: 7,
-    label: 'Dome Label',
+    label: 'Seals & Dust Caps',
     required: true,
-    vlmCheck: 'Dome label readable with joint ID — AI cross-refs joint_label',
-    notes: 'Must match joints.joint_label in the FibreFlow database',
+    vlmCheck: 'Dome seals tightened, dust caps on unused ports',
+    notes: 'Phase A Distribution Dome — weatherproofing visible',
+  },
+  {
+    step: 8,
+    label: 'Pole ID',
+    required: true,
+    vlmCheck: 'Pole ID label/tag attached to pole near dome',
+    notes: 'Phase A Distribution Dome — number/barcode readable',
   },
 ] as const;
 
-/** Returns the correct checklist for a given discipline. */
-export function getChecklist(discipline: Discipline): readonly ChecklistStep[] {
+/**
+ * Splicing checklist — Main Joint (6 steps, numbered 11-16).
+ * Aligned with Velocity Fibre Optical Checklist Phase B.
+ */
+export const SPLICING_JOINT_CHECKLIST: readonly ChecklistStep[] = [
+  {
+    step: 11,
+    label: 'Cable Entries',
+    required: true,
+    vlmCheck: 'Labelled cable entries into main joint closure',
+    notes: 'Phase B Main Joint — cable markings and entry points',
+  },
+  {
+    step: 12,
+    label: 'Strength Members',
+    required: true,
+    vlmCheck: 'Strength members properly secured within closure',
+    notes: 'Phase B Main Joint — aramid yarn or steel wire',
+  },
+  {
+    step: 13,
+    label: 'Tube Routing',
+    required: true,
+    vlmCheck: 'Fibre tubes routed neatly from entry to splice tray',
+    notes: 'Phase B Main Joint — organized tube layout',
+  },
+  {
+    step: 14,
+    label: 'Tray Entries',
+    required: true,
+    vlmCheck: 'Fibre entering splice trays in organized manner',
+    notes: 'Phase B Main Joint — neat tray connections',
+  },
+  {
+    step: 15,
+    label: 'Coiling & Protectors',
+    required: true,
+    vlmCheck: 'Fibre coiling loops and visible splice protectors',
+    notes: 'Phase B Main Joint — heat shrinks or mechanical holders',
+  },
+  {
+    step: 16,
+    label: 'Readable Labels',
+    required: true,
+    vlmCheck: 'Clear readable labels on cables, tubes, or closure',
+    notes: 'Phase B Main Joint — legible identification',
+  },
+] as const;
+
+/** Legacy alias — returns dome checklist by default for backward compatibility. */
+export const SPLICING_CHECKLIST = SPLICING_DOME_CHECKLIST;
+
+/** Returns the correct checklist for a given discipline and optional sub-type. */
+export function getChecklist(discipline: Discipline, subType?: 'dome' | 'main_joint'): readonly ChecklistStep[] {
   if (discipline === 'civil') return CIVIL_CHECKLIST;
   if (discipline === 'optical') return OPTICAL_CHECKLIST;
-  return SPLICING_CHECKLIST;
+  if (discipline === 'splicing' && subType === 'main_joint') return SPLICING_JOINT_CHECKLIST;
+  return SPLICING_DOME_CHECKLIST;
 }
 
-/** Maximum step number per discipline. */
+/** Maximum step number per discipline (dome default for splicing). */
 export const CHECKLIST_STEP_COUNT: Record<Discipline, number> = {
-  civil: 7,
+  civil: 8,
   optical: 6,
-  splicing: 7,
+  splicing: 8,  // dome=8, main_joint uses 11-16
 };
 
 // ============================================================================
@@ -281,12 +349,13 @@ export const CHECKLIST_STEP_COUNT: Record<Discipline, number> = {
 
 /** Rejection reason codes for the civil (pole planting) discipline. */
 export type CivilReasonCode =
-  | 'CIVIL_FOUNDATION_NOT_VISIBLE'
-  | 'CIVIL_LABEL_UNREADABLE'
-  | 'CIVIL_CCA_TAG_MISSING'
-  | 'CIVIL_POLE_NOT_PLUMB'
-  | 'CIVIL_GUY_WIRE_MISSING'
-  | 'CIVIL_SLACK_BRACKET_MISSING'
+  | 'CIVIL_BEFORE_PHOTO_MISSING'
+  | 'CIVIL_DEPTH_NOT_DOCUMENTED'
+  | 'CIVIL_END_PLATES_NOT_VISIBLE'
+  | 'CIVIL_COMPACTION_IMPROPER'
+  | 'CIVIL_LEVEL_CHECK_MISSING'
+  | 'CIVIL_AFTER_PHOTO_MISSING'
+  | 'CIVIL_SIGNATURE_MISSING'
   | 'CIVIL_PHOTO_BLURRY'
   | 'CIVIL_WRONG_POLE'
   | 'CIVIL_INCOMPLETE_CHECKLIST';
@@ -319,12 +388,13 @@ export type QaReasonCode = CivilReasonCode | OpticalReasonCode | SplicingReasonC
 
 /** Human-readable plain-English descriptions keyed by reason code. */
 export const REASON_CODE_LABELS: Record<QaReasonCode, string> = {
-  CIVIL_FOUNDATION_NOT_VISIBLE: 'Foundation / base not clearly visible',
-  CIVIL_LABEL_UNREADABLE: 'Pole label is unreadable or missing',
-  CIVIL_CCA_TAG_MISSING: 'CCA H4 treatment tag not visible',
-  CIVIL_POLE_NOT_PLUMB: 'Pole is not plumb — exceeds acceptable lean tolerance',
-  CIVIL_GUY_WIRE_MISSING: 'Guy wires / stays are missing or not tensioned',
-  CIVIL_SLACK_BRACKET_MISSING: 'Slack bracket missing on breakout pole',
+  CIVIL_BEFORE_PHOTO_MISSING: 'Before photo (ground markout) not provided',
+  CIVIL_DEPTH_NOT_DOCUMENTED: 'Depth measurement photo missing or unreadable',
+  CIVIL_END_PLATES_NOT_VISIBLE: 'End plates not clearly visible',
+  CIVIL_COMPACTION_IMPROPER: 'Compaction/backfill not mixed properly (sand+cement required)',
+  CIVIL_LEVEL_CHECK_MISSING: 'Spirit level check photo not provided',
+  CIVIL_AFTER_PHOTO_MISSING: 'After photo (full pole view) not provided',
+  CIVIL_SIGNATURE_MISSING: 'Contractor signature not present',
   CIVIL_PHOTO_BLURRY: 'Photo is blurry or out of focus',
   CIVIL_WRONG_POLE: 'Photo does not match the expected pole number',
   CIVIL_INCOMPLETE_CHECKLIST: 'One or more required checklist steps have no photo',
@@ -429,16 +499,17 @@ export interface ConstructionQaReview {
   photo_sources: PhotoSource[];
   last_photo_at: string | null; // ISO timestamp
 
-  // ── Civil checklist steps ─────────────────────────────────────────────────
-  civil_step_01_foundation: boolean;
-  civil_step_02_full_pole: boolean;
-  civil_step_03_pole_label: boolean;
-  civil_step_04_cca_tag: boolean;
-  civil_step_05_vertical: boolean;
-  civil_step_06_guy_wires: boolean;
-  civil_step_07_slack_bracket: boolean;
+  // ── Civil checklist steps (Pole Install Capture Checklist) ────────────────
+  civil_step_01_before_photo: boolean;
+  civil_step_02_during_photo: boolean;
+  civil_step_03_depth_photo: boolean;
+  civil_step_04_end_plates: boolean;
+  civil_step_05_compaction: boolean;
+  civil_step_06_level_check: boolean;
+  civil_step_07_after_photo: boolean;
+  civil_step_08_signature: boolean;
 
-  // ── Optical checklist steps ───────────────────────────────────────────────
+  // ── Optical checklist steps (cable stringing — unchanged) ─────────────────
   optical_step_01_cable_route: boolean;
   optical_step_02_attachment: boolean;
   optical_step_03_slack_coil: boolean;
@@ -446,14 +517,26 @@ export interface ConstructionQaReview {
   optical_step_05_no_backfeed: boolean;
   optical_step_06_sag_ok: boolean;
 
-  // ── Splicing checklist steps ──────────────────────────────────────────────
-  splicing_step_01_dome_closed: boolean;
-  splicing_step_02_slack_bracket: boolean;
-  splicing_step_03_emergency_loop: boolean;
-  splicing_step_04_backhaul_sep: boolean;
-  splicing_step_05_tray_org: boolean;
-  splicing_step_06_heat_shrinks: boolean;
-  splicing_step_07_dome_label: boolean;
+  // ── Splicing checklist steps — Distribution Dome (steps 1-8) ─────────────
+  splicing_step_01_dome_on_pole: boolean;
+  splicing_step_02_dome_label: boolean;
+  splicing_step_03_open_dome: boolean;
+  splicing_step_04_splice_protectors: boolean;
+  splicing_step_05_slack_management: boolean;
+  splicing_step_06_strength_members: boolean;
+  splicing_step_07_seals_dustcaps: boolean;
+  splicing_step_08_pole_id: boolean;
+
+  // ── Splicing checklist steps — Main Joint (steps 11-16) ──────────────────
+  splicing_step_11_cable_entries: boolean;
+  splicing_step_12_strength_members: boolean;
+  splicing_step_13_tube_routing: boolean;
+  splicing_step_14_tray_entries: boolean;
+  splicing_step_15_coiling_protectors: boolean;
+  splicing_step_16_readable_labels: boolean;
+
+  /** Sub-type for splicing reviews: 'dome' or 'main_joint'. */
+  splicing_sub_type: 'dome' | 'main_joint' | null;
 
   // ── VLM processing ────────────────────────────────────────────────────────
   vlm_status: VlmStatus;
@@ -809,26 +892,38 @@ export interface ReviewActionRequest {
   stepUpdates?: Partial<
     Pick<
       ConstructionQaReview,
-      | 'civil_step_01_foundation'
-      | 'civil_step_02_full_pole'
-      | 'civil_step_03_pole_label'
-      | 'civil_step_04_cca_tag'
-      | 'civil_step_05_vertical'
-      | 'civil_step_06_guy_wires'
-      | 'civil_step_07_slack_bracket'
+      // Civil — Pole Install (8 steps)
+      | 'civil_step_01_before_photo'
+      | 'civil_step_02_during_photo'
+      | 'civil_step_03_depth_photo'
+      | 'civil_step_04_end_plates'
+      | 'civil_step_05_compaction'
+      | 'civil_step_06_level_check'
+      | 'civil_step_07_after_photo'
+      | 'civil_step_08_signature'
+      // Optical (6 steps, unchanged)
       | 'optical_step_01_cable_route'
       | 'optical_step_02_attachment'
       | 'optical_step_03_slack_coil'
       | 'optical_step_04_cable_label'
       | 'optical_step_05_no_backfeed'
       | 'optical_step_06_sag_ok'
-      | 'splicing_step_01_dome_closed'
-      | 'splicing_step_02_slack_bracket'
-      | 'splicing_step_03_emergency_loop'
-      | 'splicing_step_04_backhaul_sep'
-      | 'splicing_step_05_tray_org'
-      | 'splicing_step_06_heat_shrinks'
-      | 'splicing_step_07_dome_label'
+      // Splicing — Dome (8 steps)
+      | 'splicing_step_01_dome_on_pole'
+      | 'splicing_step_02_dome_label'
+      | 'splicing_step_03_open_dome'
+      | 'splicing_step_04_splice_protectors'
+      | 'splicing_step_05_slack_management'
+      | 'splicing_step_06_strength_members'
+      | 'splicing_step_07_seals_dustcaps'
+      | 'splicing_step_08_pole_id'
+      // Splicing — Main Joint (6 steps)
+      | 'splicing_step_11_cable_entries'
+      | 'splicing_step_12_strength_members'
+      | 'splicing_step_13_tube_routing'
+      | 'splicing_step_14_tray_entries'
+      | 'splicing_step_15_coiling_protectors'
+      | 'splicing_step_16_readable_labels'
     >
   >;
   /** Corrected extracted data from Phase 3 data validation. */
