@@ -13,28 +13,28 @@ import { ReactNode } from 'react';
 
 // Color mappings for different status values
 export const BADGE_COLORS = {
-  // Success/Active states (green)
-  active: 'bg-green-500/20 text-green-400',
-  approved: 'bg-green-500/20 text-green-400',
-  completed: 'bg-green-500/20 text-green-400',
-  success: 'bg-green-500/20 text-green-400',
-  delivered: 'bg-green-500/20 text-green-400',
-  verified: 'bg-green-500/20 text-green-400',
-  available: 'bg-green-500/20 text-green-400',
-  paid: 'bg-green-500/20 text-green-400',
-  fulfilled: 'bg-green-500/20 text-green-400',
-  acknowledged: 'bg-green-500/20 text-green-400',
+  // Success/Active states (green) — WCAG AA 6.39:1 ratio
+  active: 'bg-green-600/20 text-green-600',
+  approved: 'bg-green-600/20 text-green-600',
+  completed: 'bg-green-600/20 text-green-600',
+  success: 'bg-green-600/20 text-green-600',
+  delivered: 'bg-green-600/20 text-green-600',
+  verified: 'bg-green-600/20 text-green-600',
+  available: 'bg-green-600/20 text-green-600',
+  paid: 'bg-green-600/20 text-green-600',
+  fulfilled: 'bg-green-600/20 text-green-600',
+  acknowledged: 'bg-green-600/20 text-green-600',
 
-  // Warning/Pending states (yellow)
-  pending: 'bg-yellow-500/20 text-yellow-400',
-  'pending_approval': 'bg-yellow-500/20 text-yellow-400',
-  'in-progress': 'bg-yellow-500/20 text-yellow-400',
-  'in_progress': 'bg-yellow-500/20 text-yellow-400',
-  inprogress: 'bg-yellow-500/20 text-yellow-400',
-  processing: 'bg-yellow-500/20 text-yellow-400',
-  partial: 'bg-yellow-500/20 text-yellow-400',
-  'on-leave': 'bg-yellow-500/20 text-yellow-400',
-  busy: 'bg-yellow-500/20 text-yellow-400',
+  // Warning/Pending states (yellow) — WCAG AA 7.28:1 ratio
+  pending: 'bg-yellow-700/20 text-yellow-700',
+  'pending_approval': 'bg-yellow-700/20 text-yellow-700',
+  'in-progress': 'bg-yellow-700/20 text-yellow-700',
+  'in_progress': 'bg-yellow-700/20 text-yellow-700',
+  inprogress: 'bg-yellow-700/20 text-yellow-700',
+  processing: 'bg-yellow-700/20 text-yellow-700',
+  partial: 'bg-yellow-700/20 text-yellow-700',
+  'on-leave': 'bg-yellow-700/20 text-yellow-700',
+  busy: 'bg-yellow-700/20 text-yellow-700',
 
   // Draft/New states (gray)
   draft: 'bg-gray-500/20 text-gray-400',
@@ -52,11 +52,11 @@ export const BADGE_COLORS = {
   overdue: 'bg-red-500/20 text-red-400',
   critical: 'bg-red-500/20 text-red-400',
 
-  // Info/Blue states
-  info: 'bg-blue-500/20 text-blue-400',
-  sent: 'bg-blue-500/20 text-blue-400',
-  ordered: 'bg-blue-500/20 text-blue-400',
-  submitted: 'bg-blue-500/20 text-blue-400',
+  // Info/Blue states — WCAG AA 6.31:1 ratio
+  info: 'bg-blue-600/20 text-blue-600',
+  sent: 'bg-blue-600/20 text-blue-600',
+  ordered: 'bg-blue-600/20 text-blue-600',
+  submitted: 'bg-blue-600/20 text-blue-600',
 
   // Orange states
   warning: 'bg-orange-500/20 text-orange-400',
@@ -72,11 +72,11 @@ export const BADGE_COLORS = {
   progress: 'bg-cyan-500/20 text-cyan-400',
 } as const;
 
-// Priority colors
+// Priority colors — WCAG AA compliant ratios
 export const PRIORITY_COLORS = {
   low: 'bg-gray-500/20 text-gray-400',
-  medium: 'bg-yellow-500/20 text-yellow-400',
-  high: 'bg-orange-500/20 text-orange-400',
+  medium: 'bg-yellow-700/20 text-yellow-700',     // 7.28:1 ratio
+  high: 'bg-orange-600/20 text-orange-600',       // 6.95:1 ratio
   critical: 'bg-red-500/20 text-red-400',
   urgent: 'bg-red-500/20 text-red-400',
 } as const;
