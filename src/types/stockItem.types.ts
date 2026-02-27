@@ -108,7 +108,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   stringing: 'bg-orange-500/20 text-orange-400',
   consumable: 'bg-gray-500/20 text-gray-400',
   tools: 'bg-red-500/20 text-red-400',
-  fibertime: 'bg-teal-500/20 text-teal-400',
+  bootstock: 'bg-teal-500/20 text-teal-400',
   services: 'bg-indigo-500/20 text-indigo-400',
   uncategorized: 'bg-slate-500/20 text-slate-400',
 };
