@@ -13,11 +13,21 @@ interface DropdownItem {
   href: string;
 }
 
+interface DropdownSection {
+  section: string;
+}
+
+type NavItem = DropdownItem | DropdownSection;
+
+function isSection(item: NavItem): item is DropdownSection {
+  return 'section' in item;
+}
+
 interface Tab {
   id: string;
   label: string;
   href?: string;
-  items?: DropdownItem[];
+  items?: NavItem[];
 }
 
 const TABS: Tab[] = [
@@ -25,30 +35,51 @@ const TABS: Tab[] = [
   {
     id: 'customers', label: 'Customers',
     items: [
+      { section: 'Lists' },
+      { label: 'List of Customers', href: '/clients' },
+      { label: 'Customer Categories', href: '/accounting/customer-categories' },
+      { section: 'Transactions' },
       { label: 'Quotes', href: '/accounting/customer-quotes' },
       { label: 'Tax Invoices', href: '/accounting/customer-invoices' },
       { label: 'Recurring Invoices', href: '/accounting/recurring-invoices' },
       { label: 'Receipts', href: '/accounting/customer-payments' },
       { label: 'Credit Notes', href: '/accounting/credit-notes' },
       { label: 'Write-Offs', href: '/accounting/write-offs' },
+      { label: 'Allocate Receipts', href: '/accounting/customer-allocations' },
       { label: 'Adjustments', href: '/accounting/adjustments?type=customer' },
-      { label: 'Debtors Manager', href: '/accounting/debtors-manager' },
+      { section: 'Reports' },
+      { label: 'Sales by Customer', href: '/accounting/reports/sales-by-customer' },
       { label: 'Aging', href: '/accounting/ar-aging' },
       { label: 'Statements', href: '/accounting/customer-statements' },
+      { label: 'Debtors Manager', href: '/accounting/debtors-manager' },
+      { label: 'Unallocated Receipts', href: '/accounting/reports/unallocated-receipts' },
+      { section: 'Special' },
       { label: 'Statement Run', href: '/accounting/statement-run' },
       { label: 'Dunning', href: '/accounting/dunning' },
+      { label: 'Opening Balances', href: '/accounting/opening-balances' },
     ],
   },
   {
     id: 'suppliers', label: 'Suppliers',
     items: [
+      { section: 'Lists' },
+      { label: 'List of Suppliers', href: '/suppliers' },
+      { label: 'Supplier Categories', href: '/accounting/supplier-categories' },
+      { section: 'Transactions' },
+      { label: 'Purchase Orders', href: '/procurement/purchase-orders' },
       { label: 'Invoices', href: '/accounting/supplier-invoices' },
+      { label: 'Returns', href: '/accounting/supplier-returns' },
       { label: 'Payments', href: '/accounting/supplier-payments' },
       { label: 'Batch Payments', href: '/accounting/batch-payments' },
-      { label: 'Returns', href: '/accounting/supplier-returns' },
+      { label: 'Allocate Payments', href: '/accounting/supplier-allocations' },
       { label: 'Adjustments', href: '/accounting/adjustments?type=supplier' },
+      { section: 'Reports' },
+      { label: 'Purchases by Supplier', href: '/accounting/reports/purchases-by-supplier' },
       { label: 'Aging', href: '/accounting/ap-aging' },
       { label: 'Statements', href: '/accounting/supplier-statements' },
+      { label: 'Unallocated Payments', href: '/accounting/reports/unallocated-payments' },
+      { section: 'Special' },
+      { label: 'Opening Balances', href: '/accounting/opening-balances' },
     ],
   },
   {
@@ -127,12 +158,16 @@ function getActiveTabId(pathname: string, query: Record<string, string | string[
       pathname.startsWith('/accounting/ar-aging') ||
       pathname.startsWith('/accounting/statement-run') ||
       pathname.startsWith('/accounting/dunning') ||
+      pathname === '/accounting/reports/sales-by-customer' ||
+      pathname === '/accounting/reports/unallocated-receipts' ||
       (pathname.startsWith('/accounting/adjustments') && query.type === 'customer')) {
     return 'customers';
   }
   if (pathname.startsWith('/accounting/supplier-') ||
       pathname.startsWith('/accounting/batch-payments') ||
       pathname.startsWith('/accounting/ap-aging') ||
+      pathname === '/accounting/reports/purchases-by-supplier' ||
+      pathname === '/accounting/reports/unallocated-payments' ||
       (pathname.startsWith('/accounting/adjustments') && query.type === 'supplier')) {
     return 'suppliers';
   }
@@ -209,8 +244,15 @@ export function AccountingNav() {
             )}
 
             {tab.items && openTab === tab.id && (
-              <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[200px] py-1 z-40">
-                {tab.items.map(item => {
+              <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40 max-h-[70vh] overflow-y-auto">
+                {tab.items.map((item, idx) => {
+                  if (isSection(item)) {
+                    return (
+                      <div key={item.section} className={`px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ff-text-tertiary)] ${idx > 0 ? 'border-t border-[var(--ff-border-light)] mt-1 pt-2' : ''}`}>
+                        {item.section}
+                      </div>
+                    );
+                  }
                   const itemPath = item.href.split('?')[0];
                   const isActive = router.asPath.startsWith(itemPath) &&
                     (item.href.includes('?') ? router.asPath.includes(item.href.split('?')[1]) : true);
