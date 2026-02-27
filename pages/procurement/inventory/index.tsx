@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
@@ -117,6 +118,7 @@ const statusColors: Record<string, string> = {
 
 // Categories Tab Content
 function CategoriesTabContent() {
+  const router = useRouter();
   const [categories, setCategories] = useState<StockCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -286,7 +288,7 @@ function CategoriesTabContent() {
           <div
             key={cat.id}
             className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg hover:border-indigo-500/50 transition-colors cursor-pointer"
-            onClick={() => openEditModal(cat)}
+            onClick={() => router.push(`/procurement/inventory?tab=items&category=${cat.code}`)}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -301,6 +303,13 @@ function CategoriesTabContent() {
                   {cat.is_active ? 'Active' : 'Inactive'}
                 </span>
                 <span className="text-sm text-[var(--ff-text-secondary)]">{Number(cat.item_count || 0)} items</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); openEditModal(cat); }}
+                  className="p-1 text-[var(--ff-text-tertiary)] hover:text-indigo-400 transition-colors"
+                  title="Edit category"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(cat); }}
                   className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-400 transition-colors"

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import {
   Package,
@@ -18,15 +18,18 @@ import { useStockItems } from './hooks/useStockItems';
 import { StockItemRow } from './components/StockItemRow';
 import { StockItemModal } from './components/StockItemModal';
 import { Pagination } from '@/components/ui/StandardDataTable';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 import type { StockItem, StockItemFilters } from '@/types/stockItem.types';
 
 export function StockItemsPage() {
   const router = useRouter();
+  const initialCategory = (router.query.category as string) || undefined;
   const [filters, setFilters] = useState<StockItemFilters>({
     page: 1,
     limit: 25,
     sortBy: 'item_code',
     sortOrder: 'asc',
+    category: initialCategory,
   });
   const [searchInput, setSearchInput] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -34,6 +37,14 @@ export function StockItemsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { items, pagination, categories, isLoading, error, mutate } = useStockItems(filters);
+
+  // Sync category from URL query param (for client-side navigation from Categories tab)
+  useEffect(() => {
+    const urlCategory = (router.query.category as string) || undefined;
+    if (urlCategory !== filters.category) {
+      setFilters(prev => ({ ...prev, category: urlCategory, page: 1 }));
+    }
+  }, [router.query.category]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -115,6 +126,16 @@ export function StockItemsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportCSVButton
+            endpoint="/api/stock-items/stock-items-export"
+            params={{
+              search: filters.search,
+              category: filters.category,
+              hasStock: filters.hasStock ? 'true' : undefined,
+              odooOnly: filters.odooOnly ? 'true' : undefined,
+            }}
+            filenamePrefix="stock-items"
+          />
           <button
             onClick={() => mutate()}
             className="flex items-center gap-2 px-4 py-2 border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-hover)] text-[var(--ff-text-secondary)]"
