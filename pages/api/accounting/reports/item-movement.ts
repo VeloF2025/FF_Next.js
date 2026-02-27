@@ -41,11 +41,12 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
         FROM goods_receipt_items gi
         JOIN goods_receipt_notes g ON g.id = gi.grn_id
         JOIN stock_items si ON si.id = gi.stock_item_id
-        WHERE g.delivery_date >= ${from} AND g.delivery_date <= ${to}
+        WHERE g.delivery_date IS NOT NULL
+          AND g.delivery_date >= ${from} AND g.delivery_date <= ${to}
       `;
     }
 
-    // Get purchase order items dispatched as stock OUT (no stock_item_id on customer_invoice_items)
+    // No sales rows — customer_invoice_items don't link to stock_items
     const salesRows: typeof grnRows = [];
 
     // Merge and sort by date

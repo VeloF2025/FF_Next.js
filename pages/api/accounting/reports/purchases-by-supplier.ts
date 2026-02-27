@@ -4,7 +4,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import sql from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL!);
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
