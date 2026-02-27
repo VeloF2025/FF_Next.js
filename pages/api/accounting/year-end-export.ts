@@ -18,14 +18,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const rows = await sql`
-      SELECT year_label, start_date, end_date, status
-      FROM fiscal_years ORDER BY start_date DESC
+      SELECT fiscal_year, MIN(start_date) AS start_date, MAX(end_date) AS end_date,
+        CASE WHEN COUNT(*) FILTER (WHERE status = 'open') > 0 THEN 'open' ELSE 'closed' END AS status
+      FROM fiscal_periods
+      GROUP BY fiscal_year
+      ORDER BY fiscal_year DESC
     `;
 
     const csvLines = [
       'Year,Start Date,End Date,Status',
       ...rows.map((r: Record<string, unknown>) => [
-        csvCell(String(r.year_label)),
+        csvCell(String(r.fiscal_year)),
         csvCell(String(r.start_date)),
         csvCell(String(r.end_date)),
         csvCell(String(r.status)),

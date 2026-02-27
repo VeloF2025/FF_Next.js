@@ -10,13 +10,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withErrorHandler } from '@/lib/api-error-handler';
-import { createLoggedSql } from '@/lib/db-logger';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-const sql = createLoggedSql(process.env.DATABASE_URL!);
+const sql = neon(process.env.DATABASE_URL!);
 
 /** Escape a value for CSV — wraps in double-quotes and escapes internal quotes. */
 function csvVal(value: string | number): string {
@@ -39,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]!;
       endDate = now.toISOString().split('T')[0]!;
     } else {
-      const [fy] = await sql`
+      const fyRows = await sql`
         SELECT MIN(start_date) AS start_date, MAX(end_date) AS end_date
         FROM fiscal_periods
         WHERE fiscal_year = (
@@ -49,10 +48,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           LIMIT 1
         )
       `;
-      startDate = (fy?.start_date?.toString().split('T')[0] ?? `${now.getFullYear()}-03-01`) as string;
-      endDate = (period === 'full_year'
-        ? (fy?.end_date?.toString().split('T')[0] ?? `${now.getFullYear() + 1}-02-28`)
-        : now.toISOString().split('T')[0]) as string;
+      const fy = fyRows[0];
+      const fyStart = fy?.start_date instanceof Date
+        ? fy.start_date.toISOString().split('T')[0]
+        : (fy?.start_date ? String(fy.start_date).split('T')[0] : null);
+      const fyEnd = fy?.end_date instanceof Date
+        ? fy.end_date.toISOString().split('T')[0]
+        : (fy?.end_date ? String(fy.end_date).split('T')[0] : null);
+      startDate = fyStart || `${now.getFullYear()}-03-01`;
+      endDate = period === 'full_year'
+        ? (fyEnd || `${now.getFullYear() + 1}-02-28`)
+        : now.toISOString().split('T')[0]!;
     }
 
     // Load budget amounts — from accounting_budgets table, falling back to app_settings
@@ -152,9 +158,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.status(200).send(csv);
   } catch (err) {
-    log.error('Failed to export budget vs actual report', { error: err }, 'accounting-api');
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error('Failed to export budget vs actual report', { error: msg });
     return apiResponse.badRequest(res, 'Failed to export budget vs actual report');
   }
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);

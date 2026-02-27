@@ -20,16 +20,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const rows = await sql`
       SELECT a.account_code, a.account_name, a.account_type, a.normal_balance,
         COALESCE(ob.debit, 0) AS opening_debit, COALESCE(ob.credit, 0) AS opening_credit
-      FROM chart_of_accounts a
+      FROM gl_accounts a
       LEFT JOIN (
-        SELECT account_id,
+        SELECT gl_account_id,
           SUM(CASE WHEN debit > 0 THEN debit ELSE 0 END) AS debit,
           SUM(CASE WHEN credit > 0 THEN credit ELSE 0 END) AS credit
         FROM gl_journal_lines jl
         JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
         WHERE je.source = 'opening_balance'
-        GROUP BY account_id
-      ) ob ON ob.account_id = a.id
+        GROUP BY gl_account_id
+      ) ob ON ob.gl_account_id = a.id
       ORDER BY a.account_code
     `;
 
