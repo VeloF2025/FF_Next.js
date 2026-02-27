@@ -22,9 +22,9 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
         ci.client_id,
         c.name AS client_name,
         COUNT(ci.id)::int AS invoice_count,
-        COALESCE(SUM(ci.total), 0)::numeric AS total_sales,
+        COALESCE(SUM(ci.total_amount), 0)::numeric AS total_sales,
         COALESCE(SUM(ci.amount_paid), 0)::numeric AS payments_received,
-        COALESCE(SUM(ci.total - ci.amount_paid), 0)::numeric AS outstanding
+        COALESCE(SUM(ci.total_amount - ci.amount_paid), 0)::numeric AS outstanding
       FROM customer_invoices ci
       JOIN clients c ON c.id = ci.client_id
       WHERE ci.invoice_date >= ${from}

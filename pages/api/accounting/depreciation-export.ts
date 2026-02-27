@@ -14,7 +14,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
 
   try {
-    const assetRes = await fetch(`${req.headers.origin || 'http://localhost:3004'}/api/assets?status=available,assigned,in_maintenance&limit=500`, {
+    const proto = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers.host || 'localhost:3004';
+    const baseUrl = `${proto}://${host}`;
+    const assetRes = await fetch(`${baseUrl}/api/assets?status=available,assigned,in_maintenance&limit=500`, {
       headers: { cookie: req.headers.cookie || '' },
     });
     const assetJson = await assetRes.json();

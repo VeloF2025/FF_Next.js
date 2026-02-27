@@ -16,7 +16,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const rows = await sql`
-        SELECT id, item_code, name, category, uom, quantity_on_hand, cost_price, selling_price
+        SELECT id, item_code, name, category, uom, qty_available, standard_cost, list_price
         FROM stock_items WHERE is_active = true ORDER BY name
       `;
       return apiResponse.success(res, rows);
@@ -45,8 +45,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const entry of items) {
         await sql`
           UPDATE stock_items
-          SET quantity_on_hand = ${Number(entry.quantity)},
-              cost_price = ${Number(entry.unitCost)}
+          SET qty_available = ${Number(entry.quantity)},
+              standard_cost = ${Number(entry.unitCost)}
           WHERE id = ${entry.itemId}
         `;
       }

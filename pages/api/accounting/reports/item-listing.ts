@@ -24,7 +24,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       const like = `%${search}%`;
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
-          selling_price, cost_price, quantity_on_hand, is_active
+          list_price, standard_cost, qty_available, is_active
         FROM stock_items
         WHERE category = ${category} AND (name ILIKE ${like} OR item_code ILIKE ${like})
         ORDER BY name
@@ -32,7 +32,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     } else if (category) {
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
-          selling_price, cost_price, quantity_on_hand, is_active
+          list_price, standard_cost, qty_available, is_active
         FROM stock_items WHERE category = ${category}
         ORDER BY name
       `;
@@ -40,14 +40,14 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       const like = `%${search}%`;
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
-          selling_price, cost_price, quantity_on_hand, is_active
+          list_price, standard_cost, qty_available, is_active
         FROM stock_items WHERE name ILIKE ${like} OR item_code ILIKE ${like}
         ORDER BY name
       `;
     } else {
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
-          selling_price, cost_price, quantity_on_hand, is_active
+          list_price, standard_cost, qty_available, is_active
         FROM stock_items ORDER BY name
       `;
     }
@@ -59,9 +59,9 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       description: r.description || '',
       category: r.category || 'uncategorized',
       uom: r.uom || '',
-      sellingPrice: Number(r.selling_price || 0),
-      costPrice: Number(r.cost_price || 0),
-      qtyOnHand: Number(r.quantity_on_hand || 0),
+      sellingPrice: Number(r.list_price || 0),
+      costPrice: Number(r.standard_cost || 0),
+      qtyOnHand: Number(r.qty_available || 0),
       isActive: r.is_active,
     }));
 

@@ -20,17 +20,17 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     const rows = await sql`
       SELECT
         si.supplier_id,
-        s.name AS supplier_name,
+        s.company_name AS supplier_name,
         COUNT(si.id)::int AS invoice_count,
-        COALESCE(SUM(si.total), 0)::numeric AS total_purchases,
+        COALESCE(SUM(si.total_amount), 0)::numeric AS total_purchases,
         COALESCE(SUM(si.amount_paid), 0)::numeric AS payments_made,
-        COALESCE(SUM(si.total - si.amount_paid), 0)::numeric AS outstanding
+        COALESCE(SUM(si.total_amount - si.amount_paid), 0)::numeric AS outstanding
       FROM supplier_invoices si
       JOIN suppliers s ON s.id = si.supplier_id
       WHERE si.invoice_date >= ${from}
         AND si.invoice_date <= ${to}
         AND si.status != 'cancelled'
-      GROUP BY si.supplier_id, s.name
+      GROUP BY si.supplier_id, s.company_name
       ORDER BY total_purchases DESC
     `;
 
