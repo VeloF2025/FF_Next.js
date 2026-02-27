@@ -60,7 +60,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       const qtyOut = Number(r.qty_out || 0);
       runningBalance += qtyIn - qtyOut;
       return {
-        date: r.move_date?.split('T')[0] || '',
+        date: r.move_date instanceof Date ? r.move_date.toISOString().split('T')[0] : String(r.move_date || '').split('T')[0],
         type: r.move_type,
         reference: r.reference || '',
         itemName: r.item_name,

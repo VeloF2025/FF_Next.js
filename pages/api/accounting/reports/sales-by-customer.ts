@@ -22,7 +22,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     const rows = await sql`
       SELECT
         ci.client_id,
-        c.name AS client_name,
+        c.company_name AS client_name,
         COUNT(ci.id)::int AS invoice_count,
         COALESCE(SUM(ci.total_amount), 0)::numeric AS total_sales,
         COALESCE(SUM(ci.amount_paid), 0)::numeric AS payments_received,
@@ -32,7 +32,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       WHERE ci.invoice_date >= ${from}
         AND ci.invoice_date <= ${to}
         AND ci.status != 'cancelled'
-      GROUP BY ci.client_id, c.name
+      GROUP BY ci.client_id, c.company_name
       ORDER BY total_sales DESC
     `;
 
