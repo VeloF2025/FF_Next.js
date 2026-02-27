@@ -113,16 +113,39 @@ ssh root@72.61.197.178     # VPS (WhatsApp services)
 /home/velo/fibreflow-production/  # Production (app.fibreflow.app)
 ```
 
-**Deploy Commands (SSH key auth — no passwords needed):**
+**DEPLOYMENT RULES (MANDATORY):**
+
+| Time Window | Dev | Staging | Production |
+|-------------|-----|---------|------------|
+| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** | **BLOCKED** |
+| **After hours** + weekends | Allowed | Promote from dev | Promote from staging |
+| **Emergency** (any time) | Allowed | `--force` required | `--force` required |
+
+**Workflow:**
+1. During the day: deploy to **dev only** (`/deploy` or `/deploy dev`)
+2. After hours: promote dev → staging (`/deploy staging`)
+3. After hours: promote staging → production (`/deploy production`)
+4. Emergency: `/deploy staging --force` (requires explicit user confirmation)
+
+**Deploy Scripts:**
 ```bash
-# Dev
+bash scripts/deploy-gate.sh dev              # Deploy to dev (always)
+bash scripts/deploy-gate.sh staging          # Blocked during business hours
+bash scripts/promote.sh dev staging          # Promote dev → staging (after hours)
+bash scripts/promote.sh staging production   # Promote staging → production (after hours)
+bash scripts/deploy-gate.sh status           # Show all environments
+```
+
+**Direct SSH Commands (fallback):**
+```bash
+# Dev (always allowed)
 ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
 
-# Staging
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+# Staging (after hours only — promotes EXACT commit from dev)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
 
-# Production
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+# Production (after hours only — promotes EXACT commit from staging)
+ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
 ```
 
 **Full details:** `docs/INFRASTRUCTURE.md` | Credentials: `.claude/credentials.local.md`
