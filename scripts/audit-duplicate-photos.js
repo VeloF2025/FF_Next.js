@@ -369,7 +369,9 @@ async function main() {
     if (done % interval === 0 || done === candidates.length)
       process.stdout.write(`  ${done}/${candidates.length}...\r`);
     if (!buf) { failed++; return null; }
-    const [h, dh] = await Promise.all([Promise.resolve(sha256(buf)), dHash(buf)]);
+    // Skip dHash in full-scan mode — pairwise comparison is O(n²) on 100k+ photos
+    const h = sha256(buf);
+    const dh = FULL_SCAN ? null : await dHash(buf);
     return { ...p, hash: h, dhash: dh };
   }, DL_CONCURRENCY);
 
@@ -380,8 +382,16 @@ async function main() {
   console.log('Phase 3 — Finding duplicates...');
   const exactGroups = groupExact(photos);
   const exactHashes = new Set(exactGroups.flatMap(g => g.photos.map(p => p.hash)));
-  let percepPairs   = findPairs(photos, exactHashes);
-  console.log(`  Exact: ${exactGroups.length} groups | Perceptual: ${percepPairs.length} pairs\n`);
+
+  // dHash pairwise comparison is O(n²) — only feasible on small candidate sets.
+  // In full-scan mode (100k+ photos) skip it to avoid OOM; exact SHA256 catches fraud.
+  let percepPairs = [];
+  if (!FULL_SCAN) {
+    percepPairs = findPairs(photos, exactHashes);
+    console.log(`  Exact: ${exactGroups.length} groups | Perceptual: ${percepPairs.length} pairs\n`);
+  } else {
+    console.log(`  Exact: ${exactGroups.length} groups | Perceptual: skipped (full-scan mode)\n`);
+  }
 
   // ── Phase 4: VLM ─────────────────────────────────────────────────────────
   if (!SKIP_VLM && (exactGroups.length + percepPairs.length > 0)) {
