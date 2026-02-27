@@ -1,201 +1,109 @@
 /**
  * Sage-style horizontal navigation bar for accounting pages
- * Tabs with dropdown menus, active state based on current route
+ * Tabs with dropdown menus; Customers/Suppliers use flyout sub-menus
+ * that expand to the right on hover (matching Sage's UX pattern)
  */
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  TABS, getActiveTabId, isLinkActive, isFlyout,
+  type Tab, type DropdownItem,
+} from './accountingNavConfig';
 
-interface DropdownItem {
-  label: string;
-  href: string;
+/** Simple flat dropdown (Banking, Accounts, VAT, etc.) */
+function FlatDropdown({ items, asPath, onClose }: { items: DropdownItem[]; asPath: string; onClose: () => void }) {
+  return (
+    <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40">
+      {items.map(item => (
+        <Link key={item.href} href={item.href} onClick={onClose}
+          className={`block px-4 py-2 text-sm transition-colors ${
+            isLinkActive(item.href, asPath)
+              ? 'text-emerald-400 bg-emerald-500/10'
+              : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
+          }`}>
+          {item.label}
+        </Link>
+      ))}
+    </div>
+  );
 }
 
-interface DropdownSection {
-  section: string;
-}
+/** Sage-style flyout dropdown with section rows that expand sub-menus to the right */
+function FlyoutDropdown({ tab, asPath, onClose }: { tab: Tab; asPath: string; onClose: () => void }) {
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-type NavItem = DropdownItem | DropdownSection;
+  const clearTimer = () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  const delayedClose = () => { timeoutRef.current = setTimeout(() => setHoveredSection(null), 150); };
 
-function isSection(item: NavItem): item is DropdownSection {
-  return 'section' in item;
-}
+  useEffect(() => () => clearTimer(), []);
 
-interface Tab {
-  id: string;
-  label: string;
-  href?: string;
-  items?: NavItem[];
-}
+  const sections = (tab.items || []).filter(isFlyout);
+  const activeSection = sections.find(s =>
+    s.items.some(item => isLinkActive(item.href, asPath))
+  );
 
-const TABS: Tab[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '/accounting' },
-  {
-    id: 'customers', label: 'Customers',
-    items: [
-      { section: 'Lists' },
-      { label: 'List of Customers', href: '/clients' },
-      { label: 'Customer Categories', href: '/accounting/customer-categories' },
-      { section: 'Transactions' },
-      { label: 'Quotes', href: '/accounting/customer-quotes' },
-      { label: 'Tax Invoices', href: '/accounting/customer-invoices' },
-      { label: 'Recurring Invoices', href: '/accounting/recurring-invoices' },
-      { label: 'Receipts', href: '/accounting/customer-payments' },
-      { label: 'Credit Notes', href: '/accounting/credit-notes' },
-      { label: 'Write-Offs', href: '/accounting/write-offs' },
-      { label: 'Allocate Receipts', href: '/accounting/customer-allocations' },
-      { label: 'Adjustments', href: '/accounting/adjustments?type=customer' },
-      { section: 'Reports' },
-      { label: 'Sales by Customer', href: '/accounting/reports/sales-by-customer' },
-      { label: 'Aging', href: '/accounting/ar-aging' },
-      { label: 'Statements', href: '/accounting/customer-statements' },
-      { label: 'Debtors Manager', href: '/accounting/debtors-manager' },
-      { label: 'Unallocated Receipts', href: '/accounting/reports/unallocated-receipts' },
-      { section: 'Special' },
-      { label: 'Statement Run', href: '/accounting/statement-run' },
-      { label: 'Dunning', href: '/accounting/dunning' },
-      { label: 'Opening Balances', href: '/accounting/opening-balances' },
-    ],
-  },
-  {
-    id: 'suppliers', label: 'Suppliers',
-    items: [
-      { section: 'Lists' },
-      { label: 'List of Suppliers', href: '/suppliers' },
-      { label: 'Supplier Categories', href: '/accounting/supplier-categories' },
-      { section: 'Transactions' },
-      { label: 'Purchase Orders', href: '/procurement/purchase-orders' },
-      { label: 'Invoices', href: '/accounting/supplier-invoices' },
-      { label: 'Returns', href: '/accounting/supplier-returns' },
-      { label: 'Payments', href: '/accounting/supplier-payments' },
-      { label: 'Batch Payments', href: '/accounting/batch-payments' },
-      { label: 'Allocate Payments', href: '/accounting/supplier-allocations' },
-      { label: 'Adjustments', href: '/accounting/adjustments?type=supplier' },
-      { section: 'Reports' },
-      { label: 'Purchases by Supplier', href: '/accounting/reports/purchases-by-supplier' },
-      { label: 'Aging', href: '/accounting/ap-aging' },
-      { label: 'Statements', href: '/accounting/supplier-statements' },
-      { label: 'Unallocated Payments', href: '/accounting/reports/unallocated-payments' },
-      { section: 'Special' },
-      { label: 'Opening Balances', href: '/accounting/opening-balances' },
-    ],
-  },
-  {
-    id: 'banking', label: 'Banking',
-    items: [
-      { label: 'Bank Accounts', href: '/accounting/bank-accounts' },
-      { label: 'Transactions', href: '/accounting/bank-transactions' },
-      { label: 'Import Statement', href: '/accounting/bank-reconciliation/import' },
-      { label: 'Reconcile', href: '/accounting/bank-reconciliation' },
-      { label: 'Mapping Rules', href: '/accounting/bank-reconciliation/rules' },
-      { label: 'Transfers', href: '/accounting/bank-transfers' },
-    ],
-  },
-  {
-    id: 'accounts', label: 'Accounts',
-    items: [
-      { label: 'Chart of Accounts', href: '/accounting?tab=chart-of-accounts' },
-      { label: 'Journal Entries', href: '/accounting?tab=journal-entries' },
-      { label: 'Recurring Journals', href: '/accounting/recurring-journals' },
-      { label: 'Fiscal Periods', href: '/accounting?tab=fiscal-periods' },
-      { label: 'Default Accounts', href: '/accounting/default-accounts' },
-      { label: 'Currencies', href: '/accounting/currencies' },
-    ],
-  },
-  {
-    id: 'vat', label: 'VAT',
-    items: [
-      { label: 'VAT Return', href: '/accounting/reports/vat-return' },
-      { label: 'VAT Adjustments', href: '/accounting/vat-adjustments' },
-      { label: 'DRC VAT', href: '/accounting/drc-vat' },
-    ],
-  },
-  {
-    id: 'accountants', label: "Accountant's Area",
-    items: [
-      { label: 'Trial Balance', href: '/accounting/trial-balance' },
-      { label: 'Opening Balances', href: '/accounting/opening-balances' },
-      { label: 'Depreciation', href: '/accounting/depreciation' },
-      { label: 'Year-End', href: '/accounting/year-end' },
-      { label: 'Audit Trail', href: '/accounting/reports/audit-trail' },
-      { label: 'Cost Centres', href: '/accounting/cost-centres' },
-      { label: 'Budgets', href: '/accounting/budgets' },
-    ],
-  },
-  {
-    id: 'reports', label: 'Reports',
-    items: [
-      { label: 'Income Statement', href: '/accounting/reports/income-statement' },
-      { label: 'Balance Sheet', href: '/accounting/reports/balance-sheet' },
-      { label: 'Cash Flow', href: '/accounting/reports/cash-flow' },
-      { label: 'Budget vs Actual', href: '/accounting/reports/budget-vs-actual' },
-      { label: 'Project Profitability', href: '/accounting/reports/project-profitability' },
-      { label: 'Customer Report', href: '/accounting/reports/customer-reports' },
-      { label: 'Supplier Report', href: '/accounting/reports/supplier-reports' },
-      { label: 'Bank Transactions', href: '/accounting/reports/bank-transactions' },
-      { label: 'Account Transactions', href: '/accounting/reports/account-transactions' },
-    ],
-  },
-  { id: 'import', label: 'Data Import', href: '/accounting/sage-migration' },
-];
+  return (
+    <div className="absolute top-full left-0 flex z-40">
+      {/* Left panel: top actions + section names */}
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-bl-lg shadow-xl min-w-[200px] py-1">
+        {tab.topItems?.map(item => (
+          <Link key={item.href} href={item.href} onClick={onClose}
+            className="block px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)] transition-colors">
+            {item.label}
+          </Link>
+        ))}
+        {tab.topItems && tab.topItems.length > 0 && (
+          <div className="border-t border-[var(--ff-border-light)] my-1" />
+        )}
 
-function getActiveTabId(pathname: string, query: Record<string, string | string[] | undefined>): string {
-  if (pathname === '/accounting') {
-    if (query.tab === 'chart-of-accounts' || query.tab === 'journal-entries' || query.tab === 'fiscal-periods') {
-      return 'accounts';
-    }
-    return 'dashboard';
-  }
-  if (pathname.startsWith('/accounting/sage-migration')) return 'import';
+        {sections.map(section => {
+          const isHovered = hoveredSection === section.section;
+          const isActive = activeSection?.section === section.section && !hoveredSection;
+          return (
+            <div
+              key={section.section}
+              onMouseEnter={() => { clearTimer(); setHoveredSection(section.section); }}
+              onMouseLeave={delayedClose}
+              className={`flex items-center justify-between px-4 py-2.5 text-sm cursor-default transition-colors ${
+                isHovered
+                  ? 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)]'
+                  : isActive ? 'text-emerald-400' : 'text-[var(--ff-text-secondary)]'
+              }`}
+            >
+              <span className="font-medium">{section.section}</span>
+              <ChevronRight className="h-3.5 w-3.5 ml-4 flex-shrink-0" />
+            </div>
+          );
+        })}
+      </div>
 
-  if (pathname.startsWith('/accounting/customer-') ||
-      pathname.startsWith('/accounting/recurring-invoices') ||
-      pathname.startsWith('/accounting/credit-notes') ||
-      pathname.startsWith('/accounting/write-offs') ||
-      pathname.startsWith('/accounting/debtors-manager') ||
-      pathname.startsWith('/accounting/ar-aging') ||
-      pathname.startsWith('/accounting/statement-run') ||
-      pathname.startsWith('/accounting/dunning') ||
-      pathname === '/accounting/reports/sales-by-customer' ||
-      pathname === '/accounting/reports/unallocated-receipts' ||
-      (pathname.startsWith('/accounting/adjustments') && query.type === 'customer')) {
-    return 'customers';
-  }
-  if (pathname.startsWith('/accounting/supplier-') ||
-      pathname.startsWith('/accounting/batch-payments') ||
-      pathname.startsWith('/accounting/ap-aging') ||
-      pathname === '/accounting/reports/purchases-by-supplier' ||
-      pathname === '/accounting/reports/unallocated-payments' ||
-      (pathname.startsWith('/accounting/adjustments') && query.type === 'supplier')) {
-    return 'suppliers';
-  }
-  if (pathname.startsWith('/accounting/bank-')) return 'banking';
-  if (pathname.startsWith('/accounting/chart-of-accounts') ||
-      pathname.startsWith('/accounting/journal-entries') ||
-      pathname.startsWith('/accounting/recurring-journals') ||
-      pathname.startsWith('/accounting/fiscal-periods') ||
-      pathname.startsWith('/accounting/default-accounts') ||
-      pathname.startsWith('/accounting/currencies')) {
-    return 'accounts';
-  }
-  if (pathname.startsWith('/accounting/vat-') ||
-      pathname.startsWith('/accounting/drc-vat') ||
-      pathname === '/accounting/reports/vat-return') {
-    return 'vat';
-  }
-  if (pathname.startsWith('/accounting/trial-balance') ||
-      pathname.startsWith('/accounting/opening-balances') ||
-      pathname.startsWith('/accounting/depreciation') ||
-      pathname.startsWith('/accounting/year-end') ||
-      pathname.startsWith('/accounting/cost-centres') ||
-      pathname.startsWith('/accounting/budgets') ||
-      pathname === '/accounting/reports/audit-trail') {
-    return 'accountants';
-  }
-  if (pathname.startsWith('/accounting/reports')) return 'reports';
-  return 'dashboard';
+      {/* Right panel: sub-items for hovered section */}
+      {hoveredSection && (
+        <div
+          onMouseEnter={clearTimer}
+          onMouseLeave={delayedClose}
+          className="bg-[var(--ff-bg-secondary)] border border-l-0 border-[var(--ff-border-light)] rounded-br-lg shadow-xl min-w-[200px] py-1"
+        >
+          {sections
+            .find(s => s.section === hoveredSection)
+            ?.items.map(item => (
+              <Link key={item.href} href={item.href} onClick={onClose}
+                className={`block px-4 py-2 text-sm transition-colors ${
+                  isLinkActive(item.href, asPath)
+                    ? 'text-emerald-400 bg-emerald-500/10'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
+                }`}>
+                {item.label}
+              </Link>
+            ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AccountingNav() {
@@ -205,16 +113,16 @@ export function AccountingNav() {
   const activeTab = getActiveTabId(router.pathname, router.query);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (navRef.current && !navRef.current.contains(e.target as Node)) {
-        setOpenTab(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handler = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) setOpenTab(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   useEffect(() => { setOpenTab(null); }, [router.pathname]);
+
+  const hasFlyout = (tab: Tab) => tab.items?.some(isFlyout) ?? false;
 
   return (
     <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
@@ -244,30 +152,9 @@ export function AccountingNav() {
             )}
 
             {tab.items && openTab === tab.id && (
-              <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40 max-h-[70vh] overflow-y-auto">
-                {tab.items.map((item, idx) => {
-                  if (isSection(item)) {
-                    return (
-                      <div key={item.section} className={`px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--ff-text-tertiary)] ${idx > 0 ? 'border-t border-[var(--ff-border-light)] mt-1 pt-2' : ''}`}>
-                        {item.section}
-                      </div>
-                    );
-                  }
-                  const itemPath = item.href.split('?')[0];
-                  const isActive = router.asPath.startsWith(itemPath) &&
-                    (item.href.includes('?') ? router.asPath.includes(item.href.split('?')[1]) : true);
-                  return (
-                    <Link key={item.href} href={item.href}
-                      className={`block px-4 py-2 text-sm transition-colors ${
-                        isActive
-                          ? 'text-emerald-400 bg-emerald-500/10'
-                          : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)]'
-                      }`}>
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
+              hasFlyout(tab)
+                ? <FlyoutDropdown tab={tab} asPath={router.asPath} onClose={() => setOpenTab(null)} />
+                : <FlatDropdown items={tab.items as DropdownItem[]} asPath={router.asPath} onClose={() => setOpenTab(null)} />
             )}
           </div>
         ))}
