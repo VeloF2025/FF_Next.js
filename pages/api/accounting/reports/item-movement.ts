@@ -24,53 +24,30 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     let grnRows;
     if (itemId) {
       grnRows = await sql`
-        SELECT g.received_date AS move_date, 'GRN' AS move_type,
+        SELECT g.delivery_date AS move_date, 'GRN' AS move_type,
           g.grn_number AS reference, si.name AS item_name, si.item_code,
           gi.quantity_received AS qty_in, 0 AS qty_out
-        FROM grn_items gi
-        JOIN goods_received_notes g ON g.id = gi.grn_id
+        FROM goods_receipt_items gi
+        JOIN goods_receipt_notes g ON g.id = gi.grn_id
         JOIN stock_items si ON si.id = gi.stock_item_id
         WHERE gi.stock_item_id = ${itemId}
-          AND g.received_date >= ${from} AND g.received_date <= ${to}
+          AND g.delivery_date >= ${from} AND g.delivery_date <= ${to}
       `;
     } else {
       grnRows = await sql`
-        SELECT g.received_date AS move_date, 'GRN' AS move_type,
+        SELECT g.delivery_date AS move_date, 'GRN' AS move_type,
           g.grn_number AS reference, si.name AS item_name, si.item_code,
           gi.quantity_received AS qty_in, 0 AS qty_out
-        FROM grn_items gi
-        JOIN goods_received_notes g ON g.id = gi.grn_id
+        FROM goods_receipt_items gi
+        JOIN goods_receipt_notes g ON g.id = gi.grn_id
         JOIN stock_items si ON si.id = gi.stock_item_id
-        WHERE g.received_date >= ${from} AND g.received_date <= ${to}
+        WHERE g.delivery_date IS NOT NULL
+          AND g.delivery_date >= ${from} AND g.delivery_date <= ${to}
       `;
     }
 
-    // Get sales (invoiced items) as stock OUT
-    let salesRows;
-    if (itemId) {
-      salesRows = await sql`
-        SELECT ci.invoice_date AS move_date, 'Sale' AS move_type,
-          ci.invoice_number AS reference, si.name AS item_name, si.item_code,
-          0 AS qty_in, cii.quantity AS qty_out
-        FROM customer_invoice_items cii
-        JOIN customer_invoices ci ON ci.id = cii.invoice_id
-        JOIN stock_items si ON si.id = cii.stock_item_id
-        WHERE cii.stock_item_id = ${itemId}
-          AND ci.invoice_date >= ${from} AND ci.invoice_date <= ${to}
-          AND ci.status != 'cancelled'
-      `;
-    } else {
-      salesRows = await sql`
-        SELECT ci.invoice_date AS move_date, 'Sale' AS move_type,
-          ci.invoice_number AS reference, si.name AS item_name, si.item_code,
-          0 AS qty_in, cii.quantity AS qty_out
-        FROM customer_invoice_items cii
-        JOIN customer_invoices ci ON ci.id = cii.invoice_id
-        JOIN stock_items si ON si.id = cii.stock_item_id
-        WHERE ci.invoice_date >= ${from} AND ci.invoice_date <= ${to}
-          AND ci.status != 'cancelled'
-      `;
-    }
+    // No sales rows — customer_invoice_items don't link to stock_items
+    const salesRows: typeof grnRows = [];
 
     // Merge and sort by date
     const allMoves = [...grnRows, ...salesRows].sort((a, b) =>
@@ -83,7 +60,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       const qtyOut = Number(r.qty_out || 0);
       runningBalance += qtyIn - qtyOut;
       return {
-        date: r.move_date?.split('T')[0] || '',
+        date: r.move_date instanceof Date ? r.move_date.toISOString().split('T')[0] : String(r.move_date || '').split('T')[0],
         type: r.move_type,
         reference: r.reference || '',
         itemName: r.item_name,

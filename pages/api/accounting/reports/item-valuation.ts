@@ -21,16 +21,16 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     let rows;
     if (category) {
       rows = await sql`
-        SELECT id, item_code, name, category, uom, quantity_on_hand, cost_price,
-          (COALESCE(quantity_on_hand, 0) * COALESCE(cost_price, 0)) AS stock_value
+        SELECT id, item_code, name, category, uom, qty_available, standard_cost,
+          (COALESCE(qty_available, 0) * COALESCE(standard_cost, 0)) AS stock_value
         FROM stock_items
         WHERE is_active = true AND category = ${category}
         ORDER BY stock_value DESC
       `;
     } else {
       rows = await sql`
-        SELECT id, item_code, name, category, uom, quantity_on_hand, cost_price,
-          (COALESCE(quantity_on_hand, 0) * COALESCE(cost_price, 0)) AS stock_value
+        SELECT id, item_code, name, category, uom, qty_available, standard_cost,
+          (COALESCE(qty_available, 0) * COALESCE(standard_cost, 0)) AS stock_value
         FROM stock_items
         WHERE is_active = true
         ORDER BY stock_value DESC
@@ -43,8 +43,8 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       name: r.name,
       category: r.category || 'uncategorized',
       uom: r.uom || '',
-      qtyOnHand: Number(r.quantity_on_hand || 0),
-      costPrice: Number(r.cost_price || 0),
+      qtyOnHand: Number(r.qty_available || 0),
+      costPrice: Number(r.standard_cost || 0),
       stockValue: Number(r.stock_value || 0),
     }));
 

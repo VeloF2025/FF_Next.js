@@ -4,7 +4,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import sql from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.DATABASE_URL!);
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
@@ -20,17 +22,17 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     const rows = await sql`
       SELECT
         ci.client_id,
-        c.name AS client_name,
+        c.company_name AS client_name,
         COUNT(ci.id)::int AS invoice_count,
-        COALESCE(SUM(ci.total), 0)::numeric AS total_sales,
+        COALESCE(SUM(ci.total_amount), 0)::numeric AS total_sales,
         COALESCE(SUM(ci.amount_paid), 0)::numeric AS payments_received,
-        COALESCE(SUM(ci.total - ci.amount_paid), 0)::numeric AS outstanding
+        COALESCE(SUM(ci.total_amount - ci.amount_paid), 0)::numeric AS outstanding
       FROM customer_invoices ci
       JOIN clients c ON c.id = ci.client_id
       WHERE ci.invoice_date >= ${from}
         AND ci.invoice_date <= ${to}
         AND ci.status != 'cancelled'
-      GROUP BY ci.client_id, c.name
+      GROUP BY ci.client_id, c.company_name
       ORDER BY total_sales DESC
     `;
 

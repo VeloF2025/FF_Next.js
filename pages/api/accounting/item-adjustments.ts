@@ -17,7 +17,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const rows = await sql`
         SELECT id, item_code, name AS item_name, uom, category,
-          quantity_on_hand AS current_quantity, cost_price
+          qty_available AS current_quantity, standard_cost
         FROM stock_items WHERE is_active = true ORDER BY name
       `;
       return apiResponse.success(res, rows);
@@ -45,11 +45,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (!reason) return apiResponse.badRequest(res, 'reason is required');
 
       const [item] = await sql`
-        SELECT id, name, quantity_on_hand FROM stock_items WHERE id = ${itemId}
+        SELECT id, name, qty_available FROM stock_items WHERE id = ${itemId}
       `;
       if (!item) return apiResponse.notFound(res, 'Stock item', itemId);
 
-      const currentQty = Number(item.quantity_on_hand || 0);
+      const currentQty = Number(item.qty_available || 0);
       const qty = Number(quantity);
       const newQty = adjustmentType === 'increase' ? currentQty + qty : currentQty - qty;
 
@@ -57,7 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, `Cannot decrease by ${qty} — current qty is ${currentQty}`);
       }
 
-      await sql`UPDATE stock_items SET quantity_on_hand = ${newQty} WHERE id = ${itemId}`;
+      await sql`UPDATE stock_items SET qty_available = ${newQty} WHERE id = ${itemId}`;
 
       log.info('Stock item adjusted', { itemId, adjustmentType, quantity: qty, newQty });
 

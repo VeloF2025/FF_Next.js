@@ -28,9 +28,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     } catch { /* use default */ }
 
     const rows = await sql`
-      SELECT si.invoice_number, s.name AS supplier_name,
-        si.total AS total_amount, si.invoice_date,
-        COALESCE(si.total * ${vatRate}, 0) AS vat_amount
+      SELECT si.invoice_number, s.company_name AS supplier_name,
+        si.total_amount, si.invoice_date,
+        COALESCE(si.total_amount * ${vatRate}, 0) AS vat_amount
       FROM supplier_invoices si
       JOIN suppliers s ON s.id = si.supplier_id
       WHERE si.is_drc = true

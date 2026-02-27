@@ -21,24 +21,24 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
 
     const rows = await sql`
       SELECT
-        si.id, si.item_code, si.name, si.category,
+        cii.description AS name,
+        cii.income_type AS category,
         COUNT(cii.id)::int AS times_sold,
         COALESCE(SUM(cii.quantity), 0)::numeric AS qty_sold,
         COALESCE(SUM(cii.line_total), 0)::numeric AS total_revenue
       FROM customer_invoice_items cii
       JOIN customer_invoices ci ON ci.id = cii.invoice_id
-      JOIN stock_items si ON si.id = cii.stock_item_id
       WHERE ci.invoice_date >= ${from}
         AND ci.invoice_date <= ${to}
         AND ci.status != 'cancelled'
-      GROUP BY si.id, si.item_code, si.name, si.category
+      GROUP BY cii.description, cii.income_type
       ORDER BY total_revenue DESC
     `;
 
     const data = rows.map(r => ({
-      id: r.id,
-      itemCode: r.item_code || '',
-      name: r.name,
+      id: '',
+      itemCode: '',
+      name: r.name || 'Unnamed',
       category: r.category || '',
       timesSold: Number(r.times_sold),
       qtySold: Number(r.qty_sold),

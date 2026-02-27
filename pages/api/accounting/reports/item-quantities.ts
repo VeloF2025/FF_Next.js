@@ -19,7 +19,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     const lowStockOnly = req.query.low_stock === 'true';
 
     const rows = await sql`
-      SELECT id, item_code, name, category, uom, quantity_on_hand,
+      SELECT id, item_code, name, category, uom, qty_available,
         COALESCE(min_stock_level, 0) AS min_stock_level
       FROM stock_items
       WHERE is_active = true
@@ -32,9 +32,9 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       name: r.name,
       category: r.category || 'uncategorized',
       uom: r.uom || '',
-      qtyOnHand: Number(r.quantity_on_hand || 0),
+      qtyOnHand: Number(r.qty_available || 0),
       minLevel: Number(r.min_stock_level || 0),
-      lowStock: Number(r.min_stock_level || 0) > 0 && Number(r.quantity_on_hand || 0) <= Number(r.min_stock_level || 0),
+      lowStock: Number(r.min_stock_level || 0) > 0 && Number(r.qty_available || 0) <= Number(r.min_stock_level || 0),
     }));
 
     if (lowStockOnly) {

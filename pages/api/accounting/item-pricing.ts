@@ -16,7 +16,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const rows = await sql`
-        SELECT id, item_code, name, category, uom, selling_price, cost_price, quantity_on_hand
+        SELECT id, item_code, name, category, uom, list_price, standard_cost, qty_available
         FROM stock_items WHERE is_active = true ORDER BY name
       `;
       return apiResponse.success(res, rows);
@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       for (const u of updates) {
-        await sql`UPDATE stock_items SET selling_price = ${Number(u.sellingPrice)} WHERE id = ${u.itemId}`;
+        await sql`UPDATE stock_items SET list_price = ${Number(u.sellingPrice)} WHERE id = ${u.itemId}`;
       }
 
       log.info('Selling prices updated', { count: updates.length });
