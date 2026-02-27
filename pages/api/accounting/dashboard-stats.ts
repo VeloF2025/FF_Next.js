@@ -32,32 +32,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       unallocatedCount,
       recentJournals,
     ] = await Promise.all([
-      // Bank account balances
+      // Bank account balances (from bank_transactions, matching bank-accounts API)
       sql`
-        SELECT account_code, account_name,
-          COALESCE((SELECT SUM(CASE WHEN normal_balance = 'debit' THEN debit - credit ELSE credit - debit END)
-            FROM gl_journal_lines jl
-            JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-            WHERE jl.gl_account_id = ga.id AND je.status = 'posted'), 0) AS balance
+        SELECT ga.account_code, ga.account_name,
+          COALESCE(SUM(CASE WHEN bt.amount > 0 THEN bt.amount ELSE 0 END), 0)
+          - COALESCE(SUM(CASE WHEN bt.amount < 0 THEN ABS(bt.amount) ELSE 0 END), 0) AS balance
         FROM gl_accounts ga
-        WHERE account_subtype = 'bank' AND is_active = true
-        ORDER BY account_code
+        LEFT JOIN bank_transactions bt ON bt.bank_account_id = ga.id
+        WHERE ga.account_subtype = 'bank' AND ga.is_active = true
+        GROUP BY ga.id, ga.account_code, ga.account_name
+        ORDER BY ga.account_code
       `,
-      // Accounts Payable total (2110)
+      // Accounts Payable total (from supplier_invoices, matching AP aging)
       sql`
-        SELECT COALESCE(SUM(credit - debit), 0) AS total
-        FROM gl_journal_lines jl
-        JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-        JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-        WHERE ga.account_code = '2110' AND je.status = 'posted'
+        SELECT COALESCE(SUM(total_amount - COALESCE(amount_paid, 0)), 0) AS total
+        FROM supplier_invoices
+        WHERE status NOT IN ('cancelled', 'paid')
       `,
-      // Accounts Receivable total (1120)
+      // Accounts Receivable total (from customer_invoices, matching AR aging)
       sql`
-        SELECT COALESCE(SUM(debit - credit), 0) AS total
-        FROM gl_journal_lines jl
-        JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
-        JOIN gl_accounts ga ON ga.id = jl.gl_account_id
-        WHERE ga.account_code = '1120' AND je.status = 'posted'
+        SELECT COALESCE(SUM(total_amount - COALESCE(amount_paid, 0)), 0) AS total
+        FROM customer_invoices
+        WHERE status NOT IN ('cancelled', 'paid')
       `,
       // Revenue this month (account_type = 'revenue')
       sql`
