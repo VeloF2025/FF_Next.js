@@ -6,23 +6,17 @@ import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// Infer category from item code/description using actual stock_categories names
+// Infer stock category from item code/description (fallback when boq_items.category is null)
 function inferCategory(code: string, description: string): string {
   const text = `${code} ${description}`.toLowerCase();
-  if (text.includes('ont') && !text.includes('pigtail')) return 'ONT Devices';
-  if (text.includes('router')) return 'Routers';
-  if (text.includes('ups') || text.includes('battery')) return 'Mini UPS';
-  if (text.includes('drop')) return 'Drop Cables';
-  if (/cable|fibre|fiber|aerial|adss|trench|mb-sm/.test(text)) return 'Fiber Cables';
-  if (/connector|lcapc|scapc|pigtail|midcoupler|coupler|splitter|splice|protector/.test(text)) return 'Connectors';
-  if (text.startsWith('cons-') || /consumable|label|cement|tar|tape|alcohol|wipe|kim|clip|screw|gland|pck|ext-5|adapt|caution|spray|wallplug/.test(text)) return 'Consumables';
-  if (/tool|wrench/.test(text)) return 'Tools';
-  if (/ppe|safety|helmet|glove|vest/.test(text)) return 'Personal Protective Equipment';
-  if (/pole|creosote|stay|guy|mast/.test(text)) return 'Consumables';
-  if (/encl-|enclosure|joint|dome|fdt|nap|closure/.test(text)) return 'Connectors';
-  if (/hook|bracket|slack|buckle|deadend|dead-end|tangent|tag|dress-/.test(text)) return 'Consumables';
-  if (/manhole|chamber|duct|conduit|pipe|hdpe|corr|coupling|endcap|microduct/.test(text)) return 'Consumables';
-  return 'Consumables';
+  if (text.includes('ont') || text.includes('drop cable') || text.includes('power cable')) return 'activations';
+  if (/cable|fibre|fiber|aerial|adss|trench|mb-sm|dead-?end|tangent|trunking|wall.?attach/.test(text)) return 'stringing';
+  if (/connector|lcapc|scapc|pigtail|midcoupler|coupler|splitter|splice|protector|encl/.test(text)) return 'optics';
+  if (/pole|creosote|stay|guy|mast|hook|bracket|slack|buckle|strapping|coach/.test(text)) return 'poles';
+  if (/conduit|pipe|hdpe|duct|coupling|endcap|manhole|chamber|micro.?duct|cement|tar|bitum/.test(text)) return 'backhaul';
+  if (/tool|wrench/.test(text)) return 'tools';
+  if (text.startsWith('cons-') || /consumable|label|tape|alcohol|wipe|kim|clip|screw|gland|spray|wallplug/.test(text)) return 'consumable';
+  return 'uncategorized';
 }
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -56,13 +50,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     const boq = boqResult[0]!;
 
-    // Get BOQ items with stock category names (via mapped stock items)
+    // Get BOQ items (category is stored directly on boq_items)
     const items = await sql`
-      SELECT bi.*,
-        sc.name as stock_category_name
+      SELECT bi.*
       FROM boq_items bi
-      LEFT JOIN stock_items si ON bi.stock_item_id = si.id
-      LEFT JOIN stock_categories sc ON si.category_id = sc.id
       WHERE bi.boq_id::text = ${id}
       ORDER BY bi.line_number
     `;
@@ -90,7 +81,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         uom: item.uom || 'Each',
         unitPrice: Number(item.unit_price) || 0,
         totalPrice: Number(item.total_price) || 0,
-        category: item.stock_category_name || inferCategory(item.item_code || '', item.description || ''),
+        category: item.category || inferCategory(item.item_code || '', item.description || ''),
         stockItemId: item.stock_item_id || null,
         stockMatchMethod: item.stock_match_method || null,
         stockMatchConfidence: item.stock_match_confidence != null ? Number(item.stock_match_confidence) : null,
