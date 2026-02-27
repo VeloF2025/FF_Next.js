@@ -122,65 +122,177 @@ export const TABS: Tab[] = [
     ],
   },
   {
+    id: 'items', label: 'Items',
+    topItems: [
+      { label: 'Add an Item', href: '/stock-items?action=new' },
+    ],
+    items: [
+      {
+        section: 'Lists',
+        items: [
+          { label: 'List of Items', href: '/stock-items' },
+          { label: 'Item Categories', href: '/inventory' },
+        ],
+      },
+      {
+        section: 'Transactions',
+        items: [
+          { label: 'Item Adjustments', href: '/accounting/item-adjustments' },
+          { label: 'Adjust Selling Prices', href: '/accounting/item-pricing' },
+        ],
+      },
+      {
+        section: 'Special',
+        items: [
+          { label: 'Item Opening Balances', href: '/accounting/item-opening-balances' },
+        ],
+      },
+      {
+        section: 'Reports',
+        items: [
+          { label: 'Item Listing', href: '/accounting/reports/item-listing' },
+          { label: 'Sales by Item', href: '/accounting/reports/sales-by-item' },
+          { label: 'Purchases by Item', href: '/accounting/reports/purchases-by-item' },
+          { label: 'Item Movement', href: '/accounting/reports/item-movement' },
+          { label: 'Item Valuation', href: '/accounting/reports/item-valuation' },
+          { label: 'Item Quantities', href: '/accounting/reports/item-quantities' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'banking', label: 'Banking',
     items: [
-      { label: 'Bank Accounts', href: '/accounting/bank-accounts' },
-      { label: 'Transactions', href: '/accounting/bank-transactions' },
-      { label: 'Import Statement', href: '/accounting/bank-reconciliation/import' },
-      { label: 'Reconcile', href: '/accounting/bank-reconciliation' },
-      { label: 'Mapping Rules', href: '/accounting/bank-reconciliation/rules' },
-      { label: 'Transfers', href: '/accounting/bank-transfers' },
+      {
+        section: 'Lists',
+        items: [
+          { label: 'Bank Accounts', href: '/accounting/bank-accounts' },
+        ],
+      },
+      {
+        section: 'Transactions',
+        items: [
+          { label: 'Transactions', href: '/accounting/bank-transactions' },
+          { label: 'Import Statement', href: '/accounting/bank-reconciliation/import' },
+          { label: 'Reconcile', href: '/accounting/bank-reconciliation' },
+          { label: 'Transfers', href: '/accounting/bank-transfers' },
+        ],
+      },
+      {
+        section: 'Special',
+        items: [
+          { label: 'Mapping Rules', href: '/accounting/bank-reconciliation/rules' },
+        ],
+      },
     ],
   },
   {
     id: 'accounts', label: 'Accounts',
     items: [
-      { label: 'Chart of Accounts', href: '/accounting?tab=chart-of-accounts' },
-      { label: 'Journal Entries', href: '/accounting?tab=journal-entries' },
-      { label: 'Recurring Journals', href: '/accounting/recurring-journals' },
-      { label: 'Fiscal Periods', href: '/accounting?tab=fiscal-periods' },
-      { label: 'Default Accounts', href: '/accounting/default-accounts' },
-      { label: 'Currencies', href: '/accounting/currencies' },
+      {
+        section: 'Lists',
+        items: [
+          { label: 'Chart of Accounts', href: '/accounting?tab=chart-of-accounts' },
+          { label: 'Default Accounts', href: '/accounting/default-accounts' },
+          { label: 'Currencies', href: '/accounting/currencies' },
+        ],
+      },
+      {
+        section: 'Transactions',
+        items: [
+          { label: 'Journal Entries', href: '/accounting?tab=journal-entries' },
+          { label: 'Recurring Journals', href: '/accounting/recurring-journals' },
+        ],
+      },
+      {
+        section: 'Special',
+        items: [
+          { label: 'Fiscal Periods', href: '/accounting?tab=fiscal-periods' },
+        ],
+      },
     ],
   },
   {
     id: 'vat', label: 'VAT',
     items: [
-      { label: 'VAT Return', href: '/accounting/reports/vat-return' },
-      { label: 'VAT Adjustments', href: '/accounting/vat-adjustments' },
-      { label: 'DRC VAT', href: '/accounting/drc-vat' },
+      {
+        section: 'Returns',
+        items: [
+          { label: 'VAT Return', href: '/accounting/reports/vat-return' },
+        ],
+      },
+      {
+        section: 'Transactions',
+        items: [
+          { label: 'VAT Adjustments', href: '/accounting/vat-adjustments' },
+          { label: 'DRC VAT', href: '/accounting/drc-vat' },
+        ],
+      },
     ],
   },
   {
     id: 'accountants', label: "Accountant's Area",
     items: [
-      { label: 'Trial Balance', href: '/accounting/trial-balance' },
-      { label: 'Opening Balances', href: '/accounting/opening-balances' },
-      { label: 'Depreciation', href: '/accounting/depreciation' },
-      { label: 'Year-End', href: '/accounting/year-end' },
-      { label: 'Audit Trail', href: '/accounting/reports/audit-trail' },
-      { label: 'Cost Centres', href: '/accounting/cost-centres' },
-      { label: 'Budgets', href: '/accounting/budgets' },
+      {
+        section: 'Reports',
+        items: [
+          { label: 'Trial Balance', href: '/accounting/trial-balance' },
+          { label: 'Audit Trail', href: '/accounting/reports/audit-trail' },
+        ],
+      },
+      {
+        section: 'Transactions',
+        items: [
+          { label: 'Opening Balances', href: '/accounting/opening-balances' },
+          { label: 'Depreciation', href: '/accounting/depreciation' },
+          { label: 'Year-End', href: '/accounting/year-end' },
+        ],
+      },
+      {
+        section: 'Management',
+        items: [
+          { label: 'Cost Centres', href: '/accounting/cost-centres' },
+          { label: 'Budgets', href: '/accounting/budgets' },
+        ],
+      },
     ],
   },
   {
     id: 'reports', label: 'Reports',
     items: [
-      { label: 'Income Statement', href: '/accounting/reports/income-statement' },
-      { label: 'Balance Sheet', href: '/accounting/reports/balance-sheet' },
-      { label: 'Cash Flow', href: '/accounting/reports/cash-flow' },
-      { label: 'Budget vs Actual', href: '/accounting/reports/budget-vs-actual' },
-      { label: 'Project Profitability', href: '/accounting/reports/project-profitability' },
-      { label: 'Customer Report', href: '/accounting/reports/customer-reports' },
-      { label: 'Supplier Report', href: '/accounting/reports/supplier-reports' },
-      { label: 'Bank Transactions', href: '/accounting/reports/bank-transactions' },
-      { label: 'Account Transactions', href: '/accounting/reports/account-transactions' },
+      {
+        section: 'Financial',
+        items: [
+          { label: 'Income Statement', href: '/accounting/reports/income-statement' },
+          { label: 'Balance Sheet', href: '/accounting/reports/balance-sheet' },
+          { label: 'Cash Flow', href: '/accounting/reports/cash-flow' },
+        ],
+      },
+      {
+        section: 'Management',
+        items: [
+          { label: 'Budget vs Actual', href: '/accounting/reports/budget-vs-actual' },
+          { label: 'Project Profitability', href: '/accounting/reports/project-profitability' },
+        ],
+      },
+      {
+        section: 'Transactional',
+        items: [
+          { label: 'Customer Report', href: '/accounting/reports/customer-reports' },
+          { label: 'Supplier Report', href: '/accounting/reports/supplier-reports' },
+          { label: 'Bank Transactions', href: '/accounting/reports/bank-transactions' },
+          { label: 'Account Transactions', href: '/accounting/reports/account-transactions' },
+        ],
+      },
     ],
   },
   { id: 'import', label: 'Data Import', href: '/accounting/sage-migration' },
 ];
 
-export function getActiveTabId(pathname: string, query: Record<string, string | string[] | undefined>): string {
+export function getActiveTabId(
+  pathname: string,
+  query: Record<string, string | string[] | undefined>,
+): string {
   if (pathname === '/accounting') {
     if (query.tab === 'chart-of-accounts' || query.tab === 'journal-entries' || query.tab === 'fiscal-periods') {
       return 'accounts';
@@ -189,6 +301,7 @@ export function getActiveTabId(pathname: string, query: Record<string, string | 
   }
   if (pathname.startsWith('/accounting/sage-migration')) return 'import';
 
+  // Customers
   if (pathname.startsWith('/accounting/customer-') ||
       pathname.startsWith('/accounting/recurring-invoices') ||
       pathname.startsWith('/accounting/credit-notes') ||
@@ -203,6 +316,8 @@ export function getActiveTabId(pathname: string, query: Record<string, string | 
       (pathname.startsWith('/accounting/adjustments') && query.type === 'customer')) {
     return 'customers';
   }
+
+  // Suppliers
   if (pathname.startsWith('/accounting/supplier-') ||
       pathname.startsWith('/accounting/batch-payments') ||
       pathname.startsWith('/accounting/ap-aging') ||
@@ -211,7 +326,24 @@ export function getActiveTabId(pathname: string, query: Record<string, string | 
       (pathname.startsWith('/accounting/adjustments') && query.type === 'supplier')) {
     return 'suppliers';
   }
+
+  // Items
+  if (pathname.startsWith('/stock-items') ||
+      pathname.startsWith('/inventory') ||
+      pathname.startsWith('/accounting/item-') ||
+      pathname === '/accounting/reports/item-listing' ||
+      pathname === '/accounting/reports/sales-by-item' ||
+      pathname === '/accounting/reports/purchases-by-item' ||
+      pathname === '/accounting/reports/item-movement' ||
+      pathname === '/accounting/reports/item-valuation' ||
+      pathname === '/accounting/reports/item-quantities') {
+    return 'items';
+  }
+
+  // Banking
   if (pathname.startsWith('/accounting/bank-')) return 'banking';
+
+  // Accounts
   if (pathname.startsWith('/accounting/chart-of-accounts') ||
       pathname.startsWith('/accounting/journal-entries') ||
       pathname.startsWith('/accounting/recurring-journals') ||
@@ -220,11 +352,15 @@ export function getActiveTabId(pathname: string, query: Record<string, string | 
       pathname.startsWith('/accounting/currencies')) {
     return 'accounts';
   }
+
+  // VAT
   if (pathname.startsWith('/accounting/vat-') ||
       pathname.startsWith('/accounting/drc-vat') ||
       pathname === '/accounting/reports/vat-return') {
     return 'vat';
   }
+
+  // Accountant's Area
   if (pathname.startsWith('/accounting/trial-balance') ||
       pathname.startsWith('/accounting/opening-balances') ||
       pathname.startsWith('/accounting/depreciation') ||
@@ -234,6 +370,7 @@ export function getActiveTabId(pathname: string, query: Record<string, string | 
       pathname === '/accounting/reports/audit-trail') {
     return 'accountants';
   }
+
   if (pathname.startsWith('/accounting/reports')) return 'reports';
   return 'dashboard';
 }
