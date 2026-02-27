@@ -15,9 +15,9 @@ import { postAssetDepreciationToGL } from '@/modules/accounting/services/glCross
 type Row = any;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
-  const userId = String((req as Record<string, unknown>).userId || '');
+  const userId = String((req as unknown as { user?: { id: string } }).user?.id || '');
 
   // Find assets eligible for depreciation:
   // - Status = available or assigned (active assets)

@@ -7,24 +7,27 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import sql from '@/lib/db';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = Record<string, any>;
 
 export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     if (req.method === 'GET') {
-      const rows = await sql`
+      const rows = (await sql`
         SELECT sc.id, sc.name, sc.description, sc.created_at,
                COUNT(s.id)::int AS supplier_count
         FROM supplier_categories sc
         LEFT JOIN suppliers s ON LOWER(s.category) = LOWER(sc.name)
         GROUP BY sc.id
         ORDER BY sc.name
-      `;
-      return apiResponse.success(res, rows.map(r => ({
+      `) as Row[];
+      return apiResponse.success(res, rows.map((r: Row) => ({
         id: r.id, name: r.name, description: r.description || '',
         supplierCount: Number(r.supplier_count) || 0,
       })));
@@ -33,12 +36,12 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     if (req.method === 'POST') {
       const { name, description } = req.body;
       if (!name?.trim()) return apiResponse.badRequest(res, 'Name is required');
-      const [row] = await sql`
+      const rows = (await sql`
         INSERT INTO supplier_categories (name, description)
         VALUES (${name.trim()}, ${description || ''})
         RETURNING id, name, description
-      `;
-      return apiResponse.success(res, row);
+      `) as Row[];
+      return apiResponse.success(res, rows[0]);
     }
 
     if (req.method === 'PUT') {
@@ -59,13 +62,13 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
       return apiResponse.success(res, { deleted: true });
     }
 
-    return apiResponse.methodNotAllowed(res);
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes('does not exist')) {
       return apiResponse.success(res, []);
     }
     log.error('supplier-categories API error', { error: message });
-    return apiResponse.error(res, 'Failed to process request');
+    return apiResponse.internalError(res, err, 'Failed to process request');
   }
 });

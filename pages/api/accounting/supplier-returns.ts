@@ -14,26 +14,29 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = Record<string, any>;
+
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const returns = await sql`
+      const returns = (await sql`
         SELECT
           cn.id,
           cn.credit_note_number as return_number,
           COALESCE(s.company_name, s.name, 'Unknown') as supplier_name,
-          cn.original_invoice_number,
-          cn.amount,
+          cn.supplier_invoice_id as original_invoice_id,
+          cn.total_amount as amount,
           cn.status,
-          cn.credit_note_date as return_date,
+          cn.credit_date as return_date,
           cn.reason
         FROM credit_notes cn
         LEFT JOIN suppliers s ON s.id = cn.supplier_id
         WHERE cn.type = 'supplier'
-        ORDER BY cn.credit_note_date DESC
-      `;
+        ORDER BY cn.credit_date DESC
+      `) as Row[];
 
       return apiResponse.success(res, { returns });
     } catch (err) {
@@ -44,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'POST') {
     const userId = (req as AuthenticatedNextApiRequest).user.id;
-    const { supplierId, originalInvoiceNumber, amount, reason } = req.body;
+    const { supplierId, amount, reason } = req.body;
 
     if (!supplierId || !amount) {
       return apiResponse.validationError(res, { supplierId: 'Required', amount: 'Required' });
@@ -52,25 +55,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     try {
       // Generate return number
-      const [countRow] = await sql`
+      const countRows = (await sql`
         SELECT COUNT(*)::int as cnt FROM credit_notes WHERE type = 'supplier'
-      `;
-      const returnNum = `DR-${String(Number(countRow.cnt) + 1).padStart(4, '0')}`;
+      `) as Row[];
+      const countRow = countRows[0];
+      const returnNum = `DR-${String(Number(countRow?.cnt ?? 0) + 1).padStart(4, '0')}`;
 
-      const [created] = await sql`
+      const createdRows = (await sql`
         INSERT INTO credit_notes (
           id, credit_note_number, type, supplier_id,
-          original_invoice_number, amount, reason,
-          status, credit_note_date, created_by, created_at
+          total_amount, reason,
+          status, credit_date, created_by, created_at
         ) VALUES (
           gen_random_uuid(), ${returnNum}, 'supplier', ${supplierId},
-          ${originalInvoiceNumber || null}, ${amount}, ${reason || ''},
+          ${amount}, ${reason || ''},
           'draft', NOW(), ${userId}, NOW()
         )
         RETURNING *
-      `;
+      `) as Row[];
+      const created = createdRows[0];
 
-      log.info('Supplier return created', { id: created.id, number: returnNum, module: 'accounting' });
+      log.info('Supplier return created', { id: created?.id, number: returnNum, module: 'accounting' });
       return apiResponse.success(res, { return: created });
     } catch (err) {
       log.error('Failed to create supplier return', { error: err, module: 'accounting' });
