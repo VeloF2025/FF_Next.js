@@ -6,7 +6,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { CalendarCheck, Loader2, AlertCircle, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
+import { CalendarCheck, Loader2, AlertCircle, CheckCircle2, Lock } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -74,16 +75,19 @@ export default function YearEndPage() {
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10">
-                <CalendarCheck className="h-6 w-6 text-orange-500" />
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <CalendarCheck className="h-6 w-6 text-orange-500" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Year-End Processing</h1>
+                  <p className="text-sm text-[var(--ff-text-secondary)]">
+                    Close fiscal years and create closing journal entries
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Year-End Processing</h1>
-                <p className="text-sm text-[var(--ff-text-secondary)]">
-                  Close fiscal years and create closing journal entries
-                </p>
-              </div>
+              <ExportCSVButton endpoint="/api/accounting/year-end-export" filenamePrefix="year-end" label="Export CSV" />
             </div>
           </div>
         </div>

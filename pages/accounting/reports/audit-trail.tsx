@@ -57,6 +57,8 @@ export default function AuditTrailPage() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const load = useCallback(async () => {
     if (!periodStart || !periodEnd) return;
@@ -73,6 +75,12 @@ export default function AuditTrailPage() {
   }, [periodStart, periodEnd]);
 
   useEffect(() => { load(); }, [load]);
+
+  const filteredRows = rows.filter(r => {
+    if (sourceFilter && r.source !== sourceFilter) return false;
+    if (statusFilter && r.status !== statusFilter) return false;
+    return true;
+  });
 
   function handleExport() {
     const params = new URLSearchParams();
@@ -101,7 +109,7 @@ export default function AuditTrailPage() {
         </div>
 
         <div className="p-6 space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div>
               <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">From</label>
               <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} className="ff-input text-sm" />
@@ -110,8 +118,24 @@ export default function AuditTrailPage() {
               <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">To</label>
               <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} className="ff-input text-sm" />
             </div>
-            <div className="ml-auto text-sm text-[var(--ff-text-secondary)]">
-              {rows.length} entries
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Source</label>
+              <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} className="ff-select text-sm">
+                <option value="">All Sources</option>
+                {Object.keys(SOURCE_BADGE).map(s => <option key={s} value={s}>{s.replace('auto_', '')}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Status</label>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="ff-select text-sm">
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="posted">Posted</option>
+                <option value="reversed">Reversed</option>
+              </select>
+            </div>
+            <div className="ml-auto text-sm text-[var(--ff-text-secondary)] mt-4">
+              {filteredRows.length} entries
             </div>
           </div>
 
@@ -133,8 +157,8 @@ export default function AuditTrailPage() {
                   <th className="px-4 py-3">Created By</th>
                 </tr></thead>
                 <tbody>
-                  {rows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No entries for period</td></tr>}
-                  {rows.map((r, i) => (
+                  {filteredRows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No entries for period</td></tr>}
+                  {filteredRows.map((r, i) => (
                     <tr key={i} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
                       <td className="px-4 py-2 text-[var(--ff-text-secondary)]">{r.entryDate}</td>
                       <td className="px-4 py-2 text-[var(--ff-text-primary)] font-mono text-xs">{r.entryNumber}</td>

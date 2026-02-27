@@ -27,8 +27,12 @@ interface CashFlowReport {
   closing_cash: number;
 }
 
+interface CostCentre { id: string; code: string; name: string }
+
 export default function CashFlowPage() {
   const [report, setReport] = useState<CashFlowReport | null>(null);
+  const [costCentres, setCostCentres] = useState<CostCentre[]>([]);
+  const [costCentreFilter, setCostCentreFilter] = useState('');
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -39,11 +43,19 @@ export default function CashFlowPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    fetch('/api/accounting/cost-centres', { credentials: 'include' }).then(r => r.json()).then(res => {
+      const list = res.data?.items || [];
+      setCostCentres(list.map((c: Record<string, unknown>) => ({ id: String(c.id), code: String(c.code), name: String(c.name) })));
+    }).catch(() => {});
+  }, []);
+
   const loadReport = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+      const params = new URLSearchParams({ start_date: startDate || '', end_date: endDate || '' });
+      if (costCentreFilter) params.set('cost_centre', costCentreFilter);
       const res = await fetch(`/api/accounting/reports-cash-flow?${params}`);
       const json = await res.json();
       if (!res.ok) {
@@ -57,7 +69,7 @@ export default function CashFlowPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, costCentreFilter]);
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
@@ -111,6 +123,15 @@ export default function CashFlowPage() {
                 className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
               />
             </div>
+            {costCentres.length > 0 && (
+              <div>
+                <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Cost Centre</label>
+                <select value={costCentreFilter} onChange={e => setCostCentreFilter(e.target.value)} className="ff-select text-sm">
+                  <option value="">All Cost Centres</option>
+                  {costCentres.map(cc => <option key={cc.id} value={cc.code}>{cc.code} — {cc.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {isLoading ? (

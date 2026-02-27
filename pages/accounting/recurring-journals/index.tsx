@@ -33,6 +33,7 @@ export default function RecurringJournalsPage() {
   const [error, setError] = useState('');
   const [editId, setEditId] = useState('');
   const [form, setForm] = useState({ templateName: '', description: '', frequency: 'monthly', nextRunDate: '' });
+  const [statusFilter, setStatusFilter] = useState('');
   const [formLines, setFormLines] = useState([{ key: crypto.randomUUID(), glAccountId: '', debit: 0, credit: 0, description: '' }]);
 
   const load = useCallback(async () => {
@@ -107,6 +108,8 @@ export default function RecurringJournalsPage() {
     finally { setBusy(''); }
   };
 
+  const filteredItems = items.filter(i => !statusFilter || i.status === statusFilter);
+
   const exportCSV = () => {
     const headers = ['Template', 'Frequency', 'Next Run', 'Amount', 'Runs', 'Status'];
     const rows = items.map(i => [i.templateName, i.frequency, i.nextRunDate?.split('T')[0] || '', i.totalAmount, i.runCount, i.status]);
@@ -140,6 +143,17 @@ export default function RecurringJournalsPage() {
 
         <div className="p-6 space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">{error}</div>}
+
+          <div className="flex items-center gap-3">
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="ff-select text-sm">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <span className="text-sm text-[var(--ff-text-secondary)]">{filteredItems.length} templates</span>
+          </div>
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 space-y-4">
@@ -199,8 +213,8 @@ export default function RecurringJournalsPage() {
               </tr></thead>
               <tbody>
                 {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && items.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No recurring journals</td></tr>}
-                {items.map(item => (
+                {!loading && filteredItems.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">{statusFilter ? 'No matching journals' : 'No recurring journals'}</td></tr>}
+                {filteredItems.map(item => (
                   <tr key={item.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
                     <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">{item.templateName}</td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)] capitalize">{item.frequency}</td>

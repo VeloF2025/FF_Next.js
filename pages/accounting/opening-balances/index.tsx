@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { BookMarked, Loader2, AlertCircle, Save } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -103,14 +104,17 @@ export default function OpeningBalancesPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleSave}
-                disabled={isSaving || !isBalanced}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 text-sm"
-              >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save Opening Balances
-              </button>
+              <div className="flex items-center gap-2">
+                <ExportCSVButton endpoint="/api/accounting/opening-balances-export" filenamePrefix="opening-balances" label="Export CSV" />
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !isBalanced}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 text-sm"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Opening Balances
+                </button>
+              </div>
             </div>
           </div>
         </div>

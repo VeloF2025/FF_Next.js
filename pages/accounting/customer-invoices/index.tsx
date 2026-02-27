@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { FileText, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 import Link from 'next/link';
 
 function formatCurrency(amount: number): string {
@@ -39,6 +40,7 @@ export default function CustomerInvoicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   const loadInvoices = useCallback(async () => {
     setIsLoading(true);
@@ -60,6 +62,10 @@ export default function CustomerInvoicesPage() {
   useEffect(() => { loadInvoices(); }, [loadInvoices]);
 
   const statuses = ['all', 'draft', 'approved', 'sent', 'partially_paid', 'paid', 'overdue'];
+  const lowerSearch = search.toLowerCase();
+  const filteredInvoices = invoices.filter(inv =>
+    !search || inv.invoice_number?.toLowerCase().includes(lowerSearch) || inv.client_name?.toLowerCase().includes(lowerSearch)
+  );
 
   return (
     <AppLayout>
@@ -78,9 +84,12 @@ export default function CustomerInvoicesPage() {
                   </p>
                 </div>
               </div>
-              <Link href="/accounting/customer-invoices/new" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm">
-                <Plus className="h-4 w-4" /> New Invoice
-              </Link>
+              <div className="flex items-center gap-2">
+                <ExportCSVButton endpoint="/api/accounting/customer-invoices-export" filenamePrefix="customer-invoices" params={{ status: statusFilter }} label="Export CSV" />
+                <Link href="/accounting/customer-invoices/new" className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm">
+                  <Plus className="h-4 w-4" /> New Invoice
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -97,7 +106,14 @@ export default function CustomerInvoicesPage() {
                 <option key={s} value={s}>{s === 'all' ? 'All Statuses' : s.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
               ))}
             </select>
-            <span className="text-sm text-[var(--ff-text-secondary)]">{invoices.length} invoices</span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search invoice # or client..."
+              className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm w-64"
+            />
+            <span className="text-sm text-[var(--ff-text-secondary)]">{filteredInvoices.length} invoices</span>
           </div>
 
           {/* Content */}
@@ -110,7 +126,7 @@ export default function CustomerInvoicesPage() {
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
-          ) : invoices.length === 0 ? (
+          ) : filteredInvoices.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
               <p className="text-[var(--ff-text-secondary)]">No customer invoices found</p>
@@ -133,7 +149,7 @@ export default function CustomerInvoicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((inv) => {
+                  {filteredInvoices.map((inv) => {
                     const outstanding = Number(inv.total_amount) - Number(inv.amount_paid);
                     return (
                       <tr key={inv.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">

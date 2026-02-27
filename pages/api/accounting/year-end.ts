@@ -138,15 +138,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const totalExpenses = expenseAccounts.reduce((s, a) => s + Number(a.balance), 0);
       const netIncome = totalRevenue - totalExpenses;
 
-      // Find retained earnings account (code 3200 by convention)
-      const [retainedEarnings] = await sql`
+      // Find retained earnings account — configurable via app_settings or default 3200
+      let reAccountCode = '3200';
+      try {
+        const settingRows = await sql`SELECT value FROM app_settings WHERE key = 'retained_earnings_account'`;
+        if (settingRows[0]?.value) reAccountCode = String(settingRows[0].value);
+      } catch { /* use default */ }
+
+      const reRows = await sql`
         SELECT id FROM gl_accounts
-        WHERE account_code = '3200' OR account_name ILIKE '%retained earnings%'
+        WHERE account_code = ${reAccountCode} OR account_name ILIKE '%retained earnings%'
         LIMIT 1
       `;
+      const retainedEarnings = reRows[0];
 
       if (!retainedEarnings) {
-        return apiResponse.badRequest(res, 'Retained Earnings account not found. Create account 3200 first.');
+        return apiResponse.badRequest(res, `Retained Earnings account not found (${reAccountCode}). Create the account or set 'retained_earnings_account' in app_settings.`);
       }
 
       // Create closing journal entry

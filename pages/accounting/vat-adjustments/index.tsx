@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Percent, Plus, Check, Loader2 } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 interface VATAdjustment {
   id: string; adjustmentNumber: string; adjustmentDate: string; vatPeriod?: string;
@@ -30,6 +31,8 @@ export default function VATAdjustmentsPage() {
     adjustmentDate: new Date().toISOString().split('T')[0],
     vatPeriod: '', adjustmentType: 'input', amount: '', reason: '',
   });
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const load = useCallback(async () => {
     const res = await fetch('/api/accounting/vat-adjustments', { credentials: 'include' });
@@ -64,6 +67,13 @@ export default function VATAdjustmentsPage() {
     finally { setBusy(''); }
   };
 
+  const filteredItems = items.filter(item => {
+    const d = item.adjustmentDate?.split('T')[0] || '';
+    if (dateFrom && d < dateFrom) return false;
+    if (dateTo && d > dateTo) return false;
+    return true;
+  });
+
   const approve = async (id: string) => {
     setBusy(id);
     await fetch('/api/accounting/vat-adjustments-action', {
@@ -82,14 +92,32 @@ export default function VATAdjustmentsPage() {
               <div className="p-2 rounded-lg bg-orange-500/10"><Percent className="h-6 w-6 text-orange-500" /></div>
               <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">VAT Adjustments</h1>
             </div>
-            <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium">
-              <Plus className="h-4 w-4" /> New Adjustment
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportCSVButton endpoint="/api/accounting/vat-adjustments-export" filenamePrefix="vat-adjustments" label="Export CSV" />
+              <button onClick={() => setShowForm(!showForm)} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium">
+                <Plus className="h-4 w-4" /> New Adjustment
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-6 space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">{error}</div>}
+
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">From</label>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="ff-input text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">To</label>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="ff-input text-sm" />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="mt-4 text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]">Clear</button>
+            )}
+            <span className="mt-4 text-sm text-[var(--ff-text-secondary)] ml-auto">{filteredItems.length} adjustments</span>
+          </div>
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 space-y-4">
@@ -125,8 +153,8 @@ export default function VATAdjustmentsPage() {
               </tr></thead>
               <tbody>
                 {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && items.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No VAT adjustments</td></tr>}
-                {items.map(item => (
+                {!loading && filteredItems.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No VAT adjustments</td></tr>}
+                {filteredItems.map(item => (
                   <tr key={item.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
                     <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">{item.adjustmentNumber}</td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.adjustmentDate?.split('T')[0]}</td>

@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { TrendingDown, Play, Loader2 } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 interface DepResult {
   assetNumber: string;
@@ -29,6 +30,7 @@ interface AssetRow {
   accumulated_depreciation: number;
   useful_life_years: number;
   salvage_value: number;
+  category?: string;
 }
 
 const fmt = (n: number) =>
@@ -40,6 +42,7 @@ export default function DepreciationPage() {
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<DepRun | null>(null);
   const [error, setError] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const loadAssets = useCallback(async () => {
     try {
@@ -64,6 +67,9 @@ export default function DepreciationPage() {
   useEffect(() => {
     loadAssets();
   }, [loadAssets]);
+
+  const categories = [...new Set(assets.map(a => a.category || 'Uncategorized'))].sort();
+  const filteredAssets = assets.filter(a => !categoryFilter || (a.category || 'Uncategorized') === categoryFilter);
 
   const runDepreciation = async () => {
     setError('');
@@ -102,22 +108,35 @@ export default function DepreciationPage() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={runDepreciation}
-              disabled={running}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:opacity-50"
-            >
-              {running ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              Run Monthly Depreciation
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportCSVButton endpoint="/api/accounting/depreciation-export" filenamePrefix="depreciation" label="Export CSV" />
+              <button
+                onClick={runDepreciation}
+                disabled={running}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium disabled:opacity-50"
+              >
+                {running ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                Run Monthly Depreciation
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-6 space-y-4">
+          {categories.length > 1 && (
+            <div className="flex items-center gap-3">
+              <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="ff-select text-sm">
+                <option value="">All Categories</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span className="text-sm text-[var(--ff-text-secondary)]">{filteredAssets.length} assets</span>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">{error}</div>
           )}
@@ -191,7 +210,7 @@ export default function DepreciationPage() {
                     </td>
                   </tr>
                 )}
-                {assets.map((a) => {
+                {filteredAssets.map((a) => {
                   const pp = Number(a.purchase_price);
                   const sv = Number(a.salvage_value || 0);
                   const uly = Number(a.useful_life_years);

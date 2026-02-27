@@ -26,6 +26,7 @@ interface Report {
   transactions: Txn[];
 }
 interface GLAccount { id: string; accountCode: string; accountName: string }
+interface CostCentre { id: string; code: string; name: string }
 
 const fmt = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 
@@ -41,11 +42,17 @@ export default function AccountTransactionsPage() {
   const [periodEnd, setPeriodEnd] = useState(defaults.periodEnd);
   const [accountCode, setAccountCode] = useState('1110');
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
+  const [costCentres, setCostCentres] = useState<CostCentre[]>([]);
+  const [costCentreFilter, setCostCentreFilter] = useState('');
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    fetch('/api/accounting/cost-centres', { credentials: 'include' }).then(r => r.json()).then(res => {
+      const list = res.data?.items || [];
+      setCostCentres(list.map((c: Record<string, unknown>) => ({ id: String(c.id), code: String(c.code), name: String(c.name) })));
+    }).catch(() => {});
     fetch('/api/accounting/chart-of-accounts', { credentials: 'include' }).then(r => r.json()).then(res => {
       const d = res.data || res;
       const list = Array.isArray(d) ? d : d.accounts || d.items || [];
@@ -65,13 +72,14 @@ export default function AccountTransactionsPage() {
       const params = new URLSearchParams({
         account_code: accountCode, period_start: periodStart, period_end: periodEnd,
       });
+      if (costCentreFilter) params.set('cost_centre', costCentreFilter);
       const res = await fetch(`/api/accounting/reports-account-transactions?${params}`, { credentials: 'include' });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || 'Failed');
       setReport(json.data || null);
     } catch (err) { setError(err instanceof Error ? err.message : 'Failed'); }
     finally { setLoading(false); }
-  }, [periodStart, periodEnd, accountCode]);
+  }, [periodStart, periodEnd, accountCode, costCentreFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -121,6 +129,15 @@ export default function AccountTransactionsPage() {
               <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">To</label>
               <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} className="ff-input text-sm" />
             </div>
+            {costCentres.length > 0 && (
+              <div>
+                <label className="block text-xs text-[var(--ff-text-tertiary)] mb-1">Cost Centre</label>
+                <select value={costCentreFilter} onChange={e => setCostCentreFilter(e.target.value)} className="ff-select text-sm">
+                  <option value="">All Cost Centres</option>
+                  {costCentres.map(cc => <option key={cc.id} value={cc.code}>{cc.code} — {cc.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {error && <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 text-red-400 text-sm"><AlertCircle className="h-4 w-4" /> {error}</div>}

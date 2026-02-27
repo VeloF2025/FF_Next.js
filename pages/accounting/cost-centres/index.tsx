@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tag, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Pencil } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 interface CostCentre {
   id: string; code: string; name: string;
@@ -20,6 +21,7 @@ export default function CostCentresPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [form, setForm] = useState({ code: '', name: '', description: '', department: '' });
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     const res = await fetch('/api/accounting/cost-centres', { credentials: 'include' });
@@ -62,6 +64,11 @@ export default function CostCentresPage() {
     setEditId(cc.id); setShowForm(true);
   };
 
+  const lowerSearch = search.toLowerCase();
+  const filteredItems = items.filter(cc =>
+    !search || cc.code.toLowerCase().includes(lowerSearch) || cc.name.toLowerCase().includes(lowerSearch) || (cc.department || '').toLowerCase().includes(lowerSearch)
+  );
+
   const doAction = async (action: string, id: string, extra?: Record<string, unknown>) => {
     setBusy(id);
     try {
@@ -86,15 +93,29 @@ export default function CostCentresPage() {
                 <p className="text-sm text-[var(--ff-text-secondary)]">Analysis codes for GL reporting dimensions</p>
               </div>
             </div>
-            <button onClick={() => { setEditId(null); setForm({ code: '', name: '', description: '', department: '' }); setShowForm(!showForm); }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
-              <Plus className="h-4 w-4" /> New Cost Centre
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportCSVButton endpoint="/api/accounting/cost-centres-export" filenamePrefix="cost-centres" label="Export CSV" />
+              <button onClick={() => { setEditId(null); setForm({ code: '', name: '', description: '', department: '' }); setShowForm(!showForm); }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium">
+                <Plus className="h-4 w-4" /> New Cost Centre
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="p-6 space-y-4">
           {error && <div className="p-3 rounded-lg bg-red-500/10 text-red-400 text-sm">{error}</div>}
+
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search code, name, or department..."
+              className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm w-72"
+            />
+            <span className="text-sm text-[var(--ff-text-secondary)]">{filteredItems.length} cost centres</span>
+          </div>
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] p-6 space-y-4">
@@ -123,8 +144,8 @@ export default function CostCentresPage() {
               </tr></thead>
               <tbody>
                 {loading && <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && items.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No cost centres. Create one to tag GL entries.</td></tr>}
-                {items.map(cc => (
+                {!loading && filteredItems.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">{search ? 'No matching cost centres' : 'No cost centres. Create one to tag GL entries.'}</td></tr>}
+                {filteredItems.map(cc => (
                   <tr key={cc.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
                     <td className="px-4 py-3 font-mono text-purple-400 font-medium">{cc.code}</td>
                     <td className="px-4 py-3 text-[var(--ff-text-primary)]">{cc.name}</td>

@@ -19,9 +19,21 @@ import type { JournalLineInput } from '../types/gl.types';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
 
-const VAT_RATE = 0.15; // SA VAT rate
+const DEFAULT_VAT_RATE = 0.15; // SA VAT rate
 const VAT_INPUT_CODE = '1140';
 const VAT_OUTPUT_CODE = '2120';
+
+/** Load VAT rate from app_settings, falling back to 15% */
+async function getVatRate(): Promise<number> {
+  try {
+    const rows = (await sql`SELECT value FROM app_settings WHERE key = 'vat_rate'`) as Row[];
+    if (rows[0]?.value) {
+      const rate = Number(rows[0].value);
+      if (rate > 0 && rate < 1) return rate;
+    }
+  } catch { /* use default */ }
+  return DEFAULT_VAT_RATE;
+}
 
 export interface DRCResult {
   supplierInvoiceId: string;
@@ -50,7 +62,8 @@ export async function applyDRCVat(
   if (inv.is_drc) throw new Error('DRC VAT already applied to this invoice');
 
   const totalExclVat = Number(inv.total_amount);
-  const vatAmount = Math.round(totalExclVat * VAT_RATE * 100) / 100;
+  const vatRate = await getVatRate();
+  const vatAmount = Math.round(totalExclVat * vatRate * 100) / 100;
 
   // Get VAT account IDs
   const accounts = (await sql`
@@ -111,12 +124,13 @@ export async function getDRCEligibleInvoices(): Promise<Array<{
     ORDER BY si.invoice_date DESC
   `) as Row[];
 
+  const vatRate = await getVatRate();
   return rows.map((r: Row) => ({
     id: String(r.id),
     invoiceNumber: String(r.invoice_number),
     supplierName: String(r.supplier_name || 'Unknown'),
     totalAmount: Number(r.total_amount),
-    vatAmount: Math.round(Number(r.total_amount) * VAT_RATE * 100) / 100,
+    vatAmount: Math.round(Number(r.total_amount) * vatRate * 100) / 100,
     invoiceDate: String(r.invoice_date).split('T')[0],
   }));
 }

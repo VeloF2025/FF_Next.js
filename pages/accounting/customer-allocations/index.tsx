@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ArrowLeftRight, Loader2, AlertCircle, Check } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 
 const fmt = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 
@@ -68,12 +69,15 @@ export default function CustomerAllocationsPage() {
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10"><ArrowLeftRight className="h-6 w-6 text-blue-500" /></div>
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Allocate Receipts</h1>
-              <p className="text-sm text-[var(--ff-text-secondary)]">Match customer receipts to outstanding invoices</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10"><ArrowLeftRight className="h-6 w-6 text-blue-500" /></div>
+              <div>
+                <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Allocate Receipts</h1>
+                <p className="text-sm text-[var(--ff-text-secondary)]">Match customer receipts to outstanding invoices</p>
+              </div>
             </div>
+            <ExportCSVButton endpoint="/api/accounting/customer-allocations-export" filenamePrefix="customer-allocations" label="Export CSV" />
           </div>
         </div>
 

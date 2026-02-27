@@ -107,8 +107,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const lines = actuals.map(a => {
       const budgetAmount = Number(budgets[a.account_code] || budgets[a.id] || 0);
       const actualAmount = Number(a.actual_amount);
-      const variance = budgetAmount - actualAmount;
-      const variancePct = budgetAmount > 0 ? (variance / budgetAmount) * 100 : 0;
+      // Revenue: positive variance = good (actual > budget)
+      // Expense: positive variance = good (actual < budget, i.e. under budget)
+      const variance = a.account_type === 'revenue'
+        ? actualAmount - budgetAmount
+        : budgetAmount - actualAmount;
+      const variancePct = budgetAmount > 0
+        ? (variance / budgetAmount) * 100
+        : actualAmount > 0 ? -100 : 0;
 
       return {
         account_code: a.account_code,

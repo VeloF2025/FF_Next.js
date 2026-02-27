@@ -9,6 +9,7 @@ import Link from 'next/link';
 import {
   Wallet, Plus, Loader2, AlertCircle, ChevronRight, Filter,
 } from 'lucide-react';
+import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 import type { CustomerPayment, CustomerPaymentStatus } from '@/modules/accounting/types/ar.types';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -81,12 +82,15 @@ export default function CustomerPaymentsPage() {
                 </p>
               </div>
             </div>
-            <Link
-              href="/accounting/customer-payments/new"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="h-4 w-4" /> Record Payment
-            </Link>
+            <div className="flex items-center gap-2">
+              <ExportCSVButton endpoint="/api/accounting/customer-payments-export" filenamePrefix="customer-payments" params={{ status: statusFilter }} label="Export CSV" />
+              <Link
+                href="/accounting/customer-payments/new"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="h-4 w-4" /> Record Payment
+              </Link>
+            </div>
           </div>
         </div>
 
