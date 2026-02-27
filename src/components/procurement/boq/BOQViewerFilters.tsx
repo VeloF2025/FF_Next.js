@@ -2,7 +2,7 @@
  * BOQ Viewer Filters Component
  */
 
-import { Search, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { FilterState, VisibleColumns, INITIAL_FILTERS } from './BOQViewerTypes';
 import { BOQItemMappingStatusType, ProcurementStatusType } from '@/types/procurement/boq.types';
 
@@ -26,21 +26,7 @@ export default function BOQViewerFilters({
 }: BOQViewerFiltersProps) {
   return (
     <div className="bg-[var(--ff-bg-secondary)] p-4 rounded-lg border border-[var(--ff-border-light)] space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {/* Search */}
-        <div className="md:col-span-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-10 pr-4 py-2 w-full border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] text-[var(--ff-text-primary)] rounded-md text-sm"
-            />
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Mapping Status */}
         <select
           value={filters.mappingStatus}
