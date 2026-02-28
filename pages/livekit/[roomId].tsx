@@ -45,7 +45,7 @@ export default function LiveKitMeetingPage() {
 
     const handleDisconnect = () => {
         setToken(null);
-        router.push('/meetings');
+        router.push('/communications?tab=meetings');
     };
 
     if (!roomId || typeof roomId !== 'string') {

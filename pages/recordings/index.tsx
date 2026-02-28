@@ -130,7 +130,7 @@ export default function RecordingsPage() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href="/meetings"
+                            href="/communications?tab=meetings"
                             className="flex items-center gap-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]"
                         >
                             <ChevronLeft className="w-5 h-5" />
@@ -175,7 +175,7 @@ export default function RecordingsPage() {
                         <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">No recordings yet</h3>
                         <p className="text-[var(--ff-text-secondary)] mb-4">Start a meeting and click "Start Recording" to create your first recording.</p>
                         <Link
-                            href="/meetings"
+                            href="/communications?tab=meetings"
                             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             Go to Meetings

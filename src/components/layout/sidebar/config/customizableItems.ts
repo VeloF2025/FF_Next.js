@@ -33,7 +33,7 @@ export const DASHBOARD_ITEM: NavItem = {
 // These can be selected by users for their MAIN section
 export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
   'meetings': {
-    to: '/meetings',
+    to: '/communications?tab=meetings',
     icon: Users,
     label: 'Meetings',
     shortLabel: 'Meet',

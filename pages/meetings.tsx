@@ -1,17 +1,16 @@
-import { AppLayout } from '@/components/layout/AppLayout';
-import { MeetingsDashboard } from '@/modules/meetings/MeetingsDashboard';
+import type { GetServerSideProps } from 'next';
 
-export default function MeetingsPage() {
-  return (
-    <AppLayout>
-      <MeetingsDashboard />
-    </AppLayout>
-  );
-}
-
-// Prevent static generation to avoid router mounting issues
-export const getServerSideProps = async () => {
+// Redirect /meetings → /communications?tab=meetings (Communications Portal has better UX)
+export const getServerSideProps: GetServerSideProps = async () => {
   return {
-    props: {},
+    redirect: {
+      destination: '/communications?tab=meetings',
+      permanent: true,
+    },
   };
 };
+
+export default function MeetingsPage() {
+  // This component never renders — getServerSideProps always redirects
+  return null;
+}

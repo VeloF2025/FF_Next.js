@@ -20,7 +20,7 @@ export const mainSection: NavSection = {
       rbacKey: 'dashboard.main',
     },
     {
-      to: '/meetings',
+      to: '/communications?tab=meetings',
       icon: Users,
       label: 'Meetings',
       shortLabel: 'Meet',
