@@ -9,9 +9,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   Team,
+  TeamMember,
   TeamDropdownOption,
+  UserDropdownOption,
   CreateTeamPayload,
   UpdateTeamPayload,
+  AddTeamMemberPayload,
   TeamFilters,
 } from '../types/team';
 
@@ -24,6 +27,8 @@ export const teamsKeys = {
   dropdown: () => [...teamsKeys.all, 'dropdown'] as const,
   details: () => [...teamsKeys.all, 'detail'] as const,
   detail: (id: string) => [...teamsKeys.details(), id] as const,
+  members: (teamId: string) => [...teamsKeys.all, 'members', teamId] as const,
+  staffDropdown: () => [...teamsKeys.all, 'staff-dropdown'] as const,
 };
 
 // ==================== API Functions ====================
@@ -225,6 +230,141 @@ export function useDeleteTeam() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
       queryClient.invalidateQueries({ queryKey: teamsKeys.dropdown() });
+    },
+  });
+}
+
+// ==================== Member API Functions ====================
+
+async function fetchTeamMembers(teamId: string): Promise<TeamMember[]> {
+  const response = await fetch(`/api/maintenance/teams/${teamId}/members`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to fetch team members');
+  }
+
+  const result = await response.json();
+  return result.data || [];
+}
+
+async function fetchStaffDropdown(): Promise<UserDropdownOption[]> {
+  const response = await fetch('/api/maintenance/users');
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to fetch staff');
+  }
+
+  const result = await response.json();
+  return result.data || [];
+}
+
+async function addTeamMemberRequest({
+  teamId,
+  payload,
+}: {
+  teamId: string;
+  payload: Omit<AddTeamMemberPayload, 'team_id'>;
+}): Promise<TeamMember> {
+  const response = await fetch(`/api/maintenance/teams/${teamId}/members`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to add team member');
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+async function removeTeamMemberRequest({
+  teamId,
+  memberId,
+}: {
+  teamId: string;
+  memberId: string;
+}): Promise<void> {
+  const response = await fetch(
+    `/api/maintenance/teams/${teamId}/members?memberId=${memberId}`,
+    { method: 'DELETE' }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Failed to remove team member');
+  }
+}
+
+// ==================== Member Hooks ====================
+
+/**
+ * Hook to fetch members of a specific team
+ */
+export function useTeamMembers(teamId: string) {
+  const query = useQuery({
+    queryKey: teamsKeys.members(teamId),
+    queryFn: () => fetchTeamMembers(teamId),
+    enabled: !!teamId,
+    staleTime: 30000,
+  });
+
+  return {
+    members: query.data || [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+  };
+}
+
+/**
+ * Hook to fetch staff for the member picker dropdown
+ */
+export function useStaffDropdown() {
+  const query = useQuery({
+    queryKey: teamsKeys.staffDropdown(),
+    queryFn: fetchStaffDropdown,
+    staleTime: 60000,
+  });
+
+  return {
+    staff: query.data || [],
+    isLoading: query.isLoading,
+  };
+}
+
+/**
+ * Hook to add a member to a team
+ */
+export function useAddTeamMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: addTeamMemberRequest,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: teamsKeys.members(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.detail(variables.teamId) });
+    },
+  });
+}
+
+/**
+ * Hook to remove a member from a team
+ */
+export function useRemoveTeamMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: removeTeamMemberRequest,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: teamsKeys.members(variables.teamId) });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: teamsKeys.detail(variables.teamId) });
     },
   });
 }

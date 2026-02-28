@@ -31,10 +31,16 @@ import {
   Trash2,
   X,
   Check,
+  LayoutGrid,
+  List,
+  Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/modules/maintenance/hooks/useTeams';
 import type { Team, TeamType, CreateTeamPayload, UpdateTeamPayload } from '@/modules/maintenance/types/team';
+import { TeamDetailPanel } from '@/modules/maintenance/components/TeamDetailPanel';
+
+type ViewMode = 'cards' | 'list';
 
 type TeamTypeFilter = 'all' | 'internal' | 'contractor';
 
@@ -55,9 +61,11 @@ export default function TeamsPageClient() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TeamTypeFilter>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   // Form state for create/edit
   const [formData, setFormData] = useState<{
@@ -272,9 +280,37 @@ export default function TeamsPageClient() {
 
         {/* Team Count */}
         <div className="text-sm text-[var(--ff-text-tertiary)]">{filteredTeams.length} teams</div>
+
+        {/* View Toggle */}
+        <div className="flex items-center border border-[var(--ff-border-light)] rounded-lg overflow-hidden ml-auto">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={cn(
+              'p-2 transition-colors',
+              viewMode === 'cards'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+            )}
+            title="Card view"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={cn(
+              'p-2 border-l border-[var(--ff-border-light)] transition-colors',
+              viewMode === 'list'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+            )}
+            title="List view"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Teams Grid */}
+      {/* Teams Content */}
       <div className="flex-1 overflow-auto">
         {filteredTeams.length === 0 ? (
           <div className="text-center py-12">
@@ -284,7 +320,7 @@ export default function TeamsPageClient() {
               {searchQuery ? 'Try adjusting your search' : 'Create your first team to get started'}
             </p>
           </div>
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="space-y-6">
             {/* Internal Teams */}
             {(typeFilter === 'all' || typeFilter === 'internal') && groupedTeams.internal.length > 0 && (
@@ -298,6 +334,7 @@ export default function TeamsPageClient() {
                     <TeamCard
                       key={team.id}
                       team={team}
+                      onClick={() => setSelectedTeamId(team.id)}
                       onEdit={() => handleEdit(team)}
                       onDelete={() => setDeletingTeamId(team.id)}
                       isDeleting={deletingTeamId === team.id && isDeleting}
@@ -319,6 +356,7 @@ export default function TeamsPageClient() {
                     <TeamCard
                       key={team.id}
                       team={team}
+                      onClick={() => setSelectedTeamId(team.id)}
                       onEdit={() => handleEdit(team)}
                       onDelete={() => setDeletingTeamId(team.id)}
                       isDeleting={deletingTeamId === team.id && isDeleting}
@@ -327,6 +365,87 @@ export default function TeamsPageClient() {
                 </div>
               </div>
             )}
+          </div>
+        ) : (
+          /* List View */
+          <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
+                  <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Name</th>
+                  <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Type</th>
+                  <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium hidden md:table-cell">Description</th>
+                  <th className="text-center px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Members</th>
+                  <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium hidden sm:table-cell">Lead</th>
+                  <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeams.map((team) => {
+                  const Icon = team.team_type === 'contractor' ? Wrench : Building2;
+                  const colorClass = team.team_type === 'contractor' ? 'text-orange-400' : 'text-blue-400';
+                  return (
+                    <tr
+                      key={team.id}
+                      onClick={() => setSelectedTeamId(team.id)}
+                      className="border-b border-[var(--ff-border-light)] last:border-0 hover:bg-[var(--ff-bg-hover)] cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Icon className={cn('w-4 h-4 flex-shrink-0', colorClass)} />
+                          <span className="text-[var(--ff-text-primary)] font-medium">{team.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--ff-text-secondary)] capitalize">
+                        {team.team_type?.replace('_', ' ')}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--ff-text-tertiary)] hidden md:table-cell max-w-xs truncate">
+                        {team.description || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center gap-1 text-[var(--ff-text-secondary)]">
+                          <Users className="w-3.5 h-3.5" />
+                          {team.member_count || 0}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--ff-text-secondary)] hidden sm:table-cell">
+                        {team.lead_user ? (
+                          <span className="flex items-center gap-1">
+                            <Crown className="w-3.5 h-3.5 text-amber-400" />
+                            {team.lead_user.name}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--ff-text-tertiary)]">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleEdit(team); }}
+                            className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] rounded-md transition-colors"
+                            title="Edit team"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingTeamId(team.id); }}
+                            disabled={deletingTeamId === team.id && isDeleting}
+                            className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
+                            title="Delete team"
+                          >
+                            {deletingTeamId === team.id && isDeleting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -424,6 +543,14 @@ export default function TeamsPageClient() {
         </div>
       )}
 
+      {/* Team Detail Panel */}
+      {selectedTeamId && (
+        <TeamDetailPanel
+          teamId={selectedTeamId}
+          onClose={() => setSelectedTeamId(null)}
+        />
+      )}
+
       {/* Delete Confirmation Modal */}
       {deletingTeamId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -465,11 +592,13 @@ export default function TeamsPageClient() {
 // Team Card Component
 function TeamCard({
   team,
+  onClick,
   onEdit,
   onDelete,
   isDeleting,
 }: {
   team: Team;
+  onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -478,21 +607,24 @@ function TeamCard({
   const colorClass = team.team_type === 'contractor' ? 'text-orange-400 bg-orange-500/10' : 'text-blue-400 bg-blue-500/10';
 
   return (
-    <div className="bg-[var(--ff-bg-card)] border border-[var(--ff-border-light)] rounded-lg p-4 hover:border-blue-500/30 transition-colors">
+    <div
+      onClick={onClick}
+      className="bg-[var(--ff-bg-card)] border border-[var(--ff-border-light)] rounded-lg p-4 hover:border-blue-500/30 transition-colors cursor-pointer"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', colorClass)}>
           <Icon className="w-5 h-5" />
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={onEdit}
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] rounded-md transition-colors"
             title="Edit team"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
-            onClick={onDelete}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
             disabled={isDeleting}
             className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors disabled:opacity-50"
             title="Delete team"
