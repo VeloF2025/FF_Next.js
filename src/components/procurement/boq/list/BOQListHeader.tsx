@@ -2,13 +2,17 @@
  * BOQ List Header Component
  */
 
-import { Plus, Filter, RefreshCw, Upload } from 'lucide-react';
+import { Plus, Filter, RefreshCw, Upload, LayoutGrid, List } from 'lucide-react';
+
+export type ViewMode = 'cards' | 'list';
 
 interface BOQListHeaderProps {
   totalBOQs: number;
   filteredCount: number;
   showFilters: boolean;
   setShowFilters: (show: boolean) => void;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   onCreateBOQ?: (() => void) | undefined;
   onUploadBOQ?: (() => void) | undefined;
   onRefresh: () => void;
@@ -19,6 +23,8 @@ export default function BOQListHeader({
   filteredCount,
   showFilters,
   setShowFilters,
+  viewMode,
+  setViewMode,
   onCreateBOQ,
   onUploadBOQ,
   onRefresh
@@ -36,6 +42,32 @@ export default function BOQListHeader({
       </div>
 
       <div className="flex items-center space-x-2">
+        {/* View Toggle */}
+        <div className="flex border border-[var(--ff-border-light)] rounded-md overflow-hidden">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`p-2 ${
+              viewMode === 'cards'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+            }`}
+            title="Card view"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 border-l border-[var(--ff-border-light)] ${
+              viewMode === 'list'
+                ? 'bg-blue-500/20 text-blue-400'
+                : 'text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+            }`}
+            title="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`px-3 py-2 border rounded-md text-sm font-medium flex items-center ${

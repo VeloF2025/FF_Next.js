@@ -3,12 +3,14 @@
  * Main container for displaying and managing all BOQs
  */
 
+import { useState } from 'react';
 import { Loader2, FileText } from 'lucide-react';
 import { BOQListProps, INITIAL_FILTERS } from './list/BOQListTypes';
 import { useBOQList } from './list/useBOQList';
-import BOQListHeader from './list/BOQListHeader';
+import BOQListHeader, { ViewMode } from './list/BOQListHeader';
 import BOQListFilters from './list/BOQListFilters';
 import BOQCard from './list/BOQCard';
+import BOQListTable from './list/BOQListTable';
 
 export default function BOQList({
   onSelectBOQ,
@@ -18,6 +20,7 @@ export default function BOQList({
   className,
   projectId
 }: BOQListProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const {
     boqs,
     filteredAndSortedBOQs,
@@ -54,6 +57,8 @@ export default function BOQList({
         filteredCount={filteredAndSortedBOQs.length}
         showFilters={showFilters}
         setShowFilters={setShowFilters}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
         onCreateBOQ={onCreateBOQ}
         onUploadBOQ={onUploadBOQ}
         onRefresh={loadBOQs}
@@ -68,25 +73,38 @@ export default function BOQList({
         />
       )}
 
-      {/* BOQ Grid */}
+      {/* BOQ Grid / List */}
       {filteredAndSortedBOQs.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedBOQs.map(boq => (
-            <BOQCard
-              key={boq.id}
-              boq={boq}
-              isSelected={selectedBOQId === boq.id}
-              onClick={() => handleViewBOQ(boq)}
-              onView={() => handleViewBOQ(boq)}
-              onEdit={() => handleEditBOQ(boq)}
-              onDownload={() => handleDownloadBOQ(boq)}
-              onArchive={() => handleArchiveBOQ(boq)}
-              onDelete={() => handleDeleteBOQ(boq)}
-              actionMenuOpen={actionMenuOpen === boq.id}
-              setActionMenuOpen={(open) => setActionMenuOpen(open ? boq.id : null)}
-            />
-          ))}
-        </div>
+        viewMode === 'cards' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredAndSortedBOQs.map(boq => (
+              <BOQCard
+                key={boq.id}
+                boq={boq}
+                isSelected={selectedBOQId === boq.id}
+                onClick={() => handleViewBOQ(boq)}
+                onView={() => handleViewBOQ(boq)}
+                onEdit={() => handleEditBOQ(boq)}
+                onDownload={() => handleDownloadBOQ(boq)}
+                onArchive={() => handleArchiveBOQ(boq)}
+                onDelete={() => handleDeleteBOQ(boq)}
+                actionMenuOpen={actionMenuOpen === boq.id}
+                setActionMenuOpen={(open) => setActionMenuOpen(open ? boq.id : null)}
+              />
+            ))}
+          </div>
+        ) : (
+          <BOQListTable
+            boqs={filteredAndSortedBOQs}
+            selectedBOQId={selectedBOQId}
+            onClick={handleViewBOQ}
+            onView={handleViewBOQ}
+            onEdit={handleEditBOQ}
+            onDownload={handleDownloadBOQ}
+            onArchive={handleArchiveBOQ}
+            onDelete={handleDeleteBOQ}
+          />
+        )
       ) : (
         /* Empty State */
         <div className="text-center py-12 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
