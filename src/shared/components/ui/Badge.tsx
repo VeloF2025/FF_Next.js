@@ -17,7 +17,7 @@ export function Badge({
   const variantStyles = {
     default: 'bg-purple-600 text-white hover:bg-purple-700',
     secondary: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]',
-    destructive: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
+    destructive: 'bg-red-500/20 text-red-700 hover:bg-red-500/30',
     outline: 'text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]',
   };
 

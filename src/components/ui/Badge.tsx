@@ -110,7 +110,7 @@ export interface BadgeProps {
  */
 function getStatusColor(status: string): string {
   const normalized = status.toLowerCase().replace(/[\s_]+/g, '-');
-  return BADGE_COLORS[normalized as keyof typeof BADGE_COLORS] || 'bg-gray-500/20 text-gray-400';
+  return BADGE_COLORS[normalized as keyof typeof BADGE_COLORS] || 'bg-gray-500/20 text-gray-600';
 }
 
 /**
@@ -118,7 +118,7 @@ function getStatusColor(status: string): string {
  */
 function getPriorityColor(priority: string): string {
   const normalized = priority.toLowerCase();
-  return PRIORITY_COLORS[normalized as keyof typeof PRIORITY_COLORS] || 'bg-gray-500/20 text-gray-400';
+  return PRIORITY_COLORS[normalized as keyof typeof PRIORITY_COLORS] || 'bg-gray-500/20 text-gray-600';
 }
 
 /**
@@ -180,7 +180,7 @@ export function Badge({
       case 'type':
       case 'custom':
       default:
-        finalColorClass = 'bg-gray-500/20 text-gray-400';
+        finalColorClass = 'bg-gray-500/20 text-gray-600';
         break;
     }
   }
