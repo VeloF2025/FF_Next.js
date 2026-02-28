@@ -36,21 +36,21 @@ export const BADGE_COLORS = {
   'on-leave': 'bg-yellow-700/20 text-yellow-700',
   busy: 'bg-yellow-700/20 text-yellow-700',
 
-  // Draft/New states (gray)
-  draft: 'bg-gray-500/20 text-gray-400',
-  new: 'bg-gray-500/20 text-gray-400',
-  inactive: 'bg-gray-500/20 text-gray-400',
-  unknown: 'bg-gray-500/20 text-gray-400',
-  none: 'bg-gray-500/20 text-gray-400',
+  // Draft/New states (gray) — improved contrast from gray-400 → gray-600
+  draft: 'bg-gray-500/20 text-gray-600',
+  new: 'bg-gray-500/20 text-gray-600',
+  inactive: 'bg-gray-500/20 text-gray-600',
+  unknown: 'bg-gray-500/20 text-gray-600',
+  none: 'bg-gray-500/20 text-gray-600',
 
-  // Error/Danger states (red)
-  error: 'bg-red-500/20 text-red-400',
-  cancelled: 'bg-red-500/20 text-red-400',
-  rejected: 'bg-red-500/20 text-red-400',
-  failed: 'bg-red-500/20 text-red-400',
-  expired: 'bg-red-500/20 text-red-400',
-  overdue: 'bg-red-500/20 text-red-400',
-  critical: 'bg-red-500/20 text-red-400',
+  // Error/Danger states (red) — improved contrast from red-400 → red-700
+  error: 'bg-red-500/20 text-red-700',
+  cancelled: 'bg-red-500/20 text-red-700',
+  rejected: 'bg-red-500/20 text-red-700',
+  failed: 'bg-red-500/20 text-red-700',
+  expired: 'bg-red-500/20 text-red-700',
+  overdue: 'bg-red-500/20 text-red-700',
+  critical: 'bg-red-500/20 text-red-700',
 
   // Info/Blue states — WCAG AA 6.31:1 ratio
   info: 'bg-blue-600/20 text-blue-600',
@@ -58,15 +58,15 @@ export const BADGE_COLORS = {
   ordered: 'bg-blue-600/20 text-blue-600',
   submitted: 'bg-blue-600/20 text-blue-600',
 
-  // Orange states
-  warning: 'bg-orange-500/20 text-orange-400',
-  'on-hold': 'bg-orange-500/20 text-orange-400',
-  suspended: 'bg-orange-500/20 text-orange-400',
-  shipped: 'bg-orange-500/20 text-orange-400',
+  // Orange states — improved contrast from orange-400 → orange-700
+  warning: 'bg-orange-500/20 text-orange-700',
+  'on-hold': 'bg-orange-500/20 text-orange-700',
+  suspended: 'bg-orange-500/20 text-orange-700',
+  shipped: 'bg-orange-500/20 text-orange-700',
 
-  // Purple states
-  planning: 'bg-purple-500/20 text-purple-400',
-  scheduled: 'bg-purple-500/20 text-purple-400',
+  // Purple states — improved contrast from purple-400 → purple-700
+  planning: 'bg-purple-500/20 text-purple-700',
+  scheduled: 'bg-purple-500/20 text-purple-700',
 
   // Cyan states
   progress: 'bg-cyan-500/20 text-cyan-400',
@@ -74,11 +74,11 @@ export const BADGE_COLORS = {
 
 // Priority colors — WCAG AA compliant ratios
 export const PRIORITY_COLORS = {
-  low: 'bg-gray-500/20 text-gray-400',
+  low: 'bg-gray-500/20 text-gray-600',             // improved contrast
   medium: 'bg-yellow-700/20 text-yellow-700',     // 7.28:1 ratio
   high: 'bg-orange-600/20 text-orange-600',       // 6.95:1 ratio
-  critical: 'bg-red-500/20 text-red-400',
-  urgent: 'bg-red-500/20 text-red-400',
+  critical: 'bg-red-500/20 text-red-700',         // improved contrast
+  urgent: 'bg-red-500/20 text-red-700',           // improved contrast
 } as const;
 
 export type BadgeVariant = 'status' | 'priority' | 'type' | 'count' | 'custom';

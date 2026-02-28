@@ -240,6 +240,7 @@ export default function RecordingsPage() {
                                         </button>
                                         <button
                                             onClick={() => handleDownload(recording)}
+                                            aria-label={`Download recording: ${recording.roomName}`}
                                             className="px-3 py-2 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors"
                                             title="Download"
                                         >
@@ -248,6 +249,7 @@ export default function RecordingsPage() {
                                         <button
                                             onClick={() => handleDelete(recording)}
                                             disabled={deleting === recording.id}
+                                            aria-label={`Delete recording: ${recording.roomName}`}
                                             className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
                                             title="Delete"
                                         >
@@ -271,17 +273,21 @@ export default function RecordingsPage() {
                         onClick={() => setSelectedRecording(null)}
                     >
                         <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="recording-modal-title"
                             className="bg-[var(--ff-bg-secondary)] rounded-xl overflow-hidden max-w-4xl w-full max-h-[90vh] flex flex-col"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Modal Header */}
                             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)]">
-                                <h3 className="font-medium text-[var(--ff-text-primary)]">
+                                <h3 id="recording-modal-title" className="font-medium text-[var(--ff-text-primary)]">
                                     {selectedRecording.roomName}
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={() => handleDownload(selectedRecording)}
+                                        aria-label={`Download recording: ${selectedRecording.roomName}`}
                                         className="flex items-center gap-2 px-3 py-1.5 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors text-sm"
                                     >
                                         <Download className="w-4 h-4" />
@@ -289,6 +295,7 @@ export default function RecordingsPage() {
                                     </button>
                                     <button
                                         onClick={() => setSelectedRecording(null)}
+                                        aria-label="Close recording modal"
                                         className="p-1.5 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] rounded-lg hover:bg-[var(--ff-bg-hover)]"
                                     >
                                         <X className="w-5 h-5" />
