@@ -30,7 +30,8 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
       sowStats,
       clientStats,
       sowImportStats,
-      contractorStats
+      contractorStats,
+      openIssuesStats,
     ] = await Promise.all([
       // Projects statistics - using actual columns
       sql`
@@ -88,7 +89,11 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_contractors,
           COUNT(CASE WHEN status IN ('under_review', 'documentation_incomplete') THEN 1 END) as review_contractors
         FROM contractors
-      `
+      `,
+
+      // Open issues — action items not yet completed or cancelled
+      sql`SELECT COUNT(*) as open_issues FROM action_items WHERE status IN ('pending', 'in_progress')`
+        .catch(() => [{ open_issues: 0 }]),
     ]);
 
     // Extract results
@@ -98,6 +103,7 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
     const clientData: any = clientStats[0] || {};
     const importData: any = sowImportStats[0] || {};
     const contractorData: any = contractorStats[0] || {};
+    const issuesData: any = (openIssuesStats as any[])[0] || {};
 
     // Calculate derived metrics
     const completedProjects = parseInt(projectData.completed_projects) || 0;
@@ -125,7 +131,7 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
       
       // Staff stats
       teamMembers: parseInt(staffData.total_staff) || 0,
-      openIssues: 0, // TODO: Implement issues tracking
+      openIssues: parseInt(issuesData.open_issues) || 0,
       
       // Infrastructure stats (from actual poles data)
       polesInstalled: parseInt(sowData.total_poles) || 0, // Use actual pole count

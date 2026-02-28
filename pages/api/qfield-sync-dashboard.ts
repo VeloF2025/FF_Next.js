@@ -61,10 +61,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 async function checkQFieldConnection(): Promise<'connected' | 'disconnected' | 'error'> {
   try {
-    // TODO: Implement actual QFieldCloud connection check
-    // For now, return mock status
+    // Real check: hit QFieldCloud projects endpoint with a short timeout
+    await qfieldApiRequest('/projects/');
     return 'connected';
-  } catch (error) {
+  } catch (error: any) {
+    // Network/auth error → disconnected; unexpected error → error
+    const msg = error?.message || '';
+    if (msg.includes('timeout') || msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND')) {
+      return 'disconnected';
+    }
     return 'error';
   }
 }
@@ -80,35 +85,23 @@ async function checkDatabaseConnection(): Promise<'connected' | 'disconnected' |
 }
 
 async function getQFieldProjects() {
-  // TODO: Fetch from QFieldCloud API
-  // Mock data for now
-  return [
-    {
-      id: 'proj_fiber_infra',
-      name: 'Fiber Infrastructure',
-      description: 'Main fiber cable tracking project',
-      owner: 'FibreFlow',
-      isPublic: false,
-      lastModified: new Date().toISOString(),
-      layers: [
-        {
-          id: 'layer_cables',
-          name: 'fiber_cables',
-          type: 'line' as const,
-          featureCount: 156,
-          fields: [],
-        },
-        {
-          id: 'layer_poles',
-          name: 'poles',
-          type: 'point' as const,
-          featureCount: 423,
-          fields: [],
-        },
-      ],
+  try {
+    const rows = await getQFieldCloudProjects();
+    // Normalise to the shape the dashboard component expects
+    return rows.map((r: any) => ({
+      id: r.id || r.name,
+      name: r.name,
+      description: r.description || '',
+      owner: r.owner_id || r.owner || 'FibreFlow',
+      isPublic: r.is_public ?? false,
+      lastModified: r.updated_at || r.last_modified || new Date().toISOString(),
+      layers: [],       // Loaded on-demand per-project
       status: 'active' as const,
-    },
-  ];
+    }));
+  } catch (error) {
+    log.error('Failed to fetch QFieldCloud projects', { error }, 'qfield-sync-dashboard');
+    return [];
+  }
 }
 
 async function getCurrentSyncJob() {
