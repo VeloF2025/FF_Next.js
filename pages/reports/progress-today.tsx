@@ -22,6 +22,7 @@ interface ProgressMetrics {
   rfosCompleted: number;
   atpsCompleted: number;
   totalInstalls: number;
+  totalActivated: number;
 }
 
 interface ProgressData {
@@ -64,7 +65,14 @@ const METRIC_CONFIG = [
     label: 'Total Installs',
     icon: Home,
     color: 'rose',
-    description: 'Customer installations completed today',
+    description: 'Customer installations via WhatsApp today',
+  },
+  {
+    key: 'totalActivated' as keyof ProgressMetrics,
+    label: 'Total Activated',
+    icon: Zap,
+    color: 'cyan',
+    description: 'OES activations (day-lagged from FiberTime)',
   },
 ];
 
@@ -74,6 +82,7 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string; icon
   purple: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', iconBg: 'bg-purple-500/20' },
   amber: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', iconBg: 'bg-amber-500/20' },
   rose: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', iconBg: 'bg-rose-500/20' },
+  cyan: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', iconBg: 'bg-cyan-500/20' },
 };
 
 function TrendIndicator({ current, previous }: { current: number; previous: number }) {
