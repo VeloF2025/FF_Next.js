@@ -97,10 +97,10 @@ async function getUpcomingTeamsMeetings(
   const now = new Date();
   const end = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
 
+  // Note: isOnlineMeeting does not support $filter — filter client-side
   const url = `${GRAPH_BASE}/users/${userId}/calendarView` +
     `?startDateTime=${now.toISOString()}` +
     `&endDateTime=${end.toISOString()}` +
-    `&$filter=isOnlineMeeting eq true` +
     `&$select=id,subject,start,end,isOnlineMeeting,onlineMeeting,organizer` +
     `&$top=50`;
 
@@ -116,7 +116,10 @@ async function getUpcomingTeamsMeetings(
   }
 
   const data = await response.json();
-  return (data.value || []) as CalendarEvent[];
+  // Client-side filter: only Teams online meetings with a join URL
+  return ((data.value || []) as CalendarEvent[]).filter(
+    e => e.isOnlineMeeting && e.onlineMeeting?.joinUrl
+  );
 }
 
 /**
