@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Plus, Calendar, RefreshCw, Video, Film } from 'lucide-react';
+import { Plus, RefreshCw, Film } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
@@ -28,8 +28,6 @@ import {
   CommunicationsActionTab,
   CommunicationsNotificationsTab
 } from './components';
-import { ScheduleMeetingModal } from '@/modules/livekit/components/ScheduleMeetingModal';
-import { notificationService } from '@/services/core/NotificationService';
 
 // Tab name mapping for URL params
 const TAB_NAMES = ['overview', 'meetings', 'action-items', 'notifications'];
@@ -43,8 +41,6 @@ const CommunicationsDashboard: React.FC = () => {
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const { data, stats, isLoading, getPriorityColor, getStatusColor, refetch } = useCommunications();
 
   const tabs = ['Overview', 'Meetings', 'Action Items', 'Notifications'];
@@ -137,30 +133,6 @@ const CommunicationsDashboard: React.FC = () => {
     }
   };
 
-  // Handle Start Now button - create LiveKit room
-  const handleStartVideoMeeting = async () => {
-    setIsCreatingRoom(true);
-    try {
-      const response = await fetch('/api/livekit/rooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `Meeting ${new Date().toLocaleString()}` }),
-      });
-      const responseData = await response.json();
-      if (responseData.success && responseData.room) {
-        router.push(`/livekit/${responseData.room.name}`);
-      } else {
-        notificationService.error('Failed to create meeting: ' + (responseData.error || 'Unknown error'));
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      notificationService.error('Failed to create meeting: ' + message);
-      log.error('Failed to create video meeting:', error);
-    } finally {
-      setIsCreatingRoom(false);
-    }
-  };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header - Inline style matching Maintenance Dashboard */}
@@ -176,32 +148,6 @@ const CommunicationsDashboard: React.FC = () => {
 
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            {/* Schedule Meeting - Primary indigo */}
-            <button
-              type="button"
-              onClick={() => setShowScheduleModal(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-            >
-              <Calendar className="w-4 h-4" />
-              Schedule Meeting
-            </button>
-
-            {/* Start Now - Green */}
-            <button
-              type="button"
-              onClick={handleStartVideoMeeting}
-              disabled={isCreatingRoom}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                isCreatingRoom
-                  ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              )}
-            >
-              <Video className="w-4 h-4" />
-              {isCreatingRoom ? 'Creating...' : 'Start Now'}
-            </button>
-
             {/* Recordings - Secondary */}
             <Link
               href="/recordings"
@@ -381,14 +327,6 @@ const CommunicationsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Schedule Meeting Modal */}
-      <ScheduleMeetingModal
-        isOpen={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        onSuccess={() => {
-          handleRefresh();
-        }}
-      />
     </div>
   );
 };
