@@ -249,7 +249,7 @@ export function normalizeStorageUrl(url: string | undefined | null): string | un
   if (url.includes('/storage/')) return url;
 
   // Check if this is a storage path (procurement, staff, fleet, etc.)
-  const storagePaths = ['/procurement/', '/staff/', '/fleet/', '/contractors/', '/assets/'];
+  const storagePaths = ['/procurement/', '/accounting/', '/staff/', '/fleet/', '/contractors/', '/assets/'];
   const needsStorage = storagePaths.some(path => url.includes(path));
 
   if (!needsStorage) return url;

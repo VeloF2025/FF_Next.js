@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Wallet, Loader2, AlertCircle, Check, X } from 'lucide-react';
+import { AccountingDocumentPanel } from '@/modules/accounting/documents';
 import toast from 'react-hot-toast';
 
 function formatCurrency(amount: number): string {
@@ -242,6 +243,18 @@ export default function CustomerPaymentDetailPage() {
                   </table>
                 </div>
               </div>
+
+              {/* Documents */}
+              <AccountingDocumentPanel
+                entityType="customer_payment"
+                entityId={paymentId}
+                allowedTypes={[
+                  { value: 'proof_of_payment', label: 'Proof of Payment' },
+                  { value: 'bank_statement', label: 'Bank Statement' },
+                  { value: 'receipt', label: 'Receipt' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </>
           ) : null}
         </div>
