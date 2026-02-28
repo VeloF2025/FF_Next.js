@@ -123,11 +123,11 @@ async function matchToFibreflowUser(
   email: string
 ): Promise<{ id: number; name: string } | null> {
   const rows = await sql`
-    SELECT id, name
+    SELECT id, CONCAT(first_name, ' ', last_name) as full_name
     FROM users
     WHERE LOWER(email) = LOWER(${email})
     LIMIT 1
   `;
 
-  return rows[0] ? { id: rows[0].id as number, name: rows[0].name as string } : null;
+  return rows[0] ? { id: rows[0].id as number, name: rows[0].full_name as string } : null;
 }
