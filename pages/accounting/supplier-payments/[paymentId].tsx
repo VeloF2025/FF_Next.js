@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Wallet, Loader2, AlertCircle, Check, Zap, XCircle } from 'lucide-react';
+import { AccountingDocumentPanel } from '@/modules/accounting/documents';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -222,6 +223,18 @@ export default function SupplierPaymentDetailPage() {
                   GL Journal: <Link href={`/accounting?tab=journal-entries&id=${payment.journalEntryId}`} className="text-emerald-400 hover:underline">{payment.journalEntryId.slice(0, 8)}...</Link>
                 </div>
               )}
+
+              {/* Documents */}
+              <AccountingDocumentPanel
+                entityType="supplier_payment"
+                entityId={paymentId}
+                allowedTypes={[
+                  { value: 'proof_of_payment', label: 'Proof of Payment' },
+                  { value: 'remittance_advice', label: 'Remittance Advice' },
+                  { value: 'receipt', label: 'Receipt' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
             </>
           ) : null}
         </div>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, FileText, Loader2, AlertCircle, CheckCircle2, Send, XCircle } from 'lucide-react';
+import { AccountingDocumentPanel } from '@/modules/accounting/documents';
 
 const fmt = (n: number) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 
@@ -183,6 +184,16 @@ export default function CustomerInvoiceDetailPage() {
               <FileText className="h-4 w-4" /> View GL Journal Entry
             </Link>
           )}
+
+          {/* Documents */}
+          <AccountingDocumentPanel
+            entityType="customer_invoice"
+            entityId={invoiceId as string}
+            allowedTypes={[
+              { value: 'invoice', label: 'Invoice PDF' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
         </div>
       </div>
     </AppLayout>

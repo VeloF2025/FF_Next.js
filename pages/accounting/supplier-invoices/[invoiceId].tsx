@@ -12,6 +12,7 @@ import {
   XCircle, Link2, FileText, Pencil, Save,
 } from 'lucide-react';
 import type { SupplierInvoice, SupplierInvoiceItem } from '@/modules/accounting/types/ap.types';
+import { AccountingDocumentPanel } from '@/modules/accounting/documents';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -263,6 +264,17 @@ export default function SupplierInvoiceDetailPage() {
               <FileText className="h-4 w-4" /> View GL Journal Entry
             </Link>
           )}
+
+          {/* Documents */}
+          <AccountingDocumentPanel
+            entityType="supplier_invoice"
+            entityId={invoiceId as string}
+            allowedTypes={[
+              { value: 'invoice', label: 'Invoice' },
+              { value: 'receipt', label: 'Receipt' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
         </div>
       </div>
     </AppLayout>
