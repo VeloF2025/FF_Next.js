@@ -133,28 +133,31 @@ async function enableAutoRecordForMeeting(
   joinUrl: string,
   subject: string
 ): Promise<'enabled' | 'already' | 'failed' | 'access_denied'> {
-  // Step 1: Find the online meeting by join URL (try encoded and raw)
-  for (const url of [encodeURIComponent(joinUrl), joinUrl]) {
-    const findUrl = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings` +
-      `?$filter=joinWebUrl eq '${url}'` +
-      `&$select=id,subject,recordAutomatically`;
+  // Use URL class to properly encode the join URL in the OData $filter
+  // Join URLs contain %3a etc. that corrupt query strings if embedded directly
+  const endpoint = new URL(`${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings`);
+  endpoint.searchParams.set('$filter', `joinWebUrl eq '${joinUrl}'`);
+  endpoint.searchParams.set('$select', 'id,subject,recordAutomatically');
 
-    const findResp = await graphFetch(findUrl);
-    if (findResp.status === 403) {
-      log.warn('OnlineMeetings access denied — application access policy required', { subject }, LOGGER);
-      return 'access_denied';
-    }
-    if (!findResp.ok) continue;
-
-    const data = await findResp.json();
-    const meetings = (data.value || []) as OnlineMeeting[];
-    if (meetings.length > 0) {
-      return await patchMeeting(organizerUserId, meetings[0]!, subject);
-    }
+  const findResp = await graphFetch(endpoint.toString());
+  if (findResp.status === 403) {
+    log.warn('OnlineMeetings access denied — application access policy required', { subject }, LOGGER);
+    return 'access_denied';
+  }
+  if (!findResp.ok) {
+    const err = await findResp.text();
+    log.warn('Cannot find online meeting', { subject, status: findResp.status, error: err.slice(0, 200) }, LOGGER);
+    return 'failed';
   }
 
-  log.warn('Online meeting not found for join URL', { subject }, LOGGER);
-  return 'failed';
+  const data = await findResp.json();
+  const meetings = (data.value || []) as OnlineMeeting[];
+  if (meetings.length === 0) {
+    log.warn('Online meeting not found for join URL', { subject }, LOGGER);
+    return 'failed';
+  }
+
+  return await patchMeeting(organizerUserId, meetings[0]!, subject);
 }
 
 async function patchMeeting(
