@@ -155,15 +155,36 @@ async function checkDatabaseHealth(
  * This requires the API to have access to docker commands
  */
 async function checkDockerContainers(): Promise<ContainerStatus[]> {
-  // For now, we'll check via HTTP endpoints where available
-  // Full docker status would require executing docker commands on the server
+  // Check container health via HTTP endpoints (Next.js API has no docker CLI access)
+  const healthChecks = [
+    { name: 'qfieldcloud-nginx-1',         endpoint: `http://${VELOCITY_HOST}:8009/` },
+    { name: 'qfieldcloud-app-1',           endpoint: `http://${VELOCITY_HOST}:8009/api/v1/` },
+    { name: 'qfieldcloud-db-1',            endpoint: null }, // PostgreSQL: no HTTP endpoint
+    { name: 'qfieldcloud-minio-1',         endpoint: `http://${VELOCITY_HOST}:8010/minio/health/live` },
+    { name: 'qfieldcloud-memcached-1',     endpoint: null }, // Memcached: no HTTP endpoint
+    { name: 'qfieldcloud-worker_wrapper-1', endpoint: null }, // Worker: no HTTP endpoint
+    { name: 'qfieldcloud-worker_wrapper-2', endpoint: null },
+    { name: 'qfieldcloud-worker_wrapper-3', endpoint: null },
+  ];
+
   const containers: ContainerStatus[] = [];
 
-  for (const containerName of QFIELD_CONTAINERS) {
-    containers.push({
-      name: containerName,
-      status: 'unknown', // Would need docker ps access
-    });
+  for (const check of healthChecks) {
+    let status: ContainerStatus['status'] = 'unknown';
+
+    if (check.endpoint) {
+      try {
+        const response = await fetch(check.endpoint, {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(5000),
+        });
+        status = response.ok ? 'running' : 'unhealthy';
+      } catch {
+        status = 'down';
+      }
+    }
+
+    containers.push({ name: check.name, status });
   }
 
   return containers;
@@ -178,15 +199,15 @@ async function checkQFieldStatus(): Promise<QFieldStatus> {
     SERVICE_ENDPOINTS.qfield.syncWebhook.timeout
   );
 
-  // Check QField app endpoint
+  // Check QField app endpoint (port 8009 = docker 9000->8009)
   const qfieldApp = await checkHttpEndpoint(
-    `http://${VELOCITY_HOST}:8000/api/v1/`,
+    `http://${VELOCITY_HOST}:8009/api/v1/`,
     10000
   );
 
-  // Check MinIO health
+  // Check MinIO health (port 8010 = docker 9001->8010)
   const minioHealth = await checkHttpEndpoint(
-    `http://${VELOCITY_HOST}:8009/minio/health/live`,
+    `http://${VELOCITY_HOST}:8010/minio/health/live`,
     10000
   );
 
