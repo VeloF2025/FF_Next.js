@@ -24,7 +24,7 @@ async function handler(
   if (req.method === 'GET') {
     try {
       // Check if requesting a specific meeting by ID
-      const { id } = req.query;
+      const { id, source } = req.query;
 
       if (id) {
         // Super admin can access any meeting, others need to be participants
@@ -32,14 +32,20 @@ async function handler(
           ? await sql`
               SELECT
                 id, fireflies_id, title, meeting_date as date, duration,
-                transcript_url, summary, participants, created_at, updated_at
+                transcript_url, summary, participants, created_at, updated_at,
+                source, processing_status, organizer_name, organizer_email, join_url,
+                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
             `
           : await sql`
               SELECT
                 id, fireflies_id, title, meeting_date as date, duration,
-                transcript_url, summary, participants, created_at, updated_at
+                transcript_url, summary, participants, created_at, updated_at,
+                source, processing_status, organizer_name, organizer_email, join_url,
+                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
               AND EXISTS (
@@ -57,12 +63,54 @@ async function handler(
         return res.status(200).json({ meeting });
       }
 
+      // Source filter: ?source=teams|fireflies|all (default: all)
+      const sourceFilter = typeof source === 'string' && source !== 'all' ? source : null;
+
       // Super admin sees all meetings, others only see meetings they participated in
+      if (sourceFilter) {
+        const meetings = isSuperAdmin
+          ? await sql`
+              SELECT
+                id, fireflies_id, title, meeting_date as date, duration,
+                transcript_url, summary, participants, created_at, updated_at,
+                source, processing_status, organizer_name, organizer_email,
+                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (recording_path IS NOT NULL) as has_recording
+              FROM meetings
+              WHERE source = ${sourceFilter}
+              ORDER BY meeting_date DESC
+              LIMIT 50
+            `
+          : await sql`
+              SELECT
+                id, fireflies_id, title, meeting_date as date, duration,
+                transcript_url, summary, participants, created_at, updated_at,
+                source, processing_status, organizer_name, organizer_email,
+                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (recording_path IS NOT NULL) as has_recording
+              FROM meetings
+              WHERE source = ${sourceFilter}
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements(participants) AS p
+                WHERE LOWER(p->>'email') = ${userEmail}
+                   OR LOWER(p->>'name') = ${userName}
+                   OR LOWER(p->>'displayName') = ${userName}
+              )
+              ORDER BY meeting_date DESC
+              LIMIT 50
+            `;
+
+        return res.status(200).json({ meetings });
+      }
+
       const meetings = isSuperAdmin
         ? await sql`
             SELECT
               id, fireflies_id, title, meeting_date as date, duration,
-              transcript_url, summary, participants, created_at, updated_at
+              transcript_url, summary, participants, created_at, updated_at,
+              source, processing_status, organizer_name, organizer_email,
+              (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+              (recording_path IS NOT NULL) as has_recording
             FROM meetings
             ORDER BY meeting_date DESC
             LIMIT 50
@@ -70,7 +118,10 @@ async function handler(
         : await sql`
             SELECT
               id, fireflies_id, title, meeting_date as date, duration,
-              transcript_url, summary, participants, created_at, updated_at
+              transcript_url, summary, participants, created_at, updated_at,
+              source, processing_status, organizer_name, organizer_email,
+              (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+              (recording_path IS NOT NULL) as has_recording
             FROM meetings
             WHERE EXISTS (
               SELECT 1 FROM jsonb_array_elements(participants) AS p
