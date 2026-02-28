@@ -161,8 +161,8 @@ VPS: 72.61.197.178
 │   └── whatsapp.db      # whatsmeow session data
 └── whatsapp-bridge.service  # Systemd service
 
-Source (Velocity):
-/home/louis/whatsapp-bridge-go/main.go
+Source (Velocity — compile locally):
+/home/velo/whatsapp-bridge/main.go
 ```
 
 ### Key Features
@@ -362,11 +362,10 @@ curl http://localhost:8083/reload-groups
 ```
 
 ```bash
-# Connect to Velocity (legacy services)
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+# Run locally on Velocity as user hein (passwordless sudo)
 
 # Check LEGACY wa-feedback (avoid new usage)
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status wa-feedback.service
+sudo systemctl status wa-feedback.service
 ```
 
 ## Troubleshooting
@@ -414,8 +413,8 @@ tail -20 /opt/whatsapp-bridge/bridge.log
 # Check VPS bridge health
 curl http://72.61.197.178:8083/health
 
-# Check FibreFlow API logs
-ssh velo@100.96.203.105 "journalctl -u fibreflow -n 50"
+# Check FibreFlow API logs (run locally on Velocity)
+journalctl -u fibreflow -n 50
 ```
 
 **Fix:**

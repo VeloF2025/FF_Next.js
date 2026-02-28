@@ -85,12 +85,10 @@ ls /home/velo/scripts/vllm/benchmarks/results_*.json         # Historical
 
 ## Quick Commands
 
-### Service Management
+### Service Management (run locally on Velocity)
 ```bash
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
-
 # Check status
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status vllm-qwen.service
+sudo systemctl status vllm-qwen.service
 
 # Restart
 /home/velo/scripts/vllm/startup.sh
@@ -101,7 +99,7 @@ echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status vllm-qwen.service
 # View logs
 tail -f /var/log/vllm-benchmark.log
 tail -f /var/log/vllm-maintenance.log
-echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
+sudo journalctl -u vllm-qwen.service -n 50
 ```
 
 ## Troubleshooting
@@ -109,7 +107,7 @@ echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
 ### Service not starting
 ```bash
 nvidia-smi                                                  # Check GPU
-echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
+sudo journalctl -u vllm-qwen.service -n 50
 /home/velo/scripts/vllm/startup.sh                          # Clean restart
 ```
 

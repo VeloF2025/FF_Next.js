@@ -59,8 +59,8 @@ curl -X POST http://72.61.197.178:8083/send-message \
 | No ack/not on 1Map | 6 |
 
 ### Files Modified
-- `/home/louis/whatsapp-bridge-go/main.go` - Retry logic, Sheets removal
-- `/home/louis/whatsapp-bridge-go/sender_proxy.go` - Dedup TTL reduction
+- `/home/velo/whatsapp-bridge/main.go` - Retry logic, Sheets removal
+- `/home/velo/whatsapp-bridge/sender_proxy.go` - Dedup TTL reduction
 
 ### Next Considerations
 1. Add timestamps to bridge logger
@@ -94,20 +94,13 @@ curl -X POST http://72.61.197.178:8083/send-message \
 - **Dirty working tree:** Dev server had uncommitted changes (stash@{0})
   - Need to `git stash` before pull, or risk merge conflicts
   - Dev server now has 6 stashes accumulated - clean up eventually
-- **Deployment workflow:**
+- **Deployment workflow (run locally on Velocity as user hein):**
   ```bash
-  # Get GitHub token locally
-  GH_TOKEN=$(gh auth token)
-
-  # Deploy to dev (velo user, pass token)
-  sshpass -p 'velo2026' ssh velo@100.96.203.105 "
-    cd /home/hein/apps/fibreflow-dev &&
-    git remote set-url origin https://${GH_TOKEN}@github.com/... &&
-    git stash &&
-    git pull &&
-    npm run build &&
-    echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service
-  "
+  cd /home/hein/Workspace/FF_Next.js
+  git stash
+  git pull
+  npm run build
+  sudo systemctl restart fibreflow-dev.service
   ```
 
 **3. Index Strategy for Case-Insensitive Searches**

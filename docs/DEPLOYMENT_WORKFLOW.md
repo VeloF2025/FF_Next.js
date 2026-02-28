@@ -1,66 +1,67 @@
 # FibreFlow Deployment Workflow
 
-**Current as of:** February 2026  
-**Process Manager:** systemd  
-**Server:** velo-server (local infrastructure)
+**Current as of:** 28 February 2026
+**Process Manager:** systemd
+**Server:** velo-server (local infrastructure — Claude runs directly on Velocity)
 
 ---
 
-## 🎯 Golden Rule
-**ALWAYS deploy to STAGING first → Test → Then deploy to PRODUCTION**
+## Golden Rule
+**Dev → Staging → Production.** Always test on the lower environment first.
 
 ---
 
-## 📋 Quick Reference
+## Quick Reference
 
 ### Environments
 
-| Environment | Path | Port | Service | Branch | URL |
-|---|---|---|---|---|---|---|
-| **Production** | `/home/velo/fibreflow-production` | 3000 | `fibreflow-production` | `master` | app.fibreflow.app |
-| **Staging** | `/home/velo/fibreflow-staging` | 3005/3006 | — | varies | vf.fibreflow.app |
+| Environment | Path | Port | Service | URL |
+|---|---|---|---|---|
+| **Production** | `/home/velo/fibreflow-production` | 3000 | `fibreflow-production.service` | app.fibreflow.app |
+| **Staging** | `/home/velo/fibreflow-staging` | 3006 | `fibreflow.service` | vf.fibreflow.app |
+| **Dev** | `/home/velo/fibreflow-dev` | 3005 | `fibreflow-dev.service` | dev.fibreflow.app |
 
-### SSH Access
+### Time-Gated Deployment Rules
+
+| Time Window | Dev | Staging | Production |
+|-------------|-----|---------|------------|
+| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** | **BLOCKED** |
+| **After hours** + weekends | Allowed | Promote from dev | Promote from staging |
+| **Emergency** (any time) | Allowed | `--force` required | `--force` required |
+
+**Hein's approval is required for ALL staging and production deployments.**
+
+### Permissions
+
+All deploy dirs are owned by `velo`. Claude/hein uses `sudo -u velo` (passwordless via `/etc/sudoers.d/fibreflow-deploy`).
+
 ```bash
-# From Docker container (agent context)
-sshpass -p "velo2026" ssh velo@172.17.0.1 "command"
+# Run commands as velo (no password needed)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master'
 
-# From localhost
-sshpass -p "velo2026" ssh velo@localhost "command"
+# Restart services (no password needed)
+sudo systemctl restart fibreflow-dev.service
 ```
 
 ---
 
-## 🔄 Standard Deployment Pipeline
+## Standard Deployment Pipeline
 
-### 1️⃣ Record Current State (Rollback Lifeline)
+### Step 1: Record Current State (Rollback Lifeline)
 ```bash
-cd /home/velo/fibreflow-production
-ROLLBACK_HASH=$(git rev-parse HEAD)
-echo "Rollback commit: $ROLLBACK_HASH"
-# Save this! You'll need it if rollback is required.
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && echo "Rollback: $(git rev-parse HEAD)"'
 ```
 
-### 2️⃣ Pull Latest Code
+### Step 2: Pull Latest Code & Build
 ```bash
-cd /home/velo/fibreflow-production
-git fetch origin
-git pull origin master
-```
+# Dev (always allowed)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
 
-### 3️⃣ Check for Dependency Changes
-```bash
-git diff $ROLLBACK_HASH HEAD package.json package-lock.json
-```
+# Staging (after hours — promote EXACT commit from dev)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
 
-If `package.json` changed:
-```bash
-npm install
-```
-
-### 4️⃣ Build Application
-```bash
-npm run build
+# Production (after hours — promote EXACT commit from staging)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
 ```
 
 **Build Requirements:**
@@ -73,87 +74,67 @@ df -h /home
 free -h
 ```
 
-### 5️⃣ Run Database Migrations (if any)
+### Step 3: Restart Service
 ```bash
-npm run db:migrate
+sudo systemctl restart fibreflow-dev.service          # Dev
+sudo systemctl restart fibreflow.service               # Staging
+sudo systemctl restart fibreflow-production.service    # Production
 ```
 
-Check migration status:
+### Step 4: Verify Deployment
 ```bash
-npm run db:validate
-```
-
-### 6️⃣ Restart Service
-```bash
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
-```
-
-### 7️⃣ Verify Deployment
-```bash
-# Wait for service to start
-sleep 5
-
 # Check service status
-systemctl is-active fibreflow-production
+sudo systemctl status fibreflow-dev.service
 
 # Check HTTP response
-curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
-
-# Check health endpoint
-curl -s http://localhost:3000/api/monitoring/health | jq .
+curl -s -o /dev/null -w "%{http_code}" http://localhost:3005/
 
 # Check for errors in recent logs
-journalctl -u fibreflow-production --since "5 min ago" --priority=err --no-pager
+journalctl -u fibreflow-dev --since "5 min ago" --priority=err --no-pager
 ```
 
 ---
 
-## 🤖 Full Deployment (Single Command - Agent Context)
+## Deploy Scripts (Recommended)
 
-From Docker container:
+Use the time-gated deploy scripts instead of manual commands:
+
 ```bash
-sshpass -p "velo2026" ssh velo@172.17.0.1 "cd /home/velo/fibreflow-production && \
-  ROLLBACK_HASH=\$(git rev-parse HEAD) && \
-  echo \"Rollback: \$ROLLBACK_HASH\" && \
-  git pull origin master && \
-  npm install && \
-  npm run build && \
-  npm run db:migrate && \
-  echo 'velo2026' | sudo -S systemctl restart fibreflow-production && \
-  sleep 5 && \
-  systemctl is-active fibreflow-production && \
-  curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/"
+bash scripts/deploy-gate.sh dev              # Deploy to dev (always allowed)
+bash scripts/deploy-gate.sh staging          # Blocked during business hours
+bash scripts/promote.sh dev staging          # Promote dev → staging (after hours)
+bash scripts/promote.sh staging production   # Promote staging → production (after hours)
+bash scripts/deploy-gate.sh status           # Show all environments
 ```
 
 ---
 
-## 🚨 Rollback Procedures
+## Rollback Procedures
 
 ### Quick Rollback
 ```bash
-cd /home/velo/fibreflow-production
-git checkout <ROLLBACK_HASH>
-npm run build
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git checkout <ROLLBACK_HASH> && npm run build'
+sudo systemctl restart fibreflow-production.service
 ```
 
 ### Verify Rollback
 ```bash
 sleep 5
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/
-systemctl status fibreflow-production
+sudo systemctl status fibreflow-production.service
 ```
 
 **Rule:** Rollback first, debug later. If production is down, speed matters.
 
 ---
 
-## 📊 Monitoring & Troubleshooting
+## Monitoring & Troubleshooting
 
 ### Check Service Status
 ```bash
-systemctl status fibreflow-production
-systemctl is-active fibreflow-production
+sudo systemctl status fibreflow-production.service
+sudo systemctl status fibreflow.service
+sudo systemctl status fibreflow-dev.service
 ```
 
 ### View Logs
@@ -166,81 +147,62 @@ journalctl -u fibreflow-production -f
 
 # Errors only (last 5 minutes)
 journalctl -u fibreflow-production --since "5 min ago" --priority=err --no-pager
-
-# Specific time range
-journalctl -u fibreflow-production --since "2026-02-14 10:00:00" --until "2026-02-14 11:00:00"
 ```
 
 ### Restart Service
 ```bash
-echo 'velo2026' | sudo -S systemctl restart fibreflow-production
+sudo systemctl restart fibreflow-production.service    # No password needed
+sudo systemctl restart fibreflow.service               # Staging
+sudo systemctl restart fibreflow-dev.service           # Dev
 ```
 
 ### Check System Resources
 ```bash
-# Disk space
-df -h /home
-
-# Memory usage
-free -h
-
-# Process memory
-ps aux | grep node | grep fibreflow-production
-
-# Database connections
-npm run check:db-connections
+df -h /home    # Disk space
+free -h        # Memory usage
 ```
 
 ---
 
-## 🛠️ Common Issues & Solutions
+## Common Issues & Solutions
 
 ### Build Fails with OOM
 ```bash
-# Check current memory usage
-free -h
+free -h  # Check memory
 
 # If <2GB free, stop service temporarily
-echo 'velo2026' | sudo -S systemctl stop fibreflow-production
-npm run build
-echo 'velo2026' | sudo -S systemctl start fibreflow-production
+sudo systemctl stop fibreflow-production.service
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && npm run build'
+sudo systemctl start fibreflow-production.service
 ```
 
 ### Service Won't Start
 ```bash
-# Check for port conflicts
-sudo lsof -i :3000
-
-# Check environment variables
-systemctl show fibreflow-production --property=Environment
-
-# Check recent errors
-journalctl -u fibreflow-production -n 100 --priority=err --no-pager
+sudo lsof -i :3000                                        # Port conflicts
+journalctl -u fibreflow-production -n 100 --priority=err   # Recent errors
 ```
 
 ### Database Connection Issues
 ```bash
-# Check connection pool
-npm run check:db-connections
-
 # Verify .env.local has DATABASE_URL
-cat /home/velo/fibreflow-production/.env.local | grep DATABASE_URL
+sudo -u velo cat /home/velo/fibreflow-production/.env.local | grep DATABASE_URL
 ```
 
 ---
 
-## 🔒 Safety Rules
+## Safety Rules
 
-1. ✅ **ALWAYS record the current commit hash before deploying** (your rollback lifeline)
-2. ✅ **NEVER run destructive database operations without reading the SQL first**
-3. ✅ **NEVER modify `.env.local`** unless explicitly instructed
-4. ✅ **NEVER force-push or force-checkout** on production branch
-5. ✅ **Rollback first, debug later** if production is down
-6. ✅ **Check disk space before builds** (need >2GB free)
-7. ✅ **Check memory before builds** (need >2GB free RAM)
-8. ✅ **Don't deploy during business hours** (08:00-17:00 SAST) without approval
-9. ✅ **Verify after every deploy** (a deploy without QA is incomplete)
-10. ✅ **One deploy at a time** (never run concurrent deploys)
+1. **ALWAYS record the current commit hash before deploying** (your rollback lifeline)
+2. **NEVER run destructive database operations without reading the SQL first**
+3. **NEVER modify `.env.local`** unless explicitly instructed
+4. **NEVER force-push or force-checkout** on production branch
+5. **Rollback first, debug later** if production is down
+6. **Check disk space before builds** (need >2GB free)
+7. **Check memory before builds** (need >2GB free RAM)
+8. **Don't deploy to staging/production during business hours** (08:00-17:00 SAST) without `--force`
+9. **Verify after every deploy** (a deploy without QA is incomplete)
+10. **One deploy at a time** (never run concurrent deploys)
+11. **Hein's approval required** for all staging and production deployments
 
 ---
 
@@ -261,31 +223,30 @@ cat /home/velo/fibreflow-production/.env.local | grep DATABASE_URL
 
 ---
 
-## 🤖 AI Agent Protocol
+## AI Agent Protocol
 
-When Forge (deployment agent) executes deployments:
+When Claude deploys:
 
-1. ✅ Record rollback commit hash
-2. ✅ Pull latest code from master
-3. ✅ Install dependencies if package.json changed
-4. ✅ Build application
-5. ✅ Run database migrations
-6. ✅ Restart systemd service
-7. ✅ Verify deployment (health checks, logs, HTTP status)
-8. ✅ Report results to Mission Control
-9. ⚠️ Rollback immediately if verification fails
+1. Record rollback commit hash
+2. Run `sudo -u velo bash -c '...'` for git/npm/build operations
+3. Install dependencies if package.json changed
+4. Build application
+5. Restart systemd service via `sudo systemctl restart ...`
+6. Verify deployment (health checks, logs, HTTP status)
+7. Rollback immediately if verification fails
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
-- **Root CLAUDE.md** - Agent reference for Forge
-- **docs/INFRASTRUCTURE.md** - Server architecture
-- **docs/VPS/DEPLOYMENT.md** - Old VPS setup (DEPRECATED)
-- **skills/deploy-pipeline.md** - Detailed deployment procedures
-- **skills/rollback-procedures.md** - Emergency rollback guide
-- **skills/build-troubleshooting.md** - Build failure diagnostics
+- **CLAUDE.md** — Deploy commands and rules
+- **docs/INFRASTRUCTURE.md** — Server architecture and services
+- **docs/DEPLOYMENT.md** — Safe deploy scripts (post-incident)
+- **scripts/deploy-gate.sh** — Time-gated deploy wrapper
+- **scripts/promote.sh** — Promotion pipeline (dev → staging → production)
+- **scripts/safe-deploy.sh** — Atomic deploy engine
+- `/etc/sudoers.d/fibreflow-deploy` — hein passwordless sudo for deploys
 
 ---
 
-**Last Updated:** 2026-02-14 by Forge (Task #85)
+**Last Updated:** 2026-02-28

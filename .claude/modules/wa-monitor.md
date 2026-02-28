@@ -66,7 +66,7 @@ systemctl restart whatsapp-bridge
 Routes FibreFlow API calls to unified bridge:
 ```bash
 curl http://100.96.203.105:8092/health
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback
+sudo systemctl restart wa-feedback
 # Config: /etc/systemd/system/wa-feedback.service
 # Code: /home/louis/wa-feedback-service/wa-feedback-service.js
 ```
@@ -240,11 +240,6 @@ Steps are stored as `step_01` through `step_12` boolean columns in database.
 
 ## Quick Commands
 
-### SSH Access
-```bash
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
-```
-
 ### Service Management
 ```bash
 # Bridge on VPS (72.61.197.178)
@@ -257,15 +252,12 @@ systemctl stop whatsapp-bridge
 # ... copy new binary ...
 systemctl start whatsapp-bridge
 
-# Bridge source on Velocity (100.96.203.105)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
+# Bridge source on Velocity — edit main.go or sender_proxy.go, then compile:
 cd /home/velo/whatsapp-bridge
-# Edit main.go or sender_proxy.go, then compile:
 go build -o whatsapp-bridge-new .
 
-# Deploy binary (relay via local machine — servers can't SSH to each other)
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/velo/whatsapp-bridge/whatsapp-bridge-new /tmp/
-scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
+# Deploy binary (relay via local machine — servers can't SSH to each other directly)
+scp /home/velo/whatsapp-bridge/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
 
 # Deploy on VPS (MUST stop service first)
 ssh root@72.61.197.178 "systemctl stop whatsapp-bridge && mv /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup && mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge && chmod +x /opt/whatsapp-bridge/whatsapp-bridge && systemctl start whatsapp-bridge"
@@ -343,25 +335,24 @@ const sql = neon('postgresql://neondb_owner:$NEON_DB_PASSWORD@ep-dry-night-a9qyh
 ```
 Group types: `dr_submission` (activations), `maintenance`, `admin`
 
-**Step 3: Add to main.go PROJECTS map**
+**Step 3: Add to main.go PROJECTS map (run locally on Velocity)**
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "sed -i '/\"Mamelodi\": {/i\\
-\	\"New Group Name\": {\\
-\		\"group_jid\":          \"120363XXXXXXXXXX@g.us\",\\
-\		\"project_name\":       \"Project\",\\
-\		\"group_description\": \"Description\",\\
+sed -i '/\"Mamelodi\": {/i\
+\	\"New Group Name\": {\
+\		\"group_jid\":          \"120363XXXXXXXXXX@g.us\",\
+\		\"project_name\":       \"Project\",\
+\		\"group_description\": \"Description\",\
 \	},
-' /home/velo/whatsapp-bridge/main.go"
+' /home/velo/whatsapp-bridge/main.go
 ```
 
 **Step 4: Compile and Deploy**
 ```bash
-# Compile on Velocity
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/whatsapp-bridge && echo '$VELO_SSH_PASSWORD' | sudo -S go build -o whatsapp-bridge-new ."
+# Compile on Velocity (run locally)
+cd /home/velo/whatsapp-bridge && go build -o whatsapp-bridge-new .
 
-# Copy via local machine (servers can't SSH to each other)
-sshpass -p '$VELO_SSH_PASSWORD' scp velo@100.96.203.105:/home/velo/whatsapp-bridge/whatsapp-bridge-new /tmp/
-scp /tmp/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
+# Copy to VPS (from Velocity, direct scp to VPS)
+scp /home/velo/whatsapp-bridge/whatsapp-bridge-new root@72.61.197.178:/opt/whatsapp-bridge/
 
 # Deploy and restart on VPS
 ssh root@72.61.197.178 "systemctl stop whatsapp-bridge && cp /opt/whatsapp-bridge/whatsapp-bridge /opt/whatsapp-bridge/whatsapp-bridge.backup && mv /opt/whatsapp-bridge/whatsapp-bridge-new /opt/whatsapp-bridge/whatsapp-bridge && chmod +x /opt/whatsapp-bridge/whatsapp-bridge && systemctl start whatsapp-bridge"

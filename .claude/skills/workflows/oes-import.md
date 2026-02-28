@@ -276,34 +276,32 @@ inserted = 5500 - 5000 = 500 new records
 updated = total_rows - inserted = 6259 - 500 = 5759 updated
 ```
 
-## SSH Commands Reference
+## Commands Reference
 
 ```bash
-# Server users:
-# - velo ($VELO_SSH_PASSWORD): sudo/service operations
-# - hein (0203): git operations (not needed for OES)
+# Run locally on Velocity as user hein (passwordless sudo)
 
 # Check staging server status
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
+systemctl status fibreflow.service --no-pager | head -15
 
 # Restart staging server (port 3006)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+sudo systemctl restart fibreflow.service
 
 # View service logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
+sudo journalctl -u fibreflow.service -n 50 --no-pager
 
 # Check what's using port 3006
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "ss -tlnp | grep 3006"
+ss -tlnp | grep 3006
 
 # HTTP health check
 curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
 
 # Pull latest code and rebuild
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
+cd /home/velo/fibreflow-development && git pull && npm run build
 
 # Full restart sequence
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build" && \
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+cd /home/velo/fibreflow-development && git pull && npm run build && \
+sudo systemctl restart fibreflow.service
 ```
 
 ## Database Queries
@@ -365,17 +363,17 @@ ORDER BY count DESC;
 Old code used `RETURNING (xmax = 0)` which caused performance issues with 6000+ rows.
 
 **Fix**:
-1. Check server has latest code:
+1. Check server has latest code (run locally on Velocity):
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
+cd /home/velo/fibreflow-development && git log -1 --oneline
 ```
 
 2. Should show commit: `fix(oes-import): use count-based approach`
 
 3. If not, pull and restart:
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+cd /home/velo/fibreflow-development && git pull && npm run build
+sudo systemctl restart fibreflow.service
 ```
 
 ---
@@ -408,8 +406,8 @@ SELECT COUNT(*) FROM oes_activations;
 
 **Fix**:
 ```bash
-# Restart the service (it will take over port 3006)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+# Restart the service (it will take over port 3006) — run locally on Velocity
+sudo systemctl restart fibreflow.service
 ```
 
 **Note**: Don't try to kill processes manually. The systemd service manages port 3006.
@@ -424,11 +422,11 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWOR
 
 **Fix**:
 ```bash
-# Check if service is running
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl is-active fibreflow.service"
+# Check if service is running (run locally on Velocity)
+systemctl is-active fibreflow.service
 
 # If not active, restart
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+sudo systemctl restart fibreflow.service
 
 # Verify local response
 curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
@@ -483,10 +481,10 @@ Preview mode will show parsed data before import.
 Nginx proxy_read_timeout too low for large imports (7000+ rows). The `maxDuration` config in Next.js only works on Vercel, not self-hosted.
 
 **Fix**:
-Increase nginx proxy timeouts:
+Increase nginx proxy timeouts (run locally on Velocity):
 ```bash
 # Check current config
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow"
+sudo grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow
 
 # Add timeout settings to dev server block (if missing)
 # proxy_connect_timeout 300s;
@@ -494,7 +492,7 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWOR
 # proxy_read_timeout 300s;
 
 # Reload nginx
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S nginx -t && echo '$VELO_SSH_PASSWORD' | sudo -S systemctl reload nginx"
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 **Required Timeouts**:
@@ -537,20 +535,20 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWOR
 
 ## Quick Recovery Checklist
 
-When OES import is broken:
+When OES import is broken (run locally on Velocity as user hein):
 
 ```bash
 # 1. Check service status
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -10"
+systemctl status fibreflow.service --no-pager | head -10
 
 # 2. Pull latest code
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull"
+cd /home/velo/fibreflow-development && git pull
 
 # 3. Rebuild
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && npm run build"
+cd /home/velo/fibreflow-development && npm run build
 
 # 4. Restart service
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+sudo systemctl restart fibreflow.service
 
 # 5. Verify
 sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
@@ -617,14 +615,16 @@ Bad GPS coordinates are filtered out:
 ### Manual Sync Commands
 
 ```bash
+# Run locally on Velocity as user hein
+
 # Check sync status
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s http://localhost:8095/status"
+curl -s http://localhost:8095/status
 
 # Trigger manual sync
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s -X POST http://localhost:8095/sync/oes -H 'Content-Type: application/json' -d '{\"batchId\": \"manual\"}'"
+curl -s -X POST http://localhost:8095/sync/oes -H 'Content-Type: application/json' -d '{"batchId": "manual"}'
 
 # View sync logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -30 /var/log/qfield-oes-sync.log"
+tail -30 /var/log/qfield-oes-sync.log
 ```
 
 ### Sync Script Location

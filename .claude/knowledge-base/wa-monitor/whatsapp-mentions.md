@@ -113,7 +113,7 @@ The bridge accepts either format for `recipient_jid`.
 |------|---------|
 | `pages/api/activate/send-feedback.ts` | QA feedback - sends to wa-feedback |
 | `pages/api/wa-monitor-send-feedback.ts` | Generic send - routes to wa-feedback |
-| `/home/louis/wa-feedback-service/wa-feedback-service.js` (Velocity) | Proxy to VPS bridge |
+| `/home/velo/wa-feedback-service/wa-feedback-service.js` (Velocity) | Proxy to VPS bridge |
 | `/opt/whatsapp-bridge/whatsapp-bridge` (VPS) | Go binary that sends messages |
 
 ## Troubleshooting
@@ -192,19 +192,17 @@ The Go WhatsApp Bridge can disconnect from WhatsApp servers due to:
 Location: `/opt/wa-healthcheck.sh` on VPS (72.61.197.178)
 
 Runs every 5 minutes via cron and checks:
-1. **Sender** (8081): `curl http://localhost:8081/health | jq '.connected'`
-2. **Bridge** (8083): `curl http://localhost:8083/health | jq '.connected'`
+- **Bridge** (8083): `curl http://localhost:8083/health | jq '.connected'`
 
-If either shows `connected: false`, the service is restarted automatically.
+If bridge shows `connected: false`, the service is restarted automatically.
+
+> **Note:** The sender service (port 8081) was permanently removed on 2026-02-18. The bridge now sends ACKs directly via its built-in whatsmeow client (direct-send architecture).
 
 ### Manual Health Check
 
 ```bash
 # Check bridge status
 curl -s http://72.61.197.178:8083/health | jq '{connected, status}'
-
-# Check sender status
-curl -s http://72.61.197.178:8081/health | jq '{connected, status}'
 
 # If disconnected, restart manually
 ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"

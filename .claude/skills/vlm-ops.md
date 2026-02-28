@@ -30,15 +30,13 @@ Manages the Qwen3-VL-8B-Instruct Vision Language Model on Velocity. Used for DR 
 | **Endpoint** | `http://100.96.203.105:8100` |
 | **Model** | `Qwen/Qwen3-VL-8B-Instruct` |
 | **GPU** | RTX 5090 (compute-only mode) |
-| **Server** | `ssh velo@100.96.203.105` |
+| **Server** | Velocity (100.96.203.105) — run locally as user `hein` |
 | **Benchmark script** | `/home/velo/scripts/vllm/benchmark.sh` |
 | **Startup script** | `/home/velo/scripts/vllm/startup.sh` |
 
-## Service Management
+## Service Management (run locally on Velocity)
 
 ```bash
-ssh velo@100.96.203.105
-
 # Check status
 sudo systemctl status vllm-qwen.service
 
@@ -158,9 +156,8 @@ Current stable settings (Jan 2026):
 
 ## Troubleshooting
 
-### Service Not Responding
+### Service Not Responding (run locally on Velocity)
 ```bash
-ssh velo@100.96.203.105
 nvidia-smi                          # 1. Check GPU is visible
 sudo systemctl status vllm-qwen.service  # 2. Check service state
 sudo journalctl -u vllm-qwen.service -n 50  # 3. Check errors
@@ -200,12 +197,12 @@ curl -X POST https://dev.fibreflow.app/api/activate/admin/retry-failed
 curl https://dev.fibreflow.app/api/activate/admin/retry-failed
 
 # SQL: Find stuck DRs
-ssh velo@100.96.203.105 "psql \$DATABASE_URL -c \"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && psql $DATABASE_URL -c "
 SELECT dr_number, vlm_status, retry_count, vlm_error
 FROM foto_ai_reviews
-WHERE vlm_status IN ('failed', 'pending')
-  AND created_at < NOW() - INTERVAL '30 minutes'
-ORDER BY created_at;\""
+WHERE vlm_status IN ('"'"'failed'"'"', '"'"'pending'"'"')
+  AND created_at < NOW() - INTERVAL '"'"'30 minutes'"'"'
+ORDER BY created_at;"'
 ```
 
 ## VLM Consumers in FibreFlow

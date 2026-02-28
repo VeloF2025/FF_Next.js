@@ -198,9 +198,7 @@ const rows = await sql`SELECT * FROM table WHERE id = ${id}`;
 
 After schema changes, re-ingest to keep vector DB current:
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && \
-  export \$(grep DATABASE_URL .env) && \
-  scripts/.venv/bin/python scripts/ingest-qdrant.py --force 2>&1"
+cd /home/velo/fibreflow-production && export $(grep DATABASE_URL .env) && scripts/.venv/bin/python scripts/ingest-qdrant.py --force 2>&1
 ```
 
 ## Troubleshooting

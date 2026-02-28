@@ -76,8 +76,8 @@ npm run build
 
 **Velocity Server (permissions issue):**
 ```bash
-echo '$VELO_SSH_PASSWORD' | sudo -S rm -rf .next
-echo '$VELO_SSH_PASSWORD' | sudo -S chown -R velo:velo .
+sudo rm -rf .next
+sudo chown -R hein:hein .
 mkdir -p .next
 npm run build
 ```
@@ -460,17 +460,16 @@ grep -r ": sql\`\`" pages/api/ --include="*.ts"
 
 **Server Directory Layout:**
 ```
-/home/velo/fibreflow/          ← WRONG - personal clone, NOT used by service
-/home/louis/apps/fibreflow/    ← CORRECT - staging service runs from here
+/home/velo/fibreflow-staging/  ← CORRECT - staging service runs from here
 ```
 
 **The systemd Service Configuration:**
 ```ini
 # /etc/systemd/system/fibreflow.service
 [Service]
-User=louis
-Group=louis
-WorkingDirectory=/home/louis/apps/fibreflow   # ← This is the directory that matters!
+User=velo
+Group=velo
+WorkingDirectory=/home/velo/fibreflow-staging   # ← This is the directory that matters!
 ExecStart=/usr/bin/npm start -- -p 3006
 ```
 
@@ -487,31 +486,28 @@ ExecStart=/usr/bin/npm start -- -p 3006
 cat /etc/systemd/system/fibreflow.service | grep WorkingDirectory
 
 # Check if you're in the right directory
-pwd  # Should be /home/louis/apps/fibreflow
+pwd  # Should be /home/velo/fibreflow-staging
 
 # Verify build files match what browser requests
-ls /home/louis/apps/fibreflow/.next/static/chunks/ | head
+ls /home/velo/fibreflow-staging/.next/static/chunks/ | head
 # Compare with browser Network tab chunk filenames
 ```
 
 **Correct Deploy Commands for Staging:**
 ```bash
-# SSH to Velocity server
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105
-
-# Deploy to staging (CORRECT directory)
-cd /home/louis/apps/fibreflow && \
-  echo '$VELO_SSH_PASSWORD' | sudo -S git pull && \
-  echo '$VELO_SSH_PASSWORD' | sudo -S npm run build && \
-  echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service
+# Deploy to staging (CORRECT directory — run locally on Velocity)
+cd /home/velo/fibreflow-staging && \
+  git pull && \
+  npm run build && \
+  sudo systemctl restart fibreflow.service
 ```
 
 **All Service Directories:**
 
 | Environment | Service | Directory | Port |
 |-------------|---------|-----------|------|
-| Staging | `fibreflow.service` | `/home/louis/apps/fibreflow` | 3006 |
-| Dev | `fibreflow-dev.service` | `/home/hein/apps/fibreflow-dev` | 3005 |
+| Staging | `fibreflow.service` | `/home/velo/fibreflow-staging` | 3006 |
+| Dev | `fibreflow-dev.service` | `/home/velo/fibreflow-dev` | 3005 |
 | Production | `fibreflow-production.service` | `/home/velo/fibreflow-production` | 3000 |
 
 **Prevention:**

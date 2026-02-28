@@ -189,7 +189,7 @@ WHERE g.purchase_order_id IS NULL;
 ### Odoo Sync Errors
 ```bash
 # Check server logs
-ssh velo@100.96.203.105 "sudo journalctl -u fibreflow-dev.service -n 100 | grep odoo"
+journalctl -u fibreflow-dev.service -n 100 | grep odoo
 ```
 
 ## Related

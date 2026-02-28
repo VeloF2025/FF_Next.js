@@ -819,7 +819,7 @@ Human corrections for few-shot learning with `workflow_type`, `vlm_predicted_*`,
 - `approved` - Human-approved
 - `failed` - Error occurred
 
-## SSH Commands Reference
+## Commands Reference
 
 ```bash
 # Check health via API
@@ -830,14 +830,14 @@ curl -s -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
   -H "Content-Type: application/json" \
   -d '{"dropNumber":"DR1750922","project":"Lawley"}' | jq .
 
-# Check Go bridge logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -50 /home/louis/whatsapp-bridge-go/bridge.log"
+# Check Go bridge logs (SSH to VPS)
+ssh root@72.61.197.178 "tail -50 /opt/whatsapp-bridge/bridge.log"
 
-# Filter for acknowledgment logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(Sent ack|photos:|ACK)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+# Filter for acknowledgment logs (VPS)
+ssh root@72.61.197.178 "grep -E '(Sent ack|photos:|ACK)' /opt/whatsapp-bridge/bridge.log | tail -20"
 
-# Restart Go bridge
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
+# Restart Go bridge (VPS)
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge.service"
 
 # Check VLM server
 curl -s http://100.96.203.105:8100/v1/models | jq .
@@ -845,8 +845,8 @@ curl -s http://100.96.203.105:8100/v1/models | jq .
 # Check WA Feedback
 curl -s http://100.96.203.105:8090/health | jq .
 
-# Restart WA Feedback
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback"
+# Restart WA Feedback (run locally on Velocity — passwordless sudo)
+sudo systemctl restart wa-feedback
 ```
 
 ## Database Queries
@@ -900,8 +900,8 @@ WHERE drop_number = 'DR1234567';
 
 **Diagnosis**:
 ```bash
-# Check Go bridge logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'ACK|ERROR' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+# Check Go bridge logs (VPS)
+ssh root@72.61.197.178 "grep -E 'ACK|ERROR' /opt/whatsapp-bridge/bridge.log | tail -30"
 ```
 
 **Common Causes**:
@@ -941,14 +941,14 @@ ContextInfo: &waProto.ContextInfo{
 # Check VLM server
 curl -s http://100.96.203.105:8100/v1/models | jq .
 
-# Check docker
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker ps | grep vllm"
+# Check VLM service (run locally on Velocity as user hein)
+sudo systemctl status vllm-qwen.service
 ```
 
 **Fix**:
 ```bash
-# Restart VLM container
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
+# Restart VLM service (run locally on Velocity)
+sudo systemctl restart vllm-qwen.service
 ```
 
 ---

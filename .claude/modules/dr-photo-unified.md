@@ -153,7 +153,7 @@ retryFailed(drNumbers?: string[])
 
 ### VLM Not Responding
 ```bash
-ssh louis@100.96.203.105
+# Run locally on Velocity
 docker ps | grep vllm
 docker logs vllm-qwen3
 ```
@@ -168,8 +168,8 @@ docker logs vllm-qwen3
 # Check VPS sender
 ssh root@72.61.197.178 "systemctl restart whatsapp-sender"
 
-# Check wa-feedback proxy on Velocity
-ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart wa-feedback"
+# Check wa-feedback proxy on Velocity (run locally)
+sudo systemctl restart wa-feedback
 ```
 
 ## Related Modules

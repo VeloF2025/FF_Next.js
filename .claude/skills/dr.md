@@ -137,7 +137,6 @@ curl -X POST https://dev.fibreflow.app/api/activate/process-new-dr \
 
 ### VLM Not Categorizing
 ```bash
-ssh velo@100.96.203.105
 sudo systemctl status vllm-qwen.service
 # If down:
 /home/velo/scripts/vllm/startup.sh
@@ -148,8 +147,8 @@ sudo systemctl status vllm-qwen.service
 # Check WA bridge on VPS
 ssh root@72.61.197.178 "systemctl status whatsapp-bridge.service"
 
-# Check wa-feedback proxy on Velocity
-ssh velo@100.96.203.105 "sudo systemctl status wa-feedback.service"
+# Check wa-feedback proxy on Velocity (local)
+sudo systemctl status wa-feedback.service
 ```
 
 ### DR Stuck in 'pending' > 30 min

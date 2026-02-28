@@ -177,7 +177,7 @@ async function resizeImageForVlm(base64Image: string): Promise<string> {
 
 ### Manual Commands
 ```bash
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+# Run locally on Velocity as user hein
 
 # Run benchmark
 /home/velo/scripts/vllm/benchmark.sh
@@ -192,16 +192,16 @@ tail -f /var/log/vllm-maintenance.log
 
 ## Service Management
 ```bash
-ssh velo@100.96.203.105
+# Run locally on Velocity as user hein (passwordless sudo)
 
 # Check status
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl status vllm-qwen.service
+sudo systemctl status vllm-qwen.service
 
 # Restart
-echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart vllm-qwen.service
+sudo systemctl restart vllm-qwen.service
 
 # View logs
-echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
+sudo journalctl -u vllm-qwen.service -n 50
 
 # Clean restart script
 /home/velo/scripts/vllm/startup.sh
@@ -215,7 +215,7 @@ echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
 nvidia-smi
 
 # Check logs
-echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u vllm-qwen.service -n 50
+sudo journalctl -u vllm-qwen.service -n 50
 
 # Clean restart
 /home/velo/scripts/vllm/startup.sh

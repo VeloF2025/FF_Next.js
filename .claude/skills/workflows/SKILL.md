@@ -162,8 +162,10 @@ PRD → /tdd spec → /tdd generate → /tdd implement → PR
 
 ### With CI Pipeline
 
+> **Note:** GitHub Actions CI workflows (`.github/workflows/`) are currently disabled for this project. TDD validation is enforced locally via `npm test` and pre-PR checks rather than automated CI runners.
+
 ```yaml
-# .github/workflows/test.yml
+# .github/workflows/test.yml (currently disabled)
 jobs:
   tdd-check:
     runs-on: ubuntu-latest

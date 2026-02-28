@@ -481,12 +481,9 @@ Please retake this photo addressing the issues above.
 /opt/qfield-sync/qfield-photo-validate.sh --validate --dry-run --test-group
 ```
 
-**Direct Python (inside container):**
+**Direct Python (inside container — run locally on Velocity):**
 
 ```bash
-# SSH to Velocity
-ssh velo@100.96.203.105
-
 # Run inside container with env vars
 sudo docker exec -i qfieldcloud-app-1 bash -c "
   source /opt/qfield-sync/config.env && \
@@ -933,7 +930,7 @@ Imports photos from QFieldCloud into `qfield_photo_validations` table:
 
 **Usage:**
 ```bash
-# 1. Export from QFieldCloud (on Velocity server)
+# 1. Export from QFieldCloud (run locally on Velocity)
 docker exec qfieldcloud-db-1 psql -U qfieldcloud_db_admin -d qfieldcloud_db -t -A -F'|' -c "
 SELECT f.project_id, p.name,
   'projects/' || f.project_id || '/files/' || f.name || '/v' ||
@@ -948,10 +945,7 @@ WHERE f.name LIKE 'DCIM/%'
 ORDER BY fv.created_at DESC;
 " > /tmp/qfield_photos.csv
 
-# 2. Copy to local
-scp velo@100.96.203.105:/tmp/qfield_photos.csv /tmp/
-
-# 3. Run import
+# 2. Run import (from FibreFlow repo dir on Velocity)
 npx tsx scripts/import_qfield_photos.js
 ```
 

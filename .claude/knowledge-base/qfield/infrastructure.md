@@ -105,7 +105,8 @@ const QFIELD_API_TOKEN = '2VbfhkUAfPHw7s7zAtMsyRTFF0xU00JtQRKyF3vzTxZtRODF4FLbzE
 
 **Generate New Token:**
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker exec qfieldcloud-app-1 python manage.py shell -c \"
+# Run locally on Velocity
+docker exec qfieldcloud-app-1 python manage.py shell -c "
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import get_user_model
 User = get_user_model()
@@ -113,7 +114,7 @@ user = User.objects.get(username='Jaun')
 Token.objects.filter(user=user).delete()
 token = Token.objects.create(user=user)
 print('NEW TOKEN:', token.key)
-\""
+"
 ```
 
 **API Usage:**
@@ -194,8 +195,8 @@ pool.query('SELECT COUNT(*) FROM core_project').then(r => {
 });
 "
 
-# Check Docker containers
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker ps --format '{{.Names}}' | grep qfield"
+# Check Docker containers (run locally on Velocity)
+docker ps --format '{{.Names}}' | grep qfield
 ```
 
 ## Related Files

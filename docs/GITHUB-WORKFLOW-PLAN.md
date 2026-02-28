@@ -424,7 +424,11 @@ git push
 
 ## Phase 5: GitHub Actions Integration (Optional)
 
-**Effort**: 20 minutes | **Impact**: Medium | **Priority**: When needed
+> **Status (Feb 2026):** GitHub Actions billing exhausted. All CI workflows disabled
+> (renamed to `.yml.disabled`). Only `claude-pr-assistant.yml` remains active
+> (triggers on @claude mention only). To re-enable: rename `.yml.disabled` → `.yml`.
+
+**Effort**: 20 minutes | **Impact**: Medium | **Priority**: When billing restored
 
 ### File: `.github/workflows/claude-review.yml`
 
