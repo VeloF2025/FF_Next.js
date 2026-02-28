@@ -20,24 +20,27 @@ export function MeetingsDashboard() {
   const [, setShowNewMeetingModal] = useState(false);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'teams' | 'fireflies'>('all');
   const router = useRouter();
 
   useEffect(() => {
-    loadMeetings();
+    loadMeetings(sourceFilter);
     // Auto-sync from Fireflies in background on page load
     syncFromFireflies();
-  }, []);
+  }, [sourceFilter]);
 
   const getAttendeeDisplayName = (p: MeetingAttendee): string => {
     return p.displayName || p.name || p.email || 'Unknown';
   };
 
-  const loadMeetings = async () => {
+  const loadMeetings = async (source?: string) => {
     try {
-      const response = await fetch('/api/meetings');
+      const filterParam = source && source !== 'all' ? `?source=${source}` : '';
+      const response = await fetch(`/api/meetings${filterParam}`);
       const data = await response.json();
 
       if (data.meetings) {
@@ -59,8 +62,8 @@ export function MeetingsDashboard() {
             duration: `${m.duration} min`,
             location: 'Virtual',
             isVirtual: true,
-            meetingLink: m.transcript_url,
-            organizer: 'Fireflies',
+            meetingLink: m.transcript_url || m.join_url,
+            organizer: m.organizer_name || (m.source === 'teams' ? 'Teams' : 'Fireflies'),
             participants: rawParticipants.map(getAttendeeDisplayName),
             rawParticipants,
             agenda: m.summary?.outline || m.summary?.keywords || [],
@@ -69,6 +72,12 @@ export function MeetingsDashboard() {
             actionItems: [],
             summary: m.summary,
             firefliesId: m.fireflies_id,
+            source: m.source || 'fireflies',
+            processingStatus: m.processing_status || 'completed',
+            hasTranscript: Boolean(m.has_transcript),
+            hasRecording: Boolean(m.has_recording),
+            organizerName: m.organizer_name,
+            organizerEmail: m.organizer_email,
           };
         });
 
@@ -106,18 +115,42 @@ export function MeetingsDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        setSyncMessage(`✓ Synced ${data.synced} meetings from Fireflies`);
-        // Reload meetings after sync
-        await loadMeetings();
+        setSyncMessage(`Synced ${data.synced} meetings from Fireflies`);
+        await loadMeetings(sourceFilter);
       } else {
-        setSyncMessage(`✗ Sync failed: ${data.error}`);
+        setSyncMessage(`Sync failed: ${data.error}`);
       }
     } catch (error: any) {
-      setSyncMessage(`✗ Sync failed: ${error.message}`);
+      setSyncMessage(`Sync failed: ${error.message}`);
     } finally {
       setIsSyncing(false);
-      // Clear message after 5 seconds
       setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
+
+  const handleTeamsSync = async () => {
+    setIsSyncingTeams(true);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch('/api/meetings/sync-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: 48 }),
+      });
+
+      if (response.ok) {
+        setSyncMessage('Teams sync started (processing in background)');
+        setTimeout(() => loadMeetings(sourceFilter), 5000);
+      } else {
+        const data = await response.json();
+        setSyncMessage(`Teams sync failed: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      setSyncMessage(`Teams sync failed: ${error.message}`);
+    } finally {
+      setIsSyncingTeams(false);
+      setTimeout(() => setSyncMessage(null), 8000);
     }
   };
 
@@ -199,6 +232,17 @@ export function MeetingsDashboard() {
               Recordings
             </Link>
             <button
+              onClick={handleTeamsSync}
+              disabled={isSyncingTeams}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isSyncingTeams
+                ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncingTeams ? 'animate-spin' : ''}`} />
+              {isSyncingTeams ? 'Syncing...' : 'Sync Teams'}
+            </button>
+            <button
               onClick={handleSync}
               disabled={isSyncing}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isSyncing
@@ -223,6 +267,25 @@ export function MeetingsDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2">
+          {/* Source Filter */}
+          <div className="flex gap-2 mb-4">
+            {(['all', 'teams', 'fireflies'] as const).map((src) => (
+              <button
+                key={src}
+                onClick={() => setSourceFilter(src)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  sourceFilter === src
+                    ? src === 'teams' ? 'bg-purple-600 text-white'
+                    : src === 'fireflies' ? 'bg-orange-600 text-white'
+                    : 'bg-blue-600 text-white'
+                    : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+                }`}
+              >
+                {src === 'all' ? 'All Sources' : src === 'teams' ? 'Teams' : 'Fireflies'}
+              </button>
+            ))}
+          </div>
+
           {/* Tabs */}
           <div className="ff-card mb-6">
             <div className="border-b">

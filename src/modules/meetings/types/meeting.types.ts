@@ -4,6 +4,9 @@ export interface MeetingAttendee {
   displayName?: string;
 }
 
+export type MeetingSource = 'fireflies' | 'teams' | 'livekit' | 'manual';
+export type ProcessingStatus = 'pending' | 'fetching' | 'processing' | 'completed' | 'failed';
+
 export interface Meeting {
   id: string;
   title: string;
@@ -26,8 +29,16 @@ export interface Meeting {
     action_items?: string[];
     outline?: string[];
     overview?: string;
+    decisions?: string[];
   };
   firefliesId?: string;
+  source: MeetingSource;
+  processingStatus: ProcessingStatus;
+  hasTranscript: boolean;
+  hasRecording: boolean;
+  organizerName?: string;
+  organizerEmail?: string;
+  joinUrl?: string;
 }
 
 export interface ActionItem {
