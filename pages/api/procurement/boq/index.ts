@@ -24,7 +24,7 @@ export default withAuth(async (
       if (projectId && projectId !== 'all') {
         // Get BOQ data for specific project
         boqData = await sql`
-          SELECT b.*, p.name as project_name
+          SELECT b.*, p.project_name
           FROM boqs b
           LEFT JOIN projects p ON b.project_id::text = p.id::text
           WHERE b.project_id = ${projectId}
@@ -46,14 +46,14 @@ export default withAuth(async (
         const boqWithCount = await sql`
           SELECT
             b.*,
-            p.name as project_name,
+            p.project_name,
             COUNT(bi.id)::int as items_count,
             COUNT(CASE WHEN bi.mapping_status = 'mapped' THEN 1 END)::int as mapped_items_count,
             COUNT(CASE WHEN bi.mapping_status = 'pending' OR bi.mapping_status IS NULL THEN 1 END)::int as unmapped_items_count
           FROM boqs b
           LEFT JOIN boq_items bi ON b.id = bi.boq_id
           LEFT JOIN projects p ON b.project_id::text = p.id::text
-          GROUP BY b.id, p.name
+          GROUP BY b.id, p.project_name
           ORDER BY b.created_at DESC
           LIMIT 100
         `;
