@@ -51,12 +51,8 @@ export interface CallRecord {
  */
 export async function fetchRecentCallRecords(since: Date): Promise<CallRecord[]> {
   const sinceISO = since.toISOString();
-  let url: string = [
-    `${GRAPH_BASE}/communications/callRecords`,
-    `?$filter=startDateTime ge ${sinceISO}`,
-    `&$top=50`,
-    `&$orderby=startDateTime desc`,
-  ].join('');
+  // callRecords endpoint does not support $top or $orderby — only $filter
+  let url = `${GRAPH_BASE}/communications/callRecords?$filter=startDateTime ge ${sinceISO}`;
 
   const records: CallRecord[] = [];
 
