@@ -12,6 +12,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { log } from '@/lib/logger';
 
 interface Transaction {
+  id: number;
   date: string;
   type: 'invoice' | 'payment' | 'debit_note';
   reference: string;
@@ -79,8 +80,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Merge into chronological transactions
     const transactions: Transaction[] = [];
 
-    for (const inv of invoices as { reference: string; date: string; amount: number; description: string }[]) {
+    for (const inv of invoices as { id: number; reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
+        id: inv.id,
         date: toISODate(inv.date),
         type: 'invoice',
         reference: inv.reference || '-',
@@ -91,8 +93,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       });
     }
 
-    for (const pmt of payments as { reference: string; date: string; amount: number; description: string }[]) {
+    for (const pmt of payments as { id: number; reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
+        id: pmt.id,
         date: toISODate(pmt.date),
         type: 'payment',
         reference: pmt.reference || '-',
@@ -103,8 +106,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       });
     }
 
-    for (const ret of returns as { reference: string; date: string; amount: number; description: string }[]) {
+    for (const ret of returns as { id: number; reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
+        id: ret.id,
         date: toISODate(ret.date),
         type: 'debit_note',
         reference: ret.reference || '-',

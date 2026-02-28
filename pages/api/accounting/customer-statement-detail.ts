@@ -73,6 +73,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Build transaction list
     interface Transaction {
+      id: number | string;
       date: string;
       type: 'invoice' | 'payment' | 'credit_note';
       reference: string;
@@ -86,6 +87,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const inv of invoices) {
       transactions.push({
+        id: inv.id,
         date: toISODate(inv.invoice_date),
         type: 'invoice',
         reference: String(inv.invoice_number),
@@ -98,6 +100,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const pmt of payments) {
       transactions.push({
+        id: pmt.id,
         date: toISODate(pmt.payment_date),
         type: 'payment',
         reference: String(pmt.payment_number),
@@ -110,6 +113,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const cn of creditNotes) {
       transactions.push({
+        id: cn.id,
         date: toISODate(cn.credit_date),
         type: 'credit_note',
         reference: String(cn.credit_note_number),
