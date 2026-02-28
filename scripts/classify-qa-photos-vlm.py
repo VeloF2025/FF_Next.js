@@ -216,7 +216,7 @@ def download_sp_photo(token, drive_id, item_id):
     try:
         resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
         resp.raise_for_status()
-        if len(resp.content) > 10_000_000:
+        if len(resp.content) > 50_000_000:
             return None
         return resp.content
     except Exception:
@@ -246,7 +246,7 @@ def download_qfield_photo(storage_key, local_minio=False):
         if result.returncode != 0:
             return None
         data = result.stdout
-        if len(data) < 100 or len(data) > 10_000_000:
+        if len(data) < 100 or len(data) > 50_000_000:
             return None
         # Validate magic bytes (JPEG or PNG)
         if data[:2] == b'\xff\xd8' or data[:4] == b'\x89PNG':
