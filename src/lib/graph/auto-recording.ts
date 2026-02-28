@@ -41,18 +41,23 @@ export interface AutoRecordingResult {
  */
 async function getOrganizationUsers(): Promise<{ id: string; displayName: string; mail: string }[]> {
   const users: { id: string; displayName: string; mail: string }[] = [];
-  let url = `${GRAPH_BASE}/users?$filter=accountEnabled eq true and mail ne null&$select=id,displayName,mail&$top=100`;
+  // Use userPrincipalName filter (more reliable than mail ne null across tenants)
+  let url = `${GRAPH_BASE}/users?$filter=accountEnabled eq true&$select=id,displayName,mail,userPrincipalName&$top=100`;
 
   while (url) {
     const response = await graphFetch(url);
     if (!response.ok) {
       const err = await response.text();
       log.error('Failed to fetch users', { status: response.status, error: err }, LOGGER);
-      break;
+      throw new Error(`Graph API /users failed: ${response.status} — ${err.slice(0, 200)}`);
     }
 
     const data = await response.json();
-    const pageUsers = (data.value || []) as { id: string; displayName: string; mail: string }[];
+    const pageUsers = (data.value || []).map((u: Record<string, string>) => ({
+      id: u.id,
+      displayName: u.displayName || '',
+      mail: u.mail || u.userPrincipalName || '',
+    })).filter((u: { mail: string }) => u.mail && !u.mail.startsWith('#'));
     users.push(...pageUsers);
     url = data['@odata.nextLink'] || '';
   }
