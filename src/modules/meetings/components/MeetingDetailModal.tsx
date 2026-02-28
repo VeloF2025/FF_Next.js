@@ -153,7 +153,13 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                   {meeting.summary.overview && (
                     <div>
                       <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">Meeting Summary</h3>
-                      <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{meeting.summary.overview}</p>
+                      {meeting.summary.overview.toLowerCase().includes('no transcript available') ? (
+                        <p className="text-sm text-[var(--ff-text-tertiary)] italic">
+                          No AI summary — transcription was not enabled for this meeting.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-[var(--ff-text-secondary)] whitespace-pre-wrap">{meeting.summary.overview}</p>
+                      )}
                     </div>
                   )}
 
@@ -198,7 +204,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
                     </div>
                   )}
 
-                  {meeting.summary.action_items && (
+                  {meeting.summary.action_items && (Array.isArray(meeting.summary.action_items) ? meeting.summary.action_items.length > 0 : String(meeting.summary.action_items).trim().length > 0) && (
                     <div>
                       <h3 className="font-medium text-[var(--ff-text-primary)] mb-3">AI-Detected Action Items</h3>
                       <div className="p-4 bg-[var(--ff-bg-tertiary)] rounded-lg border-l-4 border-blue-500">
@@ -273,9 +279,6 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
             onClick={onClose}
           >
             Close
-          </button>
-          <button className="ff-button ff-button-primary">
-            Edit Meeting
           </button>
         </div>
       </div>

@@ -40,6 +40,7 @@ const CommunicationsDashboard: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<CommunicationsTab>(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -103,6 +104,36 @@ const CommunicationsDashboard: React.FC = () => {
       setIsSyncing(false);
       // Clear message after 5 seconds
       setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
+
+  // Handle Teams sync
+  const handleTeamsSync = async () => {
+    setIsSyncingTeams(true);
+    setSyncMessage(null);
+
+    try {
+      const response = await fetch('/api/meetings/sync-teams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hours: 48 }),
+      });
+
+      if (response.ok) {
+        setSyncMessage('Teams sync started (processing in background)');
+        // Reload after a delay to allow background processing
+        setTimeout(() => handleRefresh(), 5000);
+      } else {
+        const data = await response.json();
+        setSyncMessage(`Teams sync failed: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setSyncMessage(`Teams sync failed: ${message}`);
+      log.error('Teams sync failed:', error);
+    } finally {
+      setIsSyncingTeams(false);
+      setTimeout(() => setSyncMessage(null), 8000);
     }
   };
 
@@ -179,6 +210,22 @@ const CommunicationsDashboard: React.FC = () => {
               <Film className="w-4 h-4" />
               Recordings
             </Link>
+
+            {/* Sync Teams - Purple */}
+            <button
+              type="button"
+              onClick={handleTeamsSync}
+              disabled={isSyncingTeams}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                isSyncingTeams
+                  ? 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)] cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              )}
+            >
+              <RefreshCw className={cn('w-4 h-4', isSyncingTeams && 'animate-spin')} />
+              {isSyncingTeams ? 'Syncing...' : 'Sync Teams'}
+            </button>
 
             {/* Sync Fireflies - Blue */}
             <button

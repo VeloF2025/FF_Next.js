@@ -1,5 +1,5 @@
 // 🟢 WORKING: Retrieve transcript for a specific meeting (VTT or plain text)
-// Access is restricted to meeting participants; super_admin bypasses the check
+// Access is restricted to meeting participants; hein@velocityfibre.co.za bypasses the check
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
@@ -27,7 +27,7 @@ interface StoredTranscriptRow {
  * Returns the transcript for a meeting in both raw and structured (speaker-parsed) form.
  *
  * Access control:
- *   - super_admin: unrestricted access
+ *   - hein@velocityfibre.co.za: unrestricted access
  *   - Other roles: must appear in the meeting's participants JSON array by email
  *
  * Response body:
@@ -43,8 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
-  const userRole = authReq.user?.role;
-  const isSuperAdmin = userRole === 'super_admin';
+  const isOwner = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
     return apiResponse.forbidden(res, 'User email is required for transcript access');
@@ -58,8 +57,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   }
 
   try {
-    // Fetch meeting row — super_admin gets unconditional access, others require participant match
-    const rows = isSuperAdmin
+    // Fetch meeting row — owner gets unconditional access, others require participant match
+    const rows = isOwner
       ? await sql`
           SELECT id, raw_transcript, participants
           FROM meetings

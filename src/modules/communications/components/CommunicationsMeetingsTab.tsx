@@ -22,6 +22,7 @@ interface CommunicationsMeetingsTabProps {
 }
 
 type MeetingFilter = 'all' | 'upcoming' | 'past' | 'cancelled';
+type SourceFilter = 'all' | 'teams' | 'fireflies';
 
 export function CommunicationsMeetingsTab({
   meetings,
@@ -29,11 +30,16 @@ export function CommunicationsMeetingsTab({
   onRefresh
 }: CommunicationsMeetingsTabProps) {
   const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Filter meetings based on active filter
+  // Filter meetings based on source + status filters
   const filteredMeetings = meetings.filter(meeting => {
+    // Source filter
+    if (sourceFilter !== 'all' && meeting.source !== sourceFilter) return false;
+
+    // Status filter
     switch (activeFilter) {
       case 'upcoming':
         return meeting.status === 'scheduled';
@@ -57,11 +63,22 @@ export function CommunicationsMeetingsTab({
     // Future: implement delete functionality
   };
 
+  // Source-filtered meetings for accurate counts
+  const sourceMeetings = sourceFilter === 'all'
+    ? meetings
+    : meetings.filter(m => m.source === sourceFilter);
+
   const filters: { key: MeetingFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: meetings.length },
-    { key: 'upcoming', label: 'Upcoming', count: meetings.filter(m => m.status === 'scheduled').length },
-    { key: 'past', label: 'Past', count: meetings.filter(m => m.status === 'completed').length },
-    { key: 'cancelled', label: 'Cancelled', count: meetings.filter(m => m.status === 'cancelled').length },
+    { key: 'all', label: 'All', count: sourceMeetings.length },
+    { key: 'upcoming', label: 'Upcoming', count: sourceMeetings.filter(m => m.status === 'scheduled').length },
+    { key: 'past', label: 'Past', count: sourceMeetings.filter(m => m.status === 'completed').length },
+    { key: 'cancelled', label: 'Cancelled', count: sourceMeetings.filter(m => m.status === 'cancelled').length },
+  ];
+
+  const sourceFilters: { key: SourceFilter; label: string; color: string }[] = [
+    { key: 'all', label: 'All Sources', color: 'bg-blue-600 text-white' },
+    { key: 'teams', label: 'Teams', color: 'bg-purple-600 text-white' },
+    { key: 'fireflies', label: 'Fireflies', color: 'bg-orange-600 text-white' },
   ];
 
   if (meetings.length === 0) {
@@ -78,7 +95,24 @@ export function CommunicationsMeetingsTab({
 
   return (
     <div className="space-y-4">
-      {/* Sub-tab filters */}
+      {/* Source filter */}
+      <div className="flex items-center gap-2">
+        {sourceFilters.map(sf => (
+          <button
+            key={sf.key}
+            onClick={() => setSourceFilter(sf.key)}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              sourceFilter === sf.key
+                ? sf.color
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+            }`}
+          >
+            {sf.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Status filters */}
       <div className="flex items-center gap-2">
         {filters.map(filter => (
           <button
