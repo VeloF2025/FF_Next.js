@@ -83,7 +83,10 @@ export interface BOQ {
   totalEstimatedValue?: number;
   totalValue?: number; // Add this for compatibility
   currency: string; // Default 'ZAR'
-  
+
+  // Joined fields (optional, populated by list queries)
+  projectName?: string;
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;

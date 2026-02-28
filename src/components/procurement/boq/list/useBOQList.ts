@@ -46,6 +46,7 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
       const transformed: BOQ[] = boqData.map((b: any) => ({
         id: b.id,
         projectId: b.project_id,
+        name: b.name || b.title || 'Untitled BOQ',
         title: b.title || 'Untitled BOQ',
         description: b.description || '',
         version: b.version || 'V1',
@@ -54,9 +55,13 @@ export const useBOQList = (onSelectBOQ?: (boq: BOQ) => void, projectId?: string)
         itemCount: b.item_count || b.items_count || 0,
         mappedItems: b.mapped_items_count || 0,
         unmappedItems: b.unmapped_items_count || 0,
+        exceptionsCount: Number(b.exceptions_count) || 0,
         totalEstimatedValue: Number(b.total_estimated_value) || 0,
+        currency: b.currency || 'ZAR',
         mappingStatus: b.mapping_status || 'pending',
+        mappingConfidence: Number(b.mapping_confidence) || 0,
         uploadedBy: b.uploaded_by || 'System',
+        projectName: b.project_name || null,
         createdAt: b.created_at || new Date().toISOString(),
         updatedAt: b.updated_at || new Date().toISOString(),
       }));

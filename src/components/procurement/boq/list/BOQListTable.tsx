@@ -1,5 +1,5 @@
 /**
- * BOQ List Table Component - List/table view for BOQs
+ * BOQ List Table Component — project-focused list view
  */
 
 import { useRef, useEffect, useState } from 'react';
@@ -28,8 +28,7 @@ interface BOQListTableProps {
   onClick: (boq: BOQ) => void;
 }
 
-function ActionMenu({ boq, onView, onEdit, onDownload, onArchive, onDelete }: {
-  boq: BOQ;
+function ActionMenu({ onView, onEdit, onDownload, onArchive, onDelete }: {
   onView: () => void;
   onEdit: () => void;
   onDownload: () => void;
@@ -95,16 +94,21 @@ function getMappingIcon(status: string) {
   switch (status) {
     case 'mapped':
     case 'completed':
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
+      return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
     case 'in_progress':
     case 'mapping':
-      return <Clock className="h-4 w-4 text-yellow-500" />;
+      return <Clock className="h-3.5 w-3.5 text-yellow-500" />;
     case 'exception':
-      return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      return <AlertTriangle className="h-3.5 w-3.5 text-red-500" />;
     default:
-      return <Clock className="h-4 w-4 text-muted-foreground" />;
+      return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
   }
 }
+
+const formatCurrency = (val: number) =>
+  val > 0
+    ? `R ${val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    : '—';
 
 export default function BOQListTable({
   boqs,
@@ -122,11 +126,11 @@ export default function BOQListTable({
         <thead>
           <tr className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
             <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Name</th>
+            <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Project</th>
             <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Status</th>
-            <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Version</th>
-            <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Items</th>
+            <th className="text-right px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Items</th>
             <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Mapping</th>
-            <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Uploaded By</th>
+            <th className="text-right px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Est. Value</th>
             <th className="text-left px-4 py-3 font-medium text-[var(--ff-text-secondary)]">Date</th>
             <th className="w-10 px-4 py-3"></th>
           </tr>
@@ -137,6 +141,8 @@ export default function BOQListTable({
               ? Math.round(((boq.mappedItems || 0) / boq.itemCount) * 100)
               : 0;
             const mappingStatus = boq.mappingStatus || 'pending';
+            const mapped = boq.mappedItems || 0;
+            const unmapped = boq.unmappedItems || 0;
 
             return (
               <tr
@@ -146,49 +152,62 @@ export default function BOQListTable({
                   selectedBOQId === boq.id ? 'bg-blue-500/10' : ''
                 }`}
               >
+                {/* Name */}
                 <td className="px-4 py-3">
                   <span className="font-medium text-[var(--ff-text-primary)]">
                     {boq.title || boq.fileName || boq.name}
                   </span>
-                  {boq.description && (
-                    <p className="text-xs text-[var(--ff-text-tertiary)] truncate max-w-xs mt-0.5">
-                      {boq.description}
-                    </p>
-                  )}
                 </td>
+
+                {/* Project */}
+                <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
+                  {boq.projectName || '—'}
+                </td>
+
+                {/* Status */}
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${BOQ_STATUS_COLORS[boq.status]}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${BOQ_STATUS_COLORS[boq.status]}`}>
                     {boq.status.charAt(0).toUpperCase() + boq.status.slice(1)}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-[var(--ff-text-secondary)]">v{boq.version}</td>
-                <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{boq.itemCount || 0}</td>
+
+                {/* Items breakdown */}
+                <td className="px-4 py-3 text-right">
+                  <span className="text-[var(--ff-text-primary)] font-medium">{boq.itemCount || 0}</span>
+                  <span className="text-xs text-[var(--ff-text-tertiary)] ml-1">
+                    ({mapped}/{unmapped})
+                  </span>
+                </td>
+
+                {/* Mapping progress */}
                 <td className="px-4 py-3">
                   <div className="flex items-center space-x-2">
                     {getMappingIcon(mappingStatus)}
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${MAPPING_STATUS_COLORS[mappingStatus]}`}>
-                      {mappingStatus}
-                    </span>
-                    {boq.itemCount > 0 && (
-                      <div className="flex items-center space-x-1.5">
-                        <div className="w-16 bg-[var(--ff-bg-hover)] rounded-full h-1.5">
-                          <div
-                            className="bg-blue-600 h-1.5 rounded-full"
-                            style={{ width: `${mappingPct}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-[var(--ff-text-tertiary)]">{mappingPct}%</span>
+                    <div className="flex items-center space-x-1.5">
+                      <div className="w-16 bg-[var(--ff-bg-hover)] rounded-full h-1.5">
+                        <div
+                          className="bg-blue-600 h-1.5 rounded-full"
+                          style={{ width: `${mappingPct}%` }}
+                        />
                       </div>
-                    )}
+                      <span className="text-xs text-[var(--ff-text-secondary)] w-8">{mappingPct}%</span>
+                    </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{boq.uploadedBy}</td>
+
+                {/* Value */}
+                <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)]">
+                  {formatCurrency(boq.totalEstimatedValue || 0)}
+                </td>
+
+                {/* Date */}
                 <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                   {new Date(boq.createdAt).toISOString().split('T')[0]}
                 </td>
+
+                {/* Actions */}
                 <td className="px-4 py-3">
                   <ActionMenu
-                    boq={boq}
                     onView={() => onView(boq)}
                     onEdit={() => onEdit(boq)}
                     onDownload={() => onDownload(boq)}
