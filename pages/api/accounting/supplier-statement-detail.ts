@@ -38,7 +38,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Get invoices
     const invoices = await sql`
       SELECT id, invoice_number as reference, invoice_date as date,
-        total_amount as amount, amount_paid, description
+        total_amount as amount, amount_paid, notes as description
       FROM supplier_invoices
       WHERE supplier_id = ${Number(supplier_id)}
         AND status NOT IN ('cancelled', 'draft')
@@ -58,7 +58,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Get debit notes (supplier returns)
     const returns = await sql`
       SELECT cn.id, cn.credit_note_number as reference, cn.credit_date as date,
-        cn.total_amount as amount, cn.description
+        cn.total_amount as amount, cn.reason as description
       FROM credit_notes cn
       WHERE cn.supplier_id = ${Number(supplier_id)}
         AND cn.type = 'supplier'

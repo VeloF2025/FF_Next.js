@@ -85,7 +85,7 @@ export async function getSupplierReport(
     const rows = (await sql`
       SELECT
         s.id AS supplier_id,
-        s.company_name AS supplier_name,
+        COALESCE(s.company_name, s.name) AS supplier_name,
         COUNT(DISTINCT si.id) AS invoice_count,
         COALESCE(SUM(si.total_amount), 0) AS total_invoiced,
         COALESCE(SUM(si.amount_paid), 0) AS total_paid
@@ -94,7 +94,7 @@ export async function getSupplierReport(
         AND si.invoice_date >= ${periodStart}
         AND si.invoice_date <= ${periodEnd}
         AND si.status NOT IN ('draft', 'cancelled')
-      GROUP BY s.id, s.company_name
+      GROUP BY s.id, s.company_name, s.name
       HAVING COUNT(si.id) > 0
       ORDER BY COALESCE(SUM(si.total_amount), 0) DESC
     `) as Row[];

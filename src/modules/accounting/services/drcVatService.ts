@@ -119,7 +119,7 @@ export async function getDRCEligibleInvoices(): Promise<Array<{
            s.company_name as supplier_name
     FROM supplier_invoices si
     LEFT JOIN suppliers s ON s.id = si.supplier_id
-    WHERE si.status IN ('approved', 'posted')
+    WHERE si.status IN ('approved', 'partially_paid', 'paid')
       AND (si.is_drc IS NULL OR si.is_drc = false)
     ORDER BY si.invoice_date DESC
   `) as Row[];
