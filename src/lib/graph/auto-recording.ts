@@ -224,7 +224,8 @@ export async function enableAutoRecordingForUpcomingMeetings(
     }
   }
 
-  // Track join URLs we've already processed (meetings appear on multiple calendars)
+  // Track meetings: seenUrls for counting, processedUrls for organizer-processed
+  const seenUrls = new Set<string>();
   const processedUrls = new Set<string>();
 
   for (const user of users) {
@@ -234,14 +235,22 @@ export async function enableAutoRecordingForUpcomingMeetings(
 
       for (const event of events) {
         const joinUrl = event.onlineMeeting?.joinUrl;
-        if (!joinUrl || processedUrls.has(joinUrl)) continue;
+        if (!joinUrl) continue;
 
-        processedUrls.add(joinUrl);
-        result.meetingsFound++;
+        // Count each unique meeting once
+        if (!seenUrls.has(joinUrl)) {
+          seenUrls.add(joinUrl);
+          result.meetingsFound++;
+        }
+
+        // Skip if already processed by the organizer
+        if (processedUrls.has(joinUrl)) continue;
 
         // Only the organizer can modify meeting settings
         const isOrganizer = event.organizer?.emailAddress?.address?.toLowerCase() === user.mail?.toLowerCase();
         if (!isOrganizer) continue;
+
+        processedUrls.add(joinUrl);
 
         try {
           const status = await enableAutoRecordForMeeting(user.id, joinUrl, event.subject);
@@ -254,7 +263,6 @@ export async function enableAutoRecordingForUpcomingMeetings(
               `${event.subject}: OnlineMeetings access denied. ` +
               'Create a Teams Application Access Policy via PowerShell.'
             );
-            // Stop trying — all meetings will fail the same way
             break;
           } else {
             result.failed++;
@@ -266,7 +274,6 @@ export async function enableAutoRecordingForUpcomingMeetings(
         }
       }
 
-      // If meeting access is denied, stop scanning more users
       if (result.meetingAccessDenied) break;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
