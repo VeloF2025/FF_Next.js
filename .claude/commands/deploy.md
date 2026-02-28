@@ -31,13 +31,19 @@ Environment-aware deployment with time-gating. During business hours (08:00-17:0
 
 1. Verify clean working directory: `git status`
 2. Push changes to origin: `git push origin master`
-3. Deploy to dev:
+3. Deploy to dev (one command — handles ownership, clean build, retry, health check):
 ```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build'
-sudo systemctl restart fibreflow-dev.service
+bash scripts/deploy-local.sh dev
 ```
-4. Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
-5. Test on https://dev.fibreflow.app
+4. Test on https://dev.fibreflow.app
+
+**Note:** `deploy-local.sh` handles everything automatically:
+- Fixes `.next` ownership (prevents EACCES from mixed user builds)
+- Cleans stale `.next` artifacts before building
+- Retries build up to 3 times (handles Next.js race condition)
+- Stops service before build, restarts after
+- Runs HTTP health check on completion
+- Keeps last 3 build backups for rollback
 
 ### After hours: Promote to staging (requires Hein's approval)
 
@@ -66,24 +72,34 @@ sudo systemctl restart fibreflow-production.service
 
 ## Using the scripts (preferred)
 
-The deploy scripts handle all the safety checks automatically:
-
+**Primary method — `deploy-local.sh`** (one command, handles everything):
 ```bash
 # Deploy to dev (always)
-bash scripts/deploy-gate.sh dev
+bash scripts/deploy-local.sh dev
 
+# Deploy to staging (after hours, requires Hein's approval)
+bash scripts/deploy-local.sh staging
+
+# Deploy to production (after hours, requires Hein's approval)
+bash scripts/deploy-local.sh production
+
+# Emergency override
+bash scripts/deploy-local.sh staging --force
+
+# Check all environments
+bash scripts/deploy-local.sh status
+```
+
+**Promotion scripts** (for deploying exact commits between environments):
+```bash
 # Promote dev → staging (after hours)
 bash scripts/promote.sh dev staging
 
 # Promote staging → production (after hours)
 bash scripts/promote.sh staging production
-
-# Emergency override
-bash scripts/deploy-gate.sh staging --force
-
-# Check all environments
-bash scripts/deploy-gate.sh status
 ```
+
+**Legacy** — `deploy-gate.sh` now auto-redirects to `deploy-local.sh` when on Velocity.
 
 ## Check Status
 

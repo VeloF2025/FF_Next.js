@@ -27,6 +27,13 @@ VELOCITY_USER="velo"
 SUDO_PASS="velo2026"
 TIMEZONE="Africa/Johannesburg"
 
+# --- Local detection ---
+# If running on Velocity, use deploy-local.sh directly (no SSH overhead)
+HOSTNAME_SHORT=$(hostname -s 2>/dev/null || hostname)
+if [[ "$HOSTNAME_SHORT" == "velo-server" || "$HOSTNAME_SHORT" == "velocity" ]]; then
+  exec bash "$SCRIPT_DIR/deploy-local.sh" "$@"
+fi
+
 declare -A ENV_MAP=(
   [dev]="fibreflow-dev|3005|/home/velo/fibreflow-dev|https://dev.fibreflow.app"
   [staging]="fibreflow|3006|/home/velo/fibreflow-staging|https://vf.fibreflow.app"

@@ -1,0 +1,202 @@
+#!/bin/bash
+# =============================================================================
+# deploy-local.sh — One-Command Local Deploy for FibreFlow
+# =============================================================================
+# Handles: ownership fix, clean build, retry, service restart, health check.
+# Designed to run ON Velocity (no SSH to self).
+#
+# Usage:
+#   bash scripts/deploy-local.sh dev [--branch master]
+#   bash scripts/deploy-local.sh staging [--force]
+#   bash scripts/deploy-local.sh production [--force]
+#   bash scripts/deploy-local.sh status
+# =============================================================================
+
+set -euo pipefail
+
+# --- Configuration ---
+TIMEZONE="Africa/Johannesburg"
+MAX_RETRIES=3
+
+declare -A ENV_MAP=(
+  [dev]="fibreflow-dev.service|3005|/home/velo/fibreflow-dev|https://dev.fibreflow.app"
+  [staging]="fibreflow.service|3006|/home/velo/fibreflow-staging|https://vf.fibreflow.app"
+  [production]="fibreflow-production.service|3000|/home/velo/fibreflow-production|https://app.fibreflow.app"
+)
+
+# --- Colors ---
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+log()   { echo -e "${GREEN}[$(date +%H:%M:%S)]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[$(date +%H:%M:%S)] WARNING:${NC} $*"; }
+error() { echo -e "${RED}[$(date +%H:%M:%S)] ERROR:${NC} $*"; exit 1; }
+
+# --- Parse arguments ---
+TARGET="${1:-dev}"
+FORCE=false
+BRANCH="master"
+
+shift || true
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force|-f)  FORCE=true; shift ;;
+    --branch|-b) BRANCH="$2"; shift 2 ;;
+    *)           shift ;;
+  esac
+done
+
+# --- Time gate ---
+is_business_hours() {
+  local hour day_of_week
+  hour=$(TZ=$TIMEZONE date +%H)
+  day_of_week=$(TZ=$TIMEZONE date +%u)
+  [[ "$day_of_week" -le 5 && "$hour" -ge 8 && "$hour" -lt 17 ]]
+}
+
+if [[ "$TARGET" == "status" ]]; then
+  echo -e "\n${BOLD}=== FibreFlow Local Deploy Status ===${NC}"
+  echo -e "  Time: $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')"
+  if is_business_hours; then
+    echo -e "  Window: ${RED}BUSINESS HOURS${NC} — Dev only"
+  else
+    echo -e "  Window: ${GREEN}AFTER HOURS${NC} — All envs allowed"
+  fi
+  echo ""
+  for env in dev staging production; do
+    IFS='|' read -r svc port dir url <<< "${ENV_MAP[$env]}"
+    commit=$(sudo -u velo bash -c "cd $dir && git rev-parse --short HEAD 2>/dev/null" 2>/dev/null || echo "unknown")
+    status=$(systemctl is-active "$svc" 2>/dev/null || echo "unknown")
+    printf "  %-12s %-8s  commit: %-10s  %s\n" "$env" "$status" "$commit" "$url"
+  done
+  echo ""
+  exit 0
+fi
+
+# --- Validate target ---
+if [[ -z "${ENV_MAP[$TARGET]+x}" ]]; then
+  error "Unknown environment: $TARGET. Use dev|staging|production|status"
+fi
+
+IFS='|' read -r SVC PORT DIR URL <<< "${ENV_MAP[$TARGET]}"
+
+# --- Time gate enforcement ---
+if [[ "$TARGET" != "dev" ]] && is_business_hours; then
+  if [[ "$FORCE" != true ]]; then
+    echo -e "\n${RED}BLOCKED: Cannot deploy to $TARGET during business hours (08:00-17:00 SAST)${NC}"
+    echo "  Deploy to dev instead: bash scripts/deploy-local.sh dev"
+    echo "  Emergency override:    bash scripts/deploy-local.sh $TARGET --force"
+    exit 1
+  fi
+  warn "EMERGENCY OVERRIDE — Deploying to $TARGET during business hours"
+fi
+
+echo -e "\n${BOLD}=== Deploy to $TARGET ===${NC}"
+echo -e "  Dir:     $DIR"
+echo -e "  Service: $SVC"
+echo -e "  URL:     $URL"
+echo -e "  Branch:  $BRANCH"
+echo -e "  Time:    $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')\n"
+
+DEPLOY_START=$(date +%s)
+
+# --- Step 1: Fix ownership ---
+log "Fixing ownership on $DIR..."
+sudo chown -R velo:velo "$DIR"
+
+# --- Step 2: Pull latest code ---
+log "Pulling $BRANCH..."
+CURRENT_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
+sudo -u velo bash -c "cd $DIR && git fetch origin && git checkout $BRANCH && git pull origin $BRANCH"
+NEW_COMMIT=$(sudo -u velo bash -c "cd $DIR && git rev-parse --short HEAD")
+log "Commit: $CURRENT_COMMIT -> $NEW_COMMIT"
+
+# --- Step 3: Install deps if needed ---
+if sudo -u velo bash -c "cd $DIR && git diff --name-only $CURRENT_COMMIT HEAD 2>/dev/null" | grep -q 'package.json'; then
+  log "package.json changed, running npm install..."
+  sudo -u velo bash -c "cd $DIR && npm install"
+fi
+
+# --- Step 4: Stop service to free resources ---
+log "Stopping $SVC..."
+sudo systemctl stop "$SVC" 2>/dev/null || true
+
+# --- Step 5: Clean .next to prevent stale artifacts ---
+log "Cleaning .next directory..."
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+if sudo -u velo test -d "$DIR/.next"; then
+  sudo -u velo bash -c "cd $DIR && mv .next .next-backup-$TIMESTAMP"
+  log "Backed up existing build to .next-backup-$TIMESTAMP"
+fi
+
+# --- Step 6: Build with retry ---
+BUILD_SUCCESS=false
+for attempt in $(seq 1 $MAX_RETRIES); do
+  log "Build attempt $attempt/$MAX_RETRIES..."
+  if sudo -u velo bash -c "cd $DIR && npm run build" 2>&1; then
+    BUILD_SUCCESS=true
+    break
+  fi
+  if [[ $attempt -lt $MAX_RETRIES ]]; then
+    warn "Build failed (attempt $attempt) — retrying in 5s (Next.js race condition)..."
+    sleep 5
+    # Clean partial build artifacts before retry
+    sudo -u velo bash -c "cd $DIR && rm -rf .next" 2>/dev/null || true
+  fi
+done
+
+if [[ "$BUILD_SUCCESS" != true ]]; then
+  error "Build failed after $MAX_RETRIES attempts. Restoring backup..."
+  if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
+    sudo -u velo bash -c "cd $DIR && mv .next-backup-$TIMESTAMP .next"
+  fi
+  sudo systemctl start "$SVC" 2>/dev/null || true
+  exit 1
+fi
+
+# --- Step 7: Validate build ---
+if ! sudo -u velo test -f "$DIR/.next/BUILD_ID"; then
+  error "BUILD_ID missing after build — build is incomplete"
+fi
+BUILD_ID=$(sudo -u velo cat "$DIR/.next/BUILD_ID")
+log "Build validated (BUILD_ID: $BUILD_ID)"
+
+# --- Step 8: Start service ---
+log "Starting $SVC..."
+sudo systemctl start "$SVC"
+sleep 5
+
+if ! systemctl is-active --quiet "$SVC"; then
+  error "Service $SVC failed to start. Check: journalctl -u $SVC -n 50"
+fi
+log "Service $SVC is active"
+
+# --- Step 9: Health check ---
+log "Running health check on $URL..."
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$URL/sign-in" 2>/dev/null || echo "000")
+if [[ "$HTTP_CODE" == "200" ]]; then
+  log "Health check passed (HTTP $HTTP_CODE)"
+else
+  warn "Health check returned HTTP $HTTP_CODE — may still be starting up"
+fi
+
+# --- Step 10: Clean old backups (keep last 3) ---
+sudo -u velo bash -c "cd $DIR && ls -dt .next-backup-* 2>/dev/null | tail -n +4 | xargs -r rm -rf"
+
+# --- Summary ---
+DEPLOY_END=$(date +%s)
+DURATION=$((DEPLOY_END - DEPLOY_START))
+
+echo ""
+echo -e "${BOLD}===== DEPLOYMENT COMPLETE =====${NC}"
+echo -e "  Environment: ${GREEN}$TARGET${NC}"
+echo -e "  Commit:      $CURRENT_COMMIT -> $NEW_COMMIT"
+echo -e "  Build ID:    $BUILD_ID"
+echo -e "  Duration:    ${DURATION}s"
+echo -e "  URL:         $URL"
+echo -e "  Health:      HTTP $HTTP_CODE"
+echo -e "  Time:        $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')"
+echo "==============================="
