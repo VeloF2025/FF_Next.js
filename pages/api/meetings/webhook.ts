@@ -34,7 +34,8 @@ interface GraphNotificationPayload {
 /**
  * Webhook endpoint for Microsoft Graph callRecords change notifications.
  *
- * GET  — Graph validation handshake (returns validationToken as plain text)
+ * GET/POST with ?validationToken= — Graph validation handshake (returns token as text/plain)
+ *   Note: Graph sends validation as POST, not GET — must check query param on both methods.
  * POST — Receives batched change notifications; responds 202 immediately
  *        and processes each call record in the background via setImmediate.
  *
@@ -46,24 +47,25 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   // -------------------------------------------------------------------------
-  // GET — subscription validation handshake
+  // Subscription validation handshake (GET or POST with validationToken)
+  // Microsoft Graph sends validation as POST with ?validationToken= in query
   // -------------------------------------------------------------------------
-  if (req.method === 'GET') {
-    const validationToken = req.query.validationToken as string | undefined;
+  const validationToken = req.query.validationToken as string | undefined;
 
-    if (!validationToken) {
-      res.status(400).json({ error: 'Missing validationToken' });
-      return;
-    }
-
+  if (validationToken) {
     log.info(
       'Graph webhook validation request received',
-      { tokenPrefix: validationToken.slice(0, 12) + '...' },
+      { method: req.method, tokenPrefix: validationToken.slice(0, 12) + '...' },
       LOGGER
     );
 
     res.setHeader('Content-Type', 'text/plain');
     res.status(200).send(validationToken);
+    return;
+  }
+
+  if (req.method === 'GET') {
+    res.status(400).json({ error: 'Missing validationToken' });
     return;
   }
 
