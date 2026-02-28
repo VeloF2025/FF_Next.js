@@ -33,7 +33,7 @@ async function handler(
                 id, fireflies_id, title, meeting_date as date, duration,
                 transcript_url, summary, participants, created_at, updated_at,
                 source, processing_status, organizer_name, organizer_email, join_url,
-                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
                 (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
@@ -43,7 +43,7 @@ async function handler(
                 id, fireflies_id, title, meeting_date as date, duration,
                 transcript_url, summary, participants, created_at, updated_at,
                 source, processing_status, organizer_name, organizer_email, join_url,
-                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
                 (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
@@ -73,7 +73,7 @@ async function handler(
                 id, fireflies_id, title, meeting_date as date, duration,
                 transcript_url, summary, participants, created_at, updated_at,
                 source, processing_status, organizer_name, organizer_email,
-                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
                 (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE source = ${sourceFilter}
@@ -85,7 +85,7 @@ async function handler(
                 id, fireflies_id, title, meeting_date as date, duration,
                 transcript_url, summary, participants, created_at, updated_at,
                 source, processing_status, organizer_name, organizer_email,
-                (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+                (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
                 (recording_path IS NOT NULL) as has_recording
               FROM meetings
               WHERE source = ${sourceFilter}
@@ -108,7 +108,7 @@ async function handler(
               id, fireflies_id, title, meeting_date as date, duration,
               transcript_url, summary, participants, created_at, updated_at,
               source, processing_status, organizer_name, organizer_email,
-              (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+              (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
               (recording_path IS NOT NULL) as has_recording
             FROM meetings
             ORDER BY meeting_date DESC
@@ -119,7 +119,7 @@ async function handler(
               id, fireflies_id, title, meeting_date as date, duration,
               transcript_url, summary, participants, created_at, updated_at,
               source, processing_status, organizer_name, organizer_email,
-              (raw_transcript IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
+              (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
               (recording_path IS NOT NULL) as has_recording
             FROM meetings
             WHERE EXISTS (

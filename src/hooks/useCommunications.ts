@@ -63,6 +63,7 @@ export function useCommunications() {
             hasRecording: Boolean(m.has_recording),
             organizerName: m.organizer_name as string | undefined,
             organizerEmail: m.organizer_email as string | undefined,
+            transcriptUrl: m.transcript_url as string | undefined,
           };
         });
 

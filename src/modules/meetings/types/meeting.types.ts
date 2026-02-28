@@ -39,6 +39,7 @@ export interface Meeting {
   organizerName?: string;
   organizerEmail?: string;
   joinUrl?: string;
+  transcriptUrl?: string;
 }
 
 export interface ActionItem {

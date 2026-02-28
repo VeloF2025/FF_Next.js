@@ -265,7 +265,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
           )}
 
           {activeTab === 'transcript' && (
-            <TranscriptView meetingId={meeting.id} />
+            <TranscriptView meetingId={meeting.id} transcriptUrl={meeting.transcriptUrl} />
           )}
 
           {activeTab === 'recording' && (

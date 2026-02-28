@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, MessageSquare, Loader2, ExternalLink } from 'lucide-react';
 import { log } from '@/lib/logger';
 
 interface TranscriptUtterance {
@@ -10,6 +10,7 @@ interface TranscriptUtterance {
 
 interface TranscriptViewProps {
   meetingId: string;
+  transcriptUrl?: string;
 }
 
 const SPEAKER_COLORS = [
@@ -29,7 +30,7 @@ function formatTimestamp(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function TranscriptView({ meetingId }: TranscriptViewProps) {
+export function TranscriptView({ meetingId, transcriptUrl }: TranscriptViewProps) {
   const [utterances, setUtterances] = useState<TranscriptUtterance[]>([]);
   const [rawText, setRawText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +49,9 @@ export function TranscriptView({ meetingId }: TranscriptViewProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error?.message || 'Transcript not available');
+        setError(transcriptUrl
+          ? 'Transcript is available on Fireflies — click below to view.'
+          : (data.error?.message || 'Transcript not available'));
         return;
       }
 
@@ -102,7 +105,18 @@ export function TranscriptView({ meetingId }: TranscriptViewProps) {
     return (
       <div className="text-center py-8">
         <MessageSquare className="w-10 h-10 mx-auto mb-3 text-[var(--ff-text-tertiary)]" />
-        <p className="text-[var(--ff-text-secondary)]">{error}</p>
+        <p className="text-[var(--ff-text-secondary)] mb-4">{error}</p>
+        {transcriptUrl && (
+          <a
+            href={transcriptUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            View Full Transcript on Fireflies
+          </a>
+        )}
       </div>
     );
   }
