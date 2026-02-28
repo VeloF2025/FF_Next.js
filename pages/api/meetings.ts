@@ -14,8 +14,7 @@ async function handler(
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
   const userName = authReq.user?.name?.toLowerCase() || '';
-  const userRole = authReq.user?.role;
-  const isSuperAdmin = userRole === 'super_admin';
+  const isOwner = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
     return res.status(403).json({ error: 'User email required for meeting access' });
@@ -28,7 +27,7 @@ async function handler(
 
       if (id) {
         // Super admin can access any meeting, others need to be participants
-        const [meeting] = isSuperAdmin
+        const [meeting] = isOwner
           ? await sql`
               SELECT
                 id, fireflies_id, title, meeting_date as date, duration,
@@ -68,7 +67,7 @@ async function handler(
 
       // Super admin sees all meetings, others only see meetings they participated in
       if (sourceFilter) {
-        const meetings = isSuperAdmin
+        const meetings = isOwner
           ? await sql`
               SELECT
                 id, fireflies_id, title, meeting_date as date, duration,
@@ -103,7 +102,7 @@ async function handler(
         return res.status(200).json({ meetings });
       }
 
-      const meetings = isSuperAdmin
+      const meetings = isOwner
         ? await sql`
             SELECT
               id, fireflies_id, title, meeting_date as date, duration,
