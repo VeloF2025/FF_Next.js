@@ -66,12 +66,22 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       ORDER BY cn.credit_date ASC
     `;
 
+    // Normalize date to YYYY-MM-DD regardless of input format
+    function toISODate(val: unknown): string {
+      if (!val) return '1970-01-01';
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      const s = String(val);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0];
+    }
+
     // Merge into chronological transactions
     const transactions: Transaction[] = [];
 
     for (const inv of invoices as { reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
-        date: inv.date,
+        date: toISODate(inv.date),
         type: 'invoice',
         reference: inv.reference || '-',
         description: inv.description || 'Supplier Invoice',
@@ -83,7 +93,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
     for (const pmt of payments as { reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
-        date: pmt.date,
+        date: toISODate(pmt.date),
         type: 'payment',
         reference: pmt.reference || '-',
         description: pmt.description || 'Payment',
@@ -95,7 +105,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
     for (const ret of returns as { reference: string; date: string; amount: number; description: string }[]) {
       transactions.push({
-        date: ret.date,
+        date: toISODate(ret.date),
         type: 'debit_note',
         reference: ret.reference || '-',
         description: ret.description || 'Debit Note',
@@ -105,8 +115,12 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       });
     }
 
-    // Sort chronologically
-    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort chronologically, invoices before payments on same date
+    transactions.sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      const typeOrder: Record<string, number> = { invoice: 0, debit_note: 1, payment: 2 };
+      return (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9);
+    });
 
     // Calculate running balance
     let running = 0;

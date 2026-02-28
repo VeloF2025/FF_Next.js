@@ -91,8 +91,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Fetch payment
       const paymentRows = await sql`
-        SELECT id, client_id, total_amount, allocated_amount, status
-        FROM customer_payments WHERE id = ${paymentId}
+        SELECT cp.id, cp.client_id, cp.total_amount, cp.status,
+          COALESCE((SELECT SUM(amount_allocated) FROM customer_payment_allocations WHERE payment_id = cp.id), 0) AS allocated_amount
+        FROM customer_payments cp WHERE cp.id = ${paymentId}
       `;
       const payment = paymentRows[0];
       if (!payment) return apiResponse.notFound(res, 'Payment', paymentId);
@@ -114,7 +115,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const alloc of allocations) {
         // Validate invoice belongs to same client
         const invoiceRows = await sql`
-          SELECT id, client_id, total, amount_paid, status
+          SELECT id, client_id, total_amount, amount_paid, status
           FROM customer_invoices WHERE id = ${alloc.invoiceId}
         `;
         const invoice = invoiceRows[0];
@@ -125,7 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           return apiResponse.badRequest(res, `Invoice ${alloc.invoiceId} belongs to a different client`);
         }
 
-        const outstanding = Number(invoice.total) - Number(invoice.amount_paid || 0);
+        const outstanding = Number(invoice.total_amount) - Number(invoice.amount_paid || 0);
         if (alloc.amount > outstanding + 0.01) {
           return apiResponse.badRequest(res, `Allocation ${alloc.amount} exceeds outstanding ${outstanding.toFixed(2)} for invoice ${alloc.invoiceId}`);
         }
@@ -138,7 +139,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         // Update invoice amount_paid
         const newPaid = Number(invoice.amount_paid || 0) + alloc.amount;
-        const invoiceTotal = Number(invoice.total);
+        const invoiceTotal = Number(invoice.total_amount);
         const newStatus = newPaid >= invoiceTotal - 0.01 ? 'paid' : 'partially_paid';
 
         await sql`
@@ -156,7 +157,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       await sql`
         UPDATE customer_payments
-        SET allocated_amount = ${newAllocated}, status = ${paymentStatus}
+        SET status = ${paymentStatus}
         WHERE id = ${paymentId}
       `;
 
