@@ -17,6 +17,7 @@ interface CalendarEvent {
   start: { dateTime: string; timeZone: string };
   end: { dateTime: string; timeZone: string };
   isOnlineMeeting: boolean;
+  isCancelled?: boolean;
   onlineMeeting?: { joinUrl: string };
   organizer?: { emailAddress: { address: string; name: string } };
 }
@@ -101,7 +102,7 @@ async function getUpcomingTeamsMeetings(
   const url = `${GRAPH_BASE}/users/${userId}/calendarView` +
     `?startDateTime=${now.toISOString()}` +
     `&endDateTime=${end.toISOString()}` +
-    `&$select=id,subject,start,end,isOnlineMeeting,onlineMeeting,organizer` +
+    `&$select=id,subject,start,end,isOnlineMeeting,isCancelled,onlineMeeting,organizer` +
     `&$top=50`;
 
   const response = await graphFetch(url);
@@ -116,9 +117,9 @@ async function getUpcomingTeamsMeetings(
   }
 
   const data = await response.json();
-  // Client-side filter: only Teams online meetings with a join URL
+  // Client-side filter: only active Teams online meetings with a join URL
   return ((data.value || []) as CalendarEvent[]).filter(
-    e => e.isOnlineMeeting && e.onlineMeeting?.joinUrl
+    e => e.isOnlineMeeting && e.onlineMeeting?.joinUrl && !e.isCancelled
   );
 }
 
@@ -133,13 +134,12 @@ async function enableAutoRecordForMeeting(
   joinUrl: string,
   subject: string
 ): Promise<'enabled' | 'already' | 'failed' | 'access_denied'> {
-  // Use URL class to properly encode the join URL in the OData $filter
-  // Join URLs contain %3a etc. that corrupt query strings if embedded directly
-  const endpoint = new URL(`${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings`);
-  endpoint.searchParams.set('$filter', `joinWebUrl eq '${joinUrl}'`);
-  endpoint.searchParams.set('$select', 'id,subject,recordAutomatically');
+  // encodeURIComponent the $filter value (NOT the $filter key — $ must stay literal)
+  // Join URLs contain %3a etc. that corrupt query strings if embedded raw
+  const filterValue = encodeURIComponent(`JoinWebUrl eq '${joinUrl}'`);
+  const findUrl = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings?$filter=${filterValue}`;
 
-  const findResp = await graphFetch(endpoint.toString());
+  const findResp = await graphFetch(findUrl);
   if (findResp.status === 403) {
     log.warn('OnlineMeetings access denied — application access policy required', { subject }, LOGGER);
     return 'access_denied';
