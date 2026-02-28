@@ -29,10 +29,14 @@ export interface Notification {
 }
 
 export interface CommunicationsStats {
+  totalMeetings: number;
+  completedMeetings: number;
   upcomingMeetings: number;
   pendingActions: number;
-  unreadNotifications: number;
-  overdueItems: number;
+  teamsMeetings: number;
+  firefliesMeetings: number;
+  withTranscripts: number;
+  withRecordings: number;
 }
 
 export interface CommunicationsData {

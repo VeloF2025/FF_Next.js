@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, CheckCircle, Bell, AlertCircle } from 'lucide-react';
+import { Calendar, CheckCircle, Video, FileText } from 'lucide-react';
 import { CommunicationsStats } from '@/types/communications.types';
 
 interface CommunicationsStatsCardsProps {
@@ -17,27 +17,27 @@ export function CommunicationsStatsCards({ stats }: CommunicationsStatsCardsProp
   const cards = [
     {
       label: 'Total Meetings',
-      value: stats.upcomingMeetings,
+      value: stats.totalMeetings,
       icon: Calendar,
       iconColor: 'text-blue-400',
     },
     {
-      label: 'Completed',
-      value: stats.overdueItems, // Repurposed to show completed meetings
-      icon: CheckCircle,
-      iconColor: 'text-green-400',
-    },
-    {
-      label: 'Unread',
-      value: stats.unreadNotifications,
-      icon: Bell,
+      label: 'Teams',
+      value: stats.teamsMeetings,
+      icon: Video,
       iconColor: 'text-purple-400',
     },
     {
-      label: 'Pending Actions',
-      value: stats.pendingActions,
-      icon: AlertCircle,
-      iconColor: 'text-yellow-400',
+      label: 'Fireflies',
+      value: stats.firefliesMeetings,
+      icon: CheckCircle,
+      iconColor: 'text-orange-400',
+    },
+    {
+      label: 'With Transcripts',
+      value: stats.withTranscripts,
+      icon: FileText,
+      iconColor: 'text-green-400',
     },
   ];
 
