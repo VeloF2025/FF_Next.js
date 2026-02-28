@@ -179,12 +179,14 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 # Check VLM health
 curl http://100.96.203.105:8100/v1/models
 
-# Check docker container
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker ps | grep vllm"
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker logs vllm-qwen3 --tail 50"
+# Check VLM service (run locally on Velocity)
+sudo systemctl status vllm-qwen.service
+sudo journalctl -u vllm-qwen.service -n 50
 
 # Restart if needed
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "docker restart vllm-qwen3"
+sudo systemctl restart vllm-qwen.service
+# Or use startup script
+/home/velo/scripts/vllm/startup.sh
 ```
 
 ### Validation Always Failing

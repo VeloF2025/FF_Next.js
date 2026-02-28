@@ -71,7 +71,7 @@ This keeps the vector search in sync with local knowledge files.
 
 ```bash
 # Full re-ingestion (recommended during /kb)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && export \$(grep DATABASE_URL .env) && scripts/.venv/bin/python scripts/ingest-qdrant.py --force 2>&1"
+cd /home/velo/fibreflow-production && export $(grep DATABASE_URL .env) && scripts/.venv/bin/python scripts/ingest-qdrant.py --force 2>&1
 ```
 
 The script:

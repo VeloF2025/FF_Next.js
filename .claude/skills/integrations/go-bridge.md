@@ -15,13 +15,14 @@ Manage and troubleshoot the WhatsApp Go bridge:
 
 | Setting | Value |
 |---------|-------|
-| **Server** | Velocity VPS (100.96.203.105) |
-| **Location** | `/home/louis/whatsapp-bridge-go/` |
+| **Server** | VPS (72.61.197.178) — run locally on Velocity, SSH to VPS |
+| **Source Location** | `/home/velo/whatsapp-bridge/` (compile on Velocity) |
+| **Deployed Location** | `/opt/whatsapp-bridge/` (VPS) |
 | **Binary** | `whatsapp-bridge` |
-| **Service** | `whatsapp-bridge.service` |
-| **Log File** | `/home/louis/whatsapp-bridge-go/bridge.log` |
+| **Service** | `whatsapp-bridge.service` (VPS) |
+| **Log File** | `/opt/whatsapp-bridge/bridge.log` (VPS) |
 | **Config** | Environment variables in service |
-| **API Base** | `https://vf.fibreflow.app/api/activate` |
+| **API Base** | `https://app.fibreflow.app/api/activate` |
 
 ## Slash Commands
 
@@ -246,38 +247,43 @@ WhatsApp now uses LID (Linked ID) instead of phone numbers:
 
 **Impact**: Reply threading requires `QuotedMessage` to work with LID format.
 
-## SSH Commands Reference
+## Commands Reference
 
 ```bash
-# Check service status
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status whatsapp-bridge.service --no-pager | head -15"
+# Bridge runs on VPS — SSH to VPS for service management
+ssh root@72.61.197.178
 
-# Restart bridge
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
+# Check service status (on VPS)
+systemctl status whatsapp-bridge.service --no-pager | head -15
 
-# View recent logs
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "tail -100 /home/louis/whatsapp-bridge-go/bridge.log"
+# Restart bridge (on VPS)
+systemctl restart whatsapp-bridge.service
 
-# Filter for DR processing
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'DR[0-9]{6,7}' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+# View recent logs (on VPS)
+tail -100 /opt/whatsapp-bridge/bridge.log
 
-# Filter for acknowledgments
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(ACK|Sent ack|photos:)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+# Filter for DR processing (on VPS)
+grep -E 'DR[0-9]{6,7}' /opt/whatsapp-bridge/bridge.log | tail -30
 
-# Filter for errors
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -iE '(ERROR|WARN|FAIL)' /home/louis/whatsapp-bridge-go/bridge.log | tail -30"
+# Filter for acknowledgments (on VPS)
+grep -E '(ACK|Sent ack|photos:)' /opt/whatsapp-bridge/bridge.log | tail -20
 
-# Filter for validation
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E '(NOT_FOUND|MISMATCH|validation)' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+# Filter for errors (on VPS)
+grep -iE '(ERROR|WARN|FAIL)' /opt/whatsapp-bridge/bridge.log | tail -30
 
-# Check if process is running
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "pgrep -a whatsapp-bridge"
+# Filter for validation (on VPS)
+grep -E '(NOT_FOUND|MISMATCH|validation)' /opt/whatsapp-bridge/bridge.log | tail -20
 
-# View service logs via journald
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
+# Check if process is running (on VPS)
+pgrep -a whatsapp-bridge
 
-# Rebuild bridge (if code changed)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp-bridge-go && go build -o whatsapp-bridge main.go"
+# View service logs via journald (on VPS)
+journalctl -u whatsapp-bridge.service -n 50
+
+# Rebuild bridge (run locally on Velocity, then deploy)
+cd /home/velo/whatsapp-bridge && go build -o whatsapp-bridge .
+scp /home/velo/whatsapp-bridge/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 ## Log Patterns
@@ -318,7 +324,9 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/louis/whatsapp
 
 **Diagnosis**:
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u whatsapp-bridge.service -n 50"
+# SSH to VPS
+ssh root@72.61.197.178
+journalctl -u whatsapp-bridge.service -n 50
 ```
 
 **Common Causes**:
@@ -332,8 +340,8 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWOR
 
 **Diagnosis**:
 ```bash
-# Check if bridge is receiving messages
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep 'Message from' /home/louis/whatsapp-bridge-go/bridge.log | tail -10"
+# SSH to VPS and check if bridge is receiving messages
+ssh root@72.61.197.178 "grep 'Message from' /opt/whatsapp-bridge/bridge.log | tail -10"
 ```
 
 **Common Causes**:
@@ -347,7 +355,7 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep 'Message from' /ho
 
 **Diagnosis**:
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "grep -E 'ACK|ack' /home/louis/whatsapp-bridge-go/bridge.log | tail -20"
+ssh root@72.61.197.178 "grep -E 'ACK|ack' /opt/whatsapp-bridge/bridge.log | tail -20"
 ```
 
 **Common Causes**:
@@ -401,13 +409,13 @@ Include `QuotedMessage` - WhatsApp uses it for LID resolution.
 
 **Diagnosis**:
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "ps aux | grep whatsapp-bridge"
+ssh root@72.61.197.178 "ps aux | grep whatsapp-bridge"
 ```
 
 **Fix**:
 Restart service to clear memory:
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart whatsapp-bridge.service"
+ssh root@72.61.197.178 "systemctl restart whatsapp-bridge.service"
 ```
 
 ## Environment Variables
@@ -431,9 +439,10 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWOR
 
 | File | Purpose |
 |------|---------|
-| `/home/louis/whatsapp-bridge-go/main.go` | Main bridge code |
-| `/home/louis/whatsapp-bridge-go/bridge.log` | Log file |
-| `/etc/systemd/system/whatsapp-bridge.service` | Systemd service |
+| `/home/velo/whatsapp-bridge/main.go` | Main bridge source (Velocity — compile here) |
+| `/opt/whatsapp-bridge/bridge.log` | Log file (VPS) |
+| `/opt/whatsapp-bridge/whatsapp-bridge` | Deployed binary (VPS) |
+| `/etc/systemd/system/whatsapp-bridge.service` | Systemd service (VPS) |
 
 ## Auto-Activation Rules
 

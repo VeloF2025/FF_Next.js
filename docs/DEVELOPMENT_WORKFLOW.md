@@ -34,10 +34,12 @@ A comprehensive end-to-end guide for developing features, enhancing existing fun
 ### Branch Strategy
 
 ```
-master (production)
-  └── develop (integration)
-       └── feature/your-feature (work branch)
+master (production — all environments)
+  └── feature/your-feature (work branch)
+  └── fix/your-fix (bug fix branch)
 ```
+
+> **Note:** We work directly off `master` — there is no `develop` branch.
 
 ---
 
@@ -67,8 +69,8 @@ Before writing any code, ensure you have a clear specification:
 
 ```bash
 # Ensure you're on latest master
-git checkout develop
-git pull origin develop
+git checkout master
+git pull origin master
 
 # Create feature branch
 git checkout -b feature/descriptive-name
@@ -445,13 +447,13 @@ git push
 
 ### 7.3 CI Checks
 
-Ensure all checks pass:
-- Build
-- Tests
-- Lint
-- Type check
+> **Note (Feb 2026):** GitHub Actions CI workflows are currently **disabled** (billing exhausted).
+> Workflows renamed to `.yml.disabled`. Run quality checks locally before merging:
+> ```bash
+> npm run lint && npm run type-check && npm test
+> ```
 
-### 7.4 Merge to Develop
+### 7.4 Merge to Master
 
 Once approved:
 
@@ -465,34 +467,31 @@ ff-merge 30
 
 ### 7.5 Deploy to Dev Environment
 
-After merging to develop:
+After merging to master:
 
 ```bash
-ssh louis@100.96.203.105 \
-  "cd /var/www/fibreflow-dev && git pull && npm ci && npm run build && pm2 restart fibreflow-dev"
+# Local on Velocity (no SSH needed)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
+sudo systemctl restart fibreflow-dev.service
+```
+
+Or use the deploy script:
+```bash
+bash scripts/deploy-gate.sh dev
 ```
 
 ### 7.6 Verify on Dev
 
 Test the feature on https://dev.fibreflow.app
 
-### 7.7 Merge to Master (Production)
-
-After verification on dev:
+### 7.7 Promote to Staging & Production (After Hours Only)
 
 ```bash
-# Create PR from develop to master
-gh pr create --base master --head develop --title "Release: [feature name]"
+# Promote dev → staging (requires Hein's approval)
+bash scripts/promote.sh dev staging
 
-# After approval, merge
-gh pr merge --merge
-```
-
-### 7.8 Deploy to Production
-
-```bash
-ssh louis@100.96.203.105 \
-  "cd /var/www/fibreflow && git pull && npm ci && npm run build && pm2 restart fibreflow-prod"
+# Promote staging → production (requires Hein's approval)
+bash scripts/promote.sh staging production
 ```
 
 ---
@@ -502,9 +501,8 @@ ssh louis@100.96.203.105 \
 ### 1. Reproduce the Issue
 
 ```bash
-# Check logs
-ssh louis@100.96.203.105
-pm2 logs fibreflow-prod --lines 100
+# Check logs (local on Velocity)
+journalctl -u fibreflow-production -n 100 --no-pager
 ```
 
 ### 2. Load Module Context
@@ -625,10 +623,10 @@ tests/specs/{name}.spec.md      # Test specifications
 - [ ] Manual testing done
 - [ ] PR created
 - [ ] Code review passed
-- [ ] Merged to develop
-- [ ] Verified on dev environment
 - [ ] Merged to master
-- [ ] Deployed to production
+- [ ] Deployed to dev (verified)
+- [ ] Promoted to staging (after hours, with approval)
+- [ ] Promoted to production (after hours, with approval)
 
 ---
 
@@ -646,4 +644,4 @@ tests/specs/{name}.spec.md      # Test specifications
 
 ---
 
-*Last updated: 2026-01-09*
+*Last updated: 2026-02-28*

@@ -115,12 +115,12 @@ Run `ls .claude/modules/` for full list (40+ modules).
 
 **Server Access:**
 ```bash
-ssh velo@100.96.203.105    # Velocity - SSH key auth (sudo/root, ALL deploys)
-ssh zander@100.96.203.105  # Velocity - Password: zander2026 (sudo, full deploy access)
-ssh root@72.61.197.178     # VPS (WhatsApp services)
+# Local (we ARE on Velocity — use sudo -u velo for deploy dirs)
+sudo -u velo bash -c 'whoami'     # No password needed (sudoers configured)
+ssh root@72.61.197.178             # VPS (WhatsApp services)
 ```
 
-**All deploy dirs under /home/velo/:**
+**All deploy dirs under /home/velo/ (owned by velo, use `sudo -u velo`):**
 ```
 /home/velo/fibreflow-dev/         # Dev (dev.fibreflow.app)
 /home/velo/fibreflow-staging/     # Staging (vf.fibreflow.app)
@@ -152,17 +152,22 @@ bash scripts/promote.sh staging production   # Promote staging → production (a
 bash scripts/deploy-gate.sh status           # Show all environments
 ```
 
-**Direct SSH Commands (fallback):**
+**Direct Local Commands (we run on Velocity — no SSH needed):**
 ```bash
 # Dev (always allowed)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
+sudo systemctl restart fibreflow-dev.service
 
 # Staging (after hours only — promotes EXACT commit from dev)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow.service
 
 # Production (after hours only — promotes EXACT commit from staging)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow-production.service
 ```
+
+**Sudoers:** `/etc/sudoers.d/fibreflow-deploy` — hein can run as velo (NOPASSWD) + restart services
 
 **Full details:** `docs/INFRASTRUCTURE.md` | Credentials: `.claude/credentials.local.md`
 

@@ -137,17 +137,12 @@ importFromExcel(file, overwriteExisting)
 - **Consistency**: Matches standard `ModulePage` layout pattern used throughout the app.
 - **Previous Pattern**: Old layout had centered max-width container, removed for consistency.
 
-## Dev Deployment Process (Updated 2026-02-09)
-- **Dev Server Location**: `/home/hein/apps/fibreflow-dev` (owned by hein user)
-- **Two-Step Deploy**:
-  1. SSH as `hein` (pw: 0203) for `git pull` and `npm run build`
-  2. SSH as `velo` (pw: velo2026) for `sudo systemctl restart fibreflow-dev.service`
-- **Permission Issue**: Running `sudo rm -rf .next` as velo creates permission conflicts. Use hein for build operations.
-- **Standard Dev Deploy**:
+## Dev Deployment Process (Updated 2026-02-28)
+- **Dev Server Location**: `/home/hein/Workspace/FF_Next.js` (run directly as user `hein` on Velocity)
+- **Passwordless sudo**: Configured via `/etc/sudoers.d/fibreflow-deploy`
+- **Standard Dev Deploy** (run locally on Velocity):
   ```bash
-  # Step 1: Build as hein
-  sshpass -p '0203' ssh hein@100.96.203.105 "cd /home/hein/apps/fibreflow-dev && git pull && npm run build"
-
-  # Step 2: Restart as velo
-  sshpass -p 'velo2026' ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+  cd /home/hein/Workspace/FF_Next.js
+  git pull && npm run build
+  sudo systemctl restart fibreflow-dev.service
   ```

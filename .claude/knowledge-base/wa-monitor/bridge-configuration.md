@@ -76,45 +76,32 @@ Known maintenance group JIDs:
 
 ### Source Location
 - **Server**: Velocity (`100.96.203.105`)
-- **Path**: `/home/louis/whatsapp-bridge-go/main.go`
-- **User**: `louis`
+- **Path**: `/home/velo/whatsapp-bridge/main.go`
+- **User**: `velo`
 
 ### Target Location
 - **Server**: VPS (`72.61.197.178`)
 - **Path**: `/opt/whatsapp-bridge/whatsapp-bridge`
 - **Service**: `whatsapp-bridge.service`
 
-### Compile on Velocity
+### Compile on Velocity (run locally)
 ```bash
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
-cd /home/louis/whatsapp-bridge-go
+cd /home/velo/whatsapp-bridge
 go build -o whatsapp-bridge .
 ```
 
 ### Deploy to VPS
 
-**Method A: Direct SCP (from local machine)**
+**From Velocity (direct SCP to VPS):**
 ```bash
-# 1. Copy from Velocity to local
-scp velo@100.96.203.105:/home/louis/whatsapp-bridge-go/whatsapp-bridge /tmp/whatsapp-bridge
+# 1. Copy compiled binary to VPS
+scp /home/velo/whatsapp-bridge/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
 
-# 2. Copy from local to VPS
-scp /tmp/whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/whatsapp-bridge
-
-# 3. Restart on VPS
+# 2. Restart on VPS
 ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 
-# 4. Verify
+# 3. Verify
 ssh root@72.61.197.178 "systemctl status whatsapp-bridge && tail -5 /opt/whatsapp-bridge/bridge.log"
-```
-
-**Method B: Direct from Velocity (if SSH keys configured)**
-```bash
-# From Velocity, if VPS SSH keys are set up
-ssh velo@100.96.203.105
-cd /home/louis/whatsapp-bridge-go
-scp whatsapp-bridge root@72.61.197.178:/opt/whatsapp-bridge/
-ssh root@72.61.197.178 "systemctl restart whatsapp-bridge"
 ```
 
 ## Systemd Service (VPS)

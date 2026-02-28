@@ -107,9 +107,9 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 | VF Storage | 8091 | `fibreflow-storage.service` | Fleet photo storage |
 
 **Access:**
-- `ssh velo@100.96.203.105` — SSH key auth from hein's workstation, sudo/root, ALL deploys
-- `ssh zander@100.96.203.105` (password: zander2026) — sudo, full deploy access
-- `ssh hein@100.96.203.105` (password: 0203) — personal account
+- Local `sudo -u velo` — Claude Code runs directly on Velocity as `hein`; passwordless sudo configured via `/etc/sudoers.d/fibreflow-deploy`
+- `ssh velo@100.96.203.105` — SSH key auth from external machines (fallback)
+- `ssh zander@100.96.203.105` (password: zander2026) — sudo, full deploy access (fallback)
 
 **All deploy directories unified under /home/velo/ (2026-02-11).** No more permission issues.
 
@@ -149,26 +149,26 @@ All three directories owned by `velo:velo`, same user, no permission issues.
 
 ### Quick Deploy
 
-All deploys use the `velo` user via SSH key auth (no passwords needed for SSH).
+Claude Code runs directly on Velocity as user `hein` with passwordless sudo (configured via `/etc/sudoers.d/fibreflow-deploy`). No SSH required.
 
 ```bash
 # Development (dev.fibreflow.app)
-ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-dev && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull && npm run build'
+sudo systemctl restart fibreflow-dev.service
 
 # Staging (vf.fibreflow.app)
-ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-staging && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull && npm run build'
+sudo systemctl restart fibreflow.service
 
 # Production (app.fibreflow.app)
-ssh velo@100.96.203.105 \
-  "cd /home/velo/fibreflow-production && git pull && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull && npm run build'
+sudo systemctl restart fibreflow-production.service
 ```
 
 **Notes:**
-- SSH key auth configured from hein's workstation (no sshpass needed)
 - All three dirs under `/home/velo/` — same user, no permission issues
 - All three can be deployed in parallel (separate directories, separate services)
+- For deploys from external machines (fallback): SSH key auth via `ssh velo@100.96.203.105`
 
 ### Deploy Flow
 
@@ -331,20 +331,16 @@ cat /home/velo/fibreflow-dev/.next/BUILD_ID           # Dev
 ## Rollback Procedure
 
 ```bash
-# 1. SSH to server
-ssh velo@100.96.203.105
+# 1. Check git log for previous commit (run locally on Velocity)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git log --oneline -5'
 
-# 2. Navigate to app directory
-cd /home/velo/fibreflow-production
+# 2. Reset to previous commit
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git reset --hard <commit-hash>'
 
-# 3. Check git log for previous commit
-git log --oneline -5
+# 3. Rebuild
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && npm run build'
 
-# 4. Reset to previous commit
-git reset --hard <commit-hash>
-
-# 5. Rebuild and restart
-npm run build
+# 4. Restart service
 sudo systemctl restart fibreflow-production.service
 ```
 

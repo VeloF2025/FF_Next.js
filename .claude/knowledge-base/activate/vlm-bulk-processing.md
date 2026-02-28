@@ -80,10 +80,9 @@ Key parameter: `--max-num-seqs` (concurrent inference sequences)
 - Higher values use more VRAM (RTX 5090 = 32GB)
 
 ```bash
-# Change max-num-seqs (requires sudo via velo user)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 \
-  "sudo sed -i 's/--max-num-seqs [0-9]*/--max-num-seqs 8/' /etc/systemd/system/vllm-qwen.service && \
-   sudo systemctl daemon-reload && sudo systemctl restart vllm-qwen"
+# Change max-num-seqs (run locally on Velocity)
+sudo sed -i 's/--max-num-seqs [0-9]*/--max-num-seqs 8/' /etc/systemd/system/vllm-qwen.service && \
+  sudo systemctl daemon-reload && sudo systemctl restart vllm-qwen
 ```
 
 ## Common Issues

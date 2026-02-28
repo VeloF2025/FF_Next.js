@@ -190,8 +190,7 @@ CREATE TABLE dr_photo_unified_reviews (
 # VPS (WhatsApp services)
 ssh root@72.61.197.178
 
-# Velocity (legacy services only)
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+# Velocity (run commands locally as user hein — passwordless sudo)
 ```
 
 ### Service Management (VPS)
@@ -437,7 +436,7 @@ curl -X POST https://app.fibreflow.app/api/activate/dr-acknowledgment \
 systemctl restart whatsapp-bridge
 
 # Check FibreFlow API status
-ssh velo@100.96.203.105 "systemctl status fibreflow"
+systemctl status fibreflow  # Run locally on Velocity
 ```
 
 ### 3. Wrong Group Receiving Messages

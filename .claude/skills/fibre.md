@@ -260,7 +260,7 @@ WHERE latitude BETWEEN -26.4 AND -25.8
 # Cancel stuck job
 curl -X POST https://dev.fibreflow.app/api/qfield-sync-cancel
 # Check QFieldCloud containers on Velocity
-ssh velo@100.96.203.105 "docker ps --filter 'name=qfieldcloud'"
+docker ps --filter 'name=qfieldcloud'
 ```
 
 ### 1Map Data Out of Sync

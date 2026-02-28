@@ -37,10 +37,10 @@ PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.ne
 
 ```bash
 # Restart service (port 3006)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+sudo systemctl restart fibreflow.service
 
 # Verify
-sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://100.96.203.105:3006/
+sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost:3006/
 ```
 
 ## Debug Issues
@@ -49,26 +49,26 @@ sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://100.96.203.105:
 
 ```bash
 # Check service status
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "systemctl status fibreflow.service --no-pager | head -15"
+systemctl status fibreflow.service --no-pager | head -15
 
 # Pull latest code and rebuild
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git pull && npm run build"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull && npm run build'
 
 # Restart
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S systemctl restart fibreflow.service"
+sudo systemctl restart fibreflow.service
 ```
 
 ### Wrong Insert/Update Counts
 
 Ensure latest code deployed (commit: `fix(oes-import): use count-based approach`):
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "cd /home/velo/fibreflow-development && git log -1 --oneline"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git log -1 --oneline'
 ```
 
 ### View Logs
 
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "echo '$VELO_SSH_PASSWORD' | sudo -S journalctl -u fibreflow.service -n 50 --no-pager"
+journalctl -u fibreflow.service -n 50 --no-pager
 ```
 
 ## Expected Results

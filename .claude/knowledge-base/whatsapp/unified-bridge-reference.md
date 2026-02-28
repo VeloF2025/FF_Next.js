@@ -116,8 +116,7 @@ curl http://72.61.197.178:8083/reload-groups
 # VPS (WhatsApp services)
 ssh root@72.61.197.178
 
-# Velocity (FibreFlow apps)
-ssh velo@100.96.203.105  # Password: $VELO_SSH_PASSWORD
+# Velocity (FibreFlow apps) — run commands locally as user hein (passwordless sudo)
 ```
 
 ## Service Management (VPS)
@@ -179,6 +178,6 @@ CREATE TABLE wa_monitored_groups (
 | File | Purpose |
 |------|---------|
 | `.claude/skills/modules/wa-monitor.md` | Full module documentation |
-| `/home/louis/whatsapp-bridge-go/main.go` | Bridge source (Velocity) |
+| `/home/velo/whatsapp-bridge/main.go` | Bridge source (Velocity) |
 | `/opt/whatsapp-bridge/` | Deployed binary (VPS) |
-| `/home/louis/wa-feedback-service/` | Feedback proxy (Velocity, legacy) |
+| `/home/velo/wa-feedback-service/` | Feedback proxy (Velocity, legacy) |

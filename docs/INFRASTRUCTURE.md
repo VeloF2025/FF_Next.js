@@ -1,11 +1,11 @@
 # FibreFlow Infrastructure Documentation
 
-> Last updated: 19 Feb 2026
+> Last updated: 28 Feb 2026
 
 ## Velocity Server
 
 **Server:** 100.96.203.105 (Tailscale) / 192.168.1.150 (LAN)
-**Access:** `ssh velo@100.96.203.105` (use SSH key or stored credentials)
+**Access:** Claude runs directly on Velocity as `hein`. Use `sudo -u velo` for deploy dirs (passwordless).
 **Specs:** RTX 5090 GPU, 128GB RAM, Ubuntu Server
 
 ### Storage
@@ -53,14 +53,31 @@ Password: <set in .env - never commit credentials>
 
 ### Deployment Commands
 
-**Deploy to Staging (vf.fibreflow.app):**
+Claude/hein runs directly on Velocity — no SSH needed. Passwordless sudo via `/etc/sudoers.d/fibreflow-deploy`.
+
+**Deploy to Dev (dev.fibreflow.app):**
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git pull && npm run build && sudo systemctl restart fibreflow.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
+sudo systemctl restart fibreflow-dev.service
 ```
 
-**Deploy to Production (app.fibreflow.app):**
+**Deploy to Staging (vf.fibreflow.app) — after hours only:**
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git pull origin master && npm run build && sudo systemctl restart fibreflow-production.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow.service
+```
+
+**Deploy to Production (app.fibreflow.app) — after hours only:**
+```bash
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow-production.service
+```
+
+**Or use deploy scripts:**
+```bash
+bash scripts/deploy-gate.sh dev              # Always allowed
+bash scripts/promote.sh dev staging          # After hours
+bash scripts/promote.sh staging production   # After hours
 ```
 
 ---
@@ -320,21 +337,23 @@ location /storage/ {
 
 ### Check Service Status
 ```bash
-ssh velo@100.96.203.105
-sudo systemctl status fibreflow.service
-sudo systemctl status fibreflow-production.service
+sudo systemctl status fibreflow-dev.service          # Dev
+sudo systemctl status fibreflow.service               # Staging
+sudo systemctl status fibreflow-production.service    # Production
 ```
 
 ### View Logs
 ```bash
-sudo journalctl -u fibreflow.service -f
-sudo journalctl -u fibreflow-production.service -f
+journalctl -u fibreflow-dev -f              # Dev
+journalctl -u fibreflow -f                  # Staging
+journalctl -u fibreflow-production -f       # Production
 ```
 
-### Restart Services
+### Restart Services (no password needed)
 ```bash
-sudo systemctl restart fibreflow.service          # Staging
-sudo systemctl restart fibreflow-production.service  # Production
+sudo systemctl restart fibreflow-dev.service          # Dev
+sudo systemctl restart fibreflow.service               # Staging
+sudo systemctl restart fibreflow-production.service    # Production
 ```
 
 ### Check Ports

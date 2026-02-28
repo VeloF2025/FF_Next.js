@@ -33,7 +33,8 @@ Environment-aware deployment with time-gating. During business hours (08:00-17:0
 2. Push changes to origin: `git push origin master`
 3. Deploy to dev:
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-dev.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm install && npm run build'
+sudo systemctl restart fibreflow-dev.service
 ```
 4. Verify: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
 5. Test on https://dev.fibreflow.app
@@ -43,10 +44,11 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git pull origin master &
 1. **Get Hein's explicit approval before proceeding**
 2. Check current time — must be after 17:00 SAST or weekend
 2. Verify dev is healthy: `curl -s -o /dev/null -w "%{http_code}" https://dev.fibreflow.app/sign-in`
-3. Get dev commit: `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-dev && git rev-parse --short HEAD"`
+3. Get dev commit: `sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git rev-parse --short HEAD'`
 4. Promote exact commit to staging:
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow.service
 ```
 5. Verify: `curl -s -o /dev/null -w "%{http_code}" https://vf.fibreflow.app/sign-in`
 
@@ -54,10 +56,11 @@ ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git fetch origin && 
 
 1. **Get Hein's explicit approval before proceeding**
 2. Verify staging is healthy first
-2. Get staging commit: `ssh velo@100.96.203.105 "cd /home/velo/fibreflow-staging && git rev-parse --short HEAD"`
+2. Get staging commit: `sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git rev-parse --short HEAD'`
 3. Promote exact commit to production:
 ```bash
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build && echo 'velo2026' | sudo -S systemctl restart fibreflow-production.service"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+sudo systemctl restart fibreflow-production.service
 ```
 4. Verify: `curl -s -o /dev/null -w "%{http_code}" https://app.fibreflow.app/sign-in`
 
@@ -85,18 +88,20 @@ bash scripts/deploy-gate.sh status
 ## Check Status
 
 ```bash
-ssh velo@100.96.203.105 "echo '=== Dev ===' && cd /home/velo/fibreflow-dev && git log -1 --oneline && systemctl is-active fibreflow-dev && echo '=== Staging ===' && cd /home/velo/fibreflow-staging && git log -1 --oneline && systemctl is-active fibreflow && echo '=== Production ===' && cd /home/velo/fibreflow-production && git log -1 --oneline && systemctl is-active fibreflow-production"
+echo '=== Dev ===' && sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git log -1 --oneline' && systemctl is-active fibreflow-dev
+echo '=== Staging ===' && sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git log -1 --oneline' && systemctl is-active fibreflow
+echo '=== Production ===' && sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git log -1 --oneline' && systemctl is-active fibreflow-production
 ```
 
 ## View Logs
 
 ```bash
 # Dev
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-dev -n 50"
+journalctl -u fibreflow-dev -n 50 --no-pager
 # Staging
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow -n 50"
+journalctl -u fibreflow -n 50 --no-pager
 # Production
-ssh velo@100.96.203.105 "echo 'velo2026' | sudo -S journalctl -u fibreflow-production -n 50"
+journalctl -u fibreflow-production -n 50 --no-pager
 ```
 
 ## Rollback
@@ -105,10 +110,11 @@ Each deploy keeps 3 backups (`.next-backup-*`). To rollback:
 
 ```bash
 # List backups
-ssh velo@100.96.203.105 "ls -lt /home/velo/fibreflow-production/.next-backup-* | head -3"
+ls -lt /home/velo/fibreflow-production/.next-backup-* | head -3
 
 # Restore most recent backup (example for production)
-ssh velo@100.96.203.105 "cd /home/velo/fibreflow-production && mv .next .next-failed && mv \$(ls -dt .next-backup-* | head -1) .next && echo 'velo2026' | sudo -S systemctl restart fibreflow-production"
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && mv .next .next-failed && mv $(ls -dt .next-backup-* | head -1) .next'
+sudo systemctl restart fibreflow-production.service
 ```
 
 ## CRITICAL RULES

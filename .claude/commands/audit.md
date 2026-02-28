@@ -35,12 +35,10 @@ curl -s -o /dev/null -w 'PROD: %{http_code}\n' https://app.fibreflow.app/api/hea
 curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/health
 curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health
 
-# Internal (localhost on server)
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
-  echo 'PROD (3000):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
-  echo 'STAGING (3006):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
-  echo 'DEV (3005):' \$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
-"
+# Internal (localhost — run directly on Velocity)
+echo 'PROD (3000):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
+echo 'STAGING (3006):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
+echo 'DEV (3005):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
 ```
 
 **Expected:** All return `200`
@@ -59,27 +57,24 @@ sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
 ### 1.3 Critical Services (Server)
 
 ```bash
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "
-  echo '=== SERVICES ==='
-  echo 'nginx:' \$(systemctl is-active nginx)
-  echo 'cloudflared:' \$(systemctl is-active cloudflared-tunnel.service)
-  echo 'fibreflow-prod:' \$(systemctl is-active fibreflow-production.service)
-  echo 'fibreflow-staging:' \$(systemctl is-active fibreflow.service)
-  echo 'fibreflow-dev:' \$(systemctl is-active fibreflow-dev.service)
-  echo 'vllm-qwen:' \$(systemctl is-active vllm-qwen.service)
-  echo 'wa-monitor-prod:' \$(systemctl is-active wa-monitor-prod)
-  echo 'whatsapp-sender-2:' \$(systemctl is-active whatsapp-sender-2.service)
-  echo 'whatsapp-bridge-2:' \$(systemctl is-active whatsapp-bridge-2.service)
-  echo 'wa-feedback:' \$(systemctl is-active wa-feedback)
-  echo 'qfield-webhook:' \$(systemctl is-active qfield-oes-webhook)
-"
+# Run directly on Velocity (no SSH needed)
+echo '=== SERVICES ==='
+echo 'nginx:' $(systemctl is-active nginx)
+echo 'cloudflared:' $(systemctl is-active cloudflared-tunnel.service)
+echo 'fibreflow-prod:' $(systemctl is-active fibreflow-production.service)
+echo 'fibreflow-staging:' $(systemctl is-active fibreflow.service)
+echo 'fibreflow-dev:' $(systemctl is-active fibreflow-dev.service)
+echo 'vllm-qwen:' $(systemctl is-active vllm-qwen.service)
+echo 'wa-monitor-prod:' $(systemctl is-active wa-monitor-prod)
+echo 'wa-feedback:' $(systemctl is-active wa-feedback)
+echo 'qfield-webhook:' $(systemctl is-active qfield-oes-webhook)
 ```
 
 ### 1.4 Cloudflare Tunnel
 
 ```bash
-# Check tunnel connections
-sshpass -p '$VELO_SSH_PASSWORD' ssh velo@100.96.203.105 "curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep cloudflared_tunnel_ha_connections"
+# Check tunnel connections (run locally on Velocity)
+curl -s http://127.0.0.1:20241/metrics 2>/dev/null | grep cloudflared_tunnel_ha_connections
 ```
 
 **Expected:** `cloudflared_tunnel_ha_connections 4`
