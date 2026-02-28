@@ -39,6 +39,9 @@ export async function getJournalEntries(filters?: JournalEntryFilters): Promise<
     let rows: Row[];
     let countRows: Row[];
 
+    // Exclude auto-generated entries (auto_grn, auto_supplier_payment, etc.)
+    // so only manual journals appear in the UI. Auto entries still feed into
+    // trial balance and financial reports via getTrialBalance().
     if (filters?.status && filters?.fiscalPeriodId) {
       rows = (await sql`
         SELECT je.*, fp.period_name AS fiscal_period_name
@@ -46,12 +49,14 @@ export async function getJournalEntries(filters?: JournalEntryFilters): Promise<
         LEFT JOIN fiscal_periods fp ON fp.id = je.fiscal_period_id
         WHERE je.status = ${filters.status}
           AND je.fiscal_period_id = ${filters.fiscalPeriodId}
+          AND je.source NOT LIKE 'auto_%'
         ORDER BY je.entry_date DESC, je.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
       countRows = (await sql`
         SELECT COUNT(*) AS cnt FROM gl_journal_entries
         WHERE status = ${filters.status} AND fiscal_period_id = ${filters.fiscalPeriodId}
+          AND source NOT LIKE 'auto_%'
       `) as Row[];
     } else if (filters?.status) {
       rows = (await sql`
@@ -59,11 +64,13 @@ export async function getJournalEntries(filters?: JournalEntryFilters): Promise<
         FROM gl_journal_entries je
         LEFT JOIN fiscal_periods fp ON fp.id = je.fiscal_period_id
         WHERE je.status = ${filters.status}
+          AND je.source NOT LIKE 'auto_%'
         ORDER BY je.entry_date DESC, je.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
       countRows = (await sql`
-        SELECT COUNT(*) AS cnt FROM gl_journal_entries WHERE status = ${filters.status}
+        SELECT COUNT(*) AS cnt FROM gl_journal_entries
+        WHERE status = ${filters.status} AND source NOT LIKE 'auto_%'
       `) as Row[];
     } else if (filters?.fiscalPeriodId) {
       rows = (await sql`
@@ -71,22 +78,26 @@ export async function getJournalEntries(filters?: JournalEntryFilters): Promise<
         FROM gl_journal_entries je
         LEFT JOIN fiscal_periods fp ON fp.id = je.fiscal_period_id
         WHERE je.fiscal_period_id = ${filters.fiscalPeriodId}
+          AND je.source NOT LIKE 'auto_%'
         ORDER BY je.entry_date DESC, je.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
       countRows = (await sql`
         SELECT COUNT(*) AS cnt FROM gl_journal_entries
-        WHERE fiscal_period_id = ${filters.fiscalPeriodId}
+        WHERE fiscal_period_id = ${filters.fiscalPeriodId} AND source NOT LIKE 'auto_%'
       `) as Row[];
     } else {
       rows = (await sql`
         SELECT je.*, fp.period_name AS fiscal_period_name
         FROM gl_journal_entries je
         LEFT JOIN fiscal_periods fp ON fp.id = je.fiscal_period_id
+        WHERE je.source NOT LIKE 'auto_%'
         ORDER BY je.entry_date DESC, je.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
-      countRows = (await sql`SELECT COUNT(*) AS cnt FROM gl_journal_entries`) as Row[];
+      countRows = (await sql`
+        SELECT COUNT(*) AS cnt FROM gl_journal_entries WHERE source NOT LIKE 'auto_%'
+      `) as Row[];
     }
 
     return {
