@@ -32,7 +32,7 @@ export async function getCreditNotes(filters?: CreditNoteFilters): Promise<{
 
     if (filters?.type) {
       rows = (await sql`
-        SELECT cn.*, c.company_name AS client_name, s.name AS supplier_name,
+        SELECT cn.*, c.company_name AS client_name, COALESCE(s.company_name, s.name) AS supplier_name,
           COALESCE(ci.invoice_number, si.invoice_number) AS invoice_number
         FROM credit_notes cn
         LEFT JOIN clients c ON c.id = cn.client_id
@@ -47,7 +47,7 @@ export async function getCreditNotes(filters?: CreditNoteFilters): Promise<{
       `) as Row[];
     } else {
       rows = (await sql`
-        SELECT cn.*, c.company_name AS client_name, s.name AS supplier_name,
+        SELECT cn.*, c.company_name AS client_name, COALESCE(s.company_name, s.name) AS supplier_name,
           COALESCE(ci.invoice_number, si.invoice_number) AS invoice_number
         FROM credit_notes cn
         LEFT JOIN clients c ON c.id = cn.client_id
@@ -68,7 +68,7 @@ export async function getCreditNotes(filters?: CreditNoteFilters): Promise<{
 
 export async function getCreditNoteById(id: string): Promise<CreditNote | null> {
   const rows = (await sql`
-    SELECT cn.*, c.company_name AS client_name, s.name AS supplier_name,
+    SELECT cn.*, c.company_name AS client_name, COALESCE(s.company_name, s.name) AS supplier_name,
       COALESCE(ci.invoice_number, si.invoice_number) AS invoice_number
     FROM credit_notes cn
     LEFT JOIN clients c ON c.id = cn.client_id

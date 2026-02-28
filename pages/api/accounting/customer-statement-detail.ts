@@ -61,8 +61,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE client_id = ${clientId}::UUID AND type = 'customer' AND status = 'approved'
     `) as Row[];
 
+    // Normalize date to YYYY-MM-DD regardless of input format
+    function toISODate(val: unknown): string {
+      if (!val) return '1970-01-01';
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      const s = String(val);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0];
+    }
+
     // Build transaction list
     interface Transaction {
+      id: number | string;
       date: string;
       type: 'invoice' | 'payment' | 'credit_note';
       reference: string;
@@ -76,7 +87,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const inv of invoices) {
       transactions.push({
-        date: String(inv.invoice_date),
+        id: inv.id,
+        date: toISODate(inv.invoice_date),
         type: 'invoice',
         reference: String(inv.invoice_number),
         description: inv.reference ? String(inv.reference) : '',
@@ -88,7 +100,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const pmt of payments) {
       transactions.push({
-        date: String(pmt.payment_date),
+        id: pmt.id,
+        date: toISODate(pmt.payment_date),
         type: 'payment',
         reference: String(pmt.payment_number),
         description: pmt.bank_reference ? String(pmt.bank_reference) : '',
@@ -100,7 +113,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     for (const cn of creditNotes) {
       transactions.push({
-        date: String(cn.credit_date),
+        id: cn.id,
+        date: toISODate(cn.credit_date),
         type: 'credit_note',
         reference: String(cn.credit_note_number),
         description: cn.reason ? String(cn.reason) : '',
@@ -110,12 +124,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Sort by date, then invoice before payment/credit
+    // Sort chronologically, invoices before payments on same date
     transactions.sort((a, b) => {
-      const dateComp = a.date.localeCompare(b.date);
-      if (dateComp !== 0) return dateComp;
-      const typeOrder = { invoice: 0, credit_note: 1, payment: 2 };
-      return typeOrder[a.type] - typeOrder[b.type];
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      const typeOrder: Record<string, number> = { invoice: 0, credit_note: 1, payment: 2 };
+      return (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9);
     });
 
     // Calculate running balance

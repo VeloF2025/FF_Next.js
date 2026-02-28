@@ -4,10 +4,10 @@
  * Generate and email customer account statements
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ClipboardList, Loader2, AlertCircle, Download, ChevronRight } from 'lucide-react';
+import { ClipboardList, Loader2, AlertCircle, Download, ChevronRight, Search } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -58,6 +58,13 @@ export default function CustomerStatementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
+  const [search, setSearch] = useState('');
+
+  const filteredCustomers = useMemo(() => {
+    if (!search.trim()) return customers;
+    const q = search.toLowerCase();
+    return customers.filter(c => c.client_name.toLowerCase().includes(q));
+  }, [customers, search]);
 
   /** Downloads all loaded customer balances as a single CSV file. */
   function handleDownloadAll(): void {
@@ -111,6 +118,16 @@ export default function CustomerStatementsPage() {
               onChange={(e) => setAsAtDate(e.target.value)}
               className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
             />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                placeholder="Search customer..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm placeholder:text-[var(--ff-text-tertiary)] w-48"
+              />
+            </div>
             {customers.length > 0 && (
               <button
                 onClick={handleDownloadAll}
@@ -132,7 +149,7 @@ export default function CustomerStatementsPage() {
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
-          ) : customers.length === 0 ? (
+          ) : filteredCustomers.length === 0 ? (
             <div className="text-center py-12">
               <ClipboardList className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
               <p className="text-[var(--ff-text-secondary)]">No customer balances found</p>
@@ -152,7 +169,7 @@ export default function CustomerStatementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((c) => (
+                  {filteredCustomers.map((c) => (
                     <tr key={c.client_id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
                       <td className="py-3 px-4 text-[var(--ff-text-primary)] font-medium">
                         <Link href={`/accounting/customer-statements/${c.client_id}`} className="hover:text-purple-400 transition-colors">

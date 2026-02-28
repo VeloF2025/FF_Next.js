@@ -3,11 +3,11 @@
  * Shows full transaction history with running balance for a single client
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, ClipboardList, Loader2, AlertCircle, Download, FileText } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Loader2, AlertCircle, Download, FileText, Search, ExternalLink } from 'lucide-react';
 import { generateStatementPdf } from '@/modules/accounting/utils/statementPdf';
 
 function formatCurrency(amount: number): string {
@@ -22,6 +22,7 @@ function formatDate(dateStr: string): string {
 }
 
 interface Transaction {
+  id: number | string;
   date: string;
   type: 'invoice' | 'payment' | 'credit_note';
   reference: string;
@@ -43,6 +44,16 @@ interface Summary {
   totalPaid: number;
   totalCredits: number;
   balance: number;
+}
+
+type TypeFilter = 'all' | 'invoice' | 'payment' | 'credit_note';
+
+function getTransactionUrl(txn: Transaction): string | null {
+  switch (txn.type) {
+    case 'invoice': return `/accounting/customer-invoices/${txn.id}`;
+    case 'payment': return `/accounting/customer-payments/${txn.id}`;
+    default: return null;
+  }
 }
 
 function TypeBadge({ type }: { type: string }) {
@@ -72,6 +83,8 @@ export default function CustomerStatementDetailPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
   const loadStatement = useCallback(async () => {
     if (!clientId) return;
@@ -92,6 +105,20 @@ export default function CustomerStatementDetailPage() {
   }, [clientId]);
 
   useEffect(() => { loadStatement(); }, [loadStatement]);
+
+  const filteredTransactions = useMemo(() => {
+    let filtered = transactions;
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(t => t.type === typeFilter);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.reference.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [transactions, search, typeFilter]);
 
   function handleExportCSV() {
     if (!client || transactions.length === 0) return;
@@ -130,6 +157,13 @@ export default function CustomerStatementDetailPage() {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  const typeButtons: { label: string; value: TypeFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Invoices', value: 'invoice' },
+    { label: 'Payments', value: 'payment' },
+    { label: 'Credit Notes', value: 'credit_note' },
+  ];
 
   return (
     <AppLayout>
@@ -203,41 +237,84 @@ export default function CustomerStatementDetailPage() {
                   No transactions found for this customer
                 </div>
               ) : (
-                <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                        <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Date</th>
-                        <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Type</th>
-                        <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Reference</th>
-                        <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Description</th>
-                        <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Debit</th>
-                        <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Credit</th>
-                        <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map((txn, i) => (
-                        <tr key={`${txn.type}-${txn.reference}-${i}`}
-                          className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
-                          <td className="px-4 py-3 text-[var(--ff-text-secondary)] whitespace-nowrap">{formatDate(txn.date)}</td>
-                          <td className="px-4 py-3"><TypeBadge type={txn.type} /></td>
-                          <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{txn.reference}</td>
-                          <td className="px-4 py-3 text-[var(--ff-text-tertiary)] max-w-[240px] truncate">{txn.description || '-'}</td>
-                          <td className="px-4 py-3 text-right font-mono text-[var(--ff-text-primary)]">
-                            {txn.debit > 0 ? formatCurrency(txn.debit) : ''}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-mono ${txn.type === 'payment' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {txn.credit > 0 ? formatCurrency(txn.credit) : ''}
-                          </td>
-                          <td className={`px-4 py-3 text-right font-mono font-medium ${txn.balance > 0 ? 'text-[var(--ff-text-primary)]' : 'text-emerald-400'}`}>
-                            {formatCurrency(txn.balance)}
-                          </td>
-                        </tr>
+                <>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px] max-w-sm">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+                      <input
+                        type="text"
+                        placeholder="Search reference or description..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm placeholder:text-[var(--ff-text-tertiary)]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {typeButtons.map(btn => (
+                        <button
+                          key={btn.value}
+                          onClick={() => setTypeFilter(btn.value)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            typeFilter === btn.value
+                              ? 'bg-purple-500/20 text-purple-400'
+                              : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                          }`}
+                        >
+                          {btn.label}
+                        </button>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                          <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Date</th>
+                          <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Type</th>
+                          <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Reference</th>
+                          <th className="text-left px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Description</th>
+                          <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Debit</th>
+                          <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Credit</th>
+                          <th className="text-right px-4 py-3 text-[var(--ff-text-secondary)] font-medium">Balance</th>
+                          <th className="w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTransactions.map((txn, i) => {
+                          const url = getTransactionUrl(txn);
+                          return (
+                            <tr key={`${txn.type}-${txn.reference}-${i}`}
+                              onClick={url ? () => router.push(url) : undefined}
+                              className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] ${url ? 'cursor-pointer' : ''}`}>
+                              <td className="px-4 py-3 text-[var(--ff-text-secondary)] whitespace-nowrap">{formatDate(txn.date)}</td>
+                              <td className="px-4 py-3"><TypeBadge type={txn.type} /></td>
+                              <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{txn.reference}</td>
+                              <td className="px-4 py-3 text-[var(--ff-text-tertiary)] max-w-[240px] truncate">{txn.description || '-'}</td>
+                              <td className="px-4 py-3 text-right font-mono text-[var(--ff-text-primary)]">
+                                {txn.debit > 0 ? formatCurrency(txn.debit) : ''}
+                              </td>
+                              <td className={`px-4 py-3 text-right font-mono ${txn.type === 'payment' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                {txn.credit > 0 ? formatCurrency(txn.credit) : ''}
+                              </td>
+                              <td className={`px-4 py-3 text-right font-mono font-medium ${txn.balance > 0 ? 'text-[var(--ff-text-primary)]' : 'text-emerald-400'}`}>
+                                {formatCurrency(txn.balance)}
+                              </td>
+                              <td className="px-2 py-3">
+                                {url && <ExternalLink className="h-3.5 w-3.5 text-[var(--ff-text-tertiary)]" />}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {filteredTransactions.length === 0 && (
+                      <div className="text-center py-8 text-[var(--ff-text-tertiary)] text-sm">
+                        No transactions match your filter
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </>
           )}

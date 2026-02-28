@@ -3,10 +3,10 @@
  * AP equivalent of Customer Statements — shows balances by supplier
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ClipboardList, Loader2, AlertCircle, Download, ChevronRight } from 'lucide-react';
+import { ClipboardList, Loader2, AlertCircle, Download, ChevronRight, Search } from 'lucide-react';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -28,6 +28,7 @@ export default function SupplierStatementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -65,7 +66,13 @@ export default function SupplierStatementsPage() {
     URL.revokeObjectURL(url);
   }
 
-  const totals = suppliers.reduce(
+  const filteredSuppliers = useMemo(() => {
+    if (!search.trim()) return suppliers;
+    const q = search.toLowerCase();
+    return suppliers.filter(s => s.entityName.toLowerCase().includes(q));
+  }, [suppliers, search]);
+
+  const totals = filteredSuppliers.reduce(
     (acc, s) => ({
       current: acc.current + s.current,
       days30: acc.days30 + s.days30,
@@ -101,6 +108,16 @@ export default function SupplierStatementsPage() {
             <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
             <input type="date" value={asAtDate} onChange={e => setAsAtDate(e.target.value)}
               className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm" />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                placeholder="Search supplier..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm placeholder:text-[var(--ff-text-tertiary)] w-48"
+              />
+            </div>
             {suppliers.length > 0 && (
               <button onClick={handleExportAll}
                 className="ml-auto flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm font-medium">
@@ -119,7 +136,7 @@ export default function SupplierStatementsPage() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
             </div>
-          ) : suppliers.length === 0 ? (
+          ) : filteredSuppliers.length === 0 ? (
             <div className="text-center py-12 text-[var(--ff-text-secondary)]">
               No outstanding supplier balances
             </div>
@@ -139,7 +156,7 @@ export default function SupplierStatementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {suppliers.map(s => (
+                  {filteredSuppliers.map(s => (
                     <tr key={s.entityId} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]">
                       <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">
                         <Link href={`/accounting/supplier-statements/${s.entityId}`} className="hover:text-orange-400 transition-colors">
