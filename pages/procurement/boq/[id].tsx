@@ -10,9 +10,13 @@ import {
   ArrowLeft, FileText, Calendar, Package, Edit2, Save, X,
   Trash2, Download, Loader2, XCircle, CheckCircle, Clock,
   User, Upload, ChevronDown, Eye, EyeOff, History, ArrowRight, Search, Filter,
+  ShoppingCart,
 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import StockItemMapper from '@/components/procurement/boq/StockItemMapper';
+import { BOQLifecycleKPIs } from '@/components/procurement/boq/BOQLifecycleKPIs';
+import { BOQItemLinksPopover } from '@/components/procurement/boq/BOQItemLinksPopover';
+import type { BOQLifecycleResponse, BOQLifecycleLine, LifecycleStatus } from '@/types/procurement/boq-lifecycle.types';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
 import * as XLSX from 'xlsx';
@@ -134,6 +138,11 @@ export default function BOQDetailPage() {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Lifecycle tracking states
+  const [showProcurement, setShowProcurement] = useState(false);
+  const [lifecycleData, setLifecycleData] = useState<BOQLifecycleResponse | null>(null);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
+
   useEffect(() => {
     if (id && typeof id === 'string') {
       fetchBOQ(id);
@@ -190,6 +199,42 @@ export default function BOQDetailPage() {
       log.error('Failed to fetch change history', err);
     }
   };
+
+  const fetchLifecycle = async (boqId: string) => {
+    setLifecycleLoading(true);
+    try {
+      const res = await fetch(`/api/procurement/boq-lifecycle?boqId=${boqId}`);
+      const json = await res.json() as { success: boolean; data?: BOQLifecycleResponse; error?: { message: string } };
+      if (json.success && json.data) {
+        setLifecycleData(json.data);
+      } else {
+        log.error('Failed to load lifecycle data', { error: json.error?.message }, 'BOQDetailPage');
+        notificationService.error(json.error?.message || 'Failed to load procurement data');
+      }
+    } catch (err) {
+      log.error('Failed to fetch lifecycle', err);
+      notificationService.error('Failed to load procurement data');
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  const handleToggleProcurement = () => {
+    const next = !showProcurement;
+    setShowProcurement(next);
+    if (next && !lifecycleData && id && typeof id === 'string') {
+      fetchLifecycle(id);
+    }
+  };
+
+  const lifecycleMap = useMemo(() => {
+    if (!lifecycleData) return new Map<string, BOQLifecycleLine>();
+    const map = new Map<string, BOQLifecycleLine>();
+    for (const line of lifecycleData.lines) {
+      map.set(line.boqItemId, line);
+    }
+    return map;
+  }, [lifecycleData]);
 
   // NEW: Debounce search term
   useEffect(() => {
@@ -645,6 +690,19 @@ export default function BOQDetailPage() {
                   {hiddenCount > 0 && <span className="text-xs text-yellow-400">({hiddenCount})</span>}
                 </label>
 
+                {/* Show Procurement Toggle */}
+                <button
+                  onClick={handleToggleProcurement}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                    showProcurement
+                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                      : 'bg-[var(--ff-bg-primary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+                  }`}
+                >
+                  {lifecycleLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5" />}
+                  Show Procurement
+                </button>
+
                 {/* Clear Filters Button */}
                 {hasActiveFilters && (
                   <button
@@ -657,6 +715,13 @@ export default function BOQDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Lifecycle KPI Cards */}
+            {showProcurement && lifecycleData && (
+              <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+                <BOQLifecycleKPIs summary={lifecycleData.summary} />
+              </div>
+            )}
 
             {/* Table */}
             <div className="overflow-x-auto">
@@ -676,6 +741,15 @@ export default function BOQDetailPage() {
                       <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-16">UOM</th>
                       <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-28">Unit Price</th>
                       <th className="px-3 py-3 text-right text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-32">Total</th>
+                      {showProcurement && lifecycleData && (
+                        <>
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-purple-400 tracking-wide w-28">Ordered</th>
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-green-400 tracking-wide w-28">Delivered</th>
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-blue-400 tracking-wide w-28">Invoiced</th>
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-emerald-400 tracking-wide w-28">Paid</th>
+                          <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--ff-text-primary)] tracking-wide w-28">Status</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -739,6 +813,66 @@ export default function BOQDetailPage() {
                                 : item.totalPrice || (item.quantity * (item.unitPrice || 0))
                             )}
                           </td>
+                          {showProcurement && lifecycleData && (() => {
+                            const lc = lifecycleMap.get(item.id);
+                            if (!lc) return (
+                              <>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">--</td>
+                              </>
+                            );
+                            return (
+                              <>
+                                <td className="px-3 py-2 text-right">
+                                  {lc.orderedQty > 0 ? (
+                                    <div>
+                                      <div className="text-sm font-medium text-purple-400">{formatCurrency(lc.orderedValue)}</div>
+                                      <div className="text-xs text-[var(--ff-text-tertiary)]">{lc.orderedQty} {lc.uom}</div>
+                                      <BOQItemLinksPopover
+                                        items={lc.linkedPOs.map(po => ({ id: po.id, label: po.poNumber, href: `/procurement/purchase-orders/${po.id}` }))}
+                                        badgeLabel="POs"
+                                        badgeColor="text-purple-400"
+                                      />
+                                    </div>
+                                  ) : <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {lc.receivedQty > 0 ? (
+                                    <div>
+                                      <div className="text-sm font-medium text-green-400">{formatCurrency(lc.receivedValue)}</div>
+                                      <div className="text-xs text-[var(--ff-text-tertiary)]">{lc.receivedQty} {lc.uom}</div>
+                                      <BOQItemLinksPopover
+                                        items={lc.linkedGRNs.map(grn => ({ id: grn.id, label: grn.grnNumber, href: `/procurement/grn/${grn.id}` }))}
+                                        badgeLabel="GRNs"
+                                        badgeColor="text-green-400"
+                                      />
+                                    </div>
+                                  ) : <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {lc.invoicedValue > 0 ? (
+                                    <div>
+                                      <div className="text-sm font-medium text-blue-400">{formatCurrency(lc.invoicedValue)}</div>
+                                      <BOQItemLinksPopover
+                                        items={lc.linkedInvoices.map(inv => ({ id: inv.id, label: inv.invoiceNumber, href: `/accounting/supplier-invoices/${inv.id}` }))}
+                                        badgeLabel="Invoices"
+                                        badgeColor="text-blue-400"
+                                      />
+                                    </div>
+                                  ) : <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {lc.paidValue > 0 ? (
+                                    <div className="text-sm font-medium text-emerald-400">{formatCurrency(lc.paidValue)}</div>
+                                  ) : <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>}
+                                </td>
+                                <td className="px-3 py-2">{lifecycleStatusBadge(lc.lifecycleStatus)}</td>
+                              </>
+                            );
+                          })()}
                         </tr>
                       );
                     })}
@@ -751,6 +885,23 @@ export default function BOQDetailPage() {
                       <td className="px-3 py-3 text-sm font-bold text-[var(--ff-text-primary)] text-right whitespace-nowrap">
                         {formatCurrency(totalValue)}
                       </td>
+                      {showProcurement && lifecycleData && (
+                        <>
+                          <td className="px-3 py-3 text-sm font-bold text-purple-400 text-right whitespace-nowrap">
+                            {formatCurrency(lifecycleData.summary.totalOrderedValue)}
+                          </td>
+                          <td className="px-3 py-3 text-sm font-bold text-green-400 text-right whitespace-nowrap">
+                            {formatCurrency(lifecycleData.summary.totalReceivedValue)}
+                          </td>
+                          <td className="px-3 py-3 text-sm font-bold text-blue-400 text-right whitespace-nowrap">
+                            {formatCurrency(lifecycleData.summary.totalInvoicedValue)}
+                          </td>
+                          <td className="px-3 py-3 text-sm font-bold text-emerald-400 text-right whitespace-nowrap">
+                            {formatCurrency(lifecycleData.summary.totalPaidValue)}
+                          </td>
+                          <td />
+                        </>
+                      )}
                     </tr>
                   </tfoot>
                 </table>
@@ -901,4 +1052,18 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
       <span className="text-[var(--ff-text-primary)]">{value}</span>
     </div>
   );
+}
+
+function lifecycleStatusBadge(status: LifecycleStatus) {
+  const config: Record<LifecycleStatus, { label: string; classes: string }> = {
+    not_started: { label: 'Not Started', classes: 'text-[var(--ff-text-tertiary)]' },
+    ordered: { label: 'Ordered', classes: 'text-purple-400' },
+    partially_delivered: { label: 'Part Delivered', classes: 'text-yellow-400' },
+    delivered: { label: 'Delivered', classes: 'text-green-400' },
+    invoiced: { label: 'Invoiced', classes: 'text-blue-400' },
+    partially_paid: { label: 'Part Paid', classes: 'text-amber-400' },
+    paid: { label: 'Paid', classes: 'text-emerald-400' },
+  };
+  const c = config[status] || config.not_started;
+  return <span className={`inline-flex items-center text-xs font-medium ${c.classes}`}>{c.label}</span>;
 }
