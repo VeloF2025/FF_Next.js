@@ -194,9 +194,10 @@ Velocity Fibre (Pty) Ltd — Connecting Communities, Empowering Futures
 9. [Fleet Management](#9-fleet-management)
 10. [Human Resources](#10-human-resources)
 11. [Analytics](#11-analytics)
-12. [Communications](#12-communications)
-13. [System Administration](#13-system-administration)
-14. [Appendices](#14-appendices)
+12. [Accounting](#12-accounting)
+13. [Communications](#13-communications)
+14. [System Administration](#14-system-administration)
+15. [Appendices](#15-appendices)
 
 ---
 
@@ -2941,11 +2942,177 @@ New analytics for field technician performance:
 
 ---
 
-## 12. Communications
+## 12. Accounting
+
+The Accounting module is a full double-entry accounting system aligned with Sage conventions. It covers General Ledger, Accounts Payable, Accounts Receivable, Bank Reconciliation, VAT, and Financial Reporting.
+
+**Navigation:** Sidebar → **Accounting**
+
+The module opens a tabbed interface with five main tabs: **Overview**, **Chart of Accounts**, **Journal Entries**, **Fiscal Periods**, and **Reports**. Sub-features are accessed through the horizontal navigation bar at the top of every accounting page.
+
+**(Admin / Manager — most features)**
+
+### 12.1 Dashboard (Overview)
+**Navigation:** Sidebar → **Accounting** → **Overview** tab
+
+The Accounting Dashboard shows key financial metrics at a glance:
+
+- **Total Revenue** — Year-to-date income from customer invoices
+- **Total Expenses** — Year-to-date costs from supplier invoices and journals
+- **Outstanding AR** — Unpaid customer invoices
+- **Outstanding AP** — Unpaid supplier invoices
+- **Bank Balances** — Current balances across all bank accounts
+- **Recent Transactions** — Latest journal entries and payments
+
+### 12.2 Chart of Accounts
+**Navigation:** Sidebar → **Accounting** → **Chart of Accounts** tab
+
+The Chart of Accounts defines every GL account in the system. Accounts follow a standard hierarchy:
+
+| Range | Category |
+|-------|----------|
+| 1000–1999 | Assets |
+| 2000–2999 | Liabilities |
+| 3000–3999 | Equity |
+| 4000–4999 | Revenue |
+| 5000–5999 | Cost of Sales |
+| 6000–6999 | Operating Expenses |
+| 7000–7999 | Other Income/Expenses |
+
+**Key Features:**
+- **Account Hierarchy** — Parent/child account groupings
+- **Account CRUD** — Add, edit, and deactivate accounts
+- **Default Accounts** — Map expense categories to GL accounts for auto-posting
+- **Opening Balances** — Capture initial balances during migration
+
+### 12.3 Journal Entries
+**Navigation:** Sidebar → **Accounting** → **Journal Entries** tab
+
+Journal entries are the foundation of double-entry bookkeeping. Every financial transaction creates balanced debit/credit entries.
+
+**Creating a Journal Entry:**
+1. Click **New Journal Entry**
+2. Select the posting date and reference
+3. Add line items — each line has an account, description, debit or credit amount
+4. The entry must balance (total debits = total credits)
+5. Click **Save as Draft** or **Post** to finalise
+
+**Entry Statuses:** Draft → Posted → (optionally) Reversed
+
+> **Important:** Posted entries cannot be edited. To correct a posted entry, create a reversing entry.
+
+### 12.4 Fiscal Periods
+**Navigation:** Sidebar → **Accounting** → **Fiscal Periods** tab
+
+Fiscal periods control which date ranges accept transactions.
+
+- **Open** — Transactions can be posted
+- **Closed** — No new transactions (can be re-opened by admin)
+- **Locked** — Permanently sealed after year-end
+
+**Year-End Process:** Navigate to **Accounting** → **Year End** to close the fiscal year and generate closing entries.
+
+### 12.5 Accounts Payable (Suppliers)
+**Navigation:** Sidebar → **Accounting** → **Suppliers** tab
+
+#### Supplier Invoices
+- **List View** — All supplier invoices with status filter (Draft, Pending Approval, Approved, Paid, Disputed)
+- **New Invoice** — Capture a supplier invoice with line items. Supports **3-way matching** (PO vs GRN vs Invoice)
+- **Detail View** — View the invoice with match status, approval workflow, and payment history
+
+#### Supplier Payments
+- **Payment List** — View all payments with allocation status
+- **New Payment** — Allocate payment across multiple outstanding invoices
+- **Batch Payments** — Group multiple payments into a single batch for processing
+
+#### AP Aging
+- **AP Aging Report** — Aging buckets: Current, 30, 60, 90, 120+ days
+- **Supplier Statements** — Generate and review statements per supplier
+- **Supplier Age Analysis** — Detailed breakdown by supplier
+
+### 12.6 Accounts Receivable (Customers)
+**Navigation:** Sidebar → **Accounting** → **Customers** tab
+
+#### Customer Invoices
+- **List View** — All customer invoices with status tracking
+- **New Invoice** — Create an invoice that auto-posts to the General Ledger
+- **Detail View** — Invoice with payment allocation history
+
+#### Customer Payments
+- **Payment List** — Track payments received
+- **New Payment** — Record a payment and allocate it against outstanding invoices
+
+#### AR Aging
+- **AR Aging Report** — Customer aging: Current, 30, 60, 90, 120+ days
+- **Customer Statements** — Generate statements for individual customers
+- **Credit Notes** — Issue credit notes against invoices (supplier or customer)
+
+### 12.7 Banking
+**Navigation:** Sidebar → **Accounting** → **Banking** tab
+
+#### Bank Reconciliation
+The reconciliation workspace matches imported bank transactions against GL entries:
+
+1. **Import Bank Data** — Upload CSV files (FNB, Standard Bank, Nedbank supported) or enter transactions manually
+2. **Start Reconciliation** — Create a new recon session for a bank account and date range
+3. **Match Transactions** — Manually match or use **Auto-Match** to pair bank lines with GL entries
+4. **Review & Complete** — Verify all matches and mark the reconciliation as complete
+
+#### Bank Accounts & Cashbook
+- **Bank Accounts** — Configure bank account details
+- **Bank Transactions** — View all imported and manual transactions
+- **Cashbook** — Running balance view across all bank accounts
+- **Bank Transfers** — Record inter-account transfers
+- **Bank Rules** — Define matching rules for auto-reconciliation
+
+### 12.8 VAT
+**Navigation:** Sidebar → **Accounting** → **VAT** tab
+
+- **VAT Return** — Generate input/output VAT summary for SARS filing
+- **VAT Adjustments** — Post correcting VAT journal entries
+- **DRC VAT** — Domestic Reverse Charge VAT handling for qualifying transactions
+
+### 12.9 Reports
+**Navigation:** Sidebar → **Accounting** → **Reports** tab
+
+The Reports hub provides categorised access to all financial reports:
+
+| Category | Reports |
+|----------|---------|
+| **Financial Statements** | Income Statement, Balance Sheet, Cash Flow Statement |
+| **General Ledger** | Trial Balance, General Ledger, Account Transactions |
+| **Tax & Regulatory** | VAT Return, DRC VAT |
+| **Customer Reports** | Customer Report, Customer Detail, AR Aging |
+| **Supplier Reports** | Supplier Report, Supplier Detail, AP Aging |
+| **Banking** | Bank Transactions, Unallocated Payments, Unallocated Receipts |
+| **Items & Inventory** | Item Listing, Item Movement, Item Quantities, Item Valuation |
+| **Analysis** | Project Profitability, Budget vs Actual, Audit Trail |
+
+### 12.10 Data Import & Migration
+**Navigation:** Sidebar → **Accounting** → **Data Import** tab
+
+- **Sage Migration** — Import historical data from Sage (accounts, transactions, balances)
+- **Data Import** — Bulk import utilities for customers, suppliers, items, and transactions
+- **Opening Balances** — Capture GL opening balances for initial setup
+
+#### Configuration Pages
+- **Cost Centres** — Define cost centres for departmental tracking
+- **Customer / Supplier Categories** — Classify customers and suppliers
+- **Currencies & Exchange Rates** — Multi-currency setup and conversion rates
+- **Item Pricing** — Customer-specific product pricing
+- **Budgets** — Budget planning and tracking by GL account
+- **Depreciation** — Fixed asset depreciation schedules
+- **Recurring Invoices / Journals** — Templates for auto-generated transactions
+- **Dunning** — Automated collection reminder configuration
+- **Write-offs** — Bad debt and obsolescence write-off management
+
+---
+
+## 13. Communications
 
 The Communications section manages WhatsApp integration, meeting coordination, and team notifications.
 
-### 12.1 Communications Portal
+### 13.1 Communications Portal
 **Navigation:** Sidebar → **Communications** → **Communications Portal**
 
 ![Communications](/help-center/screenshots/30-communications.png)
@@ -2968,7 +3135,7 @@ The Meetings module is now part of the Communications Portal, providing:
 - **Access Control** — Participant-based access (only see meetings you attended)
 - **Super Admin Override** — Super admins can access all meetings regardless of participation
 
-### 12.2 WhatsApp Administration
+### 13.2 WhatsApp Administration
 
 **(Admin only)**
 
@@ -2997,7 +3164,7 @@ The Meetings module is now part of the Communications Portal, providing:
   - **Bridge** (port 8083) — Receives DR submissions
   - **Feedback** (port 8092) — Sends QA feedback
 
-### 12.3 PDF Tools
+### 13.3 PDF Tools
 
 **Navigation:** Sidebar → **Communications** → **PDF Tools**
 
@@ -3009,7 +3176,7 @@ A collection of PDF manipulation tools:
 - Rotate pages
 - Add watermarks
 
-### 12.4 Help Center & AI Chat Assistant
+### 13.4 Help Center & AI Chat Assistant
 FibreFlow includes a comprehensive Help Center with an AI-powered chat assistant to provide instant support and documentation access.
 
 **Navigation:** Sidebar → **Communications** → **Help Center**
@@ -3071,7 +3238,7 @@ The floating chat button is available on every page in FibreFlow, providing inst
 
 ---
 
-### 12.5 Mission Control (Agent Dashboard)
+### 13.5 Mission Control (Agent Dashboard)
 Mission Control is an AI agent coordination dashboard that provides real-time monitoring and management of VelocityFibre's autonomous agent workforce. Supervisors and administrators can view agent status, assign tasks, monitor the live communication feed, and track system health.
 
 **Navigation:** Sidebar → **Communications** → **Mission Control**
@@ -3458,13 +3625,13 @@ GET /api/mission-control/messages?limit=50
 
 ---
 
-## 13. System Administration
+## 14. System Administration
 
 The System section provides administrative tools for monitoring, data management, and configuration.
 
 **(Admin only — most features)**
 
-### 13.1 System Health Hub
+### 14.1 System Health Hub
 
 **Navigation:** Sidebar → **System** → **System Health Hub**
 
@@ -3478,7 +3645,7 @@ Monitor the health of all FibreFlow services:
 - **Job Queue** — Background task processing status
 - **Error Tracking** — Recent errors and their frequency
 
-### 13.2 Data Sync
+### 14.2 Data Sync
 **Navigation:** Sidebar → **System** → **Data Sync**
 
 ![Data Sync](/help-center/screenshots/33-data-sync.png)
@@ -3575,7 +3742,7 @@ The OLT Report tool manages ONT serial number corrections with comprehensive enh
 
 > **Important:** When swapping serials between DRs, always verify the photos are transferred correctly. The system automatically handles photo re-sync, but visual confirmation is recommended for critical installations.
 
-### 13.3 VLM Learning
+### 14.3 VLM Learning
 **Navigation:** Sidebar → **System** → **VLM Learning**
 
 FibreFlow now includes an enterprise-wide VLM (Vision Language Model) learning system:
@@ -3597,7 +3764,7 @@ VLM Learning integrates with:
 - **QField QA** — Photo validation and compliance checking
 - **Assets** — Asset label verification
 
-### 13.4 Infrastructure
+### 14.4 Infrastructure
 
 **Navigation:** Sidebar → **System** → **Infrastructure**
 
@@ -3607,7 +3774,7 @@ Monitor FibreFlow infrastructure:
 - Resource utilization
 - Links to external monitoring (xyOps, Grafana) — **Currently hidden**
 
-### 13.5 Settings
+### 14.5 Settings
 
 **Navigation:** Sidebar → **System** → **Settings**
 
@@ -3634,7 +3801,7 @@ Users can customize their sidebar by:
 3. Reorder sections by drag-and-drop
 4. Save preferences (stored per user)
 
-### 13.6 Imports & Downloads
+### 14.6 Imports & Downloads
 
 **Navigation:** Sidebar → **System** → **Imports** / **Downloads** — **Currently hidden**
 
@@ -3643,7 +3810,7 @@ Users can customize their sidebar by:
 
 ---
 
-## 14. Appendices
+## 15. Appendices
 
 ### Appendix A: What's New in Version 1.5
 
