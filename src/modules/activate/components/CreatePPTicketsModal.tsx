@@ -37,7 +37,7 @@ export function CreatePPTicketsModal({
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    fetch('/api/contractors-teams?active=true')
+    fetch('/api/maintenance/teams?dropdown=true')
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {

@@ -144,12 +144,12 @@ async function sendTeamNotification(
   tickets: { id: string; ticket_uid: string; pp_data_id: number }[],
   projectCounts: Record<string, number>
 ): Promise<void> {
-  // Get team name and member emails
+  // Get team name and member emails from NOC teams table
   const teamResult = await pool.query(
-    `SELECT ct.name AS team_name, tm.first_name, tm.email
-     FROM contractor_teams ct
-     JOIN team_members tm ON tm.team_id = ct.id
-     WHERE ct.id = $1 AND tm.is_active = TRUE AND tm.email IS NOT NULL`,
+    `SELECT t.name AS team_name, tm.first_name, tm.email
+     FROM teams t
+     JOIN team_members tm ON tm.team_id = t.id
+     WHERE t.id = $1 AND tm.is_active = TRUE AND tm.email IS NOT NULL`,
     [teamId]
   );
 
