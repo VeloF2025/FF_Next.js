@@ -147,7 +147,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
   'communications': {
     to: '/communications',
     icon: MessageSquare,
-    label: 'Communications',
+    label: 'Communications Hub',
     shortLabel: 'Comms',
     permissions: [],
     rbacKey: 'communications.main',

@@ -2,7 +2,7 @@
  * Communications section configuration
  */
 
-import { MessageSquare, Users, CheckCircle, ListTodo, Phone, FileText, BookOpen, Satellite } from 'lucide-react';
+import { MessageSquare, ListTodo, Phone, FileText, BookOpen, Satellite } from 'lucide-react';
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
 
@@ -14,6 +14,22 @@ export const communicationsSection: NavSection = {
   sectionId: 'communications',
   isCollapsible: true,
   items: [
+    {
+      to: '/communications',
+      icon: MessageSquare,
+      label: 'Communications Hub',
+      shortLabel: 'Comms',
+      permissions: [],
+      rbacKey: 'communications.main',
+    },
+    {
+      to: '/communications/whatsapp',
+      icon: Phone,
+      label: 'WhatsApp Portal',
+      shortLabel: 'WhatsApp',
+      permissions: [Permission.SYSTEM_ADMIN], // Admin only
+      rbacKey: 'communications.whatsapp',
+    },
     {
       to: '/communications/help-center',
       icon: BookOpen,
@@ -31,22 +47,6 @@ export const communicationsSection: NavSection = {
       rbacKey: 'communications.mission-control',
     },
     {
-      to: '/communications',
-      icon: MessageSquare,
-      label: 'Communications Portal',
-      shortLabel: 'Comms',
-      permissions: [],
-      rbacKey: 'communications.main',
-    },
-    {
-      to: '/communications/whatsapp',
-      icon: Phone,
-      label: 'WhatsApp Portal',
-      shortLabel: 'WhatsApp',
-      permissions: [Permission.SYSTEM_ADMIN], // Admin only
-      rbacKey: 'communications.whatsapp',
-    },
-    {
       to: PDFCRAFT_URL,
       icon: FileText,
       label: 'PDF Tools',
@@ -54,22 +54,6 @@ export const communicationsSection: NavSection = {
       permissions: [],
       rbacKey: 'communications',
       external: true,
-    },
-    {
-      to: '/communications?tab=meetings',
-      icon: Users,
-      label: 'Meetings',
-      shortLabel: 'Meet',
-      permissions: [],
-      rbacKey: 'people.meetings',
-    },
-    {
-      to: '/action-items',
-      icon: CheckCircle,
-      label: 'Action Items',
-      shortLabel: 'Actions',
-      permissions: [],
-      rbacKey: 'dashboard.action-items',
     },
     {
       to: '/communications/dev-queue',

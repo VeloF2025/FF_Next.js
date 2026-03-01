@@ -2,7 +2,7 @@
  * Main navigation section configuration
  */
 
-import { LayoutDashboard, Users, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, CheckCircle } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const mainSection: NavSection = {
@@ -20,12 +20,12 @@ export const mainSection: NavSection = {
       rbacKey: 'dashboard.main',
     },
     {
-      to: '/communications?tab=meetings',
-      icon: Users,
-      label: 'Meetings',
-      shortLabel: 'Meet',
+      to: '/communications',
+      icon: MessageSquare,
+      label: 'Communications',
+      shortLabel: 'Comms',
       permissions: [],
-      rbacKey: 'people.meetings',
+      rbacKey: 'communications.main',
     },
     {
       to: '/action-items',

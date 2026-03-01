@@ -1,10 +1,10 @@
 import { AppLayout } from '@/components/layout/AppLayout';
-import CommunicationsDashboard from '@/modules/communications/CommunicationsDashboard';
+import CommunicationsHub from '@/modules/communications/CommunicationsHub';
 
 export default function CommunicationsPage() {
   return (
     <AppLayout>
-      <CommunicationsDashboard />
+      <CommunicationsHub />
     </AppLayout>
   );
 }
