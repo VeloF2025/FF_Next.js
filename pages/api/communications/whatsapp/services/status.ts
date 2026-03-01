@@ -23,12 +23,9 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-// Default service configurations (will be overridden by database values)
-// VPS URLs (Jan 2026 migration)
+// Default service configuration (sender removed 2026-02-18, bridge only)
 const DEFAULT_BRIDGE_URL = 'http://72.61.197.178:8083';
-const DEFAULT_SENDER_URL = 'http://72.61.197.178:8081';
 const DEFAULT_BRIDGE_PHONE = '+27638412276';
-const DEFAULT_SENDER_PHONE = '+27638412276';
 
 async function handler(
   req: NextApiRequest,
@@ -43,7 +40,7 @@ async function handler(
     const configResult = await pool.query(
       `SELECT config_key, config_value
       FROM wa_service_config
-      WHERE config_key IN ('bridge_url', 'sender_url', 'bridge_phone', 'sender_phone', 'health_check_timeout_ms')`
+      WHERE config_key IN ('bridge_url', 'bridge_phone', 'health_check_timeout_ms')`
     );
 
     const config: Record<string, string> = {};
@@ -52,16 +49,11 @@ async function handler(
     }
 
     const bridgeUrl = config.bridge_url || DEFAULT_BRIDGE_URL;
-    const senderUrl = config.sender_url || DEFAULT_SENDER_URL;
     const bridgePhone = config.bridge_phone || DEFAULT_BRIDGE_PHONE;
-    const senderPhone = config.sender_phone || DEFAULT_SENDER_PHONE;
     const healthTimeout = parseInt(config.health_check_timeout_ms || '5000', 10);
 
-    // Check both services in parallel
-    const [bridgeStatus, senderStatus] = await Promise.all([
-      checkServiceHealth('bridge', bridgeUrl, bridgePhone, healthTimeout),
-      checkServiceHealth('sender', senderUrl, senderPhone, healthTimeout),
-    ]);
+    // Check bridge only (sender removed 2026-02-18)
+    const bridgeStatus = await checkServiceHealth('bridge', bridgeUrl, bridgePhone, healthTimeout);
 
     // Get last message timestamps
     const lastMessagesResult = await pool.query(
@@ -79,21 +71,19 @@ async function handler(
     }
 
     bridgeStatus.last_message_at = lastMessageMap.bridge || null;
-    senderStatus.last_message_at = lastMessageMap.sender || null;
 
-    // Determine overall status
-    let overall: 'healthy' | 'degraded' | 'down' = 'healthy';
-    if (bridgeStatus.status === 'disconnected' && senderStatus.status === 'disconnected') {
+    // Determine overall status based on bridge only
+    let overall: 'healthy' | 'degraded' | 'down';
+    if (bridgeStatus.status === 'connected') {
+      overall = 'healthy';
+    } else if (bridgeStatus.status === 'disconnected') {
       overall = 'down';
-    } else if (bridgeStatus.status === 'disconnected' || senderStatus.status === 'disconnected') {
-      overall = 'degraded';
-    } else if (bridgeStatus.status === 'error' || senderStatus.status === 'error') {
+    } else {
       overall = 'degraded';
     }
 
     const response: WaServicesStatusResponse = {
       bridge: bridgeStatus,
-      sender: senderStatus,
       overall,
       checked_at: new Date().toISOString(),
     };
@@ -110,19 +100,18 @@ async function handler(
 }
 
 /**
- * Check the health of a WhatsApp service
- * Bridge uses TCP connectivity check (no HTTP health endpoint)
- * Sender uses HTTP /health endpoint
+ * Check bridge health by attempting an HTTP request to the port.
+ * Bridge is a Go binary with no dedicated /health endpoint — any response means it is up.
  */
 async function checkServiceHealth(
-  name: 'bridge' | 'sender',
+  name: 'bridge',
   url: string,
   phone: string,
   timeoutMs: number
 ): Promise<WaServiceStatus> {
   const baseStatus: WaServiceStatus = {
     name,
-    displayName: name === 'bridge' ? 'WhatsApp Bridge' : 'WhatsApp Sender',
+    displayName: 'WhatsApp Bridge',
     status: 'unknown',
     phone_number: phone,
     url,
@@ -138,70 +127,29 @@ async function checkServiceHealth(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    // Bridge doesn't have /health endpoint - check if port responds
-    if (name === 'bridge') {
-      // Try any HTTP request to check port is open
-      const response = await fetch(url, {
-        method: 'GET',
-        signal: controller.signal,
-      }).catch(() => null);
-
-      clearTimeout(timeoutId);
-
-      // If we get any response (even 404), the service is running
-      if (response) {
-        baseStatus.status = 'connected';
-        baseStatus.session_valid = true;
-        // Bridge is a Go binary that receives messages - it's "connected" if responding
-        return baseStatus;
-      } else {
-        baseStatus.status = 'disconnected';
-        baseStatus.error_message = 'Service not responding';
-        return baseStatus;
-      }
-    }
-
-    // Sender has /health endpoint
-    const response = await fetch(`${url}/health`, {
+    // Any HTTP response (including 404) means the bridge process is alive
+    const response = await fetch(url, {
       method: 'GET',
       signal: controller.signal,
-    });
+    }).catch(() => null);
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      baseStatus.status = 'error';
-      baseStatus.error_message = `HTTP ${response.status}`;
-      return baseStatus;
-    }
-
-    const data = await response.json();
-
-    // Parse health response (format may vary by service)
-    baseStatus.status = parseServiceStatus(data);
-    baseStatus.session_valid = data.connected === true || data.session_valid === true;
-    baseStatus.needs_auth = data.needs_auth === true || data.authenticated === false;
-    baseStatus.uptime = data.uptime || null;
-
-    // Get phone number from health response if available
-    if (data.phone_number) {
-      baseStatus.phone_number = data.phone_number;
-    }
-
-    if (data.error) {
-      baseStatus.error_message = data.error;
+    if (response) {
+      baseStatus.status = 'connected';
+      baseStatus.session_valid = true;
+    } else {
+      baseStatus.status = 'disconnected';
+      baseStatus.error_message = 'Service not responding';
     }
 
     return baseStatus;
 
   } catch (error) {
     baseStatus.status = 'disconnected';
-    baseStatus.error_message = error instanceof Error ? error.message : 'Connection failed';
-
-    // Check if it's a timeout
-    if (error instanceof Error && error.name === 'AbortError') {
-      baseStatus.error_message = 'Connection timeout';
-    }
+    baseStatus.error_message = error instanceof Error && error.name === 'AbortError'
+      ? 'Connection timeout'
+      : error instanceof Error ? error.message : 'Connection failed';
 
     return baseStatus;
   }

@@ -18,8 +18,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL!,
 });
 
-// Service URLs - use Tailscale IP for consistency across environments
-const WA_SENDER_URL = process.env.WHATSAPP_SENDER_URL || 'http://72.61.197.178:8081';
+// Service URLs - bridge is the sole send/receive service (sender removed 2026-02-18)
+const WA_BRIDGE_URL = process.env.WHATSAPP_BRIDGE_URL || 'http://72.61.197.178:8083';
 
 interface SendMessageInput {
   group_id: string;
@@ -62,8 +62,8 @@ async function handler(
   try {
     // Get the group
     const groupResult = await pool.query(
-      `SELECT id, project_name, group_jid, group_name, enabled
-      FROM wa_group_config
+      `SELECT id, project_name, group_jid, group_name, is_active
+      FROM wa_monitored_groups
       WHERE id = $1::uuid`,
       [group_id]
     );
@@ -77,7 +77,7 @@ async function handler(
 
     const group = groupResult.rows[0];
 
-    if (!group.enabled) {
+    if (!group.is_active) {
       return res.status(400).json({
         success: false,
         error: 'Cannot send message to disabled group',
@@ -106,7 +106,7 @@ async function handler(
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
       [
         'outbound',
-        'sender',
+        'bridge',
         'custom',
         group.group_jid,
         mention_phone ? recipientJid : null,
@@ -153,14 +153,14 @@ async function sendMessage(
   message: string
 ): Promise<WaTestMessageResult> {
   try {
-    const response = await fetch(`${WA_SENDER_URL}/send-message`, {
+    const response = await fetch(`${WA_BRIDGE_URL}/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         group_jid: groupJid,
-        recipient_jid: recipientJid,
+        mention_jid: recipientJid,
         message: message,
       }),
       signal: AbortSignal.timeout(30000), // 30 second timeout

@@ -122,7 +122,7 @@ export interface WaServiceStatus {
 
 export interface WaServicesStatusResponse {
   bridge: WaServiceStatus;
-  sender: WaServiceStatus;
+  sender?: WaServiceStatus;
   overall: 'healthy' | 'degraded' | 'down';
   checked_at: string;
 }
@@ -233,16 +233,19 @@ export interface WaSendMessageInput {
 // ============================================
 // Monitored Groups (Bridge Configuration)
 // ============================================
-export type WaGroupType = 'dr_submission' | 'maintenance' | 'admin';
+export type WaGroupType = 'dr_submission' | 'maintenance' | 'admin' | 'civil' | 'optical';
 
 export interface WaMonitoredGroup {
   id: string;
   group_jid: string;
   group_name: string;
   project_name: string | null;
+  project_id: string | null;
   group_type: WaGroupType;
   description: string | null;
   is_active: boolean;
+  message_count?: number;
+  last_activity?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -251,6 +254,7 @@ export interface WaMonitoredGroupInput {
   group_jid: string;
   group_name: string;
   project_name?: string;
+  project_id?: string | null;
   group_type?: WaGroupType;
   description?: string;
   is_active?: boolean;

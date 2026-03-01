@@ -291,10 +291,20 @@ export default function CommunicationsHub() {
             hidden={activeTab !== 'whatsapp'}
           >
             {activeTab === 'whatsapp' && (
-              <ComingSoonCard
-                title="WhatsApp Quick View"
-                description="View recent group activity and delivery status. Admins can access the full WhatsApp Portal from the sidebar."
-              />
+              <div className="text-center py-8">
+                <MessageCircle className="w-12 h-12 mx-auto text-green-500 mb-4" />
+                <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">WhatsApp Portal</h3>
+                <p className="text-sm text-[var(--ff-text-secondary)] max-w-md mx-auto mb-4">
+                  Manage WhatsApp groups, view messages, and monitor service status.
+                </p>
+                <Link
+                  href="/communications/whatsapp"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Open WhatsApp Portal
+                </Link>
+              </div>
             )}
           </div>
 

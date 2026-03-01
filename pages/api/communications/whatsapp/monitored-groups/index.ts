@@ -33,7 +33,7 @@ async function handler(
 }
 
 /**
- * GET - List all monitored WhatsApp groups
+ * GET - List all monitored WhatsApp groups, joined with projects for message counts
  */
 async function handleGet(
   req: NextApiRequest,
@@ -43,9 +43,13 @@ async function handleGet(
 
   let query = `
     SELECT
-      id, group_jid, group_name, project_name, group_type,
-      description, is_active, created_at, updated_at
-    FROM wa_monitored_groups
+      mg.id, mg.group_jid, mg.group_name, mg.project_name, mg.project_id,
+      mg.group_type, mg.description, mg.is_active, mg.created_at, mg.updated_at,
+      p.project_name as linked_project_name,
+      (SELECT COUNT(*) FROM wa_message_logs wml WHERE wml.group_jid = mg.group_jid) as message_count,
+      (SELECT MAX(created_at) FROM wa_message_logs wml WHERE wml.group_jid = mg.group_jid) as last_activity
+    FROM wa_monitored_groups mg
+    LEFT JOIN projects p ON mg.project_id = p.id
     WHERE 1=1
   `;
 
@@ -53,17 +57,17 @@ async function handleGet(
   let paramIndex = 1;
 
   if (group_type && typeof group_type === 'string') {
-    query += ` AND group_type = $${paramIndex++}`;
+    query += ` AND mg.group_type = $${paramIndex++}`;
     params.push(group_type);
   }
 
   if (is_active === 'true') {
-    query += ` AND is_active = true`;
+    query += ` AND mg.is_active = true`;
   } else if (is_active === 'false') {
-    query += ` AND is_active = false`;
+    query += ` AND mg.is_active = false`;
   }
 
-  query += ' ORDER BY group_type, group_name ASC';
+  query += ' ORDER BY mg.group_type, mg.group_name ASC';
 
   const result = await pool.query(query, params);
   const groups = result.rows as WaMonitoredGroup[];
@@ -95,9 +99,14 @@ async function handlePost(
   }
 
   // Validate group type
-  const validTypes = ['dr_submission', 'maintenance', 'admin'];
+  const validTypes = ['dr_submission', 'maintenance', 'admin', 'civil', 'optical'];
   if (input.group_type && !validTypes.includes(input.group_type)) {
     return apiResponse.badRequest(res, `Invalid group_type. Must be one of: ${validTypes.join(', ')}`);
+  }
+
+  // Civil and optical types require a project_id
+  if ((input.group_type === 'civil' || input.group_type === 'optical') && !input.project_id) {
+    return apiResponse.badRequest(res, `Group type "${input.group_type}" requires a project to be selected`);
   }
 
   // Check for duplicate JID
@@ -116,13 +125,14 @@ async function handlePost(
   // Insert new group
   const result = await pool.query(
     `INSERT INTO wa_monitored_groups (
-      group_jid, group_name, project_name, group_type, description, is_active
-    ) VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING id, group_jid, group_name, project_name, group_type, description, is_active, created_at, updated_at`,
+      group_jid, group_name, project_name, project_id, group_type, description, is_active
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, group_jid, group_name, project_name, project_id, group_type, description, is_active, created_at, updated_at`,
     [
       input.group_jid.trim(),
       input.group_name.trim(),
       input.project_name?.trim() || null,
+      input.project_id || null,
       input.group_type || 'dr_submission',
       input.description?.trim() || null,
       input.is_active !== false,

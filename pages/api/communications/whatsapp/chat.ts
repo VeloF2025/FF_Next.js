@@ -49,7 +49,7 @@ async function handler(
   try {
     // Get the group's JID
     const groupResult = await pool.query(
-      `SELECT group_jid, project_name FROM wa_group_config WHERE id = $1::uuid`,
+      `SELECT group_jid, project_name FROM wa_monitored_groups WHERE id = $1::uuid`,
       [group_id]
     );
 

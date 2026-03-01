@@ -40,17 +40,20 @@ async function handler(
 }
 
 /**
- * GET - Get a single monitored group by ID
+ * GET - Get a single monitored group by ID, joined with projects table
  */
 async function handleGet(
   id: string,
   res: NextApiResponse
 ) {
   const result = await pool.query(
-    `SELECT id, group_jid, group_name, project_name, group_type,
-            description, is_active, created_at, updated_at
-     FROM wa_monitored_groups
-     WHERE id = $1`,
+    `SELECT
+      mg.id, mg.group_jid, mg.group_name, mg.project_name, mg.project_id,
+      mg.group_type, mg.description, mg.is_active, mg.created_at, mg.updated_at,
+      p.project_name as linked_project_name
+     FROM wa_monitored_groups mg
+     LEFT JOIN projects p ON mg.project_id = p.id
+     WHERE mg.id = $1`,
     [id]
   );
 
@@ -82,7 +85,7 @@ async function handlePut(
   }
 
   // Validate group type if provided
-  const validTypes = ['dr_submission', 'maintenance', 'admin'];
+  const validTypes = ['dr_submission', 'maintenance', 'admin', 'civil', 'optical'];
   if (input.group_type && !validTypes.includes(input.group_type)) {
     return apiResponse.badRequest(res, `Invalid group_type. Must be one of: ${validTypes.join(', ')}`);
   }
@@ -119,6 +122,10 @@ async function handlePut(
     updates.push(`project_name = $${paramIndex++}`);
     params.push(input.project_name?.trim() || null);
   }
+  if (input.project_id !== undefined) {
+    updates.push(`project_id = $${paramIndex++}`);
+    params.push(input.project_id || null);
+  }
   if (input.group_type !== undefined) {
     updates.push(`group_type = $${paramIndex++}`);
     params.push(input.group_type);
@@ -142,7 +149,7 @@ async function handlePut(
     `UPDATE wa_monitored_groups
      SET ${updates.join(', ')}, updated_at = NOW()
      WHERE id = $${paramIndex}
-     RETURNING id, group_jid, group_name, project_name, group_type, description, is_active, created_at, updated_at`,
+     RETURNING id, group_jid, group_name, project_name, project_id, group_type, description, is_active, created_at, updated_at`,
     params
   );
 

@@ -257,7 +257,7 @@ const ServicesTab: React.FC = () => {
   const [restartingService, setRestartingService] = useState<string | null>(null);
   const [pairingModal, setPairingModal] = useState<{
     isOpen: boolean;
-    service: 'bridge' | 'sender';
+    service: 'bridge';
     serviceName: string;
     currentPhone: string;
   } | null>(null);
@@ -292,7 +292,7 @@ const ServicesTab: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  const handleRestart = async (service: 'bridge' | 'sender') => {
+  const handleRestart = async (service: 'bridge') => {
     if (restartingService) return;
 
     setRestartingService(service);
@@ -314,13 +314,13 @@ const ServicesTab: React.FC = () => {
   const handlePair = (service: WaServiceStatus) => {
     setPairingModal({
       isOpen: true,
-      service: service.name as 'bridge' | 'sender',
+      service: 'bridge',
       serviceName: service.displayName,
       currentPhone: service.phone_number,
     });
   };
 
-  const handleLogout = async (service: 'bridge' | 'sender', serviceName: string) => {
+  const handleLogout = async (service: 'bridge', serviceName: string) => {
     if (!confirm(`Are you sure you want to logout ${serviceName}? You will need to re-pair the device.`)) {
       return;
     }
@@ -438,26 +438,15 @@ const ServicesTab: React.FC = () => {
       {/* Service Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {status && (
-          <>
-            <ServiceCard
-              service={status.bridge}
-              onRestart={() => handleRestart('bridge')}
-              onPair={() => handlePair(status.bridge)}
-              onLogout={() => handleLogout('bridge', 'WhatsApp Bridge')}
-              isRestarting={restartingService === 'bridge'}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-            <ServiceCard
-              service={status.sender}
-              onRestart={() => handleRestart('sender')}
-              onPair={() => handlePair(status.sender)}
-              onLogout={() => handleLogout('sender', 'WhatsApp Sender')}
-              isRestarting={restartingService === 'sender'}
-              getStatusIcon={getStatusIcon}
-              getStatusColor={getStatusColor}
-            />
-          </>
+          <ServiceCard
+            service={status.bridge}
+            onRestart={() => handleRestart('bridge')}
+            onPair={() => handlePair(status.bridge)}
+            onLogout={() => handleLogout('bridge', 'WhatsApp Bridge')}
+            isRestarting={restartingService === 'bridge'}
+            getStatusIcon={getStatusIcon}
+            getStatusColor={getStatusColor}
+          />
         )}
       </div>
 
@@ -469,14 +458,14 @@ const ServicesTab: React.FC = () => {
             Registered Phone Numbers
           </h4>
           <div className="space-y-2">
-            {['sender', 'bridge'].map((service) => {
+            {(['bridge'] as const).map((service) => {
               const servicePhones = phoneNumbers.filter((p) => p.service === service);
               if (servicePhones.length === 0) return null;
 
               return (
                 <div key={service} className="space-y-1">
                   <p className="text-xs font-medium text-[var(--ff-text-secondary)] uppercase">
-                    {service === 'sender' ? '📤 Sender' : '📥 Bridge'}
+                    Bridge
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {servicePhones.map((phone) => (
@@ -623,12 +612,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         <div className="flex items-center gap-2 text-[var(--ff-text-secondary)]">
           <Phone className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>{service.phone_number}</span>
-          {service.name === 'sender' && (
-            <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">SENDS</span>
-          )}
-          {service.name === 'bridge' && (
-            <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">RECEIVES</span>
-          )}
+          <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">SENDS &amp; RECEIVES</span>
         </div>
 
         <div className="flex items-start sm:items-center gap-2 text-[var(--ff-text-secondary)]">
