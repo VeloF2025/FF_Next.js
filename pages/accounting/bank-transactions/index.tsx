@@ -84,8 +84,8 @@ export default function BankTransactionsPage() {
     fetch('/api/accounting/chart-of-accounts').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data || json) ? (json.data || json) : [];
       setGlAccounts(list
-        .filter((a: SelectOption & { accountSubtype?: string; level?: number }) =>
-          a.accountSubtype !== 'bank' && (a.level === undefined || a.level === 3))
+        .filter((a: SelectOption & { accountSubtype?: string }) =>
+          a.accountSubtype !== 'bank')
         .map((a: SelectOption & { accountCode?: string; accountName?: string }) => ({
           id: a.id, code: a.accountCode || a.code, name: a.accountName || a.name,
         }))
