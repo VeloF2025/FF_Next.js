@@ -119,7 +119,7 @@ Level 1/2 are grouping headers (Assets → Current Assets → Bank).
 - `GET /api/accounting/sage-migration`
 - `POST /api/accounting/sage-migration-action`
 
-## UI Pages (22)
+## UI Pages (24)
 
 | Path | Description |
 |------|-------------|
@@ -139,6 +139,8 @@ Level 1/2 are grouping headers (Assets → Current Assets → Bank).
 | `/accounting/customer-payments` | Customer payment list |
 | `/accounting/customer-payments/new` | Payment with invoice allocation |
 | `/accounting/ar-aging` | AR aging report |
+| `/accounting/customer-statement-detail` | Customer statement with search, type filter, drill-down to invoices/payments |
+| `/accounting/supplier-statement-detail` | Supplier statement with search, type filter, drill-down to invoices/payments |
 | `/accounting/credit-notes` | Credit note list |
 | `/accounting/credit-notes/new` | Create customer or supplier CN |
 | `/accounting/bank-reconciliation` | Recon session list |
