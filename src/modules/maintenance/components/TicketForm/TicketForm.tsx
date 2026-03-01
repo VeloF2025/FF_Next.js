@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { AlertCircle, Loader2, Save, X, RotateCcw } from 'lucide-react';
 import { useTicketForm, type TicketFormData } from '../../hooks/useTicketForm';
