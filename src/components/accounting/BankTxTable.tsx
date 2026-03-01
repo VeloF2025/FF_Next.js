@@ -167,12 +167,12 @@ export function BankTxTable(props: Props) {
   }
 
   function filterOptions(options: SelectOption[], q: string): SelectOption[] {
-    if (!q) return options.slice(0, 30);
+    if (!q) return options;
     const lq = q.toLowerCase();
     return options.filter(o =>
       (o.code || '').toLowerCase().includes(lq) ||
       o.name.toLowerCase().includes(lq)
-    ).slice(0, 30);
+    );
   }
 
   const TH = 'py-2 px-2 font-medium text-left';

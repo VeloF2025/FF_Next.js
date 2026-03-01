@@ -82,9 +82,9 @@ export default function NewBankTransactionPage() {
   const entityOptions = useMemo((): SelectOption[] => {
     const base = form.allocationType === 'supplier' ? suppliers
       : form.allocationType === 'customer' ? customers : glAccounts;
-    if (!entitySearch) return base.slice(0, 40);
+    if (!entitySearch) return base;
     const q = entitySearch.toLowerCase();
-    return base.filter(o => o.name.toLowerCase().includes(q) || (o.code ?? '').toLowerCase().includes(q)).slice(0, 40);
+    return base.filter(o => o.name.toLowerCase().includes(q) || (o.code ?? '').toLowerCase().includes(q));
   }, [form.allocationType, entitySearch, glAccounts, suppliers, customers]);
 
   const patch = (updates: Partial<FormState>) => setForm(prev => ({ ...prev, ...updates }));

@@ -88,8 +88,8 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, onClos
     ? glAccounts.filter(a =>
         (a.code || '').toLowerCase().includes(glSearch.toLowerCase()) ||
         a.name.toLowerCase().includes(glSearch.toLowerCase())
-      ).slice(0, 30)
-    : glAccounts.slice(0, 30);
+      )
+    : glAccounts;
 
   const handleSave = async () => {
     if (!pattern.trim()) { toast.error('Pattern is required'); return; }
