@@ -24,6 +24,10 @@ import {
 } from '@/modules/maintenance/services/ticketService';
 import { enrichTicketData } from '@/modules/maintenance/services/ticketEnrichmentService';
 import { syncOutboundUpdate } from '@/modules/maintenance/services/qcontactSyncOutbound';
+import {
+  triggerOnTicketAssignment,
+  triggerOnTeamAssignment,
+} from '@/modules/maintenance/services/notificationTriggers';
 import type { UpdateTicketPayload } from '@/modules/maintenance/types/ticket';
 import { TicketStatus } from '@/modules/maintenance/types/ticket';
 
@@ -181,6 +185,9 @@ export async function PUT(
       fieldsToUpdate: Object.keys(body)
     });
 
+    // Capture old state for assignment-change detection
+    const oldTicket = await getTicketById(ticketId);
+
     const updatedTicket = await updateTicket(ticketId, body);
 
     if (!updatedTicket) {
@@ -204,6 +211,28 @@ export async function PUT(
         .catch(err => {
           logger.error('QContact outbound sync error', { ticketId, error: err.message });
         });
+    }
+
+    // Fire assignment notifications (non-blocking)
+    if (oldTicket) {
+      const assignedToChanged =
+        body.assigned_to && body.assigned_to !== oldTicket.assigned_to;
+      const teamChanged =
+        body.assigned_team_id && body.assigned_team_id !== oldTicket.assigned_team_id;
+
+      if (assignedToChanged) {
+        triggerOnTicketAssignment(updatedTicket, oldTicket.status)
+          .catch(err => {
+            logger.error('Assignment notification error', { ticketId, error: err.message });
+          });
+      }
+
+      if (teamChanged) {
+        triggerOnTeamAssignment(updatedTicket)
+          .catch(err => {
+            logger.error('Team assignment notification error', { ticketId, error: err.message });
+          });
+      }
     }
 
     return NextResponse.json({

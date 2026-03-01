@@ -382,6 +382,17 @@ export class NotificationTriggerService {
       }
     }
 
+    // Check if assigned to team — use first active member as WA recipient
+    if (ticket.assigned_team_id) {
+      const member = await lookupFirstTeamMember(ticket.assigned_team_id);
+      if (member) {
+        return {
+          ...member,
+          type: RecipientType.TECHNICIAN,
+        };
+      }
+    }
+
     return null;
   }
 
@@ -750,4 +761,122 @@ export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult
     },
     timestamp: new Date(),
   });
+}
+
+/**
+ * Lookup first active team member (for single-recipient WA template path)
+ */
+async function lookupFirstTeamMember(
+  teamId: string
+): Promise<UserLookup | null> {
+  try {
+    return await queryOne<UserLookup>(
+      `SELECT u.id, u.name, u.phone
+       FROM team_members tm
+       JOIN users u ON u.id = tm.user_id
+       WHERE tm.team_id = $1 AND tm.is_active = true
+       LIMIT 1`,
+      [teamId]
+    );
+  } catch (error) {
+    logger.error('Failed to lookup team member', {
+      error: error instanceof Error ? error.message : 'Unknown',
+      teamId,
+    });
+    return null;
+  }
+}
+
+/**
+ * Lookup all active team members
+ */
+async function lookupTeamMembers(
+  teamId: string
+): Promise<UserLookup[]> {
+  try {
+    const rows = await query<UserLookup>(
+      `SELECT u.id, u.name, u.phone
+       FROM team_members tm
+       JOIN users u ON u.id = tm.user_id
+       WHERE tm.team_id = $1 AND tm.is_active = true`,
+      [teamId]
+    );
+    return rows;
+  } catch (error) {
+    logger.error('Failed to lookup team members', {
+      error: error instanceof Error ? error.message : 'Unknown',
+      teamId,
+    });
+    return [];
+  }
+}
+
+/**
+ * Trigger notification on ticket team assignment
+ * Notifies all active members of the assigned team via in-app + WA
+ *
+ * @param ticket - Ticket assigned to a team
+ * @returns Array of trigger results (one per member with a phone)
+ */
+export async function triggerOnTeamAssignment(
+  ticket: Ticket
+): Promise<TriggerResult[]> {
+  if (!ticket.assigned_team_id) {
+    return [];
+  }
+
+  const members = await lookupTeamMembers(ticket.assigned_team_id);
+
+  if (members.length === 0) {
+    logger.warn('No active team members found for team assignment notification', {
+      ticket_id: ticket.id,
+      team_id: ticket.assigned_team_id,
+    });
+    return [];
+  }
+
+  // UNS: fire-and-forget in-app notification to all members
+  const memberIds = members.map((m) => m.id);
+  notify({
+    event_type: 'maintenance.ticket_team_assigned',
+    title: `Ticket ${ticket.ticket_uid} assigned to your team`,
+    body: ticket.title || undefined,
+    action_url: `/app/maintenance/tickets/${ticket.id}`,
+    source_module: 'maintenance',
+    source_id: ticket.id,
+    recipient_user_ids: memberIds,
+  }).catch(() => {});
+
+  // WA template notifications — one per member with a phone
+  const service = getDefaultNotificationTriggerService();
+  const results: TriggerResult[] = [];
+
+  for (const member of members) {
+    if (!member.phone) {
+      results.push({
+        success: true,
+        notification_sent: false,
+        skipped_reason: 'no_phone',
+      });
+      continue;
+    }
+
+    const result = await service.handleEvent({
+      type: 'ticket.assigned',
+      ticket_id: ticket.id,
+      ticket: { ...ticket, assigned_to: member.id },
+      new_status: ticket.status,
+      timestamp: new Date(),
+    });
+    results.push(result);
+  }
+
+  logger.info('Team assignment notifications processed', {
+    ticket_id: ticket.id,
+    team_id: ticket.assigned_team_id,
+    members_count: members.length,
+    sent: results.filter((r) => r.notification_sent).length,
+  });
+
+  return results;
 }
