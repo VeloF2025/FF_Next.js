@@ -380,7 +380,8 @@ export function getActiveTabId(
       pathname.startsWith('/accounting/recurring-journals') ||
       pathname.startsWith('/accounting/fiscal-periods') ||
       pathname.startsWith('/accounting/default-accounts') ||
-      pathname.startsWith('/accounting/currencies')) {
+      pathname.startsWith('/accounting/currencies') ||
+      pathname.startsWith('/accounting/exchange-rates')) {
     return 'accounts';
   }
 
