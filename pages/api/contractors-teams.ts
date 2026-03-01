@@ -20,14 +20,16 @@ async function handler(
 
   const activeOnly = req.query.active === 'true';
 
-  const result = await pool.query(
-    `SELECT id, name, contractor_id
-     FROM contractor_teams
-     ${activeOnly ? 'WHERE is_active = TRUE' : ''}
-     ORDER BY name ASC`
-  );
+  try {
+    const sql = activeOnly
+      ? `SELECT id, team_name AS name, contractor_id FROM contractor_teams WHERE is_active = TRUE ORDER BY team_name ASC`
+      : `SELECT id, team_name AS name, contractor_id FROM contractor_teams ORDER BY team_name ASC`;
 
-  return apiResponse.success(res, result.rows);
+    const result = await pool.query(sql);
+    return apiResponse.success(res, result.rows);
+  } catch (err) {
+    return apiResponse.internalError(res, err);
+  }
 }
 
 export default withAuth(handler);
