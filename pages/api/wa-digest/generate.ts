@@ -189,11 +189,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     return apiResponse.success(res, responseData);
   } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
     logger.error('WA digest generation failed', {
       date: targetDate,
-      error: error instanceof Error ? error.message : String(error),
+      error: errMsg,
+      stack: errStack,
     });
-    return apiResponse.internalError(res, error);
+    return apiResponse.internalError(res, error, errMsg);
   }
 }
 

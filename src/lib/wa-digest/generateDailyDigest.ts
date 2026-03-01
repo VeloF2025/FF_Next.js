@@ -59,25 +59,25 @@ export async function generateDailyDigest(options: DigestOptions): Promise<Diges
   logger.info('Starting daily digest generation', { date, projectFilter });
 
   // Query all undigested messages for the target date
-  const rawRows = await sql`
-    SELECT
-      id,
-      wa_group_jid,
-      group_type,
-      sender_name,
-      sender_jid,
-      message_text,
-      message_timestamp,
-      project,
-      has_media,
-      media_type,
-      media_count
-    FROM field_ops_wa_messages
-    WHERE digest_date IS NULL
-      AND message_timestamp::date = ${date}::date
-      AND (${projectFilter ?? null} IS NULL OR project = ${projectFilter ?? null})
-    ORDER BY wa_group_jid, message_timestamp ASC
-  `;
+  // Use explicit query branches to avoid neon tagged template null-type issues
+  const rawRows = projectFilter
+    ? await sql`
+        SELECT id, wa_group_jid, group_type, sender_name, sender_jid,
+               message_text, message_timestamp, project, has_media, media_type, media_count
+        FROM field_ops_wa_messages
+        WHERE digest_date IS NULL
+          AND message_timestamp::date = ${date}::date
+          AND project = ${projectFilter}
+        ORDER BY wa_group_jid, message_timestamp ASC
+      `
+    : await sql`
+        SELECT id, wa_group_jid, group_type, sender_name, sender_jid,
+               message_text, message_timestamp, project, has_media, media_type, media_count
+        FROM field_ops_wa_messages
+        WHERE digest_date IS NULL
+          AND message_timestamp::date = ${date}::date
+        ORDER BY wa_group_jid, message_timestamp ASC
+      `;
   const rows = rawRows.map((r) => r as unknown as WaMessageRow);
 
   if (rows.length === 0) {
