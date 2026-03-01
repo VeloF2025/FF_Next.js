@@ -69,7 +69,7 @@ async function handler(
 
   if (action === 'list') {
     const page = parseInt(req.query.page as string, 10) || 1;
-    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 1000);
     const offset = (page - 1) * limit;
     const project = req.query.project as string;
     const status = req.query.status as string;
