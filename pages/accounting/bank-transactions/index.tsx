@@ -14,6 +14,7 @@ import { ExcludeReasonModal } from '@/components/accounting/ExcludeReasonModal';
 import { FindMatchModal } from '@/components/accounting/FindMatchModal';
 import { BankTxAttachmentsModal } from '@/components/accounting/BankTxAttachmentsModal';
 import { CreateRuleModal } from '@/components/accounting/CreateRuleModal';
+import { CreateEntityModal } from '@/components/accounting/CreateEntityModal';
 import { StatementBalanceWidget } from '@/components/accounting/StatementBalanceWidget';
 import {
   Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus, FileText,
@@ -72,6 +73,8 @@ export default function BankTransactionsPage() {
   const [findMatchTxId, setFindMatchTxId] = useState<string | null>(null);
   const [attachmentsTxId, setAttachmentsTxId] = useState<string | null>(null);
   const [createRuleTx, setCreateRuleTx] = useState<BankTx | null>(null);
+  const [createEntityTxId, setCreateEntityTxId] = useState<string | null>(null);
+  const [createEntityType, setCreateEntityType] = useState<AllocType | null>(null);
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
@@ -649,6 +652,7 @@ export default function BankTransactionsPage() {
               onReverse={handleReverse}
               onAttachments={(txId) => setAttachmentsTxId(txId)}
               onCreateRule={(tx) => setCreateRuleTx(tx)}
+              onCreateEntity={(txId, type) => { setCreateEntityTxId(txId); setCreateEntityType(type); }}
             />
           )}
         </div>
@@ -751,6 +755,35 @@ export default function BankTransactionsPage() {
             setCreateRuleTx(null);
             toast.success('Rule created — click "Apply Rules" to categorise matching transactions');
             loadTransactions();
+          }}
+        />
+      )}
+      {/* Create Entity Modal (GL Account / Supplier / Customer) */}
+      {createEntityTxId && createEntityType && (
+        <CreateEntityModal
+          type={createEntityType}
+          onClose={() => { setCreateEntityTxId(null); setCreateEntityType(null); }}
+          onCreated={(entity) => {
+            const label = entity.code ? `${entity.code} ${entity.name}` : entity.name;
+            const option: SelectOption = { id: entity.id, code: entity.code, name: entity.name };
+            if (createEntityType === 'account') {
+              setGlAccounts(prev => [...prev, option].sort((a, b) => (a.code || '').localeCompare(b.code || '')));
+            } else if (createEntityType === 'supplier') {
+              setSuppliers(prev => [...prev, option]);
+            } else {
+              setCustomers(prev => [...prev, option]);
+            }
+            setRowSelections(prev => ({
+              ...prev,
+              [createEntityTxId]: {
+                type: createEntityType,
+                entityId: entity.id,
+                label,
+                vatCode: prev[createEntityTxId]?.vatCode || 'none',
+              },
+            }));
+            setCreateEntityTxId(null);
+            setCreateEntityType(null);
           }}
         />
       )}

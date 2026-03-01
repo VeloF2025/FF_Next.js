@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, Undo2, Search, Scissors, SearchCheck, RotateCcw, Paperclip, BookmarkPlus } from 'lucide-react';
+import { Check, X, Undo2, Search, Scissors, SearchCheck, RotateCcw, Paperclip, BookmarkPlus, Plus } from 'lucide-react';
 
 export type AllocType = 'account' | 'supplier' | 'customer';
 export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
@@ -74,6 +74,7 @@ interface Props {
   onReverse?: (txId: string) => void;
   onAttachments?: (txId: string) => void;
   onCreateRule?: (tx: BankTx) => void;
+  onCreateEntity?: (txId: string, type: AllocType) => void;
 }
 
 function fmtCurrency(n: number): string {
@@ -141,19 +142,23 @@ export function BankTxTable(props: Props) {
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
     onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,
-    onFindMatch, onReverse, onAttachments, onCreateRule,
+    onFindMatch, onReverse, onAttachments, onCreateRule, onCreateEntity,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
 
+  // Close dropdown when clicking outside it (data-attribute approach for multi-row support)
   useEffect(() => {
+    if (!openSel) return;
     const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpenSel(null);
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-bank-dropdown]') || target.closest('[data-bank-toggle]')) return;
+      setOpenSel(null);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
-  }, []);
+  }, [openSel]);
 
   function getOptionsForType(type: AllocType): SelectOption[] {
     if (type === 'supplier') return suppliers;
@@ -257,6 +262,7 @@ export function BankTxTable(props: Props) {
                         <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-amber-400" title="Suggested by rule" />
                       )}
                       <button
+                        data-bank-toggle
                         onClick={() => { setOpenSel(isOpen ? null : tx.id); setSearch(''); }}
                         className={`text-xs px-2 py-0.5 rounded truncate max-w-[200px] block ${
                           sel?.entityId
@@ -277,7 +283,7 @@ export function BankTxTable(props: Props) {
                         )}
                       </button>
                       {isOpen && (
-                        <div className="absolute z-50 top-full left-0 mt-1 w-80 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl">
+                        <div data-bank-dropdown className="absolute z-50 top-full left-0 mt-1 w-80 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg shadow-xl">
                           <div className="p-2">
                             <div className="relative">
                               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--ff-text-tertiary)]" />
@@ -305,6 +311,17 @@ export function BankTxTable(props: Props) {
                               <div className="px-3 py-2 text-xs text-[var(--ff-text-tertiary)]">No results found</div>
                             )}
                           </div>
+                          {onCreateEntity && (
+                            <div className="border-t border-[var(--ff-border-light)] p-1.5">
+                              <button
+                                onClick={() => { onCreateEntity(tx.id, rowType); setOpenSel(null); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-emerald-400 hover:bg-emerald-500/10 rounded flex items-center gap-1.5"
+                              >
+                                <Plus className="h-3 w-3" />
+                                New {rowType === 'account' ? 'Account' : rowType === 'supplier' ? 'Supplier' : 'Customer'}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
