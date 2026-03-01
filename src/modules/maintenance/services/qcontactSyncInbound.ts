@@ -23,6 +23,7 @@ import {
   type FiberTimeCaseDetail,
   MAINTENANCE_VELOCITY_ID,
 } from './fibertimeQContactClient';
+import { generateTicketUID } from './ticketService';
 import type { QContactTicket } from '../types/qcontact';
 import type { CreateTicketPayload } from '../types/ticket';
 import {
@@ -206,11 +207,7 @@ function mapTicketType(category: string | null, subcategory?: string | null): st
  * Extended ticket payload with all QContact fields
  */
 export interface ExtendedTicketPayload extends CreateTicketPayload {
-  client_name?: string;
-  client_contact?: string;
-  client_email?: string;
   gps_coordinates?: string;
-  ont_serial?: string;
   category?: string;
   subcategory?: string;
   // Additional QContact fields stored in metadata
@@ -242,8 +239,8 @@ export function mapQContactTicketToFibreFlow(
     external_id: qcontactTicket.id,
     title: qcontactTicket.title,
     description: qcontactTicket.description || undefined,
-    ticket_type: mapTicketType(qcontactTicket.category, qcontactTicket.subcategory),
-    priority: mapPriority(qcontactTicket.priority),
+    ticket_type: mapTicketType(qcontactTicket.category, qcontactTicket.subcategory) as TicketType,
+    priority: mapPriority(qcontactTicket.priority) as TicketPriority,
     // Contact Info
     client_name: qcontactTicket.customer_name || undefined,
     client_contact: qcontactTicket.customer_phone || undefined,
@@ -481,6 +478,9 @@ export async function syncSingleInboundTicket(
     const qcUpdatedAt = qcontactTicket.updated_at ? new Date(qcontactTicket.updated_at) : qcCreatedAt;
     const qcLoggedDate = qcCreatedAt.toISOString().split('T')[0]; // YYYY-MM-DD for original_logged_date
 
+    // Generate proper VF-YYYYMMDD-NNN UID using QContact's creation date
+    const ticketUid = await generateTicketUID(qcCreatedAt);
+
     const sql = `
       INSERT INTO maintenance_tickets (
         ticket_uid,
@@ -508,14 +508,14 @@ export async function syncSingleInboundTicket(
         updated_at,
         original_logged_date
       ) VALUES (
-        'FF' || LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0'),
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23
+        $21, $22, $23, $24
       )
       RETURNING *
     `;
 
     const values = [
+      ticketUid,
       ticketPayload.source,
       ticketPayload.external_id,
       ticketPayload.title,

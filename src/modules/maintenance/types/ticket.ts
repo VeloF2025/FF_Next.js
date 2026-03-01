@@ -65,6 +65,8 @@ export enum TicketType {
   // Health & Safety ticket types
   HSE_INCIDENT = 'hse_incident', // H&S incident requiring investigation
   HSE_NEAR_MISS = 'hse_near_miss', // Near miss for tracking and prevention
+  // Investigation types
+  SERIAL_MISMATCH = 'serial_mismatch', // Serial number mismatch investigation
 }
 
 /**
@@ -225,6 +227,16 @@ export interface CreateTicketPayload {
   assigned_team_id?: string;
   created_by?: string;
   ont_serial?: string;
+  /** Override UID prefix (default: 'VF'). E.g. 'HS' → HS-20260301-001 */
+  uid_prefix?: string;
+  /** Override initial status (default: 'open') */
+  status?: TicketStatus;
+  /** H&S source_type field for sub-type filtering */
+  source_type?: string;
+  /** Client info */
+  client_name?: string;
+  client_contact?: string;
+  client_email?: string;
 }
 
 /**

@@ -64,6 +64,7 @@ export interface TicketFormData {
   assigned_to: string;
   assigned_contractor_id: string;
   assigned_team: string;
+  assigned_team_id: string;
 
   // Section 7: Fault Attribution (maintenance only)
   fault_cause: FaultCause | '';
@@ -127,6 +128,7 @@ const initialFormData: TicketFormData = {
   assigned_to: '',
   assigned_contractor_id: '',
   assigned_team: '',
+  assigned_team_id: '',
   fault_cause: '',
   fault_cause_details: '',
 };
@@ -347,6 +349,9 @@ export function useTicketForm(): UseTicketFormResult {
     if (formData.assigned_team.trim()) {
       payload.assigned_team = formData.assigned_team.trim();
     }
+    if (formData.assigned_team_id) {
+      payload.assigned_team_id = formData.assigned_team_id;
+    }
 
     try {
       const ticket = await createTicketMutation.mutateAsync(payload);
@@ -404,6 +409,11 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
   [TicketSource.REVENUE]: 'Revenue',
   [TicketSource.ONT_SWAP]: 'ONT Swap',
   [TicketSource.AD_HOC]: 'Ad-Hoc',
+  [TicketSource.OFFLINE_REPORT]: 'Offline Report',
+  [TicketSource.QA_REVIEW]: 'QA Review',
+  [TicketSource.HSE_REPORT]: 'H&S Report',
+  [TicketSource.WA_MAINTENANCE]: 'WhatsApp',
+  [TicketSource.PP_DATA]: 'PP Data',
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
@@ -412,6 +422,9 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   [TicketType.MODIFICATION]: 'Modification',
   [TicketType.ONT_SWAP]: 'ONT Swap',
   [TicketType.INCIDENT]: 'Incident',
+  [TicketType.HSE_INCIDENT]: 'H&S Incident',
+  [TicketType.HSE_NEAR_MISS]: 'H&S Near Miss',
+  [TicketType.SERIAL_MISMATCH]: 'Serial Mismatch',
 };
 
 export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {

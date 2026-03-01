@@ -17,9 +17,24 @@ import {
   SEVERITY_TO_PRIORITY,
   SEVERITY_SLA_HOURS,
 } from '@/modules/health-safety/types/ticket.types';
+import { createTicket } from '@/modules/maintenance/services/ticketService';
+import {
+  TicketSource,
+  TicketType,
+  TicketPriority,
+} from '@/modules/maintenance/types/ticket';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const PRIORITY_MAP: Record<string, TicketPriority> = {
+  low: TicketPriority.LOW,
+  normal: TicketPriority.NORMAL,
+  medium: TicketPriority.NORMAL,
+  high: TicketPriority.HIGH,
+  urgent: TicketPriority.URGENT,
+  critical: TicketPriority.CRITICAL,
+};
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -29,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'POST':
         return handlePost(req, res);
       default:
-        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN');
+        return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
     log.error('[H&S Incidents API] Error', { error });
@@ -57,7 +72,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   `;
 
   if (!ticketsTableExists[0]?.exists) {
-    // Return empty results if maintenance_tickets table doesn't exist
     return apiResponse.success(res, {
       incidents: [],
       total: 0,
@@ -119,7 +133,6 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     ${dol_reportable === 'true' ? sql`AND hd.dol_reportable = true` : sql``}
   `;
 
-  // Get summary stats
   const [stats] = await sql`
     SELECT
       COUNT(*)::int as total,
@@ -146,25 +159,11 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 }
 
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
-  // Check if maintenance_tickets table exists first
-  const ticketsTableExists = await sql`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_name = 'maintenance_tickets'
-    ) as exists
-  `;
-
-  if (!ticketsTableExists[0]?.exists) {
-    return apiResponse.badRequest(res, 'Incident reporting requires the maintenance module to be installed');
-  }
-
   const {
-    // Ticket fields
     title,
     project_id,
     contractor_id,
     assigned_to,
-    // H&S fields
     incident_type,
     severity = 'moderate',
     incident_date,
@@ -188,10 +187,14 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Determine ticket type
-  const ticketType = incident_type === 'near_miss' ? 'hse_near_miss' : 'hse_incident';
+  const ticketType = incident_type === 'near_miss'
+    ? TicketType.HSE_NEAR_MISS
+    : TicketType.HSE_INCIDENT;
+  const sourceType = incident_type === 'near_miss' ? 'hse_near_miss' : 'hse_incident';
 
   // Determine priority and SLA based on severity
-  const priority = SEVERITY_TO_PRIORITY[severity as keyof typeof SEVERITY_TO_PRIORITY] || 'medium';
+  const priorityStr = SEVERITY_TO_PRIORITY[severity as keyof typeof SEVERITY_TO_PRIORITY] || 'normal';
+  const priority = PRIORITY_MAP[priorityStr] || TicketPriority.NORMAL;
   const slaHours = SEVERITY_SLA_HOURS[severity as keyof typeof SEVERITY_SLA_HOURS] || 72;
 
   // Calculate due date
@@ -209,33 +212,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const autoTitle =
     title || `${incidentConfig?.label || incident_type} - ${location || 'Unknown location'}`;
 
-  // Generate ticket UID
-  const ticketUid = `HS-${Date.now().toString(36).toUpperCase()}`;
+  // Create maintenance ticket via standard service with HS- prefix
+  const ticket = await createTicket({
+    uid_prefix: 'HS',
+    source: TicketSource.HSE_REPORT,
+    source_type: sourceType,
+    ticket_type: ticketType,
+    title: autoTitle,
+    description: description || undefined,
+    priority,
+    project_id: project_id || undefined,
+    assigned_contractor_id: contractor_id || undefined,
+    assigned_to: assigned_to || undefined,
+  });
 
-  // Create maintenance ticket
-  const [ticket] = await sql`
-    INSERT INTO maintenance_tickets (
-      ticket_uid, title, description, type, source, source_type, priority, status,
-      project_id, contractor_id, assigned_to, due_date, created_by
-    ) VALUES (
-      ${ticketUid},
-      ${autoTitle},
-      ${description || null},
-      'incident',
-      'internal',
-      ${ticketType},
-      ${priority},
-      'open',
-      ${project_id || null},
-      ${contractor_id || null},
-      ${assigned_to || null},
-      ${dueDate.toISOString()},
-      (SELECT id FROM users LIMIT 1)
-    )
-    RETURNING *
-  `;
-
-  // Create H&S details
+  // Create H&S details (linked by ticket.id)
   await sql`
     INSERT INTO hs_ticket_details (
       ticket_id, incident_type, severity, incident_date, incident_time,
@@ -263,6 +254,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     INSERT INTO hs_activity_log (entity_type, entity_id, action, details)
     VALUES ('hs_incident', ${ticket.id}, 'reported', ${JSON.stringify({
       ticket_id: ticket.id,
+      ticket_uid: ticket.ticket_uid,
       incident_type,
       severity,
       dol_reportable: isDolReportable,
@@ -295,7 +287,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     ...incident,
     type_info: INCIDENT_TYPE_CONFIG[incident_type as keyof typeof INCIDENT_TYPE_CONFIG],
     sla: {
-      priority,
+      priority: priorityStr,
       sla_hours: slaHours,
       due_date: dueDate.toISOString(),
     },

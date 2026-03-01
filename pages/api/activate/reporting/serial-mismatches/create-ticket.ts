@@ -2,10 +2,11 @@
  * Create Maintenance Ticket for Serial Mismatch
  *
  * POST: Create a maintenance ticket for investigating serial mismatch
+ * Uses standard createTicket() for proper UID generation and audit trail
  *
  * Body:
  * - id: offline_devices record ID
- * - priority?: Ticket priority (default: 'medium')
+ * - priority?: Ticket priority (default: 'normal')
  * - notes?: Additional notes for the ticket
  *
  * Status: WORKING
@@ -17,12 +18,26 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { createTicket } from '@/modules/maintenance/services/ticketService';
+import {
+  TicketSource,
+  TicketType,
+  TicketPriority,
+} from '@/modules/maintenance/types/ticket';
 
 interface CreateTicketBody {
   id: string;
-  priority?: 'low' | 'medium' | 'high' | 'critical';
+  priority?: 'low' | 'normal' | 'high' | 'critical';
   notes?: string;
 }
+
+const PRIORITY_MAP: Record<string, TicketPriority> = {
+  low: TicketPriority.LOW,
+  medium: TicketPriority.NORMAL,
+  normal: TicketPriority.NORMAL,
+  high: TicketPriority.HIGH,
+  critical: TicketPriority.CRITICAL,
+};
 
 async function handler(
   req: NextApiRequest,
@@ -33,34 +48,29 @@ async function handler(
   }
 
   try {
-    const { id, priority = 'medium', notes } = req.body as CreateTicketBody;
+    const { id, priority = 'normal', notes } = req.body as CreateTicketBody;
 
-    // Validate required fields
     if (!id) {
       return apiResponse.badRequest(res, 'id is required');
     }
 
     // Get the offline device record
-    const deviceQuery = `
-      SELECT
+    const deviceResult = await pool.query(
+      `SELECT
         id, drop_number, zone, planned_pon, address,
         serial_number, expected_serial, serial_mismatch_type,
         mismatch_status, mismatch_ticket_id, last_down_reason,
         days_since_last_inform
       FROM offline_devices
-      WHERE id = $1 AND serial_mismatch = true
-    `;
-
-    const deviceResult = await pool.query(deviceQuery, [id]);
+      WHERE id = $1 AND serial_mismatch = true`,
+      [id]
+    );
 
     if (deviceResult.rows.length === 0) {
       return apiResponse.notFound(res, 'Serial mismatch record', id);
     }
 
     const device = deviceResult.rows[0];
-    if (!device) {
-      return apiResponse.notFound(res, 'Serial mismatch record', id);
-    }
 
     // Check if ticket already exists
     if (device.mismatch_ticket_id) {
@@ -71,8 +81,7 @@ async function handler(
       });
     }
 
-    // Create the maintenance ticket
-    const ticketTitle = `Serial Mismatch Investigation: ${device.drop_number}`;
+    // Build description
     const ticketDescription = `
 **Serial Mismatch Detected**
 
@@ -98,57 +107,46 @@ ${notes ?? 'Please investigate the serial number discrepancy. Possible causes: O
 4. Report findings
 `.trim();
 
-    const createTicketQuery = `
-      INSERT INTO maintenance_tickets (
-        title, description, status, priority, ticket_type, source,
-        drop_number, zone, created_at, updated_at
-      )
-      VALUES ($1, $2, 'open', $3, 'serial_mismatch', 'qa_dashboard', $4, $5, NOW(), NOW())
-      RETURNING id, title, status, priority
-    `;
+    // Create ticket via standard service
+    const ticket = await createTicket({
+      source: TicketSource.QA_REVIEW,
+      ticket_type: TicketType.SERIAL_MISMATCH,
+      title: `Serial Mismatch Investigation: ${device.drop_number}`,
+      description: ticketDescription,
+      priority: PRIORITY_MAP[priority] || TicketPriority.NORMAL,
+      dr_number: device.drop_number,
+      zone_id: device.zone?.toString() || undefined,
+      pon_number: device.planned_pon?.toString() || undefined,
+      address: device.address || undefined,
+      ont_serial: device.serial_number || undefined,
+    });
 
-    const ticketResult = await pool.query(createTicketQuery, [
-      ticketTitle,
-      ticketDescription,
-      priority,
-      device.drop_number,
-      device.zone,
-    ]);
-
-    if (ticketResult.rows.length === 0) {
-      return apiResponse.internalError(res, new Error('Failed to create ticket'));
-    }
-
-    const ticket = ticketResult.rows[0];
-    if (!ticket) {
-      return apiResponse.internalError(res, new Error('Failed to create ticket'));
-    }
-
-    // Update offline_devices with ticket reference and status
-    const updateDeviceQuery = `
-      UPDATE offline_devices
-      SET
-        mismatch_status = 'ticket_created',
-        mismatch_ticket_id = $1,
-        mismatch_investigated_at = COALESCE(mismatch_investigated_at, NOW()),
-        mismatch_investigated_by = COALESCE(mismatch_investigated_by, 'qa_dashboard')
-      WHERE id = $2
-    `;
-
-    await pool.query(updateDeviceQuery, [ticket.id, id]);
+    // Update offline_devices with ticket reference
+    await pool.query(
+      `UPDATE offline_devices
+       SET
+         mismatch_status = 'ticket_created',
+         mismatch_ticket_id = $1,
+         mismatch_investigated_at = COALESCE(mismatch_investigated_at, NOW()),
+         mismatch_investigated_by = COALESCE(mismatch_investigated_by, 'qa_dashboard')
+       WHERE id = $2`,
+      [ticket.id, id]
+    );
 
     log.info('SerialMismatchTicket', `Created ticket for mismatch ${device.drop_number}`, {
       deviceId: id,
       dropNumber: device.drop_number,
       ticketId: ticket.id,
+      ticketUid: ticket.ticket_uid,
       priority,
     });
 
     return apiResponse.success(res, {
-      ticket_id: String(ticket.id),
-      ticket_title: String(ticket.title),
-      ticket_status: String(ticket.status),
-      ticket_priority: String(ticket.priority),
+      ticket_id: ticket.id,
+      ticket_uid: ticket.ticket_uid,
+      ticket_title: ticket.title,
+      ticket_status: ticket.status,
+      ticket_priority: ticket.priority,
       drop_number: String(device.drop_number),
       message: `Maintenance ticket created for ${device.drop_number}`,
     });

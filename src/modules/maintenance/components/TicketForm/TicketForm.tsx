@@ -144,6 +144,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
           formData={form.formData}
           errors={form.errors}
           setField={form.setField}
+          setFields={form.setFields}
           disabled={form.isSubmitting}
         />
       </div>

@@ -15,6 +15,7 @@ import {
   TicketSource,
   TicketType,
   TicketPriority,
+  TicketStatus,
 } from '@/modules/maintenance/types/ticket';
 import { updateMaintenanceFlagStatus } from '@/modules/maintenance/services/waMaintenanceProcessor';
 import { withAuth } from '@/lib/auth';
@@ -35,6 +36,7 @@ interface CreateWATicketRequest {
   issue_description?: string;
   priority?: 'low' | 'normal' | 'high' | 'critical';
   created_by?: string;
+  assigned_team_id?: string;
 }
 
 interface ApiResponse {
@@ -145,7 +147,7 @@ async function handler(
     };
     const priority = priorityMap[body.priority || 'normal'] || TicketPriority.NORMAL;
 
-    // Create the ticket
+    // Create the ticket (with optional team assignment)
     const ticket = await createTicket({
       source: TicketSource.WA_MAINTENANCE,
       ticket_type: TicketType.FAULT_REPAIR,
@@ -155,6 +157,8 @@ async function handler(
       dr_number: body.drop_number,
       project_id: projectId,
       created_by: body.created_by,
+      assigned_team_id: body.assigned_team_id || undefined,
+      status: body.assigned_team_id ? TicketStatus.ASSIGNED : undefined,
     });
 
     // Update maintenance flag with ticket ID

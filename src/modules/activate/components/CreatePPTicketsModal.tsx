@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { TeamSelector } from '@/modules/maintenance/components/Assignment/TeamSelector';
 
 interface CreatePPTicketsModalProps {
   selectedCount: number;
@@ -33,19 +34,7 @@ export function CreatePPTicketsModal({
   const [ticketType, setTicketType] = useState('fault_repair');
   const [priority, setPriority] = useState('normal');
   const [notes, setNotes] = useState('');
-  const [assignedTeamId, setAssignedTeamId] = useState('');
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
-
-  useEffect(() => {
-    fetch('/api/maintenance/teams?dropdown=true')
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) {
-          setTeams(data.data.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })));
-        }
-      })
-      .catch(() => { /* non-fatal */ });
-  }, []);
+  const [assignedTeamId, setAssignedTeamId] = useState<string | null>(null);
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -114,17 +103,12 @@ export function CreatePPTicketsModal({
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
               Assign Team <span className="text-[var(--ff-text-tertiary)]">(optional)</span>
             </label>
-            <select
+            <TeamSelector
               value={assignedTeamId}
-              onChange={(e) => setAssignedTeamId(e.target.value)}
-              className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
-                         text-[var(--ff-text-primary)] text-sm"
-            >
-              <option value="">No team</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+              onChange={(teamId) => setAssignedTeamId(teamId)}
+              placeholder="Select team..."
+              compact
+            />
           </div>
         </div>
 

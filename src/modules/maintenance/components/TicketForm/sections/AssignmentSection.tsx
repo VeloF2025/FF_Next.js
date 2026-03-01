@@ -1,24 +1,23 @@
 /**
  * Assignment Section - User, Contractor, Team assignment
- * 🟢 WORKING: Form section for ticket assignment
+ * 🟢 WORKING: Form section for ticket assignment with TeamSelector dropdown
  */
 
 'use client';
 
 import { Users } from 'lucide-react';
+import { TeamSelector } from '../../../components/Assignment/TeamSelector';
 import type { TicketFormData, TicketFormErrors } from '../../../hooks/useTicketForm';
 
 interface AssignmentSectionProps {
   formData: TicketFormData;
   errors: TicketFormErrors;
   setField: <K extends keyof TicketFormData>(field: K, value: TicketFormData[K]) => void;
+  setFields: (fields: Partial<TicketFormData>) => void;
   disabled?: boolean;
 }
 
-export function AssignmentSection({ formData, errors, setField, disabled }: AssignmentSectionProps) {
-  // TODO: Fetch users, contractors, and teams from API
-  // For now, use text fields that accept UUIDs or names
-
+export function AssignmentSection({ formData, errors, setField, setFields, disabled }: AssignmentSectionProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -60,18 +59,23 @@ export function AssignmentSection({ formData, errors, setField, disabled }: Assi
           />
         </div>
 
-        {/* Assigned Team */}
+        {/* Assigned Team - TeamSelector dropdown */}
         <div>
           <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
             Assign to Team
           </label>
-          <input
-            type="text"
-            value={formData.assigned_team}
-            onChange={(e) => setField('assigned_team', e.target.value)}
-            placeholder="Team name"
+          <TeamSelector
+            value={formData.assigned_team_id || null}
+            onChange={(teamId, team) => {
+              setFields({
+                assigned_team_id: teamId || '',
+                assigned_team: team?.name || '',
+              });
+            }}
+            placeholder="Select team..."
             disabled={disabled}
-            className="w-full px-3 py-2 rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] placeholder-[var(--ff-text-muted)] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            error={errors.assigned_team || null}
+            compact
           />
         </div>
       </div>

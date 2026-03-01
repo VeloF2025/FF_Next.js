@@ -64,9 +64,10 @@ function isValidUUID(id: string): boolean {
  * @param forDate - Optional date to generate UID for (used during migration)
  * @returns Promise<string> The generated VF ticket UID
  */
-async function generateTicketUID(forDate?: Date): Promise<string> {
+async function generateTicketUID(forDate?: Date, prefix = 'VF'): Promise<string> {
   const targetDate = forDate || new Date();
-  const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD for SQL
+  const isoStr = targetDate.toISOString();
+  const dateStr = isoStr.slice(0, 10); // YYYY-MM-DD for SQL
   const formattedDate = dateStr.replace(/-/g, ''); // YYYYMMDD for UID
 
   // Atomic sequence generation using INSERT...ON CONFLICT
@@ -82,13 +83,13 @@ async function generateTicketUID(forDate?: Date): Promise<string> {
   );
 
   if (!result) {
-    throw new Error('Failed to generate VF ticket UID - sequence query returned no result');
+    throw new Error(`Failed to generate ${prefix} ticket UID - sequence query returned no result`);
   }
 
   const seqNum = result.last_sequence;
   const paddedSeq = String(seqNum).padStart(3, '0');
 
-  return `VF-${formattedDate}-${paddedSeq}`;
+  return `${prefix}-${formattedDate}-${paddedSeq}`;
 }
 
 /**
@@ -146,8 +147,8 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
 
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
-  const status = TicketStatus.OPEN;
-  const ticketUID = await generateTicketUID();
+  const status = payload.status || TicketStatus.OPEN;
+  const ticketUID = await generateTicketUID(undefined, payload.uid_prefix || 'VF');
 
   logger.info('Creating ticket', {
     title: payload.title,
@@ -161,6 +162,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       INSERT INTO maintenance_tickets (
         ticket_uid,
         source,
+        source_type,
         external_id,
         title,
         description,
@@ -178,9 +180,12 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         assigned_team,
         assigned_team_id,
         created_by,
-        ont_serial
+        ont_serial,
+        client_name,
+        client_contact,
+        client_email
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
       )
       RETURNING *
     `;
@@ -188,6 +193,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
     const values = [
       ticketUID,
       payload.source,
+      payload.source_type || null,
       payload.external_id || null,
       payload.title,
       payload.description || null,
@@ -205,7 +211,10 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.assigned_team || null,
       payload.assigned_team_id || null,
       payload.created_by || null,
-      payload.ont_serial || null
+      payload.ont_serial || null,
+      payload.client_name || null,
+      payload.client_contact || null,
+      payload.client_email || null,
     ];
 
     const ticket = await queryOne<Ticket>(sql, values);
