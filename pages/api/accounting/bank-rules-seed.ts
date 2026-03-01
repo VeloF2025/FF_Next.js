@@ -76,7 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           gl_account_id, auto_create_entry, priority, created_by
         ) VALUES (
           ${ruleName}, 'description', 'contains', ${pattern},
-          ${glAccountId}::UUID, false, 100, ${userId}::UUID
+          ${glAccountId}::UUID, false, 100, ${userId || null}
         )
       `;
       created++;
