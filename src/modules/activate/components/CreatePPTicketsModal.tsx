@@ -12,6 +12,7 @@ interface CreatePPTicketsModalProps {
 }
 
 const TICKET_TYPES = [
+  { value: 'pre_provision', label: 'Pre-Provision' },
   { value: 'fault_repair', label: 'Fault Repair' },
   { value: 'modification', label: 'Modification' },
   { value: 'ont_swap', label: 'ONT Swap' },
@@ -31,7 +32,7 @@ export function CreatePPTicketsModal({
   onClose,
   loading,
 }: CreatePPTicketsModalProps) {
-  const [ticketType, setTicketType] = useState('fault_repair');
+  const [ticketType, setTicketType] = useState('pre_provision');
   const [priority, setPriority] = useState('normal');
   const [notes, setNotes] = useState('');
   const [assignedTeamId, setAssignedTeamId] = useState<string | null>(null);
