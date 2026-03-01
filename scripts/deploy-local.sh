@@ -103,9 +103,15 @@ echo -e "  Time:    $(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M %Z')\n"
 
 DEPLOY_START=$(date +%s)
 
-# --- Step 1: Fix ownership ---
-log "Fixing ownership on $DIR..."
-sudo chown -R velo:velo "$DIR"
+# --- Step 1: Fix ownership (uses /usr/local/bin/fibreflow-fix-next, NOPASSWD) ---
+log "Fixing .next ownership on $DIR..."
+if command -v fibreflow-fix-next &>/dev/null; then
+  sudo /usr/local/bin/fibreflow-fix-next "$DIR"
+else
+  # Fallback: try direct chown (may prompt for password)
+  warn "fibreflow-fix-next not found. Run: sudo bash scripts/setup-deploy-permissions.sh"
+  sudo -u velo bash -c "rm -rf $DIR/.next" 2>/dev/null || true
+fi
 
 # --- Step 2: Pull latest code ---
 log "Pulling $BRANCH..."
@@ -122,7 +128,7 @@ fi
 
 # --- Step 4: Stop service to free resources ---
 log "Stopping $SVC..."
-sudo systemctl stop "$SVC" 2>/dev/null || true
+sudo /usr/bin/systemctl stop "$SVC" 2>/dev/null || true
 
 # --- Step 5: Clean .next to prevent stale artifacts ---
 log "Cleaning .next directory..."
@@ -153,7 +159,7 @@ if [[ "$BUILD_SUCCESS" != true ]]; then
   if sudo -u velo test -d "$DIR/.next-backup-$TIMESTAMP"; then
     sudo -u velo bash -c "cd $DIR && mv .next-backup-$TIMESTAMP .next"
   fi
-  sudo systemctl start "$SVC" 2>/dev/null || true
+  sudo /usr/bin/systemctl start "$SVC" 2>/dev/null || true
   exit 1
 fi
 
@@ -166,7 +172,7 @@ log "Build validated (BUILD_ID: $BUILD_ID)"
 
 # --- Step 8: Start service ---
 log "Starting $SVC..."
-sudo systemctl start "$SVC"
+sudo /usr/bin/systemctl start "$SVC"
 sleep 5
 
 if ! systemctl is-active --quiet "$SVC"; then
