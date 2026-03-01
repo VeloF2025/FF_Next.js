@@ -69,6 +69,13 @@ interface TranscriptRow {
 const SYSTEM_PROMPT = `You are a meeting analyst for Velocity Fibre, a fibre-optic network infrastructure company in South Africa.
 Analyze the provided meeting transcript and output ONLY valid JSON with no markdown code fences.
 
+IMPORTANT — Language handling:
+- Meetings may be conducted in Afrikaans, English, or a mix of both.
+- ALL output MUST be in English regardless of the transcript language.
+- Translate Afrikaans content accurately to English, preserving technical terms and proper nouns.
+- Fibre/telecom domain terms (e.g. PON, OLT, splice, trench, duct, drop) should use their standard English forms.
+- Person names and company names must NOT be translated — keep them exactly as spoken.
+
 Output schema:
 {
   "overview": "2-4 sentence executive summary",
