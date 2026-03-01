@@ -101,7 +101,9 @@ async function handler(
         dr_number: dr || undefined,
         ont_serial: serial,
         created_by: req.user.id,
+        assigned_team: assigned_team_id || undefined,
         assigned_team_id: assigned_team_id || undefined,
+        status: assigned_team_id ? 'assigned' : undefined,
       });
 
       // Link ticket back to PP data record
