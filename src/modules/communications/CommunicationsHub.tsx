@@ -28,6 +28,7 @@ import type { CommsTab } from './types/hub.types';
 import { CommunicationsStatsCards, CommunicationsMeetingsTab } from './components';
 import { NotificationsTab } from './notifications/NotificationsTab';
 import { EmailTab } from './email/EmailTab';
+import { InboxPanel } from './messaging/InboxPanel';
 
 const TABS: { key: CommsTab; label: string; icon: React.ElementType }[] = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
@@ -271,12 +272,7 @@ export default function CommunicationsHub() {
             role="tabpanel"
             hidden={activeTab !== 'inbox'}
           >
-            {activeTab === 'inbox' && (
-              <ComingSoonCard
-                title="Unified Inbox"
-                description="A single feed combining all your messages, emails, notifications, and meeting action items in one place."
-              />
-            )}
+            {activeTab === 'inbox' && <InboxPanel />}
           </div>
 
           {/* Email */}

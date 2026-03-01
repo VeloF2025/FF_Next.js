@@ -35,6 +35,9 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   'procurement.approved':           { in_app: true, email: true,  whatsapp: false },
   'procurement.rejected':           { in_app: true, email: true,  whatsapp: false },
 
+  // -- Internal Messaging --
+  'messaging.new_message':          { in_app: true, email: true,  whatsapp: false },
+
   // -- Compliance & Fleet --
   'compliance.document_expiring':   { in_app: true, email: true,  whatsapp: false },
   'compliance.hs_incident':         { in_app: true, email: true,  whatsapp: true  },
@@ -70,6 +73,8 @@ export const EVENT_ICONS: Record<string, string> = {
   'procurement.approved':           'check-circle',
   'procurement.rejected':           'x-circle',
 
+  'messaging.new_message':          'mail',
+
   'compliance.document_expiring':   'file-warning',
   'compliance.hs_incident':         'shield-alert',
   'fleet.license_expiring':         'car',
@@ -100,6 +105,8 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
   'procurement.approval_needed':    'warning',
   'procurement.approved':           'success',
   'procurement.rejected':           'error',
+
+  'messaging.new_message':          'info',
 
   'compliance.document_expiring':   'warning',
   'compliance.hs_incident':         'error',
@@ -132,6 +139,8 @@ export const EVENT_LABELS: Record<string, string> = {
   'procurement.approved':           'PO Approved',
   'procurement.rejected':           'PO Rejected',
 
+  'messaging.new_message':          'New Message',
+
   'compliance.document_expiring':   'Document Expiring',
   'compliance.hs_incident':         'H&S Incident Reported',
   'fleet.license_expiring':         'Vehicle License Expiring',
@@ -162,6 +171,8 @@ export const EVENT_GROUPS: Record<string, string> = {
   'procurement.approval_needed':    'Procurement',
   'procurement.approved':           'Procurement',
   'procurement.rejected':           'Procurement',
+
+  'messaging.new_message':          'Messaging',
 
   'compliance.document_expiring':   'Compliance',
   'compliance.hs_incident':         'Compliance',
