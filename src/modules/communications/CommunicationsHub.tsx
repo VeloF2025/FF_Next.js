@@ -27,6 +27,7 @@ import { useCommunications } from '@/hooks/useCommunications';
 import type { CommsTab } from './types/hub.types';
 import { CommunicationsStatsCards, CommunicationsMeetingsTab } from './components';
 import { NotificationsTab } from './notifications/NotificationsTab';
+import { EmailTab } from './email/EmailTab';
 
 const TABS: { key: CommsTab; label: string; icon: React.ElementType }[] = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
@@ -284,12 +285,7 @@ export default function CommunicationsHub() {
             role="tabpanel"
             hidden={activeTab !== 'email'}
           >
-            {activeTab === 'email' && (
-              <ComingSoonCard
-                title="Email Compose & Outbox"
-                description="Send emails directly from FibreFlow. Track all outbound emails from notifications, procurement, and manual sends."
-              />
-            )}
+            {activeTab === 'email' && <EmailTab />}
           </div>
 
           {/* WhatsApp */}

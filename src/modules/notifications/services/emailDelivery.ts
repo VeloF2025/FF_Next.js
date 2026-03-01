@@ -54,15 +54,31 @@ export async function deliverEmail(
     const subject = payload.email_subject || payload.title;
     const html = payload.email_html || buildDefaultEmailHtml(payload, firstName);
 
-    await resend.emails.send({
+    const sendResult = await resend.emails.send({
       from: FROM_ADDRESS,
       to: recipientEmail,
       subject,
       html,
     });
 
+    const resendId = sendResult.data?.id || null;
+
     // Log success
     await logDelivery(notificationId, userId, 'email', 'sent', recipientEmail, null);
+
+    // Record in email_outbox for unified tracking
+    await sql`
+      INSERT INTO email_outbox (
+        sender_id, recipient_email, recipient_name, subject, body_html,
+        source_module, source_id, status, resend_id, sent_at
+      ) VALUES (
+        ${userId}::uuid, ${recipientEmail}, ${firstName}, ${subject}, ${html},
+        ${payload.source_module || 'notification'}, ${payload.source_id || null},
+        'sent', ${resendId}, NOW()
+      )
+    `.catch(outboxErr => {
+      log.warn('Failed to record email in outbox', { error: outboxErr }, 'EmailDelivery');
+    });
 
     log.info('Email notification sent', {
       userId, to: recipientEmail, event_type: payload.event_type,
