@@ -6,7 +6,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, Undo2, Search, Scissors, SearchCheck, RotateCcw, Paperclip } from 'lucide-react';
+import { Check, X, Undo2, Search, Scissors, SearchCheck, RotateCcw, Paperclip, BookmarkPlus } from 'lucide-react';
 
 export type AllocType = 'account' | 'supplier' | 'customer';
 export type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
@@ -73,6 +73,7 @@ interface Props {
   onFindMatch?: (txId: string) => void;
   onReverse?: (txId: string) => void;
   onAttachments?: (txId: string) => void;
+  onCreateRule?: (tx: BankTx) => void;
 }
 
 function fmtCurrency(n: number): string {
@@ -140,7 +141,7 @@ export function BankTxTable(props: Props) {
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
     onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,
-    onFindMatch, onReverse, onAttachments,
+    onFindMatch, onReverse, onAttachments, onCreateRule,
   } = props;
   const [openSel, setOpenSel] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -373,6 +374,12 @@ export function BankTxTable(props: Props) {
                             className="p-1 rounded hover:bg-purple-500/10 text-purple-400">
                             <Scissors className="h-3.5 w-3.5" />
                           </button>
+                          {onCreateRule && !tx.suggestedGlAccountId && (
+                            <button onClick={() => onCreateRule(tx)} title="Create rule from this transaction"
+                              className="p-1 rounded hover:bg-yellow-500/10 text-yellow-400">
+                              <BookmarkPlus className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           {onAttachments && (
                             <button onClick={() => onAttachments(tx.id)} title="Attachments"
                               className="p-1 rounded hover:bg-gray-500/10 text-[var(--ff-text-tertiary)]">
