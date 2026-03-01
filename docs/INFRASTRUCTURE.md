@@ -55,30 +55,30 @@ Password: <set in .env - never commit credentials>
 
 Claude/hein runs directly on Velocity — no SSH needed. Passwordless sudo via `/etc/sudoers.d/fibreflow-deploy`.
 
-**Deploy to Dev (dev.fibreflow.app):**
+**One-command deploy (recommended):**
 ```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
-sudo systemctl restart fibreflow-dev.service
+bash scripts/deploy-local.sh dev              # Deploy to dev (always allowed)
+bash scripts/deploy-local.sh staging          # After hours only
+bash scripts/deploy-local.sh production       # After hours only
+bash scripts/deploy-local.sh status           # Show all environments
 ```
 
-**Deploy to Staging (vf.fibreflow.app) — after hours only:**
-```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
-sudo systemctl restart fibreflow.service
-```
+`deploy-local.sh` handles everything automatically:
+- Fixes `.next` ownership (prevents EACCES from mixed hein/velo/root builds)
+- Stops the service before building (prevents crash-loop interference)
+- Cleans stale `.next` artifacts before building
+- Retries build up to 3 times (handles Next.js 14 race condition on rename/unlink)
+- Validates BUILD_ID after build
+- Restarts service + HTTP health check
+- Keeps last 3 `.next-backup-*` builds for rollback
 
-**Deploy to Production (app.fibreflow.app) — after hours only:**
+**Promotion scripts (exact commit between envs):**
 ```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
-sudo systemctl restart fibreflow-production.service
-```
-
-**Or use deploy scripts:**
-```bash
-bash scripts/deploy-gate.sh dev              # Always allowed
 bash scripts/promote.sh dev staging          # After hours
 bash scripts/promote.sh staging production   # After hours
 ```
+
+**Legacy:** `deploy-gate.sh` auto-redirects to `deploy-local.sh` when running on Velocity (hostname detection).
 
 ---
 
