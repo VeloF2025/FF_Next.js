@@ -1,6 +1,6 @@
 /**
- * Inbox Panel — replaces the "Coming Soon" placeholder in the Inbox tab
- * Views: Inbox / Sent / Archived with compose modal and thread view
+ * Inbox Panel — unified feed + messaging views
+ * Views: Feed (default) | Messages | Sent | Archived with compose modal and thread view
  */
 
 import { useState } from 'react';
@@ -12,25 +12,32 @@ import {
   CheckCheck,
   RefreshCw,
   Mail,
+  Rss,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useInternalMessages } from '../hooks/useInternalMessages';
 import { MessageListItem } from './MessageListItem';
 import { MessageThread } from './MessageThread';
 import { ComposeMessageModal } from './ComposeMessageModal';
+import { UnifiedFeedList } from './UnifiedFeedList';
 import type { MessageView } from '../types/messaging.types';
 
-const VIEWS: { key: MessageView; label: string; icon: React.ElementType }[] = [
-  { key: 'inbox', label: 'Inbox', icon: Inbox },
+type PanelView = 'feed' | MessageView;
+
+const VIEWS: { key: PanelView; label: string; icon: React.ElementType }[] = [
+  { key: 'feed', label: 'Feed', icon: Rss },
+  { key: 'inbox', label: 'Messages', icon: Inbox },
   { key: 'sent', label: 'Sent', icon: Send },
   { key: 'archived', label: 'Archived', icon: Archive },
 ];
 
 export function InboxPanel() {
-  const [view, setView] = useState<MessageView>('inbox');
+  const [view, setView] = useState<PanelView>('feed');
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [showCompose, setShowCompose] = useState(false);
 
+  // Messages hook — only needed for messaging views, pass 'inbox' when on feed
+  const messageView: MessageView = view === 'feed' ? 'inbox' : view;
   const {
     messages,
     isLoading,
@@ -41,11 +48,13 @@ export function InboxPanel() {
     loadMore,
     markRead,
     markAllRead,
-    archiveMessages,
-  } = useInternalMessages(view);
+  } = useInternalMessages(messageView);
 
   const handleOpenThread = (messageId: string) => {
-    // Mark as read when opening
+    // If opening from feed, switch to messages view context
+    if (view === 'feed') {
+      setView('inbox');
+    }
     const msg = messages.find(m => m.id === messageId);
     if (msg && !msg.is_read) {
       markRead([messageId]);
@@ -62,12 +71,14 @@ export function InboxPanel() {
     refetch();
   };
 
-  // Thread view
+  // Thread view (shared between feed and messages)
   if (activeThread) {
     return (
       <MessageThread threadId={activeThread} onBack={handleBackFromThread} />
     );
   }
+
+  const isFeed = view === 'feed';
 
   return (
     <div className="space-y-4">
@@ -113,14 +124,16 @@ export function InboxPanel() {
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
-          </button>
+          {!isFeed && (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
+            </button>
+          )}
 
           <button
             type="button"
@@ -133,61 +146,68 @@ export function InboxPanel() {
         </div>
       </div>
 
-      {/* Message count */}
-      <p className="text-xs text-[var(--ff-text-tertiary)]">
-        {total > 0
-          ? `${total} message${total !== 1 ? 's' : ''}${view === 'inbox' && unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`
-          : ''}
-      </p>
-
-      {/* Message list */}
-      {isLoading && messages.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
-          <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading messages...</span>
-        </div>
-      ) : messages.length === 0 ? (
-        <div className="text-center py-12">
-          <Mail className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
-          <p className="text-sm text-[var(--ff-text-secondary)]">
-            {view === 'inbox' ? 'Your inbox is empty' :
-             view === 'sent' ? 'No sent messages' :
-             'No archived messages'}
-          </p>
-          {view === 'inbox' && (
-            <button
-              type="button"
-              onClick={() => setShowCompose(true)}
-              className="mt-3 text-sm text-blue-500 hover:text-blue-400"
-            >
-              Send your first message
-            </button>
-          )}
-        </div>
+      {/* Feed view */}
+      {isFeed ? (
+        <UnifiedFeedList onOpenThread={handleOpenThread} />
       ) : (
-        <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-          {messages.map(msg => (
-            <MessageListItem
-              key={msg.id}
-              message={msg}
-              onClick={handleOpenThread}
-              showSender={view !== 'sent'}
-            />
-          ))}
+        <>
+          {/* Message count */}
+          <p className="text-xs text-[var(--ff-text-tertiary)]">
+            {total > 0
+              ? `${total} message${total !== 1 ? 's' : ''}${view === 'inbox' && unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`
+              : ''}
+          </p>
 
-          {hasMore && (
-            <div className="flex justify-center py-3 border-t border-[var(--ff-border-light)]">
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={isLoading}
-                className="px-4 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'Loading...' : 'Load more'}
-              </button>
+          {/* Message list */}
+          {isLoading && messages.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
+              <span className="ml-2 text-sm text-[var(--ff-text-secondary)]">Loading messages...</span>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-12">
+              <Mail className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
+              <p className="text-sm text-[var(--ff-text-secondary)]">
+                {view === 'inbox' ? 'Your inbox is empty' :
+                 view === 'sent' ? 'No sent messages' :
+                 'No archived messages'}
+              </p>
+              {view === 'inbox' && (
+                <button
+                  type="button"
+                  onClick={() => setShowCompose(true)}
+                  className="mt-3 text-sm text-blue-500 hover:text-blue-400"
+                >
+                  Send your first message
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
+              {messages.map(msg => (
+                <MessageListItem
+                  key={msg.id}
+                  message={msg}
+                  onClick={handleOpenThread}
+                  showSender={view !== 'sent'}
+                />
+              ))}
+
+              {hasMore && (
+                <div className="flex justify-center py-3 border-t border-[var(--ff-border-light)]">
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={isLoading}
+                    className="px-4 py-1.5 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors disabled:opacity-50"
+                  >
+                    {isLoading ? 'Loading...' : 'Load more'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Compose modal */}
