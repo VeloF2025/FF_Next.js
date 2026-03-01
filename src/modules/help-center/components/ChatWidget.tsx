@@ -180,7 +180,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'fixed bottom-6 right-6 z-[9999] flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95',
+          'fixed bottom-6 left-6 z-[9999] flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95',
           isOpen
             ? 'w-12 h-12 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
             : 'w-14 h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400'
@@ -195,7 +195,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
 
       {/* Chat Panel */}
       <div className={cn(
-        'fixed bottom-24 right-6 z-[9998] w-[400px] max-w-[calc(100vw-48px)] transition-all duration-300 ease-out',
+        'fixed bottom-24 left-6 z-[9998] w-[400px] max-w-[calc(100vw-48px)] transition-all duration-300 ease-out',
         isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
       )}>
         <div className="flex flex-col h-[560px] max-h-[70vh] rounded-2xl overflow-hidden shadow-2xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]">
