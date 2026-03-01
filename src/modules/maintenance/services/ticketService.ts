@@ -550,7 +550,7 @@ export async function listTickets(
     const countSql = `
       SELECT COUNT(*) as count
       FROM maintenance_tickets t
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description)\b/g, 't.$1') : ''}
     `;
     // Count query uses same filter values but without LIMIT/OFFSET
     const countValues = values.slice(0, -2); // Remove the last two values (limit and offset)
@@ -573,7 +573,7 @@ export async function listTickets(
       FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
