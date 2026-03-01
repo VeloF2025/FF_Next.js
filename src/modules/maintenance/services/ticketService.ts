@@ -516,16 +516,21 @@ export async function listTickets(
     }
 
     // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title, and description
+    // Each column needs its own parameter index because the neon HTTP driver
+    // splits by $N placeholders to build tagged template literals.
     if (filters.search && filters.search.trim()) {
       const searchTerm = `%${filters.search.trim()}%`;
+      const p1 = paramCounter++;
+      const p2 = paramCounter++;
+      const p3 = paramCounter++;
+      const p4 = paramCounter++;
       whereClauses.push(`(
-        ticket_uid ILIKE $${paramCounter} OR
-        dr_number ILIKE $${paramCounter} OR
-        title ILIKE $${paramCounter} OR
-        description ILIKE $${paramCounter}
+        ticket_uid ILIKE $${p1} OR
+        dr_number ILIKE $${p2} OR
+        title ILIKE $${p3} OR
+        description ILIKE $${p4}
       )`);
-      values.push(searchTerm);
-      paramCounter++;
+      values.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // 🟢 WORKING: Build WHERE clause
@@ -550,7 +555,7 @@ export async function listTickets(
     const countSql = `
       SELECT COUNT(*) as count
       FROM maintenance_tickets t
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description)\b/g, 't.$1') : ''}
     `;
     // Count query uses same filter values but without LIMIT/OFFSET
     const countValues = values.slice(0, -2); // Remove the last two values (limit and offset)
@@ -573,7 +578,7 @@ export async function listTickets(
       FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
       LEFT JOIN teams tm ON t.assigned_team_id = tm.id
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id|ticket_uid|title|description)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
