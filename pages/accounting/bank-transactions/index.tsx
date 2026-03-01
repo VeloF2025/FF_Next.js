@@ -13,6 +13,7 @@ import { SplitTransactionModal } from '@/components/accounting/SplitTransactionM
 import { ExcludeReasonModal } from '@/components/accounting/ExcludeReasonModal';
 import { FindMatchModal } from '@/components/accounting/FindMatchModal';
 import { BankTxAttachmentsModal } from '@/components/accounting/BankTxAttachmentsModal';
+import { CreateRuleModal } from '@/components/accounting/CreateRuleModal';
 import { StatementBalanceWidget } from '@/components/accounting/StatementBalanceWidget';
 import {
   Loader2, AlertCircle, RefreshCw, CheckCheck, Upload, Download, Search, Trash2, Layers, Zap, Plus, FileText,
@@ -70,6 +71,7 @@ export default function BankTransactionsPage() {
   const [excludingTxId, setExcludingTxId] = useState<string | null>(null);
   const [findMatchTxId, setFindMatchTxId] = useState<string | null>(null);
   const [attachmentsTxId, setAttachmentsTxId] = useState<string | null>(null);
+  const [createRuleTx, setCreateRuleTx] = useState<BankTx | null>(null);
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
@@ -646,6 +648,7 @@ export default function BankTransactionsPage() {
               onFindMatch={(txId) => setFindMatchTxId(txId)}
               onReverse={handleReverse}
               onAttachments={(txId) => setAttachmentsTxId(txId)}
+              onCreateRule={(tx) => setCreateRuleTx(tx)}
             />
           )}
         </div>
@@ -735,6 +738,20 @@ export default function BankTransactionsPage() {
           bankTransactionId={attachmentsTxId}
           transactionDescription={transactions.find(t => t.id === attachmentsTxId)?.description}
           onClose={() => setAttachmentsTxId(null)}
+        />
+      )}
+      {/* Create Rule Modal */}
+      {createRuleTx && (
+        <CreateRuleModal
+          transaction={createRuleTx}
+          bankAccountId={selectedBank}
+          glAccounts={glAccounts}
+          onClose={() => setCreateRuleTx(null)}
+          onCreated={() => {
+            setCreateRuleTx(null);
+            toast.success('Rule created — click "Apply Rules" to categorise matching transactions');
+            loadTransactions();
+          }}
         />
       )}
     </AppLayout>
