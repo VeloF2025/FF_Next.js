@@ -144,6 +144,29 @@ export default function BankTransactionsPage() {
   }, [selectedBank, tab, page, fromDate, toDate, fromAmount, toAmount, debouncedSearch]);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+
+  // Seed rowSelections from suggestion fields on newly-loaded transactions
+  useEffect(() => {
+    if (transactions.length === 0) return;
+    const initialSelections: Record<string, RowSelection> = {};
+    for (const tx of transactions) {
+      if (tx.suggestedGlAccountId && !rowSelections[tx.id]) {
+        initialSelections[tx.id] = {
+          type: 'account' as AllocType,
+          entityId: tx.suggestedGlAccountId,
+          label: tx.suggestedGlAccountCode
+            ? `${tx.suggestedGlAccountCode} ${tx.suggestedGlAccountName || ''}`
+            : tx.suggestedGlAccountName || tx.suggestedCategory || '',
+          vatCode: 'none' as VatCode,
+        };
+      }
+    }
+    if (Object.keys(initialSelections).length > 0) {
+      setRowSelections(prev => ({ ...initialSelections, ...prev }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions]);
+
   useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());

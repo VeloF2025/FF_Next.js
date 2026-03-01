@@ -43,11 +43,18 @@ export interface BankTransaction {
   excludeReason?: string;
   /** Free-text notes attached to this transaction */
   notes?: string;
+  /** Suggestion fields — populated by rules or classified import */
+  suggestedGlAccountId?: string;
+  suggestedSupplierId?: string;
+  suggestedCategory?: string;
+  suggestedCostCentre?: string;
   createdAt: string;
   updatedAt: string;
   // Joined
   bankAccountName?: string;
   matchedEntryNumber?: string;
+  suggestedGlAccountName?: string;
+  suggestedGlAccountCode?: string;
 }
 
 // ── Bank Reconciliation ──────────────────────────────────────────────────────
@@ -130,5 +137,5 @@ export interface RuleCreateInput {
 export interface RuleApplyResult {
   applied: number;
   skipped: number;
-  entries: Array<{ bankTxId: string; ruleName: string; journalEntryId: string }>;
+  entries: Array<{ bankTxId: string; ruleName: string; journalEntryId?: string; suggestion?: boolean }>;
 }

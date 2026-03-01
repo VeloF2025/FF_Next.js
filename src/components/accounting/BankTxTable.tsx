@@ -30,6 +30,11 @@ export interface BankTx {
   excludeReason?: string;
   /** User-editable memo field from bank_transactions.notes */
   notes?: string;
+  /** Suggestion fields — populated by rules or classified import */
+  suggestedGlAccountId?: string;
+  suggestedGlAccountName?: string;
+  suggestedGlAccountCode?: string;
+  suggestedCategory?: string;
 }
 
 export interface SelectOption {
@@ -246,11 +251,17 @@ export function BankTxTable(props: Props) {
                 <td className="py-2 px-2 relative">
                   {isNew ? (
                     <>
+                      {/* Amber dot for suggested (not yet confirmed) allocations */}
+                      {tx.suggestedGlAccountId && sel?.entityId === tx.suggestedGlAccountId && (
+                        <span className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-amber-400" title="Suggested by rule" />
+                      )}
                       <button
                         onClick={() => { setOpenSel(isOpen ? null : tx.id); setSearch(''); }}
                         className={`text-xs px-2 py-0.5 rounded truncate max-w-[200px] block ${
                           sel?.entityId
-                            ? 'text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)]'
+                            ? tx.suggestedGlAccountId && sel.entityId === tx.suggestedGlAccountId
+                              ? 'text-amber-300 bg-amber-500/10 border border-amber-500/30'
+                              : 'text-[var(--ff-text-primary)] bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)]'
                             : rowType === 'account'
                               ? 'text-amber-400 bg-amber-500/10 font-medium'
                               : rowType === 'supplier'

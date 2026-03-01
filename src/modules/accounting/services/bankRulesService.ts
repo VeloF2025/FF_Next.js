@@ -126,7 +126,24 @@ export async function applyRules(
 
         if (!isMatch) continue;
 
-        if (!rule.auto_create_entry) { skipped++; matched = true; break; }
+        if (!rule.auto_create_entry) {
+          // Populate suggestion — don't change status, don't create GL entry
+          await sql`
+            UPDATE bank_transactions
+            SET suggested_gl_account_id = ${rule.gl_account_id}::UUID,
+                suggested_supplier_id = ${rule.supplier_id ? Number(rule.supplier_id) : null},
+                suggested_category = ${rule.rule_name}
+            WHERE id = ${tx.id}::UUID AND suggested_gl_account_id IS NULL
+          `;
+          entries.push({
+            bankTxId: String(tx.id),
+            ruleName: String(rule.rule_name),
+            suggestion: true,
+          });
+          applied++;
+          matched = true;
+          break;
+        }
 
         // Create GL journal entry for this transaction
         const amount = Math.abs(Number(tx.amount));

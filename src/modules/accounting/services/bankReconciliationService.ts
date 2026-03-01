@@ -164,9 +164,12 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
 
     if (filters?.reconciliationId) {
       rows = (await sql`
-        SELECT bt.*, ga.account_name AS bank_account_name
+        SELECT bt.*, ga.account_name AS bank_account_name,
+               ga2.account_name AS suggested_gl_account_name,
+               ga2.account_code AS suggested_gl_account_code
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
+        LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         WHERE bt.reconciliation_id = ${filters.reconciliationId}::UUID
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -183,9 +186,12 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
       const fromAmountVal = filters.fromAmount || '-999999999';
       const toAmountVal = filters.toAmount || '999999999';
       rows = (await sql`
-        SELECT bt.*, ga.account_name AS bank_account_name
+        SELECT bt.*, ga.account_name AS bank_account_name,
+               ga2.account_name AS suggested_gl_account_name,
+               ga2.account_code AS suggested_gl_account_code
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
+        LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
           AND bt.status = ${filters.status}
           AND bt.transaction_date >= ${fromDateVal}
@@ -208,9 +214,12 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
       `) as Row[];
     } else if (filters?.bankAccountId) {
       rows = (await sql`
-        SELECT bt.*, ga.account_name AS bank_account_name
+        SELECT bt.*, ga.account_name AS bank_account_name,
+               ga2.account_name AS suggested_gl_account_name,
+               ga2.account_code AS suggested_gl_account_code
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
+        LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -221,9 +230,12 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
       `) as Row[];
     } else {
       rows = (await sql`
-        SELECT bt.*, ga.account_name AS bank_account_name
+        SELECT bt.*, ga.account_name AS bank_account_name,
+               ga2.account_name AS suggested_gl_account_name,
+               ga2.account_code AS suggested_gl_account_code
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
+        LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
@@ -1010,10 +1022,16 @@ function mapTxRow(row: Row): BankTransaction {
     importBatchId: row.import_batch_id ? String(row.import_batch_id) : undefined,
     excludeReason: row.exclude_reason ? String(row.exclude_reason) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
+    suggestedGlAccountId: row.suggested_gl_account_id ? String(row.suggested_gl_account_id) : undefined,
+    suggestedSupplierId: row.suggested_supplier_id ? String(row.suggested_supplier_id) : undefined,
+    suggestedCategory: row.suggested_category ? String(row.suggested_category) : undefined,
+    suggestedCostCentre: row.suggested_cost_centre ? String(row.suggested_cost_centre) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     bankAccountName: row.bank_account_name ? String(row.bank_account_name) : undefined,
     matchedEntryNumber: row.matched_entry_number ? String(row.matched_entry_number) : undefined,
+    suggestedGlAccountName: row.suggested_gl_account_name ? String(row.suggested_gl_account_name) : undefined,
+    suggestedGlAccountCode: row.suggested_gl_account_code ? String(row.suggested_gl_account_code) : undefined,
   };
 }
 
