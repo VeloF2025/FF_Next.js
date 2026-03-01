@@ -516,16 +516,21 @@ export async function listTickets(
     }
 
     // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title, and description
+    // Each column needs its own parameter index because the neon HTTP driver
+    // splits by $N placeholders to build tagged template literals.
     if (filters.search && filters.search.trim()) {
       const searchTerm = `%${filters.search.trim()}%`;
+      const p1 = paramCounter++;
+      const p2 = paramCounter++;
+      const p3 = paramCounter++;
+      const p4 = paramCounter++;
       whereClauses.push(`(
-        ticket_uid ILIKE $${paramCounter} OR
-        dr_number ILIKE $${paramCounter} OR
-        title ILIKE $${paramCounter} OR
-        description ILIKE $${paramCounter}
+        ticket_uid ILIKE $${p1} OR
+        dr_number ILIKE $${p2} OR
+        title ILIKE $${p3} OR
+        description ILIKE $${p4}
       )`);
-      values.push(searchTerm);
-      paramCounter++;
+      values.push(searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // 🟢 WORKING: Build WHERE clause
