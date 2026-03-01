@@ -66,11 +66,22 @@ async function handler(
       });
     }
 
+    // Look up team name if team is assigned
+    let assignedTeamName: string | undefined;
+    if (assigned_team_id) {
+      const teamResult = await pool.query(
+        `SELECT name FROM teams WHERE id = $1`,
+        [assigned_team_id]
+      );
+      assignedTeamName = teamResult.rows[0]?.name || undefined;
+    }
+
     logger.info('Creating PP Data maintenance tickets', {
       eligible: records.length,
       skipped,
       ticket_type,
       assigned_team_id: assigned_team_id || null,
+      assigned_team_name: assignedTeamName || null,
     });
 
     const tickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
@@ -102,7 +113,7 @@ async function handler(
         dr_number: dr || undefined,
         ont_serial: serial,
         created_by: req.user.id,
-        assigned_team: assigned_team_id || undefined,
+        assigned_team: assignedTeamName || undefined,
         assigned_team_id: assigned_team_id || undefined,
         status: assigned_team_id ? 'assigned' : undefined,
       });

@@ -285,6 +285,7 @@ export interface TicketFilters {
   source?: TicketSource | TicketSource[];
   assigned_to?: string; // User ID
   assigned_contractor_id?: string; // Contractor ID
+  assigned_team_id?: string; // Team ID
   project_id?: string;
   dr_number?: string;
   qa_ready?: boolean;
@@ -293,6 +294,11 @@ export interface TicketFilters {
   created_after?: Date;
   created_before?: Date;
   guarantee_status?: GuaranteeStatus;
+  // Extended filters used by hooks/API
+  search?: string;
+  sort?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 /**
@@ -306,7 +312,7 @@ export interface TicketPagination {
 }
 
 /**
- * Ticket list response
+ * Ticket list response (from service)
  */
 export interface TicketListResponse {
   tickets: Ticket[];
@@ -314,6 +320,19 @@ export interface TicketListResponse {
   page: number;
   limit: number;
   total_pages: number;
+}
+
+/**
+ * Ticket list result (for hooks/frontend)
+ */
+export interface TicketListResult {
+  tickets: Ticket[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 /**

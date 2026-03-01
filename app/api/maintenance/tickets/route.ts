@@ -89,6 +89,9 @@ export async function GET(req: NextRequest) {
     if (searchParams.has('assigned_to')) {
       filters.assigned_to = searchParams.get('assigned_to')!;
     }
+    if (searchParams.has('assigned_team_id')) {
+      filters.assigned_team_id = searchParams.get('assigned_team_id')!;
+    }
     if (searchParams.has('project_id')) {
       filters.project_id = searchParams.get('project_id')!;
     }
