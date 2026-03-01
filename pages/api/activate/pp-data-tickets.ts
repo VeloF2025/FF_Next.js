@@ -17,6 +17,7 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('activate:pp-data-tickets');
 
 const VALID_TICKET_TYPES: string[] = [
+  TicketType.PRE_PROVISION,
   TicketType.FAULT_REPAIR,
   TicketType.MODIFICATION,
   TicketType.ONT_SWAP,

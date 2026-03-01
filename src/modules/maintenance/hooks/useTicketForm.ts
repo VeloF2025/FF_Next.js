@@ -425,6 +425,7 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   [TicketType.HSE_INCIDENT]: 'H&S Incident',
   [TicketType.HSE_NEAR_MISS]: 'H&S Near Miss',
   [TicketType.SERIAL_MISMATCH]: 'Serial Mismatch',
+  [TicketType.PRE_PROVISION]: 'Pre-Provision',
 };
 
 export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {

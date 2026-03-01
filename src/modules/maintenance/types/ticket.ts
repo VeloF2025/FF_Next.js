@@ -67,6 +67,8 @@ export enum TicketType {
   HSE_NEAR_MISS = 'hse_near_miss', // Near miss for tracking and prevention
   // Investigation types
   SERIAL_MISMATCH = 'serial_mismatch', // Serial number mismatch investigation
+  // Pre-provision
+  PRE_PROVISION = 'pre_provision', // PP Data ONT investigation
 }
 
 /**
