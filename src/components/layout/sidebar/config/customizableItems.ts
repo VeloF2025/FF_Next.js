@@ -162,6 +162,11 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
   },
 };
 
+// Legacy ID remapping: users who had 'meetings' pinned now get 'communications'
+const LEGACY_REMAP: Record<string, string> = {
+  'meetings': 'communications',
+};
+
 /**
  * Build the MAIN section items based on user preferences
  * @param selectedItemIds - Array of item IDs selected by the user
@@ -169,9 +174,13 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
  */
 export function buildMainSectionItems(selectedItemIds: string[]): NavItem[] {
   const items: NavItem[] = [DASHBOARD_ITEM];
+  const seen = new Set<string>();
 
   for (const id of selectedItemIds) {
-    const item = CUSTOMIZABLE_ITEMS[id];
+    const resolvedId = LEGACY_REMAP[id] || id;
+    if (seen.has(resolvedId)) continue;
+    seen.add(resolvedId);
+    const item = CUSTOMIZABLE_ITEMS[resolvedId];
     if (item) {
       items.push(item);
     }

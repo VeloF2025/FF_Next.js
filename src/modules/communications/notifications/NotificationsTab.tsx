@@ -192,10 +192,18 @@ export function NotificationsTab() {
         <div className="text-center py-12">
           <Bell className="w-10 h-10 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
           <p className="text-sm text-[var(--ff-text-secondary)]">
-            {unreadOnly ? 'No unread notifications' : 'No notifications yet'}
+            {unreadOnly && moduleFilter !== 'all'
+              ? `No unread ${moduleFilter} notifications`
+              : unreadOnly
+                ? 'No unread notifications'
+                : moduleFilter !== 'all'
+                  ? `No ${moduleFilter} notifications`
+                  : 'No notifications yet'}
           </p>
           <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-            Notifications from maintenance, procurement, and other modules will appear here.
+            {moduleFilter !== 'all'
+              ? `Notifications from the ${moduleFilter} module will appear here.`
+              : 'Notifications from maintenance, procurement, and other modules will appear here.'}
           </p>
         </div>
       ) : (

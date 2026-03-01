@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { log } from '@/lib/logger';
 
-const DEFAULT_ITEMS = ['meetings', 'action-items'];
+const DEFAULT_ITEMS = ['communications', 'action-items'];
 
 interface UseSidebarPreferencesReturn {
   mainSectionItems: string[];
