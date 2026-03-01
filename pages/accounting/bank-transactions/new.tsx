@@ -59,7 +59,7 @@ export default function NewBankTransactionPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const list: any[] = Array.isArray(json.data ?? json) ? (json.data ?? json) : [];
         setGlAccounts(list
-          .filter(a => a.accountSubtype !== 'bank' && (a.level === undefined || a.level === 3))
+          .filter(a => a.accountSubtype !== 'bank')
           .map(a => ({ id: a.id, code: a.accountCode ?? a.code, name: a.accountName ?? a.name })));
       }),
       fetch('/api/suppliers?status=active').then(r => r.json()).then(json => {

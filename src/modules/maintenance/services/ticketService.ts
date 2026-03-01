@@ -251,7 +251,7 @@ export async function getTicketById(id: string): Promise<Ticket> {
   logger.debug('Fetching ticket by ID', { id });
 
   try {
-    // Include assigned user info via LEFT JOIN
+    // Include assigned user and team info via LEFT JOINs
     const sql = `
       SELECT
         t.*,
@@ -262,12 +262,14 @@ export async function getTicketById(id: string): Promise<Ticket> {
             'email', u.email
           )
           ELSE NULL
-        END as assigned_user
+        END as assigned_user,
+        tm.name as assigned_team_name
       FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
+      LEFT JOIN teams tm ON t.assigned_team_id = tm.id
       WHERE t.id = $1
     `;
-    const ticket = await queryOne<Ticket & { assigned_user?: { id: string; name: string; email: string } }>(sql, [id]);
+    const ticket = await queryOne<Ticket & { assigned_user?: { id: string; name: string; email: string }; assigned_team_name?: string }>(sql, [id]);
 
     if (!ticket) {
       throw new Error(`Ticket with ID ${id} not found`);
@@ -482,6 +484,12 @@ export async function listTickets(
       paramCounter++;
     }
 
+    if (filters.assigned_team_id) {
+      whereClauses.push(`assigned_team_id = $${paramCounter}`);
+      values.push(filters.assigned_team_id);
+      paramCounter++;
+    }
+
     if (filters.project_id) {
       whereClauses.push(`project_id = $${paramCounter}`);
       values.push(filters.project_id);
@@ -542,14 +550,14 @@ export async function listTickets(
     const countSql = `
       SELECT COUNT(*) as count
       FROM maintenance_tickets t
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached)\b/g, 't.$1') : ''}
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
     `;
     // Count query uses same filter values but without LIMIT/OFFSET
     const countValues = values.slice(0, -2); // Remove the last two values (limit and offset)
     const countResult = await queryOne<{ count: string }>(countSql, countValues);
     const totalCount = parseInt(countResult?.count || '0', 10);
 
-    // 🟢 WORKING: Query with pagination, ordering, and assigned user info
+    // 🟢 WORKING: Query with pagination, ordering, and assigned user/team info
     const sql = `
       SELECT
         t.*,
@@ -560,15 +568,17 @@ export async function listTickets(
             'email', u.email
           )
           ELSE NULL
-        END as assigned_user
+        END as assigned_user,
+        tm.name as assigned_team_name
       FROM maintenance_tickets t
       LEFT JOIN users u ON t.assigned_to = u.id
-      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached)\b/g, 't.$1') : ''}
+      LEFT JOIN teams tm ON t.assigned_team_id = tm.id
+      ${whereClause ? whereClause.replace(/\b(status|type|priority|source|assigned_to|contractor_id|project_id|dr_number|qa_verified|sla_breached|assigned_team_id)\b/g, 't.$1') : ''}
       ORDER BY t.created_at DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
     `;
 
-    const tickets = await query<Ticket & { assigned_user?: { id: string; name: string; email: string } }>(sql, values);
+    const tickets = await query<Ticket & { assigned_user?: { id: string; name: string; email: string }; assigned_team_name?: string }>(sql, values);
 
     logger.debug('Tickets fetched successfully', {
       count: tickets.length,

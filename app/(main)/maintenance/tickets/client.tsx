@@ -21,11 +21,13 @@ import { ModulePage } from '@/components/module-page';
 import { maintenanceConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/maintenance/components/TicketList/TicketList';
 import { KanbanBoard } from '@/modules/maintenance/components/KanbanBoard';
+import { useMyTeams } from '@/modules/maintenance/hooks/useMyTeams';
 import Link from 'next/link';
-import { Search } from 'lucide-react';
+import { Search, Users } from 'lucide-react';
 import type { TicketFilters } from '@/modules/maintenance/types/ticket';
 
 type ViewMode = 'table' | 'kanban';
+type TicketScope = 'all' | 'my_team';
 
 // Icons for view toggle
 const TableIcon = () => (
@@ -43,16 +45,22 @@ const KanbanIcon = () => (
 export default function TicketsListPageClient() {
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [ticketScope, setTicketScope] = useState<TicketScope>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const { teamIds } = useMyTeams();
 
   // Read status filter from URL params (Active/Completed sub-tabs)
   const statusFilter = searchParams?.get('status') || undefined;
 
-  // Load saved preference from localStorage
+  // Load saved preferences from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('ticketsViewMode') as ViewMode | null;
     if (saved && (saved === 'table' || saved === 'kanban')) {
       setViewMode(saved);
+    }
+    const savedScope = localStorage.getItem('ticketsScope') as TicketScope | null;
+    if (savedScope && (savedScope === 'all' || savedScope === 'my_team')) {
+      setTicketScope(savedScope);
     }
   }, []);
 
@@ -62,84 +70,119 @@ export default function TicketsListPageClient() {
     localStorage.setItem('ticketsViewMode', mode);
   };
 
+  const handleScopeChange = (scope: TicketScope) => {
+    setTicketScope(scope);
+    localStorage.setItem('ticketsScope', scope);
+  };
+
   // Create filters object for components (include status from URL sub-tabs)
   const filters: TicketFilters = useMemo(() => ({
     search: searchTerm || undefined,
     status: statusFilter as any,
-  }), [searchTerm, statusFilter]);
-
-  // Header actions for ModulePage
-  const headerActions = (
-    <div className="flex items-center gap-4">
-      {/* View Toggle */}
-      <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
-        <button
-          onClick={() => handleViewChange('table')}
-          className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
-            ${viewMode === 'table'
-              ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-              : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-            }
-          `}
-          title="Table View"
-        >
-          <TableIcon />
-          <span className="hidden sm:inline">Table</span>
-        </button>
-        <button
-          onClick={() => handleViewChange('kanban')}
-          className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
-            ${viewMode === 'kanban'
-              ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-              : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-            }
-          `}
-          title="Kanban View"
-        >
-          <KanbanIcon />
-          <span className="hidden sm:inline">Kanban</span>
-        </button>
-      </div>
-
-      {/* Create Ticket Button */}
-      <Link
-        href="/maintenance/tickets/new"
-        className="px-6 py-2 bg-[var(--ff-primary-500)] text-white rounded-lg hover:bg-[var(--ff-primary-600)] transition-colors"
-      >
-        Create Ticket
-      </Link>
-    </div>
-  );
+    assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds[0] : undefined,
+  }), [searchTerm, statusFilter, ticketScope, teamIds]);
 
   return (
-    <ModulePage config={maintenanceConfig} headerActions={headerActions} hideHeader>
+    <ModulePage config={maintenanceConfig} hideHeader>
       <div className="flex flex-col h-full">
-        {/* Search Bar - only show in Kanban view (Table view has built-in search) */}
-        {viewMode === 'kanban' && (
-          <div className="mb-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
-              <input
-                type="text"
-                placeholder="Search tickets by ID, DR number, or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]/50"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
-              )}
+        {/* Toolbar: Scope toggle, Search, View toggle, Create */}
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* Ticket Scope Toggle */}
+            <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1 shrink-0">
+              <button
+                onClick={() => handleScopeChange('all')}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${ticketScope === 'all'
+                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                  }
+                `}
+              >
+                All Tickets
+              </button>
+              <button
+                onClick={() => handleScopeChange('my_team')}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${ticketScope === 'my_team'
+                    ? 'bg-purple-500 text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                  }
+                `}
+              >
+                <Users className="w-3.5 h-3.5" />
+                My Team
+              </button>
             </div>
+
+            {/* Search Bar */}
+            {viewMode === 'kanban' && (
+              <div className="relative max-w-md flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+                <input
+                  type="text"
+                  placeholder="Search tickets by ID, DR number, or description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary-500)]/50"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="flex items-center gap-3 shrink-0">
+            {/* View Toggle */}
+            <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
+              <button
+                onClick={() => handleViewChange('table')}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${viewMode === 'table'
+                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                  }
+                `}
+                title="Table View"
+              >
+                <TableIcon />
+                <span className="hidden sm:inline">Table</span>
+              </button>
+              <button
+                onClick={() => handleViewChange('kanban')}
+                className={`
+                  flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${viewMode === 'kanban'
+                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                  }
+                `}
+                title="Kanban View"
+              >
+                <KanbanIcon />
+                <span className="hidden sm:inline">Kanban</span>
+              </button>
+            </div>
+
+            {/* Create Ticket Button */}
+            <Link
+              href="/maintenance/tickets/new"
+              className="px-4 py-2 bg-[var(--ff-primary-500)] text-white rounded-lg hover:bg-[var(--ff-primary-600)] transition-colors text-sm font-medium"
+            >
+              Create Ticket
+            </Link>
+          </div>
+        </div>
 
         {/* View Content */}
         <div className="flex-1">
