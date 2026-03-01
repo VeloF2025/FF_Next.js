@@ -222,6 +222,7 @@ export interface CreateTicketPayload {
   assigned_to?: string;
   assigned_contractor_id?: string;
   assigned_team?: string;
+  assigned_team_id?: string;
   created_by?: string;
   ont_serial?: string;
 }

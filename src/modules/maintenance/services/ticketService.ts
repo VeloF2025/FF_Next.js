@@ -176,10 +176,11 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
         assigned_to,
         contractor_id,
         assigned_team,
+        assigned_team_id,
         created_by,
         ont_serial
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
       )
       RETURNING *
     `;
@@ -202,6 +203,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       payload.assigned_to || null,
       payload.assigned_contractor_id || null,
       payload.assigned_team || null,
+      payload.assigned_team_id || null,
       payload.created_by || null,
       payload.ont_serial || null
     ];

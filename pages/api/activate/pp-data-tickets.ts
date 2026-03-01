@@ -2,7 +2,7 @@
  * API Route: /api/activate/pp-data-tickets
  *
  * POST: Create maintenance tickets for selected PP Data records
- * Links located PP records to maintenance tickets for investigation/verification.
+ * Supports both located (has DR) and not_found (no DR) records.
  */
 
 import type { NextApiResponse } from 'next';
@@ -31,7 +31,7 @@ async function handler(
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
   }
 
-  const { pp_data_ids, ticket_type, priority, notes } = req.body;
+  const { pp_data_ids, ticket_type, priority, notes, assigned_team_id } = req.body;
 
   if (!Array.isArray(pp_data_ids) || pp_data_ids.length === 0) {
     return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
@@ -46,12 +46,12 @@ async function handler(
     : TicketPriority.NORMAL;
 
   try {
-    // Fetch eligible records: located (has DR) and not yet ticketed
+    // Fetch eligible records: (has DR OR is not_found) and not yet ticketed
     const eligible = await pool.query(
-      `SELECT id, serial_number, resolved_drop_number, project
+      `SELECT id, serial_number, resolved_drop_number, project, resolution_status
        FROM oes_pp_data
        WHERE id = ANY($1)
-         AND resolved_drop_number IS NOT NULL
+         AND (resolved_drop_number IS NOT NULL OR resolution_status = 'not_found')
          AND maintenance_ticket_id IS NULL`,
       [pp_data_ids]
     );
@@ -69,23 +69,39 @@ async function handler(
       eligible: records.length,
       skipped,
       ticket_type,
+      assigned_team_id: assigned_team_id || null,
     });
 
     const tickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
+    const projectCounts: Record<string, number> = {};
 
     for (const record of records) {
       const dr = record.resolved_drop_number;
       const serial = record.serial_number;
+      const project = record.project || 'Unknown';
+
+      // Track per-project counts for email summary
+      projectCounts[project] = (projectCounts[project] || 0) + 1;
+
+      // Build title based on whether DR exists
+      const title = dr
+        ? `PP ONT ${serial} at ${dr}`
+        : `PP ONT ${serial} — No DR (Project: ${project})`;
+
+      const description = dr
+        ? (notes || `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${project})`)
+        : (notes || `PP Data investigation: ONT ${serial} — not found in any source (Project: ${project}). Requires physical verification.`);
 
       const ticket = await createTicket({
         source: TicketSource.PP_DATA,
-        title: `PP ONT ${serial} at ${dr}`,
+        title,
         ticket_type: ticket_type as TicketType,
         priority: ticketPriority,
-        description: notes || `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${record.project})`,
-        dr_number: dr,
+        description,
+        dr_number: dr || undefined,
         ont_serial: serial,
         created_by: req.user.id,
+        assigned_team_id: assigned_team_id || undefined,
       });
 
       // Link ticket back to PP data record
@@ -103,6 +119,13 @@ async function handler(
 
     logger.info('PP Data tickets created', { created: tickets.length, skipped });
 
+    // Send email notification to team members if team was assigned
+    if (assigned_team_id && tickets.length > 0) {
+      sendTeamNotification(assigned_team_id, tickets, projectCounts).catch((err) => {
+        logger.error('Failed to send team notification email', { error: err });
+      });
+    }
+
     return apiResponse.success(res, {
       created: tickets.length, skipped, tickets,
     });
@@ -110,6 +133,100 @@ async function handler(
     logger.error('Failed to create PP Data tickets', { error: err });
     return apiResponse.internalError(res, err);
   }
+}
+
+/**
+ * Send summary email to all team members about newly created PP Data tickets.
+ * Runs async (fire-and-forget) so it doesn't block the API response.
+ */
+async function sendTeamNotification(
+  teamId: string,
+  tickets: { id: string; ticket_uid: string; pp_data_id: number }[],
+  projectCounts: Record<string, number>
+): Promise<void> {
+  // Get team name and member emails
+  const teamResult = await pool.query(
+    `SELECT ct.name AS team_name, tm.first_name, tm.email
+     FROM contractor_teams ct
+     JOIN team_members tm ON tm.team_id = ct.id
+     WHERE ct.id = $1 AND tm.is_active = TRUE AND tm.email IS NOT NULL`,
+    [teamId]
+  );
+
+  const members = teamResult.rows;
+  if (members.length === 0) {
+    logger.warn('No active team members with email found for notification', { teamId });
+    return;
+  }
+
+  const teamName = members[0].team_name || 'Assigned Team';
+  const ticketUids = tickets.map(t => t.ticket_uid);
+
+  // Build project breakdown
+  const breakdown = Object.entries(projectCounts)
+    .sort(([, a], [, b]) => b - a)
+    .map(([project, count]) => `${project}: ${count}`)
+    .join(', ');
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
+  const nocUrl = `${appUrl}/maintenance/noc?source=pp_data`;
+
+  const subject = `${tickets.length} PP Data Maintenance Tickets Assigned to ${teamName}`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f3f4f6;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <tr><td style="padding:32px 40px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:8px 8px 0 0;">
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">PP Data Tickets Assigned</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#374151;">
+            <strong>${tickets.length}</strong> maintenance tickets have been created from PP Data records
+            and assigned to <strong>${teamName}</strong>.
+          </p>
+          <p style="margin:0 0 8px;font-size:14px;color:#6b7280;font-weight:600;">Project Breakdown:</p>
+          <p style="margin:0 0 24px;font-size:14px;color:#374151;">${breakdown}</p>
+          <p style="margin:0 0 8px;font-size:14px;color:#6b7280;font-weight:600;">Ticket UIDs:</p>
+          <p style="margin:0 0 24px;font-size:13px;color:#374151;font-family:monospace;word-break:break-all;">
+            ${ticketUids.join(', ')}
+          </p>
+          <table cellpadding="0" cellspacing="0"><tr><td style="background-color:#f59e0b;border-radius:6px;">
+            <a href="${nocUrl}" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;">
+              View in NOC
+            </a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td style="padding:24px 40px;background-color:#f9fafb;border-radius:0 0 8px 8px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">FibreFlow Notifications</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  // Send to each team member
+  const { resend } = await import('@/lib/email/resendClient');
+  const emails = members.map((m: { email: string }) => m.email);
+
+  await resend.emails.send({
+    from: 'FibreFlow <notifications@fibreflow.app>',
+    to: emails,
+    subject,
+    html,
+  });
+
+  logger.info('Team notification email sent', {
+    teamId,
+    teamName,
+    recipientCount: emails.length,
+    ticketCount: tickets.length,
+  });
 }
 
 export default withAuth(withRole('manager')(handler));

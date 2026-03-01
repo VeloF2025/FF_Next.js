@@ -57,9 +57,9 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
 
-/** Check if a record is eligible for ticket selection (located, no existing ticket) */
+/** Check if a record is eligible for ticket selection (located or not_found, no existing ticket) */
 function isSelectable(r: PPRecord): boolean {
-  return r.resolved_drop_number !== null && r.maintenance_ticket_id === null;
+  return (r.resolved_drop_number !== null || r.resolution_status === 'not_found') && r.maintenance_ticket_id === null;
 }
 
 export function PPDataTab() {
@@ -190,7 +190,7 @@ export function PPDataTab() {
     }
   };
 
-  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string }) => {
+  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => {
     setCreatingTickets(true);
     try {
       const res = await fetch('/api/activate/pp-data-tickets', {
@@ -210,6 +210,31 @@ export function PPDataTab() {
       toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
     } finally {
       setCreatingTickets(false);
+    }
+  };
+
+  // Select all not_found records across all pages
+  const [selectingAllNotFound, setSelectingAllNotFound] = useState(false);
+  const handleSelectAllNotFound = async () => {
+    setSelectingAllNotFound(true);
+    try {
+      const params = new URLSearchParams({ action: 'list', status: 'not_found', limit: '10000' });
+      const res = await fetch(`/api/activate/import-pp-data?${params}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        const notFoundIds = data.data
+          .filter((r: PPRecord) => r.maintenance_ticket_id === null)
+          .map((r: PPRecord) => r.id);
+        setSelectedIds(notFoundIds);
+        // Switch filter to not_found so user can see the selection
+        setFilterStatus('not_found');
+        setPage(1);
+        toast.success(`Selected ${notFoundIds.length} not-found records`);
+      }
+    } catch {
+      toast.error('Failed to fetch not-found records');
+    } finally {
+      setSelectingAllNotFound(false);
     }
   };
 
@@ -374,6 +399,20 @@ export function PPDataTab() {
               <><Map className="w-4 h-4" /> 1Map Serial Search</>
             )}
           </button>
+          {stats && stats.notFound > 0 && (
+            <button
+              onClick={handleSelectAllNotFound}
+              disabled={selectingAllNotFound}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700
+                         disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {selectingAllNotFound ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+              ) : (
+                <><Wrench className="w-4 h-4" /> Ticket All Not Found ({stats.notFound})</>
+              )}
+            </button>
+          )}
           <button
             onClick={() => { fetchStats(); fetchRecords(); }}
             className="px-4 py-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]
@@ -402,7 +441,7 @@ export function PPDataTab() {
               className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700
                          flex items-center gap-1.5"
             >
-              <Wrench className="w-3.5 h-3.5" /> Create Maintenance Tickets
+              <Wrench className="w-3.5 h-3.5" /> Create NOC Tickets
             </button>
           </div>
         </div>
