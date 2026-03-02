@@ -102,13 +102,16 @@ const reqStatusConfig: Record<RequisitionStatus, { label: string; color: string;
   cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-300', icon: XCircle },
 };
 
-const poStatusConfig: Record<POStatus, { label: string; color: string; icon: typeof Clock }> = {
+const poStatusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
   pending_approval: { label: 'Pending', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
   approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   sent: { label: 'Sent', color: 'bg-blue-500/20 text-blue-400', icon: Send },
   acknowledged: { label: 'Acknowledged', color: 'bg-indigo-500/20 text-indigo-400', icon: Package },
   partial_receipt: { label: 'Partial', color: 'bg-orange-500/20 text-orange-400', icon: Truck },
+  partially_received: { label: 'Partial Receipt', color: 'bg-orange-500/20 text-orange-400', icon: Truck },
+  received: { label: 'Received', color: 'bg-green-500/20 text-green-400', icon: PackageCheck },
+  closed: { label: 'Closed', color: 'bg-gray-500/20 text-gray-400', icon: CheckCircle },
   completed: { label: 'Completed', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-300', icon: XCircle },
 };
@@ -351,7 +354,7 @@ function PurchaseOrdersTabContent() {
 
       <div className="space-y-2">
         {filtered.map((po) => {
-          const status = poStatusConfig[po.status];
+          const status = poStatusConfig[po.status] || { label: po.status, color: 'bg-gray-500/20 text-gray-400', icon: Clock };
           const StatusIcon = status.icon;
           return (
             <div
