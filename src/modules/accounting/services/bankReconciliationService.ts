@@ -189,6 +189,10 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
       const toDateVal = filters.toDate || '2099-12-31';
       const fromAmountVal = filters.fromAmount || '-999999999';
       const toAmountVal = filters.toAmount || '999999999';
+      // 'imported' tab shows both imported and allocated (not-yet-reviewed) transactions
+      const statusArr = filters.status === 'imported'
+        ? ['imported', 'allocated']
+        : [filters.status];
       rows = (await sql`
         SELECT bt.*, ga.account_name AS bank_account_name,
                ga2.account_name AS suggested_gl_account_name,
@@ -201,7 +205,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         LEFT JOIN suppliers s2 ON s2.id = bt.suggested_supplier_id
         LEFT JOIN clients c2 ON c2.id = bt.suggested_client_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
-          AND bt.status = ${filters.status}
+          AND bt.status = ANY(${statusArr}::TEXT[])
           AND bt.transaction_date >= ${fromDateVal}
           AND bt.transaction_date <= ${toDateVal}
           AND bt.amount >= ${fromAmountVal}::NUMERIC
@@ -213,7 +217,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
       countRows = (await sql`
         SELECT COUNT(*) AS cnt FROM bank_transactions bt
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
-          AND bt.status = ${filters.status}
+          AND bt.status = ANY(${statusArr}::TEXT[])
           AND bt.transaction_date >= ${fromDateVal}
           AND bt.transaction_date <= ${toDateVal}
           AND bt.amount >= ${fromAmountVal}::NUMERIC
@@ -386,9 +390,10 @@ export async function deleteTransactions(bankTxIds: string[]): Promise<number> {
 export async function bulkAcceptTransactions(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0;
   try {
+    // Move both imported (unallocated) and allocated transactions to reviewed
     const result = (await sql`
       UPDATE bank_transactions SET status = 'matched', updated_at = NOW()
-      WHERE id = ANY(${ids}::UUID[]) AND status = 'imported'
+      WHERE id = ANY(${ids}::UUID[]) AND status IN ('imported', 'allocated')
     `) as Row[];
     const count = (result as unknown as { count?: number }).count ?? ids.length;
     log.info('Bulk accepted bank transactions', { count, ids }, 'accounting');
@@ -795,11 +800,11 @@ export async function allocateTransaction(
 
   const journalLineId = jeLines.length > 0 ? String(jeLines[0]!.id) : null;
 
-  // Auto-match the bank transaction to the journal line
+  // Mark as allocated (stays on New tab until explicitly reviewed)
   if (journalLineId) {
     await sql`
       UPDATE bank_transactions
-      SET status = 'matched',
+      SET status = 'allocated',
           matched_journal_line_id = ${journalLineId}::UUID,
           allocation_type = ${allocType},
           allocated_entity_name = ${allocEntityName},
@@ -958,7 +963,7 @@ export async function splitAllocateTransaction(
   if (journalLineId) {
     await sql`
       UPDATE bank_transactions
-      SET status = 'matched',
+      SET status = 'allocated',
           matched_journal_line_id = ${journalLineId}::UUID,
           allocation_type = 'account',
           allocated_entity_name = 'Split allocation',
@@ -989,8 +994,8 @@ export async function reverseReconciledTransaction(bankTxId: string, userId: str
   `) as Row[];
   const tx = txRows[0];
   if (!tx) throw new Error('Transaction not found');
-  if (tx.status !== 'matched' && tx.status !== 'reconciled') {
-    throw new Error('Can only reverse matched or reconciled transactions');
+  if (tx.status !== 'allocated' && tx.status !== 'matched' && tx.status !== 'reconciled') {
+    throw new Error('Can only reverse allocated, matched, or reconciled transactions');
   }
 
   // 2. If there is a matched journal line, reverse the parent journal entry

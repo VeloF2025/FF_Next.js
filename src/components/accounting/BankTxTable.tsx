@@ -207,6 +207,7 @@ export function BankTxTable(props: Props) {
         <tbody>
           {transactions.map(tx => {
             const isNew = tx.status === 'imported';
+            const isAllocated = tx.status === 'allocated';
             const sel = rowSelections[tx.id];
             const rowType: AllocType = sel?.type || 'account';
             const isOpen = openSel === tx.id;
@@ -218,7 +219,7 @@ export function BankTxTable(props: Props) {
 
             return (
               <tr key={tx.id} className={`border-b border-[var(--ff-border-light)]/50 hover:bg-[var(--ff-bg-secondary)]/50 ${
-                isOpen ? 'bg-blue-500/5' : ''
+                isOpen ? 'bg-blue-500/5' : isAllocated ? 'bg-emerald-500/5' : ''
               } ${isExcluded ? 'opacity-60' : ''}`}>
                 <td className="py-2 px-2">
                   <input type="checkbox" checked={selectedIds.has(tx.id)}
@@ -255,7 +256,7 @@ export function BankTxTable(props: Props) {
                       <option value="customer">Customer</option>
                     </select>
                   ) : (
-                    <span className={`text-xs ${
+                    <span className={`text-xs font-medium ${
                       (tx.allocationType || sel?.type) === 'supplier' ? 'text-blue-400'
                       : (tx.allocationType || sel?.type) === 'customer' ? 'text-purple-400'
                       : 'text-[var(--ff-text-secondary)]'
@@ -426,6 +427,21 @@ export function BankTxTable(props: Props) {
                             className="p-1 rounded hover:bg-red-500/10 text-red-400">
                             <X className="h-3.5 w-3.5" />
                           </button>
+                        </>
+                      ) : isAllocated ? (
+                        <>
+                          {onReverse && (
+                            <button onClick={() => onReverse(tx.id)} title="Undo allocation"
+                              className="p-1 rounded hover:bg-amber-500/10 text-amber-400">
+                              <Undo2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {onAttachments && (
+                            <button onClick={() => onAttachments(tx.id)} title="Attachments"
+                              className="p-1 rounded hover:bg-gray-500/10 text-[var(--ff-text-tertiary)]">
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </>
                       ) : (
                         <>

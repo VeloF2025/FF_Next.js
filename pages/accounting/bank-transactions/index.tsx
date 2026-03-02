@@ -309,18 +309,17 @@ export default function BankTransactionsPage() {
 
   const handleBulkAccept = async () => {
     if (selectedIds.size === 0) return;
-    if (!window.confirm(`Mark ${selectedIds.size} transaction(s) as reviewed? No journal entries will be created.`)) return;
     try {
       const res = await fetch('/api/accounting/bank-transactions-action', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ action: 'bulk_accept', bankTransactionIds: Array.from(selectedIds) }),
       });
       const json = await res.json();
-      if (!res.ok || json.success === false) throw new Error(json.message || 'Bulk accept failed');
+      if (!res.ok || json.success === false) throw new Error(json.message || 'Failed to mark as reviewed');
       toast.success(`${json.data?.accepted ?? selectedIds.size} transaction(s) marked as reviewed`);
       setSelectedIds(new Set());
       loadTransactions();
-    } catch (e) { toast.error(e instanceof Error ? e.message : 'Bulk accept failed'); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to mark as reviewed'); }
   };
 
   const handleExport = () => {
@@ -371,10 +370,14 @@ export default function BankTransactionsPage() {
   };
 
   const handleReverse = async (txId: string) => {
-    if (!window.confirm('Reverse this reconciled transaction? The associated journal entry will also be reversed.')) return;
+    const tx = transactions.find(t => t.id === txId);
+    const msg = tx?.status === 'allocated'
+      ? 'Undo this allocation? The journal entry will be reversed.'
+      : 'Reverse this transaction? The associated journal entry will also be reversed.';
+    if (!window.confirm(msg)) return;
     try {
       await callAction({ action: 'reverse', bankTransactionId: txId });
-      toast.success('Transaction reversed');
+      toast.success(tx?.status === 'allocated' ? 'Allocation undone' : 'Transaction reversed');
       loadTransactions();
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Reverse failed'); }
   };
@@ -486,15 +489,15 @@ export default function BankTransactionsPage() {
           </button>
           {tab === 'new' && (
             <>
-              <button onClick={handleBatchAccept}
+              <button onClick={handleBulkAccept}
                 disabled={selectedIds.size === 0}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] disabled:opacity-30">
                 <CheckCheck className="h-3.5 w-3.5" /> Mark as Reviewed
               </button>
               {selectedIds.size > 0 && (
-                <button onClick={handleBulkAccept}
+                <button onClick={handleBatchAccept}
                   className="flex items-center gap-1 px-2 py-1 rounded text-xs text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20">
-                  <CheckCheck className="h-3.5 w-3.5" /> Batch Accept
+                  <CheckCheck className="h-3.5 w-3.5" /> Batch Allocate
                 </button>
               )}
               <button onClick={handleBatchDelete}
@@ -700,10 +703,10 @@ export default function BankTransactionsPage() {
           </div>
         )}
 
-        {/* Bottom bar — Sage-style: Save Changes | Mark Selected | Mark All */}
+        {/* Bottom bar — Sage-style: Mark Selected as Reviewed */}
         {tab === 'new' && transactions.length > 0 && (
           <div className="sticky bottom-0 bg-[var(--ff-bg-secondary)] border-t border-[var(--ff-border-light)] px-6 py-3 flex items-center justify-center gap-4">
-            <button onClick={handleBatchAccept}
+            <button onClick={handleBulkAccept}
               disabled={selectedIds.size === 0}
               className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium">
               Mark Selected as Reviewed ({selectedIds.size})

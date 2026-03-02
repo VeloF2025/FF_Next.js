@@ -3,7 +3,7 @@
  * Bank Reconciliation Type Definitions
  */
 
-export type BankTxStatus = 'imported' | 'matched' | 'reconciled' | 'excluded';
+export type BankTxStatus = 'imported' | 'allocated' | 'matched' | 'reconciled' | 'excluded';
 export type BankReconStatus = 'in_progress' | 'completed';
 export type BankFormat = 'fnb' | 'standard_bank' | 'nedbank' | 'absa' | 'capitec' | 'ofx' | 'qif' | 'unknown';
 
