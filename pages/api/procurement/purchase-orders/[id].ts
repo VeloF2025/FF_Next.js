@@ -146,14 +146,14 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
     const grnIds = receiptsResult.map(r => r.id);
     const odooDocsResult = grnIds.length > 0
       ? await sql`
-          SELECT id, document_name, document_type, file_url, file_name, mime_type, file_size, created_at
+          SELECT id, document_name, document_type, odoo_model, file_url, file_name, mime_type, file_size, created_at
           FROM odoo_documents
           WHERE (ff_entity_type = 'purchase_order' AND ff_entity_id = ${id}::uuid)
              OR (ff_entity_type = 'goods_receipt_note' AND ff_entity_id = ANY(${grnIds}::uuid[]))
           ORDER BY created_at DESC
         `
       : await sql`
-          SELECT id, document_name, document_type, file_url, file_name, mime_type, file_size, created_at
+          SELECT id, document_name, document_type, odoo_model, file_url, file_name, mime_type, file_size, created_at
           FROM odoo_documents
           WHERE ff_entity_type = 'purchase_order' AND ff_entity_id = ${id}::uuid
           ORDER BY created_at DESC
@@ -227,6 +227,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         id: d.id,
         name: d.document_name,
         type: d.document_type,
+        odooModel: d.odoo_model,
         fileUrl: d.file_url,
         fileName: d.file_name,
         mimeType: d.mime_type,

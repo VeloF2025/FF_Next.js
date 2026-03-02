@@ -25,7 +25,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
-import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
+import { ProcurementDocumentPanel, useProcurementDocuments } from '@/modules/procurement/documents';
 
 // Types
 type POStatus = string;
@@ -97,6 +97,7 @@ interface PurchaseOrderDetail {
     id: string;
     name: string;
     type: string;
+    odooModel: string;
     fileUrl: string;
     fileName: string;
     mimeType: string;
@@ -128,6 +129,7 @@ export default function PurchaseOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('details');
   const [actionLoading, setActionLoading] = useState(false);
+  const { documents: procDocs } = useProcurementDocuments('purchase_order', id as string | undefined);
   const [isEditing, setIsEditing] = useState(false);
   const [editFields, setEditFields] = useState({
     orderDate: '',
@@ -909,8 +911,93 @@ export default function PurchaseOrderDetailPage() {
             </div>
           )}
 
-          {activeTab === 'documents' && (
+          {activeTab === 'documents' && (() => {
+            // Document Checklist — resolve each category to { url, name } or null
+            const odooDocs = purchaseOrder.odooDocuments || [];
+
+            function resolveDoc(
+              procMatch: typeof procDocs[number] | undefined,
+              odooMatch: typeof odooDocs[number] | undefined,
+              fallbackUrl?: string | null,
+              fallbackName?: string | null,
+            ): { url: string; name: string } | null {
+              if (procMatch) return { url: procMatch.fileUrl, name: procMatch.documentName };
+              if (odooMatch) return { url: odooMatch.fileUrl, name: odooMatch.name };
+              if (fallbackUrl) return { url: fallbackUrl, name: fallbackName || 'Document' };
+              return null;
+            }
+
+            const quote = resolveDoc(
+              procDocs.find(d => d.documentType === 'quote_pdf'),
+              odooDocs.find(d => d.type === 'quote'),
+              purchaseOrder.quoteAttachmentUrl,
+              purchaseOrder.quoteAttachmentName,
+            );
+            const poDocument = resolveDoc(
+              procDocs.find(d => d.documentType === 'contract'),
+              odooDocs.find(d => d.odooModel === 'purchase.order'),
+            );
+            const grv = resolveDoc(
+              procDocs.find(d => d.documentType === 'grv' || d.documentType === 'delivery_note'),
+              odooDocs.find(d => d.odooModel === 'stock.picking'),
+            );
+            const invoice = resolveDoc(
+              procDocs.find(d => d.documentType === 'invoice'),
+              odooDocs.find(d => d.type === 'invoice' || d.odooModel === 'account.move'),
+            );
+
+            const checklistItems = [
+              { label: 'Quote', present: !!quote, name: quote?.name, url: quote?.url },
+              { label: 'Purchase Order', present: !!poDocument, name: poDocument?.name, url: poDocument?.url },
+              { label: 'GRV', present: !!grv, name: grv?.name, url: grv?.url },
+              { label: 'Supplier Invoice', present: !!invoice, name: invoice?.name, url: invoice?.url },
+            ];
+            const completedCount = checklistItems.filter(i => i.present).length;
+            const allComplete = completedCount === 4;
+
+            return (
             <div className="space-y-6">
+              {/* Document Checklist */}
+              <div className={`bg-[var(--ff-bg-secondary)] border rounded-lg p-5 ${allComplete ? 'border-green-500/50' : 'border-[var(--ff-border-light)]'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-blue-400" />
+                    <h3 className="font-semibold text-[var(--ff-text-primary)]">Document Checklist</h3>
+                  </div>
+                  <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${allComplete ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                    {allComplete ? '4/4 Complete' : `${completedCount}/4`}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {checklistItems.map((item) => (
+                    <div key={item.label} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-[var(--ff-bg-hover)] transition-colors">
+                      {item.present ? (
+                        <CheckCircle className="h-5 w-5 text-green-400 shrink-0" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-400 shrink-0" />
+                      )}
+                      <span className="text-sm font-medium text-[var(--ff-text-primary)] w-32 shrink-0">
+                        {item.label}
+                      </span>
+                      {item.present && item.url ? (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-400 hover:text-blue-300 truncate transition-colors"
+                        >
+                          {item.name}
+                        </a>
+                      ) : !item.present ? (
+                        <span className="text-sm text-red-400/70">Missing — upload required</span>
+                      ) : (
+                        <span className="text-sm text-[var(--ff-text-secondary)] truncate">{item.name}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Synced Documents from Odoo */}
               {purchaseOrder.odooDocuments && purchaseOrder.odooDocuments.length > 0 && (
                 <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
@@ -952,13 +1039,15 @@ export default function PurchaseOrderDetailPage() {
                 allowedTypes={[
                   { value: 'quote_pdf', label: 'Supplier Quote' },
                   { value: 'invoice', label: 'Invoice' },
+                  { value: 'grv', label: 'GRV' },
                   { value: 'delivery_note', label: 'Delivery Note' },
                   { value: 'contract', label: 'Contract' },
                   { value: 'other', label: 'Other' },
                 ]}
               />
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </AppLayout>
