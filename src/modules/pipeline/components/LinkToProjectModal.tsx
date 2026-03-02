@@ -15,6 +15,7 @@ import {
   Star,
   AlertCircle,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { log } from '@/lib/logger';
 
 interface Project {
@@ -148,6 +149,7 @@ export function LinkToProjectModal({
       const result = await response.json();
 
       if (result.success) {
+        toast.success(`Pipeline linked to "${selectedProject.project_name}" successfully`);
         onLinkCreated();
         onClose();
       } else {

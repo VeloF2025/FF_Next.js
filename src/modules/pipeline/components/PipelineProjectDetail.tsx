@@ -49,6 +49,7 @@ import { ApprovalDetailDrawer } from './ApprovalDetailDrawer';
 import { ProjectDocumentManager } from './ProjectDocumentManager';
 import { AddApprovalModal } from './AddApprovalModal';
 import { LinkToProjectModal } from './LinkToProjectModal';
+import { CreateAndLinkProjectModal } from './CreateAndLinkProjectModal';
 import { PipelineProjectSearch } from './PipelineProjectSearch';
 
 const STATUS_LABELS: Record<PipelineStatus, string> = {
@@ -166,6 +167,7 @@ export function PipelineProjectDetail() {
   const [bulkApproving, setBulkApproving] = useState(false);
   const [transitionModalOpen, setTransitionModalOpen] = useState(false);
   const [linkToProjectModalOpen, setLinkToProjectModalOpen] = useState(false);
+  const [createAndLinkModalOpen, setCreateAndLinkModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // Map auth role to drawer role
@@ -1162,6 +1164,13 @@ export function PipelineProjectDetail() {
                   <ExternalLink className="w-4 h-4" />
                   Link to Existing Project
                 </button>
+                <button
+                  onClick={() => setCreateAndLinkModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-green-500 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create &amp; Link New Project
+                </button>
                 {!project.po_number && approvalStatus?.complete && (
                   <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--ff-accent)] text-white rounded-lg hover:bg-[var(--ff-accent-hover)] transition-colors text-sm">
                     <FileText className="w-4 h-4" />
@@ -1242,6 +1251,17 @@ export function PipelineProjectDetail() {
           isOpen={linkToProjectModalOpen}
           onClose={() => setLinkToProjectModalOpen(false)}
           onLinkCreated={handleLinkToProjectCreated}
+        />
+      )}
+
+      {/* Create & Link Project Modal */}
+      {id && typeof id === 'string' && project && (
+        <CreateAndLinkProjectModal
+          pipelineProjectId={id}
+          pipelineProjectName={project.project_name}
+          isOpen={createAndLinkModalOpen}
+          onClose={() => setCreateAndLinkModalOpen(false)}
+          onProjectCreated={handleLinkToProjectCreated}
         />
       )}
     </div>
