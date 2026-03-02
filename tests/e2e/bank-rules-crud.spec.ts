@@ -16,10 +16,10 @@ test.describe('Bank Rules CRUD', () => {
     // Check heading
     await expect(page.getByRole('heading', { name: 'Categorisation Rules' })).toBeVisible();
 
-    // Check table headers
-    await expect(page.getByText('Rule')).toBeVisible();
-    await expect(page.getByText('Pattern')).toBeVisible();
-    await expect(page.getByText('GL Account')).toBeVisible();
+    // Check table headers — scope to <th> elements to avoid strict-mode conflicts
+    await expect(page.locator('th', { hasText: 'Rule' }).first()).toBeVisible();
+    await expect(page.locator('th', { hasText: 'Pattern' })).toBeVisible();
+    await expect(page.locator('th', { hasText: 'GL Account' })).toBeVisible();
 
     console.log('✅ Page loaded OK');
   });
@@ -55,11 +55,11 @@ test.describe('Bank Rules CRUD', () => {
     await page.waitForTimeout(1500);
     await page.screenshot({ path: 'tests/screenshots/rules-04-after-create.png', fullPage: true });
 
-    // Check error state
-    const errorEl = page.locator('.text-red-400');
-    const hasError = await errorEl.count() > 0;
+    // Check error state — use the specific error banner, not all red elements
+    const errorBanner = page.locator('div.bg-red-500\\/10.text-red-400');
+    const hasError = await errorBanner.isVisible().catch(() => false);
     if (hasError) {
-      const errorText = await errorEl.first().textContent();
+      const errorText = await errorBanner.textContent();
       console.log(`❌ Create error: ${errorText}`);
     } else {
       // Check new rule appears in table
@@ -109,10 +109,10 @@ test.describe('Bank Rules CRUD', () => {
     await page.waitForTimeout(1500);
     await page.screenshot({ path: 'tests/screenshots/rules-07-after-edit.png', fullPage: true });
 
-    const errorEl = page.locator('.text-red-400');
-    const hasError = await errorEl.count() > 0;
+    const errorBanner = page.locator('div.bg-red-500\\/10.text-red-400');
+    const hasError = await errorBanner.isVisible().catch(() => false);
     if (hasError) {
-      console.log(`❌ Edit error: ${await errorEl.first().textContent()}`);
+      console.log(`❌ Edit error: ${await errorBanner.textContent()}`);
     } else {
       console.log('✅ Edit saved');
     }
@@ -181,20 +181,31 @@ test.describe('Bank Rules CRUD', () => {
     await expect(applyBtn).toBeEnabled({ timeout: 8000 });
     console.log('✅ Apply Rules button enabled');
 
-    await applyBtn.click();
-    // Apply can take a while with many rules — wait up to 10 seconds
-    await page.waitForTimeout(8000);
+    // Wait for the API response — rules now run in parallel so should be fast
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        r => r.url().includes('bank-rules-action') && r.request().method() === 'POST',
+        { timeout: 60000 }
+      ),
+      applyBtn.click(),
+    ]);
+
+    const responseBody = await response.json().catch(() => null);
+    console.log(`Apply API status: ${response.status()}`);
+    if (responseBody?.data) {
+      console.log(`Apply result: ${responseBody.data.applied} categorised, ${responseBody.data.skipped} skipped`);
+    }
+
+    // Wait for React to re-render the banner
+    await page.waitForTimeout(500);
     await page.screenshot({ path: 'tests/screenshots/rules-10-after-apply.png', fullPage: true });
 
-    // Check for result banner (text contains "categorised")
-    const resultBanner = page.locator('text=/Rules applied/i').first();
+    // Check for result banner
+    const resultBanner = page.locator('div.bg-emerald-500\\/10.text-emerald-400').first();
     const bannerVisible = await resultBanner.isVisible().catch(() => false);
     console.log(`Apply result banner: ${bannerVisible ? '✅ shown' : '⚠️  not shown'}`);
-
-    // Also check the apply result text
     if (bannerVisible) {
-      const bannerText = await resultBanner.textContent();
-      console.log(`  Banner text: ${bannerText}`);
+      console.log(`  Banner: ${await resultBanner.textContent()}`);
     }
   });
 });

@@ -104,18 +104,22 @@ export async function applyRules(
     let totalApplied = 0;
     const entries: RuleApplyResult['entries'] = [];
 
-    // Process each rule with bulk SQL — one UPDATE per rule, not per transaction.
-    // Only target new transactions (imported/allocated) without existing suggestions.
-    for (const rule of rules) {
-      const pattern = toSqlPattern(String(rule.match_type), String(rule.match_pattern));
-      const field = String(rule.match_field);
-      const glAccountId = rule.gl_account_id ? String(rule.gl_account_id) : null;
-      const supplierId = rule.supplier_id ? Number(rule.supplier_id) : null;
-      const clientId = rule.client_id ? String(rule.client_id) : null;
-      const ruleName = String(rule.rule_name);
+    // Split rules into suggestion-mode and auto-create-mode
+    const suggestionRules = rules.filter((r: Row) => !r.auto_create_entry);
+    const autoCreateRules = rules.filter((r: Row) => r.auto_create_entry);
 
-      if (!rule.auto_create_entry) {
-        // Suggestion mode — bulk update all matching transactions in one query
+    // Suggestion-mode rules: run all in parallel (one bulk UPDATE per rule).
+    // PostgreSQL row locking via `suggested_gl_account_id IS NULL` prevents double-updates
+    // when concurrent queries race on the same transaction row.
+    const suggestionResults = await Promise.all(
+      suggestionRules.map(async (rule: Row) => {
+        const pattern = toSqlPattern(String(rule.match_type), String(rule.match_pattern));
+        const field = String(rule.match_field);
+        const glAccountId = rule.gl_account_id ? String(rule.gl_account_id) : null;
+        const supplierId = rule.supplier_id ? Number(rule.supplier_id) : null;
+        const clientId = rule.client_id ? String(rule.client_id) : null;
+        const ruleName = String(rule.rule_name);
+
         let updated: Row[];
         if (field === 'description') {
           updated = (await sql`
@@ -144,7 +148,6 @@ export async function applyRules(
             RETURNING id
           `) as Row[];
         } else {
-          // 'both' — match description OR reference
           updated = (await sql`
             UPDATE bank_transactions
             SET suggested_gl_account_id = ${glAccountId}::UUID,
@@ -159,14 +162,23 @@ export async function applyRules(
           `) as Row[];
         }
 
-        for (const row of updated) {
-          entries.push({ bankTxId: String(row.id), ruleName, suggestion: true });
-        }
-        totalApplied += updated.length;
-        continue;
-      }
+        return { ruleName, updated };
+      })
+    );
 
-      // Auto-create JE mode — must loop per transaction (each needs its own JE)
+    for (const { ruleName, updated } of suggestionResults) {
+      for (const row of updated) {
+        entries.push({ bankTxId: String(row.id), ruleName, suggestion: true });
+      }
+      totalApplied += updated.length;
+    }
+
+    // Auto-create JE mode — sequential (each transaction needs its own JE)
+    for (const rule of autoCreateRules) {
+      const pattern = toSqlPattern(String(rule.match_type), String(rule.match_pattern));
+      const field = String(rule.match_field);
+      const ruleName = String(rule.rule_name);
+
       let matchingTxs: Row[];
       if (field === 'description') {
         matchingTxs = (await sql`
@@ -276,7 +288,7 @@ function mapRuleRow(row: Row): BankCategorisationRule {
     matchField: String(row.match_field) as BankCategorisationRule['matchField'],
     matchType: String(row.match_type) as BankCategorisationRule['matchType'],
     matchPattern: String(row.match_pattern),
-    glAccountId: String(row.gl_account_id),
+    glAccountId: row.gl_account_id ? String(row.gl_account_id) : undefined,
     supplierId: row.supplier_id ? String(row.supplier_id) : undefined,
     clientId: row.client_id ? String(row.client_id) : undefined,
     descriptionTemplate: row.description_template ? String(row.description_template) : undefined,
