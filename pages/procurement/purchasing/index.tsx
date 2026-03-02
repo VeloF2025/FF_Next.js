@@ -369,8 +369,8 @@ function PurchaseOrdersTabContent() {
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-[var(--ff-text-primary)]">{po.poNumber}</p>
                       {po.odooPoId && (
-                        <span className="inline-flex items-center rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                          Odoo
+                        <span className="inline-flex items-center rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                          Synced
                         </span>
                       )}
                     </div>

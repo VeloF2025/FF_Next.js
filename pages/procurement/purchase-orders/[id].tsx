@@ -563,9 +563,9 @@ export default function PurchaseOrderDetailPage() {
                   </div>
                 </div>
                 {purchaseOrder.odooPoId && (
-                  <div className="flex items-center gap-2 rounded-lg bg-orange-50 px-3 py-1.5 text-sm dark:bg-orange-900/20">
-                    <span className="font-medium text-orange-700 dark:text-orange-300">
-                      Imported from Odoo
+                  <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-sm dark:bg-green-900/20">
+                    <span className="font-medium text-green-700 dark:text-green-300">
+                      Synced
                     </span>
                   </div>
                 )}
