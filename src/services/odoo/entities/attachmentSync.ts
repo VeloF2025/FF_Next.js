@@ -169,18 +169,19 @@ function getStoragePath(
   ffEntityId: string | null,
   isOrphan: boolean
 ): { type: string; category: string } {
+  // VF Storage only supports /upload/{type}/{category} — no nested paths
   const modelSlug = odooModel.replace(/\./g, '-');
 
   if (isOrphan || !ffEntityId) {
     return {
       type: 'odoo-docs',
-      category: `orphaned/${modelSlug}`,
+      category: `orphaned-${modelSlug}`,
     };
   }
 
   return {
     type: 'odoo-docs',
-    category: `${modelSlug}/${ffEntityId}`,
+    category: `${modelSlug}-${ffEntityId}`,
   };
 }
 
