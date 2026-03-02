@@ -773,8 +773,8 @@ async function lookupFirstTeamMember(
     return await queryOne<UserLookup>(
       `SELECT u.id, u.first_name || ' ' || u.last_name AS name, tm.phone
        FROM team_members tm
-       JOIN users u ON u.id = tm.user_id
-       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.user_id IS NOT NULL
+       JOIN users u ON LOWER(u.email) = LOWER(tm.email)
+       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.email IS NOT NULL
        LIMIT 1`,
       [teamId]
     );
@@ -797,8 +797,8 @@ async function lookupTeamMembers(
     const rows = await query<UserLookup>(
       `SELECT u.id, u.first_name || ' ' || u.last_name AS name, tm.phone
        FROM team_members tm
-       JOIN users u ON u.id = tm.user_id
-       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.user_id IS NOT NULL`,
+       JOIN users u ON LOWER(u.email) = LOWER(tm.email)
+       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.email IS NOT NULL`,
       [teamId]
     );
     return rows;
