@@ -403,7 +403,7 @@ export class NotificationTriggerService {
   private async lookupUser(userId: string): Promise<UserLookup | null> {
     try {
       const user = await queryOne<UserLookup>(
-        `SELECT id, name, phone FROM users WHERE id = $1`,
+        `SELECT id, first_name || ' ' || last_name AS name, phone_number AS phone FROM users WHERE id = $1`,
         [userId]
       );
       return user;
@@ -423,7 +423,7 @@ export class NotificationTriggerService {
   private async lookupContractor(contractorId: string): Promise<ContractorLookup | null> {
     try {
       const contractor = await queryOne<ContractorLookup>(
-        `SELECT id, name, phone FROM contractors WHERE id = $1`,
+        `SELECT id, company_name AS name, phone FROM contractors WHERE id = $1`,
         [contractorId]
       );
       return contractor;
@@ -771,10 +771,10 @@ async function lookupFirstTeamMember(
 ): Promise<UserLookup | null> {
   try {
     return await queryOne<UserLookup>(
-      `SELECT u.id, u.name, u.phone
+      `SELECT u.id, u.first_name || ' ' || u.last_name AS name, tm.phone
        FROM team_members tm
        JOIN users u ON u.id = tm.user_id
-       WHERE tm.team_id = $1 AND tm.is_active = true
+       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.user_id IS NOT NULL
        LIMIT 1`,
       [teamId]
     );
@@ -795,10 +795,10 @@ async function lookupTeamMembers(
 ): Promise<UserLookup[]> {
   try {
     const rows = await query<UserLookup>(
-      `SELECT u.id, u.name, u.phone
+      `SELECT u.id, u.first_name || ' ' || u.last_name AS name, tm.phone
        FROM team_members tm
        JOIN users u ON u.id = tm.user_id
-       WHERE tm.team_id = $1 AND tm.is_active = true`,
+       WHERE tm.team_id = $1 AND tm.is_active = true AND tm.user_id IS NOT NULL`,
       [teamId]
     );
     return rows;
