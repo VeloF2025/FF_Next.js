@@ -93,6 +93,16 @@ interface PurchaseOrderDetail {
   items: POLineItem[];
   history: POHistoryEvent[];
   receipts: POReceipt[];
+  odooDocuments?: {
+    id: string;
+    name: string;
+    type: string;
+    fileUrl: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    createdAt: string;
+  }[];
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -525,7 +535,7 @@ export default function PurchaseOrderDetailPage() {
     { id: 'items' as TabId, label: `Items (${purchaseOrder.items.length})`, icon: Package },
     { id: 'receipts' as TabId, label: `Receipts (${purchaseOrder.receipts.length})`, icon: Truck },
     { id: 'history' as TabId, label: 'History', icon: Clock },
-    { id: 'documents' as TabId, label: 'Documents', icon: FileText },
+    { id: 'documents' as TabId, label: `Documents${purchaseOrder.odooDocuments?.length ? ` (${purchaseOrder.odooDocuments.length})` : ''}`, icon: FileText },
   ];
 
   return (
@@ -900,17 +910,54 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {activeTab === 'documents' && (
-            <ProcurementDocumentPanel
-              entityType="purchase_order"
-              entityId={purchaseOrder.id}
-              allowedTypes={[
-                { value: 'quote_pdf', label: 'Supplier Quote' },
-                { value: 'invoice', label: 'Invoice' },
-                { value: 'delivery_note', label: 'Delivery Note' },
-                { value: 'contract', label: 'Contract' },
-                { value: 'other', label: 'Other' },
-              ]}
-            />
+            <div className="space-y-6">
+              {/* Synced Documents from Odoo */}
+              {purchaseOrder.odooDocuments && purchaseOrder.odooDocuments.length > 0 && (
+                <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Paperclip className="h-5 w-5 text-green-400" />
+                    <h3 className="font-semibold text-[var(--ff-text-primary)]">Synced Documents</h3>
+                    <span className="text-xs text-[var(--ff-text-tertiary)]">({purchaseOrder.odooDocuments.length})</span>
+                  </div>
+                  <div className="space-y-2">
+                    {purchaseOrder.odooDocuments.map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-3 rounded-lg border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)] transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-blue-400" />
+                          <div>
+                            <p className="text-sm font-medium text-[var(--ff-text-primary)]">{doc.name}</p>
+                            <p className="text-xs text-[var(--ff-text-tertiary)]">
+                              {doc.type} • {doc.fileSize > 1024 ? `${(doc.fileSize / 1024).toFixed(0)} KB` : `${doc.fileSize} B`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-[var(--ff-text-tertiary)]">
+                          {new Date(doc.createdAt).toLocaleDateString('en-ZA')}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* User-uploaded Documents */}
+              <ProcurementDocumentPanel
+                entityType="purchase_order"
+                entityId={purchaseOrder.id}
+                allowedTypes={[
+                  { value: 'quote_pdf', label: 'Supplier Quote' },
+                  { value: 'invoice', label: 'Invoice' },
+                  { value: 'delivery_note', label: 'Delivery Note' },
+                  { value: 'contract', label: 'Contract' },
+                  { value: 'other', label: 'Other' },
+                ]}
+              />
+            </div>
           )}
         </div>
       </div>

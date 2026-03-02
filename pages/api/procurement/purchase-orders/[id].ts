@@ -134,6 +134,31 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
       ? await poApprovalService.getVersionHistory(id)
       : [];
 
+    // Fetch GRN receipts linked to this PO
+    const receiptsResult = await sql`
+      SELECT id, grn_number, delivery_date, received_by_name, total_items, status
+      FROM goods_receipt_notes
+      WHERE purchase_order_id = ${id}
+      ORDER BY delivery_date DESC
+    `;
+
+    // Fetch documents: procurement_documents + odoo_documents linked to this PO or its GRNs
+    const grnIds = receiptsResult.map(r => r.id);
+    const odooDocsResult = grnIds.length > 0
+      ? await sql`
+          SELECT id, document_name, document_type, file_url, file_name, mime_type, file_size, created_at
+          FROM odoo_documents
+          WHERE (ff_entity_type = 'purchase_order' AND ff_entity_id = ${id}::uuid)
+             OR (ff_entity_type = 'goods_receipt_note' AND ff_entity_id = ANY(${grnIds}::uuid[]))
+          ORDER BY created_at DESC
+        `
+      : await sql`
+          SELECT id, document_name, document_type, file_url, file_name, mime_type, file_size, created_at
+          FROM odoo_documents
+          WHERE ff_entity_type = 'purchase_order' AND ff_entity_id = ${id}::uuid
+          ORDER BY created_at DESC
+        `;
+
     // Get quote comparison if RFQ linked
     let quoteComparison = null;
     try {
@@ -191,7 +216,23 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
         createdBy: h.created_by,
         createdAt: h.created_at,
       })),
-      receipts: [] as { id: string; grnNumber: string; receivedDate: string; receivedBy: string; totalItems: number }[],
+      receipts: receiptsResult.map(r => ({
+        id: r.id,
+        grnNumber: r.grn_number,
+        receivedDate: r.delivery_date,
+        receivedBy: r.received_by_name || 'Unknown',
+        totalItems: parseInt(r.total_items) || 0,
+      })),
+      odooDocuments: odooDocsResult.map(d => ({
+        id: d.id,
+        name: d.document_name,
+        type: d.document_type,
+        fileUrl: d.file_url,
+        fileName: d.file_name,
+        mimeType: d.mime_type,
+        fileSize: parseInt(d.file_size) || 0,
+        createdAt: d.created_at,
+      })),
     };
 
     return apiResponse.success(res, purchaseOrder);
