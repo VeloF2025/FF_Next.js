@@ -14,7 +14,7 @@ interface Rule {
   matchField: string;
   matchType: string;
   matchPattern: string;
-  glAccountId: string;
+  glAccountId?: string;
   glAccountCode?: string;
   glAccountName?: string;
   supplierId?: string;
@@ -34,6 +34,8 @@ interface Client { id: string; name: string }
 export default function BankRulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<GLAccount[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,13 +60,25 @@ export default function BankRulesPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    const mapAccount = (a: Record<string, unknown>) => ({
+      id: String(a.id),
+      accountCode: String(a.accountCode || a.account_code || ''),
+      accountName: String(a.accountName || a.account_name || ''),
+    });
     fetch('/api/accounting/chart-of-accounts', { credentials: 'include' }).then(r => r.json()).then(res => {
       const d = res.data || res;
       const list = Array.isArray(d) ? d : d.accounts || d.items || [];
-      setAccounts(list.map((a: Record<string, unknown>) => ({
-        id: String(a.id), accountCode: String(a.accountCode || a.account_code || ''),
-        accountName: String(a.accountName || a.account_name || ''),
-      })));
+      setAccounts(list.map(mapAccount));
+    });
+    fetch('/api/accounting/bank-accounts', { credentials: 'include' }).then(r => r.json()).then(res => {
+      const list = Array.isArray(res.data) ? res.data : [];
+      const mapped = list.map((a: Record<string, unknown>) => ({
+        id: String(a.id),
+        accountCode: String(a.accountCode || ''),
+        accountName: String(a.accountName || ''),
+      }));
+      setBankAccounts(mapped);
+      if (mapped.length > 0) setSelectedBankId(String(mapped[0].id));
     });
     fetch('/api/suppliers?status=active', { credentials: 'include' }).then(r => r.json()).then(res => {
       const list = Array.isArray(res.data) ? res.data : [];
@@ -92,7 +106,7 @@ export default function BankRulesPage() {
       matchField: rule.matchField,
       matchType: rule.matchType,
       matchPattern: rule.matchPattern,
-      glAccountId: rule.glAccountId,
+      glAccountId: rule.glAccountId || '',
       supplierId: rule.supplierId || '',
       clientId: rule.clientId || '',
       vatCode: '',
@@ -142,16 +156,21 @@ export default function BankRulesPage() {
 
   const doAction = async (action: string, id?: string, extra?: Record<string, unknown>) => {
     setBusy(id || action);
+    setError('');
     try {
       const res = await fetch('/api/accounting/bank-rules-action', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         credentials: 'include', body: JSON.stringify({ action, id, ...extra }),
       });
       const json = await res.json();
+      if (!res.ok) throw new Error(json.message || `${action} failed`);
       if (action === 'apply' && json.data) setApplyResult(json.data);
       await load();
-    } catch { /* ignore */ }
-    setBusy('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `${action} failed`);
+    } finally {
+      setBusy('');
+    }
   };
 
   return (
@@ -169,9 +188,23 @@ export default function BankRulesPage() {
                 <p className="text-sm text-[var(--ff-text-secondary)]">Auto-categorise bank transactions by pattern matching</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => doAction('apply', undefined, { bankAccountId: accounts.find(a => a.accountCode === '1110')?.id })}
-                disabled={!!busy} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium disabled:opacity-50">
+            <div className="flex items-center gap-2">
+              {bankAccounts.length > 1 && (
+                <select
+                  value={selectedBankId}
+                  onChange={e => setSelectedBankId(e.target.value)}
+                  className="ff-select text-sm py-2 px-3"
+                >
+                  {bankAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => doAction('apply', undefined, { bankAccountId: selectedBankId })}
+                disabled={!!busy || !selectedBankId}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium disabled:opacity-50"
+              >
                 {busy === 'apply' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Apply Rules
               </button>
               <button onClick={() => { resetForm(); setShowForm(v => !v); }} className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
@@ -210,8 +243,8 @@ export default function BankRulesPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input value={form.matchPattern} onChange={e => setForm(f => ({ ...f, matchPattern: e.target.value }))} className="ff-input" placeholder="Pattern (e.g. WOOLWORTHS) *" required />
-                <select value={form.glAccountId} onChange={e => setForm(f => ({ ...f, glAccountId: e.target.value }))} className="ff-select" required>
-                  <option value="">Select GL Account *</option>
+                <select value={form.glAccountId} onChange={e => setForm(f => ({ ...f, glAccountId: e.target.value }))} className="ff-select" required={!form.supplierId && !form.clientId}>
+                  <option value="">{form.supplierId || form.clientId ? 'No GL Account (optional)' : 'Select GL Account *'}</option>
                   {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
                 </select>
                 <input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="ff-input" placeholder="Priority (lower = first)" />
@@ -266,7 +299,9 @@ export default function BankRulesPage() {
                     </td>
                     <td className="px-4 py-3"><code className="px-2 py-0.5 rounded bg-[var(--ff-bg-primary)] text-yellow-400 text-xs">{rule.matchPattern}</code></td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs">
-                      {rule.glAccountCode} — {rule.glAccountName}
+                      {rule.glAccountCode
+                        ? `${rule.glAccountCode} — ${rule.glAccountName}`
+                        : <span className="text-[var(--ff-text-tertiary)]">—</span>}
                     </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs">
                       {rule.supplierName
