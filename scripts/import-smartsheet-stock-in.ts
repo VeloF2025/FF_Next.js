@@ -179,6 +179,16 @@ async function loadSuppliers(): Promise<Map<string, number>> {
   return map;
 }
 
+// Smartsheet → FF project alias map
+const PROJECT_ALIASES: Record<string, string> = {
+  'mamelodi p1':  '7003dc06-9af7-4a7c-bc6c-a177d77784f2', // Mamelodi
+  'tembisa 1':    '7d8b94d6-8e5a-4dbb-9ede-69ce3884e004', // Thembisa POP 1
+  'tembisa 2':    'd3df9135-9aa3-415d-87b6-17cce547eb22', // Thembisa POP 2
+  'tembisa 3':    '1de088dd-fe24-43fb-b8d3-94fca61ef91d', // Thembisa POP 3
+  'tonga a':      'ce3bf310-d6ba-4ede-ab36-a8c902a5efc6', // Tonga
+  'etwatwa':      'c7255076-1d2f-41ce-97bb-858b8c87ee27', // Etwatwa
+};
+
 async function loadProjects(): Promise<Map<string, string>> {
   const rows = await sql`
     SELECT id, LOWER(project_name) as project_name FROM projects
@@ -187,6 +197,12 @@ async function loadProjects(): Promise<Map<string, string>> {
   for (const r of rows) {
     map.set(String(r.project_name).toLowerCase(), String(r.id));
   }
+
+  // Add hardcoded aliases (Smartsheet short names → FF project IDs)
+  for (const [alias, id] of Object.entries(PROJECT_ALIASES)) {
+    map.set(alias, id);
+  }
+
   return map;
 }
 
