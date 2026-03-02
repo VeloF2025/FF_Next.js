@@ -6,14 +6,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { deleteBudget, copyBudgets } from '@/modules/accounting/services/budgetService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
 
-  const userId = String((req as Record<string, unknown>).userId || '');
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { action, id, fromYear, toYear } = req.body;
 
   try {

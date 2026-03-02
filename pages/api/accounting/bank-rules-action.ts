@@ -6,14 +6,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { deleteRule, toggleRule, applyRules, updateRule } from '@/modules/accounting/services/bankRulesService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
 
-  const userId = String((req as Record<string, unknown>).userId || '');
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { action, id, isActive, bankAccountId } = req.body;
 
   try {

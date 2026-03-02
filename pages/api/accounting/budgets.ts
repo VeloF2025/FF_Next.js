@@ -7,12 +7,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
-import { log } from '@/lib/logger';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { getBudgets, upsertBudget } from '@/modules/accounting/services/budgetService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const userId = String((req as Record<string, unknown>).userId || '');
+  const userId = (req as AuthenticatedNextApiRequest).user.id;
 
   if (req.method === 'GET') {
     const fiscalYear = Number(req.query.fiscal_year) || new Date().getFullYear();
