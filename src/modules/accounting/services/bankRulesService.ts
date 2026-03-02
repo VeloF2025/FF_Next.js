@@ -218,7 +218,9 @@ export async function applyRules(
             ];
 
         const je = await createJournalEntry({
-          entryDate: String(tx.transaction_date).split('T')[0],
+          entryDate: tx.transaction_date instanceof Date
+            ? tx.transaction_date.toISOString().split('T')[0]
+            : String(tx.transaction_date).split('T')[0],
           description: entryDesc,
           source: 'auto_bank_recon',
           lines,
