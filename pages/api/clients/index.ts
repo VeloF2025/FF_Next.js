@@ -204,19 +204,19 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         const street = typeof addr === 'object' && addr?.street ? addr.street : (typeof addr === 'string' ? addr : null);
         const newClient = await sql`
           INSERT INTO clients (
-            code, name, contact_person, email, phone,
-            address, city, country, postal_code, status,
+            company_name, contact_person, email, phone,
+            address, city, state, country, postal_code, status,
             category, priority, payment_terms, credit_rating, credit_limit,
             sales_representative_id, account_manager_id
           )
           VALUES (
-            ${clientData.client_code || clientData.clientCode || clientData.code || `CLI-${Date.now()}`},
             ${clientData.client_name || clientData.clientName || clientData.name || clientData.company_name},
             ${clientData.contact_person || clientData.contactPerson || null},
             ${clientData.email || null},
             ${clientData.phone || null},
             ${street},
             ${clientData.city || (typeof addr === 'object' ? addr?.city : null) || null},
+            ${clientData.state || (typeof addr === 'object' ? addr?.state : null) || null},
             ${clientData.country || (typeof addr === 'object' ? addr?.country : null) || 'South Africa'},
             ${clientData.postal_code || clientData.postalCode || (typeof addr === 'object' ? addr?.postalCode : null) || null},
             ${clientData.status || 'active'},
@@ -245,12 +245,13 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
         const updatedClient = await sql`
           UPDATE clients
           SET
-              name = COALESCE(${updates.client_name || updates.clientName || updates.name || updates.company_name || null}, name),
+              company_name = COALESCE(${updates.client_name || updates.clientName || updates.name || updates.company_name || null}, company_name),
               contact_person = COALESCE(${updates.contact_person || updates.contactPerson || null}, contact_person),
               email = COALESCE(${updates.email || null}, email),
               phone = COALESCE(${updates.phone || null}, phone),
               address = COALESCE(${addrStr}, address),
               city = COALESCE(${updates.city || (typeof addrObj === 'object' ? addrObj?.city : null) || null}, city),
+              state = COALESCE(${updates.state || (typeof addrObj === 'object' ? addrObj?.state : null) || null}, state),
               country = COALESCE(${updates.country || (typeof addrObj === 'object' ? addrObj?.country : null) || null}, country),
               postal_code = COALESCE(${updates.postal_code || updates.postalCode || (typeof addrObj === 'object' ? addrObj?.postalCode : null) || null}, postal_code),
               status = COALESCE(${updates.status || null}, status),
