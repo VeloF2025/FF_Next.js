@@ -89,10 +89,16 @@ export function TeamSelector({
     return result;
   }, [teams, searchQuery, typeFilter, filterTypes]);
 
-  // Group teams by type
+  // Group teams by type, sort internal-type teams first within each group
   const groupedTeams = useMemo(() => {
-    const internal = filteredTeams.filter((t) => t.type === 'internal');
-    const contractor = filteredTeams.filter((t) => t.type === 'contractor');
+    const sortByType = (a: TeamDropdownOption, b: TeamDropdownOption) => {
+      // 'internal' team_type first, then alphabetical
+      if (a.team_type === 'internal' && b.team_type !== 'internal') return -1;
+      if (a.team_type !== 'internal' && b.team_type === 'internal') return 1;
+      return a.name.localeCompare(b.name);
+    };
+    const internal = filteredTeams.filter((t) => t.type === 'internal').sort(sortByType);
+    const contractor = filteredTeams.filter((t) => t.type === 'contractor').sort(sortByType);
     return { internal, contractor };
   }, [filteredTeams]);
 
@@ -292,7 +298,7 @@ export function TeamSelector({
           </div>
 
           {/* Options List */}
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto">
             {isLoading ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 animate-spin text-[var(--ff-text-tertiary)]" />
