@@ -9,22 +9,25 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
 import type { AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import type { AuthRole } from '@/lib/auth/types';
 import { ROLE_HIERARCHY } from '@/lib/auth/types';
+import { mapCheckoutRow } from '@/modules/stock-items/utils/checkoutUtils';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   // Role check: manager, admin, super_admin only
   const authReq = req as AuthenticatedNextApiRequest;
   const user = authReq.user;
   if (!user || (ROLE_HIERARCHY[user.role as AuthRole] ?? 0) < ROLE_HIERARCHY.manager) {
-    return res.status(403).json({ error: 'Only managers and above can check in items' });
+    return apiResponse.forbidden(res, 'Only managers and above can check in items');
   }
 
   const sql = neon(DATABASE_URL);
@@ -33,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { checkoutId, conditionNotes } = req.body;
 
     if (!checkoutId) {
-      return res.status(400).json({ error: 'checkoutId is required' });
+      return apiResponse.badRequest(res, 'checkoutId is required');
     }
 
     // Find the active checkout
@@ -45,7 +48,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!checkout) {
-      return res.status(404).json({ error: 'Active checkout not found' });
+      return apiResponse.notFound(res, 'Active checkout', checkoutId);
     }
 
     // Update checkout to returned
@@ -61,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!updated) {
-      return res.status(500).json({ error: 'Failed to update checkout record' });
+      return apiResponse.internalError(res, new Error('Failed to update checkout record'));
     }
 
     log.info('Tool checked in', {
@@ -72,32 +75,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       userName: user.name,
     }, 'ToolCheckout');
 
-    return res.status(200).json({
-      data: mapCheckoutRow(updated),
-      message: `${String(checkout.item_code)} checked in successfully`,
-    });
+    return apiResponse.success(
+      res,
+      mapCheckoutRow(updated),
+      `${String(checkout.item_code)} checked in successfully`,
+    );
   } catch (error) {
     log.error('Error checking in stock item', { error }, 'ToolCheckout');
-    return res.status(500).json({ error: 'Failed to check in item' });
+    return apiResponse.internalError(res, error, 'Failed to check in item');
   }
 }
 
-export default withAuth(withArcjetProtection(handler, aj));
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCheckoutRow(row: Record<string, any>) {
-  return {
-    id: row.id,
-    stockItemId: row.stock_item_id,
-    serialNumber: row.serial_number,
-    checkedOutBy: row.checked_out_by,
-    jobSiteId: row.job_site_id,
-    jobSiteName: row.job_site_name,
-    expectedReturnDate: row.expected_return_date,
-    checkedOutAt: row.checked_out_at,
-    checkedInAt: row.checked_in_at,
-    checkedInBy: row.checked_in_by,
-    conditionNotes: row.condition_notes,
-    status: row.status,
-  };
-}
+export default withAuth(withArcjetProtection(withErrorHandler(handler), aj));

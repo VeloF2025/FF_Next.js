@@ -9,12 +9,15 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { withErrorHandler } from '@/lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
+import { mapCheckoutRow } from '@/modules/stock-items/utils/checkoutUtils';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 
   const sql = neon(DATABASE_URL);
@@ -38,10 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ORDER BY tc.expected_return_date ASC
       `;
 
-      return res.status(200).json({
-        data: items.map(mapCheckoutRow),
-        total: items.length,
-      });
+      return apiResponse.success(res, items.map(mapCheckoutRow));
     }
 
     if (stockItemId && typeof stockItemId === 'string') {
@@ -61,10 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ORDER BY tc.checked_out_at DESC
       `;
 
-      return res.status(200).json({
-        data: items.map(mapCheckoutRow),
-        total: items.length,
-      });
+      return apiResponse.success(res, items.map(mapCheckoutRow));
     }
 
     // Default: list all active checkouts
@@ -81,38 +78,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY tc.checked_out_at DESC
     `;
 
-    return res.status(200).json({
-      data: items.map(mapCheckoutRow),
-      total: items.length,
-    });
+    return apiResponse.success(res, items.map(mapCheckoutRow));
   } catch (error) {
     log.error('Error listing checkouts', { error }, 'ToolCheckout');
-    return res.status(500).json({ error: 'Failed to list checkouts' });
+    return apiResponse.internalError(res, error, 'Failed to list checkouts');
   }
 }
 
-export default withAuth(withArcjetProtection(handler, aj));
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCheckoutRow(row: Record<string, any>) {
-  return {
-    id: row.id,
-    stockItemId: row.stock_item_id,
-    serialNumber: row.serial_number,
-    checkedOutBy: row.checked_out_by,
-    checkedOutByName: row.checked_out_by_name,
-    checkedOutByEmail: row.checked_out_by_email,
-    jobSiteId: row.job_site_id,
-    jobSiteName: row.job_site_name,
-    expectedReturnDate: row.expected_return_date,
-    checkedOutAt: row.checked_out_at,
-    checkedInAt: row.checked_in_at,
-    checkedInBy: row.checked_in_by,
-    checkedInByName: row.checked_in_by_name,
-    conditionNotes: row.condition_notes,
-    status: row.status,
-    itemCode: row.item_code,
-    itemName: row.item_name,
-    category: row.category,
-  };
-}
+export default withAuth(withArcjetProtection(withErrorHandler(handler), aj));
