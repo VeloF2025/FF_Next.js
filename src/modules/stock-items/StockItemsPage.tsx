@@ -15,14 +15,20 @@ import {
   X,
 } from 'lucide-react';
 import { useStockItems } from './hooks/useStockItems';
+import { useActiveCheckouts } from './hooks/useToolCheckouts';
 import { StockItemRow } from './components/StockItemRow';
 import { StockItemModal } from './components/StockItemModal';
+import { CheckOutModal, CheckInModal } from './components/CheckOutModal';
 import { Pagination } from '@/components/ui/StandardDataTable';
 import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
-import type { StockItem, StockItemFilters } from '@/types/stockItem.types';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth.types';
+import type { StockItem, StockItemFilters, ToolCheckout } from '@/types/stockItem.types';
 
 export function StockItemsPage() {
   const router = useRouter();
+  const { hasAnyRole } = useAuth();
+  const canManageCheckouts = hasAnyRole([UserRole.PROJECT_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN]);
   const initialCategory = (router.query.category as string) || undefined;
   const [filters, setFilters] = useState<StockItemFilters>({
     page: 1,
@@ -35,8 +41,20 @@ export function StockItemsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [checkOutItem, setCheckOutItem] = useState<StockItem | null>(null);
+  const [checkInData, setCheckInData] = useState<{ item: StockItem; checkout: ToolCheckout } | null>(null);
 
   const { items, pagination, categories, isLoading, error, mutate } = useStockItems(filters);
+  const { checkouts, refetch: refetchCheckouts } = useActiveCheckouts();
+
+  // Build a map of stockItemId -> active checkout for quick lookup
+  const checkoutMap = useMemo(() => {
+    const map = new Map<string, ToolCheckout>();
+    for (const co of checkouts) {
+      map.set(co.stockItemId, co);
+    }
+    return map;
+  }, [checkouts]);
 
   // Sync category from URL query param (for client-side navigation from Categories tab)
   useEffect(() => {
@@ -88,8 +106,24 @@ export function StockItemsPage() {
 
   const handleSaveSuccess = useCallback(() => {
     mutate();
+    refetchCheckouts();
     handleCloseModal();
-  }, [mutate, handleCloseModal]);
+  }, [mutate, refetchCheckouts, handleCloseModal]);
+
+  const handleCheckOut = useCallback((item: StockItem) => {
+    setCheckOutItem(item);
+  }, []);
+
+  const handleCheckIn = useCallback((item: StockItem, checkout: ToolCheckout) => {
+    setCheckInData({ item, checkout });
+  }, []);
+
+  const handleCheckoutSuccess = useCallback(() => {
+    setCheckOutItem(null);
+    setCheckInData(null);
+    mutate();
+    refetchCheckouts();
+  }, [mutate, refetchCheckouts]);
 
   const clearFilters = useCallback(() => {
     setFilters({ page: 1, limit: 25, sortBy: 'item_code', sortOrder: 'asc' });
@@ -317,6 +351,11 @@ export function StockItemsPage() {
                 <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
                   Source
                 </th>
+                {canManageCheckouts && (
+                  <th className="px-4 py-3 text-center text-xs font-medium text-[var(--ff-text-secondary)] tracking-wide">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-[var(--ff-bg-secondary)] divide-y divide-[var(--ff-border-light)]">
@@ -330,11 +369,12 @@ export function StockItemsPage() {
                     <td className="px-4 py-4"><div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-20 ml-auto" /></td>
                     <td className="px-4 py-4"><div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-16 mx-auto" /></td>
                     <td className="px-4 py-4"><div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-12 mx-auto" /></td>
+                    {canManageCheckouts && <td className="px-4 py-4"><div className="h-4 bg-[var(--ff-bg-tertiary)] rounded w-20 mx-auto" /></td>}
                   </tr>
                 ))
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--ff-text-secondary)]">
+                  <td colSpan={canManageCheckouts ? 8 : 7} className="px-4 py-12 text-center text-[var(--ff-text-secondary)]">
                     <Package className="h-12 w-12 mx-auto mb-4 text-[var(--ff-text-tertiary)]" />
                     <p className="mb-2">No stock items found</p>
                     <button
@@ -351,6 +391,10 @@ export function StockItemsPage() {
                     key={item.id}
                     item={item}
                     onClick={() => handleRowClick(item)}
+                    activeCheckout={checkoutMap.get(item.id) || null}
+                    canManageCheckouts={canManageCheckouts}
+                    onCheckOut={handleCheckOut}
+                    onCheckIn={handleCheckIn}
                   />
                 ))
               )}
@@ -376,6 +420,25 @@ export function StockItemsPage() {
           item={selectedItem}
           onClose={handleCloseModal}
           onSave={handleSaveSuccess}
+        />
+      )}
+
+      {/* Check Out Modal */}
+      {checkOutItem && (
+        <CheckOutModal
+          item={checkOutItem}
+          onClose={() => setCheckOutItem(null)}
+          onSuccess={handleCheckoutSuccess}
+        />
+      )}
+
+      {/* Check In Modal */}
+      {checkInData && (
+        <CheckInModal
+          checkout={checkInData.checkout}
+          itemName={`${checkInData.item.itemCode} - ${checkInData.item.name}`}
+          onClose={() => setCheckInData(null)}
+          onSuccess={handleCheckoutSuccess}
         />
       )}
     </div>

@@ -25,12 +25,14 @@ export interface StockItem {
   qtyAvailable: number;
   qtyReserved: number;
   qtyOnOrder: number;
+  serialNumber: string | null;
   odooProductId: number | null;
   odooSyncedAt: Date | null;
   createdBy: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
   supplierCodes?: SupplierItemCode[];
+  activeCheckout?: ToolCheckout | null;
 }
 
 export interface SupplierItemCode {
@@ -119,3 +121,28 @@ export const TRACKING_TYPE_LABELS: Record<string, string> = {
   lot: 'Lot/Batch',
   quantity: 'Quantity',
 };
+
+// Categories eligible for tool checkout
+export const CHECKOUT_CATEGORIES = ['tools', 'assets', 'ppe'];
+
+// Tool Checkout Types
+export interface ToolCheckout {
+  id: string;
+  stockItemId: string;
+  serialNumber: string;
+  checkedOutBy: string;
+  checkedOutByName?: string;
+  checkedOutByEmail?: string;
+  jobSiteId: string | null;
+  jobSiteName: string | null;
+  expectedReturnDate: string;
+  checkedOutAt: string;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+  checkedInByName?: string;
+  conditionNotes: string | null;
+  status: 'checked_out' | 'returned';
+  itemCode?: string;
+  itemName?: string;
+  category?: string;
+}

@@ -318,6 +318,7 @@ function mapDbToStockItem(row: Record<string, unknown>) {
     qtyAvailable: row.qty_available ? Number(row.qty_available) : 0,
     qtyReserved: row.qty_reserved ? Number(row.qty_reserved) : 0,
     qtyOnOrder: row.qty_on_order ? Number(row.qty_on_order) : 0,
+    serialNumber: row.serial_number || null,
     odooProductId: row.odoo_product_id,
     odooSyncedAt: row.odoo_synced_at ? new Date(String(row.odoo_synced_at)) : null,
     createdBy: row.created_by,
