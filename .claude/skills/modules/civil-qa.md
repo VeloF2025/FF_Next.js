@@ -106,10 +106,33 @@ Photos ingested via `/api/construction-qa/ingest-qfield`:
 - Creates `construction_qa_reviews` + `construction_qa_photos` records
 - Triggers VLM validation pipeline immediately
 
+## WhatsApp Photo Integration (Added Mar 2026)
+
+Civil group photos flow into QA reviews via the **Pole Install ACK Pipeline**:
+
+```
+WhatsApp civil group → Bridge (inline photo) → /api/field-ops/wa-message
+    → poleInstallAckService.ts (VLM classify + session tracking)
+    → On session complete → poleInstallCompletionService.ts
+        → Creates construction_qa_reviews record
+        → Sets civil step flags from classified photos
+        → Links field_ops_wa_photos → construction_qa_photos
+```
+
+**Key services:**
+| Service | File | Purpose |
+|---------|------|---------|
+| Classifier | `src/modules/field-ops/services/poleInstallClassifier.ts` | VLM step classification (9 steps) |
+| ACK Service | `src/modules/field-ops/services/poleInstallAckService.ts` | Session tracking + real-time ACK |
+| Completion | `src/modules/field-ops/services/poleInstallCompletionService.ts` | Session → QA review link |
+
+**PhotoSource**: `'whatsapp'` — photos from this pipeline use the `whatsapp` source type in `construction_qa_photos`.
+
 ## Recent Changes
 
 | Date | Change |
 |------|--------|
+| Mar 02, 2026 | Added WhatsApp photo integration via pole install ACK pipeline |
 | Feb 20, 2026 | Added photo lightbox with zoom/pan |
 | Feb 20, 2026 | Added `unidentified` workflow status for non-standard feature IDs |
 | Feb 20, 2026 | Renamed from "Construction QA" → "Civil QA" in all user-facing labels |
@@ -121,3 +144,5 @@ Photos ingested via `/api/construction-qa/ingest-qfield`:
 - `/activate` — Downstream activation (Civil QA clears features for activation)
 - `/vlm` — VLM infrastructure
 - `/skills/vlm-ops.md` — VLM operations and cron
+- `/skills/infrastructure/whatsapp.md` — WhatsApp bridge + pole install ACK pipeline
+- `/skills/modules/wa-monitor.md` — WA Monitor triggers for pole sessions

@@ -102,7 +102,8 @@ Group configuration loaded by bridge:
 - group_jid (VARCHAR(100) UNIQUE NOT NULL)
 - group_name (VARCHAR(200) NOT NULL)
 - project_name (VARCHAR(200))
-- group_type (VARCHAR(50) DEFAULT 'dr_submission') -- dr_submission, maintenance, admin, pre_provision
+- group_type (VARCHAR(50) DEFAULT 'dr_submission') -- dr_submission, maintenance, admin, pre_provision, civil, optical
+- project_id (UUID REFERENCES projects) -- links civil/optical groups to projects
 - description (TEXT)
 - is_active (BOOLEAN DEFAULT true)
 - created_at, updated_at (TIMESTAMPTZ)
@@ -128,7 +129,7 @@ Group configuration loaded by bridge:
 - Edit existing group settings
 - Delete with confirmation modal (focus trapping)
 - Send test message to verify connectivity
-- Group type selection: dr_submission, maintenance, admin, pre_provision
+- Group type selection: dr_submission, maintenance, admin, pre_provision, civil, optical
 
 ### Templates Tab
 - List templates grouped by category
@@ -242,6 +243,7 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 
 | Date | Change |
 |------|--------|
+| Mar 02, 2026 | Added civil + optical group types; project_id column on wa_monitored_groups; 11 groups total |
 | Feb 20, 2026 | Updated for unified VPS bridge architecture, 9 groups |
 | Jan 26, 2026 | WhatsApp Admin Portal created |
 
@@ -249,7 +251,9 @@ Navigate to Services tab - shows real-time status with auto-refresh.
 
 1. **Architecture Change:** Unified VPS bridge (version 2.0.0) at 72.61.197.178:8083
 2. **Phone Number:** +27 63 841 2276 (unified for all operations)
-3. **9 Monitored Groups:** Including pre_provision type
+3. **11 Monitored Groups:** Including civil and optical types (added Mar 2026)
 4. **No Separate Sender:** Bridge handles all message sending
 5. **wa-feedback:** Legacy service on Velocity, proxies to bridge
-6. **Group Types:** dr_submission, maintenance, admin, pre_provision
+6. **Group Types:** dr_submission, maintenance, admin, pre_provision, civil, optical
+7. **Pole Install ACK Pipeline:** Civil groups trigger real-time VLM photo classification and ACK messages (see `infrastructure/whatsapp.md`)
+8. **New Tables (Mar 2026):** `pole_install_sessions` (session tracking), columns added to `field_ops_wa_photos`

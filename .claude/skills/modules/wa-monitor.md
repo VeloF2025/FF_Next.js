@@ -271,6 +271,83 @@ Workflow: [implemented/pending]
 [Provide current workflow details or implementation status]
 ```
 
+### Trigger 9: Pole Install Session Issues (Added Mar 2026)
+
+**Keywords**:
+- "pole session"
+- "pole ACK"
+- "pole install"
+- "no ACK"
+- "photo not classified"
+- "session stuck"
+- "Tonga photos"
+
+**Automatic Actions**:
+1. Invoke WA agent
+2. Check `pole_install_sessions` for recent/active sessions
+3. Check VLM service health (port 8100)
+4. Check bridge connectivity and recent field-ops messages
+5. Check `field_ops_wa_photos` for unclassified photos
+
+**Response Template**:
+```
+🏗️ Pole Install ACK Pipeline Check:
+
+Active Sessions: [count]
+  [list recent sessions with pole# and progress]
+
+VLM Service: ✅ healthy / ❌ unreachable (100.96.203.105:8100)
+Bridge:       ✅ connected / ❌ down (72.61.197.178:8083)
+
+Recent Photos: [count] in last hour
+  Classified: [count] | Pending: [count]
+
+[Suggested actions if issues detected]
+```
+
+**Diagnostic Queries**:
+```sql
+-- Active sessions
+SELECT pole_number, status, total_photos, required_photos, started_at
+FROM pole_install_sessions WHERE status = 'in_progress'
+ORDER BY started_at DESC LIMIT 10;
+
+-- Unclassified photos
+SELECT COUNT(*) FROM field_ops_wa_photos
+WHERE classified_step IS NULL AND created_at > NOW() - INTERVAL '1 hour';
+
+-- Recent ACK sends (check bridge logs on VPS)
+-- ssh root@72.61.197.178 "grep 'send-message' /opt/whatsapp-bridge/bridge.log | tail -10"
+```
+
+### Trigger 10: Civil Group Photo Issues
+
+**Keywords**:
+- "civil group"
+- "photos not forwarding"
+- "base64"
+- "photo_base64 missing"
+
+**Automatic Actions**:
+1. Check bridge logs for civil group photo downloads
+2. Verify bridge has latest binary (should include inline download)
+3. Check `field_ops_wa_photos` for recent entries from civil groups
+4. Verify group is linked to project with `project_id` set
+
+**Response Template**:
+```
+📸 Civil Group Photo Pipeline Check:
+
+Bridge Binary: [check date vs 2026-03-02]
+Civil Groups: [count] configured
+  [list civil groups with project linkage]
+
+Recent field_ops_wa_photos: [count] in last hour
+  With photo_base64: [count] (should match total if bridge is current)
+
+[Check if bridge needs rebuild/redeploy]
+```
+
 ## Auto-Activation Rules
 
 ### DO Automatically (No User Confirmation Needed):

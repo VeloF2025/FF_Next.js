@@ -1,11 +1,11 @@
 # WhatsApp Infrastructure Skill
 
-> **Last updated:** 2026-02-20  
-> **Status:** Current architecture - VPS unified bridge
+> **Last updated:** 2026-03-02
+> **Status:** Current architecture - VPS unified bridge + pole install ACK pipeline
 
 ## Overview
 
-Comprehensive documentation of the WhatsApp communication infrastructure for FibreFlow DR photo processing.
+Comprehensive documentation of the WhatsApp communication infrastructure for FibreFlow DR photo processing and civil pole installation real-time ACK.
 
 ## Quick Reference
 
@@ -25,7 +25,7 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 
 **REMOVED SERVICES:**
 
-## WhatsApp Groups (9 Monitored)
+## WhatsApp Groups (11 Monitored)
 
 | Project | Group JID | Type |
 |---------|-----------|------|
@@ -38,6 +38,19 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
 | **Lawley Maintenance** | `120363423947610853@g.us` | maintenance |
 | **Mohadin Pre-Provision** | `120363423163566226@g.us` | pre_provision |
 | **Velo Server** | `120363423864087150@g.us` | admin |
+| **Tonga Mafemani** | `120363407161101660@g.us` | civil |
+| **Tonga A - As Build & QA** | `120363426646561186@g.us` | civil |
+
+### Group Types
+
+| Type | Purpose | Pipeline |
+|------|---------|----------|
+| `dr_submission` | Drop/activation photo submissions | DR ACK → QA review |
+| `maintenance` | Non-invoicable maintenance photos | Forward to maintenance API |
+| `admin` | Admin/server alerts | No processing |
+| `pre_provision` | Pre-provisioning workflow | TBD |
+| `civil` | Pole installation photos | **Pole Install ACK pipeline** (real-time VLM classify → session track → ACK) |
+| `optical` | Cable/optical installation photos | Same pipeline as civil (planned) |
 
 ## Architecture
 
@@ -83,6 +96,64 @@ Comprehensive documentation of the WhatsApp communication infrastructure for Fib
          │  ⚠️  DEPRECATED - avoid new usage      │
          └────────────────────────────────────────┘
 ```
+
+## Pole Install ACK Pipeline (Added 2026-03-02)
+
+Real-time photo classification and ACK for civil pole installations via WhatsApp.
+
+### Flow
+```
+WhatsApp Group (civil) → Bridge downloads photo inline → base64 in POST body
+                                                               ↓
+                                              /api/field-ops/wa-message
+                                                               ↓
+                                              poleInstallAckService.ts (fire-and-forget)
+                                                ├─ VLM classify step + extract pole#
+                                                ├─ Find/create pole_install_session
+                                                ├─ Cross-ref pole against poles table
+                                                ├─ Update session progress counts
+                                                └─ Build ACK → send via bridge /send-message
+                                                               ↓
+                                              ACK appears in WhatsApp group (~3 sec)
+```
+
+### Services
+| Component | File | Purpose |
+|-----------|------|---------|
+| **Classifier** | `src/modules/field-ops/services/poleInstallClassifier.ts` | VLM classify photo into 9 steps, extract pole# from text |
+| **ACK Service** | `src/modules/field-ops/services/poleInstallAckService.ts` | Session management, progress tracking, ACK builder, bridge send |
+| **Completion** | `src/modules/field-ops/services/poleInstallCompletionService.ts` | Session → construction_qa_reviews link |
+| **API Handler** | `pages/api/field-ops/wa-message.ts` | Receives bridge payload, fire-and-forget ACK pipeline |
+
+### Photo Classification Steps
+| Step | Description | Required Count |
+|------|-------------|---------------|
+| BEFORE | Marked ground showing hole location | 3 |
+| DEPTH | Measuring tape in hole | 1 |
+| STUMPING | Pole planted, various angles | 3 |
+| COMPACTION | Cement/soil backfill around base | 1 |
+| HOUSEKEEPING | Clean site around pole | 3 |
+| DURING | Digging/preparation (bonus) | 0 |
+| ENDPLATE | End plates on pole (bonus) | 0 |
+| LEVEL | Spirit level on pole (bonus) | 0 |
+| SIGNATURE | Sign-off sheet (bonus) | 0 |
+
+**Standard pole = 11 required photos. Corner pole = 14.**
+
+### Session Resolution
+1. **Text declaration**: "Pole TON.P.A003" → creates session with pole#
+2. **VLM extraction**: Pole# read from photo → matched to session
+3. **Sender fallback**: Same sender within 4 hours → reuses active session
+
+### Database Tables (Migration 229)
+- `pole_install_sessions` — per-pole session with step counts, status, cross-reference
+- `field_ops_wa_photos.pole_install_session_id` — FK to session
+- `field_ops_wa_photos.classified_step` — VLM-assigned step name
+
+### Bridge Change (2026-03-02)
+Bridge now downloads civil/optical photos inline using `client.Download()`, base64-encodes them, and includes `photo_base64` + `photo_filename` in the forwarded JSON payload. Backup saved to `store/{chatJID}/{messageID}.jpg`.
+
+---
 
 ## Message Flow
 
@@ -497,11 +568,16 @@ curl http://72.61.197.178:8083/reload-groups
 - `/vlm` - VLM infrastructure and configuration
 - `/wa-monitor` - WA Monitor dashboard troubleshooting
 - `/deploy` - Deployment procedures
+- `civil-qa.md` - Construction QA (pole install sessions link to QA reviews)
 
 ## Version History
 
 | Date | Change |
 |------|--------|
+| Mar 02, 2026 | **Pole Install ACK Pipeline** — real-time VLM classify + session track + WA ACK for civil groups |
+| Mar 02, 2026 | Bridge downloads civil/optical photos inline (base64 in payload) |
+| Mar 02, 2026 | Added Tonga project + 2 civil groups (11 monitored total) |
+| Mar 02, 2026 | Migration 229: pole_install_sessions table |
 | Feb 20, 2026 | Updated to VPS unified bridge architecture (v2.0.0) |
 | Feb 20, 2026 | Updated phone to +27 63 841 2276 |
 | Feb 20, 2026 | Added 9 monitored groups with types |
