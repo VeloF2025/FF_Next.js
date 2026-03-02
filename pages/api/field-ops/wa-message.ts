@@ -14,6 +14,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import {
+  processPoleInstallPhoto,
+  handlePoleTextMessage,
+  type PhotoData,
+  type GroupInfo,
+} from '@/modules/field-ops/services/poleInstallAckService';
 
 const logger = createLogger('api:field-ops:wa-message');
 
@@ -27,11 +33,14 @@ interface IncomingFieldOpsMessage {
   has_media?: boolean;
   media_type?: string;
   media_count?: number;
+  photo_base64?: string;
+  photo_filename?: string;
 }
 
 interface GroupLookupResult {
   group_type: string;
   project_name: string | null;
+  project_id: string | null;
 }
 
 interface MessageInsertResult {
@@ -43,6 +52,7 @@ function toGroupResult(row: Record<string, unknown>): GroupLookupResult {
   return {
     group_type: String(row['group_type'] ?? ''),
     project_name: row['project_name'] != null ? String(row['project_name']) : null,
+    project_id: row['project_id'] != null ? String(row['project_id']) : null,
   };
 }
 
@@ -87,7 +97,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   try {
     // Look up group in wa_monitored_groups to get group_type and project
     const groupRows = (await sql`
-      SELECT group_type, project_name
+      SELECT group_type, project_name, project_id
       FROM wa_monitored_groups
       WHERE group_jid = ${body.group_jid}
         AND is_active = TRUE
@@ -98,7 +108,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       return apiResponse.badRequest(res, `Unknown or inactive group: ${body.group_jid}`);
     }
 
-    const { group_type, project_name } = groupRows[0]!
+    const { group_type, project_name, project_id } = groupRows[0]!
 
     // Determine message timestamp from bridge payload
     const messageTimestamp = new Date(
@@ -180,6 +190,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         photos_created: photoCount,
         project: project_name,
       });
+
+      // Fire-and-forget: real-time pole install ACK pipeline
+      if (body.photo_base64 && project_id && group_type === 'civil') {
+        const photoData: PhotoData = {
+          photoId: messageDbId, // Use message DB ID as photo reference
+          senderJid: body.sender_jid,
+          senderName: body.sender_name ?? 'Unknown',
+          messageTimestamp: messageTimestamp,
+        };
+        const groupInfo: GroupInfo = {
+          groupJid: body.group_jid,
+          projectId: project_id,
+          projectName: project_name ?? '',
+        };
+        processPoleInstallPhoto(photoData, body.photo_base64, groupInfo).catch((err) =>
+          logger.error('Pole install ACK pipeline failed', {
+            error: err instanceof Error ? err.message : String(err),
+            message_id: body.message_id,
+          })
+        );
+      }
+    }
+
+    // Fire-and-forget: check text messages for pole number declarations
+    if (!body.has_media && body.message_text && project_id && group_type === 'civil') {
+      handlePoleTextMessage(
+        body.message_text, body.sender_jid, body.sender_name ?? 'Unknown',
+        body.group_jid, project_id, project_name ?? ''
+      ).catch((err) =>
+        logger.error('Pole text message handler failed', {
+          error: err instanceof Error ? err.message : String(err),
+          message_id: body.message_id,
+        })
+      );
     }
 
     logger.info('Field ops WA message stored', {
@@ -208,7 +252,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '50mb',
     },
   },
 };
