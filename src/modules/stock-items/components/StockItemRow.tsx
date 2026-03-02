@@ -1,14 +1,20 @@
-import { Package, ExternalLink } from 'lucide-react';
-import type { StockItem } from '@/types/stockItem.types';
-import { CATEGORY_COLORS } from '@/types/stockItem.types';
+import { Package, ExternalLink, LogOut, LogIn, AlertTriangle } from 'lucide-react';
+import type { StockItem, ToolCheckout } from '@/types/stockItem.types';
+import { CATEGORY_COLORS, CHECKOUT_CATEGORIES } from '@/types/stockItem.types';
 
 interface StockItemRowProps {
   item: StockItem;
   onClick: () => void;
+  activeCheckout?: ToolCheckout | null;
+  canManageCheckouts: boolean;
+  onCheckOut?: (item: StockItem) => void;
+  onCheckIn?: (item: StockItem, checkout: ToolCheckout) => void;
 }
 
-export function StockItemRow({ item, onClick }: StockItemRowProps) {
+export function StockItemRow({ item, onClick, activeCheckout, canManageCheckouts, onCheckOut, onCheckIn }: StockItemRowProps) {
   const categoryColor = CATEGORY_COLORS[item.category] || 'bg-gray-500/20 text-gray-400';
+  const isCheckoutEligible = CHECKOUT_CATEGORIES.includes(item.category);
+  const isCheckedOut = !!activeCheckout;
 
   const stockStatus = item.qtyAvailable > 0
     ? item.qtyAvailable < (item.minStockLevel || 0)
@@ -26,6 +32,16 @@ export function StockItemRow({ item, onClick }: StockItemRowProps) {
     'in-stock': 'In Stock',
     'low': 'Low Stock',
     'out-of-stock': 'Out of Stock',
+  };
+
+  const handleCheckOutClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCheckOut) onCheckOut(item);
+  };
+
+  const handleCheckInClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCheckIn && activeCheckout) onCheckIn(item, activeCheckout);
   };
 
   return (
@@ -87,11 +103,31 @@ export function StockItemRow({ item, onClick }: StockItemRowProps) {
         )}
       </td>
 
-      {/* Status */}
+      {/* Checkout Status */}
       <td className="px-4 py-4 text-center">
-        <span className={`px-2 py-1 text-xs rounded-full ${stockStatusColors[stockStatus]}`}>
-          {stockStatusLabels[stockStatus]}
-        </span>
+        {isCheckoutEligible ? (
+          isCheckedOut ? (
+            <div>
+              <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400">
+                Checked Out
+              </span>
+              <div className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                {activeCheckout.checkedOutByName || 'Unknown'}
+              </div>
+              <div className="text-xs text-[var(--ff-text-tertiary)]">
+                Due: {activeCheckout.expectedReturnDate}
+              </div>
+            </div>
+          ) : (
+            <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400">
+              Available
+            </span>
+          )
+        ) : (
+          <span className={`px-2 py-1 text-xs rounded-full ${stockStatusColors[stockStatus]}`}>
+            {stockStatusLabels[stockStatus]}
+          </span>
+        )}
       </td>
 
       {/* Source */}
@@ -107,6 +143,39 @@ export function StockItemRow({ item, onClick }: StockItemRowProps) {
           </span>
         )}
       </td>
+
+      {/* Actions */}
+      {canManageCheckouts && (
+        <td className="px-4 py-4 text-center">
+          {isCheckoutEligible && (
+            isCheckedOut ? (
+              <button
+                onClick={handleCheckInClick}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+              >
+                <LogIn className="h-3 w-3" />
+                Check In
+              </button>
+            ) : !item.serialNumber ? (
+              <span
+                title="Add a serial number to this item before checking out"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-500/20 text-gray-400 rounded-lg cursor-not-allowed"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                No Serial
+              </span>
+            ) : (
+              <button
+                onClick={handleCheckOutClick}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
+              >
+                <LogOut className="h-3 w-3" />
+                Check Out
+              </button>
+            )
+          )}
+        </td>
+      )}
     </tr>
   );
 }
