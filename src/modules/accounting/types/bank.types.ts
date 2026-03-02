@@ -55,6 +55,10 @@ export interface BankTransaction {
   matchedEntryNumber?: string;
   suggestedGlAccountName?: string;
   suggestedGlAccountCode?: string;
+  suggestedSupplierId?: string;
+  suggestedSupplierName?: string;
+  suggestedClientId?: string;
+  suggestedClientName?: string;
 }
 
 // ── Bank Reconciliation ──────────────────────────────────────────────────────
@@ -109,6 +113,7 @@ export interface BankCategorisationRule {
   matchPattern: string;
   glAccountId: string;
   supplierId?: string;
+  clientId?: string;
   descriptionTemplate?: string;
   priority: number;
   isActive: boolean;
@@ -120,6 +125,7 @@ export interface BankCategorisationRule {
   glAccountCode?: string;
   glAccountName?: string;
   supplierName?: string;
+  clientName?: string;
 }
 
 export interface RuleCreateInput {
@@ -129,6 +135,7 @@ export interface RuleCreateInput {
   matchPattern: string;
   glAccountId: string;
   supplierId?: string;
+  clientId?: string;
   descriptionTemplate?: string;
   priority?: number;
   autoCreateEntry?: boolean;

@@ -19,6 +19,8 @@ interface Rule {
   glAccountName?: string;
   supplierId?: string;
   supplierName?: string;
+  clientId?: string;
+  clientName?: string;
   descriptionTemplate?: string;
   priority: number;
   isActive: boolean;
@@ -27,11 +29,13 @@ interface Rule {
 
 interface GLAccount { id: string; accountCode: string; accountName: string }
 interface Supplier { id: string; name: string }
+interface Client { id: string; name: string }
 
 export default function BankRulesPage() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState('');
@@ -41,7 +45,7 @@ export default function BankRulesPage() {
 
   const [form, setForm] = useState({
     ruleName: '', matchField: 'description', matchType: 'contains',
-    matchPattern: '', glAccountId: '', supplierId: '', vatCode: '',
+    matchPattern: '', glAccountId: '', supplierId: '', clientId: '', vatCode: '',
     descriptionTemplate: '', priority: '100',
   });
 
@@ -68,10 +72,16 @@ export default function BankRulesPage() {
         id: String(s.id), name: s.name,
       })));
     });
+    fetch('/api/clients', { credentials: 'include' }).then(r => r.json()).then(res => {
+      const list = Array.isArray(res.data) ? res.data : [];
+      setClients(list.map((c: { id: string; name?: string; company_name?: string; companyName?: string }) => ({
+        id: c.id, name: c.company_name || c.companyName || c.name || '',
+      })));
+    });
   }, []);
 
   const resetForm = () => {
-    setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
+    setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', clientId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
     setEditingRule(null);
     setShowForm(false);
   };
@@ -84,6 +94,7 @@ export default function BankRulesPage() {
       matchPattern: rule.matchPattern,
       glAccountId: rule.glAccountId,
       supplierId: rule.supplierId || '',
+      clientId: rule.clientId || '',
       vatCode: '',
       descriptionTemplate: rule.descriptionTemplate || '',
       priority: String(rule.priority),
@@ -100,6 +111,7 @@ export default function BankRulesPage() {
         ruleName: form.ruleName, matchField: form.matchField, matchType: form.matchType,
         matchPattern: form.matchPattern, glAccountId: form.glAccountId,
         supplierId: form.supplierId || undefined,
+        clientId: form.clientId || undefined,
         descriptionTemplate: form.descriptionTemplate || undefined,
         priority: Number(form.priority) || 100,
       };
@@ -205,10 +217,13 @@ export default function BankRulesPage() {
                 <input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="ff-input" placeholder="Priority (lower = first)" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Quick Win 3: Supplier dropdown */}
-                <select value={form.supplierId} onChange={e => setForm(f => ({ ...f, supplierId: e.target.value }))} className="ff-select">
+                <select value={form.supplierId} onChange={e => setForm(f => ({ ...f, supplierId: e.target.value, clientId: '' }))} className="ff-select">
                   <option value="">No Supplier (optional)</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <select value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value, supplierId: '' }))} className="ff-select">
+                  <option value="">No Customer (optional)</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {/* Quick Win 3: VAT Code select */}
                 <select value={form.vatCode} onChange={e => setForm(f => ({ ...f, vatCode: e.target.value }))} className="ff-select">
@@ -235,7 +250,7 @@ export default function BankRulesPage() {
                 <th className="px-4 py-3">Match</th>
                 <th className="px-4 py-3">Pattern</th>
                 <th className="px-4 py-3">GL Account</th>
-                <th className="px-4 py-3">Supplier</th>
+                <th className="px-4 py-3">Supplier / Customer</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
@@ -254,7 +269,11 @@ export default function BankRulesPage() {
                       {rule.glAccountCode} — {rule.glAccountName}
                     </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)] text-xs">
-                      {rule.supplierName || <span className="text-[var(--ff-text-tertiary)]">—</span>}
+                      {rule.supplierName
+                        ? <span><span className="text-blue-400 text-[10px] mr-1">SUP</span>{rule.supplierName}</span>
+                        : rule.clientName
+                        ? <span><span className="text-purple-400 text-[10px] mr-1">CUST</span>{rule.clientName}</span>
+                        : <span className="text-[var(--ff-text-tertiary)]">{'\u2014'}</span>}
                     </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{rule.priority}</td>
                     <td className="px-4 py-3">
