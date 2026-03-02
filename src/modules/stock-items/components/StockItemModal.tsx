@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { X, Package, Trash2, AlertCircle, ExternalLink, Loader2, ChevronDown, Search } from 'lucide-react';
 import { useStockItemMutations } from '../hooks/useStockItems';
+import { SerialsPanel } from './SerialsPanel';
 import type { StockItem, CreateStockItemInput } from '@/types/stockItem.types';
 import { CATEGORY_COLORS, TRACKING_TYPE_LABELS } from '@/types/stockItem.types';
 import { log } from '@/lib/logger';
+
+const CHECKOUT_ELIGIBLE_CATEGORIES = ['tools', 'assets', 'ppe'];
 
 interface StockCategory {
   id: string;
@@ -44,7 +47,9 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'inventory' | 'suppliers'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'inventory' | 'suppliers' | 'units'>('details');
+
+  const showUnitsTab = isEditing && item && CHECKOUT_ELIGIBLE_CATEGORIES.includes(item.category?.toLowerCase());
 
   // Categories for dropdown
   const [categories, setCategories] = useState<StockCategory[]>([]);
@@ -150,17 +155,17 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
 
         {/* Tabs */}
         <div className="flex border-b border-[var(--ff-border-light)]">
-          {(['details', 'inventory', 'suppliers'] as const).map((tab) => (
+          {(['details', 'inventory', 'suppliers', ...(showUnitsTab ? ['units'] : [])] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setActiveTab(tab as typeof activeTab)}
               className={`px-4 py-3 text-sm font-medium capitalize transition-colors ${
                 activeTab === tab
                   ? 'text-blue-400 border-b-2 border-blue-400'
                   : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
               }`}
             >
-              {tab}
+              {tab === 'units' ? 'Units / Checkout' : tab}
             </button>
           ))}
         </div>
@@ -497,6 +502,15 @@ export function StockItemModal({ item, onClose, onSave }: StockItemModalProps) {
                   </>
                 )}
               </div>
+            )}
+
+            {/* Units / Checkout Tab */}
+            {activeTab === 'units' && showUnitsTab && item && (
+              <SerialsPanel
+                stockItemId={item.id}
+                stockItemName={item.name}
+                category={item.category}
+              />
             )}
 
             {/* Suppliers Tab */}
