@@ -1,7 +1,7 @@
 ---
 name: openclaw
 description: OpenClaw Agent Fleet & Mission Control — diagnostics, cron management, MC messaging, proactive monitoring, fleet maintenance
-version: 1.0.0
+version: 1.1.0
 triggers:
   - /openclaw
   - /mc
@@ -23,15 +23,17 @@ triggers:
 
 # /openclaw — OpenClaw Agent Fleet & Mission Control
 
-Manages the OpenClaw AI agent fleet (11 agents) running on Velocity, coordinated through Mission Control (MC) API.
+Manages the OpenClaw AI agent fleet (11 agents) running on velo-server, coordinated through Mission Control (MC) API.
+
+> **Purpose:** Use this command when Elon and/or Jarvis are down and you need to manage or recover the fleet. Also useful for routine diagnostics and MC operations.
 
 ## Quick Reference
 
 | Item | Value |
 |------|-------|
 | **MC API** | `http://localhost:4000` |
-| **MC API Key** | See `~/.openclaw/sentinel/workspace/.env` (`MC_API_KEY`) |
-| **MC Dashboard** | `http://localhost:4000` (web UI) |
+| **MC API Key** | `/home/hein/.openclaw/workspace/.env` (`MC_API_KEY`) — primary |
+| **MC Dashboard** | `http://localhost:3847` (web UI) — proxied to `mc.fibreflow.app` |
 | **MC Database** | PostgreSQL on `:5434` |
 | **Qdrant (KB)** | `http://localhost:6333` |
 | **Cron Config** | `/home/hein/.openclaw/cron/jobs.json` |
@@ -53,8 +55,10 @@ Manages the OpenClaw AI agent fleet (11 agents) running on Velocity, coordinated
 | **qfield** | `openclaw-qfield.service` | QField — GPKG sync, MinIO, field data | 2h |
 | **scribe** | `openclaw-scribe.service` | Docs — changelogs, knowledge base, writing | 4h |
 | **atlas** | `openclaw-atlas.service` | CIO — research, tech scanning, intelligence | — |
-| **relay** | — | WA Monitor relay (no gateway service) | — |
+| **relay** | `openclaw-relay.service` (disabled — re-enable: see Relay Recovery below) | WA Monitor relay | — |
 | **main** | — | Core system jobs (security, health, youtube) | — |
+
+> **Note on Elon:** Elon's service is `openclaw-gateway.service` (not `openclaw-elon.service`).
 
 ## Service Management
 
@@ -75,15 +79,18 @@ journalctl --user -u openclaw-sentinel.service -n 50
 
 ## MC API Usage
 
-All MC API calls require the Authorization header:
+All MC API calls require the Authorization header. Source the primary .env:
 ```bash
-MC_KEY=$(grep MC_API_KEY /home/hein/.openclaw/sentinel/workspace/.env | cut -d= -f2)
+source /home/hein/.openclaw/workspace/.env
+# MC_API_KEY is now available
+# Fallback if above missing:
+# MC_API_KEY=$(grep MC_API_KEY /home/hein/.openclaw/sentinel/workspace/.env | cut -d= -f2)
 ```
 
 ### Send Message to Agent
 ```bash
 curl -s -X POST http://localhost:4000/messages \
-  -H "Authorization: Bearer $MC_KEY" \
+  -H "Authorization: Bearer $MC_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "from_agent": "hein",
@@ -97,7 +104,7 @@ curl -s -X POST http://localhost:4000/messages \
 ```bash
 for agent in sentinel flow forge gene pixel qfield scribe atlas elon; do
   curl -s -X POST http://localhost:4000/messages \
-    -H "Authorization: Bearer $MC_KEY" \
+    -H "Authorization: Bearer $MC_API_KEY" \
     -H "Content-Type: application/json" \
     -d "{
       \"from_agent\": \"hein\",
@@ -111,18 +118,95 @@ done
 ### Read Agent Inbox
 ```bash
 # All unread messages for an agent
-curl -s -H "Authorization: Bearer $MC_KEY" \
+curl -s -H "Authorization: Bearer $MC_API_KEY" \
   "http://localhost:4000/messages?to_agent=sentinel&unread=true"
 
 # All messages
-curl -s -H "Authorization: Bearer $MC_KEY" \
+curl -s -H "Authorization: Bearer $MC_API_KEY" \
   "http://localhost:4000/messages?to_agent=sentinel"
 ```
 
 ### List Registered Agents
 ```bash
-curl -s -H "Authorization: Bearer $MC_KEY" http://localhost:4000/agents
+curl -s -H "Authorization: Bearer $MC_API_KEY" http://localhost:4000/agents
 ```
+
+## Recovery Playbooks
+
+### Elon Down (velo-server)
+```bash
+# Check service status
+systemctl --user status openclaw-gateway.service
+
+# Restart
+systemctl --user restart openclaw-gateway.service
+
+# If service fails to start, check logs
+journalctl --user -u openclaw-gateway.service -n 50 --no-pager
+```
+
+### Jarvis Down (Mac Mini — 192.168.1.79)
+Jarvis runs on the Mac Mini. Recovery via SSH:
+```bash
+# 1. SSH in
+ssh jarvisspecter@192.168.1.79
+
+# 2. Check if watchdog cron is active (runs every 5 min)
+crontab -l | grep jarvis-watchdog
+
+# 3. Run watchdog manually (restarts gateway if port 18789 is dead)
+bash /Users/jarvisspecter/scripts/jarvis-watchdog.sh
+
+# 4. Manual restart if watchdog fails
+pkill -f 'openclaw-gateway' 2>/dev/null; sleep 2
+HOME=/Users/jarvisspecter \
+OPENCLAW_STATE_DIR=/Users/jarvisspecter/.openclaw \
+OPENCLAW_SKIP_CANVAS_HOST=1 \
+PATH=/Users/jarvisspecter/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin \
+nohup /opt/homebrew/Cellar/node/25.6.1/bin/node \
+  /opt/homebrew/lib/node_modules/openclaw/dist/index.js \
+  gateway --port 18789 \
+  >> /tmp/openclaw-gateway-stdout.log 2>> /tmp/openclaw-gateway-stderr.log &
+
+# 5. Verify (should return 200)
+curl -s -o /dev/null -w '%{http_code}' http://localhost:18789/
+
+# 6. Watchdog log location
+cat /tmp/jarvis-watchdog.log
+```
+
+> **Note:** launchd is configured to manage Jarvis (`ai.openclaw.gateway`, KeepAlive=true). The cron watchdog (`*/5 * * * *`) is a second layer. If both fail, use manual restart above.
+
+### Relay Recovery (velo-server)
+```bash
+# Relay was disabled — re-enable with systemd supervision
+systemctl --user enable --now openclaw-relay.service
+
+# Verify
+systemctl --user status openclaw-relay.service
+curl -s -o /dev/null -w '%{http_code}' http://localhost:18838/
+```
+
+## Escalation Threshold — When to Stop and Wait for Hein
+
+**Handle autonomously (no approval needed):**
+- Agent restarts (any agent)
+- Jarvis recovery
+- Relay recovery
+- Cron job fixes
+- MC API issues
+- Monitoring / alerting
+- Infrastructure diagnostics
+
+**STOP — wait for Hein's explicit approval:**
+- Any change to FibreFlow **production** (`/home/velo/fibreflow-production/`)
+- Any change to FibreFlow **staging** (`/home/velo/fibreflow-staging/`)
+- Any change to FibreFlow **dev** (`/home/velo/fibreflow-dev/`)
+- WhatsApp gateway or WA sender changes
+- Destructive database operations
+- Security policy changes
+
+> FibreFlow = Hein approves. Everything else = act and report.
 
 ## Cron Job Management
 
@@ -137,7 +221,6 @@ for j in sorted(data['jobs'], key=lambda x: x.get('agentId','')):
     name = j.get('name','')
     enabled = j.get('enabled', True)
     state = j.get('state', {})
-    status = state.get('lastStatus', 'n/a')
     errs = state.get('consecutiveErrors', 0)
     icon = 'OK' if enabled and errs == 0 else 'ERR' if errs > 0 else 'OFF'
     print(f'{icon:3s} {agent:12s} | {name:40s} | errs={errs}')
@@ -178,11 +261,8 @@ with open('/home/hein/.openclaw/cron/jobs.json') as f:
     data = json.load(f)
 for j in data['jobs']:
     if j.get('name','') == 'JOB_NAME':
-        # Edit payload
         j['payload']['message'] = 'New message here'
-        # Or change timeout
         j['payload']['timeoutSeconds'] = 300
-        # Or enable/disable
         j['enabled'] = True
         break
 with open('/home/hein/.openclaw/cron/jobs.json', 'w') as f:
@@ -218,25 +298,12 @@ All scripts run from their agent workspace and require no arguments.
 
 ### Run Manually
 ```bash
-# Metrics collection
 bash /home/hein/.openclaw/sentinel/workspace/scripts/collect-metrics.sh
-
-# Trend analysis (needs 7+ data points)
 bash /home/hein/.openclaw/sentinel/workspace/scripts/trend-analyzer.sh
-
-# Anomaly detection
 bash /home/hein/.openclaw/sentinel/workspace/scripts/anomaly-detector.sh
-
-# Backup health
 bash /home/hein/.openclaw/sentinel/workspace/scripts/backup-health-check.sh
-
-# Code quality
 bash /home/hein/.openclaw/flow/workspace/scripts/code-quality-sweep.sh
-
-# Pattern frequency
 bash /home/hein/.openclaw/sentinel/workspace/scripts/pattern-frequency-report.sh
-
-# Remediation queue
 bash /home/hein/.openclaw/sentinel/workspace/scripts/process-remediation-queue.sh
 ```
 
@@ -267,11 +334,11 @@ bash /home/hein/.openclaw/sentinel/workspace/scripts/process-remediation-queue.s
 
 | Data | Path | Format |
 |------|------|--------|
-| System metrics | `sentinel/workspace/metrics/system-metrics.jsonl` | JSONL (disk, mem, load, response times) |
-| Code quality | `flow/workspace/metrics/code-quality.jsonl` | JSONL (lint, types, file lengths, console.log) |
-| Remediation log | `sentinel/workspace/metrics/remediation-log.jsonl` | JSONL (restart requests) |
-| Agent pulse | `team-brain/metrics/agent-pulse.jsonl` | JSONL (heartbeat records) |
-| Incidents | `team-brain/incidents/*.md` | Markdown (structured template) |
+| System metrics | `sentinel/workspace/metrics/system-metrics.jsonl` | JSONL |
+| Code quality | `flow/workspace/metrics/code-quality.jsonl` | JSONL |
+| Remediation log | `sentinel/workspace/metrics/remediation-log.jsonl` | JSONL |
+| Agent pulse | `team-brain/metrics/agent-pulse.jsonl` | JSONL |
+| Incidents | `team-brain/incidents/*.md` | Markdown |
 | Incident index | `team-brain/incidents/INDEX.md` | Markdown (auto-generated) |
 
 All paths relative to `/home/hein/.openclaw/`.
@@ -294,19 +361,6 @@ All paths relative to `/home/hein/.openclaw/`.
 - sentinel, flow, forge, gene, qfield: 120s
 - scribe, pixel: 300s (increased due to frequent timeouts)
 
-## Standards & Processes
-
-| Document | Path |
-|----------|------|
-| Event routing (13 topics) | `team-brain/standards/event-routing.md` |
-| Incident template | `team-brain/standards/incident-template.md` |
-| Post-incident review | `team-brain/standards/post-incident-review.md` |
-| Maintenance calendar | `team-brain/processes/maintenance-calendar.md` |
-| Fleet upgrade briefing | `team-brain/PROACTIVE-FLEET-UPGRADE.md` |
-| Sentinel guardrails | `sentinel/workspace/GUARDRAILS.md` |
-
-All paths relative to `/home/hein/.openclaw/`.
-
 ## Diagnostics Playbook
 
 ### Fleet Health Check (Quick)
@@ -317,7 +371,13 @@ systemctl --user list-units 'openclaw*' --no-pager
 # 2. MC API up?
 curl -s http://localhost:4000/health
 
-# 3. Any cron errors?
+# 3. MC Dashboard up?
+curl -s -o /dev/null -w '%{http_code}' http://localhost:3847/
+
+# 4. Jarvis up? (Mac Mini)
+curl -s -o /dev/null -w '%{http_code}' http://192.168.1.79:18789/
+
+# 5. Any cron errors?
 python3 -c "
 import json
 with open('/home/hein/.openclaw/cron/jobs.json') as f:
@@ -331,7 +391,7 @@ else:
     print('All cron jobs clean.')
 "
 
-# 4. Run proactive checks
+# 6. Run proactive checks
 bash /home/hein/.openclaw/sentinel/workspace/scripts/trend-analyzer.sh
 bash /home/hein/.openclaw/sentinel/workspace/scripts/anomaly-detector.sh
 bash /home/hein/.openclaw/sentinel/workspace/scripts/backup-health-check.sh
@@ -340,7 +400,6 @@ bash /home/hein/.openclaw/flow/workspace/scripts/code-quality-sweep.sh
 
 ### Daily Improvement Failures
 ```bash
-# Check which jobs failed
 python3 -c "
 import json, os
 from datetime import datetime
@@ -368,14 +427,27 @@ for j in data['jobs']:
 # 1. Check service
 systemctl --user status openclaw-AGENT.service
 
-# 2. Check MC inbox for errors
-MC_KEY=$(grep MC_API_KEY /home/hein/.openclaw/sentinel/workspace/.env | cut -d= -f2)
-curl -s -H "Authorization: Bearer $MC_KEY" \
+# 2. Check MC inbox
+source /home/hein/.openclaw/workspace/.env
+curl -s -H "Authorization: Bearer $MC_API_KEY" \
   "http://localhost:4000/messages?to_agent=AGENT&unread=true" | python3 -m json.tool | head -30
 
 # 3. Restart
 systemctl --user restart openclaw-AGENT.service
 ```
+
+## Standards & Processes
+
+| Document | Path |
+|----------|------|
+| Event routing (13 topics) | `team-brain/standards/event-routing.md` |
+| Incident template | `team-brain/standards/incident-template.md` |
+| Post-incident review | `team-brain/standards/post-incident-review.md` |
+| Maintenance calendar | `team-brain/processes/maintenance-calendar.md` |
+| Fleet upgrade briefing | `team-brain/PROACTIVE-FLEET-UPGRADE.md` |
+| Sentinel guardrails | `sentinel/workspace/GUARDRAILS.md` |
+
+All paths relative to `/home/hein/.openclaw/`.
 
 ## Related
 
@@ -388,4 +460,5 @@ systemctl --user restart openclaw-AGENT.service
 
 | Date | Change |
 |------|--------|
-| Mar 2, 2026 | Initial skill — fleet overview, MC API, cron management, proactive monitoring |
+| Mar 2, 2026 | v1.1 — Fixed MC Dashboard port (3847), MC API key path, Relay service name, added Jarvis recovery playbook, escalation threshold, Elon service name note |
+| Mar 2, 2026 | v1.0 — Initial skill — fleet overview, MC API, cron management, proactive monitoring |
