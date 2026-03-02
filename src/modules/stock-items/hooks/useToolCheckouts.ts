@@ -8,17 +8,17 @@ import type { ToolCheckout } from '@/types/stockItem.types';
 import { log } from '@/lib/logger';
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.error || 'Failed to fetch');
+    const body = await res.json();
+    throw new Error(body.error?.message || 'Failed to fetch');
   }
   return res.json();
 };
 
 /** Fetch all active checkouts */
 export function useActiveCheckouts() {
-  const { data, error, isLoading, refetch } = useQuery<{ data: ToolCheckout[]; total: number }>({
+  const { data, error, isLoading, refetch } = useQuery<{ success: boolean; data: ToolCheckout[] }>({
     queryKey: ['tool-checkouts', 'active'],
     queryFn: () => fetcher('/api/stock-items/checkouts'),
     staleTime: 15 * 1000,
@@ -26,7 +26,7 @@ export function useActiveCheckouts() {
 
   return {
     checkouts: data?.data || [],
-    total: data?.total || 0,
+    total: data?.data?.length || 0,
     isLoading,
     error: error as Error | null,
     refetch,
@@ -35,7 +35,7 @@ export function useActiveCheckouts() {
 
 /** Fetch overdue checkouts */
 export function useOverdueCheckouts() {
-  const { data, error, isLoading, refetch } = useQuery<{ data: ToolCheckout[]; total: number }>({
+  const { data, error, isLoading, refetch } = useQuery<{ success: boolean; data: ToolCheckout[] }>({
     queryKey: ['tool-checkouts', 'overdue'],
     queryFn: () => fetcher('/api/stock-items/checkouts?overdue=true'),
     staleTime: 30 * 1000,
@@ -43,7 +43,7 @@ export function useOverdueCheckouts() {
 
   return {
     checkouts: data?.data || [],
-    total: data?.total || 0,
+    total: data?.data?.length || 0,
     isLoading,
     error: error as Error | null,
     refetch,
@@ -69,13 +69,14 @@ export function useToolCheckoutMutations() {
       const res = await fetch('/api/stock-items/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(input),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to check out item');
+        throw new Error(data.error?.message || 'Failed to check out item');
       }
 
       queryClient.invalidateQueries({ queryKey: ['tool-checkouts'] });
@@ -102,13 +103,14 @@ export function useToolCheckoutMutations() {
       const res = await fetch('/api/stock-items/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(input),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to check in item');
+        throw new Error(data.error?.message || 'Failed to check in item');
       }
 
       queryClient.invalidateQueries({ queryKey: ['tool-checkouts'] });
