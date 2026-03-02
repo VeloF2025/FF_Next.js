@@ -156,9 +156,11 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
     setSelectedClient(null);
   }, [allocType]);
 
+  const needsGlAccount = allocType === 'account';
+
   const handleSave = async () => {
     if (!pattern.trim()) { toast.error('Pattern is required'); return; }
-    if (!selectedGl) { toast.error('Select a GL account'); return; }
+    if (needsGlAccount && !selectedGl) { toast.error('Select a GL account'); return; }
     if (allocType === 'supplier' && !selectedSupplier) { toast.error('Select a supplier'); return; }
     if (allocType === 'customer' && !selectedClient) { toast.error('Select a customer'); return; }
     setSaving(true);
@@ -168,9 +170,10 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
         matchField: 'description',
         matchType,
         matchPattern: pattern.trim(),
-        glAccountId: selectedGl.id,
         autoCreateEntry,
       };
+      // GL account only needed for 'account' type — supplier/customer use AP/AR automatically
+      if (needsGlAccount && selectedGl) body.glAccountId = selectedGl.id;
       if (allocType === 'supplier' && selectedSupplier) body.supplierId = selectedSupplier.id;
       if (allocType === 'customer' && selectedClient) body.clientId = selectedClient.id;
 
@@ -270,14 +273,16 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
             </div>
           </div>
 
-          {/* GL Account — always shown */}
-          <EntityPicker
-            label="GL Account"
-            placeholder="Select GL Account..."
-            options={glAccounts}
-            selected={selectedGl}
-            onSelect={setSelectedGl}
-          />
+          {/* GL Account — only for 'account' type; supplier/customer use AP/AR automatically */}
+          {needsGlAccount && (
+            <EntityPicker
+              label="GL Account"
+              placeholder="Select GL Account..."
+              options={glAccounts}
+              selected={selectedGl}
+              onSelect={setSelectedGl}
+            />
+          )}
 
           {/* Supplier picker — only when allocType is supplier */}
           {allocType === 'supplier' && (
@@ -332,7 +337,7 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
             className="px-4 py-1.5 rounded text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving || !pattern.trim() || !selectedGl}
+          <button onClick={handleSave} disabled={saving || !pattern.trim() || (needsGlAccount && !selectedGl)}
             className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium flex items-center gap-1.5">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Create Rule

@@ -133,7 +133,7 @@ export interface RuleCreateInput {
   matchField: RuleMatchField;
   matchType: RuleMatchType;
   matchPattern: string;
-  glAccountId: string;
+  glAccountId?: string;
   supplierId?: string;
   clientId?: string;
   descriptionTemplate?: string;

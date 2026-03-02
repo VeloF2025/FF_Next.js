@@ -37,7 +37,7 @@ export async function createRule(input: RuleCreateInput, userId: string): Promis
       priority, auto_create_entry, created_by
     ) VALUES (
       ${input.ruleName}, ${input.matchField}, ${input.matchType}, ${input.matchPattern},
-      ${input.glAccountId}::UUID, ${input.supplierId ? Number(input.supplierId) : null},
+      ${input.glAccountId || null}::UUID, ${input.supplierId ? Number(input.supplierId) : null},
       ${input.clientId || null}::UUID,
       ${input.descriptionTemplate || null},
       ${input.priority || 100}, ${input.autoCreateEntry !== false}, ${userId}::UUID
