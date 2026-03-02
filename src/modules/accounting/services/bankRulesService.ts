@@ -19,10 +19,11 @@ type Row = any;
 export async function getRules(): Promise<BankCategorisationRule[]> {
   const rows = (await sql`
     SELECT r.*, ga.account_code AS gl_account_code, ga.account_name AS gl_account_name,
-           s.company_name AS supplier_name
+           s.company_name AS supplier_name, c.company_name AS client_name
     FROM bank_categorisation_rules r
     LEFT JOIN gl_accounts ga ON ga.id = r.gl_account_id
     LEFT JOIN suppliers s ON s.id = r.supplier_id
+    LEFT JOIN clients c ON c.id = r.client_id
     ORDER BY r.priority ASC, r.rule_name ASC
   `) as Row[];
   return rows.map(mapRuleRow);
@@ -32,11 +33,12 @@ export async function createRule(input: RuleCreateInput, userId: string): Promis
   const rows = (await sql`
     INSERT INTO bank_categorisation_rules (
       rule_name, match_field, match_type, match_pattern,
-      gl_account_id, supplier_id, description_template,
+      gl_account_id, supplier_id, client_id, description_template,
       priority, auto_create_entry, created_by
     ) VALUES (
       ${input.ruleName}, ${input.matchField}, ${input.matchType}, ${input.matchPattern},
       ${input.glAccountId}::UUID, ${input.supplierId ? Number(input.supplierId) : null},
+      ${input.clientId || null}::UUID,
       ${input.descriptionTemplate || null},
       ${input.priority || 100}, ${input.autoCreateEntry !== false}, ${userId}::UUID
     ) RETURNING *
@@ -54,6 +56,7 @@ export async function updateRule(id: string, input: Partial<RuleCreateInput>): P
       match_pattern = COALESCE(${input.matchPattern || null}, match_pattern),
       gl_account_id = COALESCE(${input.glAccountId || null}::UUID, gl_account_id),
       supplier_id = COALESCE(${input.supplierId ? Number(input.supplierId) : null}, supplier_id),
+      client_id = COALESCE(${input.clientId || null}::UUID, client_id),
       description_template = COALESCE(${input.descriptionTemplate || null}, description_template),
       priority = COALESCE(${input.priority || null}, priority),
       auto_create_entry = COALESCE(${input.autoCreateEntry ?? null}, auto_create_entry)
@@ -132,6 +135,7 @@ export async function applyRules(
             UPDATE bank_transactions
             SET suggested_gl_account_id = ${rule.gl_account_id}::UUID,
                 suggested_supplier_id = ${rule.supplier_id ? Number(rule.supplier_id) : null},
+                suggested_client_id = ${rule.client_id || null}::UUID,
                 suggested_category = ${rule.rule_name}
             WHERE id = ${tx.id}::UUID AND suggested_gl_account_id IS NULL
           `;
@@ -217,6 +221,7 @@ function mapRuleRow(row: Row): BankCategorisationRule {
     matchPattern: String(row.match_pattern),
     glAccountId: String(row.gl_account_id),
     supplierId: row.supplier_id ? String(row.supplier_id) : undefined,
+    clientId: row.client_id ? String(row.client_id) : undefined,
     descriptionTemplate: row.description_template ? String(row.description_template) : undefined,
     priority: Number(row.priority),
     isActive: Boolean(row.is_active),
@@ -227,5 +232,6 @@ function mapRuleRow(row: Row): BankCategorisationRule {
     glAccountCode: row.gl_account_code ? String(row.gl_account_code) : undefined,
     glAccountName: row.gl_account_name ? String(row.gl_account_name) : undefined,
     supplierName: row.supplier_name ? String(row.supplier_name) : undefined,
+    clientName: row.client_name ? String(row.client_name) : undefined,
   };
 }

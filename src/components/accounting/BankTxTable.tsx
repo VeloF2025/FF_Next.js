@@ -34,6 +34,10 @@ export interface BankTx {
   suggestedGlAccountId?: string;
   suggestedGlAccountName?: string;
   suggestedGlAccountCode?: string;
+  suggestedSupplierId?: string;
+  suggestedSupplierName?: string;
+  suggestedClientId?: string;
+  suggestedClientName?: string;
   suggestedCategory?: string;
 }
 

@@ -65,6 +65,7 @@ export async function getDailyCountsWithBreakdown(
         AND upr.submitted_date <= $2::DATE
         AND (upr.is_oes_only = FALSE OR upr.is_oes_only IS NULL)
         AND ($3::TEXT IS NULL OR upr.project = $3)
+        AND COALESCE(upr.project, '') NOT IN ('Marketing', 'Marketing Activations', 'Unknown')
       `,
       [dateFrom, dateTo, project || null]
     );
@@ -89,6 +90,7 @@ export async function getDailyCountsWithBreakdown(
       WHERE oes.activation_date >= $1::DATE
         AND oes.activation_date <= $2::DATE
         AND ($3::TEXT IS NULL OR upr.project = $3 OR p.project_name = $3)
+        AND COALESCE(upr.project, p.project_name, '') NOT IN ('Marketing', 'Marketing Activations', 'Unknown')
       `,
       [dateFrom, dateTo, project || null]
     );

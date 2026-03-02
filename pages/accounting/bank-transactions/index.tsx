@@ -155,7 +155,22 @@ export default function BankTransactionsPage() {
     if (transactions.length === 0) return;
     const initialSelections: Record<string, RowSelection> = {};
     for (const tx of transactions) {
-      if (tx.suggestedGlAccountId && !rowSelections[tx.id]) {
+      if (rowSelections[tx.id]) continue;
+      if (tx.suggestedSupplierId) {
+        initialSelections[tx.id] = {
+          type: 'supplier' as AllocType,
+          entityId: tx.suggestedSupplierId,
+          label: tx.suggestedSupplierName || tx.suggestedCategory || '',
+          vatCode: 'none' as VatCode,
+        };
+      } else if (tx.suggestedClientId) {
+        initialSelections[tx.id] = {
+          type: 'customer' as AllocType,
+          entityId: tx.suggestedClientId,
+          label: tx.suggestedClientName || tx.suggestedCategory || '',
+          vatCode: 'none' as VatCode,
+        };
+      } else if (tx.suggestedGlAccountId) {
         initialSelections[tx.id] = {
           type: 'account' as AllocType,
           entityId: tx.suggestedGlAccountId,
@@ -750,6 +765,8 @@ export default function BankTransactionsPage() {
           transaction={createRuleTx}
           bankAccountId={selectedBank}
           glAccounts={glAccounts}
+          suppliers={suppliers}
+          clients={customers}
           onClose={() => setCreateRuleTx(null)}
           onCreated={() => {
             setCreateRuleTx(null);

@@ -20,13 +20,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const { ruleName, matchField, matchType, matchPattern, glAccountId, supplierId, descriptionTemplate, priority, autoCreateEntry } = req.body;
+    const { ruleName, matchField, matchType, matchPattern, glAccountId, supplierId, clientId, descriptionTemplate, priority, autoCreateEntry } = req.body;
     if (!ruleName || !matchField || !matchType || !matchPattern || !glAccountId) {
       return apiResponse.badRequest(res, 'ruleName, matchField, matchType, matchPattern, and glAccountId are required');
     }
     const rule = await createRule({
       ruleName, matchField, matchType, matchPattern, glAccountId,
       supplierId: supplierId || undefined,
+      clientId: clientId || undefined,
       descriptionTemplate: descriptionTemplate || undefined,
       priority: priority || 100,
       autoCreateEntry: autoCreateEntry !== false,
