@@ -198,6 +198,30 @@ export async function markApproved(
   id: string,
   input: ApproveApprovalInput
 ): Promise<PipelineProjectApproval | null> {
+  // Auto-copy issue_date/expiry_date from latest uploaded document if not provided
+  let issueDate = input.issue_date || null;
+  let expiryDate = input.expiry_date || null;
+
+  if (!issueDate || !expiryDate) {
+    const latestDoc = (await sql`
+      SELECT issue_date, expiry_date
+      FROM pipeline_approval_documents
+      WHERE approval_id = ${id}
+        AND (issue_date IS NOT NULL OR expiry_date IS NOT NULL)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `) as Record<string, unknown>[];
+
+    if (latestDoc.length > 0) {
+      if (!issueDate && latestDoc[0].issue_date) {
+        issueDate = latestDoc[0].issue_date as string;
+      }
+      if (!expiryDate && latestDoc[0].expiry_date) {
+        expiryDate = latestDoc[0].expiry_date as string;
+      }
+    }
+  }
+
   const result = (await sql`
     UPDATE pipeline_project_approvals
     SET
@@ -205,8 +229,8 @@ export async function markApproved(
       approval_date = ${input.approval_date},
       approval_reference = ${input.approval_reference},
       approval_document_url = ${input.approval_document_url || null},
-      issue_date = ${input.issue_date || null},
-      expiry_date = ${input.expiry_date || null},
+      issue_date = ${issueDate},
+      expiry_date = ${expiryDate},
       conditions = ${input.conditions || null},
       notes = COALESCE(${input.notes || null}, notes),
       updated_at = NOW(),

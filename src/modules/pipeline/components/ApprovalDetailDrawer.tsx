@@ -172,12 +172,10 @@ export function ApprovalDetailDrawer({
     notes: '',
   });
 
-  // Form state for approval
+  // Form state for approval (issue_date/expiry_date auto-copied from uploaded document by backend)
   const [approveData, setApproveData] = useState({
     approval_date: new Date().toISOString().split('T')[0],
     approval_reference: '',
-    issue_date: '',
-    expiry_date: '',
     conditions: '',
     notes: '',
   });
@@ -367,8 +365,6 @@ export function ApprovalDetailDrawer({
         body: JSON.stringify({
           approval_date: approveData.approval_date,
           approval_reference: approveData.approval_reference,
-          issue_date: approveData.issue_date || undefined,
-          expiry_date: approveData.expiry_date || undefined,
           conditions: approveData.conditions || undefined,
           notes: approveData.notes || undefined,
           updated_by: currentUserId,
@@ -739,36 +735,7 @@ export function ApprovalDetailDrawer({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="approve-issue-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                        Issue Date
-                      </label>
-                      <input
-                        id="approve-issue-date"
-                        type="date"
-                        value={approveData.issue_date}
-                        onChange={(e) =>
-                          setApproveData({ ...approveData, issue_date: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="approve-expiry-date" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                        Expiry Date
-                      </label>
-                      <input
-                        id="approve-expiry-date"
-                        type="date"
-                        value={approveData.expiry_date}
-                        onChange={(e) =>
-                          setApproveData({ ...approveData, expiry_date: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-[var(--ff-border-light)] rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-[var(--ff-bg-primary)]"
-                      />
-                    </div>
-                  </div>
+                  {/* Issue Date & Expiry Date auto-copied from uploaded document */}
                   <div>
                     <label htmlFor="approve-conditions" className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                       Conditions
