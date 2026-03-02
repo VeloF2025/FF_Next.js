@@ -39,6 +39,9 @@ export interface BankTx {
   suggestedClientId?: string;
   suggestedClientName?: string;
   suggestedCategory?: string;
+  /** Allocation tracking — populated for matched/reconciled transactions */
+  allocationType?: AllocType;
+  allocatedEntityName?: string;
 }
 
 export interface SelectOption {
@@ -252,8 +255,14 @@ export function BankTxTable(props: Props) {
                       <option value="customer">Customer</option>
                     </select>
                   ) : (
-                    <span className="text-xs text-[var(--ff-text-secondary)]">
-                      {sel?.type === 'supplier' ? 'Supplier' : sel?.type === 'customer' ? 'Customer' : 'Account'}
+                    <span className={`text-xs ${
+                      (tx.allocationType || sel?.type) === 'supplier' ? 'text-blue-400'
+                      : (tx.allocationType || sel?.type) === 'customer' ? 'text-purple-400'
+                      : 'text-[var(--ff-text-secondary)]'
+                    }`}>
+                      {(tx.allocationType || sel?.type) === 'supplier' ? 'Supplier'
+                       : (tx.allocationType || sel?.type) === 'customer' ? 'Customer'
+                       : 'Account'}
                     </span>
                   )}
                 </td>
@@ -330,7 +339,13 @@ export function BankTxTable(props: Props) {
                       )}
                     </>
                   ) : (
-                    <span className="text-xs text-emerald-400">{sel?.label || 'Allocated'}</span>
+                    <span className={`text-xs truncate max-w-[200px] block ${
+                      (tx.allocationType) === 'supplier' ? 'text-blue-400'
+                      : (tx.allocationType) === 'customer' ? 'text-purple-400'
+                      : 'text-emerald-400'
+                    }`} title={tx.allocatedEntityName || sel?.label || 'Allocated'}>
+                      {tx.allocatedEntityName || sel?.label || 'Allocated'}
+                    </span>
                   )}
                 </td>
                 <td className="py-2 px-2 text-xs font-mono text-[var(--ff-text-tertiary)]">

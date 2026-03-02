@@ -59,6 +59,9 @@ export interface BankTransaction {
   suggestedSupplierName?: string;
   suggestedClientId?: string;
   suggestedClientName?: string;
+  // Allocation tracking — populated when status is matched/reconciled
+  allocationType?: 'account' | 'supplier' | 'customer';
+  allocatedEntityName?: string;
 }
 
 // ── Bank Reconciliation ──────────────────────────────────────────────────────

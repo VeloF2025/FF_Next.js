@@ -315,7 +315,10 @@ export async function unmatchTransaction(bankTxId: string): Promise<BankTransact
 
     const rows = (await sql`
       UPDATE bank_transactions
-      SET status = 'imported', matched_journal_line_id = NULL
+      SET status = 'imported',
+          matched_journal_line_id = NULL,
+          allocation_type = NULL,
+          allocated_entity_name = NULL
       WHERE id = ${bankTxId}::UUID
       RETURNING *
     `) as Row[];
@@ -710,12 +713,14 @@ export async function allocateTransaction(
   let lines: JournalLineInput[];
   let source: string;
   let entryDesc: string;
+  let allocEntityName: string | null = null;
 
   if (allocType === 'supplier' && entityId) {
     // Supplier payment: DR Accounts Payable, CR Bank (+ VAT Input if applicable)
     const apAccountId = await glAccountByCode('2110');
     const supRows = (await sql`SELECT name FROM suppliers WHERE id = ${Number(entityId)}`) as Row[];
     const supName = supRows.length > 0 ? String(supRows[0]!.name) : `Supplier #${entityId}`;
+    allocEntityName = supName;
     entryDesc = description || `Payment to ${supName}`;
     source = 'auto_supplier_payment';
     lines = [
@@ -731,6 +736,7 @@ export async function allocateTransaction(
     const arAccountId = await glAccountByCode('1120');
     const custRows = (await sql`SELECT company_name FROM clients WHERE id = ${entityId}::UUID`) as Row[];
     const custName = custRows.length > 0 ? String(custRows[0]!.company_name) : `Customer #${entityId}`;
+    allocEntityName = custName;
     entryDesc = description || `Receipt from ${custName}`;
     source = 'auto_payment';
     lines = [
@@ -743,6 +749,8 @@ export async function allocateTransaction(
     }
   } else {
     // Standard GL account allocation
+    const acctRows = (await sql`SELECT account_code, account_name FROM gl_accounts WHERE id = ${contraAccountId}::UUID`) as Row[];
+    allocEntityName = acctRows.length > 0 ? `${acctRows[0]!.account_code} ${acctRows[0]!.account_name}` : null;
     entryDesc = description || tx.description || 'Bank allocation';
     source = 'auto_bank_recon';
     if (!isSpent) {
@@ -791,7 +799,11 @@ export async function allocateTransaction(
   if (journalLineId) {
     await sql`
       UPDATE bank_transactions
-      SET status = 'matched', matched_journal_line_id = ${journalLineId}::UUID, updated_at = NOW()
+      SET status = 'matched',
+          matched_journal_line_id = ${journalLineId}::UUID,
+          allocation_type = ${allocType},
+          allocated_entity_name = ${allocEntityName},
+          updated_at = NOW()
       WHERE id = ${bankTxId}::UUID
     `;
   }
@@ -946,7 +958,11 @@ export async function splitAllocateTransaction(
   if (journalLineId) {
     await sql`
       UPDATE bank_transactions
-      SET status = 'matched', matched_journal_line_id = ${journalLineId}::UUID, updated_at = NOW()
+      SET status = 'matched',
+          matched_journal_line_id = ${journalLineId}::UUID,
+          allocation_type = 'account',
+          allocated_entity_name = 'Split allocation',
+          updated_at = NOW()
       WHERE id = ${bankTxId}::UUID
     `;
   }
@@ -1002,6 +1018,8 @@ export async function reverseReconciledTransaction(bankTxId: string, userId: str
         linked_asset_id = NULL,
         linked_fleet_fuel_id = NULL,
         linked_fleet_service_id = NULL,
+        allocation_type = NULL,
+        allocated_entity_name = NULL,
         updated_at = NOW()
     WHERE id = ${bankTxId}::UUID
   `;
@@ -1068,6 +1086,8 @@ function mapTxRow(row: Row): BankTransaction {
     suggestedSupplierName: row.suggested_supplier_name ? String(row.suggested_supplier_name) : undefined,
     suggestedClientId: row.suggested_client_id ? String(row.suggested_client_id) : undefined,
     suggestedClientName: row.suggested_client_name ? String(row.suggested_client_name) : undefined,
+    allocationType: row.allocation_type ? String(row.allocation_type) as BankTransaction['allocationType'] : undefined,
+    allocatedEntityName: row.allocated_entity_name ? String(row.allocated_entity_name) : undefined,
   };
 }
 
