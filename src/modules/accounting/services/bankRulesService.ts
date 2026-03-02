@@ -104,71 +104,65 @@ export async function applyRules(
     let totalApplied = 0;
     const entries: RuleApplyResult['entries'] = [];
 
-    // Split rules into suggestion-mode and auto-create-mode
-    const suggestionRules = rules.filter((r: Row) => !r.auto_create_entry);
-    const autoCreateRules = rules.filter((r: Row) => r.auto_create_entry);
+    const autoCreateRules = rules.filter((r: Row) => Boolean(r.auto_create_entry));
+    const hasSuggestionRules = rules.some((r: Row) => !r.auto_create_entry);
 
-    // Suggestion-mode rules: run all in parallel (one bulk UPDATE per rule).
-    // PostgreSQL row locking via `suggested_gl_account_id IS NULL` prevents double-updates
-    // when concurrent queries race on the same transaction row.
-    const suggestionResults = await Promise.all(
-      suggestionRules.map(async (rule: Row) => {
-        const pattern = toSqlPattern(String(rule.match_type), String(rule.match_pattern));
-        const field = String(rule.match_field);
-        const glAccountId = rule.gl_account_id ? String(rule.gl_account_id) : null;
-        const supplierId = rule.supplier_id ? Number(rule.supplier_id) : null;
-        const clientId = rule.client_id ? String(rule.client_id) : null;
-        const ruleName = String(rule.rule_name);
+    if (hasSuggestionRules) {
+      // Single-query approach: JOIN all suggestion-mode rules against all unmatched
+      // transactions in one CTE, assign the highest-priority matching rule per tx.
+      // ILIKE patterns are generated inline using CASE on match_type column —
+      // one network round-trip to Neon regardless of rule count.
+      const updated = (await sql`
+        WITH matched AS (
+          SELECT
+            bt.id                                              AS tx_id,
+            r.gl_account_id,
+            r.supplier_id,
+            r.client_id,
+            r.rule_name,
+            ROW_NUMBER() OVER (PARTITION BY bt.id ORDER BY r.priority ASC) AS rn
+          FROM bank_transactions bt
+          JOIN bank_categorisation_rules r ON (
+            r.is_active = true
+            AND r.auto_create_entry = false
+            AND (
+              (r.match_field IN ('description', 'both')
+                AND bt.description ILIKE
+                  CASE r.match_type
+                    WHEN 'contains'    THEN '%' || r.match_pattern || '%'
+                    WHEN 'starts_with' THEN        r.match_pattern || '%'
+                    WHEN 'ends_with'   THEN '%' || r.match_pattern
+                    ELSE                           r.match_pattern
+                  END)
+              OR
+              (r.match_field IN ('reference', 'both')
+                AND bt.reference ILIKE
+                  CASE r.match_type
+                    WHEN 'contains'    THEN '%' || r.match_pattern || '%'
+                    WHEN 'starts_with' THEN        r.match_pattern || '%'
+                    WHEN 'ends_with'   THEN '%' || r.match_pattern
+                    ELSE                           r.match_pattern
+                  END)
+            )
+          )
+          WHERE bt.bank_account_id = ${bankAccountId}::UUID
+            AND bt.status IN ('imported', 'allocated')
+            AND bt.suggested_gl_account_id IS NULL
+        ),
+        top_match AS (SELECT * FROM matched WHERE rn = 1)
+        UPDATE bank_transactions bt
+        SET
+          suggested_gl_account_id = tm.gl_account_id,
+          suggested_supplier_id   = tm.supplier_id,
+          suggested_client_id     = tm.client_id,
+          suggested_category      = tm.rule_name
+        FROM top_match tm
+        WHERE bt.id = tm.tx_id
+        RETURNING bt.id, tm.rule_name
+      `) as Row[];
 
-        let updated: Row[];
-        if (field === 'description') {
-          updated = (await sql`
-            UPDATE bank_transactions
-            SET suggested_gl_account_id = ${glAccountId}::UUID,
-                suggested_supplier_id = ${supplierId},
-                suggested_client_id = ${clientId}::UUID,
-                suggested_category = ${ruleName}
-            WHERE bank_account_id = ${bankAccountId}::UUID
-              AND status IN ('imported', 'allocated')
-              AND suggested_gl_account_id IS NULL
-              AND description ILIKE ${pattern}
-            RETURNING id
-          `) as Row[];
-        } else if (field === 'reference') {
-          updated = (await sql`
-            UPDATE bank_transactions
-            SET suggested_gl_account_id = ${glAccountId}::UUID,
-                suggested_supplier_id = ${supplierId},
-                suggested_client_id = ${clientId}::UUID,
-                suggested_category = ${ruleName}
-            WHERE bank_account_id = ${bankAccountId}::UUID
-              AND status IN ('imported', 'allocated')
-              AND suggested_gl_account_id IS NULL
-              AND reference ILIKE ${pattern}
-            RETURNING id
-          `) as Row[];
-        } else {
-          updated = (await sql`
-            UPDATE bank_transactions
-            SET suggested_gl_account_id = ${glAccountId}::UUID,
-                suggested_supplier_id = ${supplierId},
-                suggested_client_id = ${clientId}::UUID,
-                suggested_category = ${ruleName}
-            WHERE bank_account_id = ${bankAccountId}::UUID
-              AND status IN ('imported', 'allocated')
-              AND suggested_gl_account_id IS NULL
-              AND (description ILIKE ${pattern} OR reference ILIKE ${pattern})
-            RETURNING id
-          `) as Row[];
-        }
-
-        return { ruleName, updated };
-      })
-    );
-
-    for (const { ruleName, updated } of suggestionResults) {
       for (const row of updated) {
-        entries.push({ bankTxId: String(row.id), ruleName, suggestion: true });
+        entries.push({ bankTxId: String(row.id), ruleName: String(row.rule_name), suggestion: true });
       }
       totalApplied += updated.length;
     }
