@@ -200,7 +200,10 @@ export default function BankTransactionsPage() {
       body: JSON.stringify(body),
     });
     const json = await res.json();
-    if (!res.ok || json.success === false) throw new Error(json.message || json.error || 'Action failed');
+    if (!res.ok || json.success === false) {
+      const msg = json.error?.message || json.message || (typeof json.error === 'string' ? json.error : 'Action failed');
+      throw new Error(msg);
+    }
     return json;
   };
 
