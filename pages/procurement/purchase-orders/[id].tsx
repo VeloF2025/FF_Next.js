@@ -28,15 +28,7 @@ import { log } from '@/lib/logger';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents';
 
 // Types
-type POStatus =
-  | 'draft'
-  | 'pending_approval'
-  | 'approved'
-  | 'sent'
-  | 'acknowledged'
-  | 'partial_receipt'
-  | 'completed'
-  | 'cancelled';
+type POStatus = string;
 
 type TabId = 'details' | 'items' | 'receipts' | 'history' | 'documents';
 
@@ -103,13 +95,16 @@ interface PurchaseOrderDetail {
   receipts: POReceipt[];
 }
 
-const statusConfig: Record<POStatus, { label: string; color: string; icon: typeof Clock }> = {
+const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
   pending_approval: { label: 'Pending Approval', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
   approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   sent: { label: 'Sent', color: 'bg-blue-500/20 text-blue-400', icon: Send },
   acknowledged: { label: 'Acknowledged', color: 'bg-indigo-500/20 text-indigo-400', icon: Package },
   partial_receipt: { label: 'Partial Receipt', color: 'bg-orange-500/20 text-orange-400', icon: Truck },
+  partially_received: { label: 'Partial Receipt', color: 'bg-orange-500/20 text-orange-400', icon: Truck },
+  received: { label: 'Received', color: 'bg-green-500/20 text-green-400', icon: PackageCheck },
+  closed: { label: 'Closed', color: 'bg-gray-500/20 text-gray-400', icon: CheckCircle },
   completed: { label: 'Completed', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-300', icon: XCircle },
 };
@@ -522,7 +517,7 @@ export default function PurchaseOrderDetailPage() {
     );
   }
 
-  const statusInfo = statusConfig[purchaseOrder.status];
+  const statusInfo = statusConfig[purchaseOrder.status] || { label: purchaseOrder.status, color: 'bg-gray-500/20 text-gray-400', icon: Clock };
   const StatusIcon = statusInfo.icon;
 
   const tabs = [
