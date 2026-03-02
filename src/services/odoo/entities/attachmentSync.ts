@@ -284,11 +284,11 @@ export async function syncAttachments(
     // Build entity mapping cache
     const mappingCache = await buildEntityMappingCache(sql);
 
-    // Get existing synced attachments to skip
+    // Get existing synced attachments to skip (only skip 'synced' — retry pending/failed)
     let existingIds = new Set<number>();
     if (skipExisting) {
       const existing = await sql<{ odoo_attachment_id: number }[]>`
-        SELECT odoo_attachment_id FROM odoo_documents
+        SELECT odoo_attachment_id FROM odoo_documents WHERE sync_status = 'synced'
       `;
       existingIds = new Set(existing.map((e) => e.odoo_attachment_id));
       logger.info(`Found ${existingIds.size} already synced attachments`);
@@ -554,6 +554,242 @@ export async function syncAttachmentsForModel(
     ...options,
     models: [model],
   });
+}
+
+/**
+ * Process pending/failed attachments — download from Odoo and upload to VF Storage
+ * These records already exist in odoo_documents but never had files downloaded.
+ */
+export async function processPendingAttachments(
+  client: OdooClient,
+  databaseUrl: string,
+  options: { limit?: number; models?: string[] } = {}
+): Promise<AttachmentSyncResult> {
+  const sql = neon(databaseUrl);
+  const storage = new VFStorageService();
+
+  const result: AttachmentSyncResult = {
+    synced: 0,
+    orphaned: 0,
+    skipped: 0,
+    errors: [],
+    details: [],
+  };
+
+  const { limit = 200, models } = options;
+
+  try {
+    logger.info('Processing pending/failed attachments', { limit, models });
+
+    const storageHealthy = await storage.checkHealth();
+    if (!storageHealthy) {
+      throw new Error('VF Storage service is not available');
+    }
+
+    // Fetch pending/failed records from odoo_documents
+    interface PendingDoc {
+      id: string;
+      odoo_attachment_id: number;
+      odoo_model: string;
+      odoo_record_id: number;
+      ff_entity_type: string | null;
+      ff_entity_id: string | null;
+      file_name: string;
+      sync_attempts: number;
+    }
+
+    let pendingDocs: PendingDoc[];
+    if (models && models.length > 0) {
+      pendingDocs = await sql`
+        SELECT id, odoo_attachment_id, odoo_model, odoo_record_id,
+               ff_entity_type, ff_entity_id, file_name, sync_attempts
+        FROM odoo_documents
+        WHERE sync_status IN ('pending', 'failed')
+          AND odoo_model = ANY(${models})
+        ORDER BY created_at
+        LIMIT ${limit}
+      ` as unknown as PendingDoc[];
+    } else {
+      pendingDocs = await sql`
+        SELECT id, odoo_attachment_id, odoo_model, odoo_record_id,
+               ff_entity_type, ff_entity_id, file_name, sync_attempts
+        FROM odoo_documents
+        WHERE sync_status IN ('pending', 'failed')
+        ORDER BY created_at
+        LIMIT ${limit}
+      ` as unknown as PendingDoc[];
+    }
+
+    logger.info(`Found ${pendingDocs.length} pending/failed attachments to process`);
+
+    for (const doc of pendingDocs) {
+      try {
+        // Update status to downloading
+        await sql`
+          UPDATE odoo_documents
+          SET sync_status = 'downloading',
+              sync_attempts = ${doc.sync_attempts + 1},
+              last_sync_attempt = NOW()
+          WHERE id = ${doc.id}::uuid
+        `;
+
+        // Download from Odoo
+        const downloadResult = await client.downloadAttachment(doc.odoo_attachment_id);
+        if (!downloadResult) {
+          await sql`
+            UPDATE odoo_documents
+            SET sync_status = 'failed',
+                sync_error = 'Could not download from Odoo — attachment may have been deleted'
+            WHERE id = ${doc.id}::uuid
+          `;
+          result.errors.push(`${doc.file_name}: Could not download from Odoo`);
+          result.details.push({
+            odooId: doc.odoo_attachment_id,
+            name: doc.file_name,
+            model: doc.odoo_model,
+            action: 'error',
+            message: 'Download failed',
+          });
+          continue;
+        }
+
+        // Update status to uploading
+        await sql`
+          UPDATE odoo_documents SET sync_status = 'uploading' WHERE id = ${doc.id}::uuid
+        `;
+
+        // Determine storage path
+        const isOrphan = !doc.ff_entity_id;
+        const storagePath = getStoragePath(doc.odoo_model, doc.ff_entity_id, isOrphan);
+
+        const timestamp = Date.now();
+        const safeFilename = downloadResult.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const uniqueFilename = `${doc.odoo_attachment_id}_${timestamp}_${safeFilename}`;
+
+        // Upload to VF Storage
+        const uploadResult = await storage.uploadFile(
+          downloadResult.buffer,
+          storagePath.type,
+          storagePath.category,
+          uniqueFilename
+        );
+
+        if (!uploadResult.success) {
+          await sql`
+            UPDATE odoo_documents
+            SET sync_status = 'failed',
+                sync_error = 'Upload to VF Storage failed'
+            WHERE id = ${doc.id}::uuid
+          `;
+          result.errors.push(`${doc.file_name}: Upload to VF Storage failed`);
+          result.details.push({
+            odooId: doc.odoo_attachment_id,
+            name: doc.file_name,
+            model: doc.odoo_model,
+            action: 'error',
+            message: 'Upload failed',
+          });
+          continue;
+        }
+
+        // Detect document type
+        const documentType = detectDocumentType(
+          downloadResult.filename,
+          downloadResult.mimetype
+        );
+
+        // Update record with file info
+        await sql`
+          UPDATE odoo_documents
+          SET file_path = ${uploadResult.path},
+              file_url = ${uploadResult.url},
+              file_size = ${downloadResult.fileSize},
+              mime_type = ${downloadResult.mimetype},
+              document_type = ${documentType},
+              sync_status = ${isOrphan ? 'orphaned' : 'synced'},
+              sync_error = NULL
+          WHERE id = ${doc.id}::uuid
+        `;
+
+        if (isOrphan) {
+          result.orphaned++;
+        } else {
+          result.synced++;
+        }
+
+        result.details.push({
+          odooId: doc.odoo_attachment_id,
+          name: doc.file_name,
+          model: doc.odoo_model,
+          action: isOrphan ? 'orphaned' : 'synced',
+          ffEntityType: doc.ff_entity_type || undefined,
+          ffEntityId: doc.ff_entity_id || undefined,
+          message: isOrphan
+            ? `Stored as orphan: ${uploadResult.path}`
+            : `Linked to ${doc.ff_entity_type}:${doc.ff_entity_id}`,
+        });
+
+        logger.debug(`Processed pending attachment: ${doc.file_name}`, {
+          odooId: doc.odoo_attachment_id,
+          status: isOrphan ? 'orphaned' : 'synced',
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        // Mark as failed
+        try {
+          await sql`
+            UPDATE odoo_documents
+            SET sync_status = 'failed',
+                sync_error = ${message}
+            WHERE id = ${doc.id}::uuid
+          `;
+        } catch {
+          logger.error('Could not update failed status', { docId: doc.id });
+        }
+        result.errors.push(`${doc.file_name}: ${message}`);
+        result.details.push({
+          odooId: doc.odoo_attachment_id,
+          name: doc.file_name,
+          model: doc.odoo_model,
+          action: 'error',
+          message,
+        });
+        logger.error(`Error processing pending attachment ${doc.file_name}`, { error: message });
+      }
+    }
+
+    // Record in sync history
+    try {
+      await sql`
+        INSERT INTO odoo_sync_history (
+          entity_type, sync_type, records_processed, records_created,
+          records_updated, records_failed, status, error_details, completed_at
+        ) VALUES (
+          'attachment', 'process_pending', ${pendingDocs.length}, 0,
+          ${result.synced + result.orphaned}, ${result.errors.length},
+          ${result.errors.length > 0 ? 'completed_with_errors' : 'completed'},
+          ${result.errors.length > 0 ? JSON.stringify(result.errors) : null},
+          CURRENT_TIMESTAMP
+        )
+      `;
+    } catch {
+      logger.debug('Could not record sync history — table may not exist');
+    }
+
+    logger.info('Pending attachment processing completed', {
+      synced: result.synced,
+      orphaned: result.orphaned,
+      errors: result.errors.length,
+      total: pendingDocs.length,
+    });
+
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Pending attachment processing failed', { error: message });
+    result.errors.push(`Processing failed: ${message}`);
+    return result;
+  }
 }
 
 /**

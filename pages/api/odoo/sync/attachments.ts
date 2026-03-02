@@ -11,6 +11,7 @@ import { OdooClient } from '@/services/odoo/odooClient';
 import {
   syncAttachments,
   syncAttachmentsForEntity,
+  processPendingAttachments,
   getAttachmentSyncStats,
   getOrphanedDocuments,
   linkOrphanedDocument,
@@ -81,6 +82,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
  */
 async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   const {
+    action,
     dryRun = false,
     models,
     limit = 500,
@@ -90,6 +92,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
   } = req.body;
 
   logger.info('Starting attachment sync', {
+    action,
     dryRun,
     models,
     limit,
@@ -107,9 +110,22 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   await client.authenticate();
 
+  // Process pending/failed attachments
+  if (action === 'process_pending') {
+    const syncResult = await processPendingAttachments(client, DATABASE_URL!, {
+      limit: parseInt(String(limit), 10),
+      models: models as string[],
+    });
+
+    return apiResponse.success(res, {
+      message: 'Pending attachments processed',
+      result: syncResult,
+    });
+  }
+
   // If specific entity provided, sync just that entity
   if (entityType && entityId) {
-    const result = await syncAttachmentsForEntity(
+    const syncResult = await syncAttachmentsForEntity(
       client,
       DATABASE_URL!,
       entityType,
@@ -118,12 +134,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, {
       message: 'Entity attachment sync completed',
-      result,
+      result: syncResult,
     });
   }
 
   // Full sync
-  const result = await syncAttachments(client, DATABASE_URL!, {
+  const syncResult = await syncAttachments(client, DATABASE_URL!, {
     dryRun,
     models: models as string[],
     limit: parseInt(String(limit), 10),
@@ -132,7 +148,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
   return apiResponse.success(res, {
     message: dryRun ? 'Dry run completed' : 'Attachment sync completed',
-    result,
+    result: syncResult,
   });
 }
 
