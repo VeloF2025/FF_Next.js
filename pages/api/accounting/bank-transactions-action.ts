@@ -114,6 +114,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         log.info('Updated bank transaction notes', { bankTransactionId }, 'accounting-api');
         return apiResponse.success(res, { updated: true });
       }
+      case 'save_selection': {
+        if (!bankTransactionId) return apiResponse.badRequest(res, 'bankTransactionId required');
+        const selType: string = req.body.selectionType || 'account';
+        const selEntityId: string | null = req.body.selectionEntityId || null;
+        await sql`
+          UPDATE bank_transactions
+          SET suggested_gl_account_id = ${selType === 'account' && selEntityId ? selEntityId : null}::UUID,
+              suggested_supplier_id = ${selType === 'supplier' && selEntityId ? Number(selEntityId) : null},
+              suggested_client_id = ${selType === 'customer' && selEntityId ? selEntityId : null}::UUID,
+              updated_at = NOW()
+          WHERE id = ${bankTransactionId}::UUID AND status = 'imported'
+        `;
+        return apiResponse.success(res, { saved: true });
+      }
       case 'reverse': {
         if (!bankTransactionId) return apiResponse.badRequest(res, 'bankTransactionId required');
         await reverseReconciledTransaction(bankTransactionId, userId);

@@ -207,6 +207,14 @@ export default function BankTransactionsPage() {
     return json;
   };
 
+  // Fire-and-forget: persist dropdown selection to DB so it survives page refresh
+  const saveSelection = (txId: string, type: AllocType, entityId: string) => {
+    fetch('/api/accounting/bank-transactions-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ action: 'save_selection', bankTransactionId: txId, selectionType: type, selectionEntityId: entityId || null }),
+    }).catch(() => {});
+  };
+
   const handleAccept = async (txId: string) => {
     const sel = rowSelections[txId];
     if (!sel?.entityId) { toast.error('Select an account/supplier/customer first'); return; }
@@ -649,15 +657,18 @@ export default function BankTransactionsPage() {
               onSelectAll={() => setSelectedIds(
                 allSelected ? new Set() : new Set(transactions.map(t => t.id))
               )}
-              onRowTypeChange={(txId, type) =>
-                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode: prev[txId]?.vatCode || 'none' } }))
-              }
-              onRowEntityChange={(txId, entityId, label) =>
+              onRowTypeChange={(txId, type) => {
+                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode: prev[txId]?.vatCode || 'none' } }));
+                saveSelection(txId, type, '');
+              }}
+              onRowEntityChange={(txId, entityId, label) => {
+                const type = rowSelections[txId]?.type || 'account';
                 setRowSelections(prev => ({
                   ...prev,
-                  [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId, label, vatCode: prev[txId]?.vatCode || 'none' },
-                }))
-              }
+                  [txId]: { ...prev[txId], type, entityId, label, vatCode: prev[txId]?.vatCode || 'none' },
+                }));
+                saveSelection(txId, type as AllocType, entityId);
+              }}
               onRowVatChange={(txId, vatCode) =>
                 setRowSelections(prev => ({
                   ...prev,

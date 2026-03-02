@@ -167,7 +167,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         SELECT bt.*, ga.account_name AS bank_account_name,
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
-               s2.company_name AS suggested_supplier_name,
+               COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
                c2.company_name AS suggested_client_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
@@ -197,7 +197,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         SELECT bt.*, ga.account_name AS bank_account_name,
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
-               s2.company_name AS suggested_supplier_name,
+               COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
                c2.company_name AS suggested_client_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
@@ -229,7 +229,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         SELECT bt.*, ga.account_name AS bank_account_name,
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
-               s2.company_name AS suggested_supplier_name,
+               COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
                c2.company_name AS suggested_client_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
@@ -249,7 +249,7 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
         SELECT bt.*, ga.account_name AS bank_account_name,
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
-               s2.company_name AS suggested_supplier_name,
+               COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
                c2.company_name AS suggested_client_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
