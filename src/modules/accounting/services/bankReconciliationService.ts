@@ -796,6 +796,22 @@ export async function allocateTransaction(
     `;
   }
 
+  // Create customer_payments record so payment appears in customer statements
+  if (allocType === 'customer' && entityId) {
+    await sql`
+      INSERT INTO customer_payments (
+        client_id, payment_date, total_amount, payment_method,
+        bank_reference, bank_account_id, description, status,
+        gl_journal_entry_id, created_by, confirmed_by, confirmed_at
+      ) VALUES (
+        ${entityId}::UUID, ${txDate}, ${totalAmount}, 'eft',
+        ${tx.reference || tx.bank_reference || tx.description || null},
+        ${bankAccountId}::UUID, ${entryDesc}, 'confirmed',
+        ${je.id}::UUID, ${userId}::UUID, ${userId}::UUID, NOW()
+      )
+    `;
+  }
+
   log.info('Allocated bank transaction', {
     bankTxId, journalEntryId: je.id, allocType, entityId, contraAccountId,
   }, 'accounting');

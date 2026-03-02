@@ -44,14 +44,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ORDER BY invoice_date
     `) as Row[];
 
-    // Get confirmed payment allocations
+    // Get confirmed payments — includes both allocated and unallocated (bank-sourced)
     const payments = (await sql`
       SELECT cp.id, cp.payment_number, cp.payment_date, cp.bank_reference,
-        cpa.amount_allocated
+        COALESCE(SUM(cpa.amount_allocated), cp.total_amount) AS amount_allocated
       FROM customer_payments cp
-      JOIN customer_payment_allocations cpa ON cpa.payment_id = cp.id
-      JOIN customer_invoices ci ON ci.id = cpa.invoice_id
-      WHERE ci.client_id = ${clientId}::UUID AND cp.status = 'confirmed'
+      LEFT JOIN customer_payment_allocations cpa ON cpa.payment_id = cp.id
+      WHERE cp.client_id = ${clientId}::UUID AND cp.status IN ('confirmed', 'reconciled')
+      GROUP BY cp.id, cp.payment_number, cp.payment_date, cp.bank_reference, cp.total_amount
     `) as Row[];
 
     // Get approved customer credit notes

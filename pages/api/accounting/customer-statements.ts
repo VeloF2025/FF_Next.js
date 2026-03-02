@@ -24,16 +24,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ci.client_id,
         c.company_name as client_name,
         SUM(ci.total_amount::numeric) as total_invoiced,
-        SUM(ci.amount_paid::numeric) as total_paid,
-        SUM(ci.total_amount::numeric) - SUM(ci.amount_paid::numeric) as balance,
-        MAX(ci.paid_at) as last_payment_date,
+        COALESCE(paid.total_paid, 0) as total_paid,
+        SUM(ci.total_amount::numeric) - COALESCE(paid.total_paid, 0) as balance,
+        paid.last_payment_date,
         COUNT(*)::int as invoice_count
       FROM customer_invoices ci
       LEFT JOIN clients c ON c.id = ci.client_id
+      LEFT JOIN (
+        SELECT client_id,
+          SUM(total_amount::numeric) as total_paid,
+          MAX(payment_date) as last_payment_date
+        FROM customer_payments
+        WHERE status IN ('confirmed', 'reconciled')
+        GROUP BY client_id
+      ) paid ON paid.client_id = ci.client_id
       WHERE ci.status != 'cancelled'
-      GROUP BY ci.client_id, c.company_name
+      GROUP BY ci.client_id, c.company_name, paid.total_paid, paid.last_payment_date
       HAVING SUM(ci.total_amount::numeric) > 0
-      ORDER BY SUM(ci.total_amount::numeric) - SUM(ci.amount_paid::numeric) DESC
+      ORDER BY SUM(ci.total_amount::numeric) - COALESCE(paid.total_paid, 0) DESC
     `;
 
     return apiResponse.success(res, {
