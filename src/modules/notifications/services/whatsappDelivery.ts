@@ -144,10 +144,10 @@ async function lookupUserPhone(userId: string): Promise<string | null> {
       return staffRow.phone as string;
     }
 
-    // Fallback: users table (some users have phone directly)
+    // Fallback: users table
     const userRows = await sql`
-      SELECT phone FROM users
-      WHERE id = ${userId}::uuid AND phone IS NOT NULL
+      SELECT phone_number AS phone FROM users
+      WHERE id = ${userId}::uuid AND phone_number IS NOT NULL
       LIMIT 1
     `;
     const userRow = userRows[0];
