@@ -76,6 +76,17 @@ export async function toggleRule(id: string, isActive: boolean): Promise<void> {
 
 // ── Apply Rules ─────────────────────────────────────────────────────────────
 
+/** Convert rule match type to SQL ILIKE pattern */
+function toSqlPattern(matchType: string, matchPattern: string): string {
+  switch (matchType) {
+    case 'contains': return `%${matchPattern}%`;
+    case 'starts_with': return `${matchPattern}%`;
+    case 'ends_with': return `%${matchPattern}`;
+    case 'exact': return matchPattern;
+    default: return `%${matchPattern}%`;
+  }
+}
+
 export async function applyRules(
   bankAccountId: string,
   userId: string
@@ -90,66 +101,106 @@ export async function applyRules(
 
     if (rules.length === 0) return { applied: 0, skipped: 0, entries: [] };
 
-    // Get unmatched imported transactions
-    const txns = (await sql`
-      SELECT id, amount, transaction_date, description, reference
-      FROM bank_transactions
-      WHERE bank_account_id = ${bankAccountId}::UUID
-        AND status = 'imported'
-      ORDER BY transaction_date
-    `) as Row[];
-
-    let applied = 0;
-    let skipped = 0;
+    let totalApplied = 0;
     const entries: RuleApplyResult['entries'] = [];
 
-    for (const tx of txns) {
-      const desc = String(tx.description || '').toLowerCase();
-      const ref = String(tx.reference || '').toLowerCase();
-      let matched = false;
+    // Process each rule with bulk SQL — one UPDATE per rule, not per transaction.
+    // Only target new transactions (imported/allocated) without existing suggestions.
+    for (const rule of rules) {
+      const pattern = toSqlPattern(String(rule.match_type), String(rule.match_pattern));
+      const field = String(rule.match_field);
+      const glAccountId = rule.gl_account_id ? String(rule.gl_account_id) : null;
+      const supplierId = rule.supplier_id ? Number(rule.supplier_id) : null;
+      const clientId = rule.client_id ? String(rule.client_id) : null;
+      const ruleName = String(rule.rule_name);
 
-      for (const rule of rules) {
-        const pattern = String(rule.match_pattern).toLowerCase();
-        const field = String(rule.match_field);
-        const type = String(rule.match_type);
-
-        const targets: string[] = [];
-        if (field === 'description' || field === 'both') targets.push(desc);
-        if (field === 'reference' || field === 'both') targets.push(ref);
-
-        const isMatch = targets.some(target => {
-          switch (type) {
-            case 'contains': return target.includes(pattern);
-            case 'starts_with': return target.startsWith(pattern);
-            case 'ends_with': return target.endsWith(pattern);
-            case 'exact': return target === pattern;
-            default: return false;
-          }
-        });
-
-        if (!isMatch) continue;
-
-        if (!rule.auto_create_entry) {
-          // Populate suggestion — don't change status, don't create GL entry
-          await sql`
+      if (!rule.auto_create_entry) {
+        // Suggestion mode — bulk update all matching transactions in one query
+        let updated: Row[];
+        if (field === 'description') {
+          updated = (await sql`
             UPDATE bank_transactions
-            SET suggested_gl_account_id = ${rule.gl_account_id}::UUID,
-                suggested_supplier_id = ${rule.supplier_id ? Number(rule.supplier_id) : null},
-                suggested_client_id = ${rule.client_id || null}::UUID,
-                suggested_category = ${rule.rule_name}
-            WHERE id = ${tx.id}::UUID AND suggested_gl_account_id IS NULL
-          `;
-          entries.push({
-            bankTxId: String(tx.id),
-            ruleName: String(rule.rule_name),
-            suggestion: true,
-          });
-          applied++;
-          matched = true;
-          break;
+            SET suggested_gl_account_id = ${glAccountId}::UUID,
+                suggested_supplier_id = ${supplierId},
+                suggested_client_id = ${clientId}::UUID,
+                suggested_category = ${ruleName}
+            WHERE bank_account_id = ${bankAccountId}::UUID
+              AND status IN ('imported', 'allocated')
+              AND suggested_gl_account_id IS NULL
+              AND description ILIKE ${pattern}
+            RETURNING id
+          `) as Row[];
+        } else if (field === 'reference') {
+          updated = (await sql`
+            UPDATE bank_transactions
+            SET suggested_gl_account_id = ${glAccountId}::UUID,
+                suggested_supplier_id = ${supplierId},
+                suggested_client_id = ${clientId}::UUID,
+                suggested_category = ${ruleName}
+            WHERE bank_account_id = ${bankAccountId}::UUID
+              AND status IN ('imported', 'allocated')
+              AND suggested_gl_account_id IS NULL
+              AND reference ILIKE ${pattern}
+            RETURNING id
+          `) as Row[];
+        } else {
+          // 'both' — match description OR reference
+          updated = (await sql`
+            UPDATE bank_transactions
+            SET suggested_gl_account_id = ${glAccountId}::UUID,
+                suggested_supplier_id = ${supplierId},
+                suggested_client_id = ${clientId}::UUID,
+                suggested_category = ${ruleName}
+            WHERE bank_account_id = ${bankAccountId}::UUID
+              AND status IN ('imported', 'allocated')
+              AND suggested_gl_account_id IS NULL
+              AND (description ILIKE ${pattern} OR reference ILIKE ${pattern})
+            RETURNING id
+          `) as Row[];
         }
 
-        // Create GL journal entry for this transaction
+        for (const row of updated) {
+          entries.push({ bankTxId: String(row.id), ruleName, suggestion: true });
+        }
+        totalApplied += updated.length;
+        continue;
+      }
+
+      // Auto-create JE mode — must loop per transaction (each needs its own JE)
+      let matchingTxs: Row[];
+      if (field === 'description') {
+        matchingTxs = (await sql`
+          SELECT id, amount, transaction_date, description
+          FROM bank_transactions
+          WHERE bank_account_id = ${bankAccountId}::UUID
+            AND status IN ('imported', 'allocated')
+            AND matched_journal_line_id IS NULL
+            AND description ILIKE ${pattern}
+          ORDER BY transaction_date
+        `) as Row[];
+      } else if (field === 'reference') {
+        matchingTxs = (await sql`
+          SELECT id, amount, transaction_date, description, reference
+          FROM bank_transactions
+          WHERE bank_account_id = ${bankAccountId}::UUID
+            AND status IN ('imported', 'allocated')
+            AND matched_journal_line_id IS NULL
+            AND reference ILIKE ${pattern}
+          ORDER BY transaction_date
+        `) as Row[];
+      } else {
+        matchingTxs = (await sql`
+          SELECT id, amount, transaction_date, description, reference
+          FROM bank_transactions
+          WHERE bank_account_id = ${bankAccountId}::UUID
+            AND status IN ('imported', 'allocated')
+            AND matched_journal_line_id IS NULL
+            AND (description ILIKE ${pattern} OR reference ILIKE ${pattern})
+          ORDER BY transaction_date
+        `) as Row[];
+      }
+
+      for (const tx of matchingTxs) {
         const amount = Math.abs(Number(tx.amount));
         const isDeposit = Number(tx.amount) > 0;
         const entryDesc = rule.description_template
@@ -174,7 +225,6 @@ export async function applyRules(
         }, userId);
         await postJournalEntry(je.id, userId);
 
-        // Get the bank-side journal line to match against
         const bankLineRows = (await sql`
           SELECT id FROM gl_journal_lines
           WHERE journal_entry_id = ${je.id}::UUID AND gl_account_id = ${bankAccountId}::UUID
@@ -184,26 +234,31 @@ export async function applyRules(
         if (bankLineRows[0]) {
           await sql`
             UPDATE bank_transactions
-            SET status = 'matched', matched_journal_line_id = ${bankLineRows[0].id}::UUID
+            SET status = 'allocated', matched_journal_line_id = ${bankLineRows[0].id}::UUID,
+                allocation_type = 'account',
+                allocated_entity_name = ${ruleName},
+                updated_at = NOW()
             WHERE id = ${tx.id}::UUID
           `;
         }
 
-        entries.push({
-          bankTxId: String(tx.id),
-          ruleName: String(rule.rule_name),
-          journalEntryId: je.id,
-        });
-        applied++;
-        matched = true;
-        break; // First matching rule wins
+        entries.push({ bankTxId: String(tx.id), ruleName, journalEntryId: je.id });
+        totalApplied++;
       }
-
-      if (!matched) skipped++;
     }
 
-    log.info('Applied bank rules', { bankAccountId, applied, skipped }, 'accounting');
-    return { applied, skipped, entries };
+    // Count remaining unmatched for the skipped total
+    const remaining = (await sql`
+      SELECT COUNT(*) AS cnt FROM bank_transactions
+      WHERE bank_account_id = ${bankAccountId}::UUID
+        AND status IN ('imported', 'allocated')
+        AND suggested_gl_account_id IS NULL
+        AND matched_journal_line_id IS NULL
+    `) as Row[];
+    const skipped = Number(remaining[0].cnt);
+
+    log.info('Applied bank rules', { bankAccountId, applied: totalApplied, skipped }, 'accounting');
+    return { applied: totalApplied, skipped, entries };
   } catch (err) {
     log.error('Failed to apply bank rules', { error: err }, 'accounting');
     throw err;
