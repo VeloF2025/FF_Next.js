@@ -20,6 +20,10 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { fetchPhotosWithRetry } from '@/modules/activate/services/photoFetchService';
 
+// Only show installation/activation projects — exclude marketing & unknown
+const EXCLUDED_PROJECTS = ['Marketing', 'Marketing Activations', 'Unknown'];
+const EXCLUDED_PROJECTS_SQL = EXCLUDED_PROJECTS.map(p => `'${p}'`).join(', ');
+
 interface UnifiedDrop {
   id: string;
   drop_number: string;
@@ -148,6 +152,9 @@ async function getPaginatedDrops(
 
   // Use IN subquery instead of EXISTS for better performance with index
   conditions.push('u.drop_number IN (SELECT drop_number FROM drops)');
+
+  // Exclude non-installation projects (marketing, unknown)
+  conditions.push(`COALESCE(u.project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})`);
 
   if (searchTerm) {
     conditions.push(`(u.drop_number ILIKE $${paramIndex} OR u.project ILIKE $${paramIndex})`);
@@ -444,6 +451,7 @@ async function calculateSummary(filters?: {
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
       AND drop_number IN (SELECT drop_number FROM drops)
+      AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
   `;
 
   const activatedQuery = `
@@ -567,6 +575,7 @@ async function getProjectStats(filters?: {
     FROM dr_photo_unified_reviews
     ${unifiedCond.whereClause}${unifiedCond.whereClause ? ' AND' : ' WHERE'} (is_oes_only = FALSE OR is_oes_only IS NULL)
       AND drop_number IN (SELECT drop_number FROM drops)
+      AND COALESCE(project, '') NOT IN (${EXCLUDED_PROJECTS_SQL})
     GROUP BY COALESCE(project, 'Unknown')
   `;
 
@@ -838,12 +847,14 @@ async function getActiveProjects(): Promise<string[]> {
       SELECT DISTINCT project as project_name
       FROM dr_photo_unified_reviews
       WHERE project IS NOT NULL AND project != ''
+        AND project NOT IN (${EXCLUDED_PROJECTS_SQL})
 
       UNION
 
       SELECT project_name
       FROM projects
       WHERE project_name IS NOT NULL AND project_name != ''
+        AND project_name NOT IN (${EXCLUDED_PROJECTS_SQL})
     ) combined
     ORDER BY project_name
   `);
