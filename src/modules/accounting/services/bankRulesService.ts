@@ -169,6 +169,9 @@ export async function applyRules(
           WHERE bt.bank_account_id = ${bankAccountId}::UUID
             AND bt.status IN ('imported', 'allocated')
             AND bt.suggested_gl_account_id IS NULL
+            AND bt.suggested_supplier_id IS NULL
+            AND bt.suggested_client_id IS NULL
+            AND bt.suggested_category IS NULL
         ),
         top_match AS (SELECT * FROM matched WHERE rn = 1)
         UPDATE bank_transactions bt

@@ -165,7 +165,9 @@ export default function BankTransactionsPage() {
     if (transactions.length === 0) return;
     const initialSelections: Record<string, RowSelection> = {};
     for (const tx of transactions) {
-      if (rowSelections[tx.id]) continue;
+      // Skip only if user has already picked a specific entity — an empty selection (type set, no entity)
+      // should be overridden by fresh DB suggestions (e.g. after Apply Rules runs)
+      if (rowSelections[tx.id]?.entityId) continue;
       if (tx.suggestedSupplierId) {
         initialSelections[tx.id] = {
           type: 'supplier' as AllocType,
@@ -192,7 +194,14 @@ export default function BankTransactionsPage() {
       }
     }
     if (Object.keys(initialSelections).length > 0) {
-      setRowSelections(prev => ({ ...initialSelections, ...prev }));
+      // Merge: DB suggestions fill in empty slots; existing selections with an entityId win
+      setRowSelections(prev => {
+        const merged = { ...prev };
+        for (const [id, sel] of Object.entries(initialSelections)) {
+          if (!merged[id]?.entityId) merged[id] = sel;
+        }
+        return merged;
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions]);

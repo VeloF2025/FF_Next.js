@@ -1078,7 +1078,6 @@ function mapTxRow(row: Row): BankTransaction {
     excludeReason: row.exclude_reason ? String(row.exclude_reason) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
     suggestedGlAccountId: row.suggested_gl_account_id ? String(row.suggested_gl_account_id) : undefined,
-    suggestedSupplierId: row.suggested_supplier_id ? String(row.suggested_supplier_id) : undefined,
     suggestedCategory: row.suggested_category ? String(row.suggested_category) : undefined,
     suggestedCostCentre: row.suggested_cost_centre ? String(row.suggested_cost_centre) : undefined,
     createdAt: String(row.created_at),
