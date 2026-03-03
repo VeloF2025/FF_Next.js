@@ -3,15 +3,14 @@
  *
  * Orchestrates the full LLM-powered meeting analysis pipeline:
  *   1. Load raw transcript from `meetings.raw_transcript` (or `meeting_transcripts` fallback).
- *   2. Chunk the transcript to respect Claude's context window.
- *   3. Call Claude Sonnet for each chunk and merge the structured results.
+ *   2. Chunk the transcript to respect the model's context window.
+ *   3. Call OpenAI GPT-4o for each chunk and merge the structured results.
  *   4. Persist the summary back to `meetings.summary` and upsert action items.
  *
  * // WORKING: single-chunk and multi-chunk paths; graceful no-transcript fallback
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient } from './client';
+import { getOpenAIClient } from './client';
 import { chunkTranscript } from './chunker';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
@@ -168,12 +167,12 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
     : '';
 
   // ------------------------------------------------------------------
-  // 5. Chunk + call Claude for each chunk
+  // 5. Chunk + call GPT-4o for each chunk
   // ------------------------------------------------------------------
   const chunks = chunkTranscript(transcript);
   log.info('Processing meeting', { meetingId, chunks: chunks.length, transcriptLength: transcript.length }, logger);
 
-  const client = getAnthropicClient();
+  const client = getOpenAIClient();
   let combinedSummary: MeetingSummary | null = null;
 
   for (const chunk of chunks) {
@@ -190,17 +189,17 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
       .filter(Boolean)
       .join('\n');
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
     });
 
-    const responseText = response.content
-      .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    const responseText = response.choices[0]?.message?.content ?? '';
 
     let parsed: MeetingSummary;
     try {
