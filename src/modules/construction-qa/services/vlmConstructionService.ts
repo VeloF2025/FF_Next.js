@@ -11,7 +11,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';
-import { recordCorrectExtraction } from '@/services/vlmLearningService';
+import { recordCorrectExtraction, getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 
 const sql = neon(process.env.DATABASE_URL!);
 const MODULE = 'cqa-vlm';
@@ -92,6 +92,23 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
 
     const checklist = getChecklist(discipline);
 
+    // Fetch few-shot correction examples for prompt enhancement (non-blocking on failure)
+    let fewShotSection = '';
+    try {
+      const fewShotExamples = await getVlmFewShotExamples({
+        module: 'construction_qa',
+        analysisType: 'construction_photo_qa',
+        context: { discipline },
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      fewShotSection = buildVlmFewShotPrompt(fewShotExamples, 'markdown');
+    } catch (fewShotErr) {
+      log.warn('Few-shot retrieval failed, continuing without', {
+        error: (fewShotErr as Error).message,
+      }, MODULE);
+    }
+
     // Process each photo
     for (const photo of photos) {
       try {
@@ -99,7 +116,7 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
         const stepDef = step ? checklist.find(s => s.step === step) : null;
 
         // Build the prompt for this photo
-        const prompt = buildPhotoPrompt(discipline, step, stepDef ?? null);
+        const prompt = buildPhotoPrompt(discipline, step, stepDef ?? null, fewShotSection);
 
         // Build the photo URL for VLM
         const photoUrl = buildPhotoUrl(photo.storage_key, photo.source);
@@ -298,14 +315,19 @@ function parseVlmResponse(text: string, step: number, stepLabel: string): VlmSte
 /**
  * Build discipline-specific VLM prompt for a checklist step.
  */
-function buildPhotoPrompt(discipline: Discipline, step: number | null, stepDef: { label: string; vlmCheck: string; notes?: string } | null): string {
+function buildPhotoPrompt(
+  discipline: Discipline,
+  step: number | null,
+  stepDef: { label: string; vlmCheck: string; notes?: string } | null,
+  fewShotSection = '',
+): string {
   const base = `You are a construction quality assurance AI inspector for fiber network installations.
 Discipline: ${discipline}
 ${step ? `Checklist Step ${step}: ${stepDef?.label || 'Unknown'}` : 'General photo evaluation'}
 
 ${stepDef?.vlmCheck ? `Check: ${stepDef.vlmCheck}` : ''}
 ${stepDef?.notes ? `Notes: ${stepDef.notes}` : ''}
-
+${fewShotSection ? `\n${fewShotSection}\n` : ''}
 Evaluate this photo and respond with ONLY a JSON object:
 {
   "valid": true/false,
