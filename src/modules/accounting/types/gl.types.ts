@@ -134,6 +134,8 @@ export interface GLAccount {
   displayOrder: number;
   /** Actual bank account number (only for bank-subtype accounts) */
   bankAccountNumber?: string;
+  /** Default VAT treatment for transactions posted to this account */
+  defaultVatCode?: 'none' | 'standard' | 'zero_rated' | 'exempt';
   createdAt: string;
   updatedAt: string;
   // Tree display

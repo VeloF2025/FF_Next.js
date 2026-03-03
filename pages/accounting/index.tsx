@@ -29,8 +29,12 @@ import {
   CreditCard,
   Landmark,
   Database,
+  Pencil,
+  Trash2,
+  Save,
+  X,
 } from 'lucide-react';
-import type { GLAccount, FiscalPeriod, JournalEntry, TrialBalanceRow } from '@/modules/accounting/types/gl.types';
+import type { GLAccount, GLAccountType, FiscalPeriod, JournalEntry, TrialBalanceRow } from '@/modules/accounting/types/gl.types';
 
 type AccountingTab = 'overview' | 'chart-of-accounts' | 'journal-entries' | 'fiscal-periods' | 'reports';
 
@@ -587,29 +591,143 @@ function OverviewTab() {
 // Chart of Accounts Tab
 // =====================================================
 
+const SUBTYPES_BY_TYPE: Record<string, { value: string; label: string }[]> = {
+  asset: [
+    { value: 'bank', label: 'Bank' },
+    { value: 'receivable', label: 'Receivable' },
+    { value: 'inventory', label: 'Inventory' },
+    { value: 'fixed_asset', label: 'Fixed Asset' },
+    { value: 'accumulated_depreciation', label: 'Accum. Depreciation' },
+    { value: 'other_current_asset', label: 'Other Current Asset' },
+    { value: 'other', label: 'Other' },
+  ],
+  liability: [
+    { value: 'payable', label: 'Payable' },
+    { value: 'tax', label: 'Tax' },
+    { value: 'other_current_liability', label: 'Other Current Liability' },
+    { value: 'other', label: 'Other' },
+  ],
+  equity: [
+    { value: 'equity', label: 'Equity' },
+    { value: 'retained_earnings', label: 'Retained Earnings' },
+    { value: 'other', label: 'Other' },
+  ],
+  revenue: [
+    { value: 'revenue', label: 'Revenue' },
+    { value: 'other', label: 'Other' },
+  ],
+  expense: [
+    { value: 'cost_of_sales', label: 'Cost of Sales' },
+    { value: 'operating_expense', label: 'Operating Expense' },
+    { value: 'other', label: 'Other' },
+  ],
+};
+
 function ChartOfAccountsTab() {
   const [accounts, setAccounts] = useState<GLAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'flat' | 'tree'>('flat');
   const [filterType, setFilterType] = useState<string>('all');
+  const [showInactive, setShowInactive] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [addForm, setAddForm] = useState({
+    accountCode: '',
+    accountName: '',
+    accountType: 'asset' as GLAccountType,
+    accountSubtype: '',
+    parentAccountId: '',
+    description: '',
+  });
 
   useEffect(() => {
     loadAccounts();
-  }, [viewMode]);
+  }, [viewMode, showInactive]);
 
   const loadAccounts = async () => {
     setIsLoading(true);
     try {
-      const url = viewMode === 'tree'
-        ? '/api/accounting/chart-of-accounts?view=tree'
-        : '/api/accounting/chart-of-accounts';
-      const res = await fetch(url);
+      const params = new URLSearchParams();
+      if (viewMode === 'tree') params.set('view', 'tree');
+      if (showInactive) params.set('includeInactive', 'true');
+      const res = await fetch(`/api/accounting/chart-of-accounts?${params}`);
       const data = await res.json();
       setAccounts(data.data || data || []);
     } catch (err) {
       log.error('Failed to load accounts', { error: err }, 'accounting-ui');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddAccount = async () => {
+    if (!addForm.accountCode || !addForm.accountName) return;
+    setIsSaving(true);
+    try {
+      const normalBalance = (addForm.accountType === 'asset' || addForm.accountType === 'expense') ? 'debit' : 'credit';
+      const res = await fetch('/api/accounting/chart-of-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          accountCode: addForm.accountCode,
+          accountName: addForm.accountName,
+          accountType: addForm.accountType,
+          accountSubtype: addForm.accountSubtype || undefined,
+          parentAccountId: addForm.parentAccountId || undefined,
+          description: addForm.description || undefined,
+          normalBalance,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to create account');
+      }
+      setShowAddForm(false);
+      setAddForm({ accountCode: '', accountName: '', accountType: 'asset', accountSubtype: '', parentAccountId: '', description: '' });
+      await loadAccounts();
+    } catch (err) {
+      log.error('Failed to create account', { error: err }, 'accounting-ui');
+      alert(err instanceof Error ? err.message : 'Failed to create account');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateAccount = async (id: string, data: { accountName: string; description: string; defaultVatCode: string }) => {
+    try {
+      const res = await fetch('/api/accounting/chart-of-accounts', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id, ...data }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to update account');
+      }
+      await loadAccounts();
+    } catch (err) {
+      log.error('Failed to update account', { error: err }, 'accounting-ui');
+      alert(err instanceof Error ? err.message : 'Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    if (!window.confirm('Deactivate this account? It will be hidden from the chart of accounts.')) return;
+    try {
+      const res = await fetch(`/api/accounting/chart-of-accounts-detail?id=${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Failed to delete account');
+      }
+      await loadAccounts();
+    } catch (err) {
+      log.error('Failed to delete account', { error: err }, 'accounting-ui');
+      alert(err instanceof Error ? err.message : 'Failed to delete account');
     }
   };
 
@@ -627,6 +745,9 @@ function ChartOfAccountsTab() {
       default: return 'bg-gray-500/20 text-gray-400';
     }
   };
+
+  const subtypes = SUBTYPES_BY_TYPE[addForm.accountType] || [];
+  const parentOptions = accounts.filter(a => a.isActive);
 
   return (
     <div className="space-y-4">
@@ -668,11 +789,131 @@ function ChartOfAccountsTab() {
               Tree
             </button>
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-[var(--ff-text-secondary)] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={e => setShowInactive(e.target.checked)}
+              className="rounded border-[var(--ff-border-light)]"
+            />
+            Show inactive
+          </label>
         </div>
-        <p className="text-sm text-[var(--ff-text-secondary)]">
-          {filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}
-        </p>
+
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-[var(--ff-text-secondary)]">
+            {filteredAccounts.length} account{filteredAccounts.length !== 1 ? 's' : ''}
+          </p>
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            Add Account
+          </button>
+        </div>
       </div>
+
+      {/* Add Account Form */}
+      {showAddForm && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-emerald-500/30 p-4 space-y-4">
+          <h4 className="text-sm font-semibold text-[var(--ff-text-primary)]">New Account</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Code *</label>
+              <input
+                type="text"
+                value={addForm.accountCode}
+                onChange={e => setAddForm(f => ({ ...f, accountCode: e.target.value }))}
+                placeholder="e.g. 1100"
+                className="ff-input w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Name *</label>
+              <input
+                type="text"
+                value={addForm.accountName}
+                onChange={e => setAddForm(f => ({ ...f, accountName: e.target.value }))}
+                placeholder="e.g. Accounts Receivable"
+                className="ff-input w-full text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Type *</label>
+              <select
+                value={addForm.accountType}
+                onChange={e => setAddForm(f => ({ ...f, accountType: e.target.value as GLAccountType, accountSubtype: '' }))}
+                className="ff-select w-full text-sm"
+              >
+                <option value="asset">Asset</option>
+                <option value="liability">Liability</option>
+                <option value="equity">Equity</option>
+                <option value="revenue">Revenue</option>
+                <option value="expense">Expense</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Subtype</label>
+              <select
+                value={addForm.accountSubtype}
+                onChange={e => setAddForm(f => ({ ...f, accountSubtype: e.target.value }))}
+                className="ff-select w-full text-sm"
+              >
+                <option value="">None</option>
+                {subtypes.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Parent Account</label>
+              <select
+                value={addForm.parentAccountId}
+                onChange={e => setAddForm(f => ({ ...f, parentAccountId: e.target.value }))}
+                className="ff-select w-full text-sm"
+              >
+                <option value="">None (top-level)</option>
+                {parentOptions.map(a => (
+                  <option key={a.id} value={a.id}>{a.accountCode} - {a.accountName}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">Description</label>
+              <input
+                type="text"
+                value={addForm.description}
+                onChange={e => setAddForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Optional description"
+                className="ff-input w-full text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-[var(--ff-text-tertiary)]">
+              Normal balance: <span className="font-medium">{addForm.accountType === 'asset' || addForm.accountType === 'expense' ? 'Debit' : 'Credit'}</span> (auto-set from type)
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="px-3 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddAccount}
+                disabled={isSaving || !addForm.accountCode || !addForm.accountName}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {isSaving ? 'Creating...' : 'Create Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
@@ -689,12 +930,22 @@ function ChartOfAccountsTab() {
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">Account Name</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">Normal Balance</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">VAT Default</th>
                   <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">System</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-[var(--ff-text-secondary)]">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAccounts.map(account => (
-                  <AccountRow key={account.id} account={account} level={0} viewMode={viewMode} accountTypeColor={accountTypeColor} />
+                  <AccountRow
+                    key={account.id}
+                    account={account}
+                    level={0}
+                    viewMode={viewMode}
+                    accountTypeColor={accountTypeColor}
+                    onUpdate={handleUpdateAccount}
+                    onDelete={handleDeleteAccount}
+                  />
                 ))}
               </tbody>
             </table>
@@ -710,24 +961,86 @@ function AccountRow({
   level,
   viewMode,
   accountTypeColor,
+  onUpdate,
+  onDelete,
 }: {
   account: GLAccount;
   level: number;
   viewMode: string;
   accountTypeColor: (type: string) => string;
+  onUpdate: (id: string, data: { accountName: string; description: string; defaultVatCode: string }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(account.accountName);
+  const [editDesc, setEditDesc] = useState(account.description || '');
+  const [editVatCode, setEditVatCode] = useState<string>(account.defaultVatCode || 'none');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await onUpdate(account.id, { accountName: editName, description: editDesc, defaultVatCode: editVatCode });
+    setIsSaving(false);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditName(account.accountName);
+    setEditDesc(account.description || '');
+    setEditVatCode(account.defaultVatCode || 'none');
+    setIsEditing(false);
+  };
+
+  const indent = viewMode === 'tree' ? `${level * 1.5}rem` : '0';
+
   return (
     <>
-      <tr className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors">
+      <tr className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors ${!account.isActive ? 'opacity-50' : ''}`}>
         <td className="px-6 py-3 text-sm font-mono font-medium text-[var(--ff-text-primary)]">
-          <span style={{ paddingLeft: viewMode === 'tree' ? `${level * 1.5}rem` : 0 }}>
-            {account.accountCode}
-          </span>
+          <span style={{ paddingLeft: indent }}>{account.accountCode}</span>
         </td>
         <td className="px-6 py-3 text-sm text-[var(--ff-text-primary)]">
-          <span style={{ paddingLeft: viewMode === 'tree' ? `${level * 1.5}rem` : 0 }}>
-            {account.accountName}
-          </span>
+          {isEditing ? (
+            <div className="space-y-1" style={{ paddingLeft: indent }}>
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="ff-input w-full text-sm"
+                autoFocus
+              />
+              <input
+                type="text"
+                value={editDesc}
+                onChange={e => setEditDesc(e.target.value)}
+                placeholder="Description (optional)"
+                className="ff-input w-full text-xs"
+              />
+              <select
+                value={editVatCode}
+                onChange={e => setEditVatCode(e.target.value)}
+                className="ff-select w-full text-xs"
+                title="Default VAT type for transactions posted to this account"
+              >
+                <option value="none">No VAT (default)</option>
+                <option value="standard">Standard 15%</option>
+                <option value="zero_rated">Zero Rated</option>
+                <option value="exempt">Exempt</option>
+              </select>
+            </div>
+          ) : (
+            <div style={{ paddingLeft: indent }}>
+              <span>{account.accountName}</span>
+              {!account.isActive && (
+                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/20 text-gray-400">
+                  Inactive
+                </span>
+              )}
+              {account.description && (
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">{account.description}</p>
+              )}
+            </div>
+          )}
         </td>
         <td className="px-6 py-3">
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase ${accountTypeColor(account.accountType)}`}>
@@ -737,14 +1050,67 @@ function AccountRow({
         <td className="px-6 py-3 text-sm text-[var(--ff-text-secondary)] capitalize">
           {account.normalBalance}
         </td>
+        <td className="px-6 py-3 text-sm">
+          {account.defaultVatCode && account.defaultVatCode !== 'none'
+            ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400">
+                {{ standard: '15%', zero_rated: 'Zero Rated', exempt: 'Exempt' }[account.defaultVatCode] ?? account.defaultVatCode}
+              </span>
+            : <span className="text-[var(--ff-text-tertiary)] text-xs">—</span>}
+        </td>
         <td className="px-6 py-3 text-center">
           {account.isSystemAccount && (
             <Lock className="h-4 w-4 text-[var(--ff-text-tertiary)] mx-auto" />
           )}
         </td>
+        <td className="px-6 py-3 text-right">
+          {account.isSystemAccount ? null : isEditing ? (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="p-1.5 rounded text-emerald-400 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+                title="Save"
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              </button>
+              <button
+                onClick={handleCancel}
+                className="p-1.5 rounded text-[var(--ff-text-tertiary)] hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                title="Cancel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => { setIsEditing(true); setEditName(account.accountName); setEditDesc(account.description || ''); }}
+                className="p-1.5 rounded text-[var(--ff-text-tertiary)] hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                title="Edit"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onDelete(account.id)}
+                className="p-1.5 rounded text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Deactivate"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </td>
       </tr>
       {viewMode === 'tree' && account.children?.map(child => (
-        <AccountRow key={child.id} account={child} level={level + 1} viewMode={viewMode} accountTypeColor={accountTypeColor} />
+        <AccountRow
+          key={child.id}
+          account={child}
+          level={level + 1}
+          viewMode={viewMode}
+          accountTypeColor={accountTypeColor}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+        />
       ))}
     </>
   );

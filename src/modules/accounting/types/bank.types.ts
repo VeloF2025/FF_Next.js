@@ -108,19 +108,22 @@ export interface AutoMatchResult {
 export type RuleMatchField = 'description' | 'reference' | 'both';
 export type RuleMatchType = 'contains' | 'starts_with' | 'ends_with' | 'exact';
 
+export type RuleVatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
+
 export interface BankCategorisationRule {
   id: string;
   ruleName: string;
   matchField: RuleMatchField;
   matchType: RuleMatchType;
   matchPattern: string;
-  glAccountId: string;
+  glAccountId?: string;
   supplierId?: string;
   clientId?: string;
   descriptionTemplate?: string;
   priority: number;
   isActive: boolean;
   autoCreateEntry: boolean;
+  vatCode: RuleVatCode;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
@@ -142,6 +145,7 @@ export interface RuleCreateInput {
   descriptionTemplate?: string;
   priority?: number;
   autoCreateEntry?: boolean;
+  vatCode?: RuleVatCode;
 }
 
 export interface RuleApplyResult {

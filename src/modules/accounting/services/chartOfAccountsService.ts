@@ -22,23 +22,36 @@ export interface UpdateAccountInput {
   description?: string;
   isActive?: boolean;
   displayOrder?: number;
+  defaultVatCode?: 'none' | 'standard' | 'zero_rated' | 'exempt';
 }
 
 interface AccountTreeNode extends GLAccount {
   children: AccountTreeNode[];
 }
 
-export async function getChartOfAccounts(): Promise<GLAccount[]> {
+export async function getChartOfAccounts(includeInactive = false): Promise<GLAccount[]> {
   try {
-    const rows = await sql`
-      SELECT a.*,
-        p.account_code AS parent_code,
-        p.account_name AS parent_name
-      FROM gl_accounts a
-      LEFT JOIN gl_accounts p ON p.id = a.parent_account_id
-      WHERE a.is_active = true
-      ORDER BY a.account_code
-    `;
+    let rows;
+    if (includeInactive) {
+      rows = await sql`
+        SELECT a.*,
+          p.account_code AS parent_code,
+          p.account_name AS parent_name
+        FROM gl_accounts a
+        LEFT JOIN gl_accounts p ON p.id = a.parent_account_id
+        ORDER BY a.account_code
+      `;
+    } else {
+      rows = await sql`
+        SELECT a.*,
+          p.account_code AS parent_code,
+          p.account_name AS parent_name
+        FROM gl_accounts a
+        LEFT JOIN gl_accounts p ON p.id = a.parent_account_id
+        WHERE a.is_active = true
+        ORDER BY a.account_code
+      `;
+    }
     return (rows as { [key: string]: unknown }[]).map(mapRow);
   } catch (err) {
     log.error('Failed to get chart of accounts', { error: err }, 'accounting');
@@ -46,8 +59,8 @@ export async function getChartOfAccounts(): Promise<GLAccount[]> {
   }
 }
 
-export async function getAccountTree(): Promise<AccountTreeNode[]> {
-  const accounts = await getChartOfAccounts();
+export async function getAccountTree(includeInactive = false): Promise<AccountTreeNode[]> {
+  const accounts = await getChartOfAccounts(includeInactive);
   const map = new Map<string, AccountTreeNode>();
   const roots: AccountTreeNode[] = [];
 
@@ -146,7 +159,8 @@ export async function updateAccount(id: string, input: UpdateAccountInput): Prom
         account_name = COALESCE(${input.accountName || null}, account_name),
         description = COALESCE(${input.description ?? null}, description),
         is_active = COALESCE(${input.isActive ?? null}, is_active),
-        display_order = COALESCE(${input.displayOrder ?? null}, display_order)
+        display_order = COALESCE(${input.displayOrder ?? null}, display_order),
+        default_vat_code = COALESCE(${input.defaultVatCode || null}, default_vat_code)
       WHERE id = ${id}
       RETURNING *
     `;
@@ -234,6 +248,7 @@ function mapRow(row: any): GLAccount {
     level: Number(row.level),
     displayOrder: Number(row.display_order),
     bankAccountNumber: row.bank_account_number ? String(row.bank_account_number) : undefined,
+    defaultVatCode: (row.default_vat_code || 'none') as GLAccount['defaultVatCode'],
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

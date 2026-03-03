@@ -8,7 +8,14 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Search, BookmarkPlus, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import type { BankTx, SelectOption } from './BankTxTable';
-import type { RuleMatchType } from '@/modules/accounting/types/bank.types';
+import type { RuleMatchType, RuleVatCode } from '@/modules/accounting/types/bank.types';
+
+const VAT_OPTIONS: { value: RuleVatCode; label: string }[] = [
+  { value: 'none', label: 'No VAT' },
+  { value: 'standard', label: 'Standard 15%' },
+  { value: 'zero_rated', label: 'Zero Rated' },
+  { value: 'exempt', label: 'Exempt' },
+];
 
 type AllocType = 'account' | 'supplier' | 'customer';
 
@@ -124,6 +131,7 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
   const [autoCreateEntry, setAutoCreateEntry] = useState(false);
 
   const [allocType, setAllocType] = useState<AllocType>('account');
+  const [vatCode, setVatCode] = useState<RuleVatCode>('none');
   const [selectedGl, setSelectedGl] = useState<SelectOption | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<SelectOption | null>(null);
   const [selectedClient, setSelectedClient] = useState<SelectOption | null>(null);
@@ -172,6 +180,7 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
         matchType,
         matchPattern: pattern.trim(),
         autoCreateEntry,
+        vatCode,
       };
       // GL account only needed for 'account' type — supplier/customer use AP/AR automatically
       if (needsGlAccount && selectedGl) body.glAccountId = selectedGl.id;
@@ -306,6 +315,27 @@ export function CreateRuleModal({ transaction, bankAccountId, glAccounts, suppli
               onSelect={setSelectedClient}
             />
           )}
+
+          {/* VAT */}
+          <div>
+            <label className="text-xs text-[var(--ff-text-tertiary)] mb-1 block">VAT Treatment</label>
+            <div className="flex gap-1">
+              {VAT_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setVatCode(opt.value)}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                    vatCode === opt.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[var(--ff-bg-primary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] border border-[var(--ff-border-light)]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Rule name */}
           <div>

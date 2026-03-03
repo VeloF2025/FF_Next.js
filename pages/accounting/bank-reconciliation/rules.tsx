@@ -8,6 +8,15 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil, Search, X } from 'lucide-react';
 
+type VatCode = 'none' | 'standard' | 'zero_rated' | 'exempt';
+
+const VAT_LABELS: Record<VatCode, string> = {
+  none: 'No VAT',
+  standard: '15%',
+  zero_rated: 'Zero Rated',
+  exempt: 'Exempt',
+};
+
 interface Rule {
   id: string;
   ruleName: string;
@@ -25,9 +34,10 @@ interface Rule {
   priority: number;
   isActive: boolean;
   autoCreateEntry: boolean;
+  vatCode: VatCode;
 }
 
-interface GLAccount { id: string; accountCode: string; accountName: string }
+interface GLAccount { id: string; accountCode: string; accountName: string; defaultVatCode?: string }
 interface Supplier { id: string; name: string }
 interface Client { id: string; name: string }
 
@@ -94,7 +104,10 @@ export default function BankRulesPage() {
     fetch('/api/accounting/chart-of-accounts', { credentials: 'include' }).then(r => r.json()).then(res => {
       const d = res.data || res;
       const list = Array.isArray(d) ? d : d.accounts || d.items || [];
-      setAccounts(list.map(mapAccount));
+      setAccounts(list.map((a: Record<string, unknown>) => ({
+        ...mapAccount(a),
+        defaultVatCode: String(a.defaultVatCode || a.default_vat_code || 'none'),
+      })));
     });
     fetch('/api/accounting/bank-accounts', { credentials: 'include' }).then(r => r.json()).then(res => {
       const list = Array.isArray(res.data) ? res.data : [];
@@ -154,7 +167,7 @@ export default function BankRulesPage() {
     : rules;
 
   const resetForm = () => {
-    setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', clientId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
+    setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', clientId: '', vatCode: 'none', descriptionTemplate: '', priority: '100' });
     setEditingRule(null);
     setShowForm(false);
     setPreviewCount(null);
@@ -169,7 +182,7 @@ export default function BankRulesPage() {
       glAccountId: rule.glAccountId || '',
       supplierId: rule.supplierId || '',
       clientId: rule.clientId || '',
-      vatCode: '',
+      vatCode: rule.vatCode || 'none',
       descriptionTemplate: rule.descriptionTemplate || '',
       priority: String(rule.priority),
     });
@@ -188,6 +201,7 @@ export default function BankRulesPage() {
         clientId: form.clientId || undefined,
         descriptionTemplate: form.descriptionTemplate || undefined,
         priority: Number(form.priority) || 100,
+        vatCode: form.vatCode || 'none',
       };
 
       if (editingRule) {
@@ -324,7 +338,23 @@ export default function BankRulesPage() {
                     </p>
                   )}
                 </div>
-                <select value={form.glAccountId} onChange={e => setForm(f => ({ ...f, glAccountId: e.target.value }))} className="ff-select" required={!form.supplierId && !form.clientId}>
+                <select
+                  value={form.glAccountId}
+                  onChange={e => {
+                    const acct = accounts.find(a => a.id === e.target.value);
+                    setForm(f => ({
+                      ...f,
+                      glAccountId: e.target.value,
+                      // Auto-fill VAT from account default when user picks an account
+                      // (only if VAT hasn't been manually changed from 'none')
+                      vatCode: acct?.defaultVatCode && f.vatCode === 'none'
+                        ? acct.defaultVatCode as VatCode
+                        : f.vatCode,
+                    }));
+                  }}
+                  className="ff-select"
+                  required={!form.supplierId && !form.clientId}
+                >
                   <option value="">{form.supplierId || form.clientId ? 'No GL Account (optional)' : 'Select GL Account *'}</option>
                   {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
                 </select>
@@ -399,14 +429,15 @@ export default function BankRulesPage() {
                 <th className="px-4 py-3">Pattern</th>
                 <th className="px-4 py-3">GL Account</th>
                 <th className="px-4 py-3">Supplier / Customer</th>
+                <th className="px-4 py-3">VAT</th>
                 <th className="px-4 py-3">Priority</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && rules.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
-                {!loading && rules.length > 0 && filteredRules.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules match &ldquo;{search}&rdquo;</td></tr>}
+                {loading && <tr><td colSpan={10} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
+                {!loading && rules.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
+                {!loading && rules.length > 0 && filteredRules.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules match &ldquo;{search}&rdquo;</td></tr>}
                 {filteredRules.map(rule => (
                   <tr key={rule.id} className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50 ${selected.has(rule.id) ? 'bg-yellow-500/5' : ''}`}>
                     <td className="px-3 py-3">
@@ -437,6 +468,11 @@ export default function BankRulesPage() {
                         : rule.clientName
                         ? <span><span className="text-purple-400 text-[10px] mr-1">CUST</span>{rule.clientName}</span>
                         : <span className="text-[var(--ff-text-tertiary)]">{'\u2014'}</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {rule.vatCode && rule.vatCode !== 'none'
+                        ? <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-400">{VAT_LABELS[rule.vatCode]}</span>
+                        : <span className="text-[var(--ff-text-tertiary)] text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{rule.priority}</td>
                     <td className="px-4 py-3">

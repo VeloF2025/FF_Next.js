@@ -19,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const { ruleName, matchField, matchType, matchPattern, glAccountId, supplierId, clientId, descriptionTemplate, priority, autoCreateEntry } = req.body;
+    const { ruleName, matchField, matchType, matchPattern, glAccountId, supplierId, clientId, descriptionTemplate, priority, autoCreateEntry, vatCode } = req.body;
     if (!ruleName || !matchField || !matchType || !matchPattern) {
       return apiResponse.badRequest(res, 'ruleName, matchField, matchType, and matchPattern are required');
     }
@@ -33,6 +33,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       descriptionTemplate: descriptionTemplate || undefined,
       priority: priority || 100,
       autoCreateEntry: autoCreateEntry !== false,
+      vatCode: vatCode || 'none',
     }, userId);
     return apiResponse.success(res, rule);
   }

@@ -30,17 +30,18 @@ export async function getRules(): Promise<BankCategorisationRule[]> {
 }
 
 export async function createRule(input: RuleCreateInput, userId: string): Promise<BankCategorisationRule> {
+  const vatCode = input.vatCode || 'none';
   const rows = (await sql`
     INSERT INTO bank_categorisation_rules (
       rule_name, match_field, match_type, match_pattern,
       gl_account_id, supplier_id, client_id, description_template,
-      priority, auto_create_entry, created_by
+      priority, auto_create_entry, vat_code, created_by
     ) VALUES (
       ${input.ruleName}, ${input.matchField}, ${input.matchType}, ${input.matchPattern},
       ${input.glAccountId || null}::UUID, ${input.supplierId ? Number(input.supplierId) : null},
       ${input.clientId || null}::UUID,
       ${input.descriptionTemplate || null},
-      ${input.priority || 100}, ${input.autoCreateEntry !== false}, ${userId}::UUID
+      ${input.priority || 100}, ${input.autoCreateEntry !== false}, ${vatCode}, ${userId}::UUID
     ) RETURNING *
   `) as Row[];
   log.info('Created bank rule', { id: rows[0].id, ruleName: input.ruleName }, 'accounting');
@@ -59,7 +60,8 @@ export async function updateRule(id: string, input: Partial<RuleCreateInput>): P
       client_id = COALESCE(${input.clientId || null}::UUID, client_id),
       description_template = COALESCE(${input.descriptionTemplate || null}, description_template),
       priority = COALESCE(${input.priority || null}, priority),
-      auto_create_entry = COALESCE(${input.autoCreateEntry ?? null}, auto_create_entry)
+      auto_create_entry = COALESCE(${input.autoCreateEntry ?? null}, auto_create_entry),
+      vat_code = COALESCE(${input.vatCode || null}, vat_code)
     WHERE id = ${id}::UUID RETURNING *
   `) as Row[];
   if (!rows[0]) throw new Error(`Rule ${id} not found`);
@@ -85,6 +87,15 @@ export async function toggleRule(id: string, isActive: boolean): Promise<void> {
 }
 
 // ── Apply Rules ─────────────────────────────────────────────────────────────
+
+/** Lookup a GL account UUID by account code */
+async function glAccountByCode(code: string): Promise<string> {
+  const rows = (await sql`
+    SELECT id FROM gl_accounts WHERE account_code = ${code} AND is_active = TRUE LIMIT 1
+  `) as Row[];
+  if (rows.length === 0) throw new Error(`GL account ${code} not found`);
+  return String(rows[0].id);
+}
 
 /** Convert rule match type to SQL ILIKE pattern */
 function toSqlPattern(matchType: string, matchPattern: string): string {
@@ -217,21 +228,43 @@ export async function applyRules(
       }
 
       for (const tx of matchingTxs) {
-        const amount = Math.abs(Number(tx.amount));
+        const totalAmount = Math.abs(Number(tx.amount));
         const isDeposit = Number(tx.amount) > 0;
         const entryDesc = rule.description_template
-          ? String(rule.description_template).replace('{description}', String(tx.description || '')).replace('{amount}', amount.toFixed(2))
+          ? String(rule.description_template).replace('{description}', String(tx.description || '')).replace('{amount}', totalAmount.toFixed(2))
           : `Bank: ${tx.description || 'Categorised by rule'}`;
 
-        const lines: JournalLineInput[] = isDeposit
-          ? [
-              { glAccountId: bankAccountId, debit: amount, credit: 0, description: entryDesc },
-              { glAccountId: String(rule.gl_account_id), debit: 0, credit: amount, description: entryDesc },
-            ]
-          : [
-              { glAccountId: String(rule.gl_account_id), debit: amount, credit: 0, description: entryDesc },
-              { glAccountId: bankAccountId, debit: 0, credit: amount, description: entryDesc },
-            ];
+        // VAT splitting — mirrors allocateTransaction logic
+        const vatCode = String(rule.vat_code || 'none');
+        const hasVat = vatCode === 'standard';
+        const netAmount = hasVat ? Math.round((totalAmount * 100 / 115) * 100) / 100 : totalAmount;
+        const vatAmount = hasVat ? Math.round((totalAmount - netAmount) * 100) / 100 : 0;
+        const vatAccountCode = isDeposit ? '2120' : '1140';
+        const mapVatType = vatCode === 'standard' ? 'standard' as const
+          : vatCode === 'zero_rated' ? 'zero_rated' as const
+          : vatCode === 'exempt' ? 'exempt' as const
+          : undefined;
+
+        let lines: JournalLineInput[];
+        if (isDeposit) {
+          lines = [
+            { glAccountId: bankAccountId, debit: totalAmount, credit: 0, description: entryDesc },
+            { glAccountId: String(rule.gl_account_id), debit: 0, credit: netAmount, description: entryDesc, vatType: mapVatType },
+          ];
+          if (hasVat) {
+            const vatAcctId = await glAccountByCode(vatAccountCode);
+            lines.splice(1, 0, { glAccountId: vatAcctId, debit: 0, credit: vatAmount, description: `VAT @ 15%`, vatType: 'standard' });
+          }
+        } else {
+          lines = [
+            { glAccountId: String(rule.gl_account_id), debit: netAmount, credit: 0, description: entryDesc, vatType: mapVatType },
+            { glAccountId: bankAccountId, debit: 0, credit: totalAmount, description: entryDesc },
+          ];
+          if (hasVat) {
+            const vatAcctId = await glAccountByCode(vatAccountCode);
+            lines.splice(1, 0, { glAccountId: vatAcctId, debit: vatAmount, credit: 0, description: `VAT @ 15%`, vatType: 'standard' });
+          }
+        }
 
         const je = await createJournalEntry({
           entryDate: tx.transaction_date instanceof Date
@@ -299,6 +332,7 @@ function mapRuleRow(row: Row): BankCategorisationRule {
     priority: Number(row.priority),
     isActive: Boolean(row.is_active),
     autoCreateEntry: Boolean(row.auto_create_entry),
+    vatCode: (row.vat_code || 'none') as BankCategorisationRule['vatCode'],
     createdBy: row.created_by ? String(row.created_by) : undefined,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
