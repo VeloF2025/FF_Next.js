@@ -16,7 +16,6 @@ import {
   Gauge,
   Fuel,
   CheckCircle2,
-  ImageIcon,
   RefreshCw,
   AlertCircle,
   Car,
@@ -63,11 +62,8 @@ export function VehicleCalibrationModal({
   const [fuelLevel, setFuelLevel] = useState<number | null>(null);
   const [dashboardPhoto, setDashboardPhoto] = useState<string | null>(null);
 
-  // Camera state
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  // File input ref (uses native camera — no getUserMedia permission needed)
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Validation
   const odometerValue = parseInt(odometer, 10);
@@ -77,77 +73,31 @@ export function VehicleCalibrationModal({
 
   const canComplete = isValidOdometer && isValidFuel && hasPhoto;
 
-  // Start camera
-  const startCamera = useCallback(async () => {
-    try {
-      setCameraError(null);
-      setIsCapturing(true);
+  // Handle photo from native camera file input
+  const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Back camera
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDashboardPhoto(reader.result as string);
+    };
+    reader.readAsDataURL(file);
 
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch (err) {
-      const error = err as DOMException;
-      if (error.name === 'NotAllowedError') {
-        setCameraError(
-          'Camera permission was denied. To fix this:\n' +
-          '1. Tap the lock/settings icon in your browser address bar\n' +
-          '2. Find "Camera" and set it to "Allow"\n' +
-          '3. Refresh the page and try again'
-        );
-      } else if (error.name === 'NotFoundError') {
-        setCameraError('No camera found on this device.');
-      } else if (error.name === 'NotReadableError') {
-        setCameraError('Camera is being used by another app. Close other apps using the camera and try again.');
-      } else {
-        setCameraError('Could not access camera. Please check your browser settings and try again.');
-      }
-      setIsCapturing(false);
-    }
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
   }, []);
 
-  // Stop camera
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setIsCapturing(false);
+  // Open native camera
+  const openCamera = useCallback(() => {
+    cameraInputRef.current?.click();
   }, []);
-
-  // Capture photo
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      setDashboardPhoto(dataUrl);
-    }
-
-    stopCamera();
-  }, [stopCamera]);
 
   // Retake photo
   const retakePhoto = useCallback(() => {
     setDashboardPhoto(null);
-    startCamera();
-  }, [startCamera]);
+    cameraInputRef.current?.click();
+  }, []);
 
   // Handle complete
   const handleComplete = () => {
@@ -299,29 +249,19 @@ export function VehicleCalibrationModal({
               This photo helps the AI learn where your odometer and fuel gauge are located.
             </div>
 
-            {/* Camera/Photo area */}
+            {/* Hidden file input — triggers native camera (no getUserMedia permission needed) */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoCapture}
+              className="hidden"
+            />
+
+            {/* Photo area */}
             <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
-              {isCapturing ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Capture button overlay */}
-                  <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={capturePhoto}
-                      className="p-4 bg-card rounded-full shadow-lg hover:bg-secondary transition-colors"
-                    >
-                      <Camera className="w-8 h-8 text-foreground" />
-                    </button>
-                  </div>
-                </>
-              ) : dashboardPhoto ? (
+              {dashboardPhoto ? (
                 <>
                   <img
                     src={dashboardPhoto}
@@ -340,41 +280,16 @@ export function VehicleCalibrationModal({
                 </>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center">
-                  {cameraError ? (
-                    <div className="text-center p-4">
-                      <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                      <div className="text-red-400 text-sm whitespace-pre-line text-left mb-3">
-                        {cameraError}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          type="button"
-                          onClick={startCamera}
-                          className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm"
-                        >
-                          Try Again
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => window.location.reload()}
-                          className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm"
-                        >
-                          Refresh Page
-                        </button>
-                      </div>
+                  <button
+                    type="button"
+                    onClick={openCamera}
+                    className="flex flex-col items-center gap-2 text-gray-400 hover:text-gray-300"
+                  >
+                    <div className="p-4 bg-gray-800 rounded-full">
+                      <Camera className="w-8 h-8" />
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="flex flex-col items-center gap-2 text-gray-400 hover:text-gray-300"
-                    >
-                      <div className="p-4 bg-gray-800 rounded-full">
-                        <Camera className="w-8 h-8" />
-                      </div>
-                      <span className="text-sm font-medium">Tap to open camera</span>
-                    </button>
-                  )}
+                    <span className="text-sm font-medium">Tap to take photo</span>
+                  </button>
                 </div>
               )}
             </div>

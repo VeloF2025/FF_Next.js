@@ -11,10 +11,8 @@ import {
   AlertTriangle,
   Gauge,
   CheckCircle2,
-  ImageIcon,
   RefreshCw,
 } from 'lucide-react';
-import { log } from '@/lib/logger';
 
 interface OdometerOverrideModalProps {
   isOpen: boolean;
@@ -37,10 +35,9 @@ export function OdometerOverrideModal({
 }: OdometerOverrideModalProps) {
   const [manualReading, setManualReading] = useState<string>('');
   const [verificationPhoto, setVerificationPhoto] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+
+  // File input ref (uses native camera — no getUserMedia permission needed)
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Validation
   const manualValue = parseInt(manualReading, 10);
@@ -57,74 +54,31 @@ export function OdometerOverrideModal({
         : null
     : null;
 
-  // Start camera
-  const startCamera = useCallback(async () => {
-    try {
-      setCameraError(null);
-      setIsCapturing(true);
+  // Handle photo from native camera file input
+  const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment', // Back camera
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+    const reader = new FileReader();
+    reader.onload = () => {
+      setVerificationPhoto(reader.result as string);
+    };
+    reader.readAsDataURL(file);
 
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-    } catch (err) {
-      log.error('Failed to access camera', { error: err }, 'OdometerOverrideModal');
-      const error = err as DOMException;
-      if (error.name === 'NotAllowedError') {
-        setCameraError(
-          'Camera permission was denied. To fix this:\n' +
-          '1. Tap the lock/settings icon in your browser address bar\n' +
-          '2. Find "Camera" and set it to "Allow"\n' +
-          '3. Refresh the page and try again'
-        );
-      } else if (error.name === 'NotReadableError') {
-        setCameraError('Camera is being used by another app. Close other apps using the camera and try again.');
-      } else {
-        setCameraError('Could not access camera. Please check your browser settings and try again.');
-      }
-      setIsCapturing(false);
-    }
+    // Reset input so the same file can be re-selected
+    e.target.value = '';
   }, []);
 
-  // Stop camera
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setIsCapturing(false);
+  // Open native camera
+  const openCamera = useCallback(() => {
+    cameraInputRef.current?.click();
   }, []);
-
-  // Capture photo
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      setVerificationPhoto(dataUrl);
-      stopCamera();
-    }
-  }, [stopCamera]);
 
   // Retake photo
   const retakePhoto = useCallback(() => {
     setVerificationPhoto(null);
-    startCamera();
-  }, [startCamera]);
+    cameraInputRef.current?.click();
+  }, []);
 
   // Handle confirm
   const handleConfirm = () => {
@@ -135,7 +89,6 @@ export function OdometerOverrideModal({
 
   // Close and cleanup
   const handleClose = () => {
-    stopCamera();
     setManualReading('');
     setVerificationPhoto(null);
     onClose();
@@ -231,6 +184,16 @@ export function OdometerOverrideModal({
               </label>
             </div>
             <div className="ml-8">
+              {/* Hidden file input — triggers native camera */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoCapture}
+                className="hidden"
+              />
+
               {verificationPhoto ? (
                 <div className="relative">
                   <img
@@ -246,38 +209,13 @@ export function OdometerOverrideModal({
                     Retake
                   </button>
                 </div>
-              ) : isCapturing ? (
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-48 object-cover rounded-lg bg-black"
-                  />
-                  <button
-                    onClick={capturePhoto}
-                    className="absolute bottom-3 left-1/2 -translate-x-1/2 w-14 h-14 bg-card rounded-full border-4 border-border shadow-lg flex items-center justify-center hover:bg-secondary"
-                  >
-                    <div className="w-10 h-10 bg-red-500 rounded-full" />
-                  </button>
-                </div>
               ) : (
                 <button
-                  onClick={startCamera}
+                  onClick={openCamera}
                   className="w-full h-32 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-blue-400 hover:text-blue-500 transition-colors"
                 >
-                  {cameraError ? (
-                    <>
-                      <AlertTriangle className="w-8 h-8 text-red-400" />
-                      <span className="text-sm text-red-500">{cameraError}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-8 h-8" />
-                      <span className="text-sm">Tap to take photo of odometer</span>
-                    </>
-                  )}
+                  <Camera className="w-8 h-8" />
+                  <span className="text-sm">Tap to take photo of odometer</span>
                 </button>
               )}
               <p className="mt-2 text-xs text-muted-foreground">
