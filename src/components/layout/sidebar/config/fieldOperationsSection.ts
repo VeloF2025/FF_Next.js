@@ -20,7 +20,7 @@ export const fieldOperationsSection: NavSection = {
       label: 'Field Operations',
       shortLabel: 'Field Ops',
       permissions: [],
-      rbacKey: 'field',
+      rbacKey: 'construction-qa',
     },
   ],
 };

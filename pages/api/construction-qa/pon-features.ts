@@ -10,7 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, withPermission } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -70,13 +70,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const dateTo = req.query.dateTo as string || '';
 
     if (dateFrom) {
-      conditions.push(`r.created_at >= $${paramIdx}::timestamptz`);
+      conditions.push(`COALESCE(r.last_photo_at, r.created_at) >= $${paramIdx}::timestamptz`);
       params.push(dateFrom);
       paramIdx++;
     }
 
     if (dateTo) {
-      conditions.push(`r.created_at < $${paramIdx}::timestamptz`);
+      conditions.push(`COALESCE(r.last_photo_at, r.created_at) < $${paramIdx}::timestamptz`);
       params.push(dateTo);
       paramIdx++;
     }
@@ -144,4 +144,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));

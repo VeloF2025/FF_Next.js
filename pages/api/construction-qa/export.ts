@@ -10,7 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, withPermission } from '@/lib/auth/middleware';
 import * as XLSX from 'xlsx';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -28,6 +28,7 @@ function toExcel(rows: Record<string, unknown>[], projectName: string): Buffer {
     'Workflow Status',
     'QA Decision',
     'Priority',
+    'Captured',
     'Created',
     'Updated',
   ];
@@ -44,6 +45,7 @@ function toExcel(rows: Record<string, unknown>[], projectName: string): Buffer {
     r.workflow_status || '',
     r.qa_decision || '',
     r.priority || '',
+    r.last_photo_at ? new Date(r.last_photo_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
     r.created_at ? new Date(r.created_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
     r.updated_at ? new Date(r.updated_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
   ]);
@@ -62,6 +64,7 @@ function toExcel(rows: Record<string, unknown>[], projectName: string): Buffer {
     { wch: 14 }, // Workflow Status
     { wch: 10 }, // QA Decision
     { wch: 8 },  // Priority
+    { wch: 16 }, // Captured
     { wch: 16 }, // Created
     { wch: 16 }, // Updated
   ];
@@ -98,13 +101,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (dateFrom) {
-      conditions.push(`r.created_at >= $${paramIdx}::timestamptz`);
+      conditions.push(`COALESCE(r.last_photo_at, r.created_at) >= $${paramIdx}::timestamptz`);
       params.push(dateFrom);
       paramIdx++;
     }
 
     if (dateTo) {
-      conditions.push(`r.created_at < $${paramIdx}::timestamptz`);
+      conditions.push(`COALESCE(r.last_photo_at, r.created_at) < $${paramIdx}::timestamptz`);
       params.push(dateTo);
       paramIdx++;
     }
@@ -131,6 +134,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.workflow_status,
         r.qa_decision,
         r.priority,
+        r.last_photo_at,
         r.created_at,
         r.updated_at
       FROM construction_qa_reviews r
@@ -167,4 +171,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.export')(handler));

@@ -11,7 +11,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, withPermission } from '@/lib/auth/middleware';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
@@ -51,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));
 
 async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void> {
   const objectPath = key.startsWith('/') ? key.slice(1) : key;

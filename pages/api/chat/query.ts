@@ -114,6 +114,36 @@ const QUERIES: QueryDef[] = [
     format: 'table',
   },
 
+  // Construction QA
+  {
+    id: 'cqa_summary',
+    name: 'Construction QA Summary',
+    description: 'Construction QA review counts by workflow status',
+    sql: `SELECT workflow_status, COUNT(*) as count FROM construction_qa_reviews GROUP BY workflow_status ORDER BY count DESC`,
+    format: 'table',
+  },
+  {
+    id: 'cqa_by_project',
+    name: 'Construction QA by Project',
+    description: 'Construction QA review counts grouped by project',
+    sql: `SELECT p.project_name as project, r.workflow_status, COUNT(*) as count FROM construction_qa_reviews r JOIN projects p ON r.project_id = p.id GROUP BY p.project_name, r.workflow_status ORDER BY p.project_name, count DESC`,
+    format: 'table',
+  },
+  {
+    id: 'cqa_pending',
+    name: 'Construction QA Pending',
+    description: 'Number of construction QA reviews pending or in review',
+    sql: `SELECT COUNT(*) as count FROM construction_qa_reviews WHERE workflow_status IN ('pending', 'in_review', 'escalated')`,
+    format: 'count',
+  },
+  {
+    id: 'cqa_pass_rate',
+    name: 'Construction QA Pass Rate',
+    description: 'Construction QA pass/fail/rework counts for decided reviews',
+    sql: `SELECT qa_decision, COUNT(*) as count, ROUND(COUNT(*)::numeric * 100.0 / NULLIF(SUM(COUNT(*)) OVER (), 0), 1) as percentage FROM construction_qa_reviews WHERE qa_decision IS NOT NULL GROUP BY qa_decision ORDER BY count DESC`,
+    format: 'table',
+  },
+
   // Maintenance
   {
     id: 'maintenance_summary',

@@ -22,7 +22,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'QA',
       icon: ClipboardCheck,
       path: '/field-ops',
-      rbacKey: 'field',
+      rbacKey: 'construction-qa.qa-centre',
     },
     {
       id: 'otdr-testing',
@@ -30,7 +30,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'OTDR',
       icon: Radio,
       path: '/field-ops/otdr',
-      rbacKey: 'field',
+      rbacKey: 'construction-qa.otdr',
     },
     {
       id: 'reports',
@@ -38,7 +38,7 @@ export const constructionQaConfig: ModuleNavigationConfig = {
       shortLabel: 'Reports',
       icon: BarChart3,
       path: '/field-ops/reports',
-      rbacKey: 'field',
+      rbacKey: 'construction-qa.reports',
     },
   ],
 };

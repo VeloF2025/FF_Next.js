@@ -9,7 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { withAuth, withPermission, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -155,7 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));
 
 function buildFeedbackMessage(
   projectName: string,

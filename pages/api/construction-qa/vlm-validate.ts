@@ -12,7 +12,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { validateReviewPhotos } from '@/modules/construction-qa/services/vlmConstructionService';
 import type { Discipline } from '@/modules/construction-qa/types';
-import { withAuth } from '@/lib/auth/middleware';
+import { withAuth, withPermission } from '@/lib/auth/middleware';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -48,4 +48,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withPermission('construction-qa.qa-centre')(handler));

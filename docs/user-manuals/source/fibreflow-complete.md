@@ -1315,9 +1315,11 @@ The Field App Portal integrates with:
 ### 5.5 Construction QA
 The Construction QA module provides structured quality assurance workflows for civil, optical, and splicing activities on fiber network construction projects. It integrates with QField for photo capture, the VLM AI service for automated photo validation, and WhatsApp for team feedback.
 
-**Navigation:** Sidebar → **Construction QA**
+**Navigation:** Sidebar → **Field Operations**
 
-**Route:** `/construction-qa`
+**Route:** `/field-ops`
+
+**Tabs:** QA Centre | OTDR Testing | Reports
 
 #### Overview
 
@@ -1331,9 +1333,14 @@ Each inspection follows a 5-phase workflow adapted from the Activate QA process,
 
 #### 5.5.1 Construction QA Dashboard
 
-The dashboard provides an at-a-glance view of all construction QA activity.
+The dashboard provides an at-a-glance view of all construction QA activity. Two view modes are available:
 
-**Navigation:** Construction QA → **Dashboard**
+- **Card View** — Visual cards showing project summary, status breakdown, and quick actions
+- **Table View** — Tabular listing of all features with sortable columns and inline status badges
+
+Toggle between views using the card/table icon in the toolbar.
+
+**Navigation:** Field Operations → **QA Centre**
 
 | Metric | Description |
 |--------|-------------|
@@ -1341,10 +1348,31 @@ The dashboard provides an at-a-glance view of all construction QA activity.
 | **Pending Review** | Submitted inspections awaiting review |
 | **Passed Today** | Inspections approved in the last 24 hours |
 | **Failed / Rework** | Inspections requiring rework |
+| **Unidentified** | Features that could not be matched to a known pole ID |
+| **Escalated** | Reviews flagged for senior review |
 
-Filters available: Project, Discipline, Status, Date Range, Reviewer.
+Filters available: Project, Discipline, Status, Date Range, Priority, Search.
 
-#### 5.5.2 QA Inspection Workflow
+#### 5.5.2 Project Detail View
+
+Clicking a project card opens the project detail page with a zone/PON accordion hierarchy.
+
+**Navigation:** QA Centre → *click project card*
+
+**Zone Accordion Navigation:**
+- Zones are listed in numerical order with feature counts and pass/fail breakdown
+- Expand a zone to see its PONs
+- Expand a PON to see individual features (poles, joints, domes)
+- Unassigned features (no zone/PON) appear in a separate section at the bottom
+
+**Infrastructure Stats:**
+Each project detail page shows a stats bar with:
+- Total features by discipline
+- Zone count and PON count
+- Pass rate percentage
+- Pending review count
+
+#### 5.5.3 QA Inspection Workflow
 
 Each construction inspection follows a structured 5-phase review process:
 
@@ -1377,35 +1405,91 @@ Each construction inspection follows a structured 5-phase review process:
 - Rejection reason codes categorized by discipline
 - Re-inspection scheduled if rework required
 
-#### 5.5.3 Discipline-Specific Checklists
+#### 5.5.4 Photo Review & Assignment
+
+Photos can be managed during the review process:
+
+- **Drag-and-Drop Assignment** — Drag unassigned photos onto checklist steps to assign them
+- **Auto-sync Checkboxes** — When a photo is assigned to a step, the step checkbox is automatically checked
+- **Swipe-to-Unassign** — Swipe an assigned photo left to remove its step assignment; an X button is also available
+- **Photo Proxy** — Photos are served via a secure proxy that handles SharePoint/Firebase authentication
+
+#### 5.5.5 Discipline-Specific Checklists
 
 Each construction discipline has a tailored checklist:
 
-**Civil Works Checklist:**
-- Trench depth meets specification (min 600mm)
-- Conduit correctly installed and bedded
-- Draw-wires installed in all conduits
-- Trench fill and compaction specification met
-- Signage and safety barriers removed after completion
-- As-built photos captured at correct angles
+**Civil Works Checklist (Pole Install Capture — 8 steps):**
+- Before photo — site condition before work
+- During photo — installation in progress
+- Depth photo — pole/trench depth measurement
+- End plates — pole end plates visible
+- Compaction — backfill compaction complete
+- Level check — pole alignment verification
+- After photo — completed installation
+- Signature — technician sign-off
 
-**Optical Works Checklist:**
-- Cable drum handling and storage correct
-- Minimum bend radius maintained throughout
-- Cable slack coiled and stored at designated points
-- Termination points secure and weatherproofed
-- Cable labelled at both ends per convention
-- Route markers installed per specification
+**Optical Works Checklist (Cable Stringing — 6 steps):**
+- Cable route — routing path verification
+- Attachment — cable attachment points secure
+- Slack coil — slack coiled and stored correctly
+- Cable label — labelled at both ends
+- No backfeed — cable direction verified
+- Sag OK — sag within specification
 
-**Splicing Checklist:**
-- Splice closure preparation (clean, dry, appropriate tools)
-- Splice loss ≤ 0.1dB per splice (OTDR measurement)
-- Fusion splice documentation captured
-- Closure sealed and pressure-tested
-- Splice tray correctly loaded and secured
-- OTDR trace saved and attached
+**Splicing Checklist — Distribution Dome (8 steps):**
+- Dome on pole — dome correctly mounted
+- Dome label — dome labelled per convention
+- Open dome — interior accessible and clean
+- Splice protectors — protectors installed on all splices
+- Slack management — fiber slack properly managed
+- Strength members — secured and terminated
+- Seals/dustcaps — all ports sealed
+- Pole ID — pole identification visible
 
-#### 5.5.4 QField Integration
+**Splicing Checklist — Main Joint (6 steps):**
+- Cable entries — cables correctly routed into joint
+- Strength members — secured and terminated
+- Tube routing — buffer tubes correctly routed
+- Tray entries — fibers entered into splice trays
+- Coiling/protectors — excess fiber coiled, protectors in place
+- Readable labels — all labels legible
+
+#### 5.5.6 OTDR Testing
+
+The OTDR Testing tab provides management of optical time-domain reflectometer test results.
+
+**Navigation:** Field Operations → **OTDR Testing**
+
+OTDR traces are linked to splicing reviews and used to verify splice loss measurements. Each trace records:
+- Fiber identifier and direction
+- Splice loss measurement (target ≤ 0.1dB)
+- Trace file attachment (SOR format)
+- Pass/fail determination based on threshold
+
+#### 5.5.7 Excel Export
+
+Export filtered Construction QA data to Excel (.xlsx) format.
+
+**Navigation:** QA Centre → *select project* → **Export** button
+
+**Export Options:**
+- **Project** — Required; select which project to export
+- **Date Range** — Optional; filter by created date (From / To)
+- **Discipline** — Optional; filter by civil, optical, or splicing
+
+**Exported Columns:** Feature ID, Type, Discipline, Zone, PON, Photos, AI Confidence, VLM Status, Workflow Status, QA Decision, Priority, Created, Updated.
+
+The exported filename follows the pattern: `field-ops-{project-name}-{date}.xlsx`
+
+#### 5.5.8 Reports
+
+The Reports tab provides construction-specific analytics and reporting.
+
+**Navigation:** Field Operations → **Reports**
+
+Available reports include pass/fail rates by discipline, reviewer performance, rework trends, and project completion progress.
+
+#### 5.5.9 QField Integration
 
 Construction QA photos are ingested from QField via the sync service:
 
@@ -1416,17 +1500,19 @@ Construction QA photos are ingested from QField via the sync service:
 
 Photos taken outside QField can be uploaded directly through the inspection form.
 
-#### 5.5.5 Access Control
+#### 5.5.10 Access Control
 
 | Role | Access Level |
 |------|-------------|
-| **Admin / Manager** | Full access — create, review, approve, reject all inspections |
+| **Super Admin / Admin** | Full access — create, review, approve, reject, delete all inspections |
+| **Manager / Project Manager** | Full access — create, review, approve, reject inspections |
 | **Site Supervisor** | Submit and review inspections for assigned projects |
-| **Technician** | Submit own inspections, view own results |
-| **Viewer** | Read-only access to inspection records |
-| **Contractor** | Submit inspections for assigned work packages |
+| **Technician** | Submit inspections, view results, view-only on reports/export |
+| **Contractor** | Submit inspections for assigned work packages, view-only on reports |
+| **Client** | View-only access to QA Centre and Reports |
+| **Viewer** | Read-only access to all inspection records |
 
-> **Note:** Only users with the `construction_qa:review` permission can approve or reject inspections. Submission requires `construction_qa:submit`.
+> **Note:** Permissions are managed via the `construction-qa` RBAC module with granular page-level keys: `construction-qa.qa-centre`, `construction-qa.otdr`, `construction-qa.reports`, `construction-qa.export`.
 
 ---
 

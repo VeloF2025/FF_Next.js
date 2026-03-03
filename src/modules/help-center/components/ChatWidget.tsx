@@ -7,7 +7,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageCircle, X, Send, Sparkles, ChevronDown, ChevronLeft, Loader2, Bot, User,
-  LayoutDashboard, FolderKanban, CheckCircle, MapPin, Wrench, ShoppingCart, Package, Truck, Users, BarChart3, MessageSquare, Settings, HelpCircle } from 'lucide-react';
+  LayoutDashboard, FolderKanban, CheckCircle, MapPin, Wrench, ShoppingCart, Package, Truck, Users, BarChart3, MessageSquare, Settings, HelpCircle, HardHat } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { log } from '@/lib/logger';
 
@@ -30,6 +30,7 @@ const TOPICS: Topic[] = [
   { id: 'dashboard', label: 'Dashboard & Meetings', icon: <LayoutDashboard className="w-4 h-4" />, color: 'text-purple-400' },
   { id: 'projects', label: 'Project Management', icon: <FolderKanban className="w-4 h-4" />, color: 'text-emerald-400' },
   { id: 'activate', label: 'Activate & QA', icon: <CheckCircle className="w-4 h-4" />, color: 'text-cyan-400' },
+  { id: 'construction-qa', label: 'Construction QA', icon: <HardHat className="w-4 h-4" />, color: 'text-amber-400' },
   { id: 'field-ops', label: 'Field Operations', icon: <MapPin className="w-4 h-4" />, color: 'text-green-400' },
   { id: 'maintenance', label: 'Maintenance', icon: <Wrench className="w-4 h-4" />, color: 'text-orange-400' },
   { id: 'procurement', label: 'Procurement', icon: <ShoppingCart className="w-4 h-4" />, color: 'text-yellow-400' },
@@ -377,6 +378,12 @@ function getQuickQuestions(topicId: string): string[] {
     'dashboard': ['What do the dashboard cards show?', 'How do I view meetings?', 'How do action items work?'],
     'projects': ['How do I create a new project?', 'What tabs are in project detail?', 'How does the pipeline work?'],
     'activate': ['What is the QA wizard?', 'How does the 5-phase review work?', 'What is PP Data?'],
+    'construction-qa': [
+      'How does the Construction QA workflow work?',
+      'How do I export QA data to Excel?',
+      'How do I drill down by zone and PON?',
+      'What are the discipline-specific checklists?',
+    ],
     'field-ops': ['How does QField QA work?', 'How are photos validated?', 'What is the Construction QA wizard?'],
     'maintenance': ['How do I create a ticket?', 'What are the SLA targets?', 'How does the Kanban board work?'],
     'procurement': [
