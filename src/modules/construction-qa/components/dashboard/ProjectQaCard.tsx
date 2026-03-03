@@ -12,10 +12,11 @@ import { useRouter } from 'next/router';
 import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable } from 'lucide-react';
 import type { ProjectDashboardRow, InfraStats } from '../../types/dashboard.types';
 
-function InfraStat({ label, icon: Icon, stats }: {
+function InfraStat({ label, icon: Icon, stats, showPlanted }: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   stats: InfraStats;
+  showPlanted?: boolean;
 }) {
   const qaPct = stats.total > 0 && stats.qa_total > 0
     ? Math.round((stats.qa_approved / stats.total) * 100)
@@ -26,15 +27,17 @@ function InfraStat({ label, icon: Icon, stats }: {
         <Icon className="w-3 h-3 text-gray-500" />
         <span className="text-xs text-gray-500">{label}</span>
       </div>
-      <div className="text-sm font-medium text-gray-300">{stats.total}</div>
-      {stats.planted > 0 && (
-        <div className="text-[10px] text-blue-400">{stats.planted} planted</div>
-      )}
-      {stats.qa_total > 0 && (
-        <div className="text-[10px] text-green-400">
-          {stats.qa_approved} QA&apos;d ({qaPct}%)
+      <div className="text-sm font-medium text-gray-300">{stats.total > 0 ? stats.total.toLocaleString() : '-'}</div>
+      {showPlanted && (
+        <div className="text-[10px] text-blue-400">
+          {stats.planted > 0 ? `${stats.planted.toLocaleString()} planted` : '-'}
         </div>
       )}
+      <div className="text-[10px] text-green-400">
+        {stats.qa_total > 0
+          ? `${stats.qa_approved} QA'd (${qaPct}%)`
+          : <span className="text-gray-600">-</span>}
+      </div>
     </div>
   );
 }
@@ -115,18 +118,14 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
         </div>
       </div>
 
-      {/* Infrastructure stats */}
-      {(project.infrastructure.poles.total > 0 ||
-        project.infrastructure.joints.total > 0 ||
-        project.infrastructure.cable_spans.total > 0) && (
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <InfraStat label="Poles" icon={Milestone} stats={project.infrastructure.poles} />
-          <InfraStat label="Joints" icon={CircleDot} stats={project.infrastructure.joints} />
-          <InfraStat label="Spans" icon={Cable} stats={project.infrastructure.cable_spans} />
-        </div>
-      )}
+      {/* Infrastructure stats — matches table columns: Poles(Total/Planted/QA'd), Joints(Total/QA'd), Spans(Total/QA'd) */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <InfraStat label="Poles" icon={Milestone} stats={project.infrastructure.poles} showPlanted />
+        <InfraStat label="Joints" icon={CircleDot} stats={project.infrastructure.joints} />
+        <InfraStat label="Spans" icon={Cable} stats={project.infrastructure.cable_spans} />
+      </div>
 
-      {/* Meta row */}
+      {/* Meta row — matches table: Zones, PONs, Photos, OTDR */}
       <div className="flex items-center gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">
           <MapPin className="w-3.5 h-3.5" />
@@ -136,18 +135,14 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
           <Layers className="w-3.5 h-3.5" />
           {project.pon_count} PONs
         </span>
-        {project.photo_count > 0 && (
-          <span className="flex items-center gap-1">
-            <Camera className="w-3.5 h-3.5" />
-            {project.photo_count.toLocaleString()}
-          </span>
-        )}
-        {project.otdr_count > 0 && (
-          <span className="flex items-center gap-1">
-            <Radio className="w-3.5 h-3.5" />
-            {project.otdr_count.toLocaleString()} OTDR
-          </span>
-        )}
+        <span className="flex items-center gap-1">
+          <Camera className="w-3.5 h-3.5" />
+          {project.photo_count > 0 ? project.photo_count.toLocaleString() : '-'}
+        </span>
+        <span className="flex items-center gap-1">
+          <Radio className="w-3.5 h-3.5" />
+          {project.otdr_count > 0 ? `${project.otdr_count.toLocaleString()} OTDR` : '-'}
+        </span>
       </div>
     </button>
   );
