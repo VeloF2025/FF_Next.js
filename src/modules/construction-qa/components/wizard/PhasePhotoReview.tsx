@@ -123,73 +123,70 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
               : null;
 
             return (
-              <div
-                key={step.step}
-                className={`border rounded-lg overflow-hidden ${
-                  isChecked ? 'border-green-500/30' : 'border-[var(--border-color)]'
-                }`}
-              >
-                {/* Step Header */}
-                <div
-                  onClick={() => setExpandedStep(isExpanded ? null : step.step)}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors"
-                >
-                  {/* Checkbox */}
-                  <button
-                    onClick={e => { e.stopPropagation(); onStepChange(col, !isChecked); }}
-                    className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                      isChecked
-                        ? 'bg-green-600 border-green-600'
-                        : 'border-gray-600 hover:border-gray-400'
+              <Droppable key={step.step} droppableId={`step-${step.step}`} direction="horizontal" isDropDisabled={!dndEnabled}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`border rounded-lg overflow-hidden transition-colors ${
+                      snapshot.isDraggingOver
+                        ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/5'
+                        : isChecked ? 'border-green-500/30' : 'border-[var(--border-color)]'
                     }`}
                   >
-                    {isChecked && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                  </button>
-
-                  {/* Step Info */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">
-                        Step {step.step}: {step.label}
-                      </span>
-                      {!step.required && (
-                        <span className="text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">optional</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{step.vlmCheck}</p>
-                  </div>
-
-                  {/* Photo count + VLM score */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
-                      <Image className="w-3 h-3" />
-                      {stepPhotos.length}
-                    </div>
-                    {avgConfidence !== null && (
-                      <span className={`text-xs font-mono ${
-                        avgConfidence >= 0.8 ? 'text-green-400' :
-                        avgConfidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>
-                        {Math.round(avgConfidence * 100)}%
-                      </span>
-                    )}
-                    {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
-                  </div>
-                </div>
-
-                {/* Expanded: Droppable Photo Grid */}
-                {isExpanded && (
-                  <Droppable droppableId={`step-${step.step}`} direction="horizontal" isDropDisabled={!dndEnabled}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`px-4 pb-4 border-t transition-colors ${
-                          snapshot.isDraggingOver
-                            ? 'border-blue-500 bg-blue-500/5'
-                            : 'border-[var(--border-color)]'
+                    {/* Step Header */}
+                    <div
+                      onClick={() => setExpandedStep(isExpanded ? null : step.step)}
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors"
+                    >
+                      {/* Checkbox */}
+                      <button
+                        onClick={e => { e.stopPropagation(); onStepChange(col, !isChecked); }}
+                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                          isChecked
+                            ? 'bg-green-600 border-green-600'
+                            : 'border-gray-600 hover:border-gray-400'
                         }`}
                       >
+                        {isChecked && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                      </button>
+
+                      {/* Step Info */}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-white">
+                            Step {step.step}: {step.label}
+                          </span>
+                          {!step.required && (
+                            <span className="text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">optional</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5">{step.vlmCheck}</p>
+                      </div>
+
+                      {/* Photo count + VLM score */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                          <Image className="w-3 h-3" />
+                          {stepPhotos.length}
+                        </div>
+                        {avgConfidence !== null && (
+                          <span className={`text-xs font-mono ${
+                            avgConfidence >= 0.8 ? 'text-green-400' :
+                            avgConfidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {Math.round(avgConfidence * 100)}%
+                          </span>
+                        )}
+                        {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                      </div>
+                    </div>
+
+                    {/* Expanded: Photo Grid */}
+                    {isExpanded && (
+                      <div className={`px-4 pb-4 border-t transition-colors ${
+                        snapshot.isDraggingOver ? 'border-blue-500' : 'border-[var(--border-color)]'
+                      }`}>
                         {step.notes && (
                           <p className="text-xs text-gray-500 py-2 italic">{step.notes}</p>
                         )}
@@ -215,12 +212,12 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                             ))}
                           </div>
                         )}
-                        {provided.placeholder}
                       </div>
                     )}
-                  </Droppable>
+                    {provided.placeholder}
+                  </div>
                 )}
-              </div>
+              </Droppable>
             );
           })}
         </div>
