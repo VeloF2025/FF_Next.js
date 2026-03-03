@@ -50,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Infrastructure inventory counts
       sql`
         SELECT project_id, 'poles' AS infra_type, COUNT(*)::int AS total,
-               COUNT(*) FILTER (WHERE pole_planted = 'Pole Planted')::int AS field_done
+               COUNT(*) FILTER (WHERE pole_planted IN ('Pole Planted', 'Yes', 'Planted'))::int AS field_done
         FROM poles WHERE project_id IS NOT NULL GROUP BY project_id
         UNION ALL
         SELECT project_id, 'joints', COUNT(*)::int, 0
