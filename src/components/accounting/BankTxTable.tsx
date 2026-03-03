@@ -49,6 +49,7 @@ export interface SelectOption {
   id: string;
   code?: string;
   name: string;
+  defaultVatCode?: string;
 }
 
 export interface RowSelection {
