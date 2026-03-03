@@ -6,6 +6,7 @@
 'use client';
 
 import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import type {
   Discipline,
   QaDecision,
@@ -13,6 +14,35 @@ import type {
   ChecklistStep,
 } from '../../types';
 import { REASON_CODE_LABELS } from '../../types/construction.types';
+
+/**
+ * Maps checklist step numbers to the corresponding reason code per discipline.
+ * When a step is unchecked, the matching reason code auto-selects on REWORK/FAIL.
+ */
+const STEP_TO_REASON: Record<string, Record<number, QaReasonCode>> = {
+  civil: {
+    1: 'CIVIL_BEFORE_PHOTO_MISSING',
+    3: 'CIVIL_DEPTH_NOT_DOCUMENTED',
+    4: 'CIVIL_END_PLATES_NOT_VISIBLE',
+    5: 'CIVIL_COMPACTION_IMPROPER',
+    6: 'CIVIL_LEVEL_CHECK_MISSING',
+    7: 'CIVIL_AFTER_PHOTO_MISSING',
+  },
+  optical: {
+    1: 'OPTICAL_ROUTE_OBSCURED',
+    2: 'OPTICAL_CABLE_NOT_ATTACHED',
+    3: 'OPTICAL_NO_SLACK_COIL',
+    4: 'OPTICAL_CABLE_TYPE_MISMATCH',
+    6: 'OPTICAL_SAG_EXCESSIVE',
+  },
+  splicing: {
+    1: 'SPLICING_DOME_NOT_SEALED',
+    2: 'SPLICING_LABEL_UNREADABLE',
+    4: 'SPLICING_HEAT_SHRINKS_MISSING',
+    5: 'SPLICING_EMERGENCY_LOOP_MISSING',
+    6: 'SPLICING_BACKHAUL_NOT_SEPARATED',
+  },
+};
 
 interface Props {
   review: { discipline: Discipline; vlm_confidence: number | null; [key: string]: unknown };
@@ -74,6 +104,45 @@ export function PhaseFinalDecision({
   const disciplinePrefix = review.discipline.toUpperCase();
   const availableReasonCodes = Object.keys(REASON_CODE_LABELS)
     .filter(code => code.startsWith(disciplinePrefix)) as QaReasonCode[];
+
+  // Auto-select reason codes from unchecked steps when REWORK/FAIL is chosen
+  const autoApplied = useRef(false);
+  useEffect(() => {
+    if (!decision || decision === 'PASS' || autoApplied.current) return;
+    autoApplied.current = true;
+
+    const stepReasons = STEP_TO_REASON[review.discipline] || {};
+    const autoCodes: QaReasonCode[] = [];
+
+    for (const step of checklist) {
+      const key = Object.keys(checkedSteps).find(k => k.includes(`_step_${String(step.step).padStart(2, '0')}_`));
+      const isChecked = key ? checkedSteps[key] : false;
+      if (!isChecked && stepReasons[step.step]) {
+        autoCodes.push(stepReasons[step.step]);
+      }
+    }
+
+    // Also add the generic INCOMPLETE_CHECKLIST code if any required step is unchecked
+    if (autoCodes.length > 0) {
+      const incompleteCode = `${disciplinePrefix}_INCOMPLETE_CHECKLIST` as QaReasonCode;
+      if (availableReasonCodes.includes(incompleteCode)) {
+        autoCodes.push(incompleteCode);
+      }
+    }
+
+    if (autoCodes.length > 0) {
+      // Merge with any manually selected codes (avoid duplicates)
+      const merged = [...new Set([...reasonCodes, ...autoCodes])];
+      onReasonCodesChange(merged);
+    }
+  }, [decision]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset auto-applied flag when decision changes back to null/PASS
+  useEffect(() => {
+    if (!decision || decision === 'PASS') {
+      autoApplied.current = false;
+    }
+  }, [decision]);
 
   const toggleReasonCode = (code: QaReasonCode) => {
     if (reasonCodes.includes(code)) {
