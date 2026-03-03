@@ -371,11 +371,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   );
 }
 
-/** Swipe-right threshold in pixels to trigger unassign */
+/** Swipe-left threshold in pixels to trigger unassign */
 const SWIPE_THRESHOLD = 60;
 
 /** Reusable draggable photo thumbnail for both step grids and unassigned section.
- *  Supports swipe-right to unassign (moves photo to unassigned pool). */
+ *  Supports swipe-left to unassign (moves photo to unassigned pool). */
 function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUnassign }: {
   photo: PhotoData;
   index: number;
@@ -401,21 +401,21 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
     if (touchStartX.current === null || touchStartY.current === null || !onUnassign) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
-    // Only swipe right, and only if horizontal movement dominates
+    // Only swipe left, and only if horizontal movement dominates
     if (!swiping && Math.abs(dy) > Math.abs(dx)) {
       touchStartX.current = null;
       return;
     }
-    if (dx > 10) {
+    if (dx < -10) {
       setSwiping(true);
-      setSwipeX(Math.min(dx, 120));
+      setSwipeX(Math.max(dx, -120));
     }
   }, [onUnassign, swiping]);
 
   const handleTouchEnd = useCallback(() => {
-    if (swipeX >= SWIPE_THRESHOLD && onUnassign) {
-      // Animate out then unassign
-      setSwipeX(200);
+    if (swipeX <= -SWIPE_THRESHOLD && onUnassign) {
+      // Animate out to the left then unassign
+      setSwipeX(-200);
       setTimeout(() => {
         onUnassign();
         setSwipeX(0);
@@ -429,7 +429,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
     touchStartY.current = null;
   }, [swipeX, onUnassign]);
 
-  const swipeProgress = Math.min(swipeX / SWIPE_THRESHOLD, 1);
+  const swipeProgress = Math.min(Math.abs(swipeX) / SWIPE_THRESHOLD, 1);
 
   return (
     <Draggable draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
@@ -454,7 +454,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
                   ? 'border-orange-500 ring-1 ring-orange-500/50'
                   : 'hover:border-blue-500 hover:ring-2 hover:ring-blue-500/30 border-[var(--border-color)]'
             }`}
-            style={swiping ? { transform: `translateX(${swipeX}px)`, transition: swipeX >= 200 ? 'transform 0.15s ease-out' : 'none' } : undefined}
+            style={swiping ? { transform: `translateX(${swipeX}px)`, transition: swipeX <= -200 ? 'transform 0.15s ease-out' : 'none' } : undefined}
             onClick={() => { if (!snapshot.isDragging && !swiping) onClickPhoto(photo.id); }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
