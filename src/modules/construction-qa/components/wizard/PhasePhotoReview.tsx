@@ -10,9 +10,9 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult, type DragStart } from '@hello-pangea/dnd';
-import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical, X as XIcon } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
 import { PhotoLightbox } from './PhotoLightbox';
 
@@ -266,6 +266,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                                 index={index}
                                 dndEnabled={dndEnabled}
                                 onClickPhoto={openLightbox}
+                                onUnassign={dndEnabled ? () => onPhotoStepChange?.(photo.id, null, null) : undefined}
                               />
                             ))}
                           </div>
@@ -370,81 +371,150 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   );
 }
 
-/** Reusable draggable photo thumbnail for both step grids and unassigned section. */
-function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact }: {
+/** Swipe-right threshold in pixels to trigger unassign */
+const SWIPE_THRESHOLD = 60;
+
+/** Reusable draggable photo thumbnail for both step grids and unassigned section.
+ *  Supports swipe-right to unassign (moves photo to unassigned pool). */
+function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUnassign }: {
   photo: PhotoData;
   index: number;
   dndEnabled: boolean;
   onClickPhoto: (id: string) => void;
   compact?: boolean;
+  onUnassign?: () => void;
 }) {
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const swipeRef = useRef<HTMLDivElement | null>(null);
+  const [swipeX, setSwipeX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!onUnassign) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setSwiping(false);
+  }, [onUnassign]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null || !onUnassign) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    const dy = e.touches[0].clientY - touchStartY.current;
+    // Only swipe right, and only if horizontal movement dominates
+    if (!swiping && Math.abs(dy) > Math.abs(dx)) {
+      touchStartX.current = null;
+      return;
+    }
+    if (dx > 10) {
+      setSwiping(true);
+      setSwipeX(Math.min(dx, 120));
+    }
+  }, [onUnassign, swiping]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (swipeX >= SWIPE_THRESHOLD && onUnassign) {
+      // Animate out then unassign
+      setSwipeX(200);
+      setTimeout(() => {
+        onUnassign();
+        setSwipeX(0);
+        setSwiping(false);
+      }, 150);
+    } else {
+      setSwipeX(0);
+      setSwiping(false);
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  }, [swipeX, onUnassign]);
+
+  const swipeProgress = Math.min(swipeX / SWIPE_THRESHOLD, 1);
+
   return (
     <Draggable draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
       {(provided, snapshot) => (
         <div
-          ref={provided.innerRef}
+          ref={(el) => { provided.innerRef(el); swipeRef.current = el; }}
           {...provided.draggableProps}
-          className={`relative rounded-lg overflow-hidden border cursor-pointer transition-all group ${
-            snapshot.isDragging
-              ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 z-50'
-              : 'hover:border-blue-500 hover:ring-2 hover:ring-blue-500/30 border-[var(--border-color)]'
-          }`}
-          onClick={() => { if (!snapshot.isDragging) onClickPhoto(photo.id); }}
+          className="relative"
         >
-          {/* Drag handle */}
-          {dndEnabled ? (
-            <div
-              {...provided.dragHandleProps}
-              className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
-            >
-              <GripVertical className="w-3 h-3" />
+          {/* Swipe background revealed behind photo */}
+          {swiping && (
+            <div className="absolute inset-0 rounded-lg bg-orange-500/20 flex items-center justify-center">
+              <XIcon className={`w-5 h-5 transition-colors ${swipeProgress >= 1 ? 'text-orange-400' : 'text-orange-400/40'}`} />
             </div>
-          ) : (
-            <span {...provided.dragHandleProps} />
           )}
 
-          {/* Photo thumbnail */}
-          <div className="aspect-square bg-gray-900 flex items-center justify-center">
-            <img
-              src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
-              alt={photo.filename || 'Photo'}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              draggable={false}
-            />
+          <div
+            className={`relative rounded-lg overflow-hidden border cursor-pointer transition-all group ${
+              snapshot.isDragging
+                ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 z-50'
+                : swiping && swipeProgress >= 1
+                  ? 'border-orange-500 ring-1 ring-orange-500/50'
+                  : 'hover:border-blue-500 hover:ring-2 hover:ring-blue-500/30 border-[var(--border-color)]'
+            }`}
+            style={swiping ? { transform: `translateX(${swipeX}px)`, transition: swipeX >= 200 ? 'transform 0.15s ease-out' : 'none' } : undefined}
+            onClick={() => { if (!snapshot.isDragging && !swiping) onClickPhoto(photo.id); }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {/* Drag handle */}
+            {dndEnabled ? (
+              <div
+                {...provided.dragHandleProps}
+                className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
+              >
+                <GripVertical className="w-3 h-3" />
+              </div>
+            ) : (
+              <span {...provided.dragHandleProps} />
+            )}
+
+            {/* Photo thumbnail */}
+            <div className="aspect-square bg-gray-900 flex items-center justify-center">
+              <img
+                src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+                alt={photo.filename || 'Photo'}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                draggable={false}
+              />
+            </div>
+
+            {/* Enlarge indicator on hover */}
+            {!snapshot.isDragging && !swiping && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                <Maximize2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white opacity-0 group-hover:opacity-100 transition-opacity`} />
+              </div>
+            )}
+
+            {/* VLM badge */}
+            {!compact && typeof photo.vlm_confidence === 'number' && !isNaN(photo.vlm_confidence) && (
+              <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                photo.vlm_confidence >= 0.8 ? 'bg-green-600/90 text-white' :
+                photo.vlm_confidence >= 0.6 ? 'bg-yellow-600/90 text-white' :
+                'bg-red-600/90 text-white'
+              }`}>
+                {Math.round(photo.vlm_confidence * 100)}%
+              </div>
+            )}
+
+            {/* Retake warning */}
+            {!compact && photo.needs_retake && (
+              <div className="absolute top-1 left-1">
+                <AlertTriangle className="w-4 h-4 text-orange-400" />
+              </div>
+            )}
+
+            {/* Filename at bottom */}
+            {!compact && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1">
+                <div className="text-[10px] text-gray-300 truncate">{photo.filename}</div>
+              </div>
+            )}
           </div>
-
-          {/* Enlarge indicator on hover */}
-          {!snapshot.isDragging && (
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-              <Maximize2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white opacity-0 group-hover:opacity-100 transition-opacity`} />
-            </div>
-          )}
-
-          {/* VLM badge */}
-          {!compact && typeof photo.vlm_confidence === 'number' && !isNaN(photo.vlm_confidence) && (
-            <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-              photo.vlm_confidence >= 0.8 ? 'bg-green-600/90 text-white' :
-              photo.vlm_confidence >= 0.6 ? 'bg-yellow-600/90 text-white' :
-              'bg-red-600/90 text-white'
-            }`}>
-              {Math.round(photo.vlm_confidence * 100)}%
-            </div>
-          )}
-
-          {/* Retake warning */}
-          {!compact && photo.needs_retake && (
-            <div className="absolute top-1 left-1">
-              <AlertTriangle className="w-4 h-4 text-orange-400" />
-            </div>
-          )}
-
-          {/* Filename at bottom */}
-          {!compact && (
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1">
-              <div className="text-[10px] text-gray-300 truncate">{photo.filename}</div>
-            </div>
-          )}
         </div>
       )}
     </Draggable>
