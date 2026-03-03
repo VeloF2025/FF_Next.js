@@ -48,6 +48,7 @@ import { PhaseFeedback } from './PhaseFeedback';
 
 interface ReviewData {
   id: string;
+  project_id: string;
   feature_id: string;
   feature_type: string;
   discipline: Discipline;
@@ -321,7 +322,13 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => router.push('/field-ops')}
+          onClick={() => {
+            const params = new URLSearchParams();
+            if (review.zone_no !== null) params.set('zone', String(review.zone_no));
+            if (review.pon_no !== null) params.set('pon', String(review.pon_no));
+            const qs = params.toString();
+            router.push(`/field-ops/project/${review.project_id}${qs ? `?${qs}` : ''}`);
+          }}
           className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-gray-400" />
