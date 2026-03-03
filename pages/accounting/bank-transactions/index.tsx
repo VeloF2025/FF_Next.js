@@ -99,8 +99,9 @@ export default function BankTransactionsPage() {
       setGlAccounts(list
         .filter((a: SelectOption & { accountSubtype?: string }) =>
           a.accountSubtype !== 'bank')
-        .map((a: SelectOption & { accountCode?: string; accountName?: string }) => ({
+        .map((a: SelectOption & { accountCode?: string; accountName?: string; defaultVatCode?: string }) => ({
           id: a.id, code: a.accountCode || a.code, name: a.accountName || a.name,
+          defaultVatCode: a.defaultVatCode,
         }))
       );
     }).catch(() => {});
@@ -391,8 +392,16 @@ export default function BankTransactionsPage() {
   // Apply batch edit selection to all selected rows
   const applyBatchEdit = (entityId: string, label: string) => {
     const updates: Record<string, RowSelection> = { ...rowSelections };
+    let autoVat: VatCode | undefined;
+    if (batchType === 'account' && entityId) {
+      const acct = glAccounts.find(g => g.id === entityId);
+      if (acct?.defaultVatCode && acct.defaultVatCode !== 'none') {
+        autoVat = acct.defaultVatCode as VatCode;
+      }
+    }
     selectedIds.forEach(id => {
-      updates[id] = { type: batchType, entityId, label, vatCode: updates[id]?.vatCode || 'none' };
+      const vatCode = autoVat ?? (updates[id]?.vatCode || 'none') as VatCode;
+      updates[id] = { type: batchType, entityId, label, vatCode };
     });
     setRowSelections(updates);
     setShowBatchEdit(false);
@@ -735,9 +744,16 @@ export default function BankTransactionsPage() {
               }}
               onRowEntityChange={(txId, entityId, label) => {
                 const type = rowSelections[txId]?.type || 'account';
+                let vatCode = (rowSelections[txId]?.vatCode || 'none') as VatCode;
+                if (type === 'account' && entityId) {
+                  const acct = glAccounts.find(g => g.id === entityId);
+                  if (acct?.defaultVatCode && acct.defaultVatCode !== 'none') {
+                    vatCode = acct.defaultVatCode as VatCode;
+                  }
+                }
                 setRowSelections(prev => ({
                   ...prev,
-                  [txId]: { ...prev[txId], type, entityId, label, vatCode: prev[txId]?.vatCode || 'none' },
+                  [txId]: { ...prev[txId], type, entityId, label, vatCode },
                 }));
                 saveSelection(txId, type as AllocType, entityId);
               }}
