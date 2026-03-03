@@ -372,10 +372,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
 }
 
 /** Swipe-left threshold in pixels to trigger unassign */
-const SWIPE_THRESHOLD = 60;
+const SWIPE_THRESHOLD = 50;
 
 /** Reusable draggable photo thumbnail for both step grids and unassigned section.
- *  Supports swipe-left to unassign (moves photo to unassigned pool). */
+ *  Supports swipe-left to unassign (moves photo to unassigned pool).
+ *  Also shows an X button on hover/long-press for quick unassign. */
 function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUnassign }: {
   photo: PhotoData;
   index: number;
@@ -384,50 +385,102 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
   compact?: boolean;
   onUnassign?: () => void;
 }) {
+  // Use refs for swipe tracking to avoid stale closure issues
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  const swipeRef = useRef<HTMLDivElement | null>(null);
+  const swipeXRef = useRef(0);
+  const swipingRef = useRef(false);
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!onUnassign) return;
+    if (!onUnassign || !e.touches[0]) return;
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
+    swipingRef.current = false;
+    swipeXRef.current = 0;
     setSwiping(false);
+    setSwipeX(0);
   }, [onUnassign]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null || !onUnassign) return;
+    if (touchStartX.current === null || touchStartY.current === null || !onUnassign || !e.touches[0]) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     const dy = e.touches[0].clientY - touchStartY.current;
     // Only swipe left, and only if horizontal movement dominates
-    if (!swiping && Math.abs(dy) > Math.abs(dx)) {
+    if (!swipingRef.current && Math.abs(dy) > Math.abs(dx)) {
       touchStartX.current = null;
       return;
     }
     if (dx < -10) {
+      e.preventDefault(); // Prevent scrolling while swiping
+      const clamped = Math.max(dx, -120);
+      swipingRef.current = true;
+      swipeXRef.current = clamped;
       setSwiping(true);
-      setSwipeX(Math.max(dx, -120));
+      setSwipeX(clamped);
     }
-  }, [onUnassign, swiping]);
+  }, [onUnassign]);
 
   const handleTouchEnd = useCallback(() => {
-    if (swipeX <= -SWIPE_THRESHOLD && onUnassign) {
-      // Animate out to the left then unassign
+    // Read from ref (always current) instead of state (may be stale)
+    if (swipeXRef.current <= -SWIPE_THRESHOLD && onUnassign) {
       setSwipeX(-200);
       setTimeout(() => {
         onUnassign();
         setSwipeX(0);
         setSwiping(false);
+        swipeXRef.current = 0;
+        swipingRef.current = false;
       }, 150);
     } else {
       setSwipeX(0);
       setSwiping(false);
+      swipeXRef.current = 0;
+      swipingRef.current = false;
     }
     touchStartX.current = null;
     touchStartY.current = null;
-  }, [swipeX, onUnassign]);
+  }, [onUnassign]);
+
+  // Also support mouse drag for desktop swipe
+  const mouseDownX = useRef<number | null>(null);
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!onUnassign) return;
+    mouseDownX.current = e.clientX;
+  }, [onUnassign]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (mouseDownX.current === null || !onUnassign) return;
+    const dx = e.clientX - mouseDownX.current;
+    if (dx < -10) {
+      const clamped = Math.max(dx, -120);
+      swipingRef.current = true;
+      swipeXRef.current = clamped;
+      setSwiping(true);
+      setSwipeX(clamped);
+    }
+  }, [onUnassign]);
+
+  const handleMouseUp = useCallback(() => {
+    if (mouseDownX.current === null) return;
+    mouseDownX.current = null;
+    if (swipeXRef.current <= -SWIPE_THRESHOLD && onUnassign) {
+      setSwipeX(-200);
+      setTimeout(() => {
+        onUnassign();
+        setSwipeX(0);
+        setSwiping(false);
+        swipeXRef.current = 0;
+        swipingRef.current = false;
+      }, 150);
+    } else {
+      setSwipeX(0);
+      setSwiping(false);
+      swipeXRef.current = 0;
+      swipingRef.current = false;
+    }
+  }, [onUnassign]);
 
   const swipeProgress = Math.min(Math.abs(swipeX) / SWIPE_THRESHOLD, 1);
 
@@ -435,14 +488,18 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
     <Draggable draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
       {(provided, snapshot) => (
         <div
-          ref={(el) => { provided.innerRef(el); swipeRef.current = el; }}
+          ref={provided.innerRef}
           {...provided.draggableProps}
           className="relative"
         >
-          {/* Swipe background revealed behind photo */}
+          {/* Swipe background — always rendered when swiping, bright orange */}
           {swiping && (
-            <div className="absolute inset-0 rounded-lg bg-orange-500/20 flex items-center justify-center">
-              <XIcon className={`w-5 h-5 transition-colors ${swipeProgress >= 1 ? 'text-orange-400' : 'text-orange-400/40'}`} />
+            <div className={`absolute inset-0 rounded-lg flex items-center justify-end pr-3 transition-colors ${
+              swipeProgress >= 1 ? 'bg-orange-500/40' : 'bg-orange-500/20'
+            }`}>
+              <XIcon className={`w-6 h-6 transition-all ${
+                swipeProgress >= 1 ? 'text-orange-300 scale-110' : 'text-orange-400/50'
+              }`} />
             </div>
           )}
 
@@ -459,6 +516,10 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
           >
             {/* Drag handle */}
             {dndEnabled ? (
@@ -470,6 +531,17 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
               </div>
             ) : (
               <span {...provided.dragHandleProps} />
+            )}
+
+            {/* Unassign X button — visible on hover for quick removal */}
+            {onUnassign && !snapshot.isDragging && !swiping && (
+              <button
+                onClick={e => { e.stopPropagation(); onUnassign(); }}
+                className="absolute top-1 right-1 z-10 p-0.5 rounded-full bg-red-600/80 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                title="Remove from step"
+              >
+                <XIcon className="w-3 h-3" />
+              </button>
             )}
 
             {/* Photo thumbnail */}
@@ -485,7 +557,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
 
             {/* Enlarge indicator on hover */}
             {!snapshot.isDragging && !swiping && (
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
                 <Maximize2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white opacity-0 group-hover:opacity-100 transition-opacity`} />
               </div>
             )}
