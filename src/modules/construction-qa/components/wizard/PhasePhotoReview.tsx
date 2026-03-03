@@ -238,7 +238,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                                     ref={dragProv.innerRef}
                                     {...dragProv.draggableProps}
                                     {...dragProv.dragHandleProps}
-                                    className={`flex-shrink-0 w-16 h-16 rounded border overflow-hidden ${
+                                    className={`flex-shrink-0 w-12 h-12 rounded border overflow-hidden ${
                                       dragSnap.isDragging
                                         ? 'ring-2 ring-blue-500 shadow-lg z-50'
                                         : 'border-[var(--border-color)]'
@@ -258,7 +258,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                           </div>
                         ) : (
                           /* Full photo grid when not dragging */
-                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-3">
+                          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-3">
                             {stepPhotos.map((photo, index) => (
                               <PhotoThumbnail
                                 key={photo.id}
@@ -307,7 +307,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                       {dndEnabled ? ' Drag them to the correct step above.' : ' Click to enlarge.'}
                     </p>
                   )}
-                  <div className={`grid ${isDragging ? 'grid-cols-6 md:grid-cols-8 gap-1' : 'grid-cols-3 md:grid-cols-6 gap-2'}`}>
+                  <div className={`grid ${isDragging ? 'grid-cols-8 md:grid-cols-10 gap-1' : 'grid-cols-4 md:grid-cols-6 gap-2'}`}>
                     {unassigned.map((photo, index) => (
                       isDragging ? (
                         <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
