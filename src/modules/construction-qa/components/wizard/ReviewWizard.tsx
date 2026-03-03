@@ -169,6 +169,25 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
 
   useEffect(() => { fetchReview(); }, [fetchReview]);
 
+  // Save a single step toggle immediately (fire-and-forget)
+  const saveStepToggle = async (col: string, val: boolean) => {
+    if (!review) return;
+    try {
+      await fetch('/api/construction-qa/review', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reviewId: review.id,
+          stepUpdates: { [col]: val },
+          reviewedBy: 'current_user',
+        }),
+      });
+    } catch (err) {
+      log.error('Failed to save step toggle', { module: 'construction-qa', error: (err as Error).message }, 'construction-qa');
+    }
+  };
+
   // Save checklist progress
   const saveProgress = async () => {
     if (!review) return;
@@ -427,7 +446,10 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
             photos={photos}
             checklist={checklist}
             checkedSteps={checkedSteps}
-            onStepChange={(col, val) => setCheckedSteps(prev => ({ ...prev, [col]: val }))}
+            onStepChange={(col, val) => {
+              setCheckedSteps(prev => ({ ...prev, [col]: val }));
+              saveStepToggle(col, val);
+            }}
             onPhotoStepChange={handlePhotoStepChange}
           />
         )}
@@ -505,7 +527,7 @@ function getStepColumn(discipline: Discipline, step: number): string {
   const stepNames: Record<string, Record<number, string>> = {
     civil: {
       1: 'before_photo', 2: 'during_photo', 3: 'depth_photo', 4: 'end_plates',
-      5: 'compaction', 6: 'level_check', 7: 'after_photo', 8: 'signature',
+      5: 'compaction', 6: 'level_check', 7: 'after_photo',
     },
     optical: {
       1: 'cable_route', 2: 'attachment', 3: 'slack_coil',

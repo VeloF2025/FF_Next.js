@@ -8,16 +8,20 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, LayoutGrid, Table2 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { ProjectDashboardRow } from '../../types/dashboard.types';
 import { ProjectQaCard } from './ProjectQaCard';
+import { ProjectQaTable } from './ProjectQaTable';
 import { GlobalSearchBar } from '../shared/GlobalSearchBar';
+
+type ViewMode = 'cards' | 'table';
 
 export function FieldOpsDashboardPage() {
   const [projects, setProjects] = useState<ProjectDashboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -58,6 +62,30 @@ export function FieldOpsDashboardPage() {
               Updated: {lastRefresh.toLocaleTimeString()}
             </span>
           )}
+          <div className="flex items-center border border-[var(--border-color)] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
+                viewMode === 'cards'
+                  ? 'bg-blue-600/20 text-blue-400 border-r border-[var(--border-color)]'
+                  : 'text-gray-400 hover:bg-[var(--hover-bg)] border-r border-[var(--border-color)]'
+              }`}
+              title="Card view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-blue-600/20 text-blue-400'
+                  : 'text-gray-400 hover:bg-[var(--hover-bg)]'
+              }`}
+              title="Table view"
+            >
+              <Table2 className="w-4 h-4" />
+            </button>
+          </div>
           <button
             onClick={fetchDashboard}
             disabled={loading}
@@ -90,11 +118,15 @@ export function FieldOpsDashboardPage() {
           No projects with QA features found.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map(project => (
-            <ProjectQaCard key={project.project_id} project={project} />
-          ))}
-        </div>
+        viewMode === 'table' ? (
+          <ProjectQaTable projects={projects} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map(project => (
+              <ProjectQaCard key={project.project_id} project={project} />
+            ))}
+          </div>
+        )
       )}
     </div>
   );

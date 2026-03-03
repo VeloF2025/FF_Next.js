@@ -20,6 +20,21 @@ export interface DisciplineStats {
   rework_needed: number;
 }
 
+/** Per-infrastructure-type inventory + QA counts */
+export interface InfraStats {
+  total: number;
+  planted: number;     // poles only (0 for joints/cable_spans)
+  qa_total: number;
+  qa_approved: number;
+}
+
+/** Infrastructure inventory across poles, joints, cable spans */
+export interface InfrastructureInventory {
+  poles: InfraStats;
+  joints: InfraStats;
+  cable_spans: InfraStats;
+}
+
 /** One row in the project dashboard grid */
 export interface ProjectDashboardRow {
   project_id: string;
@@ -32,6 +47,7 @@ export interface ProjectDashboardRow {
   civil: DisciplineStats;
   optical: DisciplineStats;
   splicing: DisciplineStats;
+  infrastructure: InfrastructureInventory;
 }
 
 // =============================================================================
