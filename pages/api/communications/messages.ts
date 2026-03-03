@@ -34,16 +34,24 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
     const limit = Math.min(parseInt(req.query.limit as string || '20', 10) || 20, 100);
     const offset = parseInt(req.query.offset as string || '0', 10) || 0;
     const unreadOnly = req.query.unread_only === 'true';
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
     if (view === 'sent') {
-      return fetchSent(res, userId, limit, offset);
+      return search
+        ? fetchSentSearch(res, userId, limit, offset, search)
+        : fetchSent(res, userId, limit, offset);
     }
 
     if (view === 'archived') {
-      return fetchRecipientView(res, userId, limit, offset, false, true);
+      return search
+        ? fetchRecipientSearch(res, userId, limit, offset, true, search)
+        : fetchRecipientView(res, userId, limit, offset, false, true);
     }
 
     // Default: inbox (not archived)
+    if (search) {
+      return fetchRecipientSearch(res, userId, limit, offset, false, search);
+    }
     return fetchRecipientView(res, userId, limit, offset, unreadOnly, false);
   } catch (error) {
     log.error('Failed to fetch messages', { error }, 'Messages');
@@ -128,6 +136,119 @@ async function fetchRecipientView(
     INNER JOIN internal_message_recipients r ON r.message_id = m.id AND r.recipient_id = ${userId}::uuid
     WHERE m.thread_id IS NULL
       AND r.is_archived = ${archived}
+  `;
+
+  return apiResponse.success(res, {
+    messages,
+    total: Number(countResult[0]?.total || 0),
+  });
+}
+
+/**
+ * Search branch for recipient (inbox / archived) views.
+ * Completely separate query — no conditional SQL fragments.
+ */
+async function fetchRecipientSearch(
+  res: NextApiResponse,
+  userId: string,
+  limit: number,
+  offset: number,
+  archived: boolean,
+  search: string
+) {
+  const term = `%${search}%`;
+
+  const messages = await sql`
+    SELECT
+      m.id, m.sender_id, m.subject, m.body, m.priority,
+      m.thread_id, m.context_module, m.context_url, m.created_at,
+      COALESCE(u.first_name || ' ' || u.last_name, u.email) AS sender_name,
+      u.email AS sender_email,
+      r.is_read,
+      (SELECT COUNT(*)::int FROM internal_messages WHERE thread_id = m.id) AS reply_count,
+      (SELECT COUNT(*)::int FROM internal_message_recipients WHERE message_id = m.id) AS recipient_count,
+      (SELECT MAX(created_at) FROM internal_messages WHERE thread_id = m.id) AS latest_reply_at
+    FROM internal_messages m
+    INNER JOIN internal_message_recipients r ON r.message_id = m.id AND r.recipient_id = ${userId}::uuid
+    INNER JOIN users u ON u.id = m.sender_id
+    WHERE m.thread_id IS NULL
+      AND r.is_archived = ${archived}
+      AND (
+        m.subject ILIKE ${term}
+        OR m.body ILIKE ${term}
+        OR COALESCE(u.first_name || ' ' || u.last_name, u.email) ILIKE ${term}
+      )
+    ORDER BY COALESCE(
+      (SELECT MAX(created_at) FROM internal_messages WHERE thread_id = m.id),
+      m.created_at
+    ) DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const countResult = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM internal_messages m
+    INNER JOIN internal_message_recipients r ON r.message_id = m.id AND r.recipient_id = ${userId}::uuid
+    INNER JOIN users u ON u.id = m.sender_id
+    WHERE m.thread_id IS NULL
+      AND r.is_archived = ${archived}
+      AND (
+        m.subject ILIKE ${term}
+        OR m.body ILIKE ${term}
+        OR COALESCE(u.first_name || ' ' || u.last_name, u.email) ILIKE ${term}
+      )
+  `;
+
+  return apiResponse.success(res, {
+    messages,
+    total: Number(countResult[0]?.total || 0),
+  });
+}
+
+/**
+ * Search branch for sent view.
+ * Completely separate query — no conditional SQL fragments.
+ */
+async function fetchSentSearch(
+  res: NextApiResponse,
+  userId: string,
+  limit: number,
+  offset: number,
+  search: string
+) {
+  const term = `%${search}%`;
+
+  const messages = await sql`
+    SELECT
+      m.id, m.sender_id, m.subject, m.body, m.priority,
+      m.thread_id, m.context_module, m.context_url, m.created_at,
+      COALESCE(u.first_name || ' ' || u.last_name, u.email) AS sender_name,
+      u.email AS sender_email,
+      TRUE AS is_read,
+      (SELECT COUNT(*)::int FROM internal_messages WHERE thread_id = m.id) AS reply_count,
+      (SELECT COUNT(*)::int FROM internal_message_recipients WHERE message_id = m.id) AS recipient_count,
+      (SELECT MAX(created_at) FROM internal_messages WHERE thread_id = m.id) AS latest_reply_at
+    FROM internal_messages m
+    INNER JOIN users u ON u.id = m.sender_id
+    WHERE m.sender_id = ${userId}::uuid
+      AND m.thread_id IS NULL
+      AND (
+        m.subject ILIKE ${term}
+        OR m.body ILIKE ${term}
+      )
+    ORDER BY m.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
+  const countResult = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM internal_messages m
+    WHERE m.sender_id = ${userId}::uuid
+      AND m.thread_id IS NULL
+      AND (
+        m.subject ILIKE ${term}
+        OR m.body ILIKE ${term}
+      )
   `;
 
   return apiResponse.success(res, {

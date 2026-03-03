@@ -2,7 +2,7 @@
  * Single message row in the inbox/sent list
  */
 
-import { MessageCircle, AlertTriangle, Clock } from 'lucide-react';
+import { MessageCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MessageListItem as MessageListItemType } from '../types/messaging.types';
 
@@ -10,6 +10,12 @@ interface MessageListItemProps {
   message: MessageListItemType;
   onClick: (id: string) => void;
   showSender?: boolean;
+  /** When true, a checkbox is rendered on the left for bulk selection */
+  showCheckbox?: boolean;
+  /** Whether this item is currently selected */
+  isSelected?: boolean;
+  /** Callback when the checkbox is toggled */
+  onToggleSelect?: (id: string) => void;
 }
 
 function formatRelative(iso: string): string {
@@ -26,25 +32,47 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
 }
 
-export function MessageListItem({ message, onClick, showSender = true }: MessageListItemProps) {
+export function MessageListItem({
+  message,
+  onClick,
+  showSender = true,
+  showCheckbox = false,
+  isSelected = false,
+  onToggleSelect,
+}: MessageListItemProps) {
   const isUnread = !message.is_read;
   const isUrgent = message.priority === 'urgent';
   const isHigh = message.priority === 'high';
 
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleSelect?.(message.id);
+  };
+
   return (
     <button
       type="button"
-      onClick={() => onClick(message.id)}
+      onClick={() => (showCheckbox ? onToggleSelect?.(message.id) : onClick(message.id))}
       className={cn(
         'w-full text-left px-4 py-3 border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors',
-        isUnread && 'bg-blue-500/5'
+        isUnread && !isSelected && 'bg-blue-500/5',
+        isSelected && 'bg-[var(--ff-primary)]/8'
       )}
     >
       <div className="flex items-start gap-3">
-        {/* Unread dot */}
-        <div className="pt-1.5 w-2 flex-shrink-0">
-          {isUnread && (
-            <div className="w-2 h-2 rounded-full bg-blue-500" />
+        {/* Checkbox (selection mode) or unread dot */}
+        <div className="pt-1.5 w-4 flex-shrink-0 flex items-start justify-center">
+          {showCheckbox ? (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onClick={handleCheckboxClick}
+              onChange={() => {/* controlled via onClick */}}
+              className="w-3.5 h-3.5 rounded accent-blue-500 cursor-pointer"
+              aria-label="Select message"
+            />
+          ) : (
+            isUnread && <div className="w-2 h-2 rounded-full bg-blue-500" />
           )}
         </div>
 

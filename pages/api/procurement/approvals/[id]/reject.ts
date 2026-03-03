@@ -76,15 +76,41 @@ export default withAuth(withErrorHandler(async (
 
     // UNS: Notify the requester that their request was rejected
     if (request.requested_by) {
+      const docLabel = (request.document_type || '').replace(/_/g, ' ');
+
       notify({
         event_type: 'procurement.rejected',
-        title: `${request.document_type?.replace(/_/g, ' ')} rejected`,
+        title: `${docLabel} rejected`,
         body: `Reason: ${reason.trim()}`,
-        action_url: '/app/procurement/approvals',
+        action_url: '/procurement/purchase-orders',
         source_module: 'procurement',
         source_id: request.document_id,
         recipient_user_ids: [request.requested_by],
       }).catch(() => {});
+
+      // Send inbox message to requester
+      try {
+        const msgResult = await sql`
+          INSERT INTO internal_messages (
+            sender_id, subject, body, priority,
+            context_module, context_id, context_url
+          ) VALUES (
+            ${userId}::uuid,
+            ${(request.document_number || docLabel) + ' — Rejected'},
+            ${'Your ' + docLabel + ' ' + (request.document_number || '') + ' has been rejected by ' + userName + '.\n\nReason: ' + reason.trim()},
+            'high', 'procurement', ${request.document_id},
+            ${'/procurement/purchase-orders'}
+          )
+          RETURNING id
+        `;
+        await sql`
+          INSERT INTO internal_message_recipients (message_id, recipient_id)
+          VALUES (${msgResult[0]!.id}, ${request.requested_by}::uuid)
+          ON CONFLICT (message_id, recipient_id) DO NOTHING
+        `;
+      } catch (msgErr) {
+        log.error('Failed to send rejection inbox message', { error: msgErr }, 'procurement');
+      }
     }
 
     return apiResponse.success(res, updated[0], 'Request rejected');

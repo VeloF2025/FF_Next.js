@@ -9,8 +9,8 @@
  * - Sub-tab filters (all/upcoming/past/cancelled)
  */
 
-import { useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Calendar, Search } from 'lucide-react';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { MeetingsList } from '@/modules/meetings/components/MeetingsList';
 import { MeetingDetailModal } from '@/modules/meetings/components/MeetingDetailModal';
@@ -31,11 +31,31 @@ export function CommunicationsMeetingsTab({
 }: CommunicationsMeetingsTabProps) {
   const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // Search filter (client-side)
+  const searchedMeetings = useMemo(() => {
+    if (!searchTerm.trim()) return meetings;
+    const term = searchTerm.toLowerCase();
+    return meetings.filter(m => {
+      if (m.title?.toLowerCase().includes(term)) return true;
+      if (m.organizer?.toLowerCase().includes(term)) return true;
+      if (m.participants?.some(p => p.toLowerCase().includes(term))) return true;
+      if (m.rawParticipants?.some(p =>
+        (p.name?.toLowerCase().includes(term)) ||
+        (p.email?.toLowerCase().includes(term)) ||
+        (p.displayName?.toLowerCase().includes(term))
+      )) return true;
+      if (m.summary?.overview?.toLowerCase().includes(term)) return true;
+      if (m.summary?.keywords?.some(k => k.toLowerCase().includes(term))) return true;
+      return false;
+    });
+  }, [meetings, searchTerm]);
+
   // Filter meetings based on source + status filters
-  const filteredMeetings = meetings.filter(meeting => {
+  const filteredMeetings = searchedMeetings.filter(meeting => {
     // Source filter
     if (sourceFilter !== 'all' && meeting.source !== sourceFilter) return false;
 
@@ -65,8 +85,8 @@ export function CommunicationsMeetingsTab({
 
   // Source-filtered meetings for accurate counts
   const sourceMeetings = sourceFilter === 'all'
-    ? meetings
-    : meetings.filter(m => m.source === sourceFilter);
+    ? searchedMeetings
+    : searchedMeetings.filter(m => m.source === sourceFilter);
 
   const filters: { key: MeetingFilter; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: sourceMeetings.length },
@@ -95,6 +115,18 @@ export function CommunicationsMeetingsTab({
 
   return (
     <div className="space-y-4">
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          placeholder="Search meetings by title, participants, keywords..."
+          className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]/50"
+        />
+      </div>
+
       {/* Source filter */}
       <div className="flex items-center gap-2">
         {sourceFilters.map(sf => (

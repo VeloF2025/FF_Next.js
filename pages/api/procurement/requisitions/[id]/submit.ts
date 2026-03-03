@@ -4,6 +4,7 @@ import { createLoggedSql, logUpdate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { notify } from '@/modules/notifications/services';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -16,7 +17,9 @@ export default withAuth(withErrorHandler(async (
   }
 
   const { id } = req.query;
-  const userId = (req as AuthenticatedNextApiRequest).user.id;
+  const authReq = req as AuthenticatedNextApiRequest;
+  const userId = authReq.user.id;
+  const userName = authReq.user.name || authReq.user.email;
 
   if (!id || typeof id !== 'string') {
     return apiResponse.badRequest(res, 'Requisition ID is required');
@@ -108,6 +111,58 @@ export default withAuth(withErrorHandler(async (
             )
           `;
           approvalCreated = true;
+
+          // Notify approvers via bell notification + inbox message
+          const approvers = await sql`
+            SELECT u.id, u.name, u.email FROM users u
+            JOIN approval_levels al ON al.id = ${level.id}
+            WHERE (
+              (al.approver_type = 'user' AND u.id::text = al.approver_user_id::text)
+              OR (al.approver_type = 'role' AND u.role = al.approver_role)
+            )
+          `;
+
+          const approverIds = approvers.map((a: { id: string }) => a.id);
+          if (approverIds.length > 0) {
+            const formattedAmount = new Intl.NumberFormat('en-ZA', {
+              style: 'currency', currency: 'ZAR',
+            }).format(amount);
+
+            notify({
+              event_type: 'procurement.approval_needed',
+              title: `PR ${updated!.requisition_number} requires your approval`,
+              body: `${userName} submitted a purchase requisition for ${formattedAmount}`,
+              action_url: `/procurement/requisitions/${id}`,
+              source_module: 'procurement',
+              source_id: id,
+              recipient_user_ids: approverIds,
+            }).catch(err => {
+              log.error('Failed to send PR approval notification', { error: err }, 'procurement');
+            });
+
+            // Send inbox message
+            const msgResult = await sql`
+              INSERT INTO internal_messages (
+                sender_id, subject, body, priority,
+                context_module, context_id, context_url
+              ) VALUES (
+                ${userId}::uuid,
+                ${'PR ' + updated!.requisition_number + ' — Approval Required'},
+                ${'Purchase Requisition ' + updated!.requisition_number + ' for ' + formattedAmount + ' has been submitted for your approval.\n\nSubmitted by: ' + userName},
+                'normal', 'procurement', ${id},
+                ${'/procurement/requisitions/' + id}
+              )
+              RETURNING id
+            `;
+
+            for (const approverId of approverIds) {
+              await sql`
+                INSERT INTO internal_message_recipients (message_id, recipient_id)
+                VALUES (${msgResult[0]!.id}, ${approverId}::uuid)
+                ON CONFLICT (message_id, recipient_id) DO NOTHING
+              `;
+            }
+          }
         }
       }
 
