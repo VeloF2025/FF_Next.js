@@ -91,8 +91,8 @@ type Phase = 'prerequisites' | 'photo_review' | 'data_validation' | 'final_decis
 const PHASES: { key: Phase; label: string; icon: typeof CheckCircle }[] = [
   { key: 'prerequisites', label: 'Prerequisites', icon: ClipboardCheck },
   { key: 'photo_review', label: 'Photo Review', icon: Camera },
-  { key: 'data_validation', label: 'Data Validation', icon: Database },
   { key: 'final_decision', label: 'Decision', icon: Gavel },
+  { key: 'data_validation', label: 'Data Validation', icon: Database },
   { key: 'feedback', label: 'Feedback', icon: MessageSquare },
 ];
 
