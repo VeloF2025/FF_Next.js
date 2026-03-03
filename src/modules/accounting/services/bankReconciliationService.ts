@@ -1090,6 +1090,7 @@ function mapTxRow(row: Row): BankTransaction {
     suggestedSupplierName: row.suggested_supplier_name ? String(row.suggested_supplier_name) : undefined,
     suggestedClientId: row.suggested_client_id ? String(row.suggested_client_id) : undefined,
     suggestedClientName: row.suggested_client_name ? String(row.suggested_client_name) : undefined,
+    suggestedVatCode: row.suggested_vat_code && row.suggested_vat_code !== 'none' ? String(row.suggested_vat_code) : undefined,
     allocationType: row.allocation_type ? String(row.allocation_type) as BankTransaction['allocationType'] : undefined,
     allocatedEntityName: row.allocated_entity_name ? String(row.allocated_entity_name) : undefined,
   };

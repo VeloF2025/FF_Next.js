@@ -168,19 +168,20 @@ export default function BankTransactionsPage() {
       // Skip only if user has already picked a specific entity — an empty selection (type set, no entity)
       // should be overridden by fresh DB suggestions (e.g. after Apply Rules runs)
       if (rowSelections[tx.id]?.entityId) continue;
+      const suggestedVat = (tx.suggestedVatCode || 'none') as VatCode;
       if (tx.suggestedSupplierId) {
         initialSelections[tx.id] = {
           type: 'supplier' as AllocType,
           entityId: tx.suggestedSupplierId,
           label: tx.suggestedSupplierName || tx.suggestedCategory || '',
-          vatCode: 'none' as VatCode,
+          vatCode: suggestedVat,
         };
       } else if (tx.suggestedClientId) {
         initialSelections[tx.id] = {
           type: 'customer' as AllocType,
           entityId: tx.suggestedClientId,
           label: tx.suggestedClientName || tx.suggestedCategory || '',
-          vatCode: 'none' as VatCode,
+          vatCode: suggestedVat,
         };
       } else if (tx.suggestedGlAccountId) {
         initialSelections[tx.id] = {
@@ -189,7 +190,7 @@ export default function BankTransactionsPage() {
           label: tx.suggestedGlAccountCode
             ? `${tx.suggestedGlAccountCode} ${tx.suggestedGlAccountName || ''}`
             : tx.suggestedGlAccountName || tx.suggestedCategory || '',
-          vatCode: 'none' as VatCode,
+          vatCode: suggestedVat,
         };
       }
     }

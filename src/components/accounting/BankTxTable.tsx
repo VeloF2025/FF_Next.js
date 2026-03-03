@@ -39,6 +39,7 @@ export interface BankTx {
   suggestedClientId?: string;
   suggestedClientName?: string;
   suggestedCategory?: string;
+  suggestedVatCode?: string;
   /** Allocation tracking — populated for matched/reconciled transactions */
   allocationType?: AllocType;
   allocatedEntityName?: string;
