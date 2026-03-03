@@ -20,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const [qaRows, otdrRows, infraRows, qaByFeatureRows] = await Promise.all([
+    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows] = await Promise.all([
       // QA stats per project per discipline
       sql`
         SELECT
@@ -47,13 +47,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE project_id IS NOT NULL
         GROUP BY project_id
       `,
-      // Infrastructure inventory counts
+      // Infrastructure inventory counts — planted = field status OR has QA photos
       sql`
         SELECT project_id, 'poles' AS infra_type, COUNT(*)::int AS total,
-               COUNT(*) FILTER (WHERE pole_planted IN ('Pole Planted', 'Yes', 'Planted'))::int AS field_done
+               COUNT(*) FILTER (WHERE pole_planted IN ('Pole Planted', 'Yes', 'Planted')
+                 OR pole_number IN (
+                   SELECT feature_id FROM construction_qa_reviews r
+                   WHERE r.project_id = poles.project_id AND r.feature_type = 'pole' AND r.photo_count > 0
+                 )
+               )::int AS field_done
         FROM poles WHERE project_id IS NOT NULL GROUP BY project_id
-        UNION ALL
-        SELECT project_id, 'joints', COUNT(*)::int, 0
+      `,
+      // Poles with QA photos but unmatched to poles table (QField internal IDs)
+      sql`
+        SELECT r.project_id, COUNT(*)::int AS unmatched_planted
+        FROM construction_qa_reviews r
+        WHERE r.feature_type = 'pole' AND r.photo_count > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM poles pol
+            WHERE pol.project_id = r.project_id AND pol.pole_number = r.feature_id
+          )
+        GROUP BY r.project_id
+      `,
+      // Joints + cable_spans inventory
+      sql`
+        SELECT project_id, 'joints' AS infra_type, COUNT(*)::int AS total, 0 AS field_done
         FROM joints WHERE project_id IS NOT NULL GROUP BY project_id
         UNION ALL
         SELECT project_id, 'cable_spans', COUNT(*)::int, 0
@@ -87,13 +105,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       cable_spans: { total: number; planted: number; qa_total: number; qa_approved: number };
     }>();
 
+    // Poles from dedicated query (includes matched photo-based planted)
+    for (const row of poleRows) {
+      const pid = row.project_id;
+      if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
+      const infra = infraMap.get(pid)!;
+      infra.poles.total = Number(row.total);
+      infra.poles.planted = Number(row.field_done);
+    }
+
+    // Add unmatched planted (QField reviews with photos but no pole record match)
+    for (const row of unmatchedPlantedRows) {
+      const pid = row.project_id;
+      if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
+      infraMap.get(pid)!.poles.planted += Number(row.unmatched_planted);
+    }
+
+    // Joints + cable_spans
     for (const row of infraRows) {
       const pid = row.project_id;
       if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
       const infra = infraMap.get(pid)!;
-      const itype = row.infra_type as 'poles' | 'joints' | 'cable_spans';
+      const itype = row.infra_type as 'joints' | 'cable_spans';
       infra[itype].total = Number(row.total);
-      infra[itype].planted = Number(row.field_done);
     }
 
     // Merge QA counts by feature_type into infra map
