@@ -156,7 +156,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
       }
 
       // If already decided, jump to feedback phase
-      if (rv.workflow_status === 'approved' || rv.workflow_status === 'rejected') {
+      if (rv.workflow_status === 'approved' || rv.workflow_status === 'rejected' || rv.workflow_status === 'rework_needed') {
         setPhase('feedback');
       }
     } catch (err) {
@@ -216,6 +216,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
   const submitDecision = async () => {
     if (!review || !decision) return;
     setSaving(true);
+    setError(null);
     try {
       const res = await fetch('/api/construction-qa/final-decision', {
         method: 'POST',
@@ -234,9 +235,15 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
       if (res.ok) {
         await fetchReview();
         setPhase('feedback');
+      } else {
+        const body = await res.json().catch(() => null);
+        const msg = body?.error || body?.message || `Decision failed (${res.status})`;
+        setError(msg);
+        log.error('Decision API error', { module: 'construction-qa', status: res.status, msg }, 'construction-qa');
       }
     } catch (err) {
       log.error('Failed to submit decision', { module: 'construction-qa', error: (err as Error).message }, 'construction-qa');
+      setError('Network error — could not submit decision');
     } finally {
       setSaving(false);
     }
@@ -430,6 +437,17 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
           );
         })}
       </div>
+
+      {/* Inline error banner (dismissible) */}
+      {error && review && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400/60 hover:text-red-300">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Phase Content */}
       <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg p-6 min-h-[400px]">
