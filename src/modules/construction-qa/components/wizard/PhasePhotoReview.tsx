@@ -7,8 +7,8 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { DragDropContext, Droppable, Draggable, type DropResult, type DragUpdate, type DragStart } from '@hello-pangea/dnd';
 import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
 import { PhotoLightbox } from './PhotoLightbox';
@@ -39,6 +39,9 @@ interface Props {
 export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onStepChange, onPhotoStepChange }: Props) {
   const [expandedStep, setExpandedStep] = useState<number | null>(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastHoveredRef = useRef<string | null>(null);
 
   // Group photos by step (step 0 = VLM-classified "unrelated" — treat as unassigned)
   const photosByStep = new Map<number, PhotoData[]>();
@@ -85,7 +88,41 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
     return map;
   }, [checklist]);
 
+  const handleDragStart = useCallback((_start: DragStart) => {
+    setIsDragging(true);
+    lastHoveredRef.current = null;
+  }, []);
+
+  const handleDragUpdate = useCallback((update: DragUpdate) => {
+    const destId = update.destination?.droppableId ?? null;
+
+    // Clear timer if we left the previous target
+    if (destId !== lastHoveredRef.current) {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      lastHoveredRef.current = destId;
+
+      // Auto-expand collapsed steps after a short hover delay
+      if (destId && destId.startsWith('step-')) {
+        const stepNo = Number(destId.replace('step-', ''));
+        if (expandedStep !== stepNo) {
+          hoverTimerRef.current = setTimeout(() => {
+            setExpandedStep(stepNo);
+          }, 350);
+        }
+      }
+    }
+  }, [expandedStep]);
+
   const handleDragEnd = useCallback((result: DropResult) => {
+    setIsDragging(false);
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+
     if (!result.destination || !onPhotoStepChange) return;
     const { draggableId, source, destination } = result;
     if (source.droppableId === destination.droppableId) return;
@@ -106,7 +143,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   const dndEnabled = Boolean(onPhotoStepChange);
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
+    <DragDropContext onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-white mb-1">Photo Review</h2>
@@ -143,7 +180,9 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                     {/* Step Header */}
                     <div
                       onClick={() => setExpandedStep(isExpanded ? null : step.step)}
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors"
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors ${
+                        isDragging && !isExpanded && snapshot.isDraggingOver ? 'bg-blue-500/10' : ''
+                      }`}
                     >
                       {/* Checkbox */}
                       <button
