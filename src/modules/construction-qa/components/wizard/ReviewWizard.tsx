@@ -280,10 +280,39 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
 
   // Drag-and-drop photo step reassignment
   const handlePhotoStepChange = async (photoId: string, newStep: number | null, stepLabel: string | null) => {
-    // Optimistic update
-    setPhotos(prev => prev.map(p =>
+    if (!review) return;
+
+    // Find the photo's current step before moving
+    const movedPhoto = photos.find(p => p.id === photoId);
+    const oldStep = movedPhoto?.checklist_step ?? null;
+
+    // Optimistic photo update
+    const updatedPhotos = photos.map(p =>
       p.id === photoId ? { ...p, checklist_step: newStep, step_label: stepLabel } : p
-    ));
+    );
+    setPhotos(updatedPhotos);
+
+    // Auto-sync checkboxes: tick destination, untick empty source
+    if (newStep != null && newStep > 0) {
+      const destCol = getStepColumn(review.discipline, newStep);
+      if (!checkedSteps[destCol]) {
+        setCheckedSteps(prev => ({ ...prev, [destCol]: true }));
+        saveStepToggle(destCol, true);
+      }
+    }
+    if (oldStep != null && oldStep > 0) {
+      const sourceStillHasPhotos = updatedPhotos.some(
+        p => p.id !== photoId && p.checklist_step === oldStep
+      );
+      if (!sourceStillHasPhotos) {
+        const srcCol = getStepColumn(review.discipline, oldStep);
+        if (checkedSteps[srcCol]) {
+          setCheckedSteps(prev => ({ ...prev, [srcCol]: false }));
+          saveStepToggle(srcCol, false);
+        }
+      }
+    }
+
     try {
       const res = await fetch('/api/construction-qa/photo-step', {
         method: 'PATCH',
