@@ -36,7 +36,7 @@
     "react/prop-types": "off",
     "react/react-in-jsx-scope": "off",
     "react/no-unescaped-entities": "off",
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-console": ["error", { "allow": ["warn", "error"] }],
     "prefer-const": "error",
     "no-var": "error",
     "max-lines": ["warn", { "max": 500, "skipBlankLines": true, "skipComments": true }]
