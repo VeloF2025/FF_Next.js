@@ -185,7 +185,21 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
               />
               {expandedZones.has(zone.zone_no) && (
                 <div className="border-t border-[var(--border-color)] bg-gray-900/30">
-                  {zone.pons.length === 0 ? (
+                  {zone.zone_no === -1 ? (
+                    /* Unassigned zone: no PON sub-rows — show direct action */
+                    <button
+                      onClick={() => handleSelectPon(-1, -1)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 pl-12 text-left transition-colors ${
+                        selectedPon?.zone === -1
+                          ? 'bg-blue-500/10 border-l-2 border-blue-500'
+                          : 'hover:bg-[var(--hover-bg)] border-l-2 border-transparent'
+                      }`}
+                    >
+                      <span className="text-sm text-yellow-400/70">
+                        {zone.total} features without zone/PON assignment
+                      </span>
+                    </button>
+                  ) : zone.pons.length === 0 ? (
                     <div className="px-4 py-3 pl-12 text-xs text-gray-500">
                       No PONs in this zone.
                     </div>

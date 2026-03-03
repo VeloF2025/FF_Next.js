@@ -29,8 +29,8 @@ export function ZoneAccordionHeader({ zone, expanded, onToggle }: ZoneAccordionH
         <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
       )}
 
-      <span className="text-sm font-semibold text-white min-w-[80px]">
-        Zone {zone.zone_no}
+      <span className={`text-sm font-semibold min-w-[80px] ${zone.zone_no === -1 ? 'text-yellow-400' : 'text-white'}`}>
+        {zone.zone_no === -1 ? 'Unassigned' : `Zone ${zone.zone_no}`}
       </span>
 
       {/* Mini progress bar */}

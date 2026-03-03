@@ -28,7 +28,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     // QA stats grouped by zone/pon
-    const conditions: string[] = ['r.project_id = $1::uuid', 'r.zone_no IS NOT NULL'];
+    const conditions: string[] = ['r.project_id = $1::uuid'];
     const params: (string | number)[] = [projectId];
     let paramIdx = 2;
 
@@ -40,6 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const whereClause = conditions.join(' AND ');
 
+    // Include ALL features (with and without zone) — NULL zones go into "Unassigned"
     const qaQuery = `
       SELECT
         r.zone_no,
@@ -56,7 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM construction_qa_reviews r
       WHERE ${whereClause}
       GROUP BY r.zone_no, r.pon_no
-      ORDER BY r.zone_no, r.pon_no
+      ORDER BY r.zone_no NULLS LAST, r.pon_no NULLS LAST
     `;
 
     // Pipeline stages from pon_stage_tracking
@@ -101,8 +102,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }>();
 
     for (const row of qaRows) {
-      const zn = Number(row.zone_no);
-      const pn = row.pon_no !== null ? Number(row.pon_no) : null;
+      // Use -1 as sentinel for unassigned features (zone_no IS NULL)
+      const zn = row.zone_no != null ? Number(row.zone_no) : -1;
+      const pn = row.pon_no != null ? Number(row.pon_no) : null;
 
       if (!zoneMap.has(zn)) {
         zoneMap.set(zn, {

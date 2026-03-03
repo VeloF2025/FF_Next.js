@@ -34,13 +34,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const offset = (page - 1) * pageSize;
 
   try {
-    const conditions: string[] = [
-      'r.project_id = $1::uuid',
-      'r.zone_no = $2',
-      'r.pon_no = $3',
-    ];
-    const params: (string | number)[] = [projectId, parseInt(zoneNo, 10), parseInt(ponNo, 10)];
-    let paramIdx = 4;
+    // zone=-1 / pon=-1 is the sentinel for unassigned features (NULL zone/pon)
+    const zoneInt = parseInt(zoneNo, 10);
+    const ponInt = parseInt(ponNo, 10);
+    const isUnassigned = zoneInt === -1;
+
+    const conditions: string[] = ['r.project_id = $1::uuid'];
+    const params: (string | number)[] = [projectId];
+    let paramIdx = 2;
+
+    if (isUnassigned) {
+      conditions.push('r.zone_no IS NULL');
+    } else {
+      conditions.push(`r.zone_no = $${paramIdx}`);
+      params.push(zoneInt);
+      paramIdx++;
+      conditions.push(`r.pon_no = $${paramIdx}`);
+      params.push(ponInt);
+      paramIdx++;
+    }
 
     if (discipline) {
       conditions.push(`r.discipline = $${paramIdx}`);

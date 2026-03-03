@@ -85,8 +85,8 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId }: PonF
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-white">
-            Zone {zoneNo} / PON {ponNo}
+          <h3 className={`text-sm font-semibold ${zoneNo === -1 ? 'text-yellow-400' : 'text-white'}`}>
+            {zoneNo === -1 ? 'Unassigned Features' : `Zone ${zoneNo} / PON ${ponNo}`}
           </h3>
           <span className="text-xs text-gray-500">{total} features</span>
         </div>
