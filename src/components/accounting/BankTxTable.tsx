@@ -355,7 +355,9 @@ export function BankTxTable(props: Props) {
                   {tx.reference || tx.bankReference || ''}
                 </td>
                 <td className="py-2 px-2">
-                  {isNew ? (
+                  {sel?.type === 'supplier' || sel?.type === 'customer' ? (
+                    <span className="text-xs text-[var(--ff-text-tertiary)] italic">N/A</span>
+                  ) : isNew ? (
                     <select
                       value={sel?.vatCode || 'none'}
                       onChange={e => onRowVatChange(tx.id, e.target.value as VatCode)}

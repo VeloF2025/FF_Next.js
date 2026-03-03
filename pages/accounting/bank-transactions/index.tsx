@@ -169,20 +169,20 @@ export default function BankTransactionsPage() {
       // Skip only if user has already picked a specific entity — an empty selection (type set, no entity)
       // should be overridden by fresh DB suggestions (e.g. after Apply Rules runs)
       if (rowSelections[tx.id]?.entityId) continue;
-      const suggestedVat = (tx.suggestedVatCode || 'none') as VatCode;
+      // VAT only applies to GL account allocations; supplier/customer VAT is handled on their own invoices
       if (tx.suggestedSupplierId) {
         initialSelections[tx.id] = {
           type: 'supplier' as AllocType,
           entityId: tx.suggestedSupplierId,
           label: tx.suggestedSupplierName || tx.suggestedCategory || '',
-          vatCode: suggestedVat,
+          vatCode: 'none',
         };
       } else if (tx.suggestedClientId) {
         initialSelections[tx.id] = {
           type: 'customer' as AllocType,
           entityId: tx.suggestedClientId,
           label: tx.suggestedClientName || tx.suggestedCategory || '',
-          vatCode: suggestedVat,
+          vatCode: 'none',
         };
       } else if (tx.suggestedGlAccountId) {
         initialSelections[tx.id] = {
@@ -191,7 +191,7 @@ export default function BankTransactionsPage() {
           label: tx.suggestedGlAccountCode
             ? `${tx.suggestedGlAccountCode} ${tx.suggestedGlAccountName || ''}`
             : tx.suggestedGlAccountName || tx.suggestedCategory || '',
-          vatCode: suggestedVat,
+          vatCode: (tx.suggestedVatCode || 'none') as VatCode,
         };
       }
     }
@@ -739,7 +739,9 @@ export default function BankTransactionsPage() {
                 allSelected ? new Set() : new Set(transactions.map(t => t.id))
               )}
               onRowTypeChange={(txId, type) => {
-                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode: prev[txId]?.vatCode || 'none' } }));
+                // VAT only applies to GL account allocations; supplier/customer VAT is handled on their invoices
+                const vatCode = type === 'account' ? (rowSelections[txId]?.vatCode || 'none') : 'none';
+                setRowSelections(prev => ({ ...prev, [txId]: { type, entityId: '', label: '', vatCode } }));
                 saveSelection(txId, type, '');
               }}
               onRowEntityChange={(txId, entityId, label) => {
