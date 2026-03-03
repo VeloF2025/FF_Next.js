@@ -8,13 +8,13 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { deleteRule, toggleRule, applyRules, updateRule } from '@/modules/accounting/services/bankRulesService';
+import { deleteRule, deleteRules, toggleRule, applyRules, updateRule } from '@/modules/accounting/services/bankRulesService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
 
   const userId = (req as AuthenticatedNextApiRequest).user.id;
-  const { action, id, isActive, bankAccountId } = req.body;
+  const { action, id, ids, isActive, bankAccountId } = req.body;
 
   try {
     switch (action) {
@@ -22,6 +22,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (!id) return apiResponse.badRequest(res, 'id required');
         await deleteRule(id);
         return apiResponse.success(res, { deleted: true });
+
+      case 'deleteMany': {
+        if (!Array.isArray(ids) || ids.length === 0) return apiResponse.badRequest(res, 'ids array required');
+        const count = await deleteRules(ids);
+        return apiResponse.success(res, { deleted: count });
+      }
 
       case 'toggle':
         if (!id) return apiResponse.badRequest(res, 'id required');

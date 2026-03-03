@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil } from 'lucide-react';
+import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil, CheckSquare } from 'lucide-react';
 
 interface Rule {
   id: string;
@@ -44,6 +44,8 @@ export default function BankRulesPage() {
   const [error, setError] = useState('');
   const [applyResult, setApplyResult] = useState<{ applied: number; skipped: number } | null>(null);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [form, setForm] = useState({
     ruleName: '', matchField: 'description', matchType: 'contains',
@@ -56,7 +58,28 @@ export default function BankRulesPage() {
     const json = await res.json();
     setRules(json.data?.items || []);
     setLoading(false);
+    setSelected(new Set());
   }, []);
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} selected rule${selected.size > 1 ? 's' : ''}?`)) return;
+    setBulkDeleting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/accounting/bank-rules-action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify({ action: 'deleteMany', ids: [...selected] }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Bulk delete failed');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk delete failed');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -200,6 +223,16 @@ export default function BankRulesPage() {
                   ))}
                 </select>
               )}
+              {selected.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium disabled:opacity-50"
+                >
+                  {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Delete {selected.size} selected
+                </button>
+              )}
               <button
                 onClick={() => doAction('apply', undefined, { bankAccountId: selectedBankId })}
                 disabled={!!busy || !selectedBankId}
@@ -279,6 +312,15 @@ export default function BankRulesPage() {
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-[var(--ff-border-light)] text-left text-[var(--ff-text-secondary)]">
+                <th className="px-3 py-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={rules.length > 0 && selected.size === rules.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < rules.length; }}
+                    onChange={e => setSelected(e.target.checked ? new Set(rules.map(r => r.id)) : new Set())}
+                    className="rounded border-[var(--ff-border-light)] accent-yellow-500"
+                  />
+                </th>
                 <th className="px-4 py-3">Rule</th>
                 <th className="px-4 py-3">Match</th>
                 <th className="px-4 py-3">Pattern</th>
@@ -289,10 +331,22 @@ export default function BankRulesPage() {
                 <th className="px-4 py-3">Actions</th>
               </tr></thead>
               <tbody>
-                {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
-                {!loading && rules.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
+                {loading && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
+                {!loading && rules.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
                 {rules.map(rule => (
-                  <tr key={rule.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50">
+                  <tr key={rule.id} className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50 ${selected.has(rule.id) ? 'bg-yellow-500/5' : ''}`}>
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(rule.id)}
+                        onChange={e => setSelected(prev => {
+                          const next = new Set(prev);
+                          e.target.checked ? next.add(rule.id) : next.delete(rule.id);
+                          return next;
+                        })}
+                        className="rounded border-[var(--ff-border-light)] accent-yellow-500"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-[var(--ff-text-primary)] font-medium">{rule.ruleName}</td>
                     <td className="px-4 py-3 text-[var(--ff-text-secondary)]">
                       <span className="text-xs">{rule.matchField} {rule.matchType}</span>

@@ -70,6 +70,16 @@ export async function deleteRule(id: string): Promise<void> {
   await sql`DELETE FROM bank_categorisation_rules WHERE id = ${id}::UUID`;
 }
 
+export async function deleteRules(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await sql`
+    DELETE FROM bank_categorisation_rules
+    WHERE id = ANY(${ids}::UUID[])
+    RETURNING id
+  ` as { id: string }[];
+  return rows.length;
+}
+
 export async function toggleRule(id: string, isActive: boolean): Promise<void> {
   await sql`UPDATE bank_categorisation_rules SET is_active = ${isActive} WHERE id = ${id}::UUID`;
 }
