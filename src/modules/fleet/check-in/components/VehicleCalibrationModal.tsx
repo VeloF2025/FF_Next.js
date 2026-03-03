@@ -73,20 +73,39 @@ export function VehicleCalibrationModal({
 
   const canComplete = isValidOdometer && isValidFuel && hasPhoto;
 
+  // Compress photo to max 1280px wide, JPEG 0.85 quality (matches old getUserMedia output)
+  const compressPhoto = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 1280;
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  }, []);
+
   // Handle photo from native camera file input
-  const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoCapture = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDashboardPhoto(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const dataUrl = await compressPhoto(file);
+    setDashboardPhoto(dataUrl);
 
     // Reset input so the same file can be re-selected
     e.target.value = '';
-  }, []);
+  }, [compressPhoto]);
 
   // Open native camera
   const openCamera = useCallback(() => {
