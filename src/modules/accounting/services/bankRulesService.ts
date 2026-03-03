@@ -191,6 +191,22 @@ export async function applyRules(
         entries.push({ bankTxId: String(row.id), ruleName: String(row.rule_name), suggestion: true });
       }
       totalApplied += updated.length;
+
+      // Backfill vat_code for already-suggested transactions (suggested before the vat_code column existed)
+      await sql`
+        UPDATE bank_transactions bt
+        SET suggested_vat_code = r.vat_code
+        FROM (
+          SELECT DISTINCT ON (rule_name) rule_name, vat_code
+          FROM bank_categorisation_rules
+          WHERE is_active = true AND vat_code != 'none'
+          ORDER BY rule_name, priority ASC
+        ) r
+        WHERE bt.bank_account_id = ${bankAccountId}::UUID
+          AND bt.status IN ('imported', 'allocated')
+          AND bt.suggested_category = r.rule_name
+          AND bt.suggested_vat_code = 'none'
+      `;
     }
 
     // Auto-create JE mode — sequential (each transaction needs its own JE)

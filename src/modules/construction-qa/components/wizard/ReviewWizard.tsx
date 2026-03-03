@@ -251,6 +251,29 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
     }
   };
 
+  // Drag-and-drop photo step reassignment
+  const handlePhotoStepChange = async (photoId: string, newStep: number | null, stepLabel: string | null) => {
+    // Optimistic update
+    setPhotos(prev => prev.map(p =>
+      p.id === photoId ? { ...p, checklist_step: newStep, step_label: stepLabel } : p
+    ));
+    try {
+      const res = await fetch('/api/construction-qa/photo-step', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId, step: newStep, stepLabel }),
+      });
+      if (!res.ok) {
+        log.error('Failed to update photo step', { module: 'construction-qa', photoId, newStep });
+        await fetchReview(); // Revert on failure
+      }
+    } catch (err) {
+      log.error('Photo step change error', { module: 'construction-qa', error: (err as Error).message });
+      await fetchReview(); // Revert on failure
+    }
+  };
+
   const goNext = async () => {
     const idx = PHASES.findIndex(p => p.key === phase);
     if (idx < PHASES.length - 1) {
@@ -398,6 +421,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
             checklist={checklist}
             checkedSteps={checkedSteps}
             onStepChange={(col, val) => setCheckedSteps(prev => ({ ...prev, [col]: val }))}
+            onPhotoStepChange={handlePhotoStepChange}
           />
         )}
         {phase === 'data_validation' && (
