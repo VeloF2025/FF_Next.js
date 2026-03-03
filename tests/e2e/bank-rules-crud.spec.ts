@@ -171,6 +171,69 @@ test.describe('Bank Rules CRUD', () => {
     console.log(`Rules after delete: ${rowsAfter} (was ${rowsBefore}) ${rowsAfter < rowsBefore ? '✅' : '❌'}`);
   });
 
+  test('bulk delete rules', async ({ page }) => {
+    await page.goto('/accounting/bank-reconciliation/rules');
+    await page.waitForTimeout(1000);
+
+    const rowsBefore = await page.locator('tbody tr').count();
+    console.log(`Rules before bulk delete: ${rowsBefore}`);
+
+    if (rowsBefore < 2) {
+      console.log('⚠️  Not enough rules to test bulk delete');
+      return;
+    }
+
+    // Check 3 checkboxes (rows 1, 2, 3)
+    const checkboxes = page.locator('tbody input[type="checkbox"]');
+    await checkboxes.nth(0).check();
+    await checkboxes.nth(1).check();
+    await checkboxes.nth(2).check();
+
+    await page.screenshot({ path: 'tests/screenshots/rules-11-bulk-selected.png', fullPage: true });
+
+    // Bulk delete button should appear
+    const bulkBtn = page.getByRole('button', { name: /Delete 3 selected/i });
+    await expect(bulkBtn).toBeVisible();
+    console.log('✅ Bulk delete button visible with 3 selected');
+
+    // Accept confirm dialog and click
+    page.on('dialog', d => d.accept());
+    await bulkBtn.click();
+    await page.waitForTimeout(2000);
+
+    await page.screenshot({ path: 'tests/screenshots/rules-12-after-bulk-delete.png', fullPage: true });
+
+    const rowsAfter = await page.locator('tbody tr').count();
+    console.log(`Rules after bulk delete: ${rowsAfter} (was ${rowsBefore}) ${rowsAfter === rowsBefore - 3 ? '✅' : '❌'}`);
+  });
+
+  test('select all checkbox', async ({ page }) => {
+    await page.goto('/accounting/bank-reconciliation/rules');
+    await page.waitForTimeout(1000);
+
+    const rowCount = await page.locator('tbody tr').count();
+    if (rowCount === 0) { console.log('⚠️  No rules'); return; }
+
+    // Click select-all in thead
+    const selectAll = page.locator('thead input[type="checkbox"]');
+    await selectAll.check();
+    await page.waitForTimeout(300);
+
+    // All row checkboxes should be checked
+    const allChecked = await page.locator('tbody input[type="checkbox"]:checked').count();
+    console.log(`Select all: ${allChecked}/${rowCount} checked ${allChecked === rowCount ? '✅' : '❌'}`);
+
+    // Bulk delete button shows total
+    const bulkBtn = page.getByRole('button', { name: new RegExp(`Delete ${rowCount} selected`) });
+    const visible = await bulkBtn.isVisible().catch(() => false);
+    console.log(`Bulk button shows correct count: ${visible ? '✅' : '❌'}`);
+
+    // Uncheck all
+    await selectAll.uncheck();
+    const noneChecked = await page.locator('tbody input[type="checkbox"]:checked').count();
+    console.log(`Uncheck all: ${noneChecked === 0 ? '✅' : '❌'} (${noneChecked} still checked)`);
+  });
+
   test('apply rules button', async ({ page }) => {
     await page.goto('/accounting/bank-reconciliation/rules');
 

@@ -82,7 +82,12 @@ interface ProjectOption {
 // Component
 // =============================================================================
 
-export function OtdrTestingPage() {
+interface OtdrTestingPageProps {
+  /** Pre-filter to a specific project when rendered from project detail page */
+  projectId?: string;
+}
+
+export function OtdrTestingPage({ projectId }: OtdrTestingPageProps = {}) {
   const [results, setResults] = useState<TestResult[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -91,7 +96,7 @@ export function OtdrTestingPage() {
   const [total, setTotal] = useState(0);
 
   // Filters
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState(projectId || '');
   const [testTypeFilter, setTestTypeFilter] = useState('');
   const [verdictFilter, setVerdictFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');

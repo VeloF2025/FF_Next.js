@@ -18,7 +18,6 @@ import {
   RefreshCw,
   Film,
   Plus,
-  Construction,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -29,6 +28,8 @@ import { CommunicationsStatsCards, CommunicationsMeetingsTab } from './component
 import { NotificationsTab } from './notifications/NotificationsTab';
 import { EmailTab } from './email/EmailTab';
 import { InboxPanel } from './messaging/InboxPanel';
+import { CreateActionItemModal } from '@/modules/meetings/components/CreateActionItemModal';
+import { SettingsTab } from './settings/SettingsTab';
 
 const TABS: { key: CommsTab; label: string; icon: React.ElementType }[] = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
@@ -39,19 +40,6 @@ const TABS: { key: CommsTab; label: string; icon: React.ElementType }[] = [
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
-function ComingSoonCard({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="text-center py-16">
-      <Construction className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-4" />
-      <h3 className="text-lg font-medium text-[var(--ff-text-primary)] mb-2">{title}</h3>
-      <p className="text-sm text-[var(--ff-text-secondary)] max-w-md mx-auto">{description}</p>
-      <span className="inline-block mt-4 px-3 py-1 text-xs font-medium bg-amber-500/10 text-amber-400 rounded-full">
-        Coming Soon
-      </span>
-    </div>
-  );
-}
-
 export default function CommunicationsHub() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<CommsTab>('meetings');
@@ -60,6 +48,7 @@ export default function CommunicationsHub() {
   const [isSyncingTeams, setIsSyncingTeams] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [showCreateActionItem, setShowCreateActionItem] = useState(false);
   const { data, stats, isLoading, getStatusColor, refetch } = useCommunications();
 
   // Sync active tab with URL param
@@ -194,7 +183,7 @@ export default function CommunicationsHub() {
 
                 <button
                   type="button"
-                  onClick={() => {}}
+                  onClick={() => setShowCreateActionItem(true)}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -345,15 +334,15 @@ export default function CommunicationsHub() {
             role="tabpanel"
             hidden={activeTab !== 'settings'}
           >
-            {activeTab === 'settings' && (
-              <ComingSoonCard
-                title="Communication Preferences"
-                description="Configure notification preferences per event type — choose between in-app, email, and WhatsApp delivery for each module."
-              />
-            )}
+            {activeTab === 'settings' && <SettingsTab />}
           </div>
         </div>
       </div>
+      {/* Create Action Item Modal */}
+      <CreateActionItemModal
+        isOpen={showCreateActionItem}
+        onClose={() => setShowCreateActionItem(false)}
+      />
     </div>
   );
 }

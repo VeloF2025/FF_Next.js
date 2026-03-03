@@ -22,7 +22,7 @@ interface UseInternalMessagesReturn {
   archiveMessages: (messageIds: string[]) => Promise<void>;
 }
 
-export function useInternalMessages(view: MessageView): UseInternalMessagesReturn {
+export function useInternalMessages(view: MessageView, searchTerm?: string): UseInternalMessagesReturn {
   const [messages, setMessages] = useState<MessageListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -40,6 +40,10 @@ export function useInternalMessages(view: MessageView): UseInternalMessagesRetur
         limit: String(PAGE_SIZE),
         offset: String(currentOffset),
       });
+
+      if (searchTerm && searchTerm.length > 0) {
+        params.set('search', searchTerm);
+      }
 
       const res = await fetch(`/api/communications/messages?${params}`, {
         credentials: 'include',
@@ -63,7 +67,7 @@ export function useInternalMessages(view: MessageView): UseInternalMessagesRetur
     } finally {
       setIsLoading(false);
     }
-  }, [offset, view]);
+  }, [offset, view, searchTerm]);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -121,11 +125,11 @@ export function useInternalMessages(view: MessageView): UseInternalMessagesRetur
     }
   }, []);
 
-  // Fetch messages on mount and when view changes
+  // Fetch messages on mount and when view or search term changes
   useEffect(() => {
     fetchMessages(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, searchTerm]);
 
   // Poll unread count
   useEffect(() => {

@@ -46,18 +46,18 @@ export interface BankTransaction {
   /** Suggestion fields — populated by rules or classified import */
   suggestedGlAccountId?: string;
   suggestedSupplierId?: string;
+  suggestedClientId?: string;
   suggestedCategory?: string;
   suggestedCostCentre?: string;
+  suggestedVatCode?: string;
   createdAt: string;
   updatedAt: string;
-  // Joined
+  // Joined display fields
   bankAccountName?: string;
   matchedEntryNumber?: string;
   suggestedGlAccountName?: string;
   suggestedGlAccountCode?: string;
-  suggestedSupplierId?: string;
   suggestedSupplierName?: string;
-  suggestedClientId?: string;
   suggestedClientName?: string;
   // Allocation tracking — populated when status is matched/reconciled
   allocationType?: 'account' | 'supplier' | 'customer';

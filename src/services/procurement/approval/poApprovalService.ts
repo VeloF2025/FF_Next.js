@@ -11,6 +11,7 @@
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
+import { notify } from '@/modules/notifications/services';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -273,6 +274,42 @@ class POApprovalService {
         amount: totalAmount,
       });
 
+      // Notify approvers via bell notification + inbox message
+      const approvers = await this.getApproversForLevel(level);
+      const approverIds = approvers.map(a => a.id);
+
+      if (approverIds.length > 0) {
+        const formattedAmount = new Intl.NumberFormat('en-ZA', {
+          style: 'currency', currency: 'ZAR',
+        }).format(totalAmount);
+
+        // Bell notification
+        notify({
+          event_type: 'procurement.approval_needed',
+          title: `PO ${po.po_number} requires your approval`,
+          body: `${requestedByName} submitted a purchase order for ${formattedAmount}`,
+          action_url: `/procurement/purchase-orders/${poId}`,
+          source_module: 'procurement',
+          source_id: poId,
+          recipient_user_ids: approverIds,
+        }).catch(err => {
+          log.error('Failed to send approval notification', { error: err }, 'procurement');
+        });
+
+        // Inbox message via internal_messages
+        this.sendApprovalInboxMessage(
+          requestedBy,
+          approverIds,
+          `PO ${po.po_number} — Approval Required`,
+          `Purchase Order ${po.po_number} for ${formattedAmount} has been submitted for your approval.\n\nLevel: ${level.name}\nSubmitted by: ${requestedByName}`,
+          'procurement',
+          poId,
+          `/procurement/purchase-orders/${poId}`
+        ).catch(err => {
+          log.error('Failed to send approval inbox message', { error: err }, 'procurement');
+        });
+      }
+
       // Return approval request
       const approvalRequest: ApprovalRequest = {
         id: approvalRequestId,
@@ -367,6 +404,33 @@ class POApprovalService {
 
       // Post commitment to GL (non-blocking)
       postPurchaseOrderToGL(poId, approverId).catch(() => {});
+
+      // Notify requester via bell + inbox
+      const approvalRequest = po.current_approval_request_id
+        ? (await sql`SELECT requested_by, requested_by_name FROM approval_requests WHERE id = ${po.current_approval_request_id}`)[0]
+        : null;
+
+      if (approvalRequest?.requested_by) {
+        notify({
+          event_type: 'procurement.approved',
+          title: `PO ${po.po_number} approved`,
+          body: notes ? `Notes: ${notes}` : `Approved by ${approverName}`,
+          action_url: `/procurement/purchase-orders/${poId}`,
+          source_module: 'procurement',
+          source_id: poId,
+          recipient_user_ids: [approvalRequest.requested_by],
+        }).catch(() => {});
+
+        this.sendApprovalInboxMessage(
+          approverId,
+          [approvalRequest.requested_by],
+          `PO ${po.po_number} — Approved`,
+          `Your Purchase Order ${po.po_number} has been approved by ${approverName}.${notes ? `\n\nNotes: ${notes}` : ''}`,
+          'procurement',
+          poId,
+          `/procurement/purchase-orders/${poId}`
+        ).catch(() => {});
+      }
 
       log.info('PO approved', { poId, approverId, approverName });
     } catch (error) {
@@ -493,6 +557,33 @@ class POApprovalService {
           ${poId}, 'rejected', ${`Rejected (v${currentVersion}): ${reason}`}, ${rejecterId}, NOW()
         )
       `;
+
+      // Notify requester via bell + inbox
+      const approvalRequest = po.current_approval_request_id
+        ? (await sql`SELECT requested_by, requested_by_name FROM approval_requests WHERE id = ${po.current_approval_request_id}`)[0]
+        : null;
+
+      if (approvalRequest?.requested_by) {
+        notify({
+          event_type: 'procurement.rejected',
+          title: `PO ${po.po_number} rejected`,
+          body: `Reason: ${reason}`,
+          action_url: `/procurement/purchase-orders/${poId}`,
+          source_module: 'procurement',
+          source_id: poId,
+          recipient_user_ids: [approvalRequest.requested_by],
+        }).catch(() => {});
+
+        this.sendApprovalInboxMessage(
+          rejecterId,
+          [approvalRequest.requested_by],
+          `PO ${po.po_number} — Rejected (v${currentVersion})`,
+          `Your Purchase Order ${po.po_number} has been rejected by ${rejecterName}.\n\nReason: ${reason}\n\nThe PO has been reverted to draft (version ${newVersion}) for revision.`,
+          'procurement',
+          poId,
+          `/procurement/purchase-orders/${poId}`
+        ).catch(() => {});
+      }
 
       log.info('PO rejected', {
         poId,
@@ -777,6 +868,44 @@ class POApprovalService {
     } catch (error) {
       log.error('Failed to check approval permission', { poId, userId, error });
       return false;
+    }
+  }
+
+  /**
+   * Send an internal inbox message to recipients (Comms Hub)
+   */
+  private async sendApprovalInboxMessage(
+    senderId: string,
+    recipientIds: string[],
+    subject: string,
+    body: string,
+    contextModule: string,
+    contextId: string,
+    contextUrl: string
+  ): Promise<void> {
+    try {
+      const messageResult = await sql`
+        INSERT INTO internal_messages (
+          sender_id, subject, body, priority,
+          context_module, context_id, context_url
+        ) VALUES (
+          ${senderId}::uuid, ${subject}, ${body}, 'normal',
+          ${contextModule}, ${contextId}, ${contextUrl}
+        )
+        RETURNING id
+      `;
+
+      const messageId = messageResult[0]!.id;
+
+      for (const recipientId of recipientIds) {
+        await sql`
+          INSERT INTO internal_message_recipients (message_id, recipient_id)
+          VALUES (${messageId}, ${recipientId}::uuid)
+          ON CONFLICT (message_id, recipient_id) DO NOTHING
+        `;
+      }
+    } catch (error) {
+      log.error('Failed to send approval inbox message', { error, subject }, 'procurement');
     }
   }
 

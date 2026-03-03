@@ -1,6 +1,6 @@
 /**
- * Construction QA Centre Page
- * Main landing page for civil, optical, and splicing quality assurance
+ * Field Ops Dashboard — Project drill-down landing page
+ * Replaces flat feature list with hierarchical Project → Zone → PON view.
  */
 
 import type { NextPage } from 'next';
@@ -8,19 +8,19 @@ import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ModulePage } from '@/components/module-page';
 import { constructionQaConfig } from '@/modules/navigation';
-import { ConstructionQaCentrePage } from '@/modules/construction-qa/components/ConstructionQaCentrePage';
+import { FieldOpsDashboardPage } from '@/modules/construction-qa/components/dashboard/FieldOpsDashboardPage';
 
-const ConstructionQaIndex: NextPage = () => {
+const FieldOpsIndex: NextPage = () => {
   return (
     <AppLayout>
       <Head>
-        <title>Civil QA | FibreFlow</title>
+        <title>Field Ops | FibreFlow</title>
       </Head>
       <ModulePage config={constructionQaConfig}>
-        <ConstructionQaCentrePage />
+        <FieldOpsDashboardPage />
       </ModulePage>
     </AppLayout>
   );
 };
 
-export default ConstructionQaIndex;
+export default FieldOpsIndex;

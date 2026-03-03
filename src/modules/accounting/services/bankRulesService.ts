@@ -141,6 +141,7 @@ export async function applyRules(
             r.supplier_id,
             r.client_id,
             r.rule_name,
+            r.vat_code,
             ROW_NUMBER() OVER (PARTITION BY bt.id ORDER BY r.priority ASC) AS rn
           FROM bank_transactions bt
           JOIN bank_categorisation_rules r ON (
@@ -179,7 +180,8 @@ export async function applyRules(
           suggested_gl_account_id = tm.gl_account_id,
           suggested_supplier_id   = tm.supplier_id,
           suggested_client_id     = tm.client_id,
-          suggested_category      = tm.rule_name
+          suggested_category      = tm.rule_name,
+          suggested_vat_code      = COALESCE(tm.vat_code, 'none')
         FROM top_match tm
         WHERE bt.id = tm.tx_id
         RETURNING bt.id, tm.rule_name

@@ -1,121 +1,5 @@
 {
   "sessions": {
-    "3fd9b7ff-7617-473a-81a7-61a820305028": {
-      "session_id": "3fd9b7ff-7617-473a-81a7-61a820305028",
-      "started_at": "2026-02-23T09:31:29.618Z",
-      "total_input_tokens": 7222,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.021665999999999998,
-      "tool_calls": 148,
-      "tools_used": {
-        "mcp__chrome-devtools__take_screenshot": 4,
-        "mcp__chrome-devtools__navigate_page": 4,
-        "mcp__chrome-devtools__list_pages": 1,
-        "Read": 57,
-        "mcp__chrome-devtools__select_page": 4,
-        "mcp__claude-in-chrome__javascript_tool": 2,
-        "Task": 9,
-        "mcp__chrome-devtools__evaluate_script": 2,
-        "Bash": 44,
-        "TaskOutput": 3,
-        "Glob": 1,
-        "Edit": 13,
-        "Grep": 4
-      }
-    },
-    "ac1e3c3c-99b4-4704-89c1-99eabcfe60fd": {
-      "session_id": "ac1e3c3c-99b4-4704-89c1-99eabcfe60fd",
-      "started_at": "2026-02-23T11:18:00.954Z",
-      "total_input_tokens": 5072,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.015215999999999997,
-      "tool_calls": 88,
-      "tools_used": {
-        "Read": 37,
-        "Glob": 10,
-        "Bash": 30,
-        "Task": 1,
-        "Grep": 6,
-        "EnterPlanMode": 1,
-        "Write": 2,
-        "AskUserQuestion": 1
-      }
-    },
-    "91e156bf-874b-416a-bb4e-60aafa845f99": {
-      "session_id": "91e156bf-874b-416a-bb4e-60aafa845f99",
-      "started_at": "2026-02-23T11:28:03.886Z",
-      "total_input_tokens": 24204,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.07261199999999995,
-      "tool_calls": 274,
-      "tools_used": {
-        "Read": 43,
-        "Glob": 11,
-        "Grep": 25,
-        "Write": 1,
-        "Edit": 22,
-        "Bash": 111,
-        "TaskOutput": 16,
-        "Task": 3,
-        "mcp__claude-in-chrome__tabs_context_mcp": 3,
-        "mcp__claude-in-chrome__tabs_create_mcp": 1,
-        "mcp__claude-in-chrome__navigate": 7,
-        "mcp__claude-in-chrome__computer": 24,
-        "mcp__claude-in-chrome__find": 2,
-        "mcp__claude-in-chrome__read_network_requests": 2,
-        "mcp__claude-in-chrome__read_console_messages": 3
-      }
-    },
-    "ce9469bb-9ce1-4f4e-a453-315e7df66dcc": {
-      "session_id": "ce9469bb-9ce1-4f4e-a453-315e7df66dcc",
-      "started_at": "2026-02-23T11:47:43.215Z",
-      "total_input_tokens": 19388,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.05816399999999999,
-      "tool_calls": 205,
-      "tools_used": {
-        "Bash": 170,
-        "Read": 20,
-        "Task": 1,
-        "WebFetch": 2,
-        "Write": 2,
-        "mcp__claude-in-chrome__tabs_context_mcp": 1,
-        "mcp__claude-in-chrome__tabs_create_mcp": 1,
-        "mcp__claude-in-chrome__navigate": 1,
-        "mcp__claude-in-chrome__computer": 1,
-        "Edit": 6
-      }
-    },
-    "a914b162-7aab-4197-8b3c-d2efe7873479": {
-      "session_id": "a914b162-7aab-4197-8b3c-d2efe7873479",
-      "started_at": "2026-02-24T05:34:32.443Z",
-      "total_input_tokens": 3285,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.009855000000000003,
-      "tool_calls": 55,
-      "tools_used": {
-        "Bash": 24,
-        "Read": 22,
-        "Task": 1,
-        "Grep": 7,
-        "Edit": 1
-      }
-    },
-    "ca36689d-16b9-4737-828b-a7a32926e092": {
-      "session_id": "ca36689d-16b9-4737-828b-a7a32926e092",
-      "started_at": "2026-02-24T05:46:02.469Z",
-      "total_input_tokens": 8322,
-      "total_output_tokens": 0,
-      "total_cost_usd": 0.024966,
-      "tool_calls": 72,
-      "tools_used": {
-        "Bash": 63,
-        "Task": 1,
-        "Write": 1,
-        "Glob": 6,
-        "Read": 1
-      }
-    },
     "7dbffa59-43e1-4ca9-a650-3d3e51f5867c": {
       "session_id": "7dbffa59-43e1-4ca9-a650-3d3e51f5867c",
       "started_at": "2026-02-25T10:08:32.329Z",
@@ -616,6 +500,178 @@
         "Glob": 2,
         "Grep": 1,
         "WebFetch": 3
+      }
+    },
+    "2ba412c1-0e34-4cb2-a3ef-33df1fa9923c": {
+      "session_id": "2ba412c1-0e34-4cb2-a3ef-33df1fa9923c",
+      "started_at": "2026-03-02T18:15:42.433Z",
+      "total_input_tokens": 8359,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.025077000000000002,
+      "tool_calls": 125,
+      "tools_used": {
+        "Bash": 58,
+        "Grep": 8,
+        "TaskOutput": 1,
+        "ToolSearch": 4,
+        "mcp__spreadsheet__list_workbooks": 6,
+        "mcp__spreadsheet__list_sheets": 2,
+        "mcp__spreadsheet__table_profile": 6,
+        "mcp__spreadsheet__read_table": 3,
+        "Glob": 3,
+        "Read": 29,
+        "Agent": 2,
+        "Write": 2,
+        "EnterPlanMode": 1
+      }
+    },
+    "814016ed-708b-46c4-af18-319282a01515": {
+      "session_id": "814016ed-708b-46c4-af18-319282a01515",
+      "started_at": "2026-03-02T18:16:49.844Z",
+      "total_input_tokens": 933,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.002799,
+      "tool_calls": 18,
+      "tools_used": {
+        "Skill": 1,
+        "Bash": 13,
+        "TaskOutput": 1,
+        "Read": 1,
+        "Edit": 2
+      }
+    },
+    "860aae3c-9ccf-4c6f-b27d-1a7387899e0b": {
+      "session_id": "860aae3c-9ccf-4c6f-b27d-1a7387899e0b",
+      "started_at": "2026-03-02T19:41:32.695Z",
+      "total_input_tokens": 56285,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.16885500000000014,
+      "tool_calls": 393,
+      "tools_used": {
+        "Read": 105,
+        "Edit": 95,
+        "Bash": 158,
+        "Grep": 4,
+        "Glob": 15,
+        "Agent": 2,
+        "ToolSearch": 2,
+        "Write": 2,
+        "TaskOutput": 9,
+        "AskUserQuestion": 1
+      }
+    },
+    "a50f0e77-c5b0-4d73-a9ff-e4e48bf9a20d": {
+      "session_id": "a50f0e77-c5b0-4d73-a9ff-e4e48bf9a20d",
+      "started_at": "2026-03-02T19:41:56.389Z",
+      "total_input_tokens": 684,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.002052,
+      "tool_calls": 23,
+      "tools_used": {
+        "Glob": 4,
+        "Bash": 9,
+        "Read": 8,
+        "Agent": 1,
+        "TaskOutput": 1
+      }
+    },
+    "ca4c8f67-bb48-4a09-9cde-a4578c932470": {
+      "session_id": "ca4c8f67-bb48-4a09-9cde-a4578c932470",
+      "started_at": "2026-03-03T04:54:47.128Z",
+      "total_input_tokens": 9369,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.028107000000000007,
+      "tool_calls": 68,
+      "tools_used": {
+        "Read": 16,
+        "Bash": 30,
+        "Grep": 8,
+        "Agent": 1,
+        "Edit": 9,
+        "TaskOutput": 3,
+        "Glob": 1
+      }
+    },
+    "c9f3d563-70f9-44ec-9d57-3109de4f8909": {
+      "session_id": "c9f3d563-70f9-44ec-9d57-3109de4f8909",
+      "started_at": "2026-03-03T05:38:58.704Z",
+      "total_input_tokens": 10106,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.030317999999999987,
+      "tool_calls": 226,
+      "tools_used": {
+        "Glob": 43,
+        "Grep": 8,
+        "Bash": 33,
+        "Read": 132,
+        "Agent": 7,
+        "EnterPlanMode": 1,
+        "AskUserQuestion": 1,
+        "Write": 1
+      }
+    },
+    "14d565d3-fd25-4e0e-8a78-aa63943fca8c": {
+      "session_id": "14d565d3-fd25-4e0e-8a78-aa63943fca8c",
+      "started_at": "2026-03-03T05:59:10.337Z",
+      "total_input_tokens": 45856,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.13756800000000005,
+      "tool_calls": 257,
+      "tools_used": {
+        "Read": 97,
+        "Glob": 15,
+        "Agent": 5,
+        "Grep": 14,
+        "Bash": 56,
+        "TaskCreate": 5,
+        "TaskUpdate": 9,
+        "Write": 19,
+        "Edit": 36,
+        "TaskOutput": 1
+      }
+    },
+    "9963ef75-6cdd-490f-b201-8316c1e2c8d9": {
+      "session_id": "9963ef75-6cdd-490f-b201-8316c1e2c8d9",
+      "started_at": "2026-03-03T07:03:49.881Z",
+      "total_input_tokens": 17140,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.05142000000000001,
+      "tool_calls": 315,
+      "tools_used": {
+        "Bash": 136,
+        "Glob": 28,
+        "Grep": 13,
+        "Read": 111,
+        "Agent": 5,
+        "TaskOutput": 2,
+        "Write": 3,
+        "Edit": 3,
+        "AskUserQuestion": 1,
+        "EnterPlanMode": 1,
+        "ToolSearch": 2,
+        "mcp__spreadsheet__list_workbooks": 4,
+        "mcp__spreadsheet__list_sheets": 1,
+        "mcp__spreadsheet__sheet_overview": 2,
+        "mcp__spreadsheet__read_table": 3
+      }
+    },
+    "3f52c3f5-4d83-4343-9107-025a0b19eef2": {
+      "session_id": "3f52c3f5-4d83-4343-9107-025a0b19eef2",
+      "started_at": "2026-03-03T08:38:37.837Z",
+      "total_input_tokens": 17060,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.05117999999999999,
+      "tool_calls": 76,
+      "tools_used": {
+        "Bash": 16,
+        "Read": 30,
+        "Agent": 1,
+        "Glob": 1,
+        "Grep": 1,
+        "TaskCreate": 4,
+        "TaskUpdate": 8,
+        "Write": 13,
+        "Edit": 2
       }
     }
   }
