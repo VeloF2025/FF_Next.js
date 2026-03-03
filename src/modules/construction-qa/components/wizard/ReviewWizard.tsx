@@ -237,7 +237,7 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
         setPhase('feedback');
       } else {
         const body = await res.json().catch(() => null);
-        const msg = body?.error || body?.message || `Decision failed (${res.status})`;
+        const msg = body?.error?.message || body?.message || `Decision failed (${res.status})`;
         setError(msg);
         log.error('Decision API error', { module: 'construction-qa', status: res.status, msg }, 'construction-qa');
       }
