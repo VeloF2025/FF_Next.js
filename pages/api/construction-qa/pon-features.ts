@@ -66,6 +66,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIdx++;
     }
 
+    const dateFrom = req.query.dateFrom as string || '';
+    const dateTo = req.query.dateTo as string || '';
+
+    if (dateFrom) {
+      conditions.push(`r.created_at >= $${paramIdx}::timestamptz`);
+      params.push(dateFrom);
+      paramIdx++;
+    }
+
+    if (dateTo) {
+      conditions.push(`r.created_at < $${paramIdx}::timestamptz`);
+      params.push(dateTo);
+      paramIdx++;
+    }
+
     const whereClause = conditions.join(' AND ');
 
     const featuresQuery = `

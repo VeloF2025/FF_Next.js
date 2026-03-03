@@ -8,10 +8,12 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download } from 'lucide-react';
 import { log } from '@/lib/logger';
+import type { DateFilter } from '@/modules/data-sync/types';
+import { getDateRange } from '@/modules/data-sync/types';
 import type { ZoneNode } from '../../types/dashboard.types';
 import { GlobalSearchBar } from '../shared/GlobalSearchBar';
 import { ZoneAccordionHeader } from './ZoneAccordionHeader';
@@ -41,6 +43,21 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
   const [selectedPon, setSelectedPon] = useState<{ zone: number; pon: number } | null>(null);
   const [highlightId, setHighlightId] = useState<string | undefined>();
   const [name, setName] = useState(projectName || '');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  // Compute date range from filter preset or custom inputs
+  const { dateFrom, dateTo } = useMemo(() => {
+    if (dateFilter === 'custom') {
+      return {
+        dateFrom: customFrom ? new Date(customFrom).toISOString() : undefined,
+        dateTo: customTo ? new Date(new Date(customTo).getTime() + 86400000).toISOString() : undefined,
+      };
+    }
+    return getDateRange(dateFilter);
+  }, [dateFilter, customFrom, customTo]);
 
   // Read deep-link params on mount
   useEffect(() => {
@@ -62,6 +79,8 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
     try {
       const params = new URLSearchParams({ projectId });
       if (discipline) params.set('discipline', discipline);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
 
       const res = await fetch(`/api/construction-qa/zone-hierarchy?${params}`, {
         credentials: 'include',
@@ -75,7 +94,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
     } finally {
       setLoading(false);
     }
-  }, [projectId, discipline]);
+  }, [projectId, discipline, dateFrom, dateTo]);
 
   // Fetch project name if not provided
   useEffect(() => {
@@ -110,6 +129,20 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
   const handleSelectPon = (zoneNo: number, ponNo: number) => {
     setSelectedPon({ zone: zoneNo, pon: ponNo });
     setHighlightId(undefined);
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ projectId });
+      if (discipline) params.set('discipline', discipline);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      window.location.href = `/api/construction-qa/export?${params}`;
+    } finally {
+      // Small delay so the browser starts the download
+      setTimeout(() => setExporting(false), 1500);
+    }
   };
 
   const totalFeatures = zones.reduce((sum, z) => sum + z.total, 0);
@@ -162,6 +195,49 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Date filter bar + export */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {(['all', 'today', 'yesterday', '7d', '30d', 'custom'] as DateFilter[]).map(f => (
+          <button
+            key={f}
+            onClick={() => setDateFilter(f)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              dateFilter === f
+                ? 'bg-blue-600 text-white'
+                : 'bg-[var(--card-bg)] text-gray-400 hover:text-white border border-[var(--border-color)]'
+            }`}
+          >
+            {f === 'all' ? 'All Time' : f === '7d' ? '7 Days' : f === '30d' ? '30 Days' : f === 'custom' ? 'Custom' : f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+        {dateFilter === 'custom' && (
+          <>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={e => setCustomFrom(e.target.value)}
+              className="px-2 py-1.5 rounded-md text-xs bg-[var(--card-bg)] text-white border border-[var(--border-color)]"
+            />
+            <span className="text-xs text-gray-500">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={e => setCustomTo(e.target.value)}
+              className="px-2 py-1.5 rounded-md text-xs bg-[var(--card-bg)] text-white border border-[var(--border-color)]"
+            />
+          </>
+        )}
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-[var(--card-bg)] border border-[var(--border-color)] rounded-md transition-colors"
+          title="Export to Excel"
+        >
+          <Download className={`w-3.5 h-3.5 ${exporting ? 'animate-pulse' : ''}`} />
+          Export
+        </button>
       </div>
 
       {/* Zone accordion */}
@@ -227,6 +303,8 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
           zoneNo={selectedPon.zone}
           ponNo={selectedPon.pon}
           highlightId={highlightId}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
         />
       )}
     </div>

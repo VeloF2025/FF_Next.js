@@ -25,6 +25,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const discipline = req.query.discipline as string || '';
+  const dateFrom = req.query.dateFrom as string || '';
+  const dateTo = req.query.dateTo as string || '';
 
   try {
     // QA stats grouped by zone/pon
@@ -35,6 +37,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (discipline) {
       conditions.push(`r.discipline = $${paramIdx}`);
       params.push(discipline);
+      paramIdx++;
+    }
+
+    if (dateFrom) {
+      conditions.push(`r.created_at >= $${paramIdx}::timestamptz`);
+      params.push(dateFrom);
+      paramIdx++;
+    }
+
+    if (dateTo) {
+      conditions.push(`r.created_at < $${paramIdx}::timestamptz`);
+      params.push(dateTo);
       paramIdx++;
     }
 
