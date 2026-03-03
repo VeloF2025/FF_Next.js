@@ -15,6 +15,7 @@ const logger = createLogger('exfoAuth');
 const FIREBASE_API_KEY = 'AIzaSyD1OuV9WUd524L9ybECyLwADBjnV8NQr6s';
 const FIREBASE_SIGN_IN_URL = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
 const FIREBASE_REFRESH_URL = `https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`;
+// Real EXFO Exchange tenant ID — "FIXME-fdjb0" is the actual value, not a placeholder
 const TENANT_ID = 'FIXME-fdjb0';
 
 // Token refresh buffer (5 minutes before expiry)

@@ -3,8 +3,9 @@
  *
  * POST /api/exfo/sync — Trigger sync for one or all workspaces
  *   Body: { workspaceId?, full?, fetchDetails? }
+ *   Auth: session cookie OR x-cron-secret header (for cron jobs)
  *
- * GET /api/exfo/sync — Get sync history
+ * GET /api/exfo/sync — Get sync history (session auth only)
  *   ?workspaceId=xxx&limit=20
  */
 
@@ -12,9 +13,19 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth/middleware';
+import { createLogger } from '@/lib/logger';
 import { syncWorkspace, syncAllWorkspaces, getSyncConfigs } from '@/services/exfo';
 
+const logger = createLogger('api:exfo:sync');
 const sql = neon(process.env.DATABASE_URL!);
+
+/**
+ * Check if request is authenticated via cron secret header.
+ */
+function hasCronSecret(req: NextApiRequest): boolean {
+  const cronSecret = req.headers['x-cron-secret'];
+  return !!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET;
+}
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
@@ -27,6 +38,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   return apiResponse.methodNotAllowed(res, req.method || 'unknown', ['GET', 'POST']);
 }
+
+/**
+ * POST handler — accepts both session auth (via withAuth wrapper) and cron secret.
+ * The cron secret path is checked in the exported default below.
+ */
 
 async function handleSync(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -78,4 +94,18 @@ async function handleGetHistory(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+/**
+ * Allow POST with cron secret header to bypass session auth.
+ * GET (history) still requires session auth.
+ */
+async function authGate(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'POST' && hasCronSecret(req)) {
+    logger.info('EXFO sync triggered via cron secret');
+    return handler(req, res);
+  }
+
+  // Fall through to session auth for all other requests
+  return withAuth(handler)(req, res);
+}
+
+export default authGate;
