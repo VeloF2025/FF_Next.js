@@ -41,20 +41,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ga.description,
         ga.is_active,
         ga.bank_account_number,
-        COALESCE(s.txn_count, 0) AS txn_count,
-        COALESCE(s.total_debits, 0) AS total_debits,
-        COALESCE(s.total_credits, 0) AS total_credits,
-        COALESCE(s.total_credits, 0) - COALESCE(s.total_debits, 0) AS balance,
+        COALESCE(s.txn_count, 0)         AS txn_count,
+        COALESCE(s.total_debits, 0)       AS total_debits,
+        COALESCE(s.total_credits, 0)      AS total_credits,
+        COALESCE(s.balance, 0)            AS balance,
+        COALESCE(s.reconciled_balance, 0) AS reconciled_balance,
+        COALESCE(s.unreconciled_balance, 0) AS unreconciled_balance,
+        COALESCE(s.unreconciled_count, 0) AS unreconciled_count,
         s.first_date,
         s.last_date
       FROM gl_accounts ga
       LEFT JOIN LATERAL (
         SELECT
-          COUNT(*)::INT AS txn_count,
+          COUNT(*)::INT                                             AS txn_count,
           SUM(CASE WHEN bt.amount < 0 THEN ABS(bt.amount) ELSE 0 END) AS total_debits,
-          SUM(CASE WHEN bt.amount > 0 THEN bt.amount ELSE 0 END) AS total_credits,
-          MIN(bt.transaction_date) AS first_date,
-          MAX(bt.transaction_date) AS last_date
+          SUM(CASE WHEN bt.amount > 0 THEN bt.amount ELSE 0 END)      AS total_credits,
+          SUM(bt.amount)                                               AS balance,
+          -- Reconciled = transactions matched to a GL journal entry
+          SUM(CASE WHEN bt.matched_journal_line_id IS NOT NULL THEN bt.amount ELSE 0 END) AS reconciled_balance,
+          -- Unreconciled = imported/suggested but not yet matched
+          SUM(CASE WHEN bt.matched_journal_line_id IS NULL AND bt.status != 'excluded' THEN bt.amount ELSE 0 END) AS unreconciled_balance,
+          COUNT(CASE WHEN bt.status = 'imported' THEN 1 END)::INT     AS unreconciled_count,
+          MIN(bt.transaction_date)                                     AS first_date,
+          MAX(bt.transaction_date)                                     AS last_date
         FROM bank_transactions bt
         WHERE bt.bank_account_id = ga.id
       ) s ON TRUE
@@ -74,6 +83,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       totalDebits: Number(r.total_debits),
       totalCredits: Number(r.total_credits),
       balance: Number(r.balance),
+      reconciledBalance: Number(r.reconciled_balance),
+      unreconciledBalance: Number(r.unreconciled_balance),
+      unreconciledCount: Number(r.unreconciled_count),
       firstDate: r.first_date instanceof Date
         ? r.first_date.toISOString().split('T')[0]
         : r.first_date ? String(r.first_date).split('T')[0] : null,

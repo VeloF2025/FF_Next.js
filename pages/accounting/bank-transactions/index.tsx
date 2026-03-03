@@ -13,7 +13,7 @@ import { SplitTransactionModal } from '@/components/accounting/SplitTransactionM
 import { ExcludeReasonModal } from '@/components/accounting/ExcludeReasonModal';
 import { FindMatchModal } from '@/components/accounting/FindMatchModal';
 import { BankTxAttachmentsModal } from '@/components/accounting/BankTxAttachmentsModal';
-import { CreateRuleModal } from '@/components/accounting/CreateRuleModal';
+import { CreateRuleModal, extractPattern } from '@/components/accounting/CreateRuleModal';
 import { CreateEntityModal } from '@/components/accounting/CreateEntityModal';
 import { StatementBalanceWidget } from '@/components/accounting/StatementBalanceWidget';
 import {
@@ -26,7 +26,16 @@ function fmtCurrency(n: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(n);
 }
 
-interface BankAcct { id: string; accountCode: string; accountName: string; bankAccountNumber?: string | null; balance: number; }
+interface BankAcct {
+  id: string;
+  accountCode: string;
+  accountName: string;
+  bankAccountNumber?: string | null;
+  balance: number;
+  reconciledBalance: number;
+  unreconciledBalance: number;
+  unreconciledCount: number;
+}
 type Tab = 'new' | 'reviewed' | 'excluded';
 const PAGE_SIZE = 25;
 
@@ -73,6 +82,7 @@ export default function BankTransactionsPage() {
   const [findMatchTxId, setFindMatchTxId] = useState<string | null>(null);
   const [attachmentsTxId, setAttachmentsTxId] = useState<string | null>(null);
   const [createRuleTx, setCreateRuleTx] = useState<BankTx | null>(null);
+  const [rulePrompt, setRulePrompt] = useState<{ tx: BankTx; matchCount: number } | null>(null);
   const [createEntityTxId, setCreateEntityTxId] = useState<string | null>(null);
   const [createEntityType, setCreateEntityType] = useState<AllocType | null>(null);
 
@@ -218,6 +228,7 @@ export default function BankTransactionsPage() {
   const handleAccept = async (txId: string) => {
     const sel = rowSelections[txId];
     if (!sel?.entityId) { toast.error('Select an account/supplier/customer first'); return; }
+    const tx = transactions.find(t => t.id === txId);
     try {
       const body: Record<string, string> = {
         action: 'allocate', bankTransactionId: txId, allocationType: sel.type,
@@ -228,6 +239,20 @@ export default function BankTransactionsPage() {
       await callAction(body);
       toast.success('Transaction allocated');
       loadTransactions();
+      // After allocation, check if there are other similar unprocessed transactions
+      // to suggest creating a categorisation rule
+      if (tx?.description && selectedBank) {
+        const pattern = extractPattern(tx.description);
+        if (pattern.trim().length >= 3) {
+          try {
+            const params = new URLSearchParams({ pattern, matchType: 'contains', bankAccountId: selectedBank });
+            const res = await fetch(`/api/accounting/bank-rules-preview?${params}`);
+            const json = await res.json();
+            const matchCount = json.data?.matchCount ?? 0;
+            if (matchCount > 0) setRulePrompt({ tx, matchCount });
+          } catch { /* non-critical — ignore preview errors */ }
+        }
+      }
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed'); }
   };
 
@@ -435,6 +460,8 @@ export default function BankTransactionsPage() {
           <div className="flex items-center gap-3 flex-wrap">
             {bankAccounts.map(b => {
               const active = b.id === selectedBank;
+              const gap = b.unreconciledBalance;
+              const hasGap = Math.abs(gap) >= 0.01;
               return (
                 <button key={b.id} onClick={() => setSelectedBank(b.id)}
                   className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border-2 transition-all text-left ${
@@ -442,20 +469,32 @@ export default function BankTransactionsPage() {
                       ? 'border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10'
                       : 'border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)] hover:border-[var(--ff-text-tertiary)]'
                   }`}>
-                  <div className={`w-2 h-8 rounded-full shrink-0 ${active ? 'bg-emerald-500' : 'bg-[var(--ff-border-light)]'}`} />
+                  <div className={`w-2 h-14 rounded-full shrink-0 ${active ? 'bg-emerald-500' : 'bg-[var(--ff-border-light)]'}`} />
                   <div>
                     <p className={`text-sm font-semibold ${active ? 'text-emerald-400' : 'text-[var(--ff-text-primary)]'}`}>
                       {b.accountName}
                     </p>
                     <p className="text-xs text-[var(--ff-text-tertiary)] font-mono">
                       {b.accountCode}
-                      {b.bankAccountNumber && <span className="ml-1.5 text-[var(--ff-text-tertiary)]">| ****{b.bankAccountNumber.slice(-4)}</span>}
+                      {b.bankAccountNumber && <span className="ml-1.5">| ****{b.bankAccountNumber.slice(-4)}</span>}
                     </p>
                   </div>
                   <div className="ml-3 text-right">
+                    {/* Statement balance — sum of all imported transactions */}
                     <p className={`text-sm font-bold font-mono ${b.balance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                       {fmtCurrency(b.balance)}
                     </p>
+                    {/* Reconciled vs unreconciled breakdown */}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-emerald-500/80 font-mono" title="Allocated to GL entries">
+                        ✓ {fmtCurrency(b.reconciledBalance)}
+                      </span>
+                      {hasGap && (
+                        <span className="text-[10px] text-amber-400 font-mono" title={`${b.unreconciledCount} unallocated transaction${b.unreconciledCount !== 1 ? 's' : ''}`}>
+                          Δ {fmtCurrency(Math.abs(gap))}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
@@ -626,6 +665,29 @@ export default function BankTransactionsPage() {
             </div>
             <button onClick={() => setShowBatchEdit(false)}
               className="text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">Cancel</button>
+          </div>
+        )}
+
+        {/* Rule suggestion banner — appears after allocating a transaction with similar matches */}
+        {rulePrompt && (
+          <div className="px-6 py-3 border-b border-yellow-500/30 bg-yellow-500/5 flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-yellow-400 font-medium">
+              {rulePrompt.matchCount} similar transaction{rulePrompt.matchCount !== 1 ? 's' : ''} found matching
+              &ldquo;{extractPattern(rulePrompt.tx.description || '')}&rdquo;.
+              Create a rule to auto-categorise them?
+            </span>
+            <button
+              onClick={() => { setCreateRuleTx(rulePrompt.tx); setRulePrompt(null); }}
+              className="px-3 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-xs text-yellow-400 font-medium transition-colors"
+            >
+              Create Rule
+            </button>
+            <button
+              onClick={() => setRulePrompt(null)}
+              className="px-3 py-1 rounded text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-secondary)]"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
