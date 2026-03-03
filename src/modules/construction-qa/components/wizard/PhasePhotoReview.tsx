@@ -37,11 +37,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   const [expandedStep, setExpandedStep] = useState<number | null>(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Group photos by step
+  // Group photos by step (step 0 = VLM-classified "unrelated" — treat as unassigned)
   const photosByStep = new Map<number, PhotoData[]>();
   const unassigned: PhotoData[] = [];
   for (const photo of photos) {
-    if (photo.checklist_step != null) {
+    if (photo.checklist_step != null && photo.checklist_step > 0) {
       if (!photosByStep.has(photo.checklist_step)) photosByStep.set(photo.checklist_step, []);
       photosByStep.get(photo.checklist_step)!.push(photo);
     } else {
