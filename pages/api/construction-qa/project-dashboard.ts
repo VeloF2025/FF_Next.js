@@ -20,36 +20,96 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // QA stats per project per discipline
-    const qaRows = await sql`
-      SELECT
-        r.project_id,
-        p.project_name,
-        r.discipline,
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE r.workflow_status = 'pending')::int AS pending,
-        COUNT(*) FILTER (WHERE r.workflow_status = 'approved')::int AS approved,
-        COUNT(*) FILTER (WHERE r.workflow_status = 'rejected')::int AS rejected,
-        COUNT(*) FILTER (WHERE r.workflow_status = 'rework_needed')::int AS rework_needed,
-        SUM(COALESCE(r.photo_count, 0))::int AS photo_count,
-        COUNT(DISTINCT r.zone_no)::int AS zone_count,
-        COUNT(DISTINCT r.pon_no)::int AS pon_count
-      FROM construction_qa_reviews r
-      JOIN projects p ON p.id = r.project_id
-      GROUP BY r.project_id, p.project_name, r.discipline
-      ORDER BY p.project_name
-    `;
+    const [qaRows, otdrRows, infraRows, qaByFeatureRows] = await Promise.all([
+      // QA stats per project per discipline
+      sql`
+        SELECT
+          r.project_id,
+          p.project_name,
+          r.discipline,
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE r.workflow_status = 'pending')::int AS pending,
+          COUNT(*) FILTER (WHERE r.workflow_status = 'approved')::int AS approved,
+          COUNT(*) FILTER (WHERE r.workflow_status = 'rejected')::int AS rejected,
+          COUNT(*) FILTER (WHERE r.workflow_status = 'rework_needed')::int AS rework_needed,
+          SUM(COALESCE(r.photo_count, 0))::int AS photo_count,
+          COUNT(DISTINCT r.zone_no)::int AS zone_count,
+          COUNT(DISTINCT r.pon_no)::int AS pon_count
+        FROM construction_qa_reviews r
+        JOIN projects p ON p.id = r.project_id
+        GROUP BY r.project_id, p.project_name, r.discipline
+        ORDER BY p.project_name
+      `,
+      // OTDR counts per project
+      sql`
+        SELECT project_id, COUNT(*)::int AS otdr_count
+        FROM exfo_test_results
+        WHERE project_id IS NOT NULL
+        GROUP BY project_id
+      `,
+      // Infrastructure inventory counts
+      sql`
+        SELECT project_id, 'poles' AS infra_type, COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE pole_planted = 'Pole Planted')::int AS field_done
+        FROM poles WHERE project_id IS NOT NULL GROUP BY project_id
+        UNION ALL
+        SELECT project_id, 'joints', COUNT(*)::int, 0
+        FROM joints WHERE project_id IS NOT NULL GROUP BY project_id
+        UNION ALL
+        SELECT project_id, 'cable_spans', COUNT(*)::int, 0
+        FROM cable_spans WHERE project_id IS NOT NULL GROUP BY project_id
+      `,
+      // QA counts by feature_type
+      sql`
+        SELECT project_id, feature_type, COUNT(*)::int AS qa_total,
+               COUNT(*) FILTER (WHERE workflow_status = 'approved')::int AS qa_approved
+        FROM construction_qa_reviews
+        GROUP BY project_id, feature_type
+      `,
+    ]);
 
-    // OTDR counts per project
-    const otdrRows = await sql`
-      SELECT project_id, COUNT(*)::int AS otdr_count
-      FROM exfo_test_results
-      WHERE project_id IS NOT NULL
-      GROUP BY project_id
-    `;
     const otdrMap = new Map<string, number>();
     for (const row of otdrRows) {
       otdrMap.set(row.project_id, Number(row.otdr_count));
+    }
+
+    // Build infrastructure map: project_id → { poles, joints, cable_spans }
+    const emptyInfra = () => ({ total: 0, planted: 0, qa_total: 0, qa_approved: 0 });
+    const emptyInfrastructure = () => ({
+      poles: emptyInfra(),
+      joints: emptyInfra(),
+      cable_spans: emptyInfra(),
+    });
+
+    const infraMap = new Map<string, {
+      poles: { total: number; planted: number; qa_total: number; qa_approved: number };
+      joints: { total: number; planted: number; qa_total: number; qa_approved: number };
+      cable_spans: { total: number; planted: number; qa_total: number; qa_approved: number };
+    }>();
+
+    for (const row of infraRows) {
+      const pid = row.project_id;
+      if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
+      const infra = infraMap.get(pid)!;
+      const itype = row.infra_type as 'poles' | 'joints' | 'cable_spans';
+      infra[itype].total = Number(row.total);
+      infra[itype].planted = Number(row.field_done);
+    }
+
+    // Merge QA counts by feature_type into infra map
+    const featureTypeToInfra: Record<string, 'poles' | 'joints' | 'cable_spans'> = {
+      pole: 'poles',
+      joint: 'joints',
+      cable_span: 'cable_spans',
+    };
+    for (const row of qaByFeatureRows) {
+      const itype = featureTypeToInfra[row.feature_type];
+      if (!itype) continue;
+      const pid = row.project_id;
+      if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
+      const infra = infraMap.get(pid)!;
+      infra[itype].qa_total = Number(row.qa_total);
+      infra[itype].qa_approved = Number(row.qa_approved);
     }
 
     // Assemble per-project rows
@@ -64,6 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       civil: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       optical: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       splicing: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
+      infrastructure: typeof emptyInfrastructure extends () => infer R ? R : never;
     }>();
 
     const emptyDiscipline = () => ({ total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0 });
@@ -82,6 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           civil: emptyDiscipline(),
           optical: emptyDiscipline(),
           splicing: emptyDiscipline(),
+          infrastructure: infraMap.get(pid) || emptyInfrastructure(),
         });
       }
       const proj = projectMap.get(pid)!;

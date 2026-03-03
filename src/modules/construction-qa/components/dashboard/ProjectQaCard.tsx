@@ -9,8 +9,35 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { MapPin, Layers, Radio, Camera } from 'lucide-react';
-import type { ProjectDashboardRow } from '../../types/dashboard.types';
+import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable } from 'lucide-react';
+import type { ProjectDashboardRow, InfraStats } from '../../types/dashboard.types';
+
+function InfraStat({ label, icon: Icon, stats }: {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  stats: InfraStats;
+}) {
+  const qaPct = stats.total > 0 && stats.qa_total > 0
+    ? Math.round((stats.qa_approved / stats.total) * 100)
+    : 0;
+  return (
+    <div className="bg-gray-800/50 rounded px-2 py-1.5">
+      <div className="flex items-center gap-1 mb-0.5">
+        <Icon className="w-3 h-3 text-gray-500" />
+        <span className="text-xs text-gray-500">{label}</span>
+      </div>
+      <div className="text-sm font-medium text-gray-300">{stats.total}</div>
+      {stats.planted > 0 && (
+        <div className="text-[10px] text-blue-400">{stats.planted} planted</div>
+      )}
+      {stats.qa_total > 0 && (
+        <div className="text-[10px] text-green-400">
+          {stats.qa_approved} QA&apos;d ({qaPct}%)
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ProjectQaCardProps {
   project: ProjectDashboardRow;
@@ -87,6 +114,17 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
           <div className="text-sm font-medium text-gray-300">{project.splicing.total}</div>
         </div>
       </div>
+
+      {/* Infrastructure stats */}
+      {(project.infrastructure.poles.total > 0 ||
+        project.infrastructure.joints.total > 0 ||
+        project.infrastructure.cable_spans.total > 0) && (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <InfraStat label="Poles" icon={Milestone} stats={project.infrastructure.poles} />
+          <InfraStat label="Joints" icon={CircleDot} stats={project.infrastructure.joints} />
+          <InfraStat label="Spans" icon={Cable} stats={project.infrastructure.cable_spans} />
+        </div>
+      )}
 
       {/* Meta row */}
       <div className="flex items-center gap-4 text-xs text-gray-500">
