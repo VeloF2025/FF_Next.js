@@ -3,10 +3,10 @@
  * Phase 2: Quick entry rules + statement mapping
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
-import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil, CheckSquare } from 'lucide-react';
+import { ArrowLeft, Zap, Plus, Trash2, Loader2, ToggleLeft, ToggleRight, Play, Pencil, Search, X } from 'lucide-react';
 
 interface Rule {
   id: string;
@@ -46,6 +46,9 @@ export default function BankRulesPage() {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [previewCount, setPreviewCount] = useState<number | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
     ruleName: '', matchField: 'description', matchType: 'contains',
@@ -117,10 +120,44 @@ export default function BankRulesPage() {
     });
   }, []);
 
+  // Debounced live preview: fetch match count 400ms after pattern/matchType/matchField changes
+  useEffect(() => {
+    if (!form.matchPattern.trim() || !showForm) { setPreviewCount(null); return; }
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          pattern: form.matchPattern,
+          matchType: form.matchType,
+          matchField: form.matchField,
+          ...(selectedBankId ? { bankAccountId: selectedBankId } : {}),
+        });
+        const res = await fetch(`/api/accounting/bank-rules-preview?${params}`, { credentials: 'include' });
+        const json = await res.json();
+        setPreviewCount(json.data?.matchCount ?? null);
+      } catch { setPreviewCount(null); }
+    }, 400);
+    return () => { if (previewTimer.current) clearTimeout(previewTimer.current); };
+  }, [form.matchPattern, form.matchType, form.matchField, showForm, selectedBankId]);
+
+  // Client-side filter: name, pattern, GL account code/name
+  const filteredRules = search.trim()
+    ? rules.filter(r => {
+        const q = search.toLowerCase();
+        return r.ruleName.toLowerCase().includes(q)
+          || r.matchPattern.toLowerCase().includes(q)
+          || (r.glAccountCode || '').toLowerCase().includes(q)
+          || (r.glAccountName || '').toLowerCase().includes(q)
+          || (r.supplierName || '').toLowerCase().includes(q)
+          || (r.clientName || '').toLowerCase().includes(q);
+      })
+    : rules;
+
   const resetForm = () => {
     setForm({ ruleName: '', matchField: 'description', matchType: 'contains', matchPattern: '', glAccountId: '', supplierId: '', clientId: '', vatCode: '', descriptionTemplate: '', priority: '100' });
     setEditingRule(null);
     setShowForm(false);
+    setPreviewCount(null);
   };
 
   const handleEdit = (rule: Rule) => {
@@ -275,7 +312,18 @@ export default function BankRulesPage() {
                 </select>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input value={form.matchPattern} onChange={e => setForm(f => ({ ...f, matchPattern: e.target.value }))} className="ff-input" placeholder="Pattern (e.g. WOOLWORTHS) *" required />
+                <div>
+                  <input value={form.matchPattern} onChange={e => setForm(f => ({ ...f, matchPattern: e.target.value }))} className="ff-input w-full" placeholder="Pattern (e.g. WOOLWORTHS) *" required />
+                  {form.matchPattern.trim() && (
+                    <p className="mt-1 text-xs text-[var(--ff-text-tertiary)]">
+                      {previewCount === null ? 'Checking matches…' : (
+                        <span className={previewCount > 0 ? 'text-emerald-400' : 'text-[var(--ff-text-tertiary)]'}>
+                          {previewCount} transaction{previewCount !== 1 ? 's' : ''} match
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
                 <select value={form.glAccountId} onChange={e => setForm(f => ({ ...f, glAccountId: e.target.value }))} className="ff-select" required={!form.supplierId && !form.clientId}>
                   <option value="">{form.supplierId || form.clientId ? 'No GL Account (optional)' : 'Select GL Account *'}</option>
                   {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.accountName}</option>)}
@@ -309,15 +357,40 @@ export default function BankRulesPage() {
             </form>
           )}
 
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search rules by name, pattern, account…"
+              className="ff-input w-full pl-9 pr-8"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {search && (
+            <p className="text-xs text-[var(--ff-text-tertiary)] -mt-2">
+              {filteredRules.length} of {rules.length} rules
+            </p>
+          )}
+
           <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
             <table className="w-full text-sm">
               <thead><tr className="border-b border-[var(--ff-border-light)] text-left text-[var(--ff-text-secondary)]">
                 <th className="px-3 py-3 w-8">
                   <input
                     type="checkbox"
-                    checked={rules.length > 0 && selected.size === rules.length}
-                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < rules.length; }}
-                    onChange={e => setSelected(e.target.checked ? new Set(rules.map(r => r.id)) : new Set())}
+                    checked={filteredRules.length > 0 && filteredRules.every(r => selected.has(r.id))}
+                    ref={el => { if (el) { const some = filteredRules.some(r => selected.has(r.id)); el.indeterminate = some && !filteredRules.every(r => selected.has(r.id)); } }}
+                    onChange={e => setSelected(prev => {
+                      const next = new Set(prev);
+                      filteredRules.forEach(r => e.target.checked ? next.add(r.id) : next.delete(r.id));
+                      return next;
+                    })}
                     className="rounded border-[var(--ff-border-light)] accent-yellow-500"
                   />
                 </th>
@@ -333,7 +406,8 @@ export default function BankRulesPage() {
               <tbody>
                 {loading && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">Loading...</td></tr>}
                 {!loading && rules.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules configured. Create one to auto-categorise bank transactions.</td></tr>}
-                {rules.map(rule => (
+                {!loading && rules.length > 0 && filteredRules.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-[var(--ff-text-tertiary)]">No rules match &ldquo;{search}&rdquo;</td></tr>}
+                {filteredRules.map(rule => (
                   <tr key={rule.id} className={`border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)]/50 ${selected.has(rule.id) ? 'bg-yellow-500/5' : ''}`}>
                     <td className="px-3 py-3">
                       <input
