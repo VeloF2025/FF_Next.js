@@ -3,12 +3,15 @@
  * Walk through each checklist step, view assigned photos, toggle checked state.
  * Click any photo to open full-screen lightbox with zoom.
  * Drag-and-drop photos between steps to correct VLM misclassifications.
+ *
+ * DnD UX: During a drag, ALL steps expand so every drop zone is visible.
+ * When not dragging, only one step is expanded (accordion mode).
  */
 
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
-import { DragDropContext, Droppable, Draggable, type DropResult, type DragUpdate, type DragStart } from '@hello-pangea/dnd';
+import { useState, useMemo, useCallback } from 'react';
+import { DragDropContext, Droppable, Draggable, type DropResult, type DragStart } from '@hello-pangea/dnd';
 import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
 import { PhotoLightbox } from './PhotoLightbox';
@@ -40,8 +43,6 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   const [expandedStep, setExpandedStep] = useState<number | null>(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastHoveredRef = useRef<string | null>(null);
 
   // Group photos by step (step 0 = VLM-classified "unrelated" — treat as unassigned)
   const photosByStep = new Map<number, PhotoData[]>();
@@ -90,38 +91,10 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
 
   const handleDragStart = useCallback((_start: DragStart) => {
     setIsDragging(true);
-    lastHoveredRef.current = null;
   }, []);
-
-  const handleDragUpdate = useCallback((update: DragUpdate) => {
-    const destId = update.destination?.droppableId ?? null;
-
-    // Clear timer if we left the previous target
-    if (destId !== lastHoveredRef.current) {
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-        hoverTimerRef.current = null;
-      }
-      lastHoveredRef.current = destId;
-
-      // Auto-expand collapsed steps after a short hover delay
-      if (destId && destId.startsWith('step-')) {
-        const stepNo = Number(destId.replace('step-', ''));
-        if (expandedStep !== stepNo) {
-          hoverTimerRef.current = setTimeout(() => {
-            setExpandedStep(stepNo);
-          }, 350);
-        }
-      }
-    }
-  }, [expandedStep]);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     setIsDragging(false);
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
 
     if (!result.destination || !onPhotoStepChange) return;
     const { draggableId, source, destination } = result;
@@ -143,7 +116,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   const dndEnabled = Boolean(onPhotoStepChange);
 
   return (
-    <DragDropContext onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd}>
+    <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-white mb-1">Photo Review</h2>
@@ -159,8 +132,9 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
             const stepPhotos = photosByStep.get(step.step) || [];
             const col = getStepColumn(step.step);
             const isChecked = checkedSteps[col] || false;
-            const isExpanded = expandedStep === step.step;
-            const withConfidence = stepPhotos.filter(p => p.vlm_confidence != null);
+            // During drag: all steps show content. Otherwise: accordion (one at a time).
+            const isExpanded = isDragging || expandedStep === step.step;
+            const withConfidence = stepPhotos.filter(p => typeof p.vlm_confidence === 'number' && !isNaN(p.vlm_confidence));
             const avgConfidence = withConfidence.length > 0
               ? withConfidence.reduce((sum, p) => sum + (p.vlm_confidence ?? 0), 0) / withConfidence.length
               : null;
@@ -174,14 +148,16 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                     className={`border rounded-lg overflow-hidden transition-colors ${
                       snapshot.isDraggingOver
                         ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-500/5'
-                        : isChecked ? 'border-green-500/30' : 'border-[var(--border-color)]'
+                        : isDragging
+                          ? 'border-blue-500/20'
+                          : isChecked ? 'border-green-500/30' : 'border-[var(--border-color)]'
                     }`}
                   >
                     {/* Step Header */}
                     <div
-                      onClick={() => setExpandedStep(isExpanded ? null : step.step)}
+                      onClick={() => !isDragging && setExpandedStep(expandedStep === step.step ? null : step.step)}
                       className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors ${
-                        isDragging && !isExpanded && snapshot.isDraggingOver ? 'bg-blue-500/10' : ''
+                        snapshot.isDraggingOver ? 'bg-blue-500/10' : ''
                       }`}
                     >
                       {/* Checkbox */}
@@ -206,7 +182,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                             <span className="text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded">optional</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">{step.vlmCheck}</p>
+                        {!isDragging && <p className="text-xs text-gray-500 mt-0.5">{step.vlmCheck}</p>}
                       </div>
 
                       {/* Photo count + VLM score */}
@@ -223,28 +199,65 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                             {Math.round(avgConfidence * 100)}%
                           </span>
                         )}
-                        {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                        {!isDragging && (
+                          expandedStep === step.step
+                            ? <ChevronDown className="w-4 h-4 text-gray-500" />
+                            : <ChevronRight className="w-4 h-4 text-gray-500" />
+                        )}
                       </div>
                     </div>
 
-                    {/* Expanded: Photo Grid */}
+                    {/* Expanded: Photo Grid / Drop Zone */}
                     {isExpanded && (
-                      <div className={`px-4 pb-4 border-t transition-colors ${
+                      <div className={`px-4 pb-3 border-t transition-colors ${
                         snapshot.isDraggingOver ? 'border-blue-500' : 'border-[var(--border-color)]'
                       }`}>
-                        {step.notes && (
+                        {!isDragging && step.notes && (
                           <p className="text-xs text-gray-500 py-2 italic">{step.notes}</p>
                         )}
 
                         {stepPhotos.length === 0 ? (
-                          <div className={`text-center py-6 text-sm rounded-lg border-2 border-dashed mt-3 transition-colors ${
+                          <div className={`text-center py-4 text-sm rounded-lg border-2 border-dashed mt-2 transition-colors ${
                             snapshot.isDraggingOver
                               ? 'border-blue-500 text-blue-400 bg-blue-500/10'
-                              : 'border-gray-700 text-gray-500'
+                              : isDragging
+                                ? 'border-blue-500/30 text-gray-500'
+                                : 'border-gray-700 text-gray-500'
                           }`}>
-                            {snapshot.isDraggingOver ? 'Drop photo here' : 'No photos assigned to this step'}
+                            {snapshot.isDraggingOver ? 'Drop photo here' : isDragging ? 'Drop here' : 'No photos assigned to this step'}
+                          </div>
+                        ) : isDragging ? (
+                          /* Compact photo strip during drag — smaller thumbnails, horizontal scroll */
+                          <div className={`flex gap-2 pt-2 pb-1 overflow-x-auto rounded-lg transition-colors ${
+                            snapshot.isDraggingOver ? 'bg-blue-500/5' : ''
+                          }`}>
+                            {stepPhotos.map((photo, index) => (
+                              <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
+                                {(dragProv, dragSnap) => (
+                                  <div
+                                    ref={dragProv.innerRef}
+                                    {...dragProv.draggableProps}
+                                    {...dragProv.dragHandleProps}
+                                    className={`flex-shrink-0 w-16 h-16 rounded border overflow-hidden ${
+                                      dragSnap.isDragging
+                                        ? 'ring-2 ring-blue-500 shadow-lg z-50'
+                                        : 'border-[var(--border-color)]'
+                                    }`}
+                                  >
+                                    <img
+                                      src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+                                      alt={photo.filename || 'Photo'}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                      draggable={false}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
                           </div>
                         ) : (
+                          /* Full photo grid when not dragging */
                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-3">
                             {stepPhotos.map((photo, index) => (
                               <PhotoThumbnail
@@ -288,20 +301,47 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
               </h3>
               {unassigned.length > 0 ? (
                 <>
-                  <p className="text-xs text-gray-500 mb-3">
-                    These photos are not linked to any checklist step.
-                    {dndEnabled ? ' Drag them to the correct step above.' : ' Click to enlarge.'}
-                  </p>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                  {!isDragging && (
+                    <p className="text-xs text-gray-500 mb-3">
+                      These photos are not linked to any checklist step.
+                      {dndEnabled ? ' Drag them to the correct step above.' : ' Click to enlarge.'}
+                    </p>
+                  )}
+                  <div className={`grid ${isDragging ? 'grid-cols-6 md:grid-cols-8 gap-1' : 'grid-cols-3 md:grid-cols-6 gap-2'}`}>
                     {unassigned.map((photo, index) => (
-                      <PhotoThumbnail
-                        key={photo.id}
-                        photo={photo}
-                        index={index}
-                        dndEnabled={dndEnabled}
-                        onClickPhoto={openLightbox}
-                        compact
-                      />
+                      isDragging ? (
+                        <Draggable key={photo.id} draggableId={photo.id} index={index} isDragDisabled={!dndEnabled}>
+                          {(dragProv, dragSnap) => (
+                            <div
+                              ref={dragProv.innerRef}
+                              {...dragProv.draggableProps}
+                              {...dragProv.dragHandleProps}
+                              className={`w-full aspect-square rounded border overflow-hidden ${
+                                dragSnap.isDragging
+                                  ? 'ring-2 ring-blue-500 shadow-lg z-50'
+                                  : 'border-[var(--border-color)]'
+                              }`}
+                            >
+                              <img
+                                src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+                                alt={photo.filename || 'Photo'}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                draggable={false}
+                              />
+                            </div>
+                          )}
+                        </Draggable>
+                      ) : (
+                        <PhotoThumbnail
+                          key={photo.id}
+                          photo={photo}
+                          index={index}
+                          dndEnabled={dndEnabled}
+                          onClickPhoto={openLightbox}
+                          compact
+                        />
+                      )
                     ))}
                   </div>
                 </>
@@ -382,7 +422,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact }: {
           )}
 
           {/* VLM badge */}
-          {!compact && photo.vlm_confidence != null && (
+          {!compact && typeof photo.vlm_confidence === 'number' && !isNaN(photo.vlm_confidence) && (
             <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
               photo.vlm_confidence >= 0.8 ? 'bg-green-600/90 text-white' :
               photo.vlm_confidence >= 0.6 ? 'bg-yellow-600/90 text-white' :
