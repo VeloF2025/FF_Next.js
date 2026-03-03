@@ -71,7 +71,7 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
   const getStepColumn = (step: number): string => {
     const pad = String(step).padStart(2, '0');
     const stepNames: Record<string, Record<number, string>> = {
-      civil: { 1: 'before_photo', 2: 'during_photo', 3: 'depth_photo', 4: 'end_plates', 5: 'compaction', 6: 'level_check', 7: 'after_photo', 8: 'signature' },
+      civil: { 1: 'before_photo', 2: 'during_photo', 3: 'depth_photo', 4: 'end_plates', 5: 'compaction', 6: 'level_check', 7: 'after_photo' },
       optical: { 1: 'cable_route', 2: 'attachment', 3: 'slack_coil', 4: 'cable_label', 5: 'no_backfeed', 6: 'sag_ok' },
       splicing: { 1: 'dome_on_pole', 2: 'dome_label', 3: 'open_dome', 4: 'splice_protectors', 5: 'slack_management', 6: 'strength_members', 7: 'seals_dustcaps', 8: 'pole_id', 11: 'cable_entries', 12: 'strength_members', 13: 'tube_routing', 14: 'tray_entries', 15: 'coiling_protectors', 16: 'readable_labels' },
     };
@@ -96,6 +96,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
     const newLabel = newStep != null ? (stepLabelMap.get(newStep) ?? null) : null;
 
     onPhotoStepChange(draggableId, newStep, newLabel);
+
+    // Auto-expand the destination step so the moved photo is visible
+    if (newStep != null) {
+      setExpandedStep(newStep);
+    }
   }, [onPhotoStepChange, stepLabelMap]);
 
   const dndEnabled = Boolean(onPhotoStepChange);
@@ -118,8 +123,9 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
             const col = getStepColumn(step.step);
             const isChecked = checkedSteps[col] || false;
             const isExpanded = expandedStep === step.step;
-            const avgConfidence = stepPhotos.length > 0
-              ? stepPhotos.reduce((sum, p) => sum + (p.vlm_confidence || 0), 0) / stepPhotos.length
+            const withConfidence = stepPhotos.filter(p => p.vlm_confidence != null);
+            const avgConfidence = withConfidence.length > 0
+              ? withConfidence.reduce((sum, p) => sum + (p.vlm_confidence ?? 0), 0) / withConfidence.length
               : null;
 
             return (

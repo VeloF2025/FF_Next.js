@@ -155,13 +155,6 @@ export const CIVIL_CHECKLIST: readonly ChecklistStep[] = [
     vlmCheck: 'Full pole standing upright, wide shot from distance',
     notes: 'Phase B Installation — may include ground-level + standing-back view',
   },
-  {
-    step: 8,
-    label: 'Signature',
-    required: true,
-    vlmCheck: 'Contractor signature or sign-off sheet visible',
-    notes: 'Phase C Assets — signature present for all installations',
-  },
 ] as const;
 
 /**
