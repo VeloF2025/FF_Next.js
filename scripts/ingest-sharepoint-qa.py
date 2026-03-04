@@ -93,9 +93,12 @@ PROJECT_FOLDERS = {
 }
 
 # Regex to extract pole number from filenames like LAW.P.A013.JPG or LAW.P.A013_1.JPG
-POLE_RE = re.compile(r"^([A-Z]{3}\.P\.[A-Z]\d{3,4})(?:_\d+)?\.(?:jpe?g|png)$", re.IGNORECASE)
-# Broader pole pattern for files without standard naming
-POLE_RE_BROAD = re.compile(r"([A-Z]{3}\.P\.[A-Z]\d{3,4})", re.IGNORECASE)
+# Also handles TEM.P.CO24 style (2-letter zone + 2-4 digit number)
+POLE_RE = re.compile(r"^([A-Z]{3}\.P\.[A-Z]{1,2}\d{2,4})(?:_\d+)?\.(?:jpe?g|png|webp)$", re.IGNORECASE)
+# Broader pole pattern for files/folders without standard naming
+POLE_RE_BROAD = re.compile(r"([A-Z]{3}\.P\.[A-Z]{1,2}\d{2,4})", re.IGNORECASE)
+# Joint/splice patterns
+JOINT_RE_BROAD = re.compile(r"([A-Z]{3}\.(?:AGG|S)\.[A-Z]{1,3}\.\d{2,4})", re.IGNORECASE)
 
 # Image extensions we care about
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -147,8 +150,10 @@ def scan_folder_recursive(token, folder_id, path="", depth=0, max_depth=5):
 
         if "folder" in item:
             # Recurse into subfolders (skip DR* folders and Historical folders)
-            if name.startswith("DR") and name[2:].isdigit():
-                continue  # Skip DR folders — handled by separate pipeline
+            name_upper = name.upper()
+            # Skip DR/RD folders (drop reports) — handled by separate pipeline
+            if (name_upper.startswith("DR") or name_upper.startswith("RD")) and name_upper[2:].isdigit():
+                continue
             sub = scan_folder_recursive(token, item["id"], item_path, depth + 1, max_depth)
             results.extend(sub)
         elif "file" in item:
@@ -180,17 +185,80 @@ def extract_pole_number(filename):
 
 
 def extract_pole_from_path(path):
-    """Extract pole number from parent folder name in the path.
-    E.g. 'Poles Planted/Lawley Poles/Poles With Numbers/LAW.P.A001/Before 1.jpg'
-    -> parent folder = 'LAW.P.A001' -> 'LAW.P.A001'
+    """Extract pole number from ANY parent folder in the path.
+    Checks from immediate parent up to root.
+    E.g. 'CPAC/Zone 17/PON 190/TEM.P.CO24/photo.jpg' -> 'TEM.P.CO24'
+    E.g. 'Poles Planted/LAW.P.A001/After/photo.jpg' -> 'LAW.P.A001' (grandparent)
     """
-    parts = path.rsplit("/", 1)
-    if len(parts) < 2:
+    parts = path.split("/")
+    # Walk from immediate parent upward (skip filename at [-1])
+    for i in range(len(parts) - 2, -1, -1):
+        folder = parts[i]
+        m = POLE_RE_BROAD.search(folder)
+        if m:
+            return m.group(1).upper()
+    return None
+
+
+def extract_zone_pon_from_path(path):
+    """Extract zone_no and pon_no from CPAC-style paths.
+    E.g. 'CPAC/Zone 17/PON 190/TEM.P.CO24/photo.jpg' -> (17, 190)
+    Returns (zone_no, pon_no) or (None, None).
+    """
+    zone_no = None
+    pon_no = None
+    for part in path.split("/"):
+        part_lower = part.lower().strip()
+        m = re.match(r"zone\s+(\d+)", part_lower)
+        if m:
+            zone_no = int(m.group(1))
+        m = re.match(r"pon\s+(\d+)", part_lower)
+        if m:
+            pon_no = int(m.group(1))
+    return zone_no, pon_no
+
+
+def fuzzy_pole_lookup(pole_num, poles_dict):
+    """Try to find a pole in the DB with O→0 substitution and padding.
+    E.g. TEM.P.CO24 -> try TEM.P.C024 (replace O with 0, pad to 3+ digits).
+    Returns the DB pole_number if found, else None.
+    """
+    # Direct lookup first
+    if pole_num in poles_dict:
+        return pole_num
+
+    # Extract prefix (e.g. TEM.P.) and suffix (e.g. CO24)
+    parts = pole_num.split(".")
+    if len(parts) < 3:
         return None
-    parent = parts[0].rsplit("/", 1)[-1]
-    m = POLE_RE_BROAD.search(parent)
+
+    prefix = ".".join(parts[:2]) + "."  # e.g. "TEM.P."
+    suffix = ".".join(parts[2:])  # e.g. "CO24"
+
+    # Try O→0 substitution in the suffix
+    suffix_fixed = suffix.replace("O", "0").replace("o", "0")
+    if suffix_fixed != suffix:
+        # Also try padding the numeric part to 3 digits
+        m = re.match(r"([A-Za-z]+)(\d+)", suffix_fixed)
+        if m:
+            letter = m.group(1).upper()
+            num = m.group(2)
+            # Try with zero-padded number: C024, C24
+            for padded in [letter + num.zfill(3), letter + num.zfill(4), letter + num]:
+                candidate = prefix + padded
+                if candidate in poles_dict:
+                    return candidate
+
+    # Try just padding the original suffix
+    m = re.match(r"([A-Za-z]+)(\d+)", suffix)
     if m:
-        return m.group(1).upper()
+        letter = m.group(1).upper()
+        num = m.group(2)
+        for padded in [letter + num.zfill(3), letter + num.zfill(4), letter + num]:
+            candidate = prefix + padded
+            if candidate in poles_dict:
+                return candidate
+
     return None
 
 
@@ -307,12 +375,14 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
             poles_by_number[pn] = row
     print(f"    ✓ Loaded {len(poles_by_number)} poles for {project_name}\n")
 
-    # Check existing reviews to avoid duplicates
+    # Check existing reviews to avoid duplicates — store actual review IDs for add-to-existing
     cur.execute(
-        "SELECT feature_id FROM construction_qa_reviews WHERE project_id = %s::uuid AND discipline = 'civil'",
+        "SELECT id, feature_id FROM construction_qa_reviews WHERE project_id = %s::uuid AND discipline = 'civil'",
         (project_id,),
     )
-    existing_reviews = {row["feature_id"] for row in cur.fetchall()}
+    existing_reviews = {}  # feature_id -> actual review UUID
+    for row in cur.fetchall():
+        existing_reviews[row["feature_id"]] = str(row["id"])
     print(f"    ✓ {len(existing_reviews)} existing civil reviews (will skip)\n")
 
     # ── Step 3: Scan SharePoint folders ──────────────────────────────────
@@ -359,8 +429,11 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
     existing_photo_keys = {row["storage_key"] for row in cur.fetchall()}
     print(f"    ✓ {len(existing_photo_keys)} existing photos in DB\n")
 
+    fuzzy_matched = 0  # Track how many needed fuzzy O→0 matching
+    path_zone_pon = {}  # pole_number -> (zone_no, pon_no) from path
+
     for photo in photos:
-        # Try filename first, then parent folder
+        # Try filename first, then parent folder path (multi-level)
         pole_num = extract_pole_number(photo["name"])
         if not pole_num:
             pole_num = extract_pole_from_path(photo["path"])
@@ -369,9 +442,20 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
             unmatched.append(photo)
             continue
 
-        if pole_num not in poles_by_number:
+        # Fuzzy lookup: try O→0 substitution and padding
+        db_pole_num = fuzzy_pole_lookup(pole_num, poles_by_number)
+        if not db_pole_num:
             unmatched.append(photo)
             continue
+
+        if db_pole_num != pole_num:
+            fuzzy_matched += 1
+
+        # Extract zone/PON from path if available (CPAC/Zone N/PON NNN/)
+        if db_pole_num not in path_zone_pon:
+            zp = extract_zone_pon_from_path(photo["path"])
+            if zp[0] is not None:
+                path_zone_pon[db_pole_num] = zp
 
         # Check if this specific photo already exists
         storage_key = f"sharepoint:{SP_DRIVE_ID}:{photo['id']}"
@@ -379,16 +463,18 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
             skipped_duplicate += 1
             continue
 
-        if pole_num in existing_reviews:
+        if db_pole_num in existing_reviews:
             # Review exists but this is a NEW photo for it
-            add_to_existing.setdefault(pole_num, []).append(photo)
+            add_to_existing.setdefault(db_pole_num, []).append(photo)
         else:
-            matched.setdefault(pole_num, []).append(photo)
+            matched.setdefault(db_pole_num, []).append(photo)
 
     new_review_photos = sum(len(v) for v in matched.values())
     add_photos = sum(len(v) for v in add_to_existing.values())
     print(f"    ✓ New reviews: {len(matched)} poles ({new_review_photos} photos)")
     print(f"    ✓ Add to existing reviews: {len(add_to_existing)} poles ({add_photos} photos)")
+    print(f"    ✓ Fuzzy matched (O→0 fix): {fuzzy_matched} photos")
+    print(f"    ✓ Zone/PON from path: {len(path_zone_pon)} poles")
     print(f"    ✗ Unmatched files: {len(unmatched)}")
     print(f"    ↻ Skipped (duplicate photos): {skipped_duplicate}\n")
 
@@ -469,6 +555,11 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
                 "source": "sharepoint", "size": p["size"],
             } for p in pole_photos]
 
+            # Prefer zone/PON from path (CPAC structure), fall back to pole table
+            pzp = path_zone_pon.get(pole_num)
+            zone_no = pzp[0] if pzp and pzp[0] is not None else pole.get("zone_no")
+            pon_no = pzp[1] if pzp and pzp[1] is not None else pole.get("pon_no")
+
             try:
                 cur.execute("""
                     INSERT INTO construction_qa_reviews (
@@ -487,7 +578,7 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
                     ON CONFLICT DO NOTHING
                 """, (
                     review_id, project_id, pole_num,
-                    pole.get("zone_no"), pole.get("pon_no"),
+                    zone_no, pon_no,
                     len(pole_photos), json.dumps(photos_json),
                     pole_photos[0].get("modified"),
                     pole.get("latitude"), pole.get("longitude"),
@@ -514,7 +605,11 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
             added_photos = 0
 
             for pole_num, new_photos in add_to_existing.items():
-                review_id = deterministic_uuid(QA_NAMESPACE, f"{project_id}:civil:{pole_num}")
+                # Use the ACTUAL review_id from DB (not deterministic UUID) to avoid FK mismatch
+                review_id = existing_reviews.get(pole_num)
+                if not review_id:
+                    print(f"    WARN: No review_id found for {pole_num}, skipping")
+                    continue
                 added_photos += insert_photos_for_review(review_id, new_photos)
 
                 # Update review photo_count and photos_json
@@ -534,6 +629,7 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
                     reviews_updated += 1
                 except Exception as e:
                     print(f"    ERROR updating review for {pole_num}: {e}")
+                    conn.rollback()  # Reset transaction on error
 
                 if reviews_updated % 100 == 0:
                     conn.commit()
@@ -551,6 +647,8 @@ def run_ingestion(project_name, db_url, dry_run=False, folder_id=None):
     print(f"  Photos scanned:      {len(photos)}")
     print(f"  Poles matched:       {total_matched_poles} ({len(matched)} new + {len(add_to_existing)} existing)")
     print(f"  Photos matched:      {total_matched_photos}")
+    print(f"  Fuzzy O→0 matches:   {fuzzy_matched}")
+    print(f"  Zone/PON from path:  {len(path_zone_pon)} poles")
     print(f"  Unmatched files:     {len(unmatched)}")
     print(f"  Skipped duplicates:  {skipped_duplicate}")
     if not dry_run:
