@@ -48,6 +48,10 @@ interface ChatWidgetProps {
   userId?: string;
 }
 
+const STORAGE_KEY = 'ff-chat-widget';
+const BTN_SIZE = 56;
+const DRAG_THRESHOLD = 5;
+
 export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, userId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -56,9 +60,65 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [dataAccess, setDataAccess] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
+  const [position, setPosition] = useState({ x: 24, y: 24 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dragState = useRef({ dragging: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0 });
+
+  // Restore persisted position + hidden state
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.x !== undefined) setPosition({ x: parsed.x, y: parsed.y });
+        if (parsed.hidden) setIsHidden(true);
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, []);
+
+  // Persist position + hidden state
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ x: position.x, y: position.y, hidden: isHidden }));
+  }, [position, isHidden]);
+
+  // Drag handlers — pointer events for mouse + touch
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    dragState.current = { dragging: true, moved: false, startX: e.clientX, startY: e.clientY, origX: position.x, origY: position.y };
+    btnRef.current?.setPointerCapture(e.pointerId);
+  }, [position]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    const ds = dragState.current;
+    if (!ds.dragging) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    if (!ds.moved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+    ds.moved = true;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setPosition({
+      x: Math.max(4, Math.min(vw - BTN_SIZE - 4, ds.origX + dx)),
+      y: Math.max(4, Math.min(vh - BTN_SIZE - 4, ds.origY - dy)),
+    });
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const ds = dragState.current;
+    btnRef.current?.releasePointerCapture(e.pointerId);
+    if (ds.moved) { ds.dragging = false; return; }
+    ds.dragging = false;
+    setIsOpen(prev => !prev);
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsHidden(true);
+    setIsOpen(false);
+  }, []);
 
   // Check if user has data lookup permission
   useEffect(() => {
@@ -175,30 +235,53 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ userName, userRole, user
     });
   };
 
+  const panelLeft = Math.min(position.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 416);
+  const panelBottom = position.y + BTN_SIZE + 12;
+
   return (
     <>
-      {/* Floating Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          'fixed bottom-6 left-6 z-[9999] flex items-center justify-center rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95',
-          isOpen
-            ? 'w-12 h-12 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
-            : 'w-14 h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400'
-        )}
-        title={isOpen ? 'Close chat' : 'Ask Velo'}
-      >
-        {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-6 h-6" />}
-        {!isOpen && messages.length === 0 && (
-          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 animate-ping opacity-20" />
-        )}
-      </button>
+      {/* Restore pill — visible when widget is hidden */}
+      {isHidden && (
+        <button
+          onClick={() => setIsHidden(false)}
+          className="fixed bottom-2 left-1/2 -translate-x-1/2 z-[9999] px-3 py-1 rounded-full bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[10px] text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] transition-colors shadow-lg"
+        >
+          Show Velo chat
+        </button>
+      )}
+
+      {/* Floating Button — draggable, right-click to hide */}
+      {!isHidden && (
+        <button
+          ref={btnRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onContextMenu={handleContextMenu}
+          className={cn(
+            'fixed z-[9999] flex items-center justify-center rounded-full shadow-2xl select-none touch-none transition-all duration-300 hover:scale-110 active:scale-95',
+            isOpen
+              ? 'w-12 h-12 bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
+              : 'w-14 h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400'
+          )}
+          style={{ left: position.x, bottom: position.y }}
+          title={isOpen ? 'Close chat · Right-click to hide' : 'Ask Velo · Drag to move · Right-click to hide'}
+        >
+          {isOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-6 h-6" />}
+          {!isOpen && messages.length === 0 && (
+            <span className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 animate-ping opacity-20" />
+          )}
+        </button>
+      )}
 
       {/* Chat Panel */}
-      <div className={cn(
-        'fixed bottom-24 left-6 z-[9998] w-[400px] max-w-[calc(100vw-48px)] transition-all duration-300 ease-out',
-        isOpen ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
-      )}>
+      <div
+        className={cn(
+          'fixed z-[9998] w-[400px] max-w-[calc(100vw-48px)] transition-all duration-300 ease-out',
+          isOpen && !isHidden ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
+        )}
+        style={{ left: panelLeft, bottom: panelBottom }}
+      >
         <div className="flex flex-col h-[560px] max-h-[70vh] rounded-2xl overflow-hidden shadow-2xl border border-[var(--ff-border-light)] bg-[var(--ff-bg-primary)]">
           
           {/* Header */}
