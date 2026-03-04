@@ -373,7 +373,7 @@ export interface RejectApprovalInput {
 }
 
 export interface InternalApproveInput {
-  action: 'pm_approve' | 'ops_approve' | 'reject';
+  action: 'pm_approve' | 'ops_approve' | 'full_approve' | 'reject';
   notes?: string;
   rejection_reason?: string; // Required if action is 'reject'
   approved_by: string;

@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const input = req.body as InternalApproveInput;
 
   if (!input.action) {
-    return apiResponse.badRequest(res, 'Action is required (pm_approve, ops_approve, or reject)');
+    return apiResponse.badRequest(res, 'Action is required (pm_approve, ops_approve, full_approve, or reject)');
   }
   if (!input.approved_by) {
     return apiResponse.badRequest(res, 'Approved by user ID is required');
@@ -52,6 +52,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res,
       `Cannot Ops approve. Current internal status is '${existing.internal_status}'. ` +
         `Ops approval is only allowed when status is 'pm_approved'.`
+    );
+  }
+
+  if (input.action === 'full_approve' && existing.internal_status !== 'pending') {
+    return apiResponse.badRequest(
+      res,
+      `Cannot full approve. Current internal status is '${existing.internal_status}'. ` +
+        `Full approval is only allowed when status is 'pending'.`
     );
   }
 
@@ -86,9 +94,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  const actionMessages = {
+  const actionMessages: Record<string, string> = {
     pm_approve: 'Approved by Project Manager',
     ops_approve: 'Approved by Operations Manager. Ready for external submission.',
+    full_approve: 'Fully approved (PM + Ops). Ready for external submission.',
     reject: 'Rejected internally',
   };
 

@@ -237,9 +237,9 @@ export function PipelineProjectDetail() {
     setSelectedApproval(null);
   };
 
-  const handleApprovalUpdate = () => {
+  const handleApprovalUpdate = async () => {
     // Reload data after approval update
-    loadProject();
+    await loadProject();
   };
 
   const handleAddApproval = () => {
@@ -418,6 +418,16 @@ export function PipelineProjectDetail() {
       loadProject();
     }
   }, [id]);
+
+  // Sync selectedApproval with refreshed approvals data (fixes stale drawer state)
+  useEffect(() => {
+    if (selectedApproval && approvals.length > 0) {
+      const updated = approvals.find(a => a.id === selectedApproval.id);
+      if (updated) {
+        setSelectedApproval(updated);
+      }
+    }
+  }, [approvals]);
 
   const loadProject = async () => {
     setLoading(true);

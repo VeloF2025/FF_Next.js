@@ -200,6 +200,9 @@ export function ApprovalDetailDrawer({
   const canOpsApprove =
     (currentUserRole === 'ops' || currentUserRole === 'admin') &&
     approval.internal_status === 'pm_approved';
+  const canFullApprove =
+    currentUserRole === 'admin' &&
+    approval.internal_status === 'pending';
   const canSubmit =
     approval.status === 'not_started' &&
     approval.internal_status === 'ops_approved';
@@ -210,7 +213,7 @@ export function ApprovalDetailDrawer({
     (currentUserRole === 'admin' || currentUserRole === 'ops') &&
     ['submitted', 'in_review', 'additional_info_required', 'conditionally_approved'].includes(approval.status);
 
-  const hasActions = canPmApprove || canOpsApprove || canSubmit || canMarkApproved || canMarkRejected;
+  const hasActions = canPmApprove || canOpsApprove || canFullApprove || canSubmit || canMarkApproved || canMarkRejected;
   const canEdit = ['admin', 'pm', 'ops'].includes(currentUserRole);
 
   // Reset edit data when starting to edit a section
@@ -304,7 +307,7 @@ export function ApprovalDetailDrawer({
     }
   }
 
-  async function handleInternalApprove(action: 'pm_approve' | 'ops_approve' | 'reject') {
+  async function handleInternalApprove(action: 'pm_approve' | 'ops_approve' | 'full_approve' | 'reject') {
     setLoading(true);
     setError(null);
     try {
@@ -532,30 +535,43 @@ export function ApprovalDetailDrawer({
           {hasActions && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4">
               {/* Internal Approval Workflow */}
-              {(canPmApprove || canOpsApprove) && !showRejectForm && (
+              {(canPmApprove || canOpsApprove || canFullApprove) && !showRejectForm && (
                 <div>
                   <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
                     Internal Approval Required
                   </h3>
                   {canPmApprove && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleInternalApprove('pm_approve')}
-                        disabled={loading}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
-                      >
-                        <CheckCircle className="w-5 h-5" />
-                        PM Approve
-                      </button>
-                      <button
-                        onClick={() => setShowRejectForm(true)}
-                        disabled={loading}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
-                      >
-                        <XCircle className="w-5 h-5" />
-                        Reject
-                      </button>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleInternalApprove('pm_approve')}
+                          disabled={loading}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                          PM Approve
+                        </button>
+                        <button
+                          onClick={() => setShowRejectForm(true)}
+                          disabled={loading}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                        >
+                          <XCircle className="w-5 h-5" />
+                          Reject
+                        </button>
+                      </div>
+                      {canFullApprove && (
+                        <button
+                          onClick={() => handleInternalApprove('full_approve')}
+                          disabled={loading}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 disabled:opacity-50 font-medium"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                          <CheckCircle className="w-5 h-5 -ml-3" />
+                          Full Approve (PM + Ops)
+                        </button>
+                      )}
                     </div>
                   )}
                   {canOpsApprove && (
@@ -794,7 +810,7 @@ export function ApprovalDetailDrawer({
                   <div className="flex gap-2">
                     <button
                       onClick={
-                        canPmApprove || canOpsApprove
+                        canPmApprove || canOpsApprove || canFullApprove
                           ? () => handleInternalApprove('reject')
                           : handleMarkRejected
                       }

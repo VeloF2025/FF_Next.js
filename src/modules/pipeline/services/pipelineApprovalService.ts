@@ -298,6 +298,25 @@ export async function internalApprove(
     return result.length > 0 ? (result[0] as unknown as PipelineProjectApproval) : null;
   }
 
+  if (input.action === 'full_approve') {
+    const result = (await sql`
+      UPDATE pipeline_project_approvals
+      SET
+        internal_status = 'ops_approved',
+        pm_approved_by = ${input.approved_by},
+        pm_approved_at = NOW(),
+        pm_notes = ${input.notes || null},
+        ops_approved_by = ${input.approved_by},
+        ops_approved_at = NOW(),
+        ops_notes = ${input.notes || null},
+        updated_at = NOW(),
+        updated_by = ${input.approved_by}
+      WHERE id = ${id} AND internal_status = 'pending'
+      RETURNING *
+    `) as Record<string, unknown>[];
+    return result.length > 0 ? (result[0] as unknown as PipelineProjectApproval) : null;
+  }
+
   if (input.action === 'reject') {
     const result = (await sql`
       UPDATE pipeline_project_approvals
