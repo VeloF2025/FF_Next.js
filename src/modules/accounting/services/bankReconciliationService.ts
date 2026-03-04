@@ -168,12 +168,16 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
                COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
-               c2.company_name AS suggested_client_name
+               c2.company_name AS suggested_client_name,
+               cc1.name AS cc1_name, cc2t.name AS cc2_name, dept.name AS bu_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
         LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         LEFT JOIN suppliers s2 ON s2.id = bt.suggested_supplier_id
         LEFT JOIN clients c2 ON c2.id = bt.suggested_client_id
+        LEFT JOIN cost_centres cc1 ON cc1.id = bt.cc1_id
+        LEFT JOIN cost_centres cc2t ON cc2t.id = bt.cc2_id
+        LEFT JOIN departments dept ON dept.id = bt.bu_id
         WHERE bt.reconciliation_id = ${filters.reconciliationId}::UUID
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -198,12 +202,16 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
                COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
-               c2.company_name AS suggested_client_name
+               c2.company_name AS suggested_client_name,
+               cc1.name AS cc1_name, cc2t.name AS cc2_name, dept.name AS bu_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
         LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         LEFT JOIN suppliers s2 ON s2.id = bt.suggested_supplier_id
         LEFT JOIN clients c2 ON c2.id = bt.suggested_client_id
+        LEFT JOIN cost_centres cc1 ON cc1.id = bt.cc1_id
+        LEFT JOIN cost_centres cc2t ON cc2t.id = bt.cc2_id
+        LEFT JOIN departments dept ON dept.id = bt.bu_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
           AND bt.status = ANY(${statusArr}::TEXT[])
           AND bt.transaction_date >= ${fromDateVal}
@@ -230,12 +238,16 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
                COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
-               c2.company_name AS suggested_client_name
+               c2.company_name AS suggested_client_name,
+               cc1.name AS cc1_name, cc2t.name AS cc2_name, dept.name AS bu_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
         LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         LEFT JOIN suppliers s2 ON s2.id = bt.suggested_supplier_id
         LEFT JOIN clients c2 ON c2.id = bt.suggested_client_id
+        LEFT JOIN cost_centres cc1 ON cc1.id = bt.cc1_id
+        LEFT JOIN cost_centres cc2t ON cc2t.id = bt.cc2_id
+        LEFT JOIN departments dept ON dept.id = bt.bu_id
         WHERE bt.bank_account_id = ${filters.bankAccountId}::UUID
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
@@ -250,12 +262,16 @@ export async function getBankTransactions(filters?: BankTxFilters): Promise<{
                ga2.account_name AS suggested_gl_account_name,
                ga2.account_code AS suggested_gl_account_code,
                COALESCE(s2.name, s2.company_name) AS suggested_supplier_name,
-               c2.company_name AS suggested_client_name
+               c2.company_name AS suggested_client_name,
+               cc1.name AS cc1_name, cc2t.name AS cc2_name, dept.name AS bu_name
         FROM bank_transactions bt
         LEFT JOIN gl_accounts ga ON ga.id = bt.bank_account_id
         LEFT JOIN gl_accounts ga2 ON ga2.id = bt.suggested_gl_account_id
         LEFT JOIN suppliers s2 ON s2.id = bt.suggested_supplier_id
         LEFT JOIN clients c2 ON c2.id = bt.suggested_client_id
+        LEFT JOIN cost_centres cc1 ON cc1.id = bt.cc1_id
+        LEFT JOIN cost_centres cc2t ON cc2t.id = bt.cc2_id
+        LEFT JOIN departments dept ON dept.id = bt.bu_id
         ORDER BY bt.transaction_date DESC, bt.amount DESC
         LIMIT ${limit} OFFSET ${offset}
       `) as Row[];
@@ -684,6 +700,9 @@ export async function allocateTransaction(
   allocType: AllocationType = 'account',
   entityId?: string,
   vatCode?: string,
+  cc1Id?: string,
+  cc2Id?: string,
+  buId?: string,
 ): Promise<{ journalEntryId: string; bankTransaction: BankTransaction }> {
   // Get the bank transaction
   const txRows = (await sql`
@@ -716,7 +735,7 @@ export async function allocateTransaction(
     : undefined;
 
   let lines: JournalLineInput[];
-  let source: string;
+  let source: import('../types/gl.types').GLEntrySource;
   let entryDesc: string;
   let allocEntityName: string | null = null;
 
@@ -781,12 +800,17 @@ export async function allocateTransaction(
     }
   }
 
+  // Attach CC1 (cost centre) and BU to contra (non-bank) lines
+  const linesWithDims = lines.map(l =>
+    l.glAccountId === bankAccountId ? l : { ...l, costCenterId: cc1Id || l.costCenterId, buId: buId || l.buId }
+  );
+
   const je = await createJournalEntry({
     entryDate: txDate,
     description: entryDesc,
     source,
     sourceDocumentId: bankTxId,
-    lines,
+    lines: linesWithDims,
   }, userId);
   await postJournalEntry(je.id, userId);
 
@@ -800,7 +824,7 @@ export async function allocateTransaction(
 
   const journalLineId = jeLines.length > 0 ? String(jeLines[0]!.id) : null;
 
-  // Mark as allocated (stays on New tab until explicitly reviewed)
+  // Mark as allocated (stays on New tab until explicitly reviewed); persist dimensions
   if (journalLineId) {
     await sql`
       UPDATE bank_transactions
@@ -808,6 +832,9 @@ export async function allocateTransaction(
           matched_journal_line_id = ${journalLineId}::UUID,
           allocation_type = ${allocType},
           allocated_entity_name = ${allocEntityName},
+          cc1_id = ${cc1Id || null}::UUID,
+          cc2_id = ${cc2Id || null}::UUID,
+          bu_id = ${buId || null}::UUID,
           updated_at = NOW()
       WHERE id = ${bankTxId}::UUID
     `;
@@ -1057,8 +1084,8 @@ async function updateReconciledBalance(reconciliationId: string): Promise<void> 
 }
 
 function fmtDate(val: unknown): string {
-  if (val instanceof Date) return val.toISOString().split('T')[0];
-  return val ? String(val).split('T')[0] : '';
+  if (val instanceof Date) return val.toISOString().split('T')[0] ?? '';
+  return val ? String(val).split('T')[0] ?? '' : '';
 }
 
 function mapTxRow(row: Row): BankTransaction {
@@ -1091,6 +1118,12 @@ function mapTxRow(row: Row): BankTransaction {
     suggestedClientId: row.suggested_client_id ? String(row.suggested_client_id) : undefined,
     suggestedClientName: row.suggested_client_name ? String(row.suggested_client_name) : undefined,
     suggestedVatCode: row.suggested_vat_code && row.suggested_vat_code !== 'none' ? String(row.suggested_vat_code) : undefined,
+    cc1Id: row.cc1_id ? String(row.cc1_id) : undefined,
+    cc2Id: row.cc2_id ? String(row.cc2_id) : undefined,
+    buId: row.bu_id ? String(row.bu_id) : undefined,
+    cc1Name: row.cc1_name ? String(row.cc1_name) : undefined,
+    cc2Name: row.cc2_name ? String(row.cc2_name) : undefined,
+    buName: row.bu_name ? String(row.bu_name) : undefined,
     allocationType: row.allocation_type ? String(row.allocation_type) as BankTransaction['allocationType'] : undefined,
     allocatedEntityName: row.allocated_entity_name ? String(row.allocated_entity_name) : undefined,
   };

@@ -180,13 +180,14 @@ export async function createJournalEntry(
       await sql`
         INSERT INTO gl_journal_lines (
           journal_entry_id, gl_account_id, debit, credit,
-          description, project_id, cost_center_id, vat_type
+          description, project_id, cost_center_id, bu_id, vat_type
         ) VALUES (
           ${entryId}::UUID, ${line.glAccountId}::UUID,
           ${line.debit}, ${line.credit},
           ${line.description || null},
           ${line.projectId || null},
           ${line.costCenterId || null},
+          ${line.buId || null},
           ${line.vatType || null}
         )
       `;

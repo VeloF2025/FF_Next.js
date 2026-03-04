@@ -50,6 +50,10 @@ export interface BankTransaction {
   suggestedCategory?: string;
   suggestedCostCentre?: string;
   suggestedVatCode?: string;
+  /** Dimension fields — cost centres and business unit */
+  cc1Id?: string;
+  cc2Id?: string;
+  buId?: string;
   createdAt: string;
   updatedAt: string;
   // Joined display fields
@@ -59,6 +63,9 @@ export interface BankTransaction {
   suggestedGlAccountCode?: string;
   suggestedSupplierName?: string;
   suggestedClientName?: string;
+  cc1Name?: string;
+  cc2Name?: string;
+  buName?: string;
   // Allocation tracking — populated when status is matched/reconciled
   allocationType?: 'account' | 'supplier' | 'customer';
   allocatedEntityName?: string;
@@ -124,6 +131,9 @@ export interface BankCategorisationRule {
   isActive: boolean;
   autoCreateEntry: boolean;
   vatCode: RuleVatCode;
+  cc1Id?: string;
+  cc2Id?: string;
+  buId?: string;
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
@@ -132,6 +142,9 @@ export interface BankCategorisationRule {
   glAccountName?: string;
   supplierName?: string;
   clientName?: string;
+  cc1Name?: string;
+  cc2Name?: string;
+  buName?: string;
 }
 
 export interface RuleCreateInput {
@@ -146,6 +159,9 @@ export interface RuleCreateInput {
   priority?: number;
   autoCreateEntry?: boolean;
   vatCode?: RuleVatCode;
+  cc1Id?: string;
+  cc2Id?: string;
+  buId?: string;
 }
 
 export interface RuleApplyResult {

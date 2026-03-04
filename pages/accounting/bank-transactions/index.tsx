@@ -51,6 +51,9 @@ export default function BankTransactionsPage() {
   const [glAccounts, setGlAccounts] = useState<SelectOption[]>([]);
   const [suppliers, setSuppliers] = useState<SelectOption[]>([]);
   const [customers, setCustomers] = useState<SelectOption[]>([]);
+  const [cc1Options, setCc1Options] = useState<SelectOption[]>([]);
+  const [cc2Options, setCc2Options] = useState<SelectOption[]>([]);
+  const [buOptions, setBuOptions] = useState<SelectOption[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAcct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -119,6 +122,22 @@ export default function BankTransactionsPage() {
         id: c.id, name: c.company_name || c.companyName || c.name || '',
       })));
     }).catch(() => {});
+
+    fetch('/api/accounting/cost-centres?cc_type=cc1&active=true').then(r => r.json()).then(json => {
+      const list = Array.isArray(json.data?.items) ? json.data.items : [];
+      setCc1Options(list.map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })));
+    }).catch(() => {});
+
+    fetch('/api/accounting/cost-centres?cc_type=cc2&active=true').then(r => r.json()).then(json => {
+      const list = Array.isArray(json.data?.items) ? json.data.items : [];
+      setCc2Options(list.map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })));
+    }).catch(() => {});
+
+    fetch('/api/departments?isActive=true').then(r => r.json()).then(json => {
+      const list = Array.isArray(json.data || json) ? (json.data || json) : [];
+      setBuOptions(list.filter((d: { is_active?: boolean; isActive?: boolean }) => d.is_active !== false && d.isActive !== false)
+        .map((d: { id: string; name: string; code?: string }) => ({ id: d.id, name: d.name, code: d.code })));
+    }).catch(() => {});
   }, []);
 
   // Debounce search input — 500ms delay before firing server request
@@ -170,19 +189,20 @@ export default function BankTransactionsPage() {
       // should be overridden by fresh DB suggestions (e.g. after Apply Rules runs)
       if (rowSelections[tx.id]?.entityId) continue;
       // VAT only applies to GL account allocations; supplier/customer VAT is handled on their own invoices
+      const dimFields = { cc1Id: tx.cc1Id, cc2Id: tx.cc2Id, buId: tx.buId };
       if (tx.suggestedSupplierId) {
         initialSelections[tx.id] = {
           type: 'supplier' as AllocType,
           entityId: tx.suggestedSupplierId,
           label: tx.suggestedSupplierName || tx.suggestedCategory || '',
-          vatCode: 'none',
+          vatCode: 'none', ...dimFields,
         };
       } else if (tx.suggestedClientId) {
         initialSelections[tx.id] = {
           type: 'customer' as AllocType,
           entityId: tx.suggestedClientId,
           label: tx.suggestedClientName || tx.suggestedCategory || '',
-          vatCode: 'none',
+          vatCode: 'none', ...dimFields,
         };
       } else if (tx.suggestedGlAccountId) {
         initialSelections[tx.id] = {
@@ -191,7 +211,7 @@ export default function BankTransactionsPage() {
           label: tx.suggestedGlAccountCode
             ? `${tx.suggestedGlAccountCode} ${tx.suggestedGlAccountName || ''}`
             : tx.suggestedGlAccountName || tx.suggestedCategory || '',
-          vatCode: (tx.suggestedVatCode || 'none') as VatCode,
+          vatCode: (tx.suggestedVatCode || 'none') as VatCode, ...dimFields,
         };
       }
     }
@@ -236,6 +256,14 @@ export default function BankTransactionsPage() {
     }).catch(() => {});
   };
 
+  // Fire-and-forget: persist CC1/CC2/BU dimension changes
+  const saveDimensions = (txId: string, cc1Id: string, cc2Id: string, buId: string) => {
+    fetch('/api/accounting/bank-transactions-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ action: 'save_dimensions', bankTransactionId: txId, cc1Id: cc1Id || null, cc2Id: cc2Id || null, buId: buId || null }),
+    }).catch(() => {});
+  };
+
   const handleAccept = async (txId: string) => {
     const sel = rowSelections[txId];
     if (!sel?.entityId) { toast.error('Select an account/supplier/customer first'); return; }
@@ -247,6 +275,9 @@ export default function BankTransactionsPage() {
       };
       if (sel.type === 'account') body.contraAccountId = sel.entityId;
       else body.entityId = sel.entityId;
+      if (sel.cc1Id) body.cc1Id = sel.cc1Id;
+      if (sel.cc2Id) body.cc2Id = sel.cc2Id;
+      if (sel.buId) body.buId = sel.buId;
       await callAction(body);
       toast.success('Transaction allocated');
       loadTransactions();
@@ -328,12 +359,16 @@ export default function BankTransactionsPage() {
     for (const txId of toAccept) {
       try {
         const sel = rowSelections[txId];
+        if (!sel) continue;
         const body: Record<string, string> = {
           action: 'allocate', bankTransactionId: txId, allocationType: sel.type,
           vatCode: sel.vatCode || 'none',
         };
         if (sel.type === 'account') body.contraAccountId = sel.entityId;
         else body.entityId = sel.entityId;
+        if (sel.cc1Id) body.cc1Id = sel.cc1Id;
+        if (sel.cc2Id) body.cc2Id = sel.cc2Id;
+        if (sel.buId) body.buId = sel.buId;
         await callAction(body);
         ok++;
       } catch { fail++; }
@@ -347,7 +382,7 @@ export default function BankTransactionsPage() {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
     try {
-      await callAction({ action: 'delete', bankTransactionIds: Array.from(selectedIds) } as Record<string, string>);
+      await callAction({ action: 'delete', bankTransactionIds: Array.from(selectedIds) } as unknown as Record<string, string>);
       toast.success(`${selectedIds.size} transaction(s) deleted`);
       setSelectedIds(new Set());
       loadTransactions();
@@ -730,6 +765,9 @@ export default function BankTransactionsPage() {
               glAccounts={glAccounts}
               suppliers={suppliers}
               customers={customers}
+              cc1Options={cc1Options}
+              cc2Options={cc2Options}
+              buOptions={buOptions}
               selectedIds={selectedIds}
               rowSelections={rowSelections}
               allSelected={allSelected}
@@ -765,6 +803,10 @@ export default function BankTransactionsPage() {
                   [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId: prev[txId]?.entityId || '', label: prev[txId]?.label || '', vatCode },
                 }))
               }
+              onRowDimensionChange={(txId, cc1Id, cc2Id, buId) => {
+                setRowSelections(prev => ({ ...prev, [txId]: { ...prev[txId], type: prev[txId]?.type || 'account', entityId: prev[txId]?.entityId || '', label: prev[txId]?.label || '', vatCode: prev[txId]?.vatCode || 'none', cc1Id: cc1Id || undefined, cc2Id: cc2Id || undefined, buId: buId || undefined } }));
+                saveDimensions(txId, cc1Id, cc2Id, buId);
+              }}
               onAccept={handleAccept}
               onExclude={handleExclude}
               onUnmatch={handleUnmatch}
