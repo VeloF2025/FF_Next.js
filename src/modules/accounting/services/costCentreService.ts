@@ -9,12 +9,15 @@ import { log } from '@/lib/logger';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
 
+export type CcType = 'cc1' | 'cc2';
+
 export interface CostCentre {
   id: string;
   code: string;
   name: string;
   description?: string;
   department?: string;
+  ccType: CcType;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -25,12 +28,24 @@ export interface CostCentreInput {
   name: string;
   description?: string;
   department?: string;
+  ccType?: CcType;
 }
 
-export async function getCostCentres(activeOnly = false): Promise<CostCentre[]> {
-  const rows = activeOnly
-    ? ((await sql`SELECT * FROM cost_centres WHERE is_active = true ORDER BY code`) as Row[])
-    : ((await sql`SELECT * FROM cost_centres ORDER BY code`) as Row[]);
+export async function getCostCentres(activeOnly = false, ccType?: CcType): Promise<CostCentre[]> {
+  let rows: Row[];
+  if (ccType === 'cc1') {
+    rows = activeOnly
+      ? ((await sql`SELECT * FROM cost_centres WHERE cc_type = 'cc1' AND is_active = true ORDER BY code`) as Row[])
+      : ((await sql`SELECT * FROM cost_centres WHERE cc_type = 'cc1' ORDER BY code`) as Row[]);
+  } else if (ccType === 'cc2') {
+    rows = activeOnly
+      ? ((await sql`SELECT * FROM cost_centres WHERE cc_type = 'cc2' AND is_active = true ORDER BY code`) as Row[])
+      : ((await sql`SELECT * FROM cost_centres WHERE cc_type = 'cc2' ORDER BY code`) as Row[]);
+  } else {
+    rows = activeOnly
+      ? ((await sql`SELECT * FROM cost_centres WHERE is_active = true ORDER BY code`) as Row[])
+      : ((await sql`SELECT * FROM cost_centres ORDER BY code`) as Row[]);
+  }
   return rows.map(mapRow);
 }
 
@@ -40,10 +55,11 @@ export async function getCostCentre(id: string): Promise<CostCentre | null> {
 }
 
 export async function createCostCentre(input: CostCentreInput, userId: string): Promise<CostCentre> {
+  const ccType: CcType = input.ccType || 'cc1';
   const rows = (await sql`
-    INSERT INTO cost_centres (code, name, description, department, created_by)
+    INSERT INTO cost_centres (code, name, description, department, cc_type, created_by)
     VALUES (${input.code}, ${input.name}, ${input.description || null},
-            ${input.department || null}, ${userId}::UUID)
+            ${input.department || null}, ${ccType}, ${userId}::UUID)
     RETURNING *
   `) as Row[];
   log.info('Created cost centre', { id: rows[0].id, code: input.code }, 'accounting');
@@ -85,6 +101,7 @@ function mapRow(row: Row): CostCentre {
     name: String(row.name),
     description: row.description ? String(row.description) : undefined,
     department: row.department ? String(row.department) : undefined,
+    ccType: (row.cc_type || 'cc1') as CcType,
     isActive: Boolean(row.is_active),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),

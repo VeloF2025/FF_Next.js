@@ -214,6 +214,7 @@ export interface JournalLineInput {
   description?: string;
   projectId?: string;
   costCenterId?: string;
+  buId?: string;
   vatType?: VatType;
 }
 

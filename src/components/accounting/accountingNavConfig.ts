@@ -283,6 +283,7 @@ export const TABS: Tab[] = [
         section: 'Management',
         items: [
           { label: 'Cost Centres', href: '/accounting/cost-centres' },
+          { label: 'Business Units', href: '/accounting/business-units' },
           { label: 'Budgets', href: '/accounting/budgets' },
         ],
       },
@@ -398,6 +399,7 @@ export function getActiveTabId(
       pathname.startsWith('/accounting/depreciation') ||
       pathname.startsWith('/accounting/year-end') ||
       pathname.startsWith('/accounting/cost-centres') ||
+      pathname.startsWith('/accounting/business-units') ||
       pathname.startsWith('/accounting/budgets') ||
       pathname === '/accounting/reports/audit-trail') {
     return 'accountants';

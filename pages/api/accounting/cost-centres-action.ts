@@ -13,7 +13,7 @@ import {
 } from '@/modules/accounting/services/costCentreService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
   const { action, id, ...data } = req.body;
   if (!id) return apiResponse.badRequest(res, 'id required');

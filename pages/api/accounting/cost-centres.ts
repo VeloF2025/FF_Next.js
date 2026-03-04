@@ -9,22 +9,23 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { getCostCentres, createCostCentre } from '@/modules/accounting/services/costCentreService';
+import { getCostCentres, createCostCentre, type CcType } from '@/modules/accounting/services/costCentreService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = (req as AuthenticatedNextApiRequest).user.id;
 
   if (req.method === 'GET') {
     const activeOnly = req.query.active === 'true';
-    const items = await getCostCentres(activeOnly);
+    const ccType = req.query.cc_type as CcType | undefined;
+    const items = await getCostCentres(activeOnly, ccType);
     return apiResponse.success(res, { items });
   }
 
   if (req.method === 'POST') {
-    const { code, name, description, department } = req.body;
+    const { code, name, description, department, ccType } = req.body;
     if (!code || !name) return apiResponse.badRequest(res, 'code and name are required');
     try {
-      const cc = await createCostCentre({ code, name, description, department }, userId);
+      const cc = await createCostCentre({ code, name, description, department, ccType }, userId);
       return apiResponse.success(res, cc);
     } catch (err) {
       log.error('Failed to create cost centre', { error: err }, 'accounting-api');
@@ -32,7 +33,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return apiResponse.methodNotAllowed(res, req.method!);
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(withErrorHandler(handler));

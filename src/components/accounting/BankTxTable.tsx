@@ -40,6 +40,13 @@ export interface BankTx {
   suggestedClientName?: string;
   suggestedCategory?: string;
   suggestedVatCode?: string;
+  /** Dimension fields */
+  cc1Id?: string;
+  cc2Id?: string;
+  buId?: string;
+  cc1Name?: string;
+  cc2Name?: string;
+  buName?: string;
   /** Allocation tracking — populated for matched/reconciled transactions */
   allocationType?: AllocType;
   allocatedEntityName?: string;
@@ -57,6 +64,9 @@ export interface RowSelection {
   entityId: string;
   label: string;
   vatCode: VatCode;
+  cc1Id?: string;
+  cc2Id?: string;
+  buId?: string;
 }
 
 interface Props {
@@ -64,6 +74,9 @@ interface Props {
   glAccounts: SelectOption[];
   suppliers: SelectOption[];
   customers: SelectOption[];
+  cc1Options: SelectOption[];
+  cc2Options: SelectOption[];
+  buOptions: SelectOption[];
   selectedIds: Set<string>;
   rowSelections: Record<string, RowSelection>;
   allSelected: boolean;
@@ -73,6 +86,7 @@ interface Props {
   onRowTypeChange: (txId: string, type: AllocType) => void;
   onRowEntityChange: (txId: string, entityId: string, label: string) => void;
   onRowVatChange: (txId: string, vatCode: VatCode) => void;
+  onRowDimensionChange: (txId: string, cc1Id: string, cc2Id: string, buId: string) => void;
   onAccept: (txId: string) => void;
   onExclude: (txId: string) => void;
   onUnmatch: (txId: string) => void;
@@ -148,8 +162,10 @@ function NotesCell({
 export function BankTxTable(props: Props) {
   const {
     transactions, glAccounts, suppliers, customers,
+    cc1Options, cc2Options, buOptions,
     selectedIds, rowSelections, allSelected, tab,
     onToggleSelect, onSelectAll, onRowTypeChange, onRowEntityChange, onRowVatChange,
+    onRowDimensionChange,
     onAccept, onExclude, onUnmatch, onSplit, onUpdateNotes,
     onFindMatch, onReverse, onAttachments, onCreateRule, onCreateEntity,
   } = props;
@@ -199,8 +215,10 @@ export function BankTxTable(props: Props) {
             <th className={`${TH} w-36`}>Notes</th>
             <th className={`${TH} w-24`}>Type</th>
             <th className={`${TH} w-52`}>Selection</th>
-            <th className={`${TH} w-28`}>Reference</th>
             <th className={`${TH} w-24`}>VAT</th>
+            <th className={`${TH} w-24`}>CC1</th>
+            <th className={`${TH} w-24`}>CC2</th>
+            <th className={`${TH} w-24`}>BU</th>
             <th className="py-2 px-2 font-medium text-right w-24">Spent</th>
             <th className="py-2 px-2 font-medium text-right w-24">Received</th>
             <th className="py-2 px-2 font-medium text-center w-16">Actions</th>
@@ -351,9 +369,6 @@ export function BankTxTable(props: Props) {
                     </span>
                   )}
                 </td>
-                <td className="py-2 px-2 text-xs font-mono text-[var(--ff-text-tertiary)]">
-                  {tx.reference || tx.bankReference || ''}
-                </td>
                 <td className="py-2 px-2">
                   {sel?.type === 'supplier' || sel?.type === 'customer' ? (
                     <span className="text-xs text-[var(--ff-text-tertiary)] italic">N/A</span>
@@ -374,6 +389,42 @@ export function BankTxTable(props: Props) {
                     <span className="text-xs text-[var(--ff-text-tertiary)]">
                       {VAT_OPTIONS.find(v => v.value === (sel?.vatCode || 'none'))?.label || 'No VAT'}
                     </span>
+                  )}
+                </td>
+                {/* CC1 */}
+                <td className="py-2 px-2">
+                  {isNew ? (
+                    <select value={sel?.cc1Id || ''} onChange={e => onRowDimensionChange(tx.id, e.target.value, sel?.cc2Id || '', sel?.buId || '')}
+                      className="text-xs px-1 py-0.5 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] w-full text-[var(--ff-text-primary)]">
+                      <option value="">—</option>
+                      {cc1Options.map(o => <option key={o.id} value={o.id}>{o.code ? `${o.code} ${o.name}` : o.name}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--ff-text-tertiary)] truncate block" title={tx.cc1Name}>{tx.cc1Name || '—'}</span>
+                  )}
+                </td>
+                {/* CC2 */}
+                <td className="py-2 px-2">
+                  {isNew ? (
+                    <select value={sel?.cc2Id || ''} onChange={e => onRowDimensionChange(tx.id, sel?.cc1Id || '', e.target.value, sel?.buId || '')}
+                      className="text-xs px-1 py-0.5 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] w-full text-[var(--ff-text-primary)]">
+                      <option value="">—</option>
+                      {cc2Options.map(o => <option key={o.id} value={o.id}>{o.code ? `${o.code} ${o.name}` : o.name}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--ff-text-tertiary)] truncate block" title={tx.cc2Name}>{tx.cc2Name || '—'}</span>
+                  )}
+                </td>
+                {/* BU */}
+                <td className="py-2 px-2">
+                  {isNew ? (
+                    <select value={sel?.buId || ''} onChange={e => onRowDimensionChange(tx.id, sel?.cc1Id || '', sel?.cc2Id || '', e.target.value)}
+                      className="text-xs px-1 py-0.5 rounded bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] w-full text-[var(--ff-text-primary)]">
+                      <option value="">—</option>
+                      {buOptions.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-[var(--ff-text-tertiary)] truncate block" title={tx.buName}>{tx.buName || '—'}</span>
                   )}
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-xs text-red-400">
