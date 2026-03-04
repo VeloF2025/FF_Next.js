@@ -8,6 +8,7 @@
  *   period: 'today' | 'yesterday' | '7d' | '30d' | 'all' (default '7d')
  *   dateFrom: ISO date string (overrides period)
  *   dateTo:   ISO date string (overrides period)
+ *   projectId: UUID — filter to a single project (optional)
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -57,11 +58,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { period = '7d', dateFrom, dateTo } = req.query as {
+    const { period = '7d', dateFrom, dateTo, projectId } = req.query as {
       period?: string;
       dateFrom?: string;
       dateTo?: string;
+      projectId?: string;
     };
+
+    // Validate projectId format if provided
+    const pid = projectId && /^[0-9a-f-]{36}$/i.test(projectId) ? projectId : null;
 
     // Resolve date range
     let from: string | null;
@@ -91,6 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             SUM(COALESCE(r.photo_count, 0))::int AS photos
           FROM construction_qa_reviews r
           WHERE r.feature_type = 'pole'
+            AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
             AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
             AND COALESCE(r.last_photo_at, r.created_at) < ${to}::timestamptz
         `
@@ -105,6 +111,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               SUM(COALESCE(r.photo_count, 0))::int AS photos
             FROM construction_qa_reviews r
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
               AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
           `
         : sql`
@@ -117,6 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               SUM(COALESCE(r.photo_count, 0))::int AS photos
             FROM construction_qa_reviews r
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
           `;
 
     // By-project query
@@ -134,6 +142,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM construction_qa_reviews r
           JOIN projects p ON p.id = r.project_id
           WHERE r.feature_type = 'pole'
+            AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
             AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
             AND COALESCE(r.last_photo_at, r.created_at) < ${to}::timestamptz
           GROUP BY r.project_id, p.project_name
@@ -153,6 +162,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             FROM construction_qa_reviews r
             JOIN projects p ON p.id = r.project_id
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
               AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
             GROUP BY r.project_id, p.project_name
             ORDER BY planted DESC
@@ -170,6 +180,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             FROM construction_qa_reviews r
             JOIN projects p ON p.id = r.project_id
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
             GROUP BY r.project_id, p.project_name
             ORDER BY planted DESC
           `;
@@ -189,6 +200,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           FROM construction_qa_reviews r
           JOIN projects p ON p.id = r.project_id
           WHERE r.feature_type = 'pole'
+            AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
             AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
             AND COALESCE(r.last_photo_at, r.created_at) < ${to}::timestamptz
           GROUP BY r.project_id, p.project_name, r.zone_no, r.pon_no
@@ -208,6 +220,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             FROM construction_qa_reviews r
             JOIN projects p ON p.id = r.project_id
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
               AND COALESCE(r.last_photo_at, r.created_at) >= ${from}::timestamptz
             GROUP BY r.project_id, p.project_name, r.zone_no, r.pon_no
             ORDER BY p.project_name, r.zone_no, r.pon_no
@@ -225,14 +238,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             FROM construction_qa_reviews r
             JOIN projects p ON p.id = r.project_id
             WHERE r.feature_type = 'pole'
+              AND (${pid}::uuid IS NULL OR r.project_id = ${pid}::uuid)
             GROUP BY r.project_id, p.project_name, r.zone_no, r.pon_no
             ORDER BY p.project_name, r.zone_no, r.pon_no
           `;
 
-    const [summaryRows, byProjectRows, byZonePonRows] = await Promise.all([
+    // Project list for filter dropdown (always unfiltered)
+    const projectListQuery = sql`
+      SELECT DISTINCT r.project_id, p.project_name
+      FROM construction_qa_reviews r
+      JOIN projects p ON p.id = r.project_id
+      WHERE r.feature_type = 'pole'
+      ORDER BY p.project_name
+    `;
+
+    const [summaryRows, byProjectRows, byZonePonRows, projectListRows] = await Promise.all([
       summaryQuery,
       byProjectQuery,
       byZonePonQuery,
+      projectListQuery,
     ]);
 
     const summary = summaryRows[0] || {
@@ -240,6 +264,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     return apiResponse.success(res, {
+      projects: projectListRows.map((r) => ({
+        project_id: r.project_id,
+        project_name: r.project_name,
+      })),
       summary: {
         planted: Number(summary.planted),
         approved: Number(summary.approved),
@@ -277,6 +305,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if ((error as Error).message?.includes('does not exist')) {
       return apiResponse.success(res, {
+        projects: [],
         summary: { planted: 0, approved: 0, pending: 0, rejected: 0, rework: 0, photos: 0 },
         byProject: [],
         byZonePon: [],

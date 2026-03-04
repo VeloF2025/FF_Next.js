@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  BarChart3, Calendar, CheckCircle2, Clock, Camera, XCircle, Download,
+  BarChart3, Calendar, CheckCircle2, Clock, Camera, XCircle, Download, Filter,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -62,6 +62,8 @@ export function FieldOpsReportsPage() {
   const [period, setPeriod] = useState<Period>('7d');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [projects, setProjects] = useState<{ project_id: string; project_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<Summary>({ planted: 0, approved: 0, pending: 0, rejected: 0, rework: 0, photos: 0 });
   const [byProject, setByProject] = useState<ProjectRow[]>([]);
@@ -77,6 +79,7 @@ export function FieldOpsReportsPage() {
       } else {
         params.set('period', period);
       }
+      if (projectId) params.set('projectId', projectId);
 
       const resp = await fetch(`/api/construction-qa/reports?${params}`, { credentials: 'include' });
       if (!resp.ok) throw new Error(`API ${resp.status}`);
@@ -85,12 +88,13 @@ export function FieldOpsReportsPage() {
       setSummary(d.summary);
       setByProject(d.byProject);
       setByZonePon(d.byZonePon);
+      if (d.projects) setProjects(d.projects);
     } catch (err) {
       log.error('Failed to load reports', { error: (err as Error).message });
     } finally {
       setLoading(false);
     }
-  }, [period, dateFrom, dateTo]);
+  }, [period, dateFrom, dateTo, projectId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -168,6 +172,23 @@ export function FieldOpsReportsPage() {
             title="To date"
           />
         </div>
+
+        {/* Project filter */}
+        {projects.length > 1 && (
+          <div className="flex items-center gap-2 ml-4">
+            <Filter className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" />
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="px-2 py-1 text-xs rounded border bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] border-[var(--ff-border-light)] focus:border-[var(--ff-accent)] outline-none"
+            >
+              <option value="">All Projects</option>
+              {projects.map((p) => (
+                <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}
