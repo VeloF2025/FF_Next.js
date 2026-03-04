@@ -14,6 +14,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { parseQFieldCaptureDate } from '@/lib/exifUtils';
 import type { Discipline, FeatureType } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -242,10 +243,23 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
           result,
         );
 
-        // Insert photo records
+        // Insert photo records and track earliest capture date
+        let earliestCapture: Date | null = null;
         for (const photo of featurePhotos) {
-          await insertPhoto(reviewId, projectId, photo);
+          const capturedAt = await insertPhoto(reviewId, projectId, photo);
+          if (capturedAt && (!earliestCapture || capturedAt < earliestCapture)) {
+            earliestCapture = capturedAt;
+          }
           result.photosIngested++;
+        }
+
+        // Update review's last_photo_at to earliest capture date
+        if (earliestCapture) {
+          await sql`
+            UPDATE construction_qa_reviews
+            SET last_photo_at = LEAST(last_photo_at, ${earliestCapture.toISOString()}::timestamptz)
+            WHERE id = ${reviewId}::uuid
+          `;
         }
       } catch (err) {
         const msg = `Failed to process feature ${featureKey}: ${(err as Error).message}`;
@@ -383,7 +397,7 @@ async function insertPhoto(
   reviewId: string,
   projectId: string,
   qfPhoto: Record<string, unknown>,
-): Promise<void> {
+): Promise<Date | null> {
   const photoKey = qfPhoto.photo_key as string;
   const filename = photoKey.split('/').pop() || photoKey;
 
@@ -395,11 +409,14 @@ async function insertPhoto(
   };
   const mimeType = mimeMap[ext] || 'image/jpeg';
 
+  // Extract capture date from QField filename
+  const capturedAt = parseQFieldCaptureDate(photoKey);
+
   await sql`
     INSERT INTO construction_qa_photos (
       review_id, project_id, source, storage_key, filename, mime_type,
       vlm_valid, vlm_confidence, vlm_feedback,
-      needs_retake
+      needs_retake, captured_at
     ) VALUES (
       ${reviewId}::uuid,
       ${projectId}::uuid,
@@ -410,7 +427,10 @@ async function insertPhoto(
       ${qfPhoto.vlm_confidence != null ? Number(qfPhoto.vlm_confidence) >= 0.6 : null},
       ${qfPhoto.vlm_confidence != null ? Number(qfPhoto.vlm_confidence) : null},
       ${(qfPhoto.vlm_feedback as string) || null},
-      ${Boolean(qfPhoto.needs_retake)}
+      ${Boolean(qfPhoto.needs_retake)},
+      ${capturedAt ? capturedAt.toISOString() : null}
     )
   `;
+
+  return capturedAt;
 }

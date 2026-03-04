@@ -93,6 +93,7 @@
     "date-fns": "^2.30.0",
     "docxtemplater": "^3.67.6",
     "exceljs": "^4.4.0",
+    "exif-reader": "^2.0.3",
     "express": "^5.1.0",
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.12",
