@@ -132,3 +132,7 @@ analyze-*.js
 *.backup.*
 *.backup-*
 CHANGELOG.md.backup.*
+
+# Generated documentation and runtime data
+docs/wa-digests/
+# docs/schema/ contains DATABASE_SCHEMA_INDEX.md (keep tracked)
