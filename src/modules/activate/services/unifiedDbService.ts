@@ -10,23 +10,14 @@
  * - Type-safe database operations
  *
  * Following FibreFlow standards:
- * - Direct SQL with Neon serverless client
- * - ep-dry-night-a9qyh4sj endpoint
+ * - Singleton connection pool (src/lib/db.ts)
  * - Comprehensive error handling
  */
 
-import { neonConfig, Pool } from '@/lib/db-neon';
-import ws from 'ws';
+import pool from '@/lib/db';
+import { Pool } from 'pg';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '../types/unified.types';
-
-// Configure Neon WebSocket
-neonConfig.webSocketConstructor = ws;
-
-// CRITICAL: Use correct Neon endpoint (ep-dry-night-a9qyh4sj)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'process.env.DATABASE_URL',
-});
 
 /**
  * Get a unified review by drop number
