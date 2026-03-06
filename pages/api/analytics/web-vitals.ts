@@ -42,20 +42,17 @@ function storeMetric(metric: WebVitalsMetric): void {
   // 4. Third-party service (DataDog, New Relic, etc.)
 
   // For now, we'll rely on Vercel Analytics
-  // If you need custom storage, uncomment below:
-
-  /*
-  try {
-    // Example: Store in database
-    await db.query(
-      `INSERT INTO web_vitals (name, value, rating, pathname, timestamp)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [metric.name, metric.value, metric.rating, metric.pathname, metric.timestamp]
-    );
-  } catch (error) {
-    console.error('[Web Vitals] Failed to store metric:', error);
-  }
-  */
+  // If you need custom storage, use log.error for structured logging:
+  // const pool = require('@/lib/db').default;
+  // try {
+  //   await pool.query(
+  //     `INSERT INTO web_vitals (name, value, rating, pathname, timestamp)
+  //      VALUES ($1, $2, $3, $4, $5)`,
+  //     [metric.name, metric.value, metric.rating, metric.pathname, metric.timestamp]
+  //   );
+  // } catch (error) {
+  //   log.error('web-vitals', { action: 'storeMetric', error });
+  // }
 }
 
 /**
