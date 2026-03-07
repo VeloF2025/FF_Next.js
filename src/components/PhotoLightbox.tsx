@@ -50,9 +50,6 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: PhotoLightboxPr
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const photo = photos[currentIndex];
-  if (!photo) return null;
-
   // -- Zoom / pan --
 
   const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
@@ -99,6 +96,10 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: PhotoLightboxPr
       setZoom(p => { const n = Math.max(p - d, MIN_ZOOM); if (n === MIN_ZOOM) setPan({ x: 0, y: 0 }); return n; });
     }
   }, []);
+
+  // -- Early return check (after all hooks) --
+  const photo = photos[currentIndex];
+  if (!photo) return null;
 
   // -- Click-drag pan --
 
