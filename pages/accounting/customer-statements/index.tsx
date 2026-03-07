@@ -185,7 +185,7 @@ export default function CustomerStatementsPage() {
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{c.last_payment_date?.split('T')[0] || '-'}</td>
                       <td className="py-3 px-4 text-center">
                         <Link href={`/accounting/customer-statements/${c.client_id}`}
-                          className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 text-sm font-medium transition-colors"
+                          className="inline-flex items-center gap-1 px-4 py-3 rounded-lg text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 text-sm font-medium transition-colors"
                           title={`View ${c.client_name} statement`}>
                           View <ChevronRight className="h-4 w-4" />
                         </Link>
