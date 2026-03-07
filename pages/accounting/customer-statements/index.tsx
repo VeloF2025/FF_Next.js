@@ -111,12 +111,14 @@ export default function CustomerStatementsPage() {
 
         <div className="p-6">
           <div className="flex items-center gap-4 mb-6 flex-wrap">
-            <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
+            <label htmlFor="asAtDate" className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
             <input
+              id="asAtDate"
               type="date"
               value={asAtDate}
               onChange={(e) => setAsAtDate(e.target.value)}
               className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
+              aria-label="Statement date"
             />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
@@ -183,7 +185,8 @@ export default function CustomerStatementsPage() {
                       <td className="py-3 px-4 text-[var(--ff-text-secondary)]">{c.last_payment_date?.split('T')[0] || '-'}</td>
                       <td className="py-3 px-4 text-center">
                         <Link href={`/accounting/customer-statements/${c.client_id}`}
-                          className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm">
+                          className="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 text-sm font-medium transition-colors"
+                          title={`View ${c.client_name} statement`}>
                           View <ChevronRight className="h-4 w-4" />
                         </Link>
                       </td>

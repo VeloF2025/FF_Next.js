@@ -105,9 +105,10 @@ export default function SupplierStatementsPage() {
 
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-4 flex-wrap">
-            <label className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
-            <input type="date" value={asAtDate} onChange={e => setAsAtDate(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm" />
+            <label htmlFor="asAtDate" className="text-sm text-[var(--ff-text-secondary)]">As at:</label>
+            <input id="asAtDate" type="date" value={asAtDate} onChange={e => setAsAtDate(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] text-sm"
+              aria-label="Statement date" />
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />
               <input
@@ -171,8 +172,10 @@ export default function SupplierStatementsPage() {
                       <td className="px-4 py-3 text-right font-mono font-bold text-[var(--ff-text-primary)]">{formatCurrency(s.total)}</td>
                       <td className="px-4 py-3 text-center">
                         <Link href={`/accounting/supplier-statements/${s.entityId}`}
-                          className="text-orange-400 hover:text-orange-300">
-                          <ChevronRight className="h-4 w-4" />
+                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-orange-400 hover:bg-orange-500/10 hover:text-orange-300 transition-colors"
+                          title={`View ${s.entityName} statement`}>
+                          <ChevronRight className="h-5 w-5" />
+                          <span className="sr-only">View details</span>
                         </Link>
                       </td>
                     </tr>
