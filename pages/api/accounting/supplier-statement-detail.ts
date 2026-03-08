@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/db.mjs';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
@@ -32,7 +32,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Get supplier info
     const supplierRows = await sql`
       SELECT id, name, email, phone FROM suppliers WHERE id = ${Number(supplier_id)}
-    `;
+    ` as any[];
     if (supplierRows.length === 0) return apiResponse.notFound(res, 'Supplier', supplier_id as string);
     const supplier = supplierRows[0] as { id: number; name: string; email: string | null; phone: string | null };
 
@@ -70,11 +70,11 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     // Normalize date to YYYY-MM-DD regardless of input format
     function toISODate(val: unknown): string {
       if (!val) return '1970-01-01';
-      if (val instanceof Date) return val.toISOString().split('T')[0];
+      if (val instanceof Date) return val.toISOString().split('T')[0]!;
       const s = String(val);
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0]!;
       const d = new Date(s);
-      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0];
+      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0]!;
     }
 
     // Merge into chronological transactions

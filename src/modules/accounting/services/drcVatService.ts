@@ -31,7 +31,7 @@ async function getVatRate(): Promise<number> {
       const rate = Number(rows[0].value);
       if (rate > 0 && rate < 1) return rate;
     }
-  } catch { /* use default */ }
+  } catch (e) { log.warn('VAT rate lookup failed, using default', { error: e }, 'accounting'); }
   return DEFAULT_VAT_RATE;
 }
 
@@ -61,9 +61,9 @@ export async function applyDRCVat(
 
   if (inv.is_drc) throw new Error('DRC VAT already applied to this invoice');
 
-  const totalExclVat = Number(inv.total_amount);
+  const totalInclVat = Number(inv.total_amount);
   const vatRate = await getVatRate();
-  const vatAmount = Math.round(totalExclVat * vatRate * 100) / 100;
+  const vatAmount = Math.round(totalInclVat * vatRate / (1 + vatRate) * 100) / 100;
 
   // Get VAT account IDs
   const accounts = (await sql`
@@ -86,7 +86,7 @@ export async function applyDRCVat(
   ];
 
   const je = await createJournalEntry({
-    entryDate: new Date().toISOString().split('T')[0],
+    entryDate: new Date().toISOString().split('T')[0] || '',
     description,
     source: 'auto_vat_adjustment',
     sourceDocumentId: supplierInvoiceId,
@@ -130,8 +130,8 @@ export async function getDRCEligibleInvoices(): Promise<Array<{
     invoiceNumber: String(r.invoice_number),
     supplierName: String(r.supplier_name || 'Unknown'),
     totalAmount: Number(r.total_amount),
-    vatAmount: Math.round(Number(r.total_amount) * vatRate * 100) / 100,
-    invoiceDate: String(r.invoice_date).split('T')[0],
+    vatAmount: Math.round(Number(r.total_amount) * vatRate / (1 + vatRate) * 100) / 100,
+    invoiceDate: String(r.invoice_date).split('T')[0] || '',
   }));
 }
 
@@ -156,6 +156,6 @@ export async function getDRCHistory(): Promise<Array<{
     invoiceNumber: String(r.invoice_number),
     supplierName: String(r.supplier_name || 'Unknown'),
     totalAmount: Number(r.total_amount),
-    invoiceDate: String(r.invoice_date).split('T')[0],
+    invoiceDate: String(r.invoice_date).split('T')[0] || '',
   }));
 }

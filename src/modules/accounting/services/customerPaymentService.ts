@@ -260,7 +260,7 @@ export async function cancelCustomerPayment(
   }
 }
 
-export async function postCustomerInvoiceToGL(invoiceId: string, userId: string): Promise<string> {
+export async function postCustomerInvoiceToGLSimple(invoiceId: string, userId: string): Promise<string> {
   try {
     const invRows = (await sql`
       SELECT ci.*, c.company_name AS client_name

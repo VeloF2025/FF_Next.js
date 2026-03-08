@@ -22,17 +22,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const userId = (req as unknown as { user?: { id: string } }).user?.id || 'system';
 
-  // Auto-generate invoice number
-  const maxRows = (await sql`
-    SELECT invoice_number FROM customer_invoices ORDER BY created_at DESC LIMIT 1
-  `) as Row[];
-  let nextNum = 1;
-  if (maxRows.length > 0) {
-    const match = maxRows[0].invoice_number?.match(/(\d+)$/);
-    if (match) nextNum = parseInt(match[1], 10) + 1;
-  }
-  const invoiceNumber = `INV-${String(nextNum).padStart(5, '0')}`;
-
   // Calculate totals
   const rate = taxRate ?? 15;
   let subtotal = 0;
@@ -54,28 +43,51 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   `) as Row[];
   const projectId = projRows[0]?.id || clientId;
 
-  const invRows = (await sql`
-    INSERT INTO customer_invoices (
-      invoice_number, project_id, client_id, billing_period_start, billing_period_end,
-      subtotal, tax_rate, tax_amount, total_amount, invoice_date, due_date,
-      notes, status, created_by
-    ) VALUES (
-      ${invoiceNumber}, ${projectId}::UUID, ${clientId}::UUID, ${bpStart}, ${bpEnd},
-      ${subtotal}, ${rate}, ${taxAmount}, ${totalAmount}, ${invDate},
-      ${dueDate || null}, ${notes || null}, 'draft', ${userId}
-    ) RETURNING id
-  `) as Row[];
+  // Insert invoice header and all line items atomically.
+  // The invoice number is generated inside the transaction to avoid race conditions.
+  let invoiceId: string;
+  let invoiceNumber: string;
 
-  const invoiceId = invRows[0].id;
+  await sql`BEGIN`;
+  try {
+    const invRows = (await sql`
+      INSERT INTO customer_invoices (
+        invoice_number, project_id, client_id, billing_period_start, billing_period_end,
+        subtotal, tax_rate, tax_amount, total_amount, invoice_date, due_date,
+        notes, status, created_by
+      ) VALUES (
+        'INV-' || LPAD(
+          (COALESCE(
+            (SELECT MAX(CAST(REGEXP_REPLACE(invoice_number, '[^0-9]', '', 'g') AS INTEGER))
+             FROM customer_invoices
+             WHERE invoice_number ~ '^INV-[0-9]+$'),
+            0
+          ) + 1)::TEXT,
+          5, '0'
+        ),
+        ${projectId}::UUID, ${clientId}::UUID, ${bpStart}, ${bpEnd},
+        ${subtotal}, ${rate}, ${taxAmount}, ${totalAmount}, ${invDate},
+        ${dueDate || null}, ${notes || null}, 'draft', ${userId}
+      ) RETURNING id, invoice_number
+    `) as Row[];
 
-  for (const item of items) {
-    const lineTotal = Math.round((item.quantity || 1) * item.unitPrice * 100) / 100;
-    const lineTax = Math.round(lineTotal * (rate / 100) * 100) / 100;
-    await sql`
-      INSERT INTO customer_invoice_items (invoice_id, drop_number, description, unit_price, quantity, tax_amount, line_total, income_type)
-      VALUES (${invoiceId}::UUID, ${item.dropNumber || 'MANUAL'}, ${item.description}, ${item.unitPrice},
-        ${item.quantity || 1}, ${lineTax}, ${lineTotal}, ${item.incomeType || 'other'})
-    `;
+    invoiceId = invRows[0].id;
+    invoiceNumber = invRows[0].invoice_number;
+
+    for (const item of items) {
+      const lineTotal = Math.round((item.quantity || 1) * item.unitPrice * 100) / 100;
+      const lineTax = Math.round(lineTotal * (rate / 100) * 100) / 100;
+      await sql`
+        INSERT INTO customer_invoice_items (invoice_id, drop_number, description, unit_price, quantity, tax_amount, line_total, income_type)
+        VALUES (${invoiceId}::UUID, ${item.dropNumber || 'MANUAL'}, ${item.description}, ${item.unitPrice},
+          ${item.quantity || 1}, ${lineTax}, ${lineTotal}, ${item.incomeType || 'other'})
+      `;
+    }
+
+    await sql`COMMIT`;
+  } catch (txErr) {
+    await sql`ROLLBACK`;
+    throw txErr;
   }
 
   log.info('Customer invoice created', { invoiceNumber, totalAmount });

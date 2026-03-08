@@ -31,8 +31,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         if (row?.value) {
           mappings = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
         }
-      } catch {
-        // app_settings table may not exist yet — return empty mappings
+      } catch (e) {
+        log.warn('app_settings table query failed', { error: e }, 'accounting');
       }
 
       return apiResponse.success(res, { mappings });

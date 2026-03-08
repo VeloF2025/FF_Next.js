@@ -4,12 +4,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -20,12 +19,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Load VAT rate from settings (default 15%)
     let vatRate = 0.15;
     try {
-      const settingRows = await sql`SELECT value FROM app_settings WHERE key = 'vat_rate'`;
+      const settingRows = await sql`SELECT value FROM app_settings WHERE key = 'vat_rate'` as any[];
       if (settingRows[0]?.value) {
         const rate = Number(settingRows[0].value);
         if (rate > 0 && rate < 1) vatRate = rate;
       }
-    } catch { /* use default */ }
+    } catch (e) { log.warn('VAT rate setting lookup failed', { error: e }, 'accounting'); }
 
     const rows = await sql`
       SELECT si.invoice_number, s.company_name AS supplier_name,
@@ -35,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       JOIN suppliers s ON s.id = si.supplier_id
       WHERE si.is_drc = true
       ORDER BY si.invoice_date DESC
-    `;
+    ` as any[];
 
     const csvLines = [
       'Invoice,Supplier,Date,Amount (excl),VAT (15%)',
@@ -57,4 +56,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

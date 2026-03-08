@@ -30,7 +30,7 @@ export default function StatementRunPage() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
-  const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0]);
+  const [asAtDate, setAsAtDate] = useState(new Date().toISOString().split('T')[0] ?? '');
   const [minBalance, setMinBalance] = useState(0);
 
   const load = useCallback(async () => {
@@ -98,10 +98,10 @@ export default function StatementRunPage() {
       }
 
       if (pdfs.length === 1) {
-        const url = URL.createObjectURL(pdfs[0].blob);
+        const url = URL.createObjectURL(pdfs[0]!.blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = pdfs[0].name;
+        a.download = pdfs[0]!.name;
         a.click();
         URL.revokeObjectURL(url);
       } else {

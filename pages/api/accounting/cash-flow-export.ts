@@ -40,8 +40,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       await sql`SELECT account_subtype FROM gl_accounts LIMIT 1`;
       hasSubtype = true;
-    } catch {
-      // Column absent — fall back to name-matching
+    } catch (e) {
+      log.warn('account_subtype column check failed', { error: e }, 'accounting');
     }
 
     // Opening cash balance (bank accounts before period start)
@@ -75,7 +75,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         openingBalance = Number(row?.balance || 0);
       }
-    } catch {
+    } catch (e) {
+      log.warn('Failed to query opening cash balance', { error: e }, 'accounting');
       openingBalance = 0;
     }
 
@@ -123,7 +124,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         arChange = Number(row?.change || 0);
       }
-    } catch { arChange = 0; }
+    } catch (e) { log.warn('Failed to query AR change', { error: e }, 'accounting'); arChange = 0; }
 
     // Change in Accounts Payable
     let apChange = 0;
@@ -153,7 +154,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         apChange = Number(row?.change || 0);
       }
-    } catch { apChange = 0; }
+    } catch (e) { log.warn('Failed to query AP change', { error: e }, 'accounting'); apChange = 0; }
 
     // Investing: fixed asset changes
     let investingChange = 0;
@@ -186,7 +187,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         investingChange = Number(row?.change || 0);
       }
-    } catch { investingChange = 0; }
+    } catch (e) { log.warn('Failed to query investing change', { error: e }, 'accounting'); investingChange = 0; }
 
     // Financing: equity changes (excluding retained earnings)
     let financingChange = 0;
@@ -218,7 +219,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         financingChange = Number(row?.change || 0);
       }
-    } catch { financingChange = 0; }
+    } catch (e) { log.warn('Failed to query financing change', { error: e }, 'accounting'); financingChange = 0; }
 
     const operatingTotal = netIncome + arChange + apChange;
     const investingTotal = investingChange;

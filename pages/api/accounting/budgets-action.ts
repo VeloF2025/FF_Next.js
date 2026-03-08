@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 import { deleteBudget, copyBudgets } from '@/modules/accounting/services/budgetService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
   const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { action, id, fromYear, toYear } = req.body;

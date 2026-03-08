@@ -51,7 +51,7 @@ export default function NewJournalEntryPage() {
 
   const loadAccounts = async () => {
     try {
-      const res = await fetch('/api/accounting/chart-of-accounts');
+      const res = await fetch('/api/accounting/chart-of-accounts', { credentials: 'include' });
       const data = await res.json();
       const list = data.data || data || [];
       // Only show leaf accounts (no children / subtype level) for journal lines
@@ -109,7 +109,6 @@ export default function NewJournalEntryPage() {
           entryDate,
           description,
           source: 'manual',
-          createdBy: 'system',
           lines: validLines.map(l => ({
             glAccountId: l.accountId,
             description: l.description,

@@ -9,13 +9,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = Record<string, any>;
 
-export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     if (req.method === 'GET') {
@@ -71,4 +72,4 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     log.error('customer-categories API error', { error: message });
     return apiResponse.internalError(res, err, 'Failed to process request');
   }
-});
+}));

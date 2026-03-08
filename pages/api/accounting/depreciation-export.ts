@@ -5,6 +5,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
@@ -53,4 +54,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

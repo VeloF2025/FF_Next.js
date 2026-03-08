@@ -44,24 +44,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { id, templateName, frequency, nextRunDate, description, lineItems } = req.body;
     if (!id) return apiResponse.badRequest(res, 'id is required');
     try {
-      let subtotal = 0;
       if (lineItems) {
+        let subtotal = 0;
         for (const l of lineItems) subtotal += (l.quantity || 1) * (l.unitPrice || 0);
+        const taxAmount = Math.round(subtotal * 0.15 * 100) / 100;
+        await sql`
+          UPDATE recurring_invoices SET
+            template_name = COALESCE(${templateName || null}, template_name),
+            frequency = COALESCE(${frequency || null}, frequency),
+            next_run_date = COALESCE(${nextRunDate || null}, next_run_date),
+            description = COALESCE(${description || null}, description),
+            line_items = ${JSON.stringify(lineItems)}::JSONB,
+            subtotal = ${subtotal},
+            tax_amount = ${taxAmount},
+            total_amount = ${subtotal + taxAmount},
+            updated_at = NOW()
+          WHERE id = ${id}::UUID AND status IN ('active', 'paused')
+        `;
+      } else {
+        await sql`
+          UPDATE recurring_invoices SET
+            template_name = COALESCE(${templateName || null}, template_name),
+            frequency = COALESCE(${frequency || null}, frequency),
+            next_run_date = COALESCE(${nextRunDate || null}, next_run_date),
+            description = COALESCE(${description || null}, description),
+            updated_at = NOW()
+          WHERE id = ${id}::UUID AND status IN ('active', 'paused')
+        `;
       }
-      const taxAmount = Math.round(subtotal * 0.15 * 100) / 100;
-      await sql`
-        UPDATE recurring_invoices SET
-          template_name = COALESCE(${templateName || null}, template_name),
-          frequency = COALESCE(${frequency || null}, frequency),
-          next_run_date = COALESCE(${nextRunDate || null}, next_run_date),
-          description = COALESCE(${description || null}, description),
-          line_items = COALESCE(${lineItems ? JSON.stringify(lineItems) : null}::JSONB, line_items),
-          subtotal = CASE WHEN ${lineItems ? 'true' : 'false'} = 'true' THEN ${subtotal} ELSE subtotal END,
-          tax_amount = CASE WHEN ${lineItems ? 'true' : 'false'} = 'true' THEN ${taxAmount} ELSE tax_amount END,
-          total_amount = CASE WHEN ${lineItems ? 'true' : 'false'} = 'true' THEN ${subtotal + taxAmount} ELSE total_amount END,
-          updated_at = NOW()
-        WHERE id = ${id}::UUID AND status IN ('active', 'paused')
-      `;
       log.info('Recurring invoice updated', { id });
       return apiResponse.success(res, { updated: true });
     } catch (err) {

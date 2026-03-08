@@ -30,8 +30,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const now = new Date();
 
     if (period === 'current') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      endDate = now.toISOString().split('T')[0];
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]!;
+      endDate = now.toISOString().split('T')[0]!;
     } else {
       // YTD or full_year — use fiscal year start
       const [fy] = await sql`
@@ -65,19 +65,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       for (const row of budgetRows) {
         let total = 0;
         for (let m = startMonth; m <= endMonth; m++) {
-          total += Number(row[monthCols[m]] || 0);
+          total += Number(row[monthCols[m]!] || 0);
         }
         budgets[row.account_code] = total;
         budgets[row.gl_account_id] = total;
       }
-    } catch {
-      // No budgets configured yet — fall back to app_settings
+    } catch (e) {
+      log.warn('Budget table query failed, trying app_settings fallback', { error: e }, 'accounting');
       try {
         const [row] = await sql`SELECT value FROM app_settings WHERE key = 'accounting_budgets'`;
         if (row?.value) {
           budgets = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
         }
-      } catch { /* no budgets */ }
+      } catch (e2) { log.warn('Budget app_settings fallback failed', { error: e2 }, 'accounting'); }
     }
 
     // Get actual GL balances for expense and revenue accounts

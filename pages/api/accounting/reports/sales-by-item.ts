@@ -4,14 +4,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-const sql = neon(process.env.DATABASE_URL!);
-
-export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
@@ -33,9 +32,9 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
         AND ci.status != 'cancelled'
       GROUP BY cii.description, cii.income_type
       ORDER BY total_revenue DESC
-    `;
+    ` as any[];
 
-    const data = rows.map(r => ({
+    const data = rows.map((r: any) => ({
       id: '',
       itemCode: '',
       name: r.name || 'Unnamed',
@@ -62,4 +61,4 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     log.error('Sales by item report error', { error: message });
     return apiResponse.badRequest(res, 'Failed to generate report');
   }
-});
+}));

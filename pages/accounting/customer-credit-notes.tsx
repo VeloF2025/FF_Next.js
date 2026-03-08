@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import {
@@ -38,6 +39,7 @@ function formatCurrency(amount: number): string {
 }
 
 export default function CustomerCreditNotesPage() {
+  const router = useRouter();
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
@@ -153,7 +155,7 @@ export default function CustomerCreditNotesPage() {
                 </thead>
                 <tbody>
                   {creditNotes.map(cn => (
-                    <tr key={cn.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)] transition-colors cursor-pointer" onClick={() => window.location.href = `/accounting/credit-notes/${cn.id}`}>
+                    <tr key={cn.id} className="border-b border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-primary)] transition-colors cursor-pointer" onClick={() => router.push(`/accounting/credit-notes/${cn.id}`)}>
                       <td className="px-4 py-3 font-mono text-[var(--ff-text-primary)]">{cn.creditNoteNumber}</td>
                       <td className="px-4 py-3 text-[var(--ff-text-primary)]">{cn.clientName || '—'}</td>
                       <td className="px-4 py-3 text-[var(--ff-text-secondary)] font-mono text-xs">

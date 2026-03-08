@@ -43,7 +43,7 @@ export async function postCustomerInvoiceToGL(
   try {
     // Check if already posted
     const inv = (await sql`
-      SELECT id, invoice_number, total_amount, tax_amount, subtotal, gl_journal_entry_id
+      SELECT id, invoice_number, invoice_date, total_amount, tax_amount, subtotal, gl_journal_entry_id
       FROM customer_invoices WHERE id = ${invoiceId}
     `) as Row[];
 
@@ -64,7 +64,7 @@ export async function postCustomerInvoiceToGL(
       INSERT INTO gl_journal_entries (
         entry_number, entry_date, description, source, status, created_by
       ) VALUES (
-        ${`CI-${inv[0].invoice_number}`}, CURRENT_DATE,
+        ${`CI-${inv[0].invoice_number}`}, ${String(inv[0].invoice_date).split('T')[0]},
         ${`Customer invoice ${inv[0].invoice_number} approved`},
         'auto_invoice', 'posted', ${userId}
       ) RETURNING id

@@ -4,14 +4,13 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-const sql = neon(process.env.DATABASE_URL!);
-
-export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
@@ -19,7 +18,7 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     const search = req.query.search as string | undefined;
     const format = req.query.format as string;
 
-    let rows;
+    let rows: any[];
     if (category && search) {
       const like = `%${search}%`;
       rows = await sql`
@@ -28,14 +27,14 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
         FROM stock_items
         WHERE category = ${category} AND (name ILIKE ${like} OR item_code ILIKE ${like})
         ORDER BY name
-      `;
+      ` as any[];
     } else if (category) {
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
           list_price, standard_cost, qty_available, is_active
         FROM stock_items WHERE category = ${category}
         ORDER BY name
-      `;
+      ` as any[];
     } else if (search) {
       const like = `%${search}%`;
       rows = await sql`
@@ -43,16 +42,16 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
           list_price, standard_cost, qty_available, is_active
         FROM stock_items WHERE name ILIKE ${like} OR item_code ILIKE ${like}
         ORDER BY name
-      `;
+      ` as any[];
     } else {
       rows = await sql`
         SELECT id, item_code, name, description, category, uom,
           list_price, standard_cost, qty_available, is_active
         FROM stock_items ORDER BY name
-      `;
+      ` as any[];
     }
 
-    const data = rows.map(r => ({
+    const data = rows.map((r: any) => ({
       id: r.id,
       itemCode: r.item_code || '',
       name: r.name,
@@ -81,4 +80,4 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
     log.error('Item listing report error', { error: message });
     return apiResponse.badRequest(res, 'Failed to generate item listing');
   }
-});
+}));

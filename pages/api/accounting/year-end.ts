@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Get revenue/expense totals per year
       const yearsWithTotals = await Promise.all(years.map(async (fy) => {
-        const [rev] = await sql`
+        const [rev] = (await sql`
           SELECT COALESCE(SUM(jl.credit - jl.debit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
@@ -47,8 +47,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND je.status = 'posted'
             AND je.entry_date >= ${fy.start_date}
             AND je.entry_date <= ${fy.end_date}
-        `;
-        const [exp] = await sql`
+        `) as any[];
+        const [exp] = (await sql`
           SELECT COALESCE(SUM(jl.debit - jl.credit), 0)::numeric as total
           FROM gl_journal_lines jl
           JOIN gl_journal_entries je ON je.id = jl.journal_entry_id
@@ -57,7 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             AND je.status = 'posted'
             AND je.entry_date >= ${fy.start_date}
             AND je.entry_date <= ${fy.end_date}
-        `;
+        `) as any[];
 
         return {
           ...fy,
@@ -93,17 +93,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const openPeriods = await sql`
         SELECT COUNT(*)::int as cnt FROM fiscal_periods
         WHERE fiscal_year = ${yearLabel} AND status = 'open'
-      `;
+      ` as any[];
 
       if (Number(openPeriods[0].cnt) > 0) {
         return apiResponse.badRequest(res, `${openPeriods[0].cnt} periods still open. Close all periods first.`);
       }
 
       // Get year date range
-      const [yearRange] = await sql`
+      const [yearRange] = (await sql`
         SELECT MIN(start_date) as start_date, MAX(end_date) as end_date
         FROM fiscal_periods WHERE fiscal_year = ${yearLabel}
-      `;
+      `) as any[];
+      if (!yearRange) {
+        return apiResponse.badRequest(res, `No fiscal periods found for year ${yearLabel}`);
+      }
 
       // Calculate net income (Revenue - Expenses)
       const revenueAccounts = await sql`
@@ -141,75 +144,87 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Find retained earnings account — configurable via app_settings or default 3200
       let reAccountCode = '3200';
       try {
-        const settingRows = await sql`SELECT value FROM app_settings WHERE key = 'retained_earnings_account'`;
+        const settingRows = await sql`SELECT value FROM app_settings WHERE key = 'retained_earnings_account'` as any[];
         if (settingRows[0]?.value) reAccountCode = String(settingRows[0].value);
-      } catch { /* use default */ }
+      } catch (e) { log.warn('Failed to load retained_earnings_account setting', { error: e }, 'accounting'); }
 
       const reRows = await sql`
         SELECT id FROM gl_accounts
         WHERE account_code = ${reAccountCode} OR account_name ILIKE '%retained earnings%'
         LIMIT 1
-      `;
+      ` as any[];
       const retainedEarnings = reRows[0];
 
       if (!retainedEarnings) {
         return apiResponse.badRequest(res, `Retained Earnings account not found (${reAccountCode}). Create the account or set 'retained_earnings_account' in app_settings.`);
       }
 
-      // Create closing journal entry
+      // Create closing journal entry — all writes are atomic
       const totalDebit = totalRevenue + (netIncome < 0 ? Math.abs(netIncome) : 0);
       const totalCredit = totalExpenses + (netIncome >= 0 ? netIncome : 0);
 
-      const [closingEntry] = await sql`
-        INSERT INTO gl_journal_entries (
-          id, entry_number, entry_date, description,
-          source, status, total_debit, total_credit,
-          created_by, created_at
-        ) VALUES (
-          gen_random_uuid(),
-          ${'YE-' + yearLabel},
-          ${yearRange.end_date},
-          ${'Year-End Closing: ' + yearLabel},
-          'year_end', 'posted',
-          ${totalDebit}, ${totalCredit},
-          ${userId}, NOW()
-        )
-        RETURNING *
-      `;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let closingEntry: any;
 
-      // DR Revenue accounts (to zero them)
-      for (const rev of revenueAccounts) {
+      await sql`BEGIN`;
+      try {
+        const [entry] = (await sql`
+          INSERT INTO gl_journal_entries (
+            id, entry_number, entry_date, description,
+            source, status, total_debit, total_credit,
+            created_by, created_at
+          ) VALUES (
+            gen_random_uuid(),
+            ${'YE-' + yearLabel},
+            ${yearRange.end_date},
+            ${'Year-End Closing: ' + yearLabel},
+            'year_end', 'posted',
+            ${totalDebit}, ${totalCredit},
+            ${userId}, NOW()
+          )
+          RETURNING *
+        `) as any[];
+        closingEntry = entry;
+
+        // DR Revenue accounts (to zero them)
+        for (const rev of revenueAccounts) {
+          await sql`
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+            VALUES (gen_random_uuid(), ${closingEntry.id}, ${rev.id}, ${Number(rev.balance)}, 0, 'Year-end close', NOW())
+          `;
+        }
+
+        // CR Expense accounts (to zero them)
+        for (const exp of expenseAccounts) {
+          await sql`
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+            VALUES (gen_random_uuid(), ${closingEntry.id}, ${exp.id}, 0, ${Number(exp.balance)}, 'Year-end close', NOW())
+          `;
+        }
+
+        // Net income → Retained Earnings
+        if (netIncome >= 0) {
+          await sql`
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+            VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, 0, ${netIncome}, 'Net income to retained earnings', NOW())
+          `;
+        } else {
+          await sql`
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+            VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, ${Math.abs(netIncome)}, 0, 'Net loss to retained earnings', NOW())
+          `;
+        }
+
+        // Lock all periods
         await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-          VALUES (gen_random_uuid(), ${closingEntry.id}, ${rev.id}, ${Number(rev.balance)}, 0, 'Year-end close', NOW())
+          UPDATE fiscal_periods SET status = 'locked' WHERE fiscal_year = ${yearLabel}
         `;
+
+        await sql`COMMIT`;
+      } catch (txErr) {
+        await sql`ROLLBACK`;
+        throw txErr;
       }
-
-      // CR Expense accounts (to zero them)
-      for (const exp of expenseAccounts) {
-        await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-          VALUES (gen_random_uuid(), ${closingEntry.id}, ${exp.id}, 0, ${Number(exp.balance)}, 'Year-end close', NOW())
-        `;
-      }
-
-      // Net income → Retained Earnings
-      if (netIncome >= 0) {
-        await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-          VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, 0, ${netIncome}, 'Net income to retained earnings', NOW())
-        `;
-      } else {
-        await sql`
-          INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-          VALUES (gen_random_uuid(), ${closingEntry.id}, ${retainedEarnings.id}, ${Math.abs(netIncome)}, 0, 'Net loss to retained earnings', NOW())
-        `;
-      }
-
-      // Lock all periods
-      await sql`
-        UPDATE fiscal_periods SET status = 'locked' WHERE fiscal_year = ${yearLabel}
-      `;
 
       log.info('Year-end processed', {
         year: yearLabel,

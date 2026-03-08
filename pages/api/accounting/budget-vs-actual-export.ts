@@ -10,12 +10,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 /** Escape a value for CSV — wraps in double-quotes and escapes internal quotes. */
 function csvVal(value: string | number): string {
@@ -47,7 +46,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ORDER BY start_date DESC
           LIMIT 1
         )
-      `;
+      ` as any[];
       const fy = fyRows[0];
       const fyStart = fy?.start_date instanceof Date
         ? fy.start_date.toISOString().split('T')[0]
@@ -76,7 +75,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         FROM accounting_budgets ab
         JOIN gl_accounts ga ON ga.id = ab.gl_account_id
         WHERE ab.fiscal_year = ${fiscalYear}
-      `;
+      ` as any[];
       for (const row of budgetRows) {
         let total = 0;
         for (let m = startMonth; m <= endMonth; m++) {
@@ -86,14 +85,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         budgets[String(row.account_code)] = total;
         budgets[String(row.gl_account_id)] = total;
       }
-    } catch {
-      // No accounting_budgets table — try app_settings fallback
+    } catch (e) {
+      log.warn('Budget table query failed, trying app_settings fallback', { error: e }, 'accounting');
       try {
-        const [row] = await sql`SELECT value FROM app_settings WHERE key = 'accounting_budgets'`;
+        const [row] = (await sql`SELECT value FROM app_settings WHERE key = 'accounting_budgets'`) as any[];
         if (row?.value) {
           budgets = typeof row.value === 'string' ? JSON.parse(String(row.value)) : (row.value as Record<string, number>);
         }
-      } catch { /* no budgets configured */ }
+      } catch (e2) { log.warn('Budget app_settings fallback failed', { error: e2 }, 'accounting'); }
     }
 
     // Fetch actual GL amounts for expense and revenue accounts in the period
@@ -118,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         AND ga.account_type IN ('expense', 'revenue')
       GROUP BY ga.id, ga.account_code, ga.account_name, ga.account_type
       ORDER BY ga.account_code
-    `;
+    ` as any[];
 
     let totalBudget = 0;
     let totalActual = 0;
@@ -164,4 +163,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

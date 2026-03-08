@@ -4,12 +4,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -20,7 +19,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const rows = await sql`
       SELECT code, name, description, department, is_active
       FROM cost_centres ORDER BY code
-    `;
+    ` as any[];
 
     const csvLines = [
       'Code,Name,Description,Department,Active',
@@ -42,4 +41,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

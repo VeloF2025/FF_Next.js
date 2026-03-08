@@ -159,7 +159,7 @@ export async function createQuote(input: QuoteInput, userId?: string): Promise<Q
 
   const quote = mapQuote(rows[0]);
   for (let i = 0; i < input.lines.length; i++) {
-    const l = input.lines[i];
+    const l = input.lines[i]!;
     const lineTotal = Math.round(l.quantity * l.unitPrice * 100) / 100;
     await sql`
       INSERT INTO customer_quote_lines (quote_id, line_number, description, quantity, unit_price, tax_rate, line_total, account_id)
@@ -184,7 +184,7 @@ export async function updateQuote(id: string, input: QuoteInput): Promise<Quote 
   `;
   await sql`DELETE FROM customer_quote_lines WHERE quote_id = ${id}::UUID`;
   for (let i = 0; i < input.lines.length; i++) {
-    const l = input.lines[i];
+    const l = input.lines[i]!;
     const lineTotal = Math.round(l.quantity * l.unitPrice * 100) / 100;
     await sql`
       INSERT INTO customer_quote_lines (quote_id, line_number, description, quantity, unit_price, tax_rate, line_total, account_id)
@@ -210,10 +210,23 @@ export async function convertToInvoice(id: string, userId?: string): Promise<{ q
   const quote = await getQuote(id);
   if (!quote || quote.status !== 'accepted') return null;
 
+  // Generate invoice number (atomic subquery)
+  const invNumRows = (await sql`
+    SELECT COALESCE(MAX(CAST(REPLACE(invoice_number, 'INV-', '') AS INTEGER)), 0) + 1 AS next_num
+    FROM customer_invoices
+  `) as Row[];
+  const invoiceNumber = `INV-${String(invNumRows[0].next_num).padStart(5, '0')}`;
+
+  // Resolve project_id from client
+  const projRows = (await sql`
+    SELECT id FROM projects WHERE client_id = ${quote.clientId}::UUID LIMIT 1
+  `) as Row[];
+  const projectId = projRows[0]?.id || null;
+
   // Create invoice from quote
   const invRows = (await sql`
-    INSERT INTO customer_invoices (client_id, invoice_date, due_date, subtotal, tax_amount, total, notes, status, created_by)
-    VALUES (${quote.clientId}, ${quote.quoteDate}, ${quote.expiryDate || quote.quoteDate}, ${quote.subtotal},
+    INSERT INTO customer_invoices (invoice_number, project_id, client_id, invoice_date, due_date, subtotal, tax_amount, total_amount, notes, status, created_by)
+    VALUES (${invoiceNumber}, ${projectId}::UUID, ${quote.clientId}, ${quote.quoteDate}, ${quote.expiryDate || quote.quoteDate}, ${quote.subtotal},
       ${quote.taxAmount}, ${quote.total}, ${'Converted from ' + quote.quoteNumber}, 'draft', ${userId || null})
     RETURNING id
   `) as Row[];

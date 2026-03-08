@@ -70,7 +70,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE ga.account_subtype = 'bank'
         AND ga.is_active = TRUE
       ORDER BY ga.account_code
-    `;
+    ` as any[];
 
     const accounts = rows.map(r => ({
       id: r.id,

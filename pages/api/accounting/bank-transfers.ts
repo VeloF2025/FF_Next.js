@@ -24,9 +24,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!fromAccountId || !toAccountId || !amount) {
     return apiResponse.validationError(res, {
-      fromAccountId: !fromAccountId ? 'Required' : undefined,
-      toAccountId: !toAccountId ? 'Required' : undefined,
-      amount: !amount ? 'Required' : undefined,
+      ...((!fromAccountId) && { fromAccountId: 'Required' }),
+      ...((!toAccountId) && { toAccountId: 'Required' }),
+      ...((!amount) && { amount: 'Required' }),
     });
   }
 
@@ -61,34 +61,46 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LIMIT 1
     `;
 
-    // Create journal entry
+    // Create journal entry and lines atomically
     const entryRef = reference || `Transfer: ${fromAcct?.account_name} → ${toAcct?.account_name}`;
-    const txDate = transferDate || new Date().toISOString().split('T')[0];
+    const txDate = transferDate || new Date().toISOString().split('T')[0]!;
 
-    const [entry] = await sql`
-      INSERT INTO gl_journal_entries (
-        id, entry_number, entry_date, description,
-        source, status, fiscal_period_id,
-        total_debit, total_credit,
-        created_by, created_at
-      ) VALUES (
-        gen_random_uuid(),
-        'TXF-' || LPAD((SELECT COALESCE(MAX(CAST(SUBSTRING(entry_number FROM 5) AS INTEGER)), 0) + 1 FROM gl_journal_entries WHERE entry_number LIKE 'TXF-%')::text, 4, '0'),
-        ${txDate}, ${entryRef},
-        'bank_transfer', 'posted', ${period?.id || null},
-        ${Number(amount)}, ${Number(amount)},
-        ${userId}, NOW()
-      )
-      RETURNING *
-    `;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let entry: any;
 
-    // Create journal lines: DR destination, CR source
-    await sql`
-      INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-      VALUES
-        (gen_random_uuid(), ${entry.id}, ${toAccountId}, ${Number(amount)}, 0, ${`Transfer from ${fromAcct?.account_name}`}, NOW()),
-        (gen_random_uuid(), ${entry.id}, ${fromAccountId}, 0, ${Number(amount)}, ${`Transfer to ${toAcct?.account_name}`}, NOW())
-    `;
+    await sql`BEGIN`;
+    try {
+      const [insertedEntry] = await sql`
+        INSERT INTO gl_journal_entries (
+          id, entry_number, entry_date, description,
+          source, status, fiscal_period_id,
+          total_debit, total_credit,
+          created_by, created_at
+        ) VALUES (
+          gen_random_uuid(),
+          'TXF-' || LPAD((SELECT COALESCE(MAX(CAST(SUBSTRING(entry_number FROM 5) AS INTEGER)), 0) + 1 FROM gl_journal_entries WHERE entry_number LIKE 'TXF-%')::text, 4, '0'),
+          ${txDate}, ${entryRef},
+          'bank_transfer', 'posted', ${period?.id || null},
+          ${Number(amount)}, ${Number(amount)},
+          ${userId}, NOW()
+        )
+        RETURNING *
+      `;
+      entry = insertedEntry;
+
+      // Create journal lines: DR destination, CR source
+      await sql`
+        INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+        VALUES
+          (gen_random_uuid(), ${entry.id}, ${toAccountId}, ${Number(amount)}, 0, ${`Transfer from ${fromAcct?.account_name}`}, NOW()),
+          (gen_random_uuid(), ${entry.id}, ${fromAccountId}, 0, ${Number(amount)}, ${`Transfer to ${toAcct?.account_name}`}, NOW())
+      `;
+
+      await sql`COMMIT`;
+    } catch (txErr) {
+      await sql`ROLLBACK`;
+      throw txErr;
+    }
 
     log.info('Bank transfer completed', {
       entryId: entry.id,

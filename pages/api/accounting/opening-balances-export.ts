@@ -4,12 +4,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -31,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         GROUP BY gl_account_id
       ) ob ON ob.gl_account_id = a.id
       ORDER BY a.account_code
-    `;
+    ` as any[];
 
     const csvLines = [
       'Account Code,Account Name,Type,Normal Balance,Opening Debit,Opening Credit',
@@ -54,4 +53,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

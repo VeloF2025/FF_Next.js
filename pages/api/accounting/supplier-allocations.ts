@@ -5,12 +5,11 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 interface AllocationItem {
   invoiceId: string;
@@ -92,7 +91,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT sp.id, sp.supplier_id, sp.total_amount, sp.status,
           COALESCE((SELECT SUM(amount_allocated) FROM supplier_payment_allocations WHERE payment_id = sp.id), 0) AS allocated_amount
         FROM supplier_payments sp WHERE sp.id = ${paymentId}
-      `;
+      ` as any[];
       const payment = paymentRows[0];
       if (!payment) return apiResponse.notFound(res, 'Payment', paymentId);
       if (payment.status === 'cancelled') {
@@ -113,7 +112,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const invoiceRows = await sql`
           SELECT id, supplier_id, total_amount, amount_paid, status
           FROM supplier_invoices WHERE id = ${alloc.invoiceId}
-        `;
+        ` as any[];
         const invoice = invoiceRows[0];
         if (!invoice) {
           return apiResponse.badRequest(res, `Invoice ${alloc.invoiceId} not found`);
@@ -176,4 +175,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 
-export default withAuth(handler);
+export default withAuth(withErrorHandler(handler));

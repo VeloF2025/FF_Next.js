@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const userId = String((req as unknown as Record<string, unknown>).userId || '');
+    const userId = (req as unknown as { user?: { id: string } }).user?.id || '';
     const { entries } = req.body as { entries: CategoryMapEntry[] };
 
     if (!Array.isArray(entries) || entries.length === 0) {

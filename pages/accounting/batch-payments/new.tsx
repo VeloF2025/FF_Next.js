@@ -51,7 +51,7 @@ export default function NewBatchPaymentPage() {
     for (const l of lines) {
       if (!l.supplierId || !l.invoiceId || l.amount <= 0) continue;
       if (!grouped[l.supplierId]) grouped[l.supplierId] = [];
-      grouped[l.supplierId].push({ invoiceId: l.invoiceId, amount: l.amount });
+      grouped[l.supplierId]!.push({ invoiceId: l.invoiceId, amount: l.amount });
     }
 
     const payments = Object.entries(grouped).map(([supplierId, allocs]) => ({

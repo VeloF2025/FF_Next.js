@@ -4,15 +4,14 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
+import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res);
+export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
     const from = (req.query.from as string) || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -34,9 +33,9 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
         AND si.status != 'cancelled'
       GROUP BY si.supplier_id, s.company_name
       ORDER BY total_purchases DESC
-    `;
+    ` as any[];
 
-    const data = rows.map(r => ({
+    const data = rows.map((r: any) => ({
       supplierId: r.supplier_id,
       supplierName: r.supplier_name,
       invoiceCount: Number(r.invoice_count),
@@ -59,6 +58,6 @@ export default withAuth(async function handler(req: NextApiRequest, res: NextApi
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     log.error('purchases-by-supplier report error', { error: message });
-    return apiResponse.error(res, 'Failed to generate report');
+    return apiResponse.internalError(res, err instanceof Error ? err : new Error('Failed to generate report'));
   }
-});
+}));

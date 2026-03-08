@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 import { deleteRule, deleteRules, toggleRule, applyRules, updateRule } from '@/modules/accounting/services/bankRulesService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!);
+  if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
   const userId = (req as AuthenticatedNextApiRequest).user.id;
   const { action, id, ids, isActive, bankAccountId } = req.body;
