@@ -59,8 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const inv = invRows[0]!;
       const supplierId = String(inv.supplier_id);
 
-      // allocateTransaction runs its own multi-statement sequence internally;
-      // wrap only the subsequent status update so the invoice mark is atomic.
+      // Allocate the bank transaction against the AP account for this supplier
       await allocateTransaction(
         bankTransactionId,
         '', // contraAccountId unused when allocType is 'supplier'
@@ -70,17 +69,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         supplierId,
       );
 
-      await sql`BEGIN`;
-      try {
-        await sql`
-          UPDATE supplier_invoices SET status = 'paid', updated_at = NOW()
-          WHERE id = ${candidateId}::UUID
-        `;
-        await sql`COMMIT`;
-      } catch (txErr) {
-        await sql`ROLLBACK`;
-        throw txErr;
-      }
+      // Mark invoice as paid
+      await sql`
+        UPDATE supplier_invoices SET status = 'paid', updated_at = NOW()
+        WHERE id = ${candidateId}::UUID
+      `;
 
       log.info('Confirmed match: supplier invoice', { bankTransactionId, candidateId }, 'accounting-api');
     } else if (candidateType === 'purchase_order') {
@@ -104,28 +97,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         supplierId,
       );
 
-      // Link PO and bank transaction to each other atomically
-      await sql`BEGIN`;
-      try {
-        await sql`
-          UPDATE purchase_orders
-          SET bank_transaction_id = ${bankTransactionId}::UUID,
-              status = 'paid',
-              updated_at = NOW()
-          WHERE id = ${candidateId}::UUID
-        `;
+      // Link PO to bank transaction and mark as paid
+      await sql`
+        UPDATE purchase_orders
+        SET bank_transaction_id = ${bankTransactionId}::UUID,
+            status = 'paid',
+            updated_at = NOW()
+        WHERE id = ${candidateId}::UUID
+      `;
 
-        await sql`
-          UPDATE bank_transactions
-          SET linked_po_id = ${candidateId}::UUID, updated_at = NOW()
-          WHERE id = ${bankTransactionId}::UUID
-        `;
-
-        await sql`COMMIT`;
-      } catch (txErr) {
-        await sql`ROLLBACK`;
-        throw txErr;
-      }
+      // Link bank transaction back to the PO
+      await sql`
+        UPDATE bank_transactions
+        SET linked_po_id = ${candidateId}::UUID, updated_at = NOW()
+        WHERE id = ${bankTransactionId}::UUID
+      `;
 
       log.info('Confirmed match: purchase order', { bankTransactionId, candidateId }, 'accounting-api');
     } else {

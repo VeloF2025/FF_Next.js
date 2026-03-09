@@ -96,7 +96,7 @@ export default function DunningPage() {
   async function handleCreateDunning(client: OverdueClient, level: number) {
     setIsSending(true);
     try {
-      const template = (DUNNING_TEMPLATES[level - 1] ?? DUNNING_TEMPLATES[0])!;
+      const template = DUNNING_TEMPLATES[level - 1] || DUNNING_TEMPLATES[0];
       const body = template.body
         .replace('{client}', client.entityName)
         .replace('{amount}', formatCurrency(client.total));

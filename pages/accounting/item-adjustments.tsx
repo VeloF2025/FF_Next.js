@@ -130,7 +130,7 @@ export default function ItemAdjustmentsPage() {
                     <tr key={i.id} className="hover:bg-[var(--ff-bg-tertiary)]">
                       <td className="px-4 py-3 font-mono text-xs text-[var(--ff-text-tertiary)]">{i.item_code}</td>
                       <td className="px-4 py-3 text-[var(--ff-text-primary)]">{i.item_name}</td>
-                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{(i as unknown as Record<string, unknown>).category as string || '—'}</td>
+                      <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{(i as Record<string, unknown>).category as string || '—'}</td>
                       <td className="px-4 py-3 text-right font-mono text-[var(--ff-text-primary)]">{fmtQty(i.current_quantity)}</td>
                       <td className="px-4 py-3 text-[var(--ff-text-tertiary)]">{i.uom}</td>
                     </tr>

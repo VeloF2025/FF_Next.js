@@ -4,20 +4,21 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
+const sql = neon(process.env.DATABASE_URL!);
+
+export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
     const format = req.query.format as string;
     const category = req.query.category as string | undefined;
 
-    let rows: any[];
+    let rows;
     if (category) {
       rows = await sql`
         SELECT id, item_code, name, category, uom, qty_available, standard_cost,
@@ -25,7 +26,7 @@ export default withAuth(withErrorHandler(async function handler(req: NextApiRequ
         FROM stock_items
         WHERE is_active = true AND category = ${category}
         ORDER BY stock_value DESC
-      ` as any[];
+      `;
     } else {
       rows = await sql`
         SELECT id, item_code, name, category, uom, qty_available, standard_cost,
@@ -33,10 +34,10 @@ export default withAuth(withErrorHandler(async function handler(req: NextApiRequ
         FROM stock_items
         WHERE is_active = true
         ORDER BY stock_value DESC
-      ` as any[];
+      `;
     }
 
-    const data = rows.map((r: any) => ({
+    const data = rows.map(r => ({
       id: r.id,
       itemCode: r.item_code || '',
       name: r.name,
@@ -63,4 +64,4 @@ export default withAuth(withErrorHandler(async function handler(req: NextApiRequ
     log.error('Item valuation report error', { error: message });
     return apiResponse.badRequest(res, 'Failed to generate report');
   }
-}));
+});

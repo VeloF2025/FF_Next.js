@@ -140,7 +140,7 @@ export default function SupplierStatementDetailPage() {
       clientName: supplier.name,
       clientEmail: supplier.email || undefined,
       clientPhone: supplier.phone || undefined,
-      asAtDate: new Date().toISOString().split('T')[0] ?? '',
+      asAtDate: new Date().toISOString().split('T')[0],
       totalInvoiced: summary.totalInvoiced,
       totalPaid: summary.totalPaid,
       totalCredits: summary.totalReturns,

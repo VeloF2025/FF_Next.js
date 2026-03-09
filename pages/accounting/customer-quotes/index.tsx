@@ -124,11 +124,11 @@ export default function CustomerQuotesPage() {
               <div className="space-y-2">
                 {lines.map((l, i) => (
                   <div key={i} className="grid grid-cols-5 gap-2">
-                    <input value={l.description} onChange={e => { const n = [...lines]; n[i] = { ...n[i]!, description: e.target.value }; setLines(n); }}
+                    <input value={l.description} onChange={e => { const n = [...lines]; n[i] = { ...n[i], description: e.target.value }; setLines(n); }}
                       placeholder="Description *" className="ff-input text-sm col-span-2" />
-                    <input type="number" value={l.quantity} onChange={e => { const n = [...lines]; n[i] = { ...n[i]!, quantity: Number(e.target.value) }; setLines(n); }}
+                    <input type="number" value={l.quantity} onChange={e => { const n = [...lines]; n[i] = { ...n[i], quantity: Number(e.target.value) }; setLines(n); }}
                       placeholder="Qty" className="ff-input text-sm" />
-                    <input type="number" value={l.unitPrice} onChange={e => { const n = [...lines]; n[i] = { ...n[i]!, unitPrice: Number(e.target.value) }; setLines(n); }}
+                    <input type="number" value={l.unitPrice} onChange={e => { const n = [...lines]; n[i] = { ...n[i], unitPrice: Number(e.target.value) }; setLines(n); }}
                       placeholder="Unit price" className="ff-input text-sm" />
                     <div className="text-sm text-right text-[var(--ff-text-secondary)] self-center font-mono">
                       {fmt(l.quantity * l.unitPrice)}

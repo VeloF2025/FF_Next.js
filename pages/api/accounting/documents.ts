@@ -6,8 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
-import { withErrorHandler } from '@/lib/api-error-handler';
+import { neon } from '@neondatabase/serverless';
 import formidable from 'formidable';
 import fs from 'fs';
 import { vfStorage } from '@/services/vfStorageAdapter';
@@ -15,10 +14,13 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import type {
+  ProcurementDocument,
   LinkedDocument,
   AccountingEntityType,
   AccountingDocumentType,
 } from '@/types/procurement/document.types';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 export const config = {
   api: { bodyParser: false },
@@ -123,7 +125,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       AND entity_id = ${entityId}::uuid
       AND is_active = true
     ORDER BY uploaded_at DESC
-  ` as any[];
+  `;
 
   // Cross-linked documents (via document_links)
   const linkedRows = await sql`
@@ -134,7 +136,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       AND dl.linked_entity_id = ${entityId}::uuid
       AND pd.is_active = true
     ORDER BY pd.uploaded_at DESC
-  ` as any[];
+  `;
 
   const results: LinkedDocument[] = [
     ...directRows.map(r => mapRow(r as Record<string, unknown>, 'direct')),
@@ -207,7 +209,7 @@ async function handlePost(
         ${user.email}, ${user.name}, ${notes || null}
       )
       RETURNING *
-    ` as any[];
+    `;
 
     const docId = (row as Record<string, unknown>).id as string;
 
@@ -245,7 +247,7 @@ async function autoLinkSupplierInvoice(docId: string, invoiceId: string) {
       SELECT purchase_order_id, grn_id
       FROM sage_supplier_invoices
       WHERE id = ${invoiceId}::uuid
-    ` as any[];
+    `;
 
     if (!invoice) return;
 
@@ -273,7 +275,7 @@ async function autoLinkSupplierInvoice(docId: string, invoiceId: string) {
       const poDocs = await sql`
         SELECT id FROM procurement_documents
         WHERE entity_type = 'purchase_order' AND entity_id = ${poId}::uuid AND is_active = true
-      ` as any[];
+      `;
       for (const doc of poDocs) {
         await sql`
           INSERT INTO document_links (document_id, linked_entity_type, linked_entity_id, link_reason)
@@ -286,7 +288,7 @@ async function autoLinkSupplierInvoice(docId: string, invoiceId: string) {
       const grnDocs = await sql`
         SELECT id FROM procurement_documents
         WHERE entity_type = 'goods_receipt_note' AND entity_id = ${grnId}::uuid AND is_active = true
-      ` as any[];
+      `;
       for (const doc of grnDocs) {
         await sql`
           INSERT INTO document_links (document_id, linked_entity_type, linked_entity_id, link_reason)
@@ -312,7 +314,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     SET is_active = false
     WHERE id = ${id}::uuid AND is_active = true
     RETURNING id
-  ` as any[];
+  `;
 
   if (!row) {
     return apiResponse.notFound(res, 'Document', id);
@@ -322,4 +324,4 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
   return apiResponse.success(res, { id: row.id, deleted: true });
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);

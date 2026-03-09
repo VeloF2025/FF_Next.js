@@ -4,11 +4,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -25,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       JOIN customer_invoices ci ON ci.id = cpa.invoice_id
       JOIN clients c ON c.id = cp.client_id
       ORDER BY cpa.created_at DESC
-    ` as any[];
+    `;
 
     const csvLines = [
       'Payment #,Invoice #,Client,Amount,Payment Date,Allocated At',
@@ -48,4 +49,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, Upload, Loader2, AlertCircle, CheckCircle2, Landmark, FileText } from 'lucide-react';
@@ -25,6 +26,7 @@ interface ImportForm {
 }
 
 export default function BankStatementImportPage() {
+  useRouter();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -45,7 +47,7 @@ export default function BankStatementImportPage() {
   });
 
   useEffect(() => {
-    fetch('/api/accounting/chart-of-accounts?subtype=bank', { credentials: 'include' })
+    fetch('/api/accounting/chart-of-accounts?subtype=bank')
       .then(r => r.json())
       .then(res => {
         const data = res.data || res;

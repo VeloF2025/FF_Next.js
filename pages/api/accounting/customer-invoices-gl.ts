@@ -9,7 +9,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { postCustomerInvoiceToGLSimple as postCustomerInvoiceToGL } from '@/modules/accounting/services/customerPaymentService';
+import { postCustomerInvoiceToGL } from '@/modules/accounting/services/customerPaymentService';
 
 async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

@@ -34,8 +34,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       await sql`SELECT account_subtype FROM gl_accounts LIMIT 1`;
       hasSubtype = true;
-    } catch (e) {
-      log.warn('account_subtype column check failed', { error: e }, 'accounting');
+    } catch {
+      // Column doesn't exist
     }
 
     // Get opening cash balance (bank accounts at start_date)
@@ -70,8 +70,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         openingBalance = Number(openingCash?.balance || 0);
       }
-    } catch (e) {
-      log.warn('Failed to query opening cash balance', { error: e }, 'accounting');
+    } catch {
       openingBalance = 0;
     }
 
@@ -118,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         arChangeVal = Number(arChange?.change || 0);
       }
-    } catch (e) { log.warn('Failed to query AR change', { error: e }, 'accounting'); arChangeVal = 0; }
+    } catch { arChangeVal = 0; }
 
     // Changes in AP (payable)
     let apChangeVal = 0;
@@ -148,7 +147,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         apChangeVal = Number(apChange?.change || 0);
       }
-    } catch (e) { log.warn('Failed to query AP change', { error: e }, 'accounting'); apChangeVal = 0; }
+    } catch { apChangeVal = 0; }
 
     // Investing: fixed asset changes
     let investingChangeVal = 0;
@@ -181,7 +180,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         investingChangeVal = Number(investingChange?.change || 0);
       }
-    } catch (e) { log.warn('Failed to query investing change', { error: e }, 'accounting'); investingChangeVal = 0; }
+    } catch { investingChangeVal = 0; }
 
     // Financing: equity + loan changes
     let financingChangeVal = 0;
@@ -213,7 +212,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
         financingChangeVal = Number(financingChange?.change || 0);
       }
-    } catch (e) { log.warn('Failed to query financing change', { error: e }, 'accounting'); financingChangeVal = 0; }
+    } catch { financingChangeVal = 0; }
 
     const operatingTotal = Number(netIncome?.net_income || 0) + arChangeVal + apChangeVal;
     const investingTotal = investingChangeVal;

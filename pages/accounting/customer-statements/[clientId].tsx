@@ -143,7 +143,7 @@ export default function CustomerStatementDetailPage() {
       clientName: client.name,
       clientEmail: client.email || undefined,
       clientPhone: client.phone || undefined,
-      asAtDate: new Date().toISOString().split('T')[0] ?? '',
+      asAtDate: new Date().toISOString().split('T')[0],
       totalInvoiced: summary.totalInvoiced,
       totalPaid: summary.totalPaid,
       totalCredits: summary.totalCredits,

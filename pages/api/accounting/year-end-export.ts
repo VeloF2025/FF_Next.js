@@ -4,11 +4,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -22,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM fiscal_periods
       GROUP BY fiscal_year
       ORDER BY fiscal_year DESC
-    ` as any[];
+    `;
 
     const csvLines = [
       'Year,Start Date,End Date,Status',
@@ -43,4 +44,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);
