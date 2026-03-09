@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       // userId from auth context or body
-      const userId = req.body.userId || (req as unknown as { user?: { id: string } }).user?.id;
+      const userId = (req as unknown as { user?: { id: string } }).user?.id;
       if (!userId) {
         return apiResponse.badRequest(res, 'userId is required');
       }

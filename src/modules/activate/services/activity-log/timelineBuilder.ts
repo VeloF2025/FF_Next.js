@@ -221,7 +221,7 @@ export async function getActivityTimeline(
 
     log.info('ActivityLog', `DR query returned ${drRows.length} rows for ${drNumber}`);
     if (drRows.length > 0) {
-      const dr = drRows[0];
+      const dr = drRows[0]!;
       log.info('ActivityLog', `DR timestamps: wa_received=${dr.wa_received_at}, vlm_cat=${dr.vlm_categorized_at}`);
 
       // Add events from DR timestamps (only if not already in activity log)
@@ -423,7 +423,7 @@ export async function getActivityTimeline(
     `;
 
     if (oesRows.length > 0) {
-      const oes = oesRows[0];
+      const oes = oesRows[0]!;
       if (oes.activation_date) {
         timeline.push({
           id: `oes-activation-${drNumber}`,

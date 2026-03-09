@@ -30,7 +30,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
+    const userId = (req as unknown as { user?: { id: string } }).user?.id;
+    if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
     const quote = await createQuote(req.body, userId);
     return apiResponse.created(res, quote);
   }

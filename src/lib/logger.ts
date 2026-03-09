@@ -53,43 +53,62 @@ class Logger {
   }
 
   /**
-   * Log debug messages
-   * @param message - Log message
-   * @param data - Additional data to log
-   * @param component - Component name for context
+   * Log debug messages - overloaded to support both (message, data, component) and (component, message, data) signatures
    */
-  debug(message: string, data?: LogData, component?: string): void {
-    this.log('debug', message, data, component);
+  debug(messageOrComponent: string, dataOrMessage?: LogData | string, componentOrData?: string | LogData): void {
+    // Detect which calling pattern is being used
+    if (typeof dataOrMessage === 'string') {
+      // Called as debug(component, message, data) - old style
+      this.log('debug', dataOrMessage, componentOrData as LogData | undefined, messageOrComponent);
+    } else {
+      // Called as debug(message, data, component) - new style
+      this.log('debug', messageOrComponent, dataOrMessage, componentOrData as string | undefined);
+    }
   }
 
   /**
-   * Log info messages
-   * @param message - Log message
-   * @param data - Additional data to log
-   * @param component - Component name for context
+   * Log info messages - overloaded to support both (message, data, component) and (component, message, data) signatures
    */
-  info(message: string, data?: LogData, component?: string): void {
-    this.log('info', message, data, component);
+  info(messageOrComponent: string, dataOrMessage?: LogData | string, componentOrData?: string | LogData): void {
+    // Detect which calling pattern is being used
+    if (typeof dataOrMessage === 'string') {
+      // Called as info(component, message, data) - old style
+      this.log('info', dataOrMessage, componentOrData as LogData | undefined, messageOrComponent);
+    } else {
+      // Called as info(message, data, component) - new style
+      this.log('info', messageOrComponent, dataOrMessage, componentOrData as string | undefined);
+    }
   }
 
   /**
-   * Log warning messages
-   * @param message - Log message
-   * @param data - Additional data to log
-   * @param component - Component name for context
+   * Log warning messages - overloaded to support both (message, data, component) and (component, message, data) signatures
    */
-  warn(message: string, data?: LogData, component?: string): void {
-    this.log('warn', message, data, component);
+  warn(messageOrComponent: string, dataOrMessage?: LogData | string, componentOrData?: string | LogData): void {
+    // Detect which calling pattern is being used
+    if (typeof dataOrMessage === 'string') {
+      // Called as warn(component, message, data) - old style
+      this.log('warn', dataOrMessage, componentOrData as LogData | undefined, messageOrComponent);
+    } else {
+      // Called as warn(message, data, component) - new style
+      this.log('warn', messageOrComponent, dataOrMessage, componentOrData as string | undefined);
+    }
   }
 
   /**
-   * Log error messages
-   * @param message - Log message
-   * @param data - Additional data to log
-   * @param component - Component name for context
+   * Log error messages - overloaded to support both (message, data, component) and (component, message, data) signatures
    */
-  error(message: string, data?: LogData, component?: string): void {
-    this.log('error', message, data, component);
+  error(messageOrComponent: string, dataOrMessage?: LogData | string | Error, componentOrData?: string | LogData | Error): void {
+    // Detect which calling pattern is being used
+    if (typeof dataOrMessage === 'string') {
+      // Called as error(component, message, data) - old style
+      this.log('error', dataOrMessage, componentOrData as LogData | undefined, messageOrComponent);
+    } else {
+      // Called as error(message, data, component) - new style
+      // Handle Error objects naturally
+      const data = (dataOrMessage instanceof Error) ? { error: dataOrMessage.message, stack: dataOrMessage.stack } : (dataOrMessage as LogData);
+      const component = (componentOrData instanceof Error) ? undefined : (componentOrData as string | undefined);
+      this.log('error', messageOrComponent, data, component);
+    }
   }
 
   /**

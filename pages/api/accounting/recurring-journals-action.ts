@@ -20,7 +20,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const { action, id } = req.body;
-    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
+    const userId = (req as unknown as { user?: { id: string } }).user?.id;
+    if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
     if (!action || !id) return apiResponse.badRequest(res, 'action and id are required');
 
     switch (action) {
@@ -34,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         await updateRecurringJournalStatus(id, 'cancelled');
         return apiResponse.success(res, { status: 'cancelled' });
       case 'generate': {
-        if (!userId) return apiResponse.badRequest(res, 'userId is required');
+        if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
         const journalId = await generateJournalFromRecurring(id, userId);
         return apiResponse.success(res, { journalId });
       }

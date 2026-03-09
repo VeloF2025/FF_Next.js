@@ -1,0 +1,436 @@
+{
+  "timestamp": "2026-03-06T07:22:52.503Z",
+  "summary": {
+    "totalPages": 17,
+    "totalViolations": 2,
+    "byImpact": {
+      "critical": 0,
+      "serious": 1,
+      "moderate": 1,
+      "minor": 0
+    },
+    "byType": {
+      "aria-progressbar-name": 1,
+      "heading-order": 1
+    }
+  },
+  "results": [
+    {
+      "page": "Procurement: PO List",
+      "component": "POListPage",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-role",
+        "aria-deprecated-role",
+        "aria-required-attr",
+        "aria-roles",
+        "button-name",
+        "empty-heading",
+        "empty-table-header",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "nested-interactive",
+        "table-duplicate-name",
+        "td-headers-attr",
+        "th-has-data-cells"
+      ],
+      "timestamp": "2026-03-06T07:22:52.327Z"
+    },
+    {
+      "page": "Procurement: Approval Dialog",
+      "component": "POApprovalDialog",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-dialog-name",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "button-name",
+        "duplicate-id-aria",
+        "empty-heading",
+        "form-field-multiple-labels",
+        "heading-order",
+        "label-title-only",
+        "label",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.343Z"
+    },
+    {
+      "page": "Pipeline: Project Dashboard",
+      "component": "PipelineDashboard",
+      "violations": [
+        {
+          "id": "aria-progressbar-name",
+          "impact": "serious",
+          "description": "Ensure every ARIA progressbar node has an accessible name",
+          "nodes": 1,
+          "help": "ARIA progressbar nodes must have an accessible name",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/aria-progressbar-name?application=axeAPI"
+        }
+      ],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "empty-heading",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.355Z"
+    },
+    {
+      "page": "Fleet: Vehicle List",
+      "component": "FleetListPage",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-role",
+        "aria-deprecated-role",
+        "aria-required-attr",
+        "aria-roles",
+        "empty-heading",
+        "empty-table-header",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "table-duplicate-name",
+        "td-headers-attr",
+        "th-has-data-cells"
+      ],
+      "timestamp": "2026-03-06T07:22:52.366Z"
+    },
+    {
+      "page": "Field App: Portal",
+      "component": "FieldAppPortal",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "button-name",
+        "duplicate-id-aria",
+        "empty-heading",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "list",
+        "listitem",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.378Z"
+    },
+    {
+      "page": "Staff: Directory",
+      "component": "StaffDirectory",
+      "violations": [
+        {
+          "id": "heading-order",
+          "impact": "moderate",
+          "description": "Ensure the order of headings is semantically correct",
+          "nodes": 1,
+          "help": "Heading levels should only increase by one",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.10/heading-order?application=axeAPI"
+        }
+      ],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "duplicate-id-aria",
+        "empty-heading",
+        "form-field-multiple-labels",
+        "heading-order",
+        "label-title-only",
+        "label",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "link-name"
+      ],
+      "timestamp": "2026-03-06T07:22:52.391Z"
+    },
+    {
+      "page": "KPI: Dashboard",
+      "component": "KPIDashboard",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "duplicate-id-aria",
+        "empty-heading",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique"
+      ],
+      "timestamp": "2026-03-06T07:22:52.401Z"
+    },
+    {
+      "page": "Assets: List",
+      "component": "AssetListPage",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-role",
+        "aria-deprecated-role",
+        "aria-required-attr",
+        "aria-roles",
+        "duplicate-id-aria",
+        "empty-heading",
+        "empty-table-header",
+        "form-field-multiple-labels",
+        "heading-order",
+        "label-title-only",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "nested-interactive",
+        "select-name",
+        "table-duplicate-name",
+        "td-headers-attr",
+        "th-has-data-cells"
+      ],
+      "timestamp": "2026-03-06T07:22:52.415Z"
+    },
+    {
+      "page": "Maintenance: Tickets",
+      "component": "TicketDashboard",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "button-name",
+        "duplicate-id-aria",
+        "empty-heading",
+        "form-field-multiple-labels",
+        "heading-order",
+        "label-title-only",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "list",
+        "listitem",
+        "nested-interactive",
+        "select-name"
+      ],
+      "timestamp": "2026-03-06T07:22:52.429Z"
+    },
+    {
+      "page": "Communications: Dev Queue",
+      "component": "DevQueueDashboard",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "duplicate-id-aria",
+        "empty-heading",
+        "empty-table-header",
+        "heading-order",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "table-duplicate-name",
+        "td-headers-attr",
+        "th-has-data-cells"
+      ],
+      "timestamp": "2026-03-06T07:22:52.440Z"
+    },
+    {
+      "page": "QA: Photo Review",
+      "component": "PhotoReviewDashboard",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "button-name",
+        "duplicate-id-aria",
+        "empty-heading",
+        "form-field-multiple-labels",
+        "heading-order",
+        "image-alt",
+        "image-redundant-alt",
+        "label-title-only",
+        "label",
+        "landmark-main-is-top-level",
+        "landmark-no-duplicate-main",
+        "landmark-unique",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.456Z"
+    },
+    {
+      "page": "Forms: Text Input",
+      "component": "TextInputField",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "button-name",
+        "duplicate-id-aria",
+        "form-field-multiple-labels",
+        "label-title-only",
+        "label",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.464Z"
+    },
+    {
+      "page": "Forms: Select",
+      "component": "SelectField",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "button-name",
+        "duplicate-id-aria",
+        "form-field-multiple-labels",
+        "label-title-only",
+        "nested-interactive",
+        "select-name"
+      ],
+      "timestamp": "2026-03-06T07:22:52.473Z"
+    },
+    {
+      "page": "Forms: Textarea",
+      "component": "TextareaField",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "button-name",
+        "duplicate-id-aria",
+        "form-field-multiple-labels",
+        "label-title-only",
+        "label",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.480Z"
+    },
+    {
+      "page": "Navigation: Main Menu",
+      "component": "MainNavigation",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-conditional-attr",
+        "aria-prohibited-attr",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "landmark-unique",
+        "link-name",
+        "list",
+        "listitem"
+      ],
+      "timestamp": "2026-03-06T07:22:52.489Z"
+    },
+    {
+      "page": "Navigation: Breadcrumb",
+      "component": "BreadcrumbNav",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-conditional-attr",
+        "aria-prohibited-attr",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "landmark-unique",
+        "link-name",
+        "list",
+        "listitem"
+      ],
+      "timestamp": "2026-03-06T07:22:52.495Z"
+    },
+    {
+      "page": "Dialogs: Confirmation",
+      "component": "ConfirmDialog",
+      "violations": [],
+      "incomplete": [],
+      "passes": [
+        "aria-allowed-attr",
+        "aria-allowed-role",
+        "aria-conditional-attr",
+        "aria-deprecated-role",
+        "aria-dialog-name",
+        "aria-prohibited-attr",
+        "aria-required-attr",
+        "aria-roles",
+        "aria-valid-attr-value",
+        "aria-valid-attr",
+        "button-name",
+        "duplicate-id-aria",
+        "empty-heading",
+        "heading-order",
+        "nested-interactive"
+      ],
+      "timestamp": "2026-03-06T07:22:52.503Z"
+    }
+  ]
+}

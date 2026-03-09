@@ -321,8 +321,8 @@ async function handler(
     case 'DELETE':
       return deleteContact(req, res);
     default:
-      return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT', 'DELETE']);
+      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST', 'PUT', 'DELETE']);
   }
 }
 
-export default withAuth(withRole(['admin', 'manager'], handler));
+export default withAuth(withRole('manager')(handler));

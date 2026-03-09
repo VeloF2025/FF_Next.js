@@ -39,12 +39,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
       const { bankAccountId, statementDate, statementBalance } = req.body;
-      const userId = req.body.userId || (req as unknown as { user?: { id: string } }).user?.id;
+      const userId = (req as unknown as { user?: { id: string } }).user?.id;
+      if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
 
       if (!bankAccountId || !statementDate || statementBalance === undefined) {
         return apiResponse.badRequest(res, 'bankAccountId, statementDate, and statementBalance are required');
       }
-      if (!userId) return apiResponse.badRequest(res, 'userId is required');
+      if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
 
       const recon = await startReconciliation(
         String(bankAccountId), String(statementDate),

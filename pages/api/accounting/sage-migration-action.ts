@@ -26,7 +26,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiResponse.methodNotAllowed(res, req.method || '', ['POST']);
   }
 
-  const userId = req.body.userId || (req as unknown as { user?: { id: string } }).user?.id || 'system';
+  const userId = (req as unknown as { user?: { id: string } }).user?.id;
+  if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
   const { action } = req.body;
 
   if (!action) {

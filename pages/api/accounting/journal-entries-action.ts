@@ -22,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const { id, action } = req.body;
-    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
+    const userId = (req as unknown as { user?: { id: string } }).user?.id;
     if (!id || !action) {
       return apiResponse.badRequest(res, 'id and action are required');
     }

@@ -27,8 +27,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = (req as unknown as { user?: { id: string } }).user?.id || req.body.userId;
-    if (!userId) return apiResponse.badRequest(res, 'userId is required');
+    const userId = (req as unknown as { user?: { id: string } }).user?.id;
+    if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
     try {
       const item = await createRecurringJournal(req.body, userId);
       return apiResponse.success(res, item);

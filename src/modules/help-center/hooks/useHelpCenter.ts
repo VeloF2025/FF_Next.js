@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { parseManualSections, searchManual, type ManualSection, type SearchResult } from '../data/manual-content';
+import { log } from '@/lib/logger';
 
 export interface NavItem {
   sectionId: string;
@@ -48,7 +49,7 @@ export function useHelpCenter(): UseHelpCenterReturn {
         setCurrentSectionId(parsedSections[0].id);
       }
     } catch (error) {
-      console.error('Failed to load manual content:', error);
+      log.error('Failed to load manual content', { error });
       setSections([]);
     }
   }, [currentSectionId]);
