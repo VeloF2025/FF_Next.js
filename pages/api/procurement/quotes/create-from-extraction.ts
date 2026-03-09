@@ -9,7 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
-import { apiResponse } from '@/lib/apiResponse';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
@@ -35,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.notFound(res, 'Quote extraction', extractionId);
     }
 
-    const extraction = extractions[0];
+    const extraction = extractions[0]!;
 
     // Use overrides if provided, otherwise fall back to extraction values
     const supplierName = overrides?.supplierName || extraction.extracted_supplier_name;
@@ -58,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (existingQuotes.length > 0) {
-        return apiResponse.error(res, 'DUPLICATE_QUOTE', 'A quote with this number already exists for this RFQ');
+        return apiResponse.error(res, ErrorCode.CONFLICT, 'A quote with this number already exists for this RFQ');
       }
     }
 
@@ -72,14 +72,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         LIMIT 1
       `;
       if (matchedSuppliers.length > 0) {
-        finalSupplierId = matchedSuppliers[0].id;
+        finalSupplierId = matchedSuppliers[0]!.id;
       }
     }
 
     // If still no supplier, create a new one from the data
     if (!finalSupplierId) {
       const supplierCode = 'SUP-SCAN-' + Date.now();
-      const createdBy = (req as any).user?.id || 'system';
+      const createdBy = ((req as any).user?.id as string | undefined) || 'system';
 
       const newSupplier = await sql`
         INSERT INTO suppliers (code, name, company_name, email, phone, vat_number, status, created_by)
@@ -95,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         )
         RETURNING id
       `;
-      finalSupplierId = newSupplier[0].id;
+      finalSupplierId = newSupplier[0]!.id;
       log.info('[CreateQuote] Created new supplier', { supplierId: finalSupplierId, code: supplierCode, name: supplierName });
     }
 
@@ -151,14 +151,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     log.info('[CreateQuote] Quote created from extraction', {
-      quoteId: newQuote[0].id,
+      quoteId: newQuote[0]!.id,
       extractionId,
       rfqId: extraction.rfq_id,
     });
 
     return apiResponse.success(res, {
-      quoteId: newQuote[0].id,
-      quoteNumber: newQuote[0].quote_number,
+      quoteId: newQuote[0]!.id,
+      quoteNumber: newQuote[0]!.quote_number,
       supplierId: finalSupplierId,
     });
 
@@ -167,7 +167,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       error: error instanceof Error ? error.message : 'Unknown error',
       extractionId,
     });
-    return apiResponse.error(res, 'CREATE_ERROR', 'Failed to create quote from extraction');
+    return apiResponse.internalError(res, error, 'Failed to create quote from extraction');
   }
 }
 

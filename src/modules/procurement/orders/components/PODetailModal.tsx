@@ -14,7 +14,6 @@ import {
   InvoicesTab,
   HistoryTab
 } from './detail-modal-tabs';
-import { ProcurementDocumentPanel } from '../../documents';
 import type { PurchaseOrder } from '../../../../types/procurement/po.types';
 
 interface PODetailModalProps {
@@ -90,7 +89,6 @@ export const PODetailModal: React.FC<PODetailModalProps> = ({
           {activeTab === 'items' && <ItemsTab items={items} currency={po.currency} />}
           {activeTab === 'delivery' && <DeliveryTab po={po} />}
           {activeTab === 'invoices' && <InvoicesTab po={po} />}
-          {activeTab === 'documents' && <ProcurementDocumentPanel entityType="purchase_order" entityId={po.id} />}
           {activeTab === 'history' && <HistoryTab po={po} />}
         </div>
       </div>
