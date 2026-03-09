@@ -122,14 +122,21 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
   useEffect(() => {
     if (project) {
       // Parse location: DB stores as string "City, Province", form needs object
+      // Handle corrupted data where JSON object was saved as string (e.g. '{"province":""}')
       let locationObj = { province: '', city: '', address: '' };
       if (project.location && typeof project.location === 'string') {
-        const parts = project.location.split(',').map((s: string) => s.trim());
-        locationObj = {
-          city: parts[0] || '',
-          province: parts[1] || '',
-          address: '',
-        };
+        const loc = project.location.trim();
+        if (loc.startsWith('{')) {
+          // Corrupted JSON string — ignore it
+          locationObj = { province: '', city: '', address: '' };
+        } else {
+          const parts = loc.split(',').map((s: string) => s.trim());
+          locationObj = {
+            city: parts[0] || '',
+            province: parts[1] || '',
+            address: '',
+          };
+        }
       } else if (project.location && typeof project.location === 'object') {
         locationObj = project.location;
       }
@@ -156,8 +163,9 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
     try {
       await onSubmit(data);
       notificationService.success('Project updated successfully');
-    } catch (error) {
-      notificationService.error('Failed to update project');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update project';
+      notificationService.error(message);
     } finally {
       setIsSubmitting(false);
     }
