@@ -10,6 +10,7 @@
 
 import { log } from '@/lib/logger';
 import { createLoggedSql } from '@/lib/db-logger';
+import { normalizeStorageUrl } from '@/services/vfStorageAdapter';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -400,7 +401,8 @@ export async function runCrossValidationIfReady(projectId: string): Promise<Cros
       bssExtraction = bssDoc.vlm_extraction_data as DocumentExtractionResult;
       bssExtraction.confidence = Number(bssDoc.vlm_confidence_score) || bssExtraction.confidence;
     } else {
-      bssExtraction = await extractFromDocument(bssDoc.file_url, BSS_EXTRACTION_PROMPT, 'BSS');
+      const bssUrl = normalizeStorageUrl(bssDoc.file_url) || bssDoc.file_url;
+      bssExtraction = await extractFromDocument(bssUrl, BSS_EXTRACTION_PROMPT, 'BSS');
       // Cache extraction result
       await sql`
         UPDATE project_documents
@@ -417,7 +419,8 @@ export async function runCrossValidationIfReady(projectId: string): Promise<Cros
       mssExtraction = mssDoc.vlm_extraction_data as DocumentExtractionResult;
       mssExtraction.confidence = Number(mssDoc.vlm_confidence_score) || mssExtraction.confidence;
     } else {
-      mssExtraction = await extractFromDocument(mssDoc.file_url, MSS_EXTRACTION_PROMPT, 'MSS');
+      const mssUrl = normalizeStorageUrl(mssDoc.file_url) || mssDoc.file_url;
+      mssExtraction = await extractFromDocument(mssUrl, MSS_EXTRACTION_PROMPT, 'MSS');
       // Cache extraction result
       await sql`
         UPDATE project_documents
