@@ -21,12 +21,12 @@ export async function getTrendAnalysisReport(
   project?: string
 ): Promise<TrendAnalysisResponse> {
   try {
-    log.info('ReportingService', 'Getting trend analysis report', {
+    log.info('Getting trend analysis report', {
       dateFrom,
       dateTo,
       groupBy,
       project,
-    });
+    }, 'ReportingService');
 
     const dateGrouping =
       groupBy === 'day'
@@ -226,7 +226,7 @@ export async function getTrendAnalysisReport(
       velocity,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get trend analysis report', { error });
+    log.error('Failed to get trend analysis report', { error }, 'ReportingService');
     throw error;
   }
 }

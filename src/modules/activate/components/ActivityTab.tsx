@@ -29,6 +29,12 @@ interface TimelineEntry {
   iconColor: string;
   actor: string | null;
   metadata?: Record<string, unknown>;
+  change_reason?: string;
+  change_source?: string;
+  change_type?: string;
+  detected_at?: string;
+  new_value?: string;
+  old_value?: string;
 }
 
 interface ActivitySummary {
@@ -336,7 +342,9 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-secondary" />
 
               {/* Timeline Events */}
-              {timeline.map((entry, index) => (
+              {timeline.map((entry, index) => {
+                const meta = entry.metadata as Record<string, any> | undefined;
+                return (
                 <div key={entry.id} className="relative pl-10 pb-6">
                   {/* Timeline Dot */}
                   <div className={`absolute left-2 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 flex items-center justify-center text-xs ${
@@ -363,33 +371,33 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                         </p>
 
                         {/* Show detailed changes for SERIAL_UPDATE events */}
-                        {entry.eventType === 'SERIAL_UPDATE' && entry.metadata?.changes && (
+                        {entry.eventType === 'SERIAL_UPDATE' && meta?.changes && (
                           <div className="mt-3 space-y-2 text-sm">
-                            {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ont && (
+                            {(meta?.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ont && (
                               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
                                 <span className="font-medium text-orange-700 dark:text-orange-300 w-12">ONT:</span>
                                 <span className="text-muted-foreground font-mono text-xs">
-                                  {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.old || 'null'}
+                                  {(meta?.changes as { ont: { old: string; new: string } }).ont.old || 'null'}
                                 </span>
                                 <span className="text-orange-500">→</span>
                                 <span className="text-foreground font-mono text-xs font-medium">
-                                  {(entry.metadata.changes as { ont: { old: string; new: string } }).ont.new}
+                                  {(meta?.changes as { ont: { old: string; new: string } }).ont.new}
                                 </span>
                               </div>
                             )}
-                            {(entry.metadata.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ups && (
+                            {(meta?.changes as { ont?: { old: string; new: string }; ups?: { old: string; new: string } }).ups && (
                               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
                                 <span className="font-medium text-orange-700 dark:text-orange-300 w-12">UPS:</span>
                                 <span className="text-muted-foreground font-mono text-xs">
-                                  {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.old || 'null'}
+                                  {(meta?.changes as { ups: { old: string; new: string } }).ups.old || 'null'}
                                 </span>
                                 <span className="text-orange-500">→</span>
                                 <span className="text-foreground font-mono text-xs font-medium">
-                                  {(entry.metadata.changes as { ups: { old: string; new: string } }).ups.new}
+                                  {(meta?.changes as { ups: { old: string; new: string } }).ups.new}
                                 </span>
                               </div>
                             )}
-                            {entry.metadata.swap_corrected && (
+                            {meta?.swap_corrected && (
                               <div className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-400">
                                 <span>✅</span>
                                 <span className="font-medium">Swap was corrected by technician</span>
@@ -406,8 +414,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span className="font-medium">Serials appear swapped!</span>
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground font-mono">
-                              <div>ONT field: {entry.metadata.ont_serial as string}</div>
-                              <div>UPS field: {entry.metadata.ups_serial as string}</div>
+                              <div>ONT field: {meta?.ont_serial as string}</div>
+                              <div>UPS field: {meta?.ups_serial as string}</div>
                             </div>
                           </div>
                         )}
@@ -420,8 +428,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               <span className="font-medium">ONT replaced but not updated in 1Map</span>
                             </div>
                             <div className="mt-2 text-xs text-muted-foreground font-mono">
-                              <div>1Map shows: {entry.metadata.onemap_serial as string}</div>
-                              <div>OES activated: {entry.metadata.oes_serial as string}</div>
+                              <div>1Map shows: {meta?.onemap_serial as string}</div>
+                              <div>OES activated: {meta?.oes_serial as string}</div>
                             </div>
                           </div>
                         )}
@@ -445,7 +453,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
         </div>
@@ -671,8 +680,10 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
           ) : (
             <div className="space-y-3">
               <h4 className="font-medium text-foreground">Change History</h4>
-              {serialHistory.map((entry) => {
-                const isOnt = entry.change_type === 'ont_serial';
+              {serialHistory.map((entry: SerialHistoryEntry) => {
+                const safeEntry = entry as SerialHistoryEntry;
+                const meta = safeEntry.metadata as Record<string, any>;
+                const isOnt = safeEntry.change_type === 'ont_serial';
                 const sourceLabel: Record<string, string> = {
                   onemap_sync: '1Map Sync',
                   manual_edit: 'Manual Edit',
@@ -688,10 +699,17 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                   data_fix: 'Data Fix',
                   initial_capture: 'Initial Capture',
                 };
+                
+                const getReasonDisplay = (reason: string | null): string => {
+                  if (!reason) return '';
+                  return String(reasonLabel[reason as keyof typeof reasonLabel] ?? reason);
+                };
+                
+                const reasonText: string = getReasonDisplay(safeEntry.change_reason);
 
                 return (
                   <div
-                    key={entry.id}
+                    key={safeEntry.id}
                     className={`border rounded-lg p-4 ${
                       isOnt
                         ? 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-900/10'
@@ -715,27 +733,27 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                               {isOnt ? 'ONT Serial' : 'UPS Serial'}
                             </span>
                             <span className="text-xs px-2 py-0.5 bg-secondary rounded text-muted-foreground">
-                              {sourceLabel[entry.change_source] || entry.change_source}
+                              {sourceLabel[safeEntry.change_source] || safeEntry.change_source}
                             </span>
                           </div>
                           {/* Value Change */}
                           <div className="mt-2 flex items-baseline gap-2 text-sm font-mono flex-wrap">
-                            <span className="text-muted-foreground break-all" title={entry.old_value || 'null'}>
-                              {entry.old_value || '(empty)'}
+                            <span className="text-muted-foreground break-all" title={safeEntry.old_value || 'null'}>
+                              {safeEntry.old_value || '(empty)'}
                             </span>
                             <span className={`shrink-0 ${isOnt ? 'text-orange-500' : 'text-purple-500'}`}>→</span>
-                            <span className="font-medium text-foreground break-all" title={entry.new_value || 'null'}>
-                              {entry.new_value || '(empty)'}
+                            <span className="font-medium text-foreground break-all" title={safeEntry.new_value || 'null'}>
+                              {safeEntry.new_value || '(empty)'}
                             </span>
                           </div>
                           {/* Reason */}
-                          {entry.change_reason && (
+                          {reasonText ? (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Reason: {reasonLabel[entry.change_reason] || entry.change_reason}
+                              Reason: {reasonText}
                             </p>
-                          )}
+                          ) : null}
                           {/* Swap indicator */}
-                          {entry.metadata?.swap_detected && (
+                          {Boolean(safeEntry.metadata?.swap_detected) && (
                             <div className="mt-2 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
                               <span>⚠️</span>
                               <span>Swap pattern detected at time of change</span>
@@ -745,8 +763,8 @@ export function ActivityTab({ dropNumber, feedbackSentAt }: ActivityTabProps) {
                       </div>
                       {/* Timestamp & Actor */}
                       <div className="text-right text-xs text-muted-foreground">
-                        <p>{formatDateTime(entry.detected_at)}</p>
-                        <p className="mt-1">by {entry.actor}</p>
+                        <p>{formatDateTime(safeEntry.detected_at)}</p>
+                        <p className="mt-1">by {safeEntry.actor}</p>
                       </div>
                     </div>
                   </div>

@@ -15,7 +15,7 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { log, createLogger } from '@/lib/logger';
 import { fetchPhotoAsBase64 } from './photoFetchService';
 import { extractOntSerialFromBarcode } from './barcodeExtractionService';
 import {
@@ -30,6 +30,9 @@ import {
   buildVlmFewShotPrompt,
   recordCorrectExtraction,
 } from '@/services/vlmLearningService';
+
+// Component logger
+const logger = createLogger('VlmExtraction');
 
 // Feature flag for barcode extraction
 const ENABLE_BARCODE_EXTRACTION = process.env.ENABLE_BARCODE_EXTRACTION !== 'false'; // Enabled by default
@@ -296,19 +299,19 @@ function isValidOntSerial(serial: string | null): boolean {
 
   // Reject SSID patterns (common VLM mistake)
   if (s.startsWith('ALHN') || s.startsWith('ALH-') || s.includes('-')) {
-    log.debug('VlmExtraction', `Rejected SSID-like value: ${serial}`);
+    logger.debug(`Rejected SSID-like value: ${serial}`);
     return false;
   }
 
   // Must start with ALCL or ALCB
   if (!s.startsWith('ALCL') && !s.startsWith('ALCB')) {
-    log.debug('VlmExtraction', `Rejected non-ALC serial: ${serial}`);
+    logger.debug(`Rejected non-ALC serial: ${serial}`);
     return false;
   }
 
   // Should be 11-12 chars (allowing some flexibility for OCR errors)
   if (s.length < 10 || s.length > 14) {
-    log.debug('VlmExtraction', `Rejected serial with wrong length (${s.length}): ${serial}`);
+    logger.debug(`Rejected serial with wrong length (${s.length}): ${serial}`);
     return false;
   }
 
@@ -397,7 +400,7 @@ async function callVlmExtraction<T>(
     clearTimeout(timeoutId);
 
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `${context}: ${message}`);
+    log.error(`${context}: ${message}`, undefined, 'VlmExtraction');
 
     return { success: false, data: null, error: message };
   }
@@ -430,7 +433,7 @@ async function preprocessForVlm(
   const blurResult = await detectBlur(base64);
 
   if (blurResult.isBlurry) {
-    log.warn('VlmExtraction', `${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`, {
+    logger.warn(`${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`, {
       score: blurResult.score,
       threshold: blurResult.threshold,
     });
@@ -440,12 +443,12 @@ async function preprocessForVlm(
       const preprocessResult = await preprocessImage(base64, { skipDeblur: false });
 
       if (preprocessResult.wasPreprocessed && preprocessResult.deblur?.newScore) {
-        log.info('VlmExtraction', `${context}: Deblurred image (${blurResult.score.toFixed(1)} → ${preprocessResult.deblur.newScore.toFixed(1)})`);
+        logger.info(`${context}: Deblurred image (${blurResult.score.toFixed(1)} → ${preprocessResult.deblur.newScore.toFixed(1)})`);
         return { base64: preprocessResult.imageBase64, blurResult };
       }
     }
   } else {
-    log.debug('VlmExtraction', `${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`);
+    logger.debug(`${context}: Image is ${blurResult.assessment} (score: ${blurResult.score.toFixed(1)})`);
   }
 
   // Optimize for VLM (resize if needed)
@@ -462,7 +465,7 @@ async function preprocessForVlm(
  * Enhanced with few-shot learning from past corrections
  */
 export async function extractPowerMeterReading(photoUrl: string): Promise<PowerMeterExtraction> {
-  log.debug('VlmExtraction', `Extracting power meter reading from ${photoUrl}`);
+  logger.debug(`Extracting power meter reading from ${photoUrl}`);
 
   try {
     let base64 = await fetchPhotoAsBase64(photoUrl);
@@ -483,10 +486,10 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
       if (examples.length > 0) {
         const fewShotSection = buildVlmFewShotPrompt(examples);
         enhancedPrompt = `${POWER_METER_PROMPT}\n\n${fewShotSection}`;
-        log.debug('VlmExtraction', `Injected ${examples.length} few-shot examples for power meter`);
+        logger.debug(`Injected ${examples.length} few-shot examples for power meter`);
       }
     } catch (fewShotError) {
-      log.warn('VlmExtraction', `Few-shot retrieval failed: ${fewShotError}`);
+      logger.warn(`Few-shot retrieval failed: ${fewShotError}`);
     }
 
     const result = await callVlmExtraction<{
@@ -525,7 +528,7 @@ export async function extractPowerMeterReading(photoUrl: string): Promise<PowerM
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `Power meter extraction failed: ${message}`);
+    log.error(`Power meter extraction failed: ${message}`, undefined, 'VlmExtraction');
 
     return {
       success: false,
@@ -556,10 +559,10 @@ async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExt
     if (examples.length > 0) {
       const fewShotSection = buildVlmFewShotPrompt(examples);
       enhancedPrompt = `${ONT_SERIAL_BACK_PROMPT}\n\n${fewShotSection}`;
-      log.debug('VlmExtraction', `Injected ${examples.length} few-shot examples for ONT serial`);
+      logger.debug(`Injected ${examples.length} few-shot examples for ONT serial`);
     }
   } catch (fewShotError) {
-    log.warn('VlmExtraction', `Few-shot retrieval failed: ${fewShotError}`);
+    logger.warn(`Few-shot retrieval failed: ${fewShotError}`);
   }
 
   const result = await callVlmExtraction<{
@@ -588,7 +591,7 @@ async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExt
   const isValid = isValidOntSerial(normalizedSerial);
 
   if (found && serial && !isValid) {
-    log.warn('VlmExtraction', `VLM returned invalid serial "${serial}" (likely SSID or wrong field)`);
+    logger.warn(`VLM returned invalid serial "${serial}" (likely SSID or wrong field)`);
   }
 
   // Record successful extraction metric (non-blocking)
@@ -614,7 +617,7 @@ async function extractOntSerialFromBackViaVlm(base64: string): Promise<SerialExt
  * Uses barcode scanning first, falls back to VLM if no barcode found
  */
 export async function extractOntSerialFromBack(photoUrl: string): Promise<SerialExtraction> {
-  log.debug('VlmExtraction', `Extracting ONT serial from back: ${photoUrl}`);
+  logger.debug(`Extracting ONT serial from back: ${photoUrl}`);
 
   try {
     let base64 = await fetchPhotoAsBase64(photoUrl);
@@ -626,11 +629,11 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
     // Step 1: Try barcode scanning first (faster, more reliable)
     if (ENABLE_BARCODE_EXTRACTION) {
       try {
-        log.debug('VlmExtraction', 'Attempting barcode scan for ONT serial');
+        logger.debug('Attempting barcode scan for ONT serial');
         const barcodeResult = await extractOntSerialFromBarcode(base64);
 
         if (barcodeResult.success && barcodeResult.serial) {
-          log.info('VlmExtraction', `Barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
+          logger.info(`Barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
           return {
             success: true,
             serial: barcodeResult.serial,
@@ -640,9 +643,9 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
             extractionMethod: 'barcode',
           };
         }
-        log.debug('VlmExtraction', 'No barcode found, falling back to VLM');
+        logger.debug('No barcode found, falling back to VLM');
       } catch (barcodeError) {
-        log.warn('VlmExtraction', `Barcode scan error: ${barcodeError}, falling back to VLM`);
+        logger.warn(`Barcode scan error: ${barcodeError}, falling back to VLM`);
       }
     }
 
@@ -650,7 +653,7 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
     return extractOntSerialFromBackViaVlm(base64);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `ONT serial back extraction failed: ${message}`);
+    log.error(`ONT serial back extraction failed: ${message}`, undefined, 'VlmExtraction');
 
     return {
       success: false,
@@ -670,7 +673,7 @@ export async function extractOntSerialFromBack(photoUrl: string): Promise<Serial
  */
 export async function extractStep9Data(photoUrl: string): Promise<Step9Extraction> {
   const startTime = Date.now();
-  log.debug('VlmExtraction', `Extracting Step 9 data from: ${photoUrl}`);
+  logger.debug(`Extracting Step 9 data from: ${photoUrl}`);
 
   try {
     let base64 = await fetchPhotoAsBase64(photoUrl);
@@ -683,11 +686,11 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
     let barcodeSerial: SerialExtraction | null = null;
     if (ENABLE_BARCODE_EXTRACTION) {
       try {
-        log.debug('VlmExtraction', 'Attempting barcode scan for Step 9 ONT serial');
+        logger.debug('Attempting barcode scan for Step 9 ONT serial');
         const barcodeResult = await extractOntSerialFromBarcode(base64);
 
         if (barcodeResult.success && barcodeResult.serial) {
-          log.info('VlmExtraction', `Step 9 barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
+          logger.info(`Step 9 barcode scan successful: ${barcodeResult.serial} (${barcodeResult.format})`);
           barcodeSerial = {
             success: true,
             serial: barcodeResult.serial,
@@ -697,10 +700,10 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
             extractionMethod: 'barcode',
           };
         } else {
-          log.debug('VlmExtraction', 'No barcode found in Step 9, will use VLM');
+          logger.debug('No barcode found in Step 9, will use VLM');
         }
       } catch (barcodeError) {
-        log.warn('VlmExtraction', `Step 9 barcode scan error: ${barcodeError}`);
+        logger.warn(`Step 9 barcode scan error: ${barcodeError}`);
       }
     }
 
@@ -757,7 +760,7 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
       const isValid = isValidOntSerial(normalizedSerial);
 
       if (ontSerial.found && ontSerial.serial && !isValid) {
-        log.warn('VlmExtraction', `Step 9 VLM returned invalid serial "${ontSerial.serial}" (likely SSID or wrong field)`);
+        logger.warn(`Step 9 VLM returned invalid serial "${ontSerial.serial}" (likely SSID or wrong field)`);
       }
 
       finalOntSerial = {
@@ -784,7 +787,7 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `Step 9 extraction failed: ${message}`);
+    log.error(`Step 9 extraction failed: ${message}`, undefined, 'VlmExtraction');
 
     return {
       ontSerial: {
@@ -825,7 +828,7 @@ export async function confirmSerialVisible(
   photoUrl: string,
   expectedSerial: string
 ): Promise<SerialConfirmation> {
-  log.debug('VlmExtraction', `Confirming serial ${expectedSerial} is visible in photo`);
+  logger.debug(`Confirming serial ${expectedSerial} is visible in photo`);
 
   try {
     let base64 = await fetchPhotoAsBase64(photoUrl);
@@ -862,9 +865,9 @@ export async function confirmSerialVisible(
       ? normalizeSerial(alternativeSerial)
       : null;
 
-    log.info('VlmExtraction', `Serial confirmation: ${confirmed ? '✓' : '✗'} ${expectedSerial} (confidence: ${confidence})`);
+    logger.info(`Serial confirmation: ${confirmed ? '✓' : '✗'} ${expectedSerial} (confidence: ${confidence})`);
     if (!confirmed && validAltSerial) {
-      log.info('VlmExtraction', `Alternative serial found: ${validAltSerial}`);
+      logger.info(`Alternative serial found: ${validAltSerial}`);
     }
 
     return {
@@ -877,7 +880,7 @@ export async function confirmSerialVisible(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `Serial confirmation failed: ${message}`);
+    log.error(`Serial confirmation failed: ${message}`, undefined, 'VlmExtraction');
 
     return {
       confirmed: false,
@@ -911,7 +914,7 @@ export async function confirmSerialFromMultiplePhotos(
     };
   }
 
-  log.info('VlmExtraction', `Confirming ${expectedSerial} across ${photoUrls.length} photos`);
+  logger.info(`Confirming ${expectedSerial} across ${photoUrls.length} photos`);
 
   let bestResult: SerialConfirmation | null = null;
   let bestUrl: string | null = null;
@@ -934,11 +937,11 @@ export async function confirmSerialFromMultiplePhotos(
 
       // Stop early if confirmed with high confidence
       if (result.confirmed && result.confidence >= 0.8) {
-        log.info('VlmExtraction', `Serial confirmed in ${url.split('/').pop()}`);
+        logger.info(`Serial confirmed in ${url.split('/').pop()}`);
         break;
       }
     } catch (error) {
-      log.warn('VlmExtraction', `Failed to check ${url}: ${error}`);
+      logger.warn(`Failed to check ${url}: ${error}`);
     }
   }
 
@@ -969,7 +972,7 @@ export async function extractPowerMeterWithMultiplePhotos(
     return { result: null, usedUrl: null };
   }
 
-  log.info('VlmExtraction', `Trying ${step7Urls.length} Step 7 photos for power meter extraction`);
+  logger.info(`Trying ${step7Urls.length} Step 7 photos for power meter extraction`);
 
   let bestResult: PowerMeterExtraction | null = null;
   let bestUrl: string | null = null;
@@ -982,7 +985,7 @@ export async function extractPowerMeterWithMultiplePhotos(
       // Score based on success and confidence
       const score = result.success ? 2 + result.confidence : 0;
 
-      log.debug('VlmExtraction', `Step 7 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, value=${result.value}`);
+      logger.debug(`Step 7 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, value=${result.value}`);
 
       if (score > bestScore) {
         bestScore = score;
@@ -992,18 +995,18 @@ export async function extractPowerMeterWithMultiplePhotos(
 
       // Stop early if we got a successful high-confidence extraction
       if (result.success && result.confidence >= 0.9) {
-        log.info('VlmExtraction', `Found high-confidence power meter reading, stopping early`);
+        logger.info(`Found high-confidence power meter reading, stopping early`);
         break;
       }
     } catch (error) {
-      log.warn('VlmExtraction', `Failed to extract power meter from ${url}: ${error}`);
+      logger.warn(`Failed to extract power meter from ${url}: ${error}`);
     }
   }
 
   if (bestResult?.success) {
-    log.info('VlmExtraction', `Best Step 7 photo: ${bestUrl?.split('/').pop()}, value=${bestResult.value}`);
+    logger.info(`Best Step 7 photo: ${bestUrl?.split('/').pop()}, value=${bestResult.value}`);
   } else {
-    log.warn('VlmExtraction', `No successful power meter extraction from ${step7Urls.length} photos`);
+    logger.warn(`No successful power meter extraction from ${step7Urls.length} photos`);
   }
 
   return { result: bestResult, usedUrl: bestUrl };
@@ -1019,7 +1022,7 @@ export async function extractOntSerialWithMultiplePhotos(
     return { result: null, usedUrl: null };
   }
 
-  log.info('VlmExtraction', `Trying ${step6Urls.length} Step 6 photos for ONT serial extraction`);
+  logger.info(`Trying ${step6Urls.length} Step 6 photos for ONT serial extraction`);
 
   let bestResult: SerialExtraction | null = null;
   let bestUrl: string | null = null;
@@ -1032,7 +1035,7 @@ export async function extractOntSerialWithMultiplePhotos(
       // Score based on success and confidence
       const score = result.success ? 2 + result.confidence : 0;
 
-      log.debug('VlmExtraction', `Step 6 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.serial}`);
+      logger.debug(`Step 6 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.serial}`);
 
       if (score > bestScore) {
         bestScore = score;
@@ -1042,18 +1045,18 @@ export async function extractOntSerialWithMultiplePhotos(
 
       // Stop early if we got a successful high-confidence extraction
       if (result.success && result.confidence >= 0.9) {
-        log.info('VlmExtraction', `Found high-confidence ONT serial, stopping early`);
+        logger.info(`Found high-confidence ONT serial, stopping early`);
         break;
       }
     } catch (error) {
-      log.warn('VlmExtraction', `Failed to extract ONT serial from ${url}: ${error}`);
+      logger.warn(`Failed to extract ONT serial from ${url}: ${error}`);
     }
   }
 
   if (bestResult?.success) {
-    log.info('VlmExtraction', `Best Step 6 photo: ${bestUrl?.split('/').pop()}, serial=${bestResult.serial}`);
+    logger.info(`Best Step 6 photo: ${bestUrl?.split('/').pop()}, serial=${bestResult.serial}`);
   } else {
-    log.warn('VlmExtraction', `No successful ONT serial extraction from ${step6Urls.length} photos`);
+    logger.warn(`No successful ONT serial extraction from ${step6Urls.length} photos`);
   }
 
   return { result: bestResult, usedUrl: bestUrl };
@@ -1070,7 +1073,7 @@ export async function extractStep9WithMultiplePhotos(
     return { result: null, usedUrl: null };
   }
 
-  log.info('VlmExtraction', `Trying ${step9Urls.length} Step 9 photos for extraction`);
+  logger.info(`Trying ${step9Urls.length} Step 9 photos for extraction`);
 
   let bestResult: Step9Extraction | null = null;
   let bestUrl: string | null = null;
@@ -1086,7 +1089,7 @@ export async function extractStep9WithMultiplePhotos(
       if (result.drNumber.success) score += 2 + result.drNumber.confidence;
       if (result.greenLightsVisible) score += 1;
 
-      log.debug('VlmExtraction', `Step 9 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.ontSerial.serial}, DR=${result.drNumber.drNumber}`);
+      logger.debug(`Step 9 photo ${url.split('/').pop()}: score=${score.toFixed(2)}, serial=${result.ontSerial.serial}, DR=${result.drNumber.drNumber}`);
 
       // Keep best result
       if (score > bestScore) {
@@ -1098,18 +1101,18 @@ export async function extractStep9WithMultiplePhotos(
       // If we got both serial and DR number with high confidence, stop early
       if (result.ontSerial.success && result.drNumber.success &&
           result.ontSerial.confidence >= 0.8 && result.drNumber.confidence >= 0.8) {
-        log.info('VlmExtraction', `Found high-confidence Step 9 result, stopping early`);
+        logger.info(`Found high-confidence Step 9 result, stopping early`);
         break;
       }
     } catch (error) {
-      log.warn('VlmExtraction', `Failed to extract from ${url}: ${error}`);
+      logger.warn(`Failed to extract from ${url}: ${error}`);
     }
   }
 
   if (bestResult) {
-    log.info('VlmExtraction', `Best Step 9 photo: ${bestUrl?.split('/').pop()}, score=${bestScore.toFixed(2)}`);
+    logger.info(`Best Step 9 photo: ${bestUrl?.split('/').pop()}, score=${bestScore.toFixed(2)}`);
   } else {
-    log.warn('VlmExtraction', `No successful Step 9 extraction from ${step9Urls.length} photos`);
+    logger.warn(`No successful Step 9 extraction from ${step9Urls.length} photos`);
   }
 
   return { result: bestResult, usedUrl: bestUrl };
@@ -1145,7 +1148,7 @@ export async function runFullExtraction(
   const expectedSerial = options?.expectedOntSerial;
   const useConfirmationMode = !!expectedSerial && isValidOntSerial(expectedSerial);
 
-  log.info('VlmExtraction', `Running ${useConfirmationMode ? 'CONFIRMATION' : 'EXTRACTION'} mode for ${drNumber}${useConfirmationMode ? ` (expecting ${expectedSerial})` : ''}`);
+  logger.info(`Running ${useConfirmationMode ? 'CONFIRMATION' : 'EXTRACTION'} mode for ${drNumber}${useConfirmationMode ? ` (expecting ${expectedSerial})` : ''}`);
 
   let powerMeter: PowerMeterExtraction | null = null;
   let ontSerialStep6: SerialExtraction | null = null;
@@ -1160,7 +1163,7 @@ export async function runFullExtraction(
     powerMeter = await extractPowerMeterReading(photos.step7Url);
   }
   if (powerMeter) {
-    log.debug('VlmExtraction', `Power meter result: ${powerMeter.success ? powerMeter.value + ' dBm' : 'failed'}`);
+    logger.debug(`Power meter result: ${powerMeter.success ? powerMeter.value + ' dBm' : 'failed'}`);
   }
 
   // SMART MODE: Use confirmation when OneMap has serial, otherwise extract
@@ -1168,7 +1171,7 @@ export async function runFullExtraction(
     // ============================================
     // CONFIRMATION MODE: Verify OneMap serial
     // ============================================
-    log.info('VlmExtraction', `Using CONFIRMATION mode for ${expectedSerial}`);
+    logger.info(`Using CONFIRMATION mode for ${expectedSerial}`);
 
     // Combine Step 6 and Step 9 photos for confirmation
     const allSerialPhotos = [
@@ -1183,7 +1186,7 @@ export async function runFullExtraction(
       serialConfirmation = result;
 
       if (serialConfirmation.confirmed) {
-        log.info('VlmExtraction', `✓ Serial ${expectedSerial} CONFIRMED in photos`);
+        logger.info(`✓ Serial ${expectedSerial} CONFIRMED in photos`);
 
         // Create synthetic extraction result from confirmation
         ontSerialStep6 = {
@@ -1195,11 +1198,11 @@ export async function runFullExtraction(
           extractionMethod: 'vlm',
         };
       } else {
-        log.warn('VlmExtraction', `✗ Serial ${expectedSerial} NOT confirmed - ${serialConfirmation.details}`);
+        logger.warn(`✗ Serial ${expectedSerial} NOT confirmed - ${serialConfirmation.details}`);
 
         // If we found a different serial, report it
         if (serialConfirmation.alternativeSerial) {
-          log.warn('VlmExtraction', `Found alternative serial: ${serialConfirmation.alternativeSerial}`);
+          logger.warn(`Found alternative serial: ${serialConfirmation.alternativeSerial}`);
           ontSerialStep6 = {
             success: true,
             serial: serialConfirmation.alternativeSerial,
@@ -1210,7 +1213,7 @@ export async function runFullExtraction(
           };
         } else {
           // Couldn't confirm or find alternative - fall back to extraction
-          log.info('VlmExtraction', 'Falling back to extraction mode');
+          logger.info('Falling back to extraction mode');
           if (photos.step6Urls && photos.step6Urls.length > 0) {
             const { result } = await extractOntSerialWithMultiplePhotos(photos.step6Urls);
             ontSerialStep6 = result;
@@ -1232,7 +1235,7 @@ export async function runFullExtraction(
     // ============================================
     // EXTRACTION MODE: No OneMap serial, extract from photos
     // ============================================
-    log.info('VlmExtraction', 'Using EXTRACTION mode (no OneMap serial)');
+    logger.info('Using EXTRACTION mode (no OneMap serial)');
 
     // Extract ONT serial from Step 6 (back) - try multiple photos if provided
     if (photos.step6Urls && photos.step6Urls.length > 0) {
@@ -1252,15 +1255,15 @@ export async function runFullExtraction(
   }
 
   if (ontSerialStep6) {
-    log.debug('VlmExtraction', `ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
+    logger.debug(`ONT serial Step 6: ${ontSerialStep6.success ? ontSerialStep6.serial : 'failed'}`);
   }
   if (step9) {
-    log.debug('VlmExtraction', `Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
+    logger.debug(`Step 9: serial=${step9.ontSerial.serial}, DR=${step9.drNumber.drNumber}`);
   }
 
   const totalProcessingTimeMs = Date.now() - startTime;
 
-  log.info('VlmExtraction', `Full extraction complete for ${drNumber} in ${totalProcessingTimeMs}ms (mode: ${useConfirmationMode ? 'confirm' : 'extract'})`);
+  logger.info(`Full extraction complete for ${drNumber} in ${totalProcessingTimeMs}ms (mode: ${useConfirmationMode ? 'confirm' : 'extract'})`);
 
   return {
     drNumber,
@@ -1378,7 +1381,7 @@ function isPromptExampleSerial(serial: string | null): boolean {
   if (!serial) return false;
   const s = serial.trim().toUpperCase().replace(/[\s-]/g, '');
   if (PROMPT_EXAMPLE_SERIALS.has(s)) {
-    log.warn('VlmExtraction', `Rejected prompt-example hallucination: ${serial}`);
+    logger.warn(`Rejected prompt-example hallucination: ${serial}`);
     return true;
   }
   return false;
@@ -1399,13 +1402,13 @@ function isValidUpsSerial(serial: string | null): boolean {
 
   // Must start with GU18W (Gizzu UPS pattern)
   if (!s.startsWith('GU18W')) {
-    log.debug('VlmExtraction', `Rejected non-GU18W UPS serial: ${serial}`);
+    logger.debug(`Rejected non-GU18W UPS serial: ${serial}`);
     return false;
   }
 
   // Should be 13-15 chars
   if (s.length < 12 || s.length > 16) {
-    log.debug('VlmExtraction', `Rejected UPS serial with wrong length (${s.length}): ${serial}`);
+    logger.debug(`Rejected UPS serial with wrong length (${s.length}): ${serial}`);
     return false;
   }
 
@@ -1421,7 +1424,7 @@ function isValidUpsSerial(serial: string | null): boolean {
  */
 export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPhotoExtractionResult> {
   const startTime = Date.now();
-  log.info('VlmExtraction', `Extracting serials from WA photo: ${photoUrl}`);
+  logger.info(`Extracting serials from WA photo: ${photoUrl}`);
 
   try {
     let base64 = await fetchPhotoAsBase64(photoUrl);
@@ -1436,11 +1439,11 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
       try {
         const barcodeResult = await extractOntSerialFromBarcode(base64);
         if (barcodeResult.success && barcodeResult.serial) {
-          log.info('VlmExtraction', `WA photo barcode scan: ${barcodeResult.serial}`);
+          logger.info(`WA photo barcode scan: ${barcodeResult.serial}`);
           ontFromBarcode = barcodeResult.serial;
         }
       } catch (barcodeError) {
-        log.warn('VlmExtraction', `WA photo barcode scan failed: ${barcodeError}`);
+        logger.warn(`WA photo barcode scan failed: ${barcodeError}`);
       }
     }
 
@@ -1483,14 +1486,14 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
       ontConfidence = 0.98; // Barcode is highly reliable
     } else if (ontResult.found && ontResult.serial) {
       if (ontResult.confidence < VLM_CONFIDENCE_FLOOR) {
-        log.warn('VlmExtraction', `WA photo ONT below confidence floor (${ontResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${ontResult.serial}`);
+        logger.warn(`WA photo ONT below confidence floor (${ontResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${ontResult.serial}`);
       } else {
         const normalized = normalizeSerial(ontResult.serial);
         if (isValidOntSerial(normalized)) {
           finalOnt = normalized;
           ontConfidence = ontResult.confidence;
         } else {
-          log.warn('VlmExtraction', `WA photo VLM returned invalid ONT: ${ontResult.serial}`);
+          logger.warn(`WA photo VLM returned invalid ONT: ${ontResult.serial}`);
         }
       }
     }
@@ -1500,14 +1503,14 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
     let upsConfidence = 0;
     if (upsResult.found && upsResult.serial) {
       if (upsResult.confidence < VLM_CONFIDENCE_FLOOR) {
-        log.warn('VlmExtraction', `WA photo UPS below confidence floor (${upsResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${upsResult.serial}`);
+        logger.warn(`WA photo UPS below confidence floor (${upsResult.confidence.toFixed(2)} < ${VLM_CONFIDENCE_FLOOR}): ${upsResult.serial}`);
       } else {
         const normalized = upsResult.serial.trim().toUpperCase().replace(/[\s-]/g, '');
         if (isValidUpsSerial(normalized)) {
           finalUps = normalized;
           upsConfidence = upsResult.confidence;
         } else {
-          log.warn('VlmExtraction', `WA photo VLM returned invalid UPS: ${upsResult.serial}`);
+          logger.warn(`WA photo VLM returned invalid UPS: ${upsResult.serial}`);
         }
       }
     }
@@ -1516,7 +1519,7 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
     const overallConfidence = Math.max(ontConfidence, upsConfidence);
     const success = !!finalOnt || !!finalUps;
 
-    log.info('VlmExtraction', `WA photo extraction: ONT=${finalOnt || 'none'} (${ontConfidence.toFixed(2)}), UPS=${finalUps || 'none'} (${upsConfidence.toFixed(2)})`);
+    logger.info(`WA photo extraction: ONT=${finalOnt || 'none'} (${ontConfidence.toFixed(2)}), UPS=${finalUps || 'none'} (${upsConfidence.toFixed(2)})`);
 
     return {
       success,
@@ -1529,7 +1532,7 @@ export async function extractSerialsFromWaPhoto(photoUrl: string): Promise<WaPho
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('VlmExtraction', `WA photo extraction failed: ${message}`);
+    log.error(`WA photo extraction failed: ${message}`, undefined, 'VlmExtraction');
 
     return {
       success: false,

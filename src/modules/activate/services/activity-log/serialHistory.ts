@@ -117,7 +117,7 @@ export async function logSerialChange(
 
     return { historyId, activityId };
   } catch (error) {
-    log.error(`[SerialChange] Failed to log change for ${drNumber}:`, error);
+    log.error(`[SerialChange] Failed to log change for ${drNumber}: ${error}`, undefined, 'SerialHistory');
     throw error;
   }
 }

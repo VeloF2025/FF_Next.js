@@ -179,10 +179,10 @@ export async function detectBlur(imageBase64: string): Promise<BlurDetectionResu
 
     const processingTimeMs = Date.now() - startTime;
 
-    log.debug('ImagePreprocess', `Blur detection: score=${score.toFixed(1)}, assessment=${assessment}`, {
+    log.debug(`Blur detection: score=${score.toFixed(1)}, assessment=${assessment}`, {
       isBlurry,
       processingTimeMs,
-    });
+    }, 'ImagePreprocess');
 
     return {
       isBlurry,
@@ -193,7 +193,7 @@ export async function detectBlur(imageBase64: string): Promise<BlurDetectionResu
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('ImagePreprocess', `Blur detection failed: ${message}`);
+    log.error(`Blur detection failed: ${message}`, undefined, 'ImagePreprocess');
 
     // Return conservative estimate (not blurry) on error
     return {
@@ -237,7 +237,7 @@ export async function deblurImage(imageBase64: string): Promise<DeblurResult> {
       };
     }
 
-    log.info('ImagePreprocess', `Deblurring image (score: ${blurResult.score.toFixed(1)})`);
+    log.info(`Deblurring image (score: ${blurResult.score.toFixed(1)})`, undefined, 'ImagePreprocess');
 
     // Resize image if too large (NAFNet has memory limits)
     const resizedBuffer = await sharp(Buffer.from(imageBase64, 'base64'))
@@ -278,7 +278,7 @@ export async function deblurImage(imageBase64: string): Promise<DeblurResult> {
       // Check blur score of deblurred image
       const newBlurResult = await detectBlur(result.image);
 
-      log.info('ImagePreprocess', `Deblurred: ${blurResult.score.toFixed(1)} → ${newBlurResult.score.toFixed(1)}`);
+      log.info(`Deblurred: ${blurResult.score.toFixed(1)} → ${newBlurResult.score.toFixed(1)}`, undefined, 'ImagePreprocess');
 
       return {
         success: true,
@@ -294,7 +294,7 @@ export async function deblurImage(imageBase64: string): Promise<DeblurResult> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('ImagePreprocess', `Deblur failed: ${message}`);
+    log.error(`Deblur failed: ${message}`, undefined, 'ImagePreprocess');
 
     // Return original image on error
     return {
@@ -360,7 +360,7 @@ export async function preprocessImage(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('ImagePreprocess', `Preprocessing failed: ${message}`);
+    log.error(`Preprocessing failed: ${message}`, undefined, 'ImagePreprocess');
 
     // Return original on error
     return {
@@ -421,7 +421,7 @@ export async function optimizeForVlm(
 
     return optimizedBuffer.toString('base64');
   } catch (error) {
-    log.warn('ImagePreprocess', `Optimization failed, returning original: ${error}`);
+    log.warn(`Optimization failed, returning original: ${error}`, undefined, 'ImagePreprocess');
     return imageBase64;
   }
 }

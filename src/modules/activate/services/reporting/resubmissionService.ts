@@ -19,11 +19,11 @@ export async function getResubmissionReport(
   project?: string
 ): Promise<ResubmissionAnalysisResponse> {
   try {
-    log.info('ReportingService', 'Getting resubmission report', {
+    log.info('Getting resubmission report', {
       dateFrom,
       dateTo,
       project,
-    });
+    }, 'ReportingService');
 
     // Get summary and by-project breakdown
     const summaryResult = await pool.query(
@@ -144,7 +144,7 @@ export async function getResubmissionReport(
       top_resubmitted: topResubmitted,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get resubmission report', { error });
+    log.error('Failed to get resubmission report', { error }, 'ReportingService');
     throw error;
   }
 }

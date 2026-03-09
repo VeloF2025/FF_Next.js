@@ -37,7 +37,7 @@ interface OESImportTabProps {
 export function OESImportTab({ onImportComplete }: OESImportTabProps) {
   const [file, setFile] = useState<File | null>(null);
   const [reportDate, setReportDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0] ?? ''
   );
   const [previewData, setPreviewData] = useState<OESRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);

@@ -20,11 +20,11 @@ export async function getQAFunnelReport(
   project?: string
 ): Promise<QAFunnelResponse> {
   try {
-    log.info('ReportingService', 'Getting QA funnel report', {
+    log.info('Getting QA funnel report', {
       dateFrom,
       dateTo,
       project,
-    });
+    }, 'ReportingService');
 
     // Get funnel stage counts
     const funnelResult = await pool.query(
@@ -197,7 +197,7 @@ export async function getQAFunnelReport(
       },
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get QA funnel report', { error });
+    log.error('Failed to get QA funnel report', { error }, 'ReportingService');
     throw error;
   }
 }

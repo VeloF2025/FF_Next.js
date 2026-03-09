@@ -485,7 +485,7 @@ function TechnicianRow({
 interface EditTechnicianModalProps {
   technician: TechnicianSummary;
   onClose: () => void;
-  onSave: (technician: TechnicianSummary) => void;
+  onSave: (technician: Partial<TechnicianSummary>) => void;
 }
 
 function EditTechnicianModal({ technician, onClose, onSave }: EditTechnicianModalProps) {

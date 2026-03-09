@@ -19,6 +19,9 @@ import { log } from '@/lib/logger';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logActivity, logWaPhotoVlmProcessed } from '@/modules/activate/services/activityLogService';
 
+// Component logger
+const logger = createLogger('SerialVerification');
+
 // VPS photo server
 const VPS_PHOTO_BASE = process.env.VPS_PHOTO_URL || 'http://72.61.197.178:8866';
 
@@ -265,12 +268,12 @@ export async function computeAndPersistVerification(dropNumber: string): Promise
       'system'
     );
 
-    log.info('SerialVerification', `Persisted verification for ${dropNumber}: ${verification.overallStatus}`, {
+    logger.info(`Persisted verification for ${dropNumber}: ${verification.overallStatus}`, {
       ontStatus: verification.ontVerification.status,
       upsStatus: verification.upsVerification.status,
     });
   } catch (error) {
-    log.error('SerialVerification', `Failed to persist verification for ${dropNumber}`, { error });
+    logger.error(`Failed to persist verification for ${dropNumber}`, { error });
   }
 
   return verification;
@@ -390,7 +393,7 @@ export async function extractWaPhotoSerials(
       }
     } catch (photoError) {
       const errorMsg = photoError instanceof Error ? photoError.message : String(photoError);
-      log.error('SerialVerification', `VLM extraction failed for photo ${photo.id}: ${errorMsg}`);
+      log.error(`VLM extraction failed for photo ${photo.id}: ${errorMsg}`, undefined, 'SerialVerification');
 
       results.push({
         photoId: photo.id,
@@ -412,7 +415,7 @@ export async function extractWaPhotoSerials(
     }
   }
 
-  log.info('SerialVerification', `Extracted serials from ${photos.length} WA photos for ${dropNumber}`, {
+  logger.info(`Extracted serials from ${photos.length} WA photos for ${dropNumber}`, {
     successful: results.filter(r => r.success).length,
     bestOnt: bestOnt?.serial || null,
     bestUps: bestUps?.serial || null,
@@ -442,7 +445,7 @@ export async function waitForWaPhotos(
     const count = parseInt(result[0]?.count || '0', 10);
 
     if (count > 0) {
-      log.info('SerialVerification', `WA photos found for ${dropNumber} after ${Date.now() - start}ms`, { count });
+      logger.info(`WA photos found for ${dropNumber} after ${Date.now() - start}ms`, { count });
       return true;
     }
 
@@ -450,6 +453,6 @@ export async function waitForWaPhotos(
     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
   }
 
-  log.info('SerialVerification', `No WA photos found for ${dropNumber} after ${maxWaitMs}ms timeout`);
+  log.info(`No WA photos found for ${dropNumber} after ${maxWaitMs}ms timeout`, undefined, 'SerialVerification');
   return false;
 }

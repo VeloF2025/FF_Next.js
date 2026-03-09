@@ -30,10 +30,10 @@ export async function logActivity(
     `;
 
     const id = result[0]?.id;
-    log.info('ActivityLog', `Logged ${eventType} for ${drNumber} (id: ${id})`);
+    log.info(`Logged ${eventType} for ${drNumber} (id: ${id})`, undefined, 'ActivityLog');
     return id;
   } catch (error) {
-    log.error('ActivityLog', `Failed to log activity for ${drNumber}: ${error}`);
+    log.error(`Failed to log activity for ${drNumber}: ${error}`, undefined, 'ActivityLog');
     throw error;
   }
 }
@@ -69,7 +69,7 @@ export async function getActivityHistory(
       created_at: new Date(row.created_at),
     }));
   } catch (error) {
-    log.error('ActivityLog', `Failed to get activity history for ${drNumber}: ${error}`);
+    log.error(`Failed to get activity history for ${drNumber}: ${error}`, undefined, 'ActivityLog');
     throw error;
   }
 }
@@ -159,7 +159,7 @@ export async function getActivitySummary(drNumber: string): Promise<ActivitySumm
       phaseTimestamps,
     };
   } catch (error) {
-    log.error('ActivityLog', `Failed to get activity summary for ${drNumber}: ${error}`);
+    log.error(`Failed to get activity summary for ${drNumber}: ${error}`, undefined, 'ActivityLog');
     throw error;
   }
 }
@@ -207,7 +207,7 @@ export async function getRecentActivity(
       created_at: new Date(row.created_at),
     }));
   } catch (error) {
-    log.error('ActivityLog', `Failed to get recent activity: ${error}`);
+    log.error(`Failed to get recent activity: ${error}`, undefined, 'ActivityLog');
     throw error;
   }
 }

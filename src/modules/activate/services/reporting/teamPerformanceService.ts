@@ -21,11 +21,11 @@ export async function getTeamPerformanceReport(
   project?: string
 ): Promise<TeamPerformanceResponse> {
   try {
-    log.info('ReportingService', 'Getting team performance report', {
+    log.info('Getting team performance report', {
       dateFrom,
       dateTo,
       project,
-    });
+    }, 'ReportingService');
 
     // Get leaderboard data (activators from WhatsApp)
     // Uses wa_contacts to get formal_name if mapped, otherwise falls back to user_name
@@ -248,7 +248,7 @@ export async function getTeamPerformanceReport(
       },
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get team performance report', { error });
+    log.error('Failed to get team performance report', { error }, 'ReportingService');
     throw error;
   }
 }

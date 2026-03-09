@@ -33,11 +33,11 @@ export async function getDailyCountsWithBreakdown(
   project?: string
 ): Promise<DailyCountsResponse> {
   try {
-    log.info('ReportingService', 'Getting daily counts with breakdown', {
+    log.info('Getting daily counts with breakdown', {
       dateFrom,
       dateTo,
       project,
-    });
+    }, 'ReportingService');
 
     // Query 1: Get INSTALLED DRs with reviewed/notReviewed status
     // Uses dr_photo_unified_reviews.submitted_date (first submission date, preserved on resubmission)
@@ -410,7 +410,7 @@ export async function getDailyCountsWithBreakdown(
       grand_total: grandTotal,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get daily counts', { error });
+    log.error('Failed to get daily counts', { error }, 'ReportingService');
     throw error;
   }
 }

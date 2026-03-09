@@ -29,11 +29,11 @@ export async function getUserTeamAttributionReport(
   project?: string
 ): Promise<UserTeamAttributionResponse> {
   try {
-    log.info('ReportingService', 'Getting user/team attribution report', {
+    log.info('Getting user/team attribution report', {
       dateFrom,
       dateTo,
       project,
-    });
+    }, 'ReportingService');
 
     // Query for user performance with consistent terminology
     const userResult = await pool.query(
@@ -148,9 +148,9 @@ export async function getUserTeamAttributionReport(
       },
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get user/team attribution report', {
+    log.error('Failed to get user/team attribution report', {
       error,
-    });
+    }, 'ReportingService');
     throw error;
   }
 }

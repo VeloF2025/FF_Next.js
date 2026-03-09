@@ -140,8 +140,8 @@ export function WizardProgressOverlay({
               <ProgressStep
                 key={step.id}
                 label={step.label}
-                isActive={step.id === phase}
-                isComplete={index < currentStepIndex || phase === 'complete'}
+                isActive={step.id === (phase as any)}
+                isComplete={index < currentStepIndex}
               />
             ))}
           </div>

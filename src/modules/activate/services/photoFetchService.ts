@@ -127,9 +127,9 @@ async function triggerDownload(dropNumber: string): Promise<boolean> {
     });
     return response.ok;
   } catch (error) {
-    log.warn('PhotoFetchService', `Download trigger failed for ${dropNumber}`, {
+    log.warn(`Download trigger failed for ${dropNumber}`, {
       error: error instanceof Error ? error.message : String(error),
-    });
+    }, 'PhotoFetchService');
     return false;
   }
 }
@@ -174,7 +174,7 @@ export async function fetchPhotosWithRetry(
       message: `Fetching photos (attempt ${attempt}/${maxRetries})...`,
     });
 
-    log.debug('PhotoFetchService', `Attempt ${attempt}/${maxRetries} for ${dropNumber}`);
+    log.debug(`Attempt ${attempt}/${maxRetries} for ${dropNumber}`, undefined, 'PhotoFetchService');
 
     // Try to fetch photos
     lastResult = await tryFetchPhotos(dropNumber);
@@ -191,11 +191,11 @@ export async function fetchPhotosWithRetry(
         message: `Found ${lastResult.photos.length} photos`,
       });
 
-      log.info('PhotoFetchService', `Successfully fetched ${lastResult.photos.length} photos for ${dropNumber}`, {
+      log.info(`Successfully fetched ${lastResult.photos.length} photos for ${dropNumber}`, {
         attempts: attempt,
         totalWaitTimeMs,
         downloadTriggered,
-      });
+      }, 'PhotoFetchService');
 
       return {
         photos: lastResult.photos,
@@ -217,12 +217,12 @@ export async function fetchPhotosWithRetry(
         message: 'Triggering photo download from OneMap...',
       });
 
-      log.info('PhotoFetchService', `Triggering download for ${dropNumber}`);
+      log.info(`Triggering download for ${dropNumber}`, undefined, 'PhotoFetchService');
       const downloadOk = await triggerDownload(dropNumber);
       downloadTriggered = true;
 
       if (!downloadOk) {
-        log.warn('PhotoFetchService', `Download trigger returned error for ${dropNumber}`);
+        log.warn(`Download trigger returned error for ${dropNumber}`, undefined, 'PhotoFetchService');
       }
     }
 
@@ -241,7 +241,7 @@ export async function fetchPhotosWithRetry(
       waitingMs: currentDelay,
     });
 
-    log.debug('PhotoFetchService', `Waiting ${currentDelay}ms before retry for ${dropNumber}`);
+    log.debug(`Waiting ${currentDelay}ms before retry for ${dropNumber}`, undefined, 'PhotoFetchService');
     await sleep(currentDelay);
 
     // Exponential backoff with cap
@@ -259,11 +259,11 @@ export async function fetchPhotosWithRetry(
     message: lastResult?.error || 'Photos not available after all retries',
   });
 
-  log.warn('PhotoFetchService', `Failed to fetch photos for ${dropNumber} after ${maxRetries} attempts`, {
+  log.warn(`Failed to fetch photos for ${dropNumber} after ${maxRetries} attempts`, {
     totalWaitTimeMs,
     downloadTriggered,
     lastError: lastResult?.error,
-  });
+  }, 'PhotoFetchService');
 
   return {
     photos: lastResult?.photos || [],
@@ -328,7 +328,7 @@ export async function fetchPhotoAsBase64(photoUrl: string): Promise<string> {
       fullUrl = `${baseUrl}${photoUrl}`;
     }
 
-    log.debug('PhotoFetchService', `Fetching photo as base64: ${fullUrl.substring(0, 80)}...`);
+    log.debug(`Fetching photo as base64: ${fullUrl.substring(0, 80)}...`, undefined, 'PhotoFetchService');
 
     const response = await fetch(fullUrl);
 
@@ -340,12 +340,12 @@ export async function fetchPhotoAsBase64(photoUrl: string): Promise<string> {
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString('base64');
 
-    log.debug('PhotoFetchService', `Fetched photo: ${Math.round(buffer.length / 1024)}KB`);
+    log.debug(`Fetched photo: ${Math.round(buffer.length / 1024)}KB`, undefined, 'PhotoFetchService');
 
     return base64;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('PhotoFetchService', `Failed to fetch photo as base64: ${message}`);
+    log.error(`Failed to fetch photo as base64: ${message}`, undefined, 'PhotoFetchService');
     throw error;
   }
 }

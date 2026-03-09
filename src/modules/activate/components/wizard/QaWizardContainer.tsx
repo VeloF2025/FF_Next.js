@@ -163,10 +163,10 @@ export function QaWizardContainer({
 
         if (ensureResult.refreshed) {
           setDataStatus(`Refreshed: ${ensureResult.photoCount} photos loaded`);
-          log.info('QaWizard', `Data refreshed for ${dropNumber}`, ensureResult);
+          log.info(`Data refreshed for ${dropNumber}`, ensureResult, 'QaWizard');
         } else if (ensureResult.status === 'partial') {
           setDataStatus('Partial data available - some items may be missing');
-          log.warn('QaWizard', `Partial data for ${dropNumber}`, ensureResult);
+          log.warn(`Partial data for ${dropNumber}`, ensureResult, 'QaWizard');
         }
       }
 
@@ -184,16 +184,16 @@ export function QaWizardContainer({
                 previousPhotoCount: dr.previous_photo_count || null,
                 previousFeedback: dr.feedback_message || null,
               });
-              log.info('QaWizard', `Resubmission detected for ${dropNumber}`, {
+              log.info(`Resubmission detected for ${dropNumber}`, {
                 submissionCount: dr.submission_count,
                 previousPhotoCount: dr.previous_photo_count,
                 hasPreviousFeedback: !!dr.feedback_message,
-              });
+              }, 'QaWizard');
             }
           }
         }
       } catch {
-        log.warn('QaWizard', `Could not fetch resubmission info for ${dropNumber}`);
+        log.warn(`Could not fetch resubmission info for ${dropNumber}`, undefined, 'QaWizard');
       }
 
       setSyncPhase('checking');
@@ -276,7 +276,7 @@ export function QaWizardContainer({
           }
         }
       } catch {
-        log.warn('QaWizard', `Could not fetch photos for ${dropNumber}`);
+        log.warn(`Could not fetch photos for ${dropNumber}`, undefined, 'QaWizard');
       }
 
       // Check for existing decision (including drafts)
@@ -293,15 +293,16 @@ export function QaWizardContainer({
           const isDraft = result.isDraft || false;
           const targetPhase = isDraft ? 'final_decision' : (result.phase || 'feedback');
 
-          setState((prev) => ({
+          setState((prev: QaWizardState): QaWizardState => ({
             ...prev,
-            phase: targetPhase,
+            phase: targetPhase as QaWizardPhase,
             finalDecision: {
+              ...prev.finalDecision,
               decision: result.decision as QaDecision,
               reasons: result.reasons || [],
               notes: result.notes,
-              decidedAt: result.decidedAt,
-              decidedBy: result.decidedBy,
+              decidedAt: result.decidedAt || null,
+              decidedBy: result.decidedBy || null,
             },
           }));
 
@@ -313,10 +314,10 @@ export function QaWizardContainer({
               technicianFeedback: result.technicianFeedback || null,
               issueClassification: result.issueClassification || null,
             });
-            log.info('QaWizard', `Loaded ${isDraft ? 'draft' : 'existing'} decision for ${dropNumber}`, {
+            log.info(`Loaded ${isDraft ? 'draft' : 'existing'} decision for ${dropNumber}`, {
               decision: result.decision,
               isDraft,
-            });
+            }, 'QaWizard');
           }
         }
       }
@@ -326,7 +327,7 @@ export function QaWizardContainer({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load wizard state';
       setError(message);
-      log.error('QaWizard', `Failed to load state for ${dropNumber}: ${message}`);
+      log.error(`Failed to load state for ${dropNumber}: ${message}`, undefined, 'QaWizard');
     } finally {
       setLoading(false);
       setSyncPhase(null);

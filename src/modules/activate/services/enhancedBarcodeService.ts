@@ -302,7 +302,7 @@ async function scanWithZxing(
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.debug('EnhancedBarcode', `zxing scan error: ${message}`);
+    log.debug(`zxing scan error: ${message}`, undefined, 'EnhancedBarcode');
     return null;
   }
 }
@@ -367,7 +367,7 @@ async function scanWithQuagga(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.debug('EnhancedBarcode', `Quagga scan error: ${message}`);
+    log.debug(`Quagga scan error: ${message}`, undefined, 'EnhancedBarcode');
     return null;
   }
 }
@@ -413,9 +413,9 @@ export async function scanBarcodeEnhanced(
 
   try {
     const imageBuffer = Buffer.from(base64Image, 'base64');
-    const strategies = quickScan ? [SCAN_STRATEGIES[0]] : SCAN_STRATEGIES.slice(0, maxAttempts);
+    const strategies: ScanStrategy[] = quickScan ? [SCAN_STRATEGIES[0]!] : SCAN_STRATEGIES.slice(0, maxAttempts);
 
-    log.debug('EnhancedBarcode', `Starting scan with ${strategies.length} strategies`);
+    log.debug(`Starting scan with ${strategies.length} strategies`, undefined, 'EnhancedBarcode');
 
     let bestResult: { value: string; format: BarcodeFormat; method: 'zxing' | 'quagga'; strategy: string } | null = null;
     let attempts = 0;
@@ -430,7 +430,7 @@ export async function scanBarcodeEnhanced(
         // Try zxing-wasm first (supports 2D)
         const zxingResult = await scanWithZxing(processedBuffer);
         if (zxingResult && zxingResult.value) {
-          log.info('EnhancedBarcode', `zxing found: ${zxingResult.value} (${zxingResult.format}) using ${strategy.name}`);
+          log.info(`zxing found: ${zxingResult.value} (${zxingResult.format}) using ${strategy.name}`, undefined, 'EnhancedBarcode');
 
           // Check if it's a high-value result (ONT/UPS serial)
           const isSerial = ONT_SERIAL_PATTERN.test(zxingResult.value) || UPS_SERIAL_PATTERN.test(zxingResult.value);
@@ -458,7 +458,7 @@ export async function scanBarcodeEnhanced(
         if (!zxingResult && strategy.preprocess !== 'invert') {
           const quaggaResult = await scanWithQuagga(processedBuffer);
           if (quaggaResult && quaggaResult.value) {
-            log.info('EnhancedBarcode', `Quagga found: ${quaggaResult.value} (${quaggaResult.format}) using ${strategy.name}`);
+            log.info(`Quagga found: ${quaggaResult.value} (${quaggaResult.format}) using ${strategy.name}`, undefined, 'EnhancedBarcode');
 
             const isSerial = ONT_SERIAL_PATTERN.test(quaggaResult.value) || UPS_SERIAL_PATTERN.test(quaggaResult.value);
 
@@ -480,7 +480,7 @@ export async function scanBarcodeEnhanced(
           }
         }
       } catch (strategyError) {
-        log.debug('EnhancedBarcode', `Strategy ${strategy.name} failed: ${strategyError}`);
+        log.debug(`Strategy ${strategy.name} failed: ${strategyError}`, undefined, 'EnhancedBarcode');
       }
     }
 
@@ -509,7 +509,7 @@ export async function scanBarcodeEnhanced(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('EnhancedBarcode', `Scan failed: ${message}`);
+    log.error(`Scan failed: ${message}`, undefined, 'EnhancedBarcode');
 
     return {
       success: false,
@@ -577,7 +577,7 @@ export async function extractOntSerialEnhanced(base64Image: string): Promise<{
       };
     }
 
-    log.debug('EnhancedBarcode', `Barcode value "${result.value}" is not an ONT serial`);
+    log.debug(`Barcode value "${result.value}" is not an ONT serial`, undefined, 'EnhancedBarcode');
   }
 
   return {
@@ -698,7 +698,7 @@ export async function scanAllBarcodes(base64Image: string): Promise<MultiBarcode
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('EnhancedBarcode', `Multi-scan failed: ${message}`);
+    log.error(`Multi-scan failed: ${message}`, undefined, 'EnhancedBarcode');
 
     return {
       barcodes: [],
@@ -725,14 +725,14 @@ export async function checkEnhancedBarcodeHealth(): Promise<{
     await import('zxing-wasm/reader');
     zxingAvailable = true;
   } catch {
-    log.warn('EnhancedBarcode', 'zxing-wasm not available');
+    log.warn('zxing-wasm not available', undefined, 'EnhancedBarcode');
   }
 
   try {
     await import('@ericblade/quagga2');
     quaggaAvailable = true;
   } catch {
-    log.warn('EnhancedBarcode', 'Quagga2 not available');
+    log.warn('zxing-wasm not available', undefined, 'EnhancedBarcode');
   }
 
   return {

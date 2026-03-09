@@ -544,6 +544,18 @@ export interface SerialMismatchRecord {
   investigated_at: string | null;
   /** Resolved at */
   resolved_at: string | null;
+
+  /** 4-way serial comparison data (OES, Offline, 1Map, WA Photo) */
+  serial_comparison?: {
+    oes: string | null;
+    offline: string | null;
+    onemap: string | null;
+    wa_photo: string | null;
+    wa_photo_confidence: number | null;
+    wa_photo_processed: boolean;
+    sources_agree: boolean;
+    unique_count: number;
+  };
 }
 
 /**

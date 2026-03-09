@@ -164,7 +164,7 @@ export function PhotoReviewPhase({
         setError(data.message || 'Failed to load categorization state');
       }
     } catch (err) {
-      log.error('PhotoReviewPhase', 'Failed to load categorization state', err);
+      log.error(`Failed to load categorization state: ${err}`, undefined, 'PhotoReviewPhase');
       setError('Failed to load categorization state');
     } finally {
       setIsLoading(false);
@@ -212,7 +212,7 @@ export function PhotoReviewPhase({
         setError(data.error?.message || data.message || 'Categorization failed');
       }
     } catch (err) {
-      log.error('PhotoReviewPhase', 'Categorization failed', err);
+      log.error(`Categorization failed: ${err}`, undefined, 'PhotoReviewPhase');
       setError('Failed to run categorization');
     } finally {
       setIsProcessing(false);
@@ -239,12 +239,12 @@ export function PhotoReviewPhase({
           status: 'approved',
           approvedAt: new Date().toISOString(),
         }));
-        log.info('PhotoReviewPhase', `All categorizations approved for ${dropNumber}`);
+        log.info(`All categorizations approved for ${dropNumber}`, undefined, 'PhotoReviewPhase');
       } else {
         setError(data.message || 'Approval failed');
       }
     } catch (err) {
-      log.error('PhotoReviewPhase', 'Approval failed', err);
+      log.error(`Approval failed: ${err}`, undefined, 'PhotoReviewPhase');
       setError('Failed to approve categorization');
     } finally {
       setIsProcessing(false);
@@ -280,12 +280,12 @@ export function PhotoReviewPhase({
           status: 'approved',
           approvedAt: new Date().toISOString(),
         }));
-        log.info('PhotoReviewPhase', `Approvals submitted for ${dropNumber}`);
+        log.info(`Approvals submitted for ${dropNumber}`, undefined, 'PhotoReviewPhase');
       } else {
         setError(data.message || 'Approval failed');
       }
     } catch (err) {
-      log.error('PhotoReviewPhase', 'Approval failed', err);
+      log.error(`Approval failed: ${err}`, undefined, 'PhotoReviewPhase');
       setError('Failed to submit approvals');
     } finally {
       setIsProcessing(false);

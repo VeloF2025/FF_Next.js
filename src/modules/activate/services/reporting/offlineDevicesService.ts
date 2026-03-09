@@ -40,11 +40,11 @@ export async function getOfflineDevicesReport(
       pageSize = 100,
     } = options;
 
-    log.info('ReportingService', 'Getting offline devices report', {
+    log.info('Getting offline devices report', {
       dateFrom,
       dateTo,
       ...options,
-    });
+    }, 'ReportingService');
 
     // Build WHERE conditions
     const conditions: string[] = [
@@ -254,7 +254,7 @@ export async function getOfflineDevicesReport(
       page_size: pageSize,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get offline devices report', { error });
+    log.error('Failed to get offline devices report', { error }, 'ReportingService');
     throw error;
   }
 }

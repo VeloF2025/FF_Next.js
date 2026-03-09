@@ -163,7 +163,7 @@ export function ReviewTab({
         setSelectedIndex(selectedIndex + 1);
       }
     } catch (error) {
-      log.error('Failed to approve step', error, 'ReviewTab');
+      log.error('Failed to approve step', { error: error instanceof Error ? error.message : String(error) }, 'ReviewTab');
     } finally {
       setIsProcessing(false);
     }
@@ -183,7 +183,7 @@ export function ReviewTab({
         setSelectedIndex(selectedIndex + 1);
       }
     } catch (error) {
-      log.error('Failed to reject step', error, 'ReviewTab');
+      log.error('Failed to reject step', { error: error instanceof Error ? error.message : String(error) }, 'ReviewTab');
     } finally {
       setIsProcessing(false);
     }

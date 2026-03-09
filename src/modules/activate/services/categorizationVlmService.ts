@@ -140,12 +140,12 @@ function resolveImageUrl(imageUrl: string): string {
 
   if (match) {
     const internalUrl = `${ONEMAP_INTERNAL_URL}/api/photo/${match[1]}`;
-    log.debug('CategorizationVlm', `Resolved proxy URL to internal: ${imageUrl} → ${internalUrl}`);
+    log.debug(`Resolved proxy URL to internal: ${imageUrl} → ${internalUrl}`, undefined, 'CategorizationVlm');
     return internalUrl;
   }
 
   // Fallback: prepend internal URL base (shouldn't happen with current architecture)
-  log.warn('CategorizationVlm', `Unrecognized URL format, using as-is: ${imageUrl}`);
+  log.warn(`Unrecognized URL format, using as-is: ${imageUrl}`, undefined, 'CategorizationVlm');
   return imageUrl;
 }
 
@@ -172,7 +172,7 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
 
     return base64;
   } catch (error) {
-    log.error('CategorizationVlm', `Failed to fetch/encode image ${resolvedUrl}: ${error}`);
+    log.error(`Failed to fetch/encode image ${resolvedUrl}: ${error}`, undefined, 'CategorizationVlm');
     throw error;
   }
 }
@@ -220,7 +220,7 @@ async function callVlmForCategorization(
     temperature: VLM_TEMPERATURE,
   };
 
-  log.info('CategorizationVlm', `Calling ${VLM_MODEL} for ${drNumber} (${photos.length} photos)...`);
+  log.info(`Calling ${VLM_MODEL} for ${drNumber} (${photos.length} photos)...`, undefined, 'CategorizationVlm');
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), VLM_TIMEOUT_MS);
@@ -247,7 +247,7 @@ async function callVlmForCategorization(
     }
 
     const data = await response.json();
-    log.info('CategorizationVlm', `VLM response received for ${drNumber}`);
+    log.info(`VLM response received for ${drNumber}`, undefined, 'CategorizationVlm');
 
     // Parse response
     const content = data.choices?.[0]?.message?.content;
@@ -321,7 +321,7 @@ export async function categorizePhotos(
   const startTime = Date.now();
   const results: VlmCategorizationResult[] = [];
 
-  log.info('CategorizationVlm', `Starting categorization for ${drNumber}: ${photos.length} photos`);
+  log.info(`Starting categorization for ${drNumber}: ${photos.length} photos`, undefined, 'CategorizationVlm');
 
   // HITL Learning: Fetch few-shot examples from human corrections
   let fewShotExamples: FewShotExample[] = [];
@@ -337,21 +337,21 @@ export async function categorizePhotos(
       fewShotExamples = selectionResult.examples;
 
       if (fewShotExamples.length > 0) {
-        log.info('CategorizationVlm', {
+        log.info('Few-shot examples loaded for categorization', {
           action: 'fewShotLoaded',
           drNumber,
           exampleCount: fewShotExamples.length,
           criteria: selectionResult.selectionCriteria,
-        });
+        }, 'CategorizationVlm');
       }
     }
   } catch (error) {
     // Don't fail categorization if few-shot loading fails
-    log.warn('CategorizationVlm', {
+    log.warn('Few-shot example loading failed', {
       action: 'fewShotLoadFailed',
       drNumber,
       error: error instanceof Error ? error.message : String(error),
-    });
+    }, 'CategorizationVlm');
   }
 
   // Process in batches
@@ -360,7 +360,7 @@ export async function categorizePhotos(
     const batchNum = Math.floor(i / batchSize) + 1;
     const totalBatches = Math.ceil(photos.length / batchSize);
 
-    log.info('CategorizationVlm', `Processing batch ${batchNum}/${totalBatches} (${batch.length} photos)`);
+    log.info(`Processing batch ${batchNum}/${totalBatches} (${batch.length} photos)`, undefined, 'CategorizationVlm');
 
     // Fetch and encode images
     const base64Images: string[] = [];
@@ -372,7 +372,7 @@ export async function categorizePhotos(
         base64Images.push(base64);
         validPhotos.push(photo);
       } catch (error) {
-        log.warn('CategorizationVlm', `Skipping ${photo.filename}: ${error}`);
+        log.warn(`Skipping ${photo.filename}: ${error}`, undefined, 'CategorizationVlm');
         // Add failed photo with error result
         results.push({
           photo_filename: photo.filename,
@@ -391,7 +391,7 @@ export async function categorizePhotos(
     }
 
     if (base64Images.length === 0) {
-      log.warn('CategorizationVlm', `Batch ${batchNum} has no valid images, skipping`);
+      log.warn(`Batch ${batchNum} has no valid images, skipping`, undefined, 'CategorizationVlm');
       continue;
     }
 
@@ -410,7 +410,7 @@ export async function categorizePhotos(
         const photo = validPhotos[photoIndex];
 
         if (!photo) {
-          log.warn('CategorizationVlm', `Invalid photo_index ${cat.photo_index} in VLM response`);
+          log.warn(`Invalid photo_index ${cat.photo_index} in VLM response`, undefined, 'CategorizationVlm');
           continue;
         }
 
@@ -429,7 +429,7 @@ export async function categorizePhotos(
         });
       }
     } catch (error) {
-      log.error('CategorizationVlm', `Batch ${batchNum} VLM error: ${error}`);
+      log.error(`Batch ${batchNum} VLM error: ${error}`, undefined, 'CategorizationVlm');
 
       // Mark all photos in batch as failed
       for (const photo of validPhotos) {
@@ -452,8 +452,9 @@ export async function categorizePhotos(
 
   const duration = Date.now() - startTime;
   log.info(
-    'CategorizationVlm',
-    `Categorization complete for ${drNumber}: ${results.length} photos in ${duration}ms`
+    `Categorization complete for ${drNumber}: ${results.length} photos in ${duration}ms`,
+    undefined,
+    'CategorizationVlm'
   );
 
   return results;
