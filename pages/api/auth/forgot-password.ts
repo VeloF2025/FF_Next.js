@@ -39,7 +39,7 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000).unref();
 
-const FROM_ADDRESS = 'FibreFlow <notifications@fibreflow.app>';
+const FROM_ADDRESS = 'FibreFlow <noreply@fibreflow.app>';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 
 interface ForgotPasswordRequest {
