@@ -1,9 +1,12 @@
 /**
  * Fireflies.ai API Service
- * Fetches meeting transcripts and summaries
+ * Fetches meeting transcripts, sentences, and media URLs
  */
 
+import { log } from '@/lib/logger';
+
 const FIREFLIES_API_URL = 'https://api.fireflies.ai/graphql';
+const LOGGER = 'FirefliesService';
 
 interface FirefliesSpeaker {
   id: number;
@@ -16,12 +19,21 @@ interface FirefliesAttendee {
   displayName: string | null;
 }
 
+interface FirefliesSentence {
+  text: string;
+  speaker_name: string;
+  start_time: number;
+  end_time: number;
+}
+
 interface FirefliesTranscript {
   id: string;
   title: string;
   date: string;
   duration: number;
   transcript_url: string;
+  audio_url: string | null;
+  video_url: string | null;
   summary: {
     keywords: string[];
     action_items: string[];
@@ -30,6 +42,7 @@ interface FirefliesTranscript {
   speakers: FirefliesSpeaker[];
   participants: string[];
   meeting_attendees: FirefliesAttendee[];
+  sentences: FirefliesSentence[] | null;
 }
 
 export interface MergedParticipant {
@@ -89,56 +102,98 @@ function mergeParticipants(transcript: FirefliesTranscript): MergedParticipant[]
   return result;
 }
 
-export async function fetchFirefliesTranscripts(apiKey: string) {
-  const query = `
-    query {
-      transcripts {
-        id
-        title
-        date
-        duration
-        transcript_url
-        summary {
-          keywords
-          action_items
-          outline
-        }
-        speakers {
+/**
+ * Build raw_transcript text from Fireflies sentences.
+ * Format: "[Speaker Name] (MM:SS): text" per sentence, one per line.
+ */
+function buildTranscriptText(sentences: FirefliesSentence[]): string {
+  return sentences.map(s => {
+    const totalSec = Math.floor((s.start_time || 0) / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    const ts = `${min}:${String(sec).padStart(2, '0')}`;
+    return `[${s.speaker_name || 'Unknown'}] (${ts}): ${s.text}`;
+  }).join('\n');
+}
+
+/**
+ * Fetch all transcripts from Fireflies with pagination (API default limit is 50).
+ */
+export async function fetchFirefliesTranscripts(apiKey: string): Promise<FirefliesTranscript[]> {
+  const PAGE_SIZE = 50;
+  const allTranscripts: FirefliesTranscript[] = [];
+  let skip = 0;
+
+  while (true) {
+    const query = `
+      query {
+        transcripts(limit: ${PAGE_SIZE}, skip: ${skip}) {
           id
-          name
-        }
-        participants
-        meeting_attendees {
-          name
-          email
-          displayName
+          title
+          date
+          duration
+          transcript_url
+          audio_url
+          video_url
+          summary {
+            keywords
+            action_items
+            outline
+          }
+          speakers {
+            id
+            name
+          }
+          participants
+          meeting_attendees {
+            name
+            email
+            displayName
+          }
+          sentences {
+            text
+            speaker_name
+            start_time
+            end_time
+          }
         }
       }
+    `;
+
+    const response = await fetch(FIREFLIES_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Fireflies API error: ${response.statusText}`);
     }
-  `;
 
-  const response = await fetch(FIREFLIES_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ query }),
-  });
+    const data = await response.json();
+    const batch = data.data.transcripts as FirefliesTranscript[];
+    allTranscripts.push(...batch);
 
-  if (!response.ok) {
-    throw new Error(`Fireflies API error: ${response.statusText}`);
+    if (batch.length < PAGE_SIZE) break;
+    skip += PAGE_SIZE;
   }
 
-  const data = await response.json();
-  return data.data.transcripts as FirefliesTranscript[];
+  log.info(`Fetched ${allTranscripts.length} transcripts from Fireflies API`, { pages: Math.ceil(allTranscripts.length / PAGE_SIZE) }, LOGGER);
+  return allTranscripts;
 }
 
 export async function syncFirefliesToNeon(apiKey: string, sql: any) {
   const transcripts = await fetchFirefliesTranscripts(apiKey);
 
+  let synced = 0;
   for (const transcript of transcripts) {
     const merged = mergeParticipants(transcript);
+    const rawTranscript = transcript.sentences?.length
+      ? buildTranscriptText(transcript.sentences)
+      : null;
 
     await sql`
       INSERT INTO meetings (
@@ -149,6 +204,10 @@ export async function syncFirefliesToNeon(apiKey: string, sql: any) {
         transcript_url,
         summary,
         participants,
+        raw_transcript,
+        audio_url,
+        video_url,
+        source,
         created_at,
         updated_at
       ) VALUES (
@@ -159,6 +218,10 @@ export async function syncFirefliesToNeon(apiKey: string, sql: any) {
         ${transcript.transcript_url},
         ${JSON.stringify(transcript.summary)},
         ${JSON.stringify(merged)},
+        ${rawTranscript},
+        ${transcript.audio_url || null},
+        ${transcript.video_url || null},
+        'fireflies',
         NOW(),
         NOW()
       )
@@ -170,9 +233,14 @@ export async function syncFirefliesToNeon(apiKey: string, sql: any) {
         transcript_url = ${transcript.transcript_url},
         summary = ${JSON.stringify(transcript.summary)},
         participants = ${JSON.stringify(merged)},
+        raw_transcript = COALESCE(${rawTranscript}, meetings.raw_transcript),
+        audio_url = COALESCE(${transcript.audio_url || null}, meetings.audio_url),
+        video_url = COALESCE(${transcript.video_url || null}, meetings.video_url),
         updated_at = NOW()
     `;
+    synced++;
   }
 
-  return transcripts.length;
+  log.info(`Synced ${synced} meetings from Fireflies`, { total: synced }, LOGGER);
+  return synced;
 }

@@ -37,6 +37,7 @@ export interface ActionItem {
  * All fields map directly to the JSON schema requested in SYSTEM_PROMPT.
  */
 export interface MeetingSummary {
+  suggested_title: string;
   overview: string;
   keywords: string[];
   outline: string[];
@@ -77,24 +78,27 @@ IMPORTANT — Language handling:
 
 Output schema:
 {
+  "suggested_title": "Short descriptive meeting title (5-10 words, e.g. 'Lawley Rollout Progress & Splice Schedule')",
   "overview": "2-4 sentence executive summary",
   "keywords": ["keyword1", "keyword2"],
   "outline": ["Topic 1: brief description", "Topic 2: brief description"],
   "decisions": ["Decision 1", "Decision 2"],
   "action_items": [
     {
-      "description": "What needs to be done",
-      "assignee": "Person name or 'Unassigned'",
-      "due_hint": "Timeline mentioned or 'Not specified'",
+      "description": "Specific, actionable task — not vague (e.g. 'Submit Lawley pole permits to municipality by Friday' NOT 'Follow up on permits')",
+      "assignee": "Full person name exactly as mentioned, or 'Unassigned' if unclear",
+      "due_hint": "Specific date/day if mentioned (e.g. 'Friday 7 March'), or relative (e.g. 'end of week', 'by Monday'), or 'Not specified'",
       "priority": "high|medium|low"
     }
   ]
 }
 
 Guidelines:
-- Extract concrete action items with specific owners when mentioned
-- Note decisions that affect project timelines or budget
-- Keywords should reflect fibre/telecom domain terms discussed
+- suggested_title: Derive from the main TOPIC discussed, not generic. Include project name if one dominates (Lawley, Mohadin, Mamelodi). Never use "Teams Meeting" or just a date.
+- action_items: Extract EVERY concrete commitment or task. Include who said they would do it. If someone says "I'll send that" or "Let me check", that's an action item.
+- assignee: Use the speaker's name from the transcript. Match to participants list when possible.
+- decisions: Note any agreement, approval, or direction change that affects work.
+- keywords: Include project names, area names, technical terms, and vendor names mentioned.
 - If no transcript is available, return minimal JSON with overview "No transcript available for analysis"`;
 
 // ---------------------------------------------------------------------------
@@ -147,6 +151,7 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
   if (!transcript) {
     log.warn('No transcript available', { meetingId }, logger);
     const minimal: MeetingSummary = {
+      suggested_title: '',
       overview: 'No transcript available for analysis.',
       keywords: [],
       outline: [],
@@ -216,7 +221,10 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
     if (!combinedSummary) {
       combinedSummary = parsed;
     } else {
-      // Merge multi-chunk results — deduplicate keywords, append the rest
+      // Merge multi-chunk results — keep first title, deduplicate keywords, append the rest
+      if (!combinedSummary.suggested_title && parsed.suggested_title) {
+        combinedSummary.suggested_title = parsed.suggested_title;
+      }
       combinedSummary.overview += ' ' + parsed.overview;
       combinedSummary.keywords = [...new Set([...combinedSummary.keywords, ...parsed.keywords])];
       combinedSummary.outline.push(...parsed.outline);
@@ -250,20 +258,41 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
 
 /**
  * Persist the merged summary JSON to the meetings row and mark as completed.
+ * Updates the title when the LLM provides a suggested_title and the current
+ * title is generic (e.g. "Teams Meeting - 2026/03/06").
  */
 async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
-  await sql`
-    UPDATE meetings
-    SET summary            = ${JSON.stringify(summary)},
-        processing_status  = 'completed',
-        processed_at       = NOW(),
-        updated_at         = NOW()
-    WHERE id = ${meetingId}
-  `;
+  const suggestedTitle = summary.suggested_title?.trim();
+
+  if (suggestedTitle) {
+    // Only overwrite generic titles — keep user-edited or Fireflies titles
+    await sql`
+      UPDATE meetings
+      SET summary            = ${JSON.stringify(summary)},
+          title              = CASE
+                                 WHEN title LIKE 'Teams Meeting -%' THEN ${suggestedTitle}
+                                 ELSE title
+                               END,
+          processing_status  = 'completed',
+          processed_at       = NOW(),
+          updated_at         = NOW()
+      WHERE id = ${meetingId}
+    `;
+  } else {
+    await sql`
+      UPDATE meetings
+      SET summary            = ${JSON.stringify(summary)},
+          processing_status  = 'completed',
+          processed_at       = NOW(),
+          updated_at         = NOW()
+      WHERE id = ${meetingId}
+    `;
+  }
 }
 
 /**
  * Replace all AI-extracted action items for a meeting with the latest set.
+ * Attempts to resolve assignee names to FibreFlow user emails.
  * Skips the INSERT entirely when the list is empty.
  */
 async function writeActionItems(meetingId: number, items: ActionItem[]): Promise<void> {
@@ -273,9 +302,29 @@ async function writeActionItems(meetingId: number, items: ActionItem[]): Promise
   if (items.length === 0) return;
 
   for (const item of items) {
+    // Try to match assignee name to a FibreFlow user (fuzzy on first/last name)
+    const assigneeName = item.assignee?.trim() || 'Unassigned';
+    let assigneeEmail: string | null = null;
+
+    if (assigneeName !== 'Unassigned') {
+      const nameParts = assigneeName.toLowerCase().split(/\s+/);
+      const firstName = nameParts[0] || '';
+
+      if (firstName) {
+        const matches = await sql`
+          SELECT email FROM users
+          WHERE LOWER(first_name) = ${firstName}
+          LIMIT 1
+        `;
+        if (matches[0]) {
+          assigneeEmail = matches[0].email as string;
+        }
+      }
+    }
+
     await sql`
-      INSERT INTO meeting_action_items (meeting_id, description, assignee_name, status, priority)
-      VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority})
+      INSERT INTO meeting_action_items (meeting_id, description, assignee_name, assignee_email, status, priority)
+      VALUES (${meetingId}, ${item.description}, ${assigneeName}, ${assigneeEmail}, 'pending', ${item.priority})
     `;
   }
 }

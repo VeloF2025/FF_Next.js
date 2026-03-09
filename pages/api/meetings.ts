@@ -35,7 +35,7 @@ async function handler(
                 source, processing_status, organizer_name, organizer_email, join_url,
                 user_notes,
                 (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-                (recording_path IS NOT NULL) as has_recording
+                (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
             `
@@ -46,7 +46,7 @@ async function handler(
                 source, processing_status, organizer_name, organizer_email, join_url,
                 user_notes,
                 (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-                (recording_path IS NOT NULL) as has_recording
+                (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
               FROM meetings
               WHERE id = ${id}
               AND EXISTS (
@@ -77,7 +77,7 @@ async function handler(
                 source, processing_status, organizer_name, organizer_email,
                 user_notes,
                 (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-                (recording_path IS NOT NULL) as has_recording
+                (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
               FROM meetings
               WHERE source = ${sourceFilter}
               ORDER BY meeting_date DESC
@@ -90,7 +90,7 @@ async function handler(
                 source, processing_status, organizer_name, organizer_email,
                 user_notes,
                 (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-                (recording_path IS NOT NULL) as has_recording
+                (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
               FROM meetings
               WHERE source = ${sourceFilter}
               AND EXISTS (
@@ -114,7 +114,7 @@ async function handler(
               source, processing_status, organizer_name, organizer_email,
               user_notes,
               (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-              (recording_path IS NOT NULL) as has_recording
+              (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
             FROM meetings
             ORDER BY meeting_date DESC
             LIMIT 50
@@ -126,7 +126,7 @@ async function handler(
               source, processing_status, organizer_name, organizer_email,
               user_notes,
               (raw_transcript IS NOT NULL OR transcript_url IS NOT NULL OR EXISTS (SELECT 1 FROM meeting_transcripts mt WHERE mt.meeting_id = meetings.id)) as has_transcript,
-              (recording_path IS NOT NULL) as has_recording
+              (recording_path IS NOT NULL OR audio_url IS NOT NULL OR video_url IS NOT NULL) as has_recording
             FROM meetings
             WHERE EXISTS (
               SELECT 1 FROM jsonb_array_elements(participants) AS p
