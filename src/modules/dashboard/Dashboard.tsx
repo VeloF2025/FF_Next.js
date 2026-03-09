@@ -163,13 +163,13 @@ export function Dashboard() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[
-            { title: 'Progress Today', icon: Activity, color: 'bg-blue-500/20 text-blue-400', route: '/reports/progress-today' },
-            { title: 'Report 2', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/reports/placeholder-2' },
-            { title: 'Report 3', icon: Target, color: 'bg-purple-500/20 text-purple-400', route: '/reports/placeholder-3' },
-            { title: 'Report 4', icon: PieChart, color: 'bg-amber-500/20 text-amber-400', route: '/reports/placeholder-4' },
-            { title: 'Report 5', icon: Clock, color: 'bg-cyan-500/20 text-cyan-400', route: '/reports/placeholder-5' },
-            { title: 'Report 6', icon: TrendingUp, color: 'bg-rose-500/20 text-rose-400', route: '/reports/placeholder-6' },
-          ].map((report) => {
+            { title: 'Progress Today', icon: Activity, color: 'bg-blue-500/20 text-blue-400', route: '/reports/progress-today', permission: null },
+            { title: 'Weekly Activations', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/reports/weekly-activations', permission: Permission.ANALYTICS_READ },
+            { title: 'Report 3', icon: Target, color: 'bg-purple-500/20 text-purple-400', route: '/reports/placeholder-3', permission: null },
+            { title: 'Report 4', icon: PieChart, color: 'bg-amber-500/20 text-amber-400', route: '/reports/placeholder-4', permission: null },
+            { title: 'Report 5', icon: Clock, color: 'bg-cyan-500/20 text-cyan-400', route: '/reports/placeholder-5', permission: null },
+            { title: 'Report 6', icon: TrendingUp, color: 'bg-rose-500/20 text-rose-400', route: '/reports/placeholder-6', permission: null },
+          ].filter((report) => !report.permission || hasPermission(report.permission)).map((report) => {
             const Icon = report.icon;
             return (
               <Link
@@ -184,7 +184,11 @@ export function Dashboard() {
                   {report.title}
                 </h3>
                 <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-                  {report.title === 'Progress Today' ? 'Daily progress overview' : 'Coming soon'}
+                  {report.title === 'Progress Today'
+                    ? 'Daily progress overview'
+                    : report.title === 'Weekly Activations'
+                      ? 'Weekly activation stats'
+                      : 'Coming soon'}
                 </p>
               </Link>
             );
