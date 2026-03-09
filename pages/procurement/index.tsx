@@ -249,7 +249,7 @@ export default function ProcurementPage({
                   </div>
                 </div>
                 <Link
-                  href="/procurement/workflow"
+                  href="/procurement/workflow?new=1"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                 >
                   <Workflow className="h-4 w-4" />
