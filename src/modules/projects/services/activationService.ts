@@ -5,6 +5,7 @@
 
 import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
+import { getLatestValidation } from './documentCrossValidationService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -47,10 +48,14 @@ export interface ActivationCheck {
 }
 
 /**
- * Check if project has at least one active Client Purchase Order
+ * Check if project has active Client PO + BSS + MSS with cross-validation.
+ * - PO must be active
+ * - BSS and MSS must be uploaded
+ * - When all 3 exist, cross-validation must pass (or have only warnings)
  */
 export async function checkClientPO(projectId: string): Promise<ClientPOBlocker> {
   try {
+    // Check for active Client PO
     const activePOs = await sql`
       SELECT id, po_number, total_value
       FROM client_purchase_orders
@@ -58,44 +63,81 @@ export async function checkClientPO(projectId: string): Promise<ClientPOBlocker>
       AND status = 'active'
     `;
 
-    if (activePOs.length > 0) {
+    if (activePOs.length === 0) {
+      const draftPOs = await sql`
+        SELECT COUNT(*) as count
+        FROM client_purchase_orders
+        WHERE project_id = ${projectId}
+        AND status = 'draft'
+      `;
+      const draftCount = draftPOs[0] ? Number(draftPOs[0].count) : 0;
+      if (draftCount > 0) {
+        return { met: false, message: `No active Client PO (${draftCount} draft PO(s) exist)` };
+      }
+      return { met: false, message: 'No Client PO found - upload one' };
+    }
+
+    // Check BSS
+    const bss = await sql`
+      SELECT id FROM project_documents
+      WHERE project_id = ${projectId} AND document_type = 'bss' AND is_active = true
+      LIMIT 1
+    `;
+
+    // Check MSS
+    const mss = await sql`
+      SELECT id FROM project_documents
+      WHERE project_id = ${projectId} AND document_type = 'mss' AND is_active = true
+      LIMIT 1
+    `;
+
+    const hasBSS = bss.length > 0;
+    const hasMSS = mss.length > 0;
+
+    if (!hasBSS && !hasMSS) {
+      return { met: false, message: 'PO active — upload BSS and MSS to complete validation' };
+    }
+    if (!hasBSS) {
+      return { met: false, message: 'PO active, MSS uploaded — upload BSS to complete validation' };
+    }
+    if (!hasMSS) {
+      return { met: false, message: 'PO active, BSS uploaded — upload MSS to complete validation' };
+    }
+
+    // All 3 exist — check cross-validation result
+    const validation = await getLatestValidation(projectId);
+
+    if (!validation) {
+      return {
+        met: false,
+        message: 'All documents uploaded — cross-validation pending (will run automatically)',
+      };
+    }
+
+    if (validation.is_valid) {
       return {
         met: true,
-        message: `${activePOs.length} active Client PO(s)`,
-        activePOs: activePOs.map(po => ({
-          id: po.id,
-          poNumber: po.po_number,
+        message: `PO + BSS + MSS validated (${validation.status})`,
+        activePOs: activePOs.map((po: Record<string, unknown>) => ({
+          id: po.id as string,
+          poNumber: po.po_number as string,
           totalValue: Number(po.total_value),
         })),
       };
     }
 
-    // Check if there are draft POs
-    const draftPOs = await sql`
-      SELECT COUNT(*) as count
-      FROM client_purchase_orders
-      WHERE project_id = ${projectId}
-      AND status = 'draft'
-    `;
-
-    const draftCount = draftPOs[0] ? Number(draftPOs[0].count) : 0;
-    if (draftCount > 0) {
-      return {
-        met: false,
-        message: `No active Client PO (${draftCount} draft PO(s) exist - activate one)`,
-      };
-    }
-
+    // Validation failed — show discrepancies
+    const discrepancies = validation.discrepancies || [];
+    const errorCount = Array.isArray(discrepancies)
+      ? discrepancies.filter((d: Record<string, unknown>) => d.severity === 'error').length
+      : 0;
     return {
       met: false,
-      message: 'No Client PO found - create and activate one',
+      message: `Cross-validation failed: ${errorCount} discrepanc${errorCount === 1 ? 'y' : 'ies'} between PO, BSS, and MSS`,
     };
   } catch (error) {
-    log.error('Failed to check client PO', { projectId, error });
-    return {
-      met: false,
-      message: 'Error checking Client PO status',
-    };
+    log.error('Failed to check client PO + documents', { projectId, error });
+    return { met: false, message: 'Error checking document status' };
   }
 }
 
