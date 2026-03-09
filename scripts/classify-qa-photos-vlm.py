@@ -134,17 +134,25 @@ Phase A — Pre-Install Context:
 1. Before Photo — Shows the ground BEFORE digging. You should see markings on the ground (circle, square, or X) indicating where the pole hole will be dug. No hole visible yet. Can also show the general site location before work begins.
 2. During Photo — Shows staff actively digging the hole OR any construction activity in progress. People working, tools visible, hole partially dug. Workers near a pole or hole.
 3. Depth Photo — Shows a measuring tape or ruler placed inside the dug hole to document the depth. The tape measure is the key visual indicator.
-4. End Plates — Close-up showing the end plates of the pole. Metal plates at the base or top of the pole visible. Also includes: CCA H4 tags, pole labels, zone/PON labels on poles, yellow identification tags, any close-up of pole markings or identification. A pole end with visible metal insert or rust is an end plate.
-5. Compaction / Backfill — Shows backfill material around the pole base. Sand and cement mix around the installed pole. Blue powder, cement, or mixed aggregate around pole base. Ground being compacted around the installed pole.
+4. End Plates — Close-up or medium shot showing end plates, metal fittings, or identification on the pole. Includes: metal end plates at the base or top of the pole, CCA H4 tags, pole labels, zone/PON labels, yellow identification tags, any close-up of pole markings. A pole end with visible metal insert, rust ring, or bolt pattern is an end plate. Also includes: close-up of the pole bottom showing circular metal plate or rust before planting, and top-down view into a hole showing the pole end/bottom. KEY RULE: If the photo is taken CLOSE to the pole (within ~2m) and shows the pole surface, fittings, tags, or hardware detail — classify as End Plates, NOT After Photo or Compaction.
+5. Compaction / Backfill — Shows backfill material VISIBLY POURED or PACKED around the pole base. You MUST see sand, cement powder, blue chemical powder, mixed aggregate, or gravel being applied or already packed around the base. KEY RULE: The backfill material itself must be clearly visible — not just bare earth or a hole. If the photo shows a close-up of the pole base with metal fittings, rust, or tags but NO loose fill material — that is End Plates (step 4), NOT Compaction. A hole with just soil/earth around a pole is NOT compaction.
 
 Phase B — Installation Execution:
 6. Level Check — Shows a spirit level (bubble level tool) held against the pole to verify it is plumb/vertical. The spirit level tool is the key visual indicator.
-7. After Photo — Shows the completed pole installation. A wide shot showing the full pole standing upright, taken from a distance. ANY photo showing a pole standing upright in the landscape qualifies — even between buildings, in narrow spaces, or with partial obstructions. Also includes ground-level views of completed installations. If a pole is visible standing in the ground and no other step is more specific, classify as After Photo.
+7. After Photo — Shows the completed pole installation as a WIDE/DISTANCE shot (taken from 3+ metres away). The full pole should be visible from base to top, standing upright in the landscape. This is a context shot showing the pole in its environment. KEY RULE: After Photo must be a WIDE shot. If the photo is a close-up showing pole hardware, metal plates, tags, fittings, or the pole surface in detail — that is End Plates (step 4), NOT After Photo. If the photo shows the ground around the pole base with backfill material — that is Compaction (step 5), NOT After Photo.
 
 Phase C — Assets & IDs:
 8. Signature — Shows a contractor signature, sign-off sheet, or completion document. Paper/form with handwritten signature visible.
 
 0. Unrelated — Photo has NOTHING to do with pole installation: team selfie, vehicle interior, food, random landscape with NO pole or construction context, completely dark/blurry photo. A fiber splitter box, cable equipment, or ANY construction-related equipment near a pole is NOT unrelated.
+
+DISAMBIGUATION PRIORITY (apply these rules when uncertain):
+- Close-up of pole base showing metal plate, rust ring, bolts, tags → End Plates (4), NOT Compaction (5) or After (7)
+- Top-down view into a hole showing pole bottom or metal insert → End Plates (4), NOT Depth (3)
+- Ground around pole with visible sand/cement/powder material → Compaction (5)
+- Ground around pole with just bare earth, no fill material → NOT Compaction — check if End Plates or During
+- Wide shot showing full pole from distance → After Photo (7)
+- Close-up of pole surface or fittings → End Plates (4)
 
 Respond with ONLY a JSON object:
 {"step": <number 0-8>, "confidence": <0.0-1.0>, "reason": "<brief reason>"}"""
@@ -372,7 +380,7 @@ def get_steps_for_discipline(discipline, sub_type=None):
 
 def run_classification(project_name, db_url, limit=100, dry_run=False, discipline="civil",
                        source="all", local_minio=False, reclassify=False,
-                       unrelated_only=False, exclude_approved=False):
+                       unrelated_only=False, exclude_approved=False, steps_only=None):
     """Batch classify unassigned photos via VLM."""
     print(f"\n{'='*70}")
     print(f"  VLM Photo Classification — {discipline.title()}")
@@ -381,7 +389,9 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
     print(f"  Limit: {limit}")
     print(f"  Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"  Reclassify: {'YES (overwriting existing)' if reclassify else 'No (unclassified only)'}")
-    if unrelated_only:
+    if steps_only:
+        print(f"  Filter: STEPS {steps_only} ONLY (reclassifying)")
+    elif unrelated_only:
         print(f"  Filter: UNRELATED ONLY (step 0)")
     if exclude_approved:
         print(f"  Excluding: approved reviews")
@@ -426,7 +436,10 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         source_filter = f"AND p.source = '{source}'"
 
     # Classification filter — skip already-classified unless reclassifying
-    if unrelated_only:
+    if steps_only:
+        step_list = ",".join(str(int(s)) for s in steps_only)
+        classify_filter = f"AND p.checklist_step IN ({step_list})"
+    elif unrelated_only:
         classify_filter = "AND p.checklist_step = 0"  # Only re-do Unrelated
     elif reclassify:
         classify_filter = ""  # Process all photos
@@ -674,6 +687,8 @@ if __name__ == "__main__":
                         help="Only reclassify photos currently marked as Unrelated (step 0)")
     parser.add_argument("--exclude-approved", action="store_true",
                         help="Skip photos on reviews with workflow_status = approved")
+    parser.add_argument("--steps", type=str, default=None,
+                        help="Only reclassify photos in these steps (comma-separated, e.g. '5,7')")
     args = parser.parse_args()
 
     try:
@@ -688,8 +703,11 @@ if __name__ == "__main__":
         print("ERROR: No database URL. Set DATABASE_URL or use --db-url")
         sys.exit(1)
 
+    steps_only = [int(s.strip()) for s in args.steps.split(",")] if args.steps else None
+
     run_classification(args.project, db_url, limit=args.limit, dry_run=args.dry_run,
                        discipline=args.discipline, source=args.source,
                        local_minio=args.local_minio, reclassify=args.reclassify,
                        unrelated_only=args.unrelated_only,
-                       exclude_approved=args.exclude_approved)
+                       exclude_approved=args.exclude_approved,
+                       steps_only=steps_only)

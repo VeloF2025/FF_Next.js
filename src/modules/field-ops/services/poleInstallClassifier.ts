@@ -89,10 +89,10 @@ Classify this photo into EXACTLY ONE of these installation steps:
 - BEFORE: Marked ground (circle/square/X) showing where hole will be dug. Open ground, paint marks.
 - DURING: Staff digging hole or hole being prepared. Shovel/pick visible.
 - DEPTH: Measuring tape or ruler placed IN the hole showing depth measurement.
-- ENDPLATE: End plates visible on the bottom of the pole before planting.
+- ENDPLATE: End plates, metal fittings, tags, or identification on the pole. Close-up or medium shot showing pole hardware, CCA H4 tags, labels, metal inserts, rust rings. If the photo is taken close to the pole showing surface detail — this is ENDPLATE.
 - COMPACTION: Sand+cement backfill mix around pole base, being compacted. NOT a loose heap.
 - LEVEL: Spirit level (bubble level) held against an upright pole.
-- STUMPING: Pole being planted/erected into hole, or freshly planted pole from various angles. Pole in ground.
+- STUMPING: Pole being planted/erected into hole, or freshly planted pole WIDE shot from distance (3m+). Full pole visible base to top. If close-up showing hardware/tags, use ENDPLATE instead.
 - HOUSEKEEPING: Clean site around a completed pole installation. Cleanup in progress or done.
 - SIGNATURE: Sign-off sheet, contractor signature, or completion document on paper.
 
