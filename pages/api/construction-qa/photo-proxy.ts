@@ -19,10 +19,14 @@ const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
 const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
-// SharePoint Graph API config
-const SP_TENANT_ID = 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
-const SP_CLIENT_ID = '075bd672-bffa-45ba-9fd0-724535e612db';
-const SP_CLIENT_SECRET = 'Ozw8Q~HG1PMZFPNb0Ze1f-eTYrtglVioRzy2lakF';
+// SharePoint Graph API config (credentials from .env)
+const SP_TENANT_ID = process.env.SP_TENANT_ID || 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
+const SP_CLIENT_ID = process.env.SP_CLIENT_ID || '075bd672-bffa-45ba-9fd0-724535e612db';
+const SP_CLIENT_SECRET = process.env.SP_CLIENT_SECRET;
+
+if (!SP_CLIENT_SECRET) {
+  throw new Error('SP_CLIENT_SECRET environment variable not set');
+}
 
 // Token cache (tokens last ~3600s, cache for 3000s)
 let spTokenCache: { token: string; expiresAt: number } | null = null;
