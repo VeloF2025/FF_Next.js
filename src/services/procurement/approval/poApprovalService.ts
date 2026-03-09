@@ -403,7 +403,9 @@ class POApprovalService {
       `;
 
       // Post commitment to GL (non-blocking)
-      postPurchaseOrderToGL(poId, approverId).catch(() => {});
+      postPurchaseOrderToGL(poId, approverId).catch(err => {
+        log.warn('Failed to post PO to GL (non-blocking)', { poId, approverId, error: err });
+      });
 
       // Notify requester via bell + inbox
       const approvalRequest = po.current_approval_request_id
@@ -419,7 +421,13 @@ class POApprovalService {
           source_module: 'procurement',
           source_id: poId,
           recipient_user_ids: [approvalRequest.requested_by],
-        }).catch(() => {});
+        }).catch(err => {
+          log.warn('Failed to send approval notification (non-blocking)', {
+            poId,
+            recipient: approvalRequest.requested_by,
+            error: err,
+          });
+        });
 
         this.sendApprovalInboxMessage(
           approverId,
@@ -429,7 +437,13 @@ class POApprovalService {
           'procurement',
           poId,
           `/procurement/purchase-orders/${poId}`
-        ).catch(() => {});
+        ).catch(err => {
+          log.warn('Failed to send approval inbox message (non-blocking)', {
+            poId,
+            recipient: approvalRequest.requested_by,
+            error: err,
+          });
+        });
       }
 
       log.info('PO approved', { poId, approverId, approverName });
@@ -572,7 +586,13 @@ class POApprovalService {
           source_module: 'procurement',
           source_id: poId,
           recipient_user_ids: [approvalRequest.requested_by],
-        }).catch(() => {});
+        }).catch(err => {
+          log.warn('Failed to send rejection notification (non-blocking)', {
+            poId,
+            recipient: approvalRequest.requested_by,
+            error: err,
+          });
+        });
 
         this.sendApprovalInboxMessage(
           rejecterId,
@@ -582,7 +602,13 @@ class POApprovalService {
           'procurement',
           poId,
           `/procurement/purchase-orders/${poId}`
-        ).catch(() => {});
+        ).catch(err => {
+          log.warn('Failed to send rejection inbox message (non-blocking)', {
+            poId,
+            recipient: approvalRequest.requested_by,
+            error: err,
+          });
+        });
       }
 
       log.info('PO rejected', {
