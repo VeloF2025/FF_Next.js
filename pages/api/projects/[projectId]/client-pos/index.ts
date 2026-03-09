@@ -157,7 +157,7 @@ export default withAuth(withErrorHandler(async (
           ${body.sourceDocumentName || null},
           ${body.vlmExtractionData ? JSON.stringify(body.vlmExtractionData) : null},
           ${body.vlmConfidenceScore || null},
-          'draft',
+          'active',
           ${userId || 'system'}
         )
         RETURNING *
