@@ -195,7 +195,7 @@ export class NeonSupplierService {
         RETURNING id
       `;
 
-      return result[0].id.toString();
+      return result[0]!.id.toString();
     } catch (error) {
       log.error('Error creating supplier:', { data: error }, 'neonSupplier');
       throw new Error(`Failed to create supplier: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -479,7 +479,7 @@ export class NeonSupplierService {
         WHERE supplier_id = ${parseInt(id)}
       `;
 
-      const avg = avgResult[0];
+      const avg = avgResult[0]!;
 
       await sql`
         UPDATE suppliers
@@ -640,11 +640,11 @@ export class NeonSupplierService {
       `;
 
       return {
-        total: parseInt(result[0].total),
-        active: parseInt(result[0].active),
-        pending: parseInt(result[0].pending),
-        preferred: parseInt(result[0].preferred),
-        blacklisted: parseInt(result[0].blacklisted)
+        total: parseInt(result[0]!.total),
+        active: parseInt(result[0]!.active),
+        pending: parseInt(result[0]!.pending),
+        preferred: parseInt(result[0]!.preferred),
+        blacklisted: parseInt(result[0]!.blacklisted)
       };
     } catch (error) {
       log.error('Error getting supplier statistics:', { data: error }, 'neonSupplier');

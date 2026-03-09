@@ -349,7 +349,7 @@ export class ComplianceChecker {
       ]
     };
 
-    return requirements[businessType.toLowerCase()] || requirements['corporation'];
+    return requirements[businessType.toLowerCase()] ?? requirements['corporation']!;
   }
 
   /**

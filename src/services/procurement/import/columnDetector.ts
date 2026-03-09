@@ -33,7 +33,7 @@ function findDataSheet(workbook: XLSX.WorkBook): { sheet: XLSX.WorkSheet; name: 
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
+    const data = XLSX.utils.sheet_to_json(sheet!, { header: 1 }) as unknown[][];
     if (data.length < 5) continue;
 
     const rowCount = data.filter(r => r && r.length > 0).length;
@@ -47,7 +47,7 @@ function findDataSheet(workbook: XLSX.WorkBook): { sheet: XLSX.WorkSheet; name: 
   }
 
   if (!bestName) return null;
-  return { sheet: workbook.Sheets[bestName], name: bestName };
+  return { sheet: workbook.Sheets[bestName]!, name: bestName };
 }
 
 /** Scan first 10 rows to find the header row */
@@ -100,7 +100,7 @@ function scoreDataPattern(field: BOQTargetField, samples: unknown[]): number {
     case 'itemNo': {
       if (nums.length < 2) return 0;
       let seq = true;
-      for (let i = 1; i < nums.length; i++) { if (nums[i] !== nums[i - 1] + 1) seq = false; }
+      for (let i = 1; i < nums.length; i++) { if (nums[i] !== nums[i - 1]! + 1) seq = false; }
       return seq ? 1.0 : 0;
     }
     case 'uom':
@@ -180,7 +180,7 @@ export async function checkSavedTemplates(
   databaseUrl: string
 ): Promise<{ id: string; name: string; supplierName?: string; mapping: Record<string, BOQTargetField>; sheetName?: string; headerRow: number } | null> {
   try {
-    const sql = neon(databaseUrl);
+    const sql: any = neon(databaseUrl);
     const templates = await sql`
       SELECT id, name, supplier_name, headers, column_mapping, sheet_name, header_row
       FROM boq_column_templates ORDER BY usage_count DESC

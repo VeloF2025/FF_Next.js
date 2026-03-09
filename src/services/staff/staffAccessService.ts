@@ -51,7 +51,7 @@ export async function getStaffIdForUser(userId: string): Promise<string | null> 
     const result = await sql`
       SELECT id FROM staff WHERE user_id = ${userId} LIMIT 1
     `;
-    return result.length > 0 ? result[0].id : null;
+    return result.length > 0 ? result[0]?.id ?? null : null;
   } catch (error) {
     log.error('Error getting staff ID for user', { userId, error });
     return null;

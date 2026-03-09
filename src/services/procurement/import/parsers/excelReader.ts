@@ -89,19 +89,19 @@ export class ExcelReader {
 
           const worksheet = workbook.Sheets[worksheetName];
           
-          if (!worksheet['!ref']) {
+          if (!worksheet || !worksheet['!ref']) {
             resolve({ rowCount: 0, columnCount: 0, range: '' });
             return;
           }
 
-          const range = XLSX.utils.decode_range(worksheet['!ref']);
+          const range = XLSX.utils.decode_range(worksheet['!ref']!);
           const rowCount = range.e.r + 1; // +1 because range is 0-based
           const columnCount = range.e.c + 1; // +1 because range is 0-based
-          
+
           resolve({
             rowCount,
             columnCount,
-            range: worksheet['!ref']
+            range: worksheet['!ref']!
           });
         } catch (error) {
           reject(new Error(`Failed to analyze worksheet: ${error instanceof Error ? error.message : 'Unknown error'}`));

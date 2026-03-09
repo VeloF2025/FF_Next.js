@@ -76,7 +76,7 @@ export class BatchProcessingUtils {
     const executing: Promise<void>[] = [];
 
     for (let i = 0; i < items.length; i++) {
-      const promise = processor(items[i], i).then(result => {
+      const promise = processor(items[i]!, i).then(result => {
         results[i] = result;
       });
 

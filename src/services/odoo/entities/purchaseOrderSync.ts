@@ -12,7 +12,7 @@ import {
   OdooPurchaseOrderLine,
 } from '../odooClient';
 
-const logger = createLogger({ module: 'odooPOSync' });
+const logger = createLogger('odooPOSync');
 
 // ============================================================================
 // Types
@@ -118,7 +118,7 @@ export async function syncPurchaseOrders(
     // 1. BUILD SUPPLIER ID MAP
     // ========================================================================
     // Get suppliers with odoo_partner_id to map Odoo partner -> FF supplier
-    const suppliers = await sql<{ id: number; odoo_partner_id: number }[]>`
+    const suppliers = await sql`
       SELECT id, odoo_partner_id FROM suppliers WHERE odoo_partner_id IS NOT NULL
     `;
     const supplierIdMap = new Map(
@@ -133,7 +133,7 @@ export async function syncPurchaseOrders(
     logger.info(`Found ${odooPOs.length} purchase orders in Odoo`);
 
     // Get existing FF POs with Odoo IDs
-    const existingPOs = await sql<{ id: string; odoo_po_id: number }[]>`
+    const existingPOs = await sql`
       SELECT id, odoo_po_id FROM purchase_orders WHERE odoo_po_id IS NOT NULL
     `;
     const existingByOdooId = new Map(
@@ -206,7 +206,7 @@ export async function syncPurchaseOrders(
           });
         } else {
           // Create new PO
-          const inserted = await sql<{ id: string }[]>`
+          const inserted = await sql`
             INSERT INTO purchase_orders (
               odoo_po_id, po_number, supplier_id, order_date, status,
               subtotal, tax_amount, total_amount, currency,
@@ -222,7 +222,7 @@ export async function syncPurchaseOrders(
             RETURNING id
           `;
           result.orders.created++;
-          poIdMap.set(odooPO.id, inserted[0].id);
+          poIdMap.set(odooPO.id, inserted[0]!.id);
           result.details.push({
             odooId: odooPO.id,
             poNumber: odooPO.name,
@@ -242,7 +242,7 @@ export async function syncPurchaseOrders(
     }
 
     // Refresh PO ID map for all existing POs
-    const allPOs = await sql<{ id: string; odoo_po_id: number }[]>`
+    const allPOs = await sql`
       SELECT id, odoo_po_id FROM purchase_orders WHERE odoo_po_id IS NOT NULL
     `;
     for (const po of allPOs) {
@@ -277,7 +277,7 @@ export async function syncPurchaseOrders(
         logger.info(`Found ${allLines.length} PO line items in Odoo`);
 
         // Get existing line items
-        const existingLines = await sql<{ id: string; odoo_line_id: number }[]>`
+        const existingLines = await sql`
           SELECT id, odoo_line_id FROM purchase_order_items WHERE odoo_line_id IS NOT NULL
         `;
         const existingLinesByOdooId = new Map(

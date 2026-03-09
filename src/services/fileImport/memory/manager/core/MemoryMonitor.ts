@@ -3,7 +3,7 @@
  * Manages interval-based memory monitoring
  */
 
-import type { MemoryStats } from '../../types';
+import type { MemoryStats } from '../../../types';
 
 export class MemoryMonitor {
   private memoryCheckInterval: number = 5000; // Check every 5 seconds

@@ -110,10 +110,10 @@ export function validateLineNumberSequence(items: ParsedBOQItem[]): {
   const gaps: number[] = [];
   
   for (let i = 1; i < lineNumbers.length; i++) {
-    const current = lineNumbers[i];
-    const previous = lineNumbers[i - 1];
+    const current = lineNumbers[i]!;
+    const previous = lineNumbers[i - 1]!;
     const expectedNext = previous + 1;
-    
+
     if (current !== expectedNext && current > expectedNext) {
       // There's a gap in the sequence
       for (let missing = expectedNext; missing < current; missing++) {

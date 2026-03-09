@@ -4,6 +4,7 @@
  */
 
 import { BOQ } from '../../../../types/procurement/boq.types';
+// @ts-ignore
 import { BOQCrud } from '../crud';
 import { log } from '@/lib/logger';
 

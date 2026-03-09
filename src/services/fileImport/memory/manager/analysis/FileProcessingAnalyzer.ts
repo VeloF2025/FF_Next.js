@@ -3,7 +3,7 @@
  * Estimates memory requirements and processing feasibility
  */
 
-import type { MemoryStats } from '../../types';
+import type { MemoryStats } from '../../../types';
 import type { ProcessingFeasibility } from '../types/memory-manager.types';
 import { estimateFileMemory, formatBytes } from '../utils/memoryUtils';
 

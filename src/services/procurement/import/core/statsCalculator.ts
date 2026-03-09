@@ -193,7 +193,7 @@ export class BOQImportStatsCalculator {
     // Group by date
     const dailyCounts = new Map<string, number>();
     recentJobs.forEach(job => {
-      const dateKey = job.createdAt.toISOString().split('T')[0];
+      const dateKey = job.createdAt.toISOString().split('T')[0]!;
       dailyCounts.set(dateKey, (dailyCounts.get(dateKey) || 0) + 1);
     });
 

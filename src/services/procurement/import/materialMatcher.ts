@@ -50,7 +50,7 @@ export interface MatchOptions {
 }
 
 export class MaterialMatcher {
-  private sql: ReturnType<typeof neon>;
+  private sql: any;
 
   constructor(databaseUrl: string) {
     this.sql = neon(databaseUrl);
@@ -81,7 +81,7 @@ export class MaterialMatcher {
       const similarCodes = await this.findSimilarCodes(input.itemCode);
       if (similarCodes.length > 0) {
         // Potential duplicate - return best match with warning
-        const bestMatch = similarCodes[0];
+        const bestMatch = similarCodes[0]!;
         return {
           inputItemCode: input.itemCode,
           inputDescription: input.description,
@@ -101,13 +101,13 @@ export class MaterialMatcher {
         input.category
       );
 
-      if (fuzzyMatches.length > 0 && fuzzyMatches[0].score >= FUZZY_THRESHOLD) {
+      if (fuzzyMatches.length > 0 && fuzzyMatches[0]!.score >= FUZZY_THRESHOLD) {
         return {
           inputItemCode: input.itemCode,
           inputDescription: input.description,
           matchType: 'fuzzy_description',
-          matchedMaterial: fuzzyMatches[0].material,
-          matchConfidence: fuzzyMatches[0].score,
+          matchedMaterial: fuzzyMatches[0]!.material,
+          matchConfidence: fuzzyMatches[0]!.score,
           isNewMaterial: false,
           potentialDuplicates: fuzzyMatches.slice(1, 4).map(m => m.material),
         };
@@ -292,8 +292,8 @@ export class MaterialMatcher {
           inputItemCode: input.itemCode,
           inputDescription: input.description,
           matchType: 'duplicate_prevented',
-          matchedMaterial: similarCodes[0].material,
-          matchConfidence: similarCodes[0].similarity,
+          matchedMaterial: similarCodes[0]!.material,
+          matchConfidence: similarCodes[0]!.similarity,
           isNewMaterial: false,
           potentialDuplicates: similarCodes.map(s => s.material),
         };
@@ -328,8 +328,8 @@ export class MaterialMatcher {
           inputItemCode: input.itemCode,
           inputDescription: input.description,
           matchType: 'fuzzy_description',
-          matchedMaterial: fuzzyMatches[0].material,
-          matchConfidence: fuzzyMatches[0].score,
+          matchedMaterial: fuzzyMatches[0]!.material,
+          matchConfidence: fuzzyMatches[0]!.score,
           isNewMaterial: false,
           potentialDuplicates: fuzzyMatches.slice(1, 4).map(m => m.material),
         };
@@ -397,7 +397,7 @@ export class MaterialMatcher {
       ORDER BY item_code
     `;
 
-    return result.map(row => this.mapToMaterial(row));
+    return result.map((row: any) => this.mapToMaterial(row));
   }
 
   /**

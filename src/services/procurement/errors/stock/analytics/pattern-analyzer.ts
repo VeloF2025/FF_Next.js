@@ -84,7 +84,7 @@ export class PatternAnalyzer {
 
     // Insight: Most problematic items
     if (analysis.mostCommonItems.length > 0) {
-      const topItem = analysis.mostCommonItems[0];
+      const topItem = analysis.mostCommonItems[0]!;
       insights.push({
         type: 'item',
         title: `Item ${topItem.itemCode} has the highest error rate`,

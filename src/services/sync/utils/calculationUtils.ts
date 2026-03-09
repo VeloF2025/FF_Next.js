@@ -51,10 +51,10 @@ export class CalculationUtils {
     const middle = Math.floor(sorted.length / 2);
     
     if (sorted.length % 2 === 0) {
-      return (sorted[middle - 1] + sorted[middle]) / 2;
+      return (sorted[middle - 1]! + sorted[middle]!) / 2;
     }
-    
-    return sorted[middle];
+
+    return sorted[middle]!;
   }
 
   /**
@@ -68,13 +68,13 @@ export class CalculationUtils {
     const index = (percentile / 100) * (sorted.length - 1);
     
     if (Number.isInteger(index)) {
-      return sorted[index];
+      return sorted[index]!;
     }
-    
-    const lower = sorted[Math.floor(index)];
-    const upper = sorted[Math.ceil(index)];
+
+    const lower = sorted[Math.floor(index)]!;
+    const upper = sorted[Math.ceil(index)]!;
     const weight = index - Math.floor(index);
-    
+
     return lower + (upper - lower) * weight;
   }
 
@@ -119,10 +119,10 @@ export class CalculationUtils {
   static calculateEMA(values: number[], alpha: number = 0.1): number[] {
     if (values.length === 0) return [];
     
-    const result: number[] = [values[0]];
-    
+    const result: number[] = [values[0]!];
+
     for (let i = 1; i < values.length; i++) {
-      const ema = alpha * values[i] + (1 - alpha) * result[i - 1];
+      const ema = alpha * values[i]! + (1 - alpha) * result[i - 1]!;
       result.push(ema);
     }
     
@@ -144,9 +144,9 @@ export class CalculationUtils {
     let denominatorY = 0;
     
     for (let i = 0; i < n; i++) {
-      const diffX = x[i] - meanX;
-      const diffY = y[i] - meanY;
-      
+      const diffX = x[i]! - meanX;
+      const diffY = y[i]! - meanY;
+
       numerator += diffX * diffY;
       denominatorX += diffX * diffX;
       denominatorY += diffY * diffY;
@@ -172,8 +172,8 @@ export class CalculationUtils {
     let denominator = 0;
     
     for (let i = 0; i < n; i++) {
-      const diffX = x[i] - meanX;
-      numerator += diffX * (y[i] - meanY);
+      const diffX = x[i]! - meanX;
+      numerator += diffX * (y[i]! - meanY);
       denominator += diffX * diffX;
     }
     

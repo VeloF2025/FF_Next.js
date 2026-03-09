@@ -549,7 +549,7 @@ export class StockOperations extends BaseService {
 
       // Group by date
       const dailyMovements = filteredMovements.reduce((acc, movement) => {
-        const dateKey = movement.movementDate.toISOString().split('T')[0];
+        const dateKey = movement.movementDate.toISOString().split('T')[0]!;
         const existing = acc.find(item => item.date === dateKey);
         if (existing) {
           existing.movements += 1;

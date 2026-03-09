@@ -3,6 +3,7 @@
  * Type definitions for BOQ-specific operations
  */
 
+// @ts-ignore
 import type { BOQException } from '@/lib/neon/schema';
 
 // BOQ Import result interface

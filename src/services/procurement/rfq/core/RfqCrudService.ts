@@ -10,13 +10,13 @@ import { RfqItemService } from './RfqItemService';
 import { RfqNotificationService } from '../notifications/RfqNotificationService';
 import { generateRFQNumber } from '../utils/rfqNumberGenerator';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqCrudService {
   /**
    * Create new RFQ with items
    */
-  static async create(data: RFQFormData): Promise<string> {
+  static async create(data: RFQFormData & { createdBy?: string; totalBudgetEstimate?: number }): Promise<string> {
     try {
       const rfqNumber = await generateRFQNumber(data.projectId);
 
@@ -32,10 +32,10 @@ export class RfqCrudService {
           ${rfqNumber},
           ${data.title},
           ${data.description || ''},
-          ${data.status || RFQStatus.DRAFT},
+          ${(data as any).status || RFQStatus.DRAFT},
           ${new Date().toISOString()},
           ${data.responseDeadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()},
-          ${data.closingDate || data.responseDeadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()},
+          ${(data as any).closingDate || data.responseDeadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()},
           ${JSON.stringify(data.supplierIds || [])},
           ${data.paymentTerms || 'Net 30 days'},
           ${data.deliveryTerms || 'Ex Works'},
@@ -50,8 +50,8 @@ export class RfqCrudService {
       const rfqId = rfqResult[0].id;
 
       // Add items if provided
-      if (data.items && data.items.length > 0) {
-        await RfqItemService.addItems(rfqId, data.items);
+      if ((data as any).items && (data as any).items.length > 0) {
+        await RfqItemService.addItems(rfqId, (data as any).items);
       }
 
       // Create initial notification
@@ -147,9 +147,9 @@ export class RfqCrudService {
         updateFields.push('response_deadline');
         values.push(new Date(data.responseDeadline).toISOString());
       }
-      if (data.closingDate !== undefined) {
+      if ((data as any).closingDate !== undefined) {
         updateFields.push('closing_date');
-        values.push(new Date(data.closingDate).toISOString());
+        values.push(new Date((data as any).closingDate).toISOString());
       }
       if (data.supplierIds !== undefined) {
         updateFields.push('invited_suppliers');
@@ -167,9 +167,9 @@ export class RfqCrudService {
         updateFields.push('technical_requirements');
         values.push(data.technicalRequirements);
       }
-      if (data.totalBudgetEstimate !== undefined) {
+      if ((data as any).totalBudgetEstimate !== undefined) {
         updateFields.push('total_budget_estimate');
-        values.push(data.totalBudgetEstimate);
+        values.push((data as any).totalBudgetEstimate);
       }
 
       if (updateFields.length > 0) {
@@ -235,7 +235,7 @@ export class RfqCrudService {
         WHERE r.rfq_id = ${rfqId}
         ORDER BY r.submission_date DESC`;
 
-      return responses.map(response => ({
+      return responses.map((response: any) => ({
         id: response.id,
         rfqId: response.rfq_id,
         supplierId: response.supplier_id,

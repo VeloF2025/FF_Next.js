@@ -11,7 +11,7 @@
 
 import { createLogger } from '@/lib/logger';
 
-const logger = createLogger({ module: 'odooClient' });
+const logger = createLogger('odooClient');
 
 // ============================================================================
 // Types

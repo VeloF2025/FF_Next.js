@@ -40,7 +40,7 @@ export interface CategoryMapResult {
 }
 
 export class CategoryMapper {
-  private sql: ReturnType<typeof neon>;
+  private sql: any;
   private mappingCache: Map<string, BOQCategoryMapping> = new Map();
   private initialized = false;
 

@@ -80,7 +80,7 @@ export async function recordVlmCorrection(
     `;
 
     const row = result[0];
-    log.info('VlmLearningService', `Recorded correction: ${module}/${analysisType} - "${vlmExtractedValue}" → "${correctedValue}"`);
+    log.info(`Recorded correction: ${module}/${analysisType} - "${vlmExtractedValue}" → "${correctedValue}"`);
 
     // Record metric for the correction
     await recordExtractionMetric({
@@ -93,7 +93,7 @@ export async function recordVlmCorrection(
 
     return mapCorrectionRow(row as Record<string, unknown>);
   } catch (error) {
-    log.error('VlmLearningService', `Failed to record correction: ${error}`);
+    log.error(`Failed to record correction: ${error}`);
     throw error;
   }
 }
@@ -112,9 +112,9 @@ export async function markAsCanonical(
       SET is_canonical = ${isCanonical}, priority = COALESCE(${priority}, priority)
       WHERE id = ${correctionId}
     `;
-    log.info('VlmLearningService', `Updated correction ${correctionId} canonical=${isCanonical}`);
+    log.info(`Updated correction ${correctionId} canonical=${isCanonical}`);
   } catch (error) {
-    log.error('VlmLearningService', `Failed to update canonical status: ${error}`);
+    log.error(`Failed to update canonical status: ${error}`);
     throw error;
   }
 }
@@ -204,10 +204,10 @@ export async function getVlmFewShotExamples(
       photoUrl: ex.photoUrl,
     }));
 
-    log.info('VlmLearningService', `Retrieved ${result.length} few-shot examples for ${module}/${analysisType}`);
+    log.info(`Retrieved ${result.length} few-shot examples for ${module}/${analysisType}`);
     return result;
   } catch (error) {
-    log.error('VlmLearningService', `Failed to get few-shot examples: ${error}`);
+    log.error(`Failed to get few-shot examples: ${error}`);
     return [];
   }
 }
@@ -449,7 +449,7 @@ export async function recordExtractionMetric(input: RecordMetricInput): Promise<
     `;
   } catch (error) {
     // Don't fail the main operation if metrics recording fails
-    log.error('VlmLearningService', `Failed to record metric: ${error}`);
+    log.error(`Failed to record metric: ${error}`);
   }
 }
 
@@ -574,7 +574,7 @@ export async function getVlmMetrics(options: GetMetricsOptions): Promise<VlmMetr
       })),
     };
   } catch (error) {
-    log.error('VlmLearningService', `Failed to get metrics: ${error}`);
+    log.error(`Failed to get metrics: ${error}`);
     throw error;
   }
 }
@@ -651,7 +651,7 @@ export async function getModuleAccuracySummaries(): Promise<ModuleAccuracySummar
       };
     });
   } catch (error) {
-    log.error('VlmLearningService', `Failed to get module summaries: ${error}`);
+    log.error(`Failed to get module summaries: ${error}`);
     return [];
   }
 }
@@ -715,7 +715,7 @@ export async function listCorrections(
       total,
     };
   } catch (error) {
-    log.error('VlmLearningService', `Failed to list corrections: ${error}`);
+    log.error(`Failed to list corrections: ${error}`);
     throw error;
   }
 }
@@ -726,9 +726,9 @@ export async function listCorrections(
 export async function deleteCorrection(correctionId: string): Promise<void> {
   try {
     await sql`DELETE FROM vlm_corrections WHERE id = ${correctionId}`;
-    log.info('VlmLearningService', `Deleted correction ${correctionId}`);
+    log.info(`Deleted correction ${correctionId}`);
   } catch (error) {
-    log.error('VlmLearningService', `Failed to delete correction: ${error}`);
+    log.error(`Failed to delete correction: ${error}`);
     throw error;
   }
 }

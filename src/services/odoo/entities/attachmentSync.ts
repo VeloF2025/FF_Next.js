@@ -17,7 +17,7 @@ import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooAttachment } from '../odooClient';
 import { VFStorageService } from '@/services/vfStorageAdapter';
 
-const logger = createLogger({ module: 'odooAttachmentSync' });
+const logger = createLogger('odooAttachmentSync');
 
 // ============================================================================
 // Types
@@ -189,7 +189,7 @@ function getStoragePath(
  * Build entity mapping cache from database
  */
 async function buildEntityMappingCache(
-  sql: NeonQueryFunction<false, false>
+  sql: any
 ): Promise<Map<string, Map<number, string>>> {
   const cache = new Map<string, Map<number, string>>();
 
@@ -288,7 +288,7 @@ export async function syncAttachments(
     // Get existing synced attachments to skip (only skip 'synced' — retry pending/failed)
     let existingIds = new Set<number>();
     if (skipExisting) {
-      const existing = await sql<{ odoo_attachment_id: number }[]>`
+      const existing = await sql`
         SELECT odoo_attachment_id FROM odoo_documents WHERE sync_status = 'synced'
       `;
       existingIds = new Set(existing.map((e) => e.odoo_attachment_id));
@@ -827,14 +827,14 @@ export async function syncAttachmentsForEntity(
       FROM ${mapping.ffTable}
       WHERE ${mapping.idColumn} = $1
     `;
-    const rows = await sql.unsafe(query, [ffEntityId]) as Array<{ odoo_id: number | null }>;
+    const rows = await (sql as any).unsafe(query, [ffEntityId]) as Array<{ odoo_id: number | null }>;
 
-    if (rows.length === 0 || !rows[0].odoo_id) {
+    if (rows.length === 0 || !rows[0]!.odoo_id) {
       result.errors.push(`Entity ${ffEntityType}:${ffEntityId} has no Odoo mapping`);
       return result;
     }
 
-    const odooRecordId = rows[0].odoo_id;
+    const odooRecordId = rows[0]!.odoo_id;
 
     // Fetch attachments for this specific record
     const attachments = await client.getAttachments({
@@ -854,7 +854,7 @@ export async function syncAttachmentsForEntity(
     for (const attachment of attachments) {
       try {
         // Check if already synced
-        const existing = await sql<{ id: string }[]>`
+        const existing = await sql`
           SELECT id FROM odoo_documents WHERE odoo_attachment_id = ${attachment.id}
         `;
 
@@ -999,18 +999,7 @@ export async function getOrphanedDocuments(
 > {
   const sql = neon(databaseUrl);
 
-  const rows = await sql<
-    Array<{
-      id: string;
-      odoo_attachment_id: number;
-      odoo_model: string;
-      odoo_record_id: number;
-      file_name: string;
-      file_path: string;
-      document_type: string;
-      created_at: Date;
-    }>
-  >`
+  const rows = await sql`
     SELECT
       id,
       odoo_attachment_id,
@@ -1027,7 +1016,7 @@ export async function getOrphanedDocuments(
     LIMIT ${options?.limit || 100}
   `;
 
-  return rows.map((row) => ({
+  return (rows as any[]).map((row: any) => ({
     id: row.id,
     odooAttachmentId: row.odoo_attachment_id,
     odooModel: row.odoo_model,
@@ -1090,14 +1079,7 @@ export async function getAttachmentSyncStats(
   const sql = neon(databaseUrl);
 
   const [totals, byModel, byEntity] = await Promise.all([
-    sql<
-      Array<{
-        total: string;
-        synced: string;
-        orphaned: string;
-        failed: string;
-      }>
-    >`
+    sql`
       SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE sync_status = 'synced') as synced,
@@ -1105,13 +1087,13 @@ export async function getAttachmentSyncStats(
         COUNT(*) FILTER (WHERE sync_status = 'failed') as failed
       FROM odoo_documents
     `,
-    sql<Array<{ model: string; count: string }>>`
+    sql`
       SELECT odoo_model as model, COUNT(*) as count
       FROM odoo_documents
       GROUP BY odoo_model
       ORDER BY count DESC
     `,
-    sql<Array<{ entity_type: string; count: string }>>`
+    sql`
       SELECT ff_entity_type as entity_type, COUNT(*) as count
       FROM odoo_documents
       WHERE ff_entity_type IS NOT NULL

@@ -15,7 +15,7 @@ import {
   OdooProduct,
 } from '../odooClient';
 
-const logger = createLogger({ module: 'odooAssetSync' });
+const logger = createLogger('odooAssetSync');
 
 // ============================================================================
 // Types
@@ -193,7 +193,7 @@ interface PoLinkCandidate {
  * 3. Supplier + date proximity (low)
  */
 async function findMatchingPo(
-  sql: ReturnType<typeof neon>,
+  sql: any,
   asset: OdooAssetData
 ): Promise<PoLinkCandidate | null> {
   // Strategy 1: Serial number match
@@ -213,8 +213,8 @@ async function findMatchingPo(
       LIMIT 1
     `;
 
-    if (serialMatch.length > 0) {
-      const match = serialMatch[0] as Record<string, unknown>;
+    if ((serialMatch as any[]).length > 0) {
+      const match = (serialMatch as any[])[0] as Record<string, unknown>;
       return {
         poId: match.po_id as string,
         poNumber: match.po_number as string,
@@ -246,8 +246,8 @@ async function findMatchingPo(
       LIMIT 1
     `;
 
-    if (nameMatch.length > 0) {
-      const match = nameMatch[0] as Record<string, unknown>;
+    if ((nameMatch as any[]).length > 0) {
+      const match = (nameMatch as any[])[0] as Record<string, unknown>;
       return {
         poId: match.po_id as string,
         poNumber: match.po_number as string,

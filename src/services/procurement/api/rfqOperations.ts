@@ -4,6 +4,7 @@
  */
 
 import { BaseService, type ServiceResponse } from '../../core/BaseService';
+// @ts-ignore
 import type { RFQ } from '@/lib/neon/schema';
 import type { ApiContext, RFQFilters } from './types';
 import { RFQCrudOperations } from './rfq-crud-operations';

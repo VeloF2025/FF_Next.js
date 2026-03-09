@@ -236,5 +236,5 @@ function deriveTypeCode(description: string): string {
     return 'bu';
   }
   // Default: use first word lowercase
-  return lower.split(/\s+/)[0].substring(0, 20);
+  return lower.split(/\s+/)[0]!.substring(0, 20);
 }

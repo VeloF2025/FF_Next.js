@@ -108,7 +108,7 @@ export const phaseOperations = {
       
       if (result.length === 0) return null;
       
-      const row = result[0];
+      const row = result[0]!;
       return {
         ...row,
         dependencies: row.dependencies || [],
@@ -163,7 +163,7 @@ export const phaseOperations = {
         RETURNING id
       `;
       
-      return result[0].id;
+      return result[0]!.id;
     } catch (error) {
       log.error('Error creating phase:', { data: error }, 'neonPhaseService');
       throw new Error('Failed to create phase');
@@ -316,7 +316,7 @@ export const stepOperations = {
         RETURNING id
       `;
       
-      return result[0].id;
+      return result[0]!.id;
     } catch (error) {
       log.error('Error creating step:', { data: error }, 'neonPhaseService');
       throw new Error('Failed to create step');
@@ -467,14 +467,14 @@ export const taskOperations = {
         ORDER BY t.task_order ASC
       `;
       
-      return result.map(task => ({
+      return result.map((task: any) => ({
         ...task,
         attachments: task.attachments || [],
         tags: task.tags || [],
         dependencies: task.dependencies || [],
         checklist: [],
         comments: []
-      })) as Task[];
+      })) as unknown as Task[];
     } catch (error) {
       log.error('Error getting phase tasks:', { data: error }, 'neonPhaseService');
       throw new Error('Failed to fetch phase tasks');
@@ -527,7 +527,7 @@ export const taskOperations = {
         RETURNING id
       `;
       
-      return result[0].id;
+      return result[0]!.id;
     } catch (error) {
       log.error('Error creating task:', { data: error }, 'neonPhaseService');
       throw new Error('Failed to create task');

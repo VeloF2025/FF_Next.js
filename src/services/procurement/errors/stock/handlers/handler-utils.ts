@@ -210,13 +210,13 @@ export class HandlerUtils {
       for (let j = i + 1; j < errors.length; j++) {
         if (processed.has(j)) continue;
 
-        if (HandlerUtils.areErrorsRelated(errors[i], errors[j])) {
+        if (HandlerUtils.areErrorsRelated(errors[i]!, errors[j]!)) {
           currentGroup.push(errors[j]);
           processed.add(j);
         }
       }
 
-      groups.push(currentGroup);
+      groups.push(currentGroup as StockError[]);
     }
 
     return groups;

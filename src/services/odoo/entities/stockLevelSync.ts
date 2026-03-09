@@ -13,7 +13,7 @@ import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockQuant } from '../odooClient';
 
-const logger = createLogger({ module: 'odooStockLevelSync' });
+const logger = createLogger('odooStockLevelSync');
 
 // ============================================================================
 // Types
@@ -50,10 +50,10 @@ export interface StockLevelSyncOptions {
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooProductId: number
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -64,12 +64,12 @@ async function getStockItemByOdooId(
  * Tries odoo_location_mappings first, then direct match
  */
 async function getWarehouseByOdooLocationId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooLocationId: number
 ): Promise<string | null> {
   // Try odoo_location_mappings first
   try {
-    const mappingRows = await sql<{ ff_location_id: string; ff_warehouse_code: string }[]>`
+    const mappingRows = await sql`
       SELECT ff_location_id, ff_warehouse_code FROM odoo_location_mappings
       WHERE odoo_location_id = ${odooLocationId}
       LIMIT 1
@@ -79,7 +79,7 @@ async function getWarehouseByOdooLocationId(
     }
     // If we have a warehouse code, look it up
     if (mappingRows.length > 0 && mappingRows[0].ff_warehouse_code) {
-      const warehouseRows = await sql<{ id: string }[]>`
+      const warehouseRows = await sql`
         SELECT id FROM stock_locations WHERE code = ${mappingRows[0].ff_warehouse_code} LIMIT 1
       `;
       return warehouseRows.length > 0 ? warehouseRows[0].id : null;
@@ -90,7 +90,7 @@ async function getWarehouseByOdooLocationId(
 
   // Fallback: try warehouses table directly
   try {
-    const directRows = await sql<{ id: string }[]>`
+    const directRows = await sql`
       SELECT id FROM stock_locations WHERE odoo_location_id = ${odooLocationId} LIMIT 1
     `;
     return directRows.length > 0 ? directRows[0].id : null;
@@ -103,9 +103,9 @@ async function getWarehouseByOdooLocationId(
  * Get default warehouse
  */
 async function getDefaultWarehouse(
-  sql: NeonQueryFunction<false, false>
+  sql: any
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_locations
     ORDER BY name ASC
     LIMIT 1
@@ -117,19 +117,19 @@ async function getDefaultWarehouse(
  * Get existing stock level by item and warehouse
  */
 async function getExistingStockLevel(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   stockItemId: string,
   warehouseId: string | null
 ): Promise<{ id: string; qty_on_hand: number } | null> {
   if (warehouseId) {
-    const rows = await sql<{ id: string; qty_on_hand: number }[]>`
+    const rows = await sql`
       SELECT id, qty_on_hand FROM stock_levels
       WHERE stock_item_id = ${stockItemId} AND location_id = ${warehouseId}
       LIMIT 1
     `;
     return rows.length > 0 ? rows[0] : null;
   } else {
-    const rows = await sql<{ id: string; qty_on_hand: number }[]>`
+    const rows = await sql`
       SELECT id, qty_on_hand FROM stock_levels
       WHERE stock_item_id = ${stockItemId} AND location_id IS NULL
       LIMIT 1
@@ -173,7 +173,7 @@ export async function syncStockLevels(
       productIds,
       locationIds,
       limit,
-    });
+    } as any);
 
     logger.info(`Found ${odooQuants.length} stock quants in Odoo`);
 
@@ -395,7 +395,7 @@ export async function syncProductStockLevel(
   });
 
   if (result.errors.length > 0) {
-    return { success: false, message: result.errors[0] };
+    return { success: false, message: result.errors[0] ?? 'Unknown error' };
   }
 
   return {
@@ -420,14 +420,14 @@ export async function getStockLevelSyncStats(
   const sql = neon(databaseUrl);
 
   const [totals, byWarehouse, lastSync] = await Promise.all([
-    sql<Array<{ total: string; odoo_synced: string; total_qty: string }>>`
+    sql`
       SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE odoo_quant_id IS NOT NULL) as odoo_synced,
         COALESCE(SUM(qty_on_hand), 0) as total_qty
       FROM stock_levels
     `,
-    sql<Array<{ warehouse_name: string | null; count: string; total_qty: string }>>`
+    sql`
       SELECT
         w.name as warehouse_name,
         COUNT(sl.*) as count,
@@ -437,7 +437,7 @@ export async function getStockLevelSyncStats(
       GROUP BY w.id, w.name
       ORDER BY total_qty DESC
     `,
-    sql<Array<{ last_sync: Date | null }>>`
+    sql`
       SELECT last_sync_stock_levels as last_sync
       FROM odoo_api_config
       LIMIT 1
@@ -497,11 +497,7 @@ export async function compareStockLevels(
   }
 
   // Get FF stock levels grouped by product
-  const ffLevels = await sql<Array<{
-    odoo_product_id: number;
-    product_name: string;
-    total_qty: string;
-  }>>`
+  const ffLevels = await sql`
     SELECT
       si.odoo_product_id,
       si.name as product_name,

@@ -75,10 +75,10 @@ export function validateImportData(rows: ClientImportRow[]): {
   const allErrors: ClientImportError[] = [];
   
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNumber = i + 2; // +2 because row 1 is headers, and arrays are 0-indexed
     const errors = validateImportRow(row, rowNumber);
-    
+
     if (errors.length === 0) {
       validRows.push(row);
     } else {

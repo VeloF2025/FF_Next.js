@@ -49,12 +49,12 @@ export class RegressionAnalyzer {
     const alpha = 0.3; // Smoothing parameter
     const beta = 0.1; // Trend parameter
     
-    let level = data[0];
-    let trend = data.length > 1 ? data[1] - data[0] : 0;
-    
+    let level = data[0]!;
+    let trend = data.length > 1 ? data[1]! - data[0]! : 0;
+
     // Apply exponential smoothing
     for (let i = 1; i < data.length; i++) {
-      const newLevel = alpha * data[i] + (1 - alpha) * (level + trend);
+      const newLevel = alpha * data[i]! + (1 - alpha) * (level + trend);
       const newTrend = beta * (newLevel - level) + (1 - beta) * trend;
       level = newLevel;
       trend = newTrend;
@@ -125,16 +125,16 @@ export class RegressionAnalyzer {
     const actuals = [];
     
     for (let i = 2; i < data.length; i++) {
-      const predicted = (data[i-2] + data[i-1]) / 2; // Simple average prediction
+      const predicted = (data[i-2]! + data[i-1]!) / 2; // Simple average prediction
       predictions.push(predicted);
-      actuals.push(data[i]);
+      actuals.push(data[i]!);
     }
 
     // Calculate accuracy
     let totalError = 0;
     for (let i = 0; i < predictions.length; i++) {
-      const error = Math.abs(predictions[i] - actuals[i]);
-      const relativeError = actuals[i] > 0 ? error / actuals[i] : 0;
+      const error = Math.abs(predictions[i]! - actuals[i]!);
+      const relativeError = actuals[i]! > 0 ? error / actuals[i]! : 0;
       totalError += relativeError;
     }
     

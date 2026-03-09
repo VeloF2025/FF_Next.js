@@ -213,7 +213,7 @@ export function parseDate(
           });
         }
 
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const parsedDate = new Date(parseInt(year!), parseInt(month!) - 1, parseInt(day!));
         
         if (isValidDate(parsedDate)) {
           return parsedDate;

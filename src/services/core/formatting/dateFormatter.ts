@@ -28,7 +28,7 @@ export class DateFormatter {
 
     try {
       // Standard YYYY-MM-DD format
-      const datePart = dateObj.toISOString().split('T')[0];
+      const datePart = dateObj.toISOString().split('T')[0] ?? '';
 
       // If time is requested, append it
       if (timeStyle) {
@@ -45,7 +45,7 @@ export class DateFormatter {
       return datePart;
     } catch (error) {
       log.warn('Date formatting failed:', { data: error }, 'dateFormatter');
-      return dateObj.toISOString().split('T')[0];
+      return dateObj.toISOString().split('T')[0] ?? '';
     }
   }
 

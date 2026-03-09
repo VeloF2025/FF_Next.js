@@ -7,7 +7,7 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { getNotificationMessage } from '../utils/rfqMessageTemplates';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqNotificationService {
   /**
@@ -118,7 +118,7 @@ export class RfqNotificationService {
         WHERE rfq_id = ${rfqId}
         ORDER BY created_at DESC`;
 
-      return notifications.map(n => ({
+      return notifications.map((n: any) => ({
         id: n.id,
         type: n.notification_type,
         recipientType: n.recipient_type,

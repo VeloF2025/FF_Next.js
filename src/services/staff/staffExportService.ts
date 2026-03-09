@@ -27,7 +27,7 @@ export const staffExportService = {
         'Alternative Phone': s.alternativePhone || '',
         'Position': s.position,
         'Department': s.department,
-        'Level': s.level,
+        'Level': s.level ?? '',
         'Status': s.status,
         'Manager': s.managerName || '',
         'Skills': s.skills.join(', '),

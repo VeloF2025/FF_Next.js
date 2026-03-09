@@ -3,7 +3,7 @@
  * Functions to transform database results to domain models
  */
 
-import { StaffMember, StaffDropdownOption, Timestamp } from '@/types/staff.types';
+import { StaffMember, StaffDropdownOption, TimestampLike } from '@/types/staff.types';
 import {
   SAContractType,
   UIFStatus,
@@ -17,14 +17,12 @@ import {
 import { safeToDate } from '@/utils/dateHelpers';
 
 // Helper function to convert Date to Timestamp for Firebase compatibility
-function dateToTimestamp(date: Date): Timestamp {
+function dateToTimestamp(date: Date): TimestampLike {
   return {
     seconds: Math.floor(date.getTime() / 1000),
     nanoseconds: (date.getTime() % 1000) * 1000000,
     toDate: () => date,
-    toMillis: () => date.getTime(),
-    isEqual: (other: Timestamp) => date.getTime() === other.toMillis()
-  } as Timestamp;
+  };
 }
 
 /**

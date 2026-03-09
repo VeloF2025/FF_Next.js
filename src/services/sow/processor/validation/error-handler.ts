@@ -81,10 +81,10 @@ export class SOWErrorHandler {
       Math.round((totalValid / totalRecords) * 100 * 100) / 100 : 0;
     
     const datasetSummaries = datasets.map((dataset, index) => {
-      const result = results[index];
+      const result = results[index]!;
       const total = result.valid.length + result.invalid.length;
       const validationRate = total > 0 ? (result.valid.length / total) * 100 : 0;
-      
+
       return {
         type: dataset.type,
         validationRate: Math.round(validationRate * 100) / 100,

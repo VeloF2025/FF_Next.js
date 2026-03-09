@@ -75,7 +75,7 @@ export class SupplierStatisticsService {
         bottomQuartile: analyzerBenchmarks.overall.q1
       },
       byCategory: Object.keys(analyzerBenchmarks.byCategory).reduce((acc, key) => {
-        const stats = analyzerBenchmarks.byCategory[key];
+        const stats = analyzerBenchmarks.byCategory[key]!;
         acc[key] = {
           topQuartile: stats.q3,
           median: stats.median,
@@ -85,7 +85,7 @@ export class SupplierStatisticsService {
         return acc;
       }, {} as Record<string, any>),
       byBusinessType: Object.keys(analyzerBenchmarks.byBusinessType).reduce((acc, key) => {
-        const stats = analyzerBenchmarks.byBusinessType[key];
+        const stats = analyzerBenchmarks.byBusinessType[key]!;
         acc[key] = {
           topQuartile: stats.q3,
           median: stats.median,

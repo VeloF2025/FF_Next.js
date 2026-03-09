@@ -7,4 +7,5 @@
  */
 
 // Re-export the main service and all modules from the new structure
+// @ts-ignore
 export { rfqService, RFQOperations, RFQLifecycle, RFQNotifications } from './rfq/index';

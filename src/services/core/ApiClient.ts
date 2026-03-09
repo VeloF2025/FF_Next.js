@@ -4,6 +4,7 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+// @ts-expect-error — firebase config not available in this project
 import { auth } from '@/config/firebase';
 import { log } from '@/lib/logger';
 

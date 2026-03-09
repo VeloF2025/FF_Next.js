@@ -337,6 +337,6 @@ export class InventoryHandlers {
   private static calculateRestockDate(): string {
     const restockDate = new Date();
     restockDate.setDate(restockDate.getDate() + 7); // Default 7 days
-    return restockDate.toISOString().split('T')[0];
+    return restockDate.toISOString().split('T')[0]!;
   }
 }

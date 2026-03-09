@@ -37,8 +37,8 @@ export class CompetitiveAnalyzer {
     
     // Calculate score gaps
     const scoreGap = {
-      toNext: rank > 1 ? allScores[rank - 2].score - supplierScore : 0,
-      toPrevious: rank < totalSuppliers ? supplierScore - allScores[rank].score : 0
+      toNext: rank > 1 ? allScores[rank - 2]!.score - supplierScore : 0,
+      toPrevious: rank < totalSuppliers ? supplierScore - allScores[rank]!.score : 0
     };
     
     // Determine percentile range

@@ -100,23 +100,23 @@ export class DisplayFormatter {
     const recommendations: string[] = [];
     const totalErrors = errors.length;
     
-    if (errorsByType.InsufficientStockError > totalErrors * 0.3) {
+    if ((errorsByType.InsufficientStockError ?? 0) > totalErrors * 0.3) {
       recommendations.push('Consider implementing automatic reorder points for frequently out-of-stock items');
     }
     
-    if (errorsByType.StockMovementError > totalErrors * 0.2) {
+    if ((errorsByType.StockMovementError ?? 0) > totalErrors * 0.2) {
       recommendations.push('Review stock movement processes for efficiency improvements');
     }
 
-    if (errorsByType.StockTransferError > totalErrors * 0.15) {
+    if ((errorsByType.StockTransferError ?? 0) > totalErrors * 0.15) {
       recommendations.push('Audit inter-location transfer procedures and infrastructure');
     }
 
-    if (errorsByType.StockAdjustmentError > totalErrors * 0.1) {
+    if ((errorsByType.StockAdjustmentError ?? 0) > totalErrors * 0.1) {
       recommendations.push('Implement more frequent cycle counts to reduce adjustment discrepancies');
     }
 
-    if (errorsByType.StockReservationError > totalErrors * 0.2) {
+    if ((errorsByType.StockReservationError ?? 0) > totalErrors * 0.2) {
       recommendations.push('Review reservation policies and implement reservation queue system');
     }
 

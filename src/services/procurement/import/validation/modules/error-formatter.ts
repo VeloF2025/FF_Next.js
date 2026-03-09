@@ -93,11 +93,11 @@ export function getErrorSummary(errors: ImportError[], warnings: ImportWarning[]
     hasParsingErrors: errors.some(e => e.type === 'parsing'),
     hasBusinessErrors: errors.some(e => e.type === 'business'),
     mostCommonError: Object.keys(errorsByType).length > 0 
-      ? Object.keys(errorsByType).reduce((a, b) => 
-          errorsByType[a].length > errorsByType[b].length ? a : b
-        ) 
+      ? Object.keys(errorsByType).reduce((a, b) =>
+          (errorsByType[a] as any[]).length > (errorsByType[b] as any[]).length ? a : b
+        )
       : null,
-    problematicColumns: Object.keys(errorsByColumn).filter(col => errorsByColumn[col].length > 1)
+    problematicColumns: Object.keys(errorsByColumn).filter(col => (errorsByColumn[col] as any[]).length > 1)
   };
 }
 
@@ -138,7 +138,7 @@ export function formatValidationSummary(results: ValidationResult[]): string {
   output += `- Warnings: ${summary.totalWarnings}\n`;
   
   if (summary.mostCommonError) {
-    output += `- Most Common Error: ${summary.mostCommonError} (${summary.errorsByType[summary.mostCommonError].length} occurrences)\n`;
+    output += `- Most Common Error: ${summary.mostCommonError} (${(summary.errorsByType[summary.mostCommonError] as any[]).length} occurrences)\n`;
   }
   
   if (summary.problematicColumns.length > 0) {

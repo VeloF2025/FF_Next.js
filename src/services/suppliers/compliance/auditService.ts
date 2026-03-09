@@ -79,7 +79,7 @@ export class ComplianceAuditService {
 
       // Calculate percentages for business types
       Object.keys(result.complianceByType).forEach(businessType => {
-        const typeData = result.complianceByType[businessType];
+        const typeData = result.complianceByType[businessType]!;
         const total = typeData.compliant + typeData.nonCompliant;
         typeData.percentage = total > 0 ? Math.round((typeData.compliant / total) * 100) : 0;
       });

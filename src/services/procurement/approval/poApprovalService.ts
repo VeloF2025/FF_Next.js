@@ -13,7 +13,7 @@ import { log } from '@/lib/logger';
 import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
 import { notify } from '@/modules/notifications/services';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 // Types
 export interface ApprovalLevel {
@@ -157,13 +157,13 @@ class POApprovalService {
           SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
           FROM users WHERE id = ${level.approverUserId}
         `;
-        approvers = result.map(r => ({ id: r.id, name: r.name, email: r.email }));
+        approvers = result.map((r: any) => ({ id: r.id, name: r.name, email: r.email }));
       } else if (level.approverType === 'role' && level.approverRole) {
         const result = await sql`
           SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
           FROM users WHERE role = ${level.approverRole}
         `;
-        approvers = result.map(r => ({ id: r.id, name: r.name, email: r.email }));
+        approvers = result.map((r: any) => ({ id: r.id, name: r.name, email: r.email }));
       }
 
       return approvers;
@@ -506,7 +506,7 @@ class POApprovalService {
         status: po.status,
         supplierId: po.supplier_id,
         totalAmount: parseFloat(po.total_amount) || 0,
-        items: itemsResult.map(item => ({
+        items: itemsResult.map((item: any) => ({
           id: item.id,
           description: item.item_description,
           quantity: parseFloat(item.quantity_ordered) || 0,
@@ -685,7 +685,7 @@ class POApprovalService {
         ORDER BY q.total_amount ASC
       `;
 
-      const allQuotes = quotesResult.map(q => ({
+      const allQuotes = quotesResult.map((q: any) => ({
         id: q.id,
         quoteNumber: q.quote_number,
         supplierName: q.supplier_name,
@@ -693,7 +693,7 @@ class POApprovalService {
         isSelected: q.id === po.quote_id,
       }));
 
-      const selectedQuoteData = quotesResult.find(q => q.id === po.quote_id);
+      const selectedQuoteData = quotesResult.find((q: typeof quotesResult[0]) => q.id === po.quote_id);
       const selectedQuote = selectedQuoteData
         ? {
             id: selectedQuoteData.id,
@@ -784,7 +784,7 @@ class POApprovalService {
         ORDER BY performed_at DESC
       `;
 
-      const history = historyResult.map(h => ({
+      const history = historyResult.map((h: any) => ({
         action: h.action,
         by: h.performed_by_name || 'Unknown',
         at: new Date(h.performed_at),
@@ -826,7 +826,7 @@ class POApprovalService {
         ORDER BY version DESC
       `;
 
-      return result.map(v => {
+      return result.map((v: any) => {
         const snapshot = typeof v.snapshot === 'string' ? JSON.parse(v.snapshot) : v.snapshot;
         return {
           version: v.version,

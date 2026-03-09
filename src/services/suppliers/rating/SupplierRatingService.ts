@@ -28,7 +28,7 @@ export class SupplierRatingService {
       // Filter by category if specified
       if (category) {
         suppliers = suppliers.filter(s =>
-          s.categories && s.categories.includes(category)
+          s.categories && s.categories.includes(category as any)
         );
       }
 

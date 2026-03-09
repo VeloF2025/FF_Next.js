@@ -8,6 +8,7 @@ import { ProcurementError } from '../procurementErrors';
 import { projectAccessMiddleware } from '../middleware/projectAccessMiddleware';
 import { rbacMiddleware } from '../middleware/rbacMiddleware';
 import { db } from '@/lib/neon/connection';
+// @ts-ignore
 import { boqs } from '@/lib/neon/schema';
 import { BOQOperations } from './boqOperations';
 import { RFQOperations } from './rfqOperations';

@@ -129,7 +129,7 @@ export function validateBOQItems(
       break;
     }
 
-    const result = validateBOQItem(items[i], i + 1, useExtendedValidation);
+    const result = validateBOQItem(items[i]!, i + 1, useExtendedValidation);
     results.push(result);
     totalErrors += result.errors.length;
   }

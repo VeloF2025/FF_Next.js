@@ -150,8 +150,8 @@ export class EncodingDetector {
     let binaryCount = 0;
     
     for (let i = 0; i < uint8Array.length; i++) {
-      const byte = uint8Array[i];
-      
+      const byte = uint8Array[i]!;
+
       if (byte <= 0x7F) {
         asciiCount++;
       } else if (byte <= 0xBF) {
@@ -159,8 +159,8 @@ export class EncodingDetector {
         binaryCount++;
       } else if (byte <= 0xDF) {
         // 2-byte UTF-8 sequence start
-        if (i + 1 < uint8Array.length && 
-            uint8Array[i + 1] >= 0x80 && uint8Array[i + 1] <= 0xBF) {
+        if (i + 1 < uint8Array.length &&
+            uint8Array[i + 1]! >= 0x80 && uint8Array[i + 1]! <= 0xBF) {
           utf8Count += 2;
           i++; // Skip next byte
         } else {
@@ -169,8 +169,8 @@ export class EncodingDetector {
       } else if (byte <= 0xEF) {
         // 3-byte UTF-8 sequence start
         if (i + 2 < uint8Array.length &&
-            uint8Array[i + 1] >= 0x80 && uint8Array[i + 1] <= 0xBF &&
-            uint8Array[i + 2] >= 0x80 && uint8Array[i + 2] <= 0xBF) {
+            uint8Array[i + 1]! >= 0x80 && uint8Array[i + 1]! <= 0xBF &&
+            uint8Array[i + 2]! >= 0x80 && uint8Array[i + 2]! <= 0xBF) {
           utf8Count += 3;
           i += 2; // Skip next two bytes
         } else {

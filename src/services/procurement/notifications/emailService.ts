@@ -7,7 +7,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 // Email provider configuration (can be SendGrid, AWS SES, etc.)
 interface EmailConfig {
@@ -455,11 +455,12 @@ export class EmailService {
             WHERE id = ${notification.id}`;
         } catch (error) {
           // Mark as failed
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           await sql`
             UPDATE rfq_notifications 
             SET 
               status = 'failed',
-              error_message = ${error.message || 'Unknown error'},
+              error_message = ${errorMessage},
               retry_count = COALESCE(retry_count, 0) + 1
             WHERE id = ${notification.id}`;
         }

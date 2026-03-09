@@ -10,7 +10,7 @@ import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqNotificationService } from '../notifications/RfqNotificationService';
 import { generateResponseNumber } from '../utils/rfqNumberGenerator';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqResponseService {
   /**
@@ -159,7 +159,7 @@ export class RfqResponseService {
         WHERE r.rfq_id = ${rfqId}
         ORDER BY r.submission_date DESC`;
 
-      return responses.map(response => ({
+      return responses.map((response: any) => ({
         id: response.id,
         rfqId: response.rfq_id,
         supplierId: response.supplier_id,

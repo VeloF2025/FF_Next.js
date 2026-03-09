@@ -346,12 +346,12 @@ export class ComparisonEngine {
     // Performance insights
     const strongestMetric = Object.entries(scores).reduce((prev, current) => 
       (current[1] as number) > (prev[1] as number) ? current : prev
-    )[0];
+    )[0]!;
     insights.push(`Strongest performance area: ${strongestMetric.replace('Score', '')}`);
     
     const weakestMetric = Object.entries(scores).reduce((prev, current) => 
       (current[1] as number) < (prev[1] as number) ? current : prev
-    )[0];
+    )[0]!;
     insights.push(`Area for improvement: ${weakestMetric.replace('Score', '')}`);
     
     // Competitive insights

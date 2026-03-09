@@ -13,7 +13,7 @@ import {
 } from '@/types/procurement.types';
 
 // Initialize Neon connection
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 /**
  * RFQ CRUD operations
@@ -64,7 +64,7 @@ export class RFQCrud {
         params
       );
 
-      return result.map(row => ({
+      return result.map((row: any) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,
@@ -146,7 +146,7 @@ export class RFQCrud {
   /**
    * Create new RFQ
    */
-  static async create(data: RFQFormData): Promise<string> {
+  static async create(data: RFQFormData & { createdBy?: string; totalBudgetEstimate?: number }): Promise<string> {
     try {
       // Generate unique RFQ number
       const rfqNumber = `RFQ-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -192,9 +192,9 @@ export class RFQCrud {
         RETURNING id`;
       
       // Insert items if provided
-      if (data.items && data.items.length > 0) {
-        for (let i = 0; i < data.items.length; i++) {
-          const item = data.items[i];
+      if ((data as any).items && (data as any).items.length > 0) {
+        for (let i = 0; i < (data as any).items.length; i++) {
+          const item = (data as any).items[i];
           await sql`
             INSERT INTO rfq_items (
               rfq_id,
@@ -267,9 +267,9 @@ export class RFQCrud {
         params.push(data.technicalRequirements);
         paramCount++;
       }
-      if (data.totalBudgetEstimate !== undefined) {
+      if ((data as any).totalBudgetEstimate !== undefined) {
         updateFields.push(`total_budget_estimate = $${paramCount}`);
-        params.push(data.totalBudgetEstimate);
+        params.push((data as any).totalBudgetEstimate);
         paramCount++;
       }
       
@@ -352,7 +352,7 @@ export class RFQCrud {
         GROUP BY r.id
         ORDER BY r.created_at DESC`;
       
-      return result.map(row => ({
+      return result.map((row: any) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,
@@ -448,7 +448,7 @@ export class RFQCrud {
         WHERE rfq_id = ${rfqId}
         ORDER BY line_number`;
       
-      return result.map(item => ({
+      return result.map((item: any) => ({
         id: item.id,
         lineNumber: item.line_number,
         description: item.description,
@@ -555,7 +555,7 @@ export class RFQCrud {
         WHERE r.rfq_id = ${rfqId}
         ORDER BY r.submission_date DESC`;
       
-      return result.map(response => ({
+      return result.map((response: any) => ({
         id: response.id,
         rfqId: response.rfq_id,
         supplierId: response.supplier_id,

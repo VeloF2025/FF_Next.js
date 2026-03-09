@@ -106,7 +106,7 @@ function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '';
   try {
     const d = new Date(date);
-    return d.toISOString().split('T')[0]; // YYYY-MM-DD
+    return d.toISOString().split('T')[0] ?? ''; // YYYY-MM-DD
   } catch {
     return String(date);
   }
@@ -530,7 +530,7 @@ export async function validateDocument(
         matchScore: 100,
         mismatches: [],
         matches: [],
-        staffRecord: await fetchStaffRecord(staffId),
+        staffRecord: await fetchStaffRecord(staffId) as { name: string; saIdNumber: string | null; position: string | null; department: string | null; startDate: string | null; } | null,
       };
   }
 }

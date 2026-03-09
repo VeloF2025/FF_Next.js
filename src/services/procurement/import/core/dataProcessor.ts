@@ -60,10 +60,10 @@ export class BOQImportDataProcessor {
 
       const matches = await catalogMatcher.findMatches(boqItem);
       
-      if (matches.length > 0 && matches[0].confidence >= config.minMappingConfidence) {
+      if (matches.length > 0 && matches[0]!.confidence >= config.minMappingConfidence) {
         mapped.push({
           ...item,
-          catalogMatch: matches[0]
+          catalogMatch: matches[0]!
         });
       } else {
         exceptions.push({
@@ -172,14 +172,14 @@ export class BOQImportDataProcessor {
     for (let i = 0; i < items.length; i++) {
       if (processed.has(i)) continue;
 
-      const currentItem = items[i];
+      const currentItem = items[i]!;
       const duplicates = [currentItem];
       processed.add(i);
 
       for (let j = i + 1; j < items.length; j++) {
         if (processed.has(j)) continue;
 
-        const otherItem = items[j];
+        const otherItem = items[j]!;
         if (this.areItemsSimilar(currentItem, otherItem)) {
           duplicates.push(otherItem);
           processed.add(j);
@@ -187,7 +187,7 @@ export class BOQImportDataProcessor {
       }
 
       if (duplicates.length > 1) {
-        duplicateGroups.push(duplicates);
+        duplicateGroups.push(duplicates as ParsedBOQItem[]);
       }
     }
 
@@ -232,20 +232,20 @@ export class BOQImportDataProcessor {
       Array(str1.length + 1).fill(null)
     );
 
-    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    for (let i = 0; i <= str1.length; i++) matrix[0]![i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j]![0] = j;
 
     for (let j = 1; j <= str2.length; j++) {
       for (let i = 1; i <= str1.length; i++) {
         const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1,
-          matrix[j - 1][i] + 1,
-          matrix[j - 1][i - 1] + indicator
+        matrix[j]![i] = Math.min(
+          matrix[j]![i - 1]! + 1,
+          matrix[j - 1]![i]! + 1,
+          matrix[j - 1]![i - 1]! + indicator
         );
       }
     }
 
-    return matrix[str2.length][str1.length];
+    return matrix[str2.length]![str1.length]!;
   }
 }

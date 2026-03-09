@@ -196,7 +196,7 @@ export class LocationReportsGenerator {
     const highPerformance = regions.filter(r => r.averageRating >= 4.0);
     if (highPerformance.length > 0) {
       report += `- High Performance Regions: ${highPerformance.length}\n`;
-      report += `  Top Rated: ${highPerformance[0].region} (${highPerformance[0].averageRating.toFixed(2)})\n`;
+      report += `  Top Rated: ${highPerformance[0]!.region} (${highPerformance[0]!.averageRating.toFixed(2)})\n`;
     }
 
     const emerging = regions.filter(r => r.supplierCount >= 3 && r.supplierCount <= 10 && r.averageRating >= 3.5);

@@ -9,7 +9,7 @@ import { BOQ, BOQFormData, BOQStatusType } from '@/types/procurement/boq.types';
 import { log } from '@/lib/logger';
 
 // Initialize Neon connection
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 /**
  * BOQ CRUD operations
@@ -50,7 +50,7 @@ export class BOQCrud {
         params
       );
 
-      return result.map(row => ({
+      return result.map((row: any) => ({
         id: row.id,
         projectId: row.project_id,
         name: row.name,
@@ -100,7 +100,7 @@ export class BOQCrud {
         throw new Error('BOQ not found');
       }
       
-      const row = result[0];
+      const row = result[0]!;
       return {
         id: row.id,
         projectId: row.project_id,
@@ -135,7 +135,7 @@ export class BOQCrud {
   /**
    * Create new BOQ
    */
-  static async create(data: BOQFormData): Promise<string> {
+  static async create(data: BOQFormData & { uploadedBy?: string; totalEstimatedValue?: number }): Promise<string> {
     try {
       const result = await sql`
         INSERT INTO boqs (
@@ -170,9 +170,9 @@ export class BOQCrud {
         RETURNING id`;
       
       // Add BOQ items if provided
-      if (data.items && data.items.length > 0) {
-        for (let i = 0; i < data.items.length; i++) {
-          const item = data.items[i];
+      if ((data as any).items && (data as any).items.length > 0) {
+        for (let i = 0; i < (data as any).items.length; i++) {
+          const item = (data as any).items[i];
           await sql`
             INSERT INTO boq_items (
               boq_id,
@@ -186,7 +186,7 @@ export class BOQCrud {
               category,
               sequence_number
             ) VALUES (
-              ${result[0].id},
+              ${result[0]!.id},
               ${data.projectId},
               ${item.itemNumber || (i + 1).toString()},
               ${item.description},
@@ -202,14 +202,14 @@ export class BOQCrud {
         // Update item count
         await sql`
           UPDATE boqs 
-          SET item_count = ${data.items.length},
+          SET item_count = ${(data as any).items.length},
               total_estimated_value = (
-                SELECT SUM(amount) FROM boq_items WHERE boq_id = ${result[0].id}
+                SELECT SUM(amount) FROM boq_items WHERE boq_id = ${result[0]!.id}
               )
-          WHERE id = ${result[0].id}`;
+          WHERE id = ${result[0]!.id}`;
       }
       
-      return result[0].id;
+      return result[0]!.id;
     } catch (error) {
       log.error('Error creating BOQ:', { data: error }, 'boqCrud');
       throw error;
@@ -235,9 +235,9 @@ export class BOQCrud {
         params.push(data.description);
         paramCount++;
       }
-      if (data.status !== undefined) {
+      if ((data as any).status !== undefined) {
         updateFields.push(`status = $${paramCount}`);
-        params.push(data.status);
+        params.push((data as any).status);
         paramCount++;
       }
       if (data.version !== undefined) {
@@ -245,9 +245,9 @@ export class BOQCrud {
         params.push(data.version);
         paramCount++;
       }
-      if (data.totalEstimatedValue !== undefined) {
+      if ((data as any).totalEstimatedValue !== undefined) {
         updateFields.push(`total_estimated_value = $${paramCount}`);
-        params.push(data.totalEstimatedValue);
+        params.push((data as any).totalEstimatedValue);
         paramCount++;
       }
       
@@ -330,7 +330,7 @@ export class BOQCrud {
         SELECT EXISTS(
           SELECT 1 FROM boqs WHERE id = ${id}
         ) as exists`;
-      return result[0].exists;
+      return result[0]!.exists;
     } catch (error) {
       log.error('Error checking BOQ existence:', { data: error }, 'boqCrud');
       return false;
@@ -396,7 +396,7 @@ export class BOQCrud {
         WHERE boq_id = ${boqId}
         ORDER BY sequence_number, item_number`;
       
-      return result.map(item => ({
+      return result.map((item: any) => ({
         id: item.id,
         boqId: item.boq_id,
         projectId: item.project_id,

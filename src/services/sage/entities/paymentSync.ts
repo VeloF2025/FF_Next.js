@@ -196,7 +196,7 @@ async function createPaymentRecord(
     RETURNING id
   `;
 
-  return { id: result[0].id as string };
+  return { id: result[0]!.id as string };
 }
 
 /**
@@ -222,12 +222,13 @@ async function matchPaymentToInvoice(
         AND ssi.ff_purchase_order_id IS NOT NULL
     `;
 
-    if (invoiceMatch.length > 0 && invoiceMatch[0].ff_purchase_order_id) {
-      await linkPaymentToInvoice(sql, localPaymentId, invoiceMatch[0].id as string);
+    const invoiceRow = invoiceMatch[0];
+    if (invoiceRow && invoiceRow.ff_purchase_order_id) {
+      await linkPaymentToInvoice(sql, localPaymentId, invoiceRow.id as string);
       return {
-        invoiceId: invoiceMatch[0].id as string,
-        poId: invoiceMatch[0].ff_purchase_order_id as string,
-        projectId: invoiceMatch[0].project_id as string,
+        invoiceId: invoiceRow.id as string,
+        poId: invoiceRow.ff_purchase_order_id as string,
+        projectId: invoiceRow.project_id as string,
       };
     }
   }
@@ -258,12 +259,13 @@ async function matchPaymentToInvoice(
       LIMIT 1
     `;
 
-    if (amountMatch.length > 0) {
-      await linkPaymentToInvoice(sql, localPaymentId, amountMatch[0].id as string);
+    const amountRow = amountMatch[0];
+    if (amountRow) {
+      await linkPaymentToInvoice(sql, localPaymentId, amountRow.id as string);
       return {
-        invoiceId: amountMatch[0].id as string,
-        poId: amountMatch[0].ff_purchase_order_id as string,
-        projectId: amountMatch[0].project_id as string,
+        invoiceId: amountRow.id as string,
+        poId: amountRow.ff_purchase_order_id as string,
+        projectId: amountRow.project_id as string,
       };
     }
   }
@@ -293,7 +295,7 @@ async function linkPaymentToInvoice(
     SELECT amount FROM sage_supplier_payments WHERE id = ${paymentId}
   `;
 
-  const paymentAmount = parseFloat(payment[0].amount as string);
+  const paymentAmount = parseFloat(payment[0]!.amount as string);
 
   await sql`
     UPDATE sage_supplier_invoices

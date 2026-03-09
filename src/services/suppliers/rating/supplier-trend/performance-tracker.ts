@@ -204,7 +204,7 @@ export class SupplierPerformanceTracker {
       const mean1 = arr1.reduce((a, b) => a + b) / n;
       const mean2 = arr2.reduce((a, b) => a + b) / n;
       
-      const num = arr1.reduce((sum, val, i) => sum + (val - mean1) * (arr2[i] - mean2), 0);
+      const num = arr1.reduce((sum, val, i) => sum + (val - mean1) * (arr2[i]! - mean2), 0);
       const den1 = Math.sqrt(arr1.reduce((sum, val) => sum + Math.pow(val - mean1, 2), 0));
       const den2 = Math.sqrt(arr2.reduce((sum, val) => sum + Math.pow(val - mean2, 2), 0));
       
@@ -271,10 +271,10 @@ export class SupplierPerformanceTracker {
     };
 
     return {
-      delivery: seasonalPatterns.delivery[month],
-      quality: seasonalPatterns.quality[month],
-      price: seasonalPatterns.price[month],
-      service: seasonalPatterns.service[month]
+      delivery: seasonalPatterns.delivery[month] ?? 1,
+      quality: seasonalPatterns.quality[month] ?? 1,
+      price: seasonalPatterns.price[month] ?? 1,
+      service: seasonalPatterns.service[month] ?? 1
     };
   }
 
@@ -284,7 +284,7 @@ export class SupplierPerformanceTracker {
   private static getGrowthSeasonalFactor(month: number): number {
     // Supplier onboarding patterns - higher in Q1 and Q3, lower during holidays
     const growthPattern = [1.3, 1.2, 1.15, 1.0, 0.95, 0.9, 0.85, 1.1, 1.25, 1.1, 0.8, 0.7];
-    return growthPattern[month];
+    return growthPattern[month] ?? 1;
   }
 
   /**
@@ -293,6 +293,6 @@ export class SupplierPerformanceTracker {
   private static getReviewSeasonalFactor(month: number): number {
     // Review activity patterns - higher after project completions, lower during holidays
     const reviewPattern = [0.9, 0.95, 1.1, 1.15, 1.2, 1.1, 0.95, 0.9, 1.05, 1.15, 1.0, 0.8];
-    return reviewPattern[month];
+    return reviewPattern[month] ?? 1;
   }
 }

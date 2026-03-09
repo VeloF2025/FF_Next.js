@@ -16,7 +16,7 @@ import type {
   AuditLogFilter,
 } from '@/types/procurement/audit.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 // ============= Types =============
 

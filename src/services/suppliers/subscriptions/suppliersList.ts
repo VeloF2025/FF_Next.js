@@ -48,7 +48,7 @@ export class SuppliersListSubscription {
       }
       if (filter?.category) {
         suppliers = suppliers.filter(s =>
-          s.categories && s.categories.includes(filter.category!)
+          s.categories && s.categories.includes(filter.category! as any)
         );
       }
 

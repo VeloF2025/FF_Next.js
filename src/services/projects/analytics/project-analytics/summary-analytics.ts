@@ -4,7 +4,11 @@
  */
 
 import { analyticsApi } from '@/services/api/analyticsApi';
+import { getSql } from '@/lib/neon-sql';
 import { log } from '@/lib/logger';
+
+const rawSql = getSql();
+const sql = async (...args: Parameters<typeof rawSql>) => (await rawSql(...args)) as Record<string, any>[];
 import type { 
   ProjectSummary, 
   ProjectStatusStats, 
@@ -22,11 +26,11 @@ export class ProjectSummaryAnalytics {
       const overview = summary.overview;
       
       return {
-        totalProjects: parseInt(result[0].total_projects),
-        activeProjects: parseInt(result[0].active_projects),
-        completedProjects: parseInt(result[0].completed_projects),
-        onHoldProjects: parseInt(result[0].on_hold_projects),
-        averageProgress: parseFloat(result[0].avg_progress) || 0
+        totalProjects: parseInt(overview?.total_projects ?? '0'),
+        activeProjects: parseInt(overview?.active_projects ?? '0'),
+        completedProjects: parseInt(overview?.completed_projects ?? '0'),
+        onHoldProjects: parseInt(overview?.on_hold_projects ?? '0'),
+        averageProgress: parseFloat(overview?.avg_progress ?? '0') || 0
       };
     } catch (error) {
       log.error('Error fetching project summary:', { data: error }, 'summary-analytics');
@@ -72,7 +76,7 @@ export class ProjectSummaryAnalytics {
         ORDER BY count DESC
       `;
       
-      return result.map(row => ({
+      return result.map((row: any) => ({
         status: row.status,
         count: parseInt(row.count)
       }));
@@ -119,7 +123,7 @@ export class ProjectSummaryAnalytics {
         ORDER BY project_count DESC
       `;
       
-      return result.map(row => ({
+      return result.map((row: any) => ({
         clientId: row.client_id,
         clientName: row.client_name,
         projectCount: parseInt(row.project_count),
@@ -165,7 +169,7 @@ export class ProjectSummaryAnalytics {
         LIMIT ${limit}
       `;
       
-      return result.map(row => ({
+      return result.map((row: any) => ({
         clientId: row.client_id,
         clientName: row.client_name,
         metrics: {
@@ -214,11 +218,11 @@ export class ProjectSummaryAnalytics {
 
       return {
         byStatus: statusResult,
-        byType: typeResult.map(row => ({
+        byType: typeResult.map((row: any) => ({
           type: row.type,
           count: parseInt(row.count)
         })),
-        byPriority: priorityResult.map(row => ({
+        byPriority: priorityResult.map((row: any) => ({
           priority: row.priority,
           count: parseInt(row.count)
         }))

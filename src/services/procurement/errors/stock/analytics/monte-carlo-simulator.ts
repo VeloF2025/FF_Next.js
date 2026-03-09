@@ -55,7 +55,7 @@ export class MonteCarloSimulator {
     
     // Calculate statistics
     const simulationMean = results.reduce((sum, val) => sum + val, 0) / results.length;
-    const simulationMedian = results[Math.floor(results.length / 2)];
+    const simulationMedian = results[Math.floor(results.length / 2)] ?? 0;
     const simulationStdDev = Math.sqrt(
       results.reduce((sum, val) => sum + Math.pow(val - simulationMean, 2), 0) / results.length
     );
@@ -70,11 +70,11 @@ export class MonteCarloSimulator {
     
     // Generate scenarios
     const scenarios = [
-      { probability: 0.1, errorCount: percentiles.p10, scenario: 'Best case' },
-      { probability: 0.25, errorCount: percentiles.p25, scenario: 'Optimistic' },
-      { probability: 0.5, errorCount: simulationMedian, scenario: 'Most likely' },
-      { probability: 0.75, errorCount: percentiles.p75, scenario: 'Pessimistic' },
-      { probability: 0.9, errorCount: percentiles.p90, scenario: 'Worst case' }
+      { probability: 0.1, errorCount: percentiles.p10 ?? 0, scenario: 'Best case' },
+      { probability: 0.25, errorCount: percentiles.p25 ?? 0, scenario: 'Optimistic' },
+      { probability: 0.5, errorCount: simulationMedian ?? 0, scenario: 'Most likely' },
+      { probability: 0.75, errorCount: percentiles.p75 ?? 0, scenario: 'Pessimistic' },
+      { probability: 0.9, errorCount: percentiles.p90 ?? 0, scenario: 'Worst case' }
     ];
     
     // Risk assessment
@@ -92,7 +92,7 @@ export class MonteCarloSimulator {
         median: Math.round(simulationMedian),
         stdDev: Math.round(simulationStdDev),
         percentiles: Object.fromEntries(
-          Object.entries(percentiles).map(([key, val]) => [key, Math.round(val)])
+          Object.entries(percentiles).map(([key, val]) => [key, Math.round(val ?? 0)])
         )
       },
       riskAssessment: {

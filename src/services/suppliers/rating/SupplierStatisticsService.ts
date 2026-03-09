@@ -229,20 +229,20 @@ export class SupplierStatisticsService {
         else if (overallRating >= 30) level = 'poor';
         else level = 'terrible';
 
-        distribution[level].count++;
-        levelData[level].total += overallRating;
-        
+        distribution[level]!.count++;
+        levelData[level]!.total += overallRating;
+
         supplier.categories?.forEach(category => {
-          levelData[level].categories.add(category);
+          levelData[level]!.categories.add(category);
         });
       });
 
       // Calculate averages and convert categories
       Object.entries(levelData).forEach(([level, data]) => {
-        if (distribution[level].count > 0) {
-          distribution[level].averageRating = Math.round(data.total / distribution[level].count);
+        if (distribution[level]!.count > 0) {
+          distribution[level]!.averageRating = Math.round(data.total / distribution[level]!.count);
         }
-        distribution[level].categories = Array.from(data.categories);
+        distribution[level]!.categories = Array.from(data.categories);
       });
 
       return distribution;

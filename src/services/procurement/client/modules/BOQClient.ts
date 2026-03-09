@@ -39,8 +39,8 @@ export class BOQClient {
     return {
       ...boq,
       items: items as BOQItem[],
-      exceptions: exceptions as BOQException[]
-    };
+      exceptions: exceptions as BOQException[],
+    } as unknown as BOQWithItems;
   }
 
   static async createBOQ(

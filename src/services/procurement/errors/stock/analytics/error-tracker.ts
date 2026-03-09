@@ -131,14 +131,14 @@ export class ErrorTracker {
       for (let j = i + 1; j < itemCodes.length; j++) {
         const item1 = itemCodes[i];
         const item2 = itemCodes[j];
-        const errors1 = itemErrorPairs.get(item1) || new Set();
-        const errors2 = itemErrorPairs.get(item2) || new Set();
-        
+        const errors1 = itemErrorPairs.get(item1!) || new Set();
+        const errors2 = itemErrorPairs.get(item2!) || new Set();
+
         const commonErrors = Array.from(errors1).filter(error => errors2.has(error));
         if (commonErrors.length > 0) {
           const strength = commonErrors.length / Math.max(errors1.size, errors2.size);
           correlations.push({
-            items: [item1, item2],
+            items: [item1!, item2!],
             strength,
             commonErrors
           });

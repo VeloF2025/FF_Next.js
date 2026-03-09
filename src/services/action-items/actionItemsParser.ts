@@ -32,7 +32,7 @@ export function parseFirefliesActionItems(actionItemsText: string): ParsedAction
     // Check if this is an assignee header (e.g., "**Louis**")
     const assigneeMatch = trimmed.match(/^\*\*(.+?)\*\*$/);
     if (assigneeMatch) {
-      currentAssignee = assigneeMatch[1].trim();
+      currentAssignee = assigneeMatch[1]!.trim();
       continue;
     }
 

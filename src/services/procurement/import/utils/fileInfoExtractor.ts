@@ -72,8 +72,8 @@ export class FileInfoExtractor {
           let estimatedRows = 0;
           let columnCount = 0;
           if (worksheets.length > 0) {
-            const firstSheet = workbook.Sheets[worksheets[0]];
-            if (firstSheet['!ref']) {
+            const firstSheet = workbook.Sheets[worksheets[0]!];
+            if (firstSheet && firstSheet['!ref']) {
               const range = XLSX.utils.decode_range(firstSheet['!ref']);
               estimatedRows = range.e.r + 1; // +1 because range is 0-based
               columnCount = range.e.c + 1; // +1 because range is 0-based

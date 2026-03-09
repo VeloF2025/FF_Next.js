@@ -231,9 +231,9 @@ export class ProjectTrendAnalytics {
         else if ([6, 7, 8].includes(monthNum)) season = 'Summer';
         else season = 'Fall';
         
-        seasonalData[season].projects.push(month.totalProjects || 0);
-        seasonalData[season].budgets.push(month.averageBudget || 0);
-        seasonalData[season].completed.push(month.completedProjects || 0);
+        seasonalData[season]!.projects.push(month.totalProjects || 0);
+        seasonalData[season]!.budgets.push(month.averageBudget || 0);
+        seasonalData[season]!.completed.push(month.completedProjects || 0);
       });
       
       return Object.entries(seasonalData).map(([season, data]) => {

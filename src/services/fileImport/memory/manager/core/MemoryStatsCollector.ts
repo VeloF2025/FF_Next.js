@@ -3,7 +3,7 @@
  * Collects and records memory statistics
  */
 
-import type { MemoryStats } from '../../types';
+import type { MemoryStats } from '../../../types';
 
 export class MemoryStatsCollector {
   private memoryHistory: MemoryStats[] = [];

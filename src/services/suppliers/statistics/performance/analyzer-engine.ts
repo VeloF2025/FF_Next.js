@@ -292,8 +292,8 @@ export class PerformanceAnalysisEngine {
   ): TrendAnalysis | null {
     if (dataPoints.length < 2) return null;
 
-    const latest = dataPoints[dataPoints.length - 1];
-    const previous = dataPoints[dataPoints.length - 2];
+    const latest = dataPoints[dataPoints.length - 1]!;
+    const previous = dataPoints[dataPoints.length - 2]!;
     
     const changePercent = PerformanceMetricsCalculator.calculateChangePercentage(
       latest.value, 

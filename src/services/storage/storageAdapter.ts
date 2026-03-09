@@ -72,10 +72,10 @@ export class StorageAdapter {
     const formData = new FormData();
 
     if (file instanceof Buffer) {
-      const blob = new Blob([file]);
+      const blob = new Blob([file as unknown as BlobPart]);
       formData.append('file', blob, fileName || `file_${Date.now()}`);
     } else {
-      formData.append('file', file, fileName || file.name);
+      formData.append('file', file as Blob, fileName || (file as File).name);
     }
 
     const response = await fetch(`${VF_STORAGE_URL}/upload/${type}/${category}`, {
@@ -117,10 +117,10 @@ export class StorageAdapter {
     const formData = new FormData();
 
     if (file instanceof Buffer) {
-      const blob = new Blob([file]);
+      const blob = new Blob([file as unknown as BlobPart]);
       formData.append('file', blob, fileName || `file_${Date.now()}`);
     } else {
-      formData.append('file', file, fileName || file.name);
+      formData.append('file', file as Blob, fileName || (file as File).name);
     }
 
     formData.append('type', type);

@@ -1,4 +1,3 @@
-import { api } from '@/lib/api';
 import { NeonPoleData, NeonDropData, NeonFibreData } from '@/services/sow/types';
 import { log } from '@/lib/logger';
 
@@ -53,7 +52,7 @@ export const sowApi = {
         }
       } catch (error) {
         log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
-        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Small delay between chunks to avoid overwhelming the serverless function
@@ -144,9 +143,9 @@ export const sowApi = {
         }
       } catch (error) {
         log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
-        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error instanceof Error ? error.message : String(error)}`);
       }
-      
+
       // Small delay between chunks to avoid overwhelming the serverless function
       if (i + CHUNK_SIZE < drops.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -233,9 +232,9 @@ export const sowApi = {
         }
       } catch (error) {
         log.error('sowApi', { error, message: `Chunk ${chunkNumber} failed` });
-        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error.message}`);
+        throw new Error(`Failed at chunk ${chunkNumber}/${totalChunks}: ${error instanceof Error ? error.message : String(error)}`);
       }
-      
+
       // Small delay between chunks
       if (i + CHUNK_SIZE < fibres.length) {
         await new Promise(resolve => setTimeout(resolve, 100));

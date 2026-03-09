@@ -243,7 +243,7 @@ export class ProgressTracker {
     const phases = this.calculatePhaseTime(history);
     
     return {
-      current,
+      current: current!,
       averageSpeed: speeds.average,
       peakSpeed: speeds.peak,
       efficiency: this.calculateEfficiency(history),
@@ -265,8 +265,8 @@ export class ProgressTracker {
     const speeds: number[] = [];
     
     for (let i = 1; i < history.length; i++) {
-      const prev = history[i - 1];
-      const curr = history[i];
+      const prev = history[i - 1]!;
+      const curr = history[i]!;
       const timeDiff = 100; // Assuming 100ms between updates
       const rowsDiff = curr.processedRows - prev.processedRows;
       
@@ -298,8 +298,8 @@ export class ProgressTracker {
     const speedVariations: number[] = [];
     
     for (let i = 1; i < history.length; i++) {
-      const prev = history[i - 1];
-      const curr = history[i];
+      const prev = history[i - 1]!;
+      const curr = history[i]!;
       const rowsDiff = curr.processedRows - prev.processedRows;
       const speed = rowsDiff / 0.1; // Assuming 100ms intervals
       
@@ -333,14 +333,14 @@ export class ProgressTracker {
     let phaseStartIndex = 0;
 
     for (let i = 0; i < history.length; i++) {
-      const progress = history[i];
-      
+      const progress = history[i]!;
+
       if (progress.currentPhase !== currentPhase) {
         // Phase changed, record time for previous phase
         const timeInPhase = (i - phaseStartIndex) * 100; // Assuming 100ms intervals
         phases[currentPhase] += timeInPhase;
         
-        currentPhase = progress.currentPhase;
+        currentPhase = progress!.currentPhase;
         phaseStartIndex = i;
       }
     }
