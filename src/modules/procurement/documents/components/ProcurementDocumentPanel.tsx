@@ -16,6 +16,7 @@ import {
   type ProcurementDocumentType,
   type ProcurementEntityType,
 } from '@/types/procurement/document.types';
+import { DocumentChecklist } from './DocumentChecklist';
 import { formatDisplayDate } from '@/utils/dateFormat';
 
 interface DocumentTypeOption {
@@ -110,6 +111,11 @@ export function ProcurementDocumentPanel({
           </button>
         )}
       </div>
+
+      {/* Document Checklist — only for purchase_order entities */}
+      {entityType === 'purchase_order' && !loading && (
+        <DocumentChecklist documents={documents} />
+      )}
 
       {/* Upload Form */}
       {showUpload && (
@@ -217,7 +223,7 @@ export function ProcurementDocumentPanel({
         ) : (
           documents.map((doc) => {
             const Icon = getFileIcon(doc.mimeType);
-            const typeLabel = DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType;
+            const typeLabel = DOCUMENT_TYPE_LABELS[doc.documentType as ProcurementDocumentType] || doc.documentType;
 
             return (
               <div

@@ -44,6 +44,7 @@ export type DocumentEntityType = ProcurementEntityType | AccountingEntityType;
 
 export type ProcurementDocumentType =
   | 'quote_pdf'
+  | 'purchase_order'
   | 'invoice'
   | 'delivery_note'
   | 'grv'
@@ -63,14 +64,23 @@ export type AccountingDocumentType =
 
 export const DOCUMENT_TYPE_LABELS: Record<ProcurementDocumentType, string> = {
   quote_pdf: 'Supplier Quote',
-  invoice: 'Invoice',
+  purchase_order: 'Purchase Order',
+  invoice: 'Supplier Invoice',
   delivery_note: 'Delivery Note',
-  grv: 'GRV (Goods Return)',
+  grv: 'GRV (Goods Received)',
   receipt: 'Receipt',
   contract: 'Contract',
   image: 'Photo/Image',
   other: 'Other',
 };
+
+/** The 4 required document types for PO document checklist completeness */
+export const PO_REQUIRED_DOC_TYPES: { type: ProcurementDocumentType; label: string }[] = [
+  { type: 'quote_pdf', label: 'Supplier Quote' },
+  { type: 'purchase_order', label: 'Purchase Order' },
+  { type: 'delivery_note', label: 'GRV / Delivery Note' },
+  { type: 'invoice', label: 'Supplier Invoice' },
+];
 
 export const ACCOUNTING_DOCUMENT_TYPE_LABELS: Record<AccountingDocumentType, string> = {
   proof_of_payment: 'Proof of Payment',
