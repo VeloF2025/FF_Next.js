@@ -126,23 +126,25 @@ SPLICING_JOINT_DB_COLS = {
 
 VLM_PROMPT_CIVIL = """You are a construction QA photo classifier for fiber optic POLE INSTALLATION.
 
-Classify this photo into exactly ONE of these 8 checklist steps from the Pole Install Capture Checklist:
+Classify this photo into exactly ONE of these 8 checklist steps from the Pole Install Capture Checklist.
+Be GENEROUS in classification — if a photo shows ANY element of a step, classify it to that step.
+Only mark as Unrelated if the photo truly has NOTHING to do with pole installation (e.g. selfie, food, random building with no pole).
 
 Phase A — Pre-Install Context:
-1. Before Photo — Shows the ground BEFORE digging. You should see markings on the ground (circle, square, or X) indicating where the pole hole will be dug. No hole visible yet.
-2. During Photo — Shows staff actively digging the hole OR the compaction process in progress. People working, tools visible, hole partially dug.
+1. Before Photo — Shows the ground BEFORE digging. You should see markings on the ground (circle, square, or X) indicating where the pole hole will be dug. No hole visible yet. Can also show the general site location before work begins.
+2. During Photo — Shows staff actively digging the hole OR any construction activity in progress. People working, tools visible, hole partially dug. Workers near a pole or hole.
 3. Depth Photo — Shows a measuring tape or ruler placed inside the dug hole to document the depth. The tape measure is the key visual indicator.
-4. End Plates — Close-up showing the end plates of the pole clearly visible. Metal plates at the base or top of the pole.
-5. Compaction / Backfill — Shows the backfill material around the pole base. Must be a MIXED sand and cement combination (not just a heap of sand or cement separately). Shows the ground being compacted around the installed pole.
+4. End Plates — Close-up showing the end plates of the pole. Metal plates at the base or top of the pole visible. Also includes: CCA H4 tags, pole labels, zone/PON labels on poles, yellow identification tags, any close-up of pole markings or identification. A pole end with visible metal insert or rust is an end plate.
+5. Compaction / Backfill — Shows backfill material around the pole base. Sand and cement mix around the installed pole. Blue powder, cement, or mixed aggregate around pole base. Ground being compacted around the installed pole.
 
 Phase B — Installation Execution:
 6. Level Check — Shows a spirit level (bubble level tool) held against the pole to verify it is plumb/vertical. The spirit level tool is the key visual indicator.
-7. After Photo — Shows the completed pole installation. A wide shot showing the full pole standing upright in the landscape, taken from a distance. May include a close-up of the ground level plus a standing-back full pole view.
+7. After Photo — Shows the completed pole installation. A wide shot showing the full pole standing upright, taken from a distance. ANY photo showing a pole standing upright in the landscape qualifies — even between buildings, in narrow spaces, or with partial obstructions. Also includes ground-level views of completed installations. If a pole is visible standing in the ground and no other step is more specific, classify as After Photo.
 
 Phase C — Assets & IDs:
 8. Signature — Shows a contractor signature, sign-off sheet, or completion document. Paper/form with handwritten signature visible.
 
-0. Unrelated — Photo does not clearly show any of the above (e.g. team selfie, vehicle, landscape without pole context, blurry/dark photo, equipment closeup).
+0. Unrelated — Photo has NOTHING to do with pole installation: team selfie, vehicle interior, food, random landscape with NO pole or construction context, completely dark/blurry photo. A fiber splitter box, cable equipment, or ANY construction-related equipment near a pole is NOT unrelated.
 
 Respond with ONLY a JSON object:
 {"step": <number 0-8>, "confidence": <0.0-1.0>, "reason": "<brief reason>"}"""
@@ -369,7 +371,8 @@ def get_steps_for_discipline(discipline, sub_type=None):
 
 
 def run_classification(project_name, db_url, limit=100, dry_run=False, discipline="civil",
-                       source="all", local_minio=False, reclassify=False):
+                       source="all", local_minio=False, reclassify=False,
+                       unrelated_only=False, exclude_approved=False):
     """Batch classify unassigned photos via VLM."""
     print(f"\n{'='*70}")
     print(f"  VLM Photo Classification — {discipline.title()}")
@@ -378,6 +381,10 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
     print(f"  Limit: {limit}")
     print(f"  Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"  Reclassify: {'YES (overwriting existing)' if reclassify else 'No (unclassified only)'}")
+    if unrelated_only:
+        print(f"  Filter: UNRELATED ONLY (step 0)")
+    if exclude_approved:
+        print(f"  Excluding: approved reviews")
     print(f"{'='*70}\n")
 
     if discipline == "optical":
@@ -419,10 +426,15 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         source_filter = f"AND p.source = '{source}'"
 
     # Classification filter — skip already-classified unless reclassifying
-    if reclassify:
+    if unrelated_only:
+        classify_filter = "AND p.checklist_step = 0"  # Only re-do Unrelated
+    elif reclassify:
         classify_filter = ""  # Process all photos
     else:
         classify_filter = "AND p.checklist_step IS NULL"
+
+    # Exclude approved reviews filter
+    approved_filter = "AND r.workflow_status != 'approved'" if exclude_approved else ""
 
     # -- Fetch photos ----------------------------------------------------------
     print("  [2/3] Fetching photos to classify...")
@@ -436,6 +448,7 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
           {classify_filter}
           {source_filter}
           {project_filter}
+          {approved_filter}
         ORDER BY pr.project_name, r.feature_id
         LIMIT %s
     """
@@ -657,6 +670,10 @@ if __name__ == "__main__":
     parser.add_argument("--db-url", help="Database URL (defaults to DATABASE_URL env var)")
     parser.add_argument("--reclassify", action="store_true",
                         help="Re-classify all photos including already classified ones")
+    parser.add_argument("--unrelated-only", action="store_true",
+                        help="Only reclassify photos currently marked as Unrelated (step 0)")
+    parser.add_argument("--exclude-approved", action="store_true",
+                        help="Skip photos on reviews with workflow_status = approved")
     args = parser.parse_args()
 
     try:
@@ -673,4 +690,6 @@ if __name__ == "__main__":
 
     run_classification(args.project, db_url, limit=args.limit, dry_run=args.dry_run,
                        discipline=args.discipline, source=args.source,
-                       local_minio=args.local_minio, reclassify=args.reclassify)
+                       local_minio=args.local_minio, reclassify=args.reclassify,
+                       unrelated_only=args.unrelated_only,
+                       exclude_approved=args.exclude_approved)
