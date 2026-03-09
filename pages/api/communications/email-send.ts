@@ -10,7 +10,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middlewar
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
-const FROM_ADDRESS = 'FibreFlow <noreply@fibreflow.app>';
+const FROM_ADDRESS = 'FibreFlow <notifications@fibreflow.app>';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

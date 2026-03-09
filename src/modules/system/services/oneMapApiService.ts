@@ -198,7 +198,7 @@ class OneMapApiService {
       return true;
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === 'AbortError';
-      log.error('OneMapAPI', isTimeout ? 'Authentication timed out' : 'Authentication failed', { error });
+      log.error('OneMapAPI', { message: isTimeout ? 'Authentication timed out' : 'Authentication failed', error });
       return false;
     }
   }

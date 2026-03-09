@@ -30,7 +30,7 @@ interface WAPhoto {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
+    return apiResponse.methodNotAllowed(res, ['GET']);
   }
 
   const { dropNumber } = req.query;

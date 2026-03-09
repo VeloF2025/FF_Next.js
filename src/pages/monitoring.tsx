@@ -5,7 +5,7 @@
  * Real-time system health monitoring
  */
 
-import AppLayout from '@/components/layout';
+import { AppLayout } from '@/components/layout';
 import { useMonitoringData } from './monitoring/hooks/useMonitoringData';
 import { performanceBudgetItems } from './monitoring/data/performanceBudgetData';
 import {

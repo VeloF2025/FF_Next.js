@@ -15,8 +15,6 @@ interface MeetingRecordingRow {
   id: number;
   recording_path: string | null;
   recording_size_bytes: number | null;
-  audio_url: string | null;
-  video_url: string | null;
 }
 
 /**
@@ -60,12 +58,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     // Fetch recording metadata with participant-based access control
     const rows = isHein
       ? await sql`
-          SELECT id, recording_path, recording_size_bytes, audio_url, video_url
+          SELECT id, recording_path, recording_size_bytes
           FROM meetings
           WHERE id = ${meetingId}
         `
       : await sql`
-          SELECT id, recording_path, recording_size_bytes, audio_url, video_url
+          SELECT id, recording_path, recording_size_bytes
           FROM meetings
           WHERE id = ${meetingId}
             AND EXISTS (
@@ -80,16 +78,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     if (!meeting) {
       // Return 403 rather than 404 to avoid leaking meeting existence to non-participants
       res.status(403).json({ error: 'Meeting not found or you are not a participant' });
-      return;
-    }
-
-    // Fireflies meetings: return CDN URLs for client-side playback
-    if (!meeting.recording_path && (meeting.video_url || meeting.audio_url)) {
-      res.status(200).json({
-        type: 'external',
-        videoUrl: meeting.video_url || null,
-        audioUrl: meeting.audio_url || null,
-      });
       return;
     }
 

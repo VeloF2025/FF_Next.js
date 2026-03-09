@@ -126,13 +126,11 @@ SPLICING_JOINT_DB_COLS = {
 
 VLM_PROMPT_CIVIL = """You are a construction QA photo classifier for fiber optic POLE INSTALLATION.
 
-Classify this photo into exactly ONE of these 8 checklist steps from the Pole Install Capture Checklist.
-Be GENEROUS in classification — if a photo shows ANY element of a step, classify it to that step.
-Only mark as Unrelated if the photo truly has NOTHING to do with pole installation (e.g. selfie, food, random building with no pole).
+Classify this photo into exactly ONE of these 8 checklist steps from the Pole Install Capture Checklist:
 
 Phase A — Pre-Install Context:
-1. Before Photo — Shows the ground BEFORE digging. You should see markings on the ground (circle, square, or X) indicating where the pole hole will be dug. No hole visible yet. Can also show the general site location before work begins.
-2. During Photo — Shows staff actively digging the hole OR any construction activity in progress. People working, tools visible, hole partially dug. Workers near a pole or hole.
+1. Before Photo — Shows the ground BEFORE digging. You should see markings on the ground (circle, square, or X) indicating where the pole hole will be dug. No hole visible yet.
+2. During Photo — Shows staff actively digging the hole OR the compaction process in progress. People working, tools visible, hole partially dug.
 3. Depth Photo — Shows a measuring tape or ruler placed inside the dug hole to document the depth. The tape measure is the key visual indicator.
 4. End Plates — Close-up or medium shot showing end plates, metal fittings, or identification on the pole. Includes: metal end plates at the base or top of the pole, CCA H4 tags, pole labels, zone/PON labels, yellow identification tags, any close-up of pole markings. A pole end with visible metal insert, rust ring, or bolt pattern is an end plate. Also includes: close-up of the pole bottom showing circular metal plate or rust before planting, and top-down view into a hole showing the pole end/bottom. KEY RULE: If the photo is taken CLOSE to the pole (within ~2m) and shows the pole surface, fittings, tags, or hardware detail — classify as End Plates, NOT After Photo or Compaction.
 5. Compaction / Backfill — Shows backfill material VISIBLY POURED or PACKED around the pole base. You MUST see sand, cement powder, blue chemical powder, mixed aggregate, or gravel being applied or already packed around the base. KEY RULE: The backfill material itself must be clearly visible — not just bare earth or a hole. If the photo shows a close-up of the pole base with metal fittings, rust, or tags but NO loose fill material — that is End Plates (step 4), NOT Compaction. A hole with just soil/earth around a pole is NOT compaction.
@@ -144,7 +142,7 @@ Phase B — Installation Execution:
 Phase C — Assets & IDs:
 8. Signature — Shows a contractor signature, sign-off sheet, or completion document. Paper/form with handwritten signature visible.
 
-0. Unrelated — Photo has NOTHING to do with pole installation: team selfie, vehicle interior, food, random landscape with NO pole or construction context, completely dark/blurry photo. A fiber splitter box, cable equipment, or ANY construction-related equipment near a pole is NOT unrelated.
+0. Unrelated — Photo does not clearly show any of the above (e.g. team selfie, vehicle, landscape without pole context, blurry/dark photo, equipment closeup).
 
 DISAMBIGUATION PRIORITY (apply these rules when uncertain):
 - Close-up of pole base showing metal plate, rust ring, bolts, tags → End Plates (4), NOT Compaction (5) or After (7)
@@ -446,9 +444,6 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
     else:
         classify_filter = "AND p.checklist_step IS NULL"
 
-    # Exclude approved reviews filter
-    approved_filter = "AND r.workflow_status != 'approved'" if exclude_approved else ""
-
     # -- Fetch photos ----------------------------------------------------------
     print("  [2/3] Fetching photos to classify...")
     query = f"""
@@ -461,7 +456,6 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
           {classify_filter}
           {source_filter}
           {project_filter}
-          {approved_filter}
         ORDER BY pr.project_name, r.feature_id
         LIMIT %s
     """

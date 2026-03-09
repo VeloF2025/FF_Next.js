@@ -235,8 +235,8 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     case 'POST':
       return handlePost(req, res);
     default:
-      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
+      return apiResponse.methodNotAllowed(res, ['GET', 'POST']);
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+export default withAuth(withRole(['admin', 'manager'], handler));

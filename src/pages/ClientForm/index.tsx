@@ -15,7 +15,8 @@ export function ClientForm() {
   const { id } = useParams<{ id: string }>();
   const isEditing = !!id;
 
-  const { data: client, isLoading } = useClient(id || '');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: client, isLoading } = useClient(id || '') as { data: Record<string, any>; isLoading: boolean };
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
 

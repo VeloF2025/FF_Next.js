@@ -78,17 +78,17 @@ async function handler(
         const sql = getSql();
 
         // Check if attempting to change status to 'active'
-        if (updateData.status?.toLowerCase() === 'active') {
+        if (updateData.status === 'active') {
           // Get current status
           const currentProject = await safeArrayQuery(
             async () => sql`SELECT status FROM projects WHERE id = ${id}`,
             { logError: true }
           );
 
-          const currentStatus = currentProject?.[0]?.status?.toLowerCase();
+          const currentStatus = currentProject?.[0]?.status;
 
-          // Only validate when transitioning TO active from a non-active status
-          if (currentStatus && currentStatus !== 'active') {
+          // Only validate when transitioning from 'planning' to 'active'
+          if (currentStatus === 'planning') {
             const activationCheck = await checkActivationRequirements(id);
 
             if (!activationCheck.canActivate) {

@@ -12,7 +12,6 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { normalizeStorageUrl } from '@/services/vfStorageAdapter';
-import { runCrossValidationIfReady } from '@/modules/projects/services/documentCrossValidationService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -158,7 +157,7 @@ export default withAuth(withErrorHandler(async (
           ${body.sourceDocumentName || null},
           ${body.vlmExtractionData ? JSON.stringify(body.vlmExtractionData) : null},
           ${body.vlmConfidenceScore || null},
-          'active',
+          'draft',
           ${userId || 'system'}
         )
         RETURNING *
@@ -186,11 +185,6 @@ export default withAuth(withErrorHandler(async (
         poNumber: body.poNumber,
         projectId,
         totalValue,
-      });
-
-      // Trigger cross-validation if BSS+MSS already exist (non-blocking)
-      runCrossValidationIfReady(projectId).catch(err => {
-        log.error('Background cross-validation failed', { projectId, error: err }, 'DocCrossVal');
       });
 
       return apiResponse.created(res, {

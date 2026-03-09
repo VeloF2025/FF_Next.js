@@ -11,7 +11,6 @@ import { neon } from '@neondatabase/serverless';
 import { generateResetToken } from '@/lib/auth';
 import logger from '@/lib/logger';
 import { log } from '@/lib/logger';
-import { resend } from '@/lib/email/resendClient';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -39,7 +38,8 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000).unref();
 
-const FROM_ADDRESS = 'FibreFlow <noreply@fibreflow.app>';
+// Email sending configuration
+const SMTP_ENABLED = process.env.SMTP_HOST && process.env.SMTP_USER;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 
 interface ForgotPasswordRequest {
@@ -47,16 +47,52 @@ interface ForgotPasswordRequest {
 }
 
 /**
- * Send password reset email via Resend
+ * Send password reset email
+ * Uses nodemailer if configured, otherwise logs the link
  */
 async function sendResetEmail(
   email: string,
   resetLink: string,
   firstName: string
 ): Promise<boolean> {
+  // For now, log the reset link (in production, send via email)
+  logger.info(
+    { email, resetLink: resetLink.substring(0, 50) + '...' },
+    'Password reset requested'
+  );
+
+  if (!SMTP_ENABLED) {
+    // In development, log the full link
+    log.debug('forgot-password', {
+      action: 'devModeResetLink',
+      email,
+      resetLink,
+      message: 'Password reset link generated in dev mode'
+    });
+    return true;
+  }
+
   try {
-    const result = await resend.emails.send({
-      from: FROM_ADDRESS,
+    // Dynamic import - nodemailer is only needed when SMTP is configured
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nodemailer = require(/* webpackIgnore: true */ 'nodemailer');
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      tls: {
+        // Only disable cert validation when explicitly opted in (e.g., ISP with expired cert)
+        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@fibreflow.app',
       to: email,
       subject: 'Reset Your FibreFlow Password',
       html: `
@@ -80,14 +116,25 @@ async function sendResetEmail(
           </p>
         </div>
       `,
-      text: `Reset Your Password\n\nHi ${firstName || 'there'},\n\nWe received a request to reset your FibreFlow password.\n\nClick here to reset: ${resetLink}\n\nThis link will expire in 1 hour.\n\nIf you didn't request this, you can safely ignore this email.`,
+      text: `
+        Reset Your Password
+
+        Hi ${firstName || 'there'},
+
+        We received a request to reset your FibreFlow password.
+
+        Click here to reset: ${resetLink}
+
+        This link will expire in 1 hour.
+
+        If you didn't request this, you can safely ignore this email.
+      `,
     });
 
-    const resendId = result.data?.id || null;
-    logger.info({ email, resendId }, 'Password reset email sent via Resend');
+    logger.info({ email }, 'Password reset email sent');
     return true;
   } catch (error) {
-    logger.error({ error, email }, 'Failed to send password reset email via Resend');
+    logger.error({ error, email }, 'Failed to send password reset email');
     return false;
   }
 }
@@ -164,10 +211,7 @@ export default async function handler(
     const resetLink = `${APP_URL}/auth/reset-password?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
     // Send email
-    const emailSent = await sendResetEmail(normalizedEmail, resetLink, user.first_name || '');
-    if (!emailSent) {
-      logger.error({ email: normalizedEmail }, 'Password reset email failed to send — user will not receive link');
-    }
+    await sendResetEmail(normalizedEmail, resetLink, user.first_name || '');
 
     return res.status(200).json(successResponse);
   } catch (error) {

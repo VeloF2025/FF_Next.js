@@ -401,7 +401,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
+    return apiResponse.methodNotAllowed(res);
   }
 
   return handlePost(req, res);
