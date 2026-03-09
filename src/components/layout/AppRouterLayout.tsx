@@ -50,6 +50,9 @@ export function AppRouterLayout({ children }: AppRouterLayoutProps) {
 
   // Get page metadata based on current route
   const getPageMeta = (): PageMeta => {
+    if (!pathname) {
+      return { title: 'Home', breadcrumbs: ['Home'] };
+    }
     const segments = pathname.split('/').filter(Boolean);
 
     // Contractors

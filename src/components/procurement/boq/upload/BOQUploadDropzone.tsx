@@ -19,9 +19,12 @@ export function BOQUploadDropzone({
   onFileRemove
 }: BOQUploadDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-    onDrop: (acceptedFiles) => {
+    onDrop: (acceptedFiles: File[]) => {
       if (acceptedFiles.length > 0) {
-        onFileSelect(acceptedFiles[0]);
+        const file = acceptedFiles[0];
+        if (file) {
+          onFileSelect(file);
+        }
       }
     },
     accept: {

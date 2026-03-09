@@ -75,7 +75,7 @@ export function StaffSearchSelect({
           if (found) setSelectedStaff(found);
         }
       } catch (error) {
-        log.error('Failed to fetch staff', error, 'StaffSearchSelect');
+        log.error('Failed to fetch staff', error as any, 'StaffSearchSelect');
       } finally {
         setLoading(false);
       }

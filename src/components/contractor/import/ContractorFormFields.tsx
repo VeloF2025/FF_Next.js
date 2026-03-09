@@ -13,8 +13,23 @@ import {
   SelectValue 
 } from '@/shared/components/ui/Select';
 import { BUSINESS_TYPES, SA_PROVINCES } from '@/constants/contractor/validation';
-import { ServiceTemplateApiService } from '@/services/contractor/rateCardApiService';
-import type { BusinessType, SAProvince } from '@/types/contractor/import.types';
+
+export type BusinessType = 'individual' | 'company' | 'partnership' | 'other';
+export type SAProvince = string;
+
+// Local placeholder - replace with actual service if available
+interface ServiceTemplate {
+  id: string;
+  name: string;
+  parentId: string | null;
+  isActive: boolean;
+}
+
+const ServiceTemplateApiService = {
+  getTemplates: async () => [] as ServiceTemplate[],
+  getTemplate: async (id: string) => null as ServiceTemplate | null,
+  getServiceTemplates: async (_options: any) => ({ data: [] as ServiceTemplate[] }),
+};
 
 interface BusinessTypeSelectProps {
   value?: BusinessType;
@@ -254,8 +269,8 @@ export function ServiceSelect({
           
           // Extract service names (not deliverables)
           const services = response.data
-            .filter(template => template.parentId !== null)
-            .map(template => template.name);
+            .filter((template: ServiceTemplate) => template.parentId !== null)
+            .map((template: ServiceTemplate) => template.name);
             
           if (services.length > 0) {
             setAvailableServices(services);

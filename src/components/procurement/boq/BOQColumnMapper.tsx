@@ -97,7 +97,7 @@ export default function BOQColumnMapper({
     if (!fieldValue) return false;
     const currentMapping = mapping.find(m => m.sourceIndex === currentSourceIndex);
     if (currentMapping?.targetField === fieldValue) return false;
-    return usedFields.has(fieldValue);
+    return usedFields.has(fieldValue as any);
   };
 
   return (
