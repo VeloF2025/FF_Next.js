@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { ArrowLeft, RefreshCw, ChevronRight, ChevronDown, Zap, TrendingUp } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { useAuth } from '@/contexts/AuthContext';
+import { Permission } from '@/types/auth.types';
 import type { WeeklyActivationsResponse, WeekRow } from '../api/reports/weekly-activations';
 
 const REVENUE_PER_ACTIVATION = 3105;
@@ -13,6 +15,7 @@ function formatRevenue(amount: number): string {
 
 export default function WeeklyActivationsPage() {
   const router = useRouter();
+  const { hasPermission } = useAuth();
   const [data, setData] = useState<WeeklyActivationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +39,12 @@ export default function WeeklyActivationsPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasPermission(Permission.ANALYTICS_READ)) {
+      router.replace('/dashboard');
+      return;
+    }
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, hasPermission, router]);
 
   const toggleWeek = (weekStart: string) => {
     setExpanded((prev) => {
