@@ -11,6 +11,7 @@ import {
 import { listRecordings, downloadRecordingToDisk } from './recordings';
 import { resolveParticipants } from './speaker-resolver';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
+import { transcribeWithWhisper } from '@/lib/llm/whisper-transcriber';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -127,6 +128,8 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
 
   try {
     // 5. Fetch transcript and recording (requires joinWebUrl + a resolved organizer)
+    let recordingPath: string | null = null;
+
     if (callRecord.joinWebUrl && organizerParticipant) {
       const onlineMeetingId = await fetchOnlineMeetingId(
         organizerParticipant.graphUserId,
@@ -140,7 +143,7 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
           onlineMeetingId
         );
 
-        await fetchAndStoreRecording(
+        recordingPath = await fetchAndStoreRecording(
           meetingId,
           organizerParticipant.graphUserId,
           onlineMeetingId
@@ -148,11 +151,34 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
       }
     }
 
-    // 6. LLM enrichment
+    // 6. Whisper re-transcription (if recording available)
+    // Teams VTT doesn't support Afrikaans — Whisper produces proper English translations
+    if (recordingPath && process.env.OPENAI_API_KEY) {
+      try {
+        await sql`UPDATE meetings SET processing_status = 'transcribing', updated_at = NOW() WHERE id = ${meetingId}`;
+        const whisperResult = await transcribeWithWhisper(recordingPath, meetingId);
+
+        if (whisperResult.englishTranscript.length > 50) {
+          await sql`
+            UPDATE meetings
+            SET raw_transcript    = ${whisperResult.englishTranscript},
+                transcript_source = 'whisper',
+                updated_at        = NOW()
+            WHERE id = ${meetingId}
+          `;
+          log.info('Whisper transcript stored', { meetingId, chars: whisperResult.englishTranscript.length }, LOGGER);
+        }
+      } catch (whisperErr: unknown) {
+        const msg = whisperErr instanceof Error ? whisperErr.message : String(whisperErr);
+        log.warn('Whisper transcription failed, falling back to VTT', { meetingId, error: msg }, LOGGER);
+      }
+    }
+
+    // 7. LLM enrichment
     await sql`UPDATE meetings SET processing_status = 'processing', updated_at = NOW() WHERE id = ${meetingId}`;
     await processWithLLM(meetingId);
 
-    // 7. Mark complete
+    // 8. Mark complete
     await sql`
       UPDATE meetings
       SET processing_status = 'completed',
@@ -222,17 +248,18 @@ async function fetchAndStoreTranscript(
 
 /**
  * Downloads the first recording for an online meeting and persists the path + size.
+ * Returns the file path if successful, null otherwise.
  */
 async function fetchAndStoreRecording(
   meetingId: number,
   organizerUserId: string,
   onlineMeetingId: string
-): Promise<void> {
+): Promise<string | null> {
   const recordings = await listRecordings(organizerUserId, onlineMeetingId);
 
   if (recordings.length === 0) {
     log.info('No recordings available', { meetingId, onlineMeetingId }, LOGGER);
-    return;
+    return null;
   }
 
   const { filePath, sizeBytes } = await downloadRecordingToDisk(
@@ -251,4 +278,5 @@ async function fetchAndStoreRecording(
   `;
 
   log.info('Recording stored', { meetingId, filePath, sizeBytes }, LOGGER);
+  return filePath;
 }
