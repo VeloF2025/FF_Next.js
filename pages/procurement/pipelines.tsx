@@ -241,7 +241,7 @@ export default function PipelinesPage() {
                 </div>
               </div>
               <button
-                onClick={() => router.push('/procurement/workflow')}
+                onClick={() => router.push('/procurement/workflow?new=1')}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
               >
                 <Plus className="h-4 w-4" />
@@ -349,7 +349,7 @@ export default function PipelinesPage() {
               </p>
               {threads.length === 0 && (
                 <button
-                  onClick={() => router.push('/procurement/workflow')}
+                  onClick={() => router.push('/procurement/workflow?new=1')}
                   className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
                 >
                   <Plus className="h-4 w-4" />

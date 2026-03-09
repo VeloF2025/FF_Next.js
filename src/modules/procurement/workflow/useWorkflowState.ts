@@ -85,7 +85,13 @@ function buildInitialState(
   urlReqId: string | undefined,
   urlApprovalId: string | undefined,
   urlThreadId: string | undefined,
+  isNewPipeline: boolean,
 ): WorkflowState {
+  // Explicit "new pipeline" — ignore persisted state entirely
+  if (isNewPipeline) {
+    return { ...DEFAULT_STATE };
+  }
+
   const base: WorkflowState = persisted ?? { ...DEFAULT_STATE };
 
   // If a threadId is provided via URL and differs from persisted, load the thread from DB
@@ -136,8 +142,10 @@ export function useWorkflowState(): UseWorkflowStateReturn {
     const urlThreadId = router.query.threadId
       ? String(Array.isArray(router.query.threadId) ? router.query.threadId[0] : router.query.threadId)
       : undefined;
+    // "New Pipeline" = /procurement/workflow with no threadId, reqId, or approvalId
+    const isNew = router.query.new === '1';
 
-    return buildInitialState(loadPersistedState(), urlStep, urlReqId, urlApprovalId, urlThreadId);
+    return buildInitialState(loadPersistedState(), urlStep, urlReqId, urlApprovalId, urlThreadId, isNew);
   });
 
   // Re-hydrate once router is ready (query may be empty on first render with SSR)
@@ -154,10 +162,20 @@ export function useWorkflowState(): UseWorkflowStateReturn {
     const urlThreadId = router.query.threadId
       ? String(Array.isArray(router.query.threadId) ? router.query.threadId[0] : router.query.threadId)
       : undefined;
+    const isNew = router.query.new === '1';
+
+    // For new pipelines, always reset even if no other params present
+    if (isNew) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(STORAGE_KEY);
+      }
+      setRawState({ ...DEFAULT_STATE });
+      return;
+    }
 
     if (!urlStep && !urlReqId && !urlApprovalId && !urlThreadId) return;
 
-    setRawState((prev) => buildInitialState(prev, urlStep, urlReqId, urlApprovalId, urlThreadId));
+    setRawState((prev) => buildInitialState(prev, urlStep, urlReqId, urlApprovalId, urlThreadId, false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady]);
 
