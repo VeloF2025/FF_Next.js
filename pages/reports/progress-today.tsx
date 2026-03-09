@@ -51,7 +51,7 @@ const METRIC_CONFIG = [
     label: "RFO's Completed",
     icon: Radio,
     color: 'purple',
-    description: 'Ready for Operation milestones reached today',
+    description: 'Ready for Optical milestones reached today',
   },
   {
     key: 'atpsCompleted' as keyof ProgressMetrics,
