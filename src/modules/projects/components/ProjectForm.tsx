@@ -121,18 +121,31 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
   // Populate form with existing project data
   useEffect(() => {
     if (project) {
+      // Parse location: DB stores as string "City, Province", form needs object
+      let locationObj = { province: '', city: '', address: '' };
+      if (project.location && typeof project.location === 'string') {
+        const parts = project.location.split(',').map((s: string) => s.trim());
+        locationObj = {
+          city: parts[0] || '',
+          province: parts[1] || '',
+          address: '',
+        };
+      } else if (project.location && typeof project.location === 'object') {
+        locationObj = project.location;
+      }
+
       const formData: ProjectFormData = {
         name: project.name || project.project_name || '',
         description: project.description || '',
         clientId: project.clientId || project.client_id || '',
         projectManagerId: project.projectManager || project.project_manager || '',
-        status: project.status || 'planning',
-        priority: project.priority || 'medium',
+        status: (project.status || 'planning').toLowerCase(),
+        priority: (project.priority || 'medium').toLowerCase(),
         // Convert ISO dates to YYYY-MM-DD format for HTML date inputs
         startDate: formatDateForInput(project.startDate || project.start_date),
         endDate: formatDateForInput(project.endDate || project.end_date),
-        budget: project.budget || 0,
-        location: project.location || {},
+        budget: Number(project.budget) || 0,
+        location: locationObj,
       };
       reset(formData);
     }
