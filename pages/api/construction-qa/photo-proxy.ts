@@ -12,9 +12,12 @@ import { log } from '@/lib/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
+import path from 'path';
+import fs from 'fs';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
+const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-photos';
 
 // SharePoint Graph API config
 const SP_TENANT_ID = 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
@@ -42,6 +45,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (source === 'sharepoint') {
       return await proxySharePointPhoto(key, res);
+    }
+
+    if (source === 'upload') {
+      return await proxyLocalPhoto(key, res);
+    }
+
+    if (source === 'local') {
+      return await proxyStoragePhoto(key, res);
     }
 
     return res.status(400).json({ error: `Unsupported photo source: ${source}` });
@@ -112,6 +123,71 @@ async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void>
 
     throw execError;
   }
+}
+
+/**
+ * Serve a photo from shared local storage (/home/velo/storage/qa-photos/).
+ * storage_key format: relative path e.g. "thembisa-pop-1/TEM.P.A001/photo.jpg"
+ */
+async function proxyStoragePhoto(storageKey: string, res: NextApiResponse): Promise<void> {
+  const normalized = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, '');
+  if (normalized.includes('..') || normalized.startsWith('/')) {
+    res.status(400).json({ error: 'Invalid storage key' });
+    return;
+  }
+
+  const filePath = path.join(STORAGE_ROOT, normalized);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'Photo not found in storage', key: storageKey });
+    return;
+  }
+
+  const ext = path.extname(filePath).toLowerCase().slice(1);
+  const contentTypes: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
+  };
+
+  const stat = fs.statSync(filePath);
+  res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  res.setHeader('Content-Length', stat.size);
+
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
+}
+
+/**
+ * Serve a photo from local uploads directory.
+ * storage_key format: relative path under public/uploads/ e.g. "qa-photos/thembisa-pop-1/TEM.P.A001/photo.jpg"
+ */
+async function proxyLocalPhoto(storageKey: string, res: NextApiResponse): Promise<void> {
+  // Prevent path traversal
+  const normalized = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, '');
+  if (normalized.includes('..') || normalized.startsWith('/')) {
+    res.status(400).json({ error: 'Invalid local storage key' });
+    return;
+  }
+
+  const filePath = path.join(process.cwd(), 'public', 'uploads', normalized);
+  if (!fs.existsSync(filePath)) {
+    res.status(404).json({ error: 'Local photo not found', key: storageKey });
+    return;
+  }
+
+  const ext = path.extname(filePath).toLowerCase().slice(1);
+  const contentTypes: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+    gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
+  };
+
+  const stat = fs.statSync(filePath);
+  res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
+  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  res.setHeader('Content-Length', stat.size);
+
+  const stream = fs.createReadStream(filePath);
+  stream.pipe(res);
 }
 
 /**
