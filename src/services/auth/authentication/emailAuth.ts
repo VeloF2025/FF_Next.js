@@ -22,7 +22,7 @@ export class EmailAuthentication {
         id: mockUser.id,
         email: mockUser.email,
         displayName: mockUser.name,
-        photoURL: mockUser.photoURL
+        photoURL: mockUser.photoURL ?? null
       };
     }
 
@@ -32,7 +32,7 @@ export class EmailAuthentication {
       id: user.id,
       email: user.email,
       displayName: user.name,
-      photoURL: user.photoURL
+      photoURL: user.photoURL ?? null
     };
   }
 
@@ -45,15 +45,16 @@ export class EmailAuthentication {
         log.debug('emailAuth', { message: '🔧 DEV MODE: Mock enhanced email sign in', email: credentials.email });
         const mockUser = await clerkAuth.signInWithEmailAndPassword(credentials.email, credentials.password);
         return {
-          uid: mockUser.id,
+          id: mockUser.id,
           email: mockUser.email || '',
           displayName: mockUser.name || '',
-          photoURL: mockUser.photoURL || '',
+          photoURL: mockUser.photoURL ?? null,
           role: mockUser.role || 'viewer',
-          emailVerified: true,
-          createdAt: mockUser.createdAt.toISOString(),
-          lastLoginAt: new Date().toISOString()
-        } as User;
+          permissions: [],
+          isEmailVerified: true,
+          createdAt: mockUser.createdAt,
+          lastLoginAt: new Date(),
+        } as unknown as User;
       }
 
       const clerkUser = await clerkAuth.signInWithEmailAndPassword(
@@ -84,7 +85,7 @@ export class EmailAuthentication {
         id: mockUser.id,
         email: mockUser.email,
         displayName: mockUser.name,
-        photoURL: mockUser.photoURL
+        photoURL: mockUser.photoURL ?? null
       };
     }
 
@@ -93,7 +94,7 @@ export class EmailAuthentication {
       id: user.id,
       email: user.email,
       displayName: user.name,
-      photoURL: user.photoURL
+      photoURL: user.photoURL ?? null
     };
   }
 
@@ -111,15 +112,16 @@ export class EmailAuthentication {
           displayName
         );
         return {
-          uid: mockUser.id,
+          id: mockUser.id,
           email: mockUser.email || '',
           displayName: mockUser.name || '',
-          photoURL: mockUser.photoURL || '',
+          photoURL: mockUser.photoURL ?? null,
           role: mockUser.role || 'viewer',
-          emailVerified: true,
-          createdAt: mockUser.createdAt.toISOString(),
-          lastLoginAt: new Date().toISOString()
-        } as User;
+          permissions: [],
+          isEmailVerified: true,
+          createdAt: mockUser.createdAt,
+          lastLoginAt: new Date(),
+        } as unknown as User;
       }
 
       const displayName = `${credentials.firstName} ${credentials.lastName}`.trim();

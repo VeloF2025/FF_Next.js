@@ -11,11 +11,11 @@ import { AuthUser } from '../authHelpers';
 import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
-const createMockAuthUser = (user: User): AuthUser => ({
+const createMockAuthUser = (user: { id: string; email: string; displayName?: string | null; name?: string; photoURL?: string | null }): AuthUser => ({
   uid: user.id,
   email: user.email,
-  displayName: user.displayName,
-  photoURL: user.photoURL,
+  displayName: user.displayName ?? user.name ?? null,
+  photoURL: user.photoURL ?? null,
   emailVerified: true,
 });
 
@@ -57,7 +57,7 @@ export class UserState {
   async getCurrentUserEnhanced(): Promise<User | null> {
     if (authConfig.isDevMode) {
       log.debug('userState', { message: 'DEV MODE: Returning mock user (enhanced)' });
-      return authConfig.devUser;
+      return authConfig.devUser as unknown as User;
     }
 
     try {
@@ -99,14 +99,14 @@ export class UserState {
    */
   async waitForAuth(): Promise<User | null> {
     if (authConfig.isDevMode) {
-      return authConfig.devUser;
+      return authConfig.devUser as unknown as User;
     }
 
     try {
       // In Clerk, we need to wait for the auth state to be loaded
       const isReady = await clerkAuth.checkAuthStatus();
       if (isReady) {
-        return await clerkAuth.getCurrentUser();
+        return await clerkAuth.getCurrentUser() as unknown as User | null;
       }
       return null;
     } catch (error) {

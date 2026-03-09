@@ -10,11 +10,11 @@ import { AuthUser } from '../authHelpers';
 import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
-const createMockAuthUser = (user: User): AuthUser => ({
+const createMockAuthUser = (user: { id: string; email: string; displayName?: string | null; name?: string; photoURL?: string | null }): AuthUser => ({
   uid: user.id,
   email: user.email,
-  displayName: user.displayName,
-  photoURL: user.photoURL,
+  displayName: user.displayName ?? user.name ?? null,
+  photoURL: user.photoURL ?? null,
   emailVerified: true,
 });
 
@@ -74,7 +74,7 @@ export class AuthState {
       log.debug('authState', { message: 'DEV MODE: Setting up mock enhanced auth state listener' });
       // In dev mode, immediately call callback with mock user
       setTimeout(() => {
-        callback(authConfig.devUser);
+        callback(authConfig.devUser as unknown as User);
       }, 100);
 
       // Return cleanup function

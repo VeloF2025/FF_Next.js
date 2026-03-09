@@ -79,8 +79,10 @@ export function decodeToken(token: string): JosePayload | null {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
+    const part = parts[1];
+    if (!part) return null;
     const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64url').toString('utf-8')
+      Buffer.from(part, 'base64url' as BufferEncoding).toString('utf-8')
     );
     return payload;
   } catch {
