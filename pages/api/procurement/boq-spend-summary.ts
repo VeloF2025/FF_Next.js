@@ -16,6 +16,73 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.methodNotAllowed(res, ['GET']);
   }
 
+  const { projectId, dateFrom, dateTo } = req.query;
+  const from = typeof dateFrom === 'string' ? dateFrom : null;
+  const to = typeof dateTo === 'string' ? dateTo : null;
+
+  // If projectId provided, return PO transactions for that project
+  if (projectId && typeof projectId === 'string') {
+    try {
+      let rows;
+      if (from && to) {
+        rows = await sql`
+          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+            AND po.order_date >= ${from}::date AND po.order_date <= ${to}::date
+          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+          ORDER BY po.order_date DESC NULLS LAST`;
+      } else if (from) {
+        rows = await sql`
+          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+            AND po.order_date >= ${from}::date
+          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+          ORDER BY po.order_date DESC NULLS LAST`;
+      } else if (to) {
+        rows = await sql`
+          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+            AND po.order_date <= ${to}::date
+          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+          ORDER BY po.order_date DESC NULLS LAST`;
+      } else {
+        rows = await sql`
+          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+          ORDER BY po.order_date DESC NULLS LAST`;
+      }
+
+      const transactions = rows.map((r) => ({
+        id: r.id,
+        poNumber: r.external_po_number || '—',
+        status: r.status,
+        orderDate: r.order_date,
+        supplierName: r.supplier_name || 'Unknown',
+        totalAmount: Number(r.total_amount),
+        itemCount: Number(r.item_count),
+        confirmed: ['received', 'partially_received', 'closed'].includes(r.status),
+      }));
+
+      return apiResponse.success(res, { transactions });
+    } catch (err) {
+      log.error('Failed to load project PO transactions', { err, projectId }, 'boq-spend-summary');
+      return apiResponse.serverError(res, err instanceof Error ? err.message : 'Unknown error');
+    }
+  }
+
   try {
     const projects = await sql`
       SELECT

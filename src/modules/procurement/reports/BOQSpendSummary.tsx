@@ -3,9 +3,12 @@
  * Shows spend vs BOQ value for all projects with active BOQs.
  */
 
-import { useEffect, useState } from 'react';
-import { Loader2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Loader2, TrendingUp, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { POTransactionDetail } from './POTransactionDetail';
+import { BOQSpendKPICards } from './BOQSpendKPICards';
+import type { POTransaction } from './POTransactionDetail';
 
 interface ProjectSpend {
   projectId: string;
@@ -61,6 +64,67 @@ export function BOQSpendSummary() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<POTransaction[]>([]);
+  const [txLoading, setTxLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const toggleProject = useCallback(async (projectId: string) => {
+    if (expandedProject === projectId) {
+      setExpandedProject(null);
+      return;
+    }
+    setExpandedProject(projectId);
+    setTxLoading(true);
+    try {
+      const params = new URLSearchParams({ projectId });
+      if (dateFrom) params.set('dateFrom', dateFrom);
+      if (dateTo) params.set('dateTo', dateTo);
+      const res = await fetch(`/api/procurement/boq-spend-summary?${params}`);
+      const json = await res.json() as { success: boolean; data?: { transactions: POTransaction[] } };
+      if (json.success && json.data) {
+        setTransactions(json.data.transactions);
+      }
+    } catch (err) {
+      log.error('Failed to load PO transactions', { err }, 'BOQSpendSummary');
+    } finally {
+      setTxLoading(false);
+    }
+  }, [expandedProject, dateFrom, dateTo]);
+
+  const exportCSV = useCallback(() => {
+    const headers = ['Project', 'BOQ Budget', 'Ordered', 'Ordered %', 'Confirmed', 'Confirmed %', 'Remaining'];
+    const rows = projects.map((p) => [
+      p.projectName,
+      p.boqValue.toFixed(2),
+      p.totalOrdered.toFixed(2),
+      `${p.orderedPercent}%`,
+      p.confirmedSpend.toFixed(2),
+      `${p.confirmedPercent}%`,
+      p.remainingBudget.toFixed(2),
+    ]);
+    if (totals) {
+      rows.push([
+        `TOTAL (${projects.length} projects)`,
+        totals.boqValue.toFixed(2),
+        totals.totalOrdered.toFixed(2),
+        totals.boqValue > 0 ? `${Math.round((totals.totalOrdered / totals.boqValue) * 100)}%` : '0%',
+        totals.confirmedSpend.toFixed(2),
+        totals.boqValue > 0 ? `${Math.round((totals.confirmedSpend / totals.boqValue) * 100)}%` : '0%',
+        totals.remainingBudget.toFixed(2),
+      ]);
+    }
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateSuffix = dateFrom || dateTo ? `_${dateFrom || 'all'}_to_${dateTo || 'all'}` : '';
+    a.download = `boq-spend-summary${dateSuffix}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [projects, totals, dateFrom, dateTo]);
 
   useEffect(() => {
     (async () => {
@@ -108,31 +172,17 @@ export function BOQSpendSummary() {
 
   return (
     <div className="space-y-4">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-4">
-          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Total BOQ Budget</p>
-          <p className="text-xl font-bold text-[var(--ff-text-primary)]">{fmtZAR(totals.boqValue)}</p>
-          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{projects.length} projects</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] border border-purple-500/30 rounded-lg p-4">
-          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Total Ordered</p>
-          <p className="text-xl font-bold text-purple-400">{fmtZAR(totals.totalOrdered)}</p>
-          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{overallOrdPct}% of budget</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] border border-green-500/30 rounded-lg p-4">
-          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Confirmed Spend</p>
-          <p className="text-xl font-bold text-green-400">{fmtZAR(totals.confirmedSpend)}</p>
-          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{overallConfPct}% of budget</p>
-        </div>
-        <div className="bg-[var(--ff-bg-secondary)] border border-amber-500/30 rounded-lg p-4">
-          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Remaining Budget</p>
-          <p className="text-xl font-bold text-amber-400">{fmtZAR(totals.remainingBudget)}</p>
-          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-            {totals.boqValue > 0 ? Math.round((totals.remainingBudget / totals.boqValue) * 100) : 0}% unallocated
-          </p>
-        </div>
-      </div>
+      <BOQSpendKPICards
+        totals={totals}
+        projectCount={projects.length}
+        overallOrdPct={overallOrdPct}
+        overallConfPct={overallConfPct}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onExport={exportCSV}
+      />
 
       {/* Overall progress */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-4 py-3">
@@ -171,35 +221,57 @@ export function BOQSpendSummary() {
             <tbody className="divide-y divide-[var(--ff-border-light)]">
               {projects.map((p) => {
                 const overBudget = p.totalOrdered > p.boqValue;
+                const isExpanded = expandedProject === p.projectId;
                 return (
-                  <tr key={p.projectId} className="hover:bg-[var(--ff-bg-hover)] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="text-[var(--ff-text-primary)] font-medium">{p.projectName}</div>
-                      <div className="text-xs text-[var(--ff-text-tertiary)]">
-                        v{p.boqVersion} · {p.boqLineCount} items · {p.poCount} POs
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] font-medium">{fmtZAR(p.boqValue)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={overBudget ? 'text-red-400 font-semibold' : 'text-purple-400'}>
-                        {fmtZAR(p.totalOrdered)}
-                      </span>
-                      {overBudget && (
-                        <div className="flex items-center justify-end gap-1 text-xs text-red-400 mt-0.5">
-                          <AlertTriangle className="h-3 w-3" />
-                          {p.orderedPercent}%
+                  <>
+                    <tr
+                      key={p.projectId}
+                      className="hover:bg-[var(--ff-bg-hover)] transition-colors cursor-pointer"
+                      onClick={() => toggleProject(p.projectId)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4 text-purple-400 shrink-0" />
+                            : <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)] shrink-0" />
+                          }
+                          <div>
+                            <div className="text-[var(--ff-text-primary)] font-medium">{p.projectName}</div>
+                            <div className="text-xs text-[var(--ff-text-tertiary)]">
+                              v{p.boqVersion} · {p.boqLineCount} items · {p.poCount} POs
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-green-400">{fmtZAR(p.confirmedSpend)}</td>
-                    <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)]">{fmtZAR(p.remainingBudget)}</td>
-                    <td className="px-4 py-3">
-                      <ProgressBar ordered={p.totalOrdered} confirmed={p.confirmedSpend} total={p.boqValue} />
-                      <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-1">
-                        {p.confirmedPercent}% confirmed · {p.orderedPercent}% ordered
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] font-medium">{fmtZAR(p.boqValue)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={overBudget ? 'text-red-400 font-semibold' : 'text-purple-400'}>
+                          {fmtZAR(p.totalOrdered)}
+                        </span>
+                        {overBudget && (
+                          <div className="flex items-center justify-end gap-1 text-xs text-red-400 mt-0.5">
+                            <AlertTriangle className="h-3 w-3" />
+                            {p.orderedPercent}%
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-400">{fmtZAR(p.confirmedSpend)}</td>
+                      <td className="px-4 py-3 text-right text-[var(--ff-text-secondary)]">{fmtZAR(p.remainingBudget)}</td>
+                      <td className="px-4 py-3">
+                        <ProgressBar ordered={p.totalOrdered} confirmed={p.confirmedSpend} total={p.boqValue} />
+                        <div className="text-[10px] text-[var(--ff-text-tertiary)] mt-1">
+                          {p.confirmedPercent}% confirmed · {p.orderedPercent}% ordered
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${p.projectId}-detail`}>
+                        <td colSpan={6} className="bg-[var(--ff-bg-tertiary)] px-4 py-3">
+                          <POTransactionDetail transactions={transactions} loading={txLoading} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 );
               })}
             </tbody>
