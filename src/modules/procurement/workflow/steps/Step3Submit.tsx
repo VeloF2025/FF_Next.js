@@ -1,9 +1,10 @@
 /**
  * Step3Submit — Review & submit requisition for approval.
  * Provides a summary of the requisition and triggers the approval workflow.
+ * Handles resuming when requisition was already submitted/approved outside the wizard.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Loader2,
@@ -76,13 +77,61 @@ interface SubmitApiResponse {
 /**
  * Step 3: Review requisition details and submit for approval.
  * Handles both auto-approve (< R10k) and pending-approval (>= R10k) paths.
+ * If the requisition was already submitted/approved outside the wizard, auto-advances.
  */
 export function Step3Submit({ state, onComplete, onBack }: Step3SubmitProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
 
   const routing = getApprovalRouting(state.estimatedTotal);
   const StrategyIcon = state.strategy ? STRATEGY_ICONS[state.strategy] : null;
+
+  // Check if the requisition was already submitted/approved outside the wizard
+  useEffect(() => {
+    if (!state.requisitionId) {
+      setIsCheckingStatus(false);
+      return;
+    }
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`/api/procurement/requisitions/${state.requisitionId}`, {
+          credentials: 'include',
+        });
+        const json = await res.json();
+        if (!json.success || !json.data) {
+          setIsCheckingStatus(false);
+          return;
+        }
+
+        const status = json.data.status as string;
+
+        if (status === 'approved' || status === 'ordered' || status === 'partially_ordered') {
+          // Already approved — skip to next step
+          onComplete({ approvalStatus: 'auto_approved' });
+          return;
+        }
+
+        if (status === 'pending_approval') {
+          // Already submitted, waiting for approval
+          onComplete({
+            approvalStatus: 'pending',
+            approvalRequestId: json.data.approvalRequestId ?? undefined,
+          });
+          return;
+        }
+
+        // Status is 'draft' — normal flow, show submit button
+        setIsCheckingStatus(false);
+      } catch (err) {
+        log.error('Failed to check requisition status', { err }, 'Step3Submit');
+        setIsCheckingStatus(false);
+      }
+    };
+
+    checkStatus();
+  }, [state.requisitionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
     if (!state.requisitionId) {
@@ -130,6 +179,15 @@ export function Step3Submit({ state, onComplete, onBack }: Step3SubmitProps) {
       setIsSubmitting(false);
     }
   };
+
+  if (isCheckingStatus) {
+    return (
+      <div className="flex items-center justify-center py-12 gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
+        <span className="text-sm text-[var(--ff-text-secondary)]">Checking requisition status...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
