@@ -2,7 +2,7 @@
  * Construction QA Module Navigation Configuration
  *
  * Provides tab-based navigation for the Construction QA module:
- * - QA Centre: Feature list for quality assurance review (civil, optical, splicing)
+ * - QA Centre: Feature list for quality assurance review (civil and optical)
  * - Reports: Construction-specific analytics and reporting
  */
 
@@ -12,7 +12,7 @@ import type { ModuleNavigationConfig } from '../../types';
 export const constructionQaConfig: ModuleNavigationConfig = {
   moduleId: 'construction-qa',
   moduleName: 'Civil QA',
-  description: 'Civil, optical, and splicing quality assurance',
+  description: 'Civil and optical quality assurance',
   basePath: '/field-ops',
   icon: HardHat,
   tabs: [

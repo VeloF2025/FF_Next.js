@@ -47,7 +47,7 @@ export function FieldOpsDashboardPage() {
 
   const totalFeatures = projects.reduce((sum, p) => sum + p.total_features, 0);
   const totalApproved = projects.reduce(
-    (sum, p) => sum + p.civil.approved + p.optical.approved + p.splicing.approved,
+    (sum, p) => sum + p.civil.approved + p.optical.approved,
     0,
   );
 

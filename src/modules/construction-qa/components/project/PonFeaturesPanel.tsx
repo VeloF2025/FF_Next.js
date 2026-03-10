@@ -103,7 +103,6 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
               <SelectItem value="__all__">All Types</SelectItem>
               <SelectItem value="civil">Civil</SelectItem>
               <SelectItem value="optical">Optical</SelectItem>
-              <SelectItem value="splicing">Splicing</SelectItem>
             </SelectContent>
           </Select>
           <Select value={status || '__all__'} onValueChange={v => setStatus(v === '__all__' ? '' : v)}>

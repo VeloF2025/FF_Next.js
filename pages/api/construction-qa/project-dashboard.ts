@@ -172,7 +172,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       otdr_count: number;
       civil: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       optical: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
-      splicing: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       infrastructure: typeof emptyInfrastructure extends () => infer R ? R : never;
     }>();
 
@@ -191,12 +190,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           otdr_count: otdrMap.get(pid) || 0,
           civil: emptyDiscipline(),
           optical: emptyDiscipline(),
-          splicing: emptyDiscipline(),
           infrastructure: infraMap.get(pid) || emptyInfrastructure(),
         });
       }
       const proj = projectMap.get(pid)!;
-      const disc = row.discipline as 'civil' | 'optical' | 'splicing';
+      const disc = row.discipline as 'civil' | 'optical';
+      if (disc !== 'civil' && disc !== 'optical') continue; // guard against legacy data
       proj[disc] = {
         total: Number(row.total),
         pending: Number(row.pending),

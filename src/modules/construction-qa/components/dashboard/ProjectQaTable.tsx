@@ -37,7 +37,7 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
           {/* Group header row */}
           <tr className="bg-gray-800/80 text-gray-500 text-[10px] uppercase tracking-widest">
             <th colSpan={3} />
-            <th colSpan={3} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Disciplines</th>
+            <th colSpan={2} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Disciplines</th>
             <th colSpan={3} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Poles</th>
             <th colSpan={2} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Joints</th>
             <th colSpan={2} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Spans</th>
@@ -51,7 +51,6 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
             {/* Disciplines */}
             <th className="text-right px-2 py-2 font-medium border-l border-[var(--border-color)]">Civil</th>
             <th className="text-right px-2 py-2 font-medium">Optical</th>
-            <th className="text-right px-2 py-2 font-medium">Splicing</th>
             {/* Poles */}
             <th className="text-right px-2 py-2 font-medium border-l border-[var(--border-color)]">Total</th>
             <th className="text-right px-2 py-2 font-medium">Planted</th>
@@ -71,7 +70,7 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
         </thead>
         <tbody className="divide-y divide-[var(--border-color)]">
           {projects.map(p => {
-            const approved = p.civil.approved + p.optical.approved + p.splicing.approved;
+            const approved = p.civil.approved + p.optical.approved;
             const pct = p.total_features > 0 ? Math.round((approved / p.total_features) * 100) : 0;
             const { poles, joints, cable_spans } = p.infrastructure;
 
@@ -87,7 +86,7 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
                     {p.total_features > 0 && (
                       <>
                         <div className="h-full bg-green-500" style={{ width: `${(approved / p.total_features) * 100}%` }} />
-                        <div className="h-full bg-yellow-500" style={{ width: `${((p.civil.pending + p.optical.pending + p.splicing.pending) / p.total_features) * 100}%` }} />
+                        <div className="h-full bg-yellow-500" style={{ width: `${((p.civil.pending + p.optical.pending) / p.total_features) * 100}%` }} />
                       </>
                     )}
                   </div>
@@ -99,7 +98,6 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
                 {/* Disciplines */}
                 <td className="text-right px-2 py-3 text-gray-300 font-mono border-l border-[var(--border-color)]">{p.civil.total || dash}</td>
                 <td className="text-right px-2 py-3 text-gray-300 font-mono">{p.optical.total || dash}</td>
-                <td className="text-right px-2 py-3 text-gray-300 font-mono">{p.splicing.total || dash}</td>
                 {/* Poles: Total / Planted / QA'd */}
                 <td className="text-right px-2 py-3 text-gray-300 font-mono border-l border-[var(--border-color)]">
                   {poles.total > 0 ? poles.total.toLocaleString() : dash}

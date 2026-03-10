@@ -18,6 +18,7 @@ import { REASON_CODE_LABELS } from '../../types/construction.types';
 /**
  * Maps checklist step numbers to the corresponding reason code per discipline.
  * When a step is unchecked, the matching reason code auto-selects on REWORK/FAIL.
+ * Optical steps 1-8 = Phase A (dome), 11-16 = Phase B (main joint).
  */
 const STEP_TO_REASON: Record<string, Record<number, QaReasonCode>> = {
   civil: {
@@ -29,18 +30,11 @@ const STEP_TO_REASON: Record<string, Record<number, QaReasonCode>> = {
     7: 'CIVIL_AFTER_PHOTO_MISSING',
   },
   optical: {
-    1: 'OPTICAL_ROUTE_OBSCURED',
-    2: 'OPTICAL_CABLE_NOT_ATTACHED',
-    3: 'OPTICAL_NO_SLACK_COIL',
-    4: 'OPTICAL_CABLE_TYPE_MISMATCH',
-    6: 'OPTICAL_SAG_EXCESSIVE',
-  },
-  splicing: {
-    1: 'SPLICING_DOME_NOT_SEALED',
-    2: 'SPLICING_LABEL_UNREADABLE',
-    4: 'SPLICING_HEAT_SHRINKS_MISSING',
-    5: 'SPLICING_EMERGENCY_LOOP_MISSING',
-    6: 'SPLICING_BACKHAUL_NOT_SEPARATED',
+    1: 'OPTICAL_DOME_NOT_SEALED',
+    2: 'OPTICAL_LABEL_UNREADABLE',
+    4: 'OPTICAL_HEAT_SHRINKS_MISSING',
+    5: 'OPTICAL_EMERGENCY_LOOP_MISSING',
+    6: 'OPTICAL_BACKHAUL_NOT_SEPARATED',
   },
 };
 
@@ -117,8 +111,9 @@ export function PhaseFinalDecision({
     for (const step of checklist) {
       const key = Object.keys(checkedSteps).find(k => k.includes(`_step_${String(step.step).padStart(2, '0')}_`));
       const isChecked = key ? checkedSteps[key] : false;
-      if (!isChecked && stepReasons[step.step]) {
-        autoCodes.push(stepReasons[step.step]);
+      const reasonCode = stepReasons[step.step];
+      if (!isChecked && reasonCode) {
+        autoCodes.push(reasonCode);
       }
     }
 

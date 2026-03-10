@@ -1,6 +1,6 @@
 /**
  * Construction QA Centre Page
- * Main dashboard for civil, optical, and splicing quality assurance.
+ * Main dashboard for civil and optical quality assurance.
  *
  * Layout: Stats cards + discipline tabs + filter bar + feature data grid
  * Pattern: Follows Activate QA Centre and QField QA Dashboard conventions
@@ -17,7 +17,6 @@ import {
   Clock,
   AlertTriangle,
   HardHat,
-  Cable,
   CircleDot,
   Search,
 } from 'lucide-react';
@@ -26,7 +25,7 @@ import type { EnhancedStatCardProps } from '@/components/dashboard/EnhancedStatC
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { log } from '@/lib/logger';
 
-type Discipline = 'civil' | 'optical' | 'splicing';
+type Discipline = 'civil' | 'optical';
 type WorkflowStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'rework_needed' | 'escalated' | 'unidentified';
 
 interface FeatureRow {
@@ -71,9 +70,8 @@ interface Filters {
 }
 
 const DISCIPLINE_TABS: { key: Discipline; label: string; icon: typeof HardHat }[] = [
-  { key: 'civil', label: 'Poles (Civil)', icon: HardHat },
-  { key: 'optical', label: 'Cable Spans (Optical)', icon: Cable },
-  { key: 'splicing', label: 'Dome Joints (Splicing)', icon: CircleDot },
+  { key: 'civil', label: 'Civil', icon: HardHat },
+  { key: 'optical', label: 'Optical', icon: CircleDot },
 ];
 
 export function ConstructionQaCentrePage() {

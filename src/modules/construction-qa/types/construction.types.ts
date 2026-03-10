@@ -1,13 +1,12 @@
 /**
  * Construction QA Module — TypeScript Type Definitions
  *
- * Covers all three pre-activation construction disciplines:
+ * Covers the two pre-activation construction disciplines:
  *   • Civil      — pole planting
- *   • Optical    — cable stringing
- *   • Splicing   — dome joint installation
+ *   • Optical    — dome joint installation (Phase A: distribution dome, Phase B: main joint)
  *
  * Database alignment: construction_qa_reviews, construction_qa_photos,
- *   construction_qa_activity, construction_qa_assignments (migrations 200–203).
+ *   construction_qa_activity, construction_qa_assignments (migrations 200–203, 240).
  *
  * NLNH Confidence: HIGH — types derived directly from PRD sections 6, 7, and 14.
  */
@@ -17,7 +16,7 @@
 // ============================================================================
 
 /** The construction discipline being quality-assured. */
-export type Discipline = 'civil' | 'optical' | 'splicing';
+export type Discipline = 'civil' | 'optical';
 
 /**
  * The physical infrastructure feature under review.
@@ -85,7 +84,7 @@ export type ActivityEventType =
 
 /** A single step in a discipline-specific photo checklist. */
 export interface ChecklistStep {
-  /** Step number (1-based, matches civil_step_0N / optical_step_0N / splicing_step_0N columns). */
+  /** Step number (1-based, matches civil_step_0N / optical_step_0N columns). */
   step: number;
   /** Human-readable label shown in the wizard UI. */
   label: string;
@@ -158,59 +157,10 @@ export const CIVIL_CHECKLIST: readonly ChecklistStep[] = [
 ] as const;
 
 /**
- * Six-step checklist for optical (cable stringing) discipline.
- * All six steps are always required.
- */
-export const OPTICAL_CHECKLIST: readonly ChecklistStep[] = [
-  {
-    step: 1,
-    label: 'Cable Route',
-    required: true,
-    vlmCheck: 'Full cable run between poles visible in frame',
-    notes: 'Shows span from departure to arrival pole',
-  },
-  {
-    step: 2,
-    label: 'Attachment Points',
-    required: true,
-    vlmCheck: 'Cable attached to messenger wire or lashing hardware',
-    notes: 'No bare resting directly on pole hardware',
-  },
-  {
-    step: 3,
-    label: 'Slack Coil',
-    required: true,
-    vlmCheck: 'Slack coil at departure pole — max 300 mm diameter',
-    notes: 'FiberTime cable standard: coil must be neat and tie-wrapped',
-  },
-  {
-    step: 4,
-    label: 'Cable Label',
-    required: true,
-    vlmCheck: 'Cable type / size label readable — AI reads: 24F, 96F, etc.',
-    notes: 'Label must match project BOM cable specification',
-  },
-  {
-    step: 5,
-    label: 'No Back-feeding',
-    required: true,
-    vlmCheck: 'Cable direction visible — no reverse runs',
-    notes: 'Checked by supervisor in full route context',
-  },
-  {
-    step: 6,
-    label: 'Sag Assessment',
-    required: true,
-    vlmCheck: 'Cable sag within tolerance — no loops touching obstacles',
-    notes: 'AI estimates clearance from ground and nearby structures',
-  },
-] as const;
-
-/**
- * Splicing checklist — Distribution Dome (8 steps).
+ * Optical checklist — Distribution Dome (Phase A, 8 steps).
  * Aligned with Velocity Fibre Optical Checklist Phase A.
  */
-export const SPLICING_DOME_CHECKLIST: readonly ChecklistStep[] = [
+export const OPTICAL_DOME_CHECKLIST: readonly ChecklistStep[] = [
   {
     step: 1,
     label: 'Dome on Pole',
@@ -270,10 +220,10 @@ export const SPLICING_DOME_CHECKLIST: readonly ChecklistStep[] = [
 ] as const;
 
 /**
- * Splicing checklist — Main Joint (6 steps, numbered 11-16).
+ * Optical checklist — Main Joint (Phase B, 6 steps, numbered 11-16).
  * Aligned with Velocity Fibre Optical Checklist Phase B.
  */
-export const SPLICING_JOINT_CHECKLIST: readonly ChecklistStep[] = [
+export const OPTICAL_JOINT_CHECKLIST: readonly ChecklistStep[] = [
   {
     step: 11,
     label: 'Cable Entries',
@@ -318,22 +268,28 @@ export const SPLICING_JOINT_CHECKLIST: readonly ChecklistStep[] = [
   },
 ] as const;
 
-/** Legacy alias — returns dome checklist by default for backward compatibility. */
-export const SPLICING_CHECKLIST = SPLICING_DOME_CHECKLIST;
+/**
+ * Combined optical checklist: Phase A (dome, 8 steps) + Phase B (main joint, 6 steps) = 14 steps.
+ * This is the default checklist used for the optical discipline.
+ */
+export const OPTICAL_CHECKLIST: readonly ChecklistStep[] = [
+  ...OPTICAL_DOME_CHECKLIST,
+  ...OPTICAL_JOINT_CHECKLIST,
+] as const;
 
 /** Returns the correct checklist for a given discipline and optional sub-type. */
 export function getChecklist(discipline: Discipline, subType?: 'dome' | 'main_joint'): readonly ChecklistStep[] {
   if (discipline === 'civil') return CIVIL_CHECKLIST;
-  if (discipline === 'optical') return OPTICAL_CHECKLIST;
-  if (discipline === 'splicing' && subType === 'main_joint') return SPLICING_JOINT_CHECKLIST;
-  return SPLICING_DOME_CHECKLIST;
+  // Optical: sub-type allows Phase A or Phase B independently; default returns combined
+  if (subType === 'dome') return OPTICAL_DOME_CHECKLIST;
+  if (subType === 'main_joint') return OPTICAL_JOINT_CHECKLIST;
+  return OPTICAL_CHECKLIST;
 }
 
-/** Maximum step number per discipline (dome default for splicing). */
+/** Maximum step number per discipline (dome default for optical). */
 export const CHECKLIST_STEP_COUNT: Record<Discipline, number> = {
   civil: 8,
-  optical: 6,
-  splicing: 8,  // dome=8, main_joint uses 11-16
+  optical: 8,  // dome=8, main_joint uses 11-16; combined = 14 steps
 };
 
 // ============================================================================
@@ -353,31 +309,20 @@ export type CivilReasonCode =
   | 'CIVIL_WRONG_POLE'
   | 'CIVIL_INCOMPLETE_CHECKLIST';
 
-/** Rejection reason codes for the optical (cable stringing) discipline. */
+/** Rejection reason codes for the optical (dome joint installation) discipline. */
 export type OpticalReasonCode =
-  | 'OPTICAL_ROUTE_OBSCURED'
-  | 'OPTICAL_CABLE_NOT_ATTACHED'
-  | 'OPTICAL_NO_SLACK_COIL'
-  | 'OPTICAL_SLACK_COIL_OVERSIZED'
-  | 'OPTICAL_CABLE_TYPE_MISMATCH'
-  | 'OPTICAL_SAG_EXCESSIVE'
+  | 'OPTICAL_DOME_NOT_SEALED'
+  | 'OPTICAL_NOT_ON_BRACKET'
+  | 'OPTICAL_EMERGENCY_LOOP_MISSING'
+  | 'OPTICAL_BACKHAUL_NOT_SEPARATED'
+  | 'OPTICAL_TRAY_DISORGANIZED'
+  | 'OPTICAL_HEAT_SHRINKS_MISSING'
+  | 'OPTICAL_LABEL_UNREADABLE'
   | 'OPTICAL_PHOTO_BLURRY'
   | 'OPTICAL_INCOMPLETE_CHECKLIST';
 
-/** Rejection reason codes for the splicing (dome joint) discipline. */
-export type SplicingReasonCode =
-  | 'SPLICING_DOME_NOT_SEALED'
-  | 'SPLICING_NOT_ON_BRACKET'
-  | 'SPLICING_EMERGENCY_LOOP_MISSING'
-  | 'SPLICING_BACKHAUL_NOT_SEPARATED'
-  | 'SPLICING_TRAY_DISORGANIZED'
-  | 'SPLICING_HEAT_SHRINKS_MISSING'
-  | 'SPLICING_LABEL_UNREADABLE'
-  | 'SPLICING_PHOTO_BLURRY'
-  | 'SPLICING_INCOMPLETE_CHECKLIST';
-
 /** Union of all discipline-specific reason codes. */
-export type QaReasonCode = CivilReasonCode | OpticalReasonCode | SplicingReasonCode;
+export type QaReasonCode = CivilReasonCode | OpticalReasonCode;
 
 /** Human-readable plain-English descriptions keyed by reason code. */
 export const REASON_CODE_LABELS: Record<QaReasonCode, string> = {
@@ -392,24 +337,15 @@ export const REASON_CODE_LABELS: Record<QaReasonCode, string> = {
   CIVIL_WRONG_POLE: 'Photo does not match the expected pole number',
   CIVIL_INCOMPLETE_CHECKLIST: 'One or more required checklist steps have no photo',
 
-  OPTICAL_ROUTE_OBSCURED: 'Cable route is obscured and cannot be verified',
-  OPTICAL_CABLE_NOT_ATTACHED: 'Cable is not properly attached to messenger wire',
-  OPTICAL_NO_SLACK_COIL: 'No slack coil present at departure pole',
-  OPTICAL_SLACK_COIL_OVERSIZED: 'Slack coil diameter exceeds the 300 mm standard',
-  OPTICAL_CABLE_TYPE_MISMATCH: 'Cable type does not match the project BOM',
-  OPTICAL_SAG_EXCESSIVE: 'Cable sag is excessive — loops touching obstacles',
+  OPTICAL_DOME_NOT_SEALED: 'Dome enclosure is not fully sealed',
+  OPTICAL_NOT_ON_BRACKET: 'Dome is not mounted on a slack bracket',
+  OPTICAL_EMERGENCY_LOOP_MISSING: 'Emergency fiber loop is missing or too short',
+  OPTICAL_BACKHAUL_NOT_SEPARATED: 'Backhaul fiber is not separated from distribution',
+  OPTICAL_TRAY_DISORGANIZED: 'Splice trays are disorganized',
+  OPTICAL_HEAT_SHRINKS_MISSING: 'Heat shrinks are missing on one or more splices',
+  OPTICAL_LABEL_UNREADABLE: 'Dome label is unreadable or missing',
   OPTICAL_PHOTO_BLURRY: 'Photo is blurry or out of focus',
   OPTICAL_INCOMPLETE_CHECKLIST: 'One or more required checklist steps have no photo',
-
-  SPLICING_DOME_NOT_SEALED: 'Dome enclosure is not fully sealed',
-  SPLICING_NOT_ON_BRACKET: 'Dome is not mounted on a slack bracket',
-  SPLICING_EMERGENCY_LOOP_MISSING: 'Emergency fiber loop is missing or too short',
-  SPLICING_BACKHAUL_NOT_SEPARATED: 'Backhaul fiber is not separated from distribution',
-  SPLICING_TRAY_DISORGANIZED: 'Splice trays are disorganized',
-  SPLICING_HEAT_SHRINKS_MISSING: 'Heat shrinks are missing on one or more splices',
-  SPLICING_LABEL_UNREADABLE: 'Dome label is unreadable or missing',
-  SPLICING_PHOTO_BLURRY: 'Photo is blurry or out of focus',
-  SPLICING_INCOMPLETE_CHECKLIST: 'One or more required checklist steps have no photo',
 };
 
 // ============================================================================
@@ -471,7 +407,7 @@ export interface ResubmissionSnapshot {
  *
  * One row per (project_id, feature_type, feature_id) triplet.
  * Aggregates photo state, VLM results, and workflow lifecycle.
- * Matches the SQL schema in migration 200_construction_qa_reviews.sql exactly.
+ * Matches the SQL schema in migration 200_construction_qa_reviews.sql + 240_optical_discipline_consolidation.sql.
  */
 export interface ConstructionQaReview {
   // ── Primary key ──────────────────────────────────────────────────────────
@@ -502,34 +438,26 @@ export interface ConstructionQaReview {
   civil_step_07_after_photo: boolean;
   civil_step_08_signature: boolean;
 
-  // ── Optical checklist steps (cable stringing — unchanged) ─────────────────
-  optical_step_01_cable_route: boolean;
-  optical_step_02_attachment: boolean;
-  optical_step_03_slack_coil: boolean;
-  optical_step_04_cable_label: boolean;
-  optical_step_05_no_backfeed: boolean;
-  optical_step_06_sag_ok: boolean;
+  // ── Optical checklist steps — Distribution Dome / Phase A (steps 1-8) ────
+  optical_step_01_dome_on_pole: boolean;
+  optical_step_02_dome_label: boolean;
+  optical_step_03_open_dome: boolean;
+  optical_step_04_splice_protectors: boolean;
+  optical_step_05_slack_management: boolean;
+  optical_step_06_strength_members: boolean;
+  optical_step_07_seals_dustcaps: boolean;
+  optical_step_08_pole_id: boolean;
 
-  // ── Splicing checklist steps — Distribution Dome (steps 1-8) ─────────────
-  splicing_step_01_dome_on_pole: boolean;
-  splicing_step_02_dome_label: boolean;
-  splicing_step_03_open_dome: boolean;
-  splicing_step_04_splice_protectors: boolean;
-  splicing_step_05_slack_management: boolean;
-  splicing_step_06_strength_members: boolean;
-  splicing_step_07_seals_dustcaps: boolean;
-  splicing_step_08_pole_id: boolean;
+  // ── Optical checklist steps — Main Joint / Phase B (steps 11-16) ─────────
+  optical_step_11_cable_entries: boolean;
+  optical_step_12_strength_members: boolean;
+  optical_step_13_tube_routing: boolean;
+  optical_step_14_tray_entries: boolean;
+  optical_step_15_coiling_protectors: boolean;
+  optical_step_16_readable_labels: boolean;
 
-  // ── Splicing checklist steps — Main Joint (steps 11-16) ──────────────────
-  splicing_step_11_cable_entries: boolean;
-  splicing_step_12_strength_members: boolean;
-  splicing_step_13_tube_routing: boolean;
-  splicing_step_14_tray_entries: boolean;
-  splicing_step_15_coiling_protectors: boolean;
-  splicing_step_16_readable_labels: boolean;
-
-  /** Sub-type for splicing reviews: 'dome' or 'main_joint'. */
-  splicing_sub_type: 'dome' | 'main_joint' | null;
+  /** Sub-type for optical reviews: 'dome' (Phase A) or 'main_joint' (Phase B). */
+  optical_sub_type: 'dome' | 'main_joint' | null;
 
   // ── VLM processing ────────────────────────────────────────────────────────
   vlm_status: VlmStatus;
@@ -627,7 +555,7 @@ export interface ConstructionQaPhoto {
   mime_type: string;
 
   // ── Checklist assignment ──────────────────────────────────────────────────
-  /** Step number 1–7 (civil/splicing) or 1–6 (optical). Null if uncategorized. */
+  /** Step number 1–7 (civil) or 1–8 + 11–16 (optical). Null if uncategorized. */
   checklist_step: number | null;
   step_label: string | null;
 
@@ -894,29 +822,22 @@ export interface ReviewActionRequest {
       | 'civil_step_06_level_check'
       | 'civil_step_07_after_photo'
       | 'civil_step_08_signature'
-      // Optical (6 steps, unchanged)
-      | 'optical_step_01_cable_route'
-      | 'optical_step_02_attachment'
-      | 'optical_step_03_slack_coil'
-      | 'optical_step_04_cable_label'
-      | 'optical_step_05_no_backfeed'
-      | 'optical_step_06_sag_ok'
-      // Splicing — Dome (8 steps)
-      | 'splicing_step_01_dome_on_pole'
-      | 'splicing_step_02_dome_label'
-      | 'splicing_step_03_open_dome'
-      | 'splicing_step_04_splice_protectors'
-      | 'splicing_step_05_slack_management'
-      | 'splicing_step_06_strength_members'
-      | 'splicing_step_07_seals_dustcaps'
-      | 'splicing_step_08_pole_id'
-      // Splicing — Main Joint (6 steps)
-      | 'splicing_step_11_cable_entries'
-      | 'splicing_step_12_strength_members'
-      | 'splicing_step_13_tube_routing'
-      | 'splicing_step_14_tray_entries'
-      | 'splicing_step_15_coiling_protectors'
-      | 'splicing_step_16_readable_labels'
+      // Optical — Dome / Phase A (steps 1-8)
+      | 'optical_step_01_dome_on_pole'
+      | 'optical_step_02_dome_label'
+      | 'optical_step_03_open_dome'
+      | 'optical_step_04_splice_protectors'
+      | 'optical_step_05_slack_management'
+      | 'optical_step_06_strength_members'
+      | 'optical_step_07_seals_dustcaps'
+      | 'optical_step_08_pole_id'
+      // Optical — Main Joint / Phase B (steps 11-16)
+      | 'optical_step_11_cable_entries'
+      | 'optical_step_12_strength_members'
+      | 'optical_step_13_tube_routing'
+      | 'optical_step_14_tray_entries'
+      | 'optical_step_15_coiling_protectors'
+      | 'optical_step_16_readable_labels'
     >
   >;
   /** Corrected extracted data from Phase 3 data validation. */
@@ -1019,7 +940,7 @@ export interface QFieldIngestRequest {
   projectId: string;
   /** Target a specific QFieldCloud project UUID (optional). */
   qfieldProjectId?: string;
-  /** Limit ingestion to one discipline or all three. */
+  /** Limit ingestion to one discipline or both. */
   discipline?: Discipline | 'all';
   /** Only ingest photos captured after this ISO date string. */
   sinceDate?: string;
@@ -1176,103 +1097,7 @@ export interface OverviewReport {
       total: number;
       passed: number;
       failed: number;
-      rework: number;
-      pending: number;
+      passRate: number;
     }
   >;
 }
-
-/** Zone/PON progress entry returned by /reporting/by-zone-pon. */
-export interface ZonePonProgress {
-  zone_no: number | null;
-  pon_no: number | null;
-  civil_total: number;
-  civil_passed: number;
-  optical_total: number;
-  optical_passed: number;
-  splicing_total: number;
-  splicing_passed: number;
-  civil_pct: number;
-  optical_pct: number;
-  splicing_pct: number;
-}
-
-/** Contractor scorecard entry returned by /reporting/by-contractor. */
-export interface ContractorScore {
-  contractor_id: string;
-  contractor_name: string;
-  total_features: number;
-  first_pass_rate: number;
-  rework_rate: number;
-  most_common_rejection: QaReasonCode | null;
-  avg_photos_per_feature: number;
-}
-
-/** VLM accuracy entry returned by /reporting/vlm-accuracy. */
-export interface VlmAccuracyReport {
-  discipline: Discipline;
-  step: number;
-  step_label: string;
-  total_reviewed: number;
-  vlm_human_agreement: number;
-  false_positives: number;
-  false_negatives: number;
-}
-
-// ============================================================================
-// HITL CORRECTION TYPE
-// ============================================================================
-
-/**
- * Payload for logging a VLM correction to the vlm_corrections table.
- * Used by vlmConstructionService.ts when a reviewer overrides a VLM decision.
- */
-export interface HitlCorrectionPayload {
-  reviewId: string;
-  photoId: string;
-  photoUrl: string;
-  step: number;
-  discipline: Discipline;
-  vlmDecision: boolean;
-  humanDecision: boolean;
-  vlmConfidence: number;
-  correctionReason: string;
-  notes: string;
-  reviewerName: string;
-}
-
-// ============================================================================
-// UTILITY / FILTER TYPES
-// ============================================================================
-
-/** QA Centre filter bar state (mirrors FeaturesListRequest with UI-level types). */
-export interface QaCentreFilters {
-  projectId: string;
-  discipline: Discipline | 'all';
-  workflowStatus: WorkflowStatus | 'all';
-  zoneNo: number | null;
-  ponNo: number | null;
-  priority: Priority | 'all';
-  assignedTo: string | null;
-  search: string;
-  page: number;
-  pageSize: number;
-  sortBy: keyof ConstructionQaReview;
-  sortDir: 'asc' | 'desc';
-}
-
-/** Default filter values for the QA Centre filter bar. */
-export const DEFAULT_QA_CENTRE_FILTERS: QaCentreFilters = {
-  projectId: '',
-  discipline: 'all',
-  workflowStatus: 'all',
-  zoneNo: null,
-  ponNo: null,
-  priority: 'all',
-  assignedTo: null,
-  search: '',
-  page: 1,
-  pageSize: 25,
-  sortBy: 'last_photo_at',
-  sortDir: 'desc',
-};

@@ -47,7 +47,6 @@ export interface ProjectDashboardRow {
   otdr_count: number;
   civil: DisciplineStats;
   optical: DisciplineStats;
-  splicing: DisciplineStats;
   infrastructure: InfrastructureInventory;
 }
 
@@ -69,7 +68,6 @@ export interface PonQaSummary {
   /** Per-discipline breakdown */
   civil_count: number;
   optical_count: number;
-  splicing_count: number;
 }
 
 /** A zone node containing its PON children */

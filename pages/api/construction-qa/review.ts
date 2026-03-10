@@ -99,18 +99,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       'civil_step_01_before_photo', 'civil_step_02_during_photo', 'civil_step_03_depth_photo',
       'civil_step_04_end_plates', 'civil_step_05_compaction', 'civil_step_06_level_check',
       'civil_step_07_after_photo', 'civil_step_08_signature',
-      // Optical — Cable Stringing (6 steps, unchanged)
-      'optical_step_01_cable_route', 'optical_step_02_attachment', 'optical_step_03_slack_coil',
-      'optical_step_04_cable_label', 'optical_step_05_no_backfeed', 'optical_step_06_sag_ok',
-      // Splicing — Distribution Dome (8 steps)
-      'splicing_step_01_dome_on_pole', 'splicing_step_02_dome_label',
-      'splicing_step_03_open_dome', 'splicing_step_04_splice_protectors',
-      'splicing_step_05_slack_management', 'splicing_step_06_strength_members',
-      'splicing_step_07_seals_dustcaps', 'splicing_step_08_pole_id',
-      // Splicing — Main Joint (6 steps, numbered 11-16)
-      'splicing_step_11_cable_entries', 'splicing_step_12_strength_members',
-      'splicing_step_13_tube_routing', 'splicing_step_14_tray_entries',
-      'splicing_step_15_coiling_protectors', 'splicing_step_16_readable_labels',
+      // Optical — Phase A / Distribution Dome (steps 1-8)
+      'optical_step_01_dome_on_pole', 'optical_step_02_dome_label',
+      'optical_step_03_open_dome', 'optical_step_04_splice_protectors',
+      'optical_step_05_slack_management', 'optical_step_06_strength_members',
+      'optical_step_07_seals_dustcaps', 'optical_step_08_pole_id',
+      // Optical — Phase B / Main Joint (steps 11-16)
+      'optical_step_11_cable_entries', 'optical_step_12_strength_members',
+      'optical_step_13_tube_routing', 'optical_step_14_tray_entries',
+      'optical_step_15_coiling_protectors', 'optical_step_16_readable_labels',
     ]);
 
     const updatedFields: string[] = [];

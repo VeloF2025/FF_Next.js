@@ -26,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.badRequest(res, 'reviewId and discipline are required');
     }
 
-    const validDisciplines = ['civil', 'optical', 'splicing'];
+    const validDisciplines = ['civil', 'optical'];
     if (!validDisciplines.includes(discipline)) {
       return apiResponse.badRequest(res, `discipline must be one of: ${validDisciplines.join(', ')}`);
     }

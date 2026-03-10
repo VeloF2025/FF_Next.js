@@ -69,7 +69,6 @@ export function PonRow({ pon, selected, onSelect }: PonRowProps) {
       <div className="flex items-center gap-2 text-xs text-gray-500">
         {pon.civil_count > 0 && <span>C:{pon.civil_count}</span>}
         {pon.optical_count > 0 && <span>O:{pon.optical_count}</span>}
-        {pon.splicing_count > 0 && <span>S:{pon.splicing_count}</span>}
       </div>
 
       {/* Stage badge */}

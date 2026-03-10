@@ -25,13 +25,12 @@ interface ProjectDetailPageProps {
   projectName?: string;
 }
 
-type DisciplineFilter = '' | 'civil' | 'optical' | 'splicing';
+type DisciplineFilter = '' | 'civil' | 'optical';
 
 const DISCIPLINE_TABS: { key: DisciplineFilter; label: string }[] = [
   { key: '', label: 'All' },
   { key: 'civil', label: 'Civil' },
   { key: 'optical', label: 'Optical' },
-  { key: 'splicing', label: 'Splicing' },
 ];
 
 export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageProps) {

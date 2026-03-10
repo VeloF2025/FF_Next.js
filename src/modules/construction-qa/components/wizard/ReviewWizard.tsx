@@ -580,12 +580,10 @@ function getStepColumn(discipline: Discipline, step: number): string {
       5: 'compaction', 6: 'level_check', 7: 'after_photo',
     },
     optical: {
-      1: 'cable_route', 2: 'attachment', 3: 'slack_coil',
-      4: 'cable_label', 5: 'no_backfeed', 6: 'sag_ok',
-    },
-    splicing: {
+      // Phase A (dome, steps 1-8)
       1: 'dome_on_pole', 2: 'dome_label', 3: 'open_dome', 4: 'splice_protectors',
       5: 'slack_management', 6: 'strength_members', 7: 'seals_dustcaps', 8: 'pole_id',
+      // Phase B (main joint, steps 11-16)
       11: 'cable_entries', 12: 'strength_members', 13: 'tube_routing',
       14: 'tray_entries', 15: 'coiling_protectors', 16: 'readable_labels',
     },

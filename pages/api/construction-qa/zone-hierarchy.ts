@@ -66,8 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         COUNT(*) FILTER (WHERE r.workflow_status = 'rework_needed')::int AS rework_needed,
         SUM(COALESCE(r.photo_count, 0))::int AS photo_count,
         COUNT(*) FILTER (WHERE r.discipline = 'civil')::int AS civil_count,
-        COUNT(*) FILTER (WHERE r.discipline = 'optical')::int AS optical_count,
-        COUNT(*) FILTER (WHERE r.discipline = 'splicing')::int AS splicing_count
+        COUNT(*) FILTER (WHERE r.discipline = 'optical')::int AS optical_count
       FROM construction_qa_reviews r
       WHERE ${whereClause}
       GROUP BY r.zone_no, r.pon_no
@@ -111,7 +110,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         overall_stage: string | null;
         civil_count: number;
         optical_count: number;
-        splicing_count: number;
       }[];
     }>();
 
@@ -157,7 +155,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           overall_stage: stageMap.get(`${zn}-${pn}`) || null,
           civil_count: Number(row.civil_count),
           optical_count: Number(row.optical_count),
-          splicing_count: Number(row.splicing_count),
         });
       }
     }

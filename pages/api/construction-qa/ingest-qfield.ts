@@ -8,7 +8,7 @@
  *
  * Body: { projectId?, discipline?, sinceDate?, dryRun? }
  *   - projectId: FibreFlow project UUID (optional — omit to ingest ALL mapped projects)
- *   - discipline: 'civil' | 'optical' | 'splicing' | 'all' (default: 'all')
+ *   - discipline: 'civil' | 'optical' | 'all' (default: 'all')
  *   - sinceDate: ISO date string to filter photos (optional)
  *   - dryRun: boolean (default: false)
  */

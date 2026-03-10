@@ -9,7 +9,7 @@
  * Maps work_type to discipline:
  *   pole_installation → civil (feature_type: pole)
  *   cable_stringing   → optical (feature_type: cable_span)
- *   dome_joint         → splicing (feature_type: joint)
+ *   dome_joint        → optical (feature_type: joint)
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -26,7 +26,7 @@ const MODULE = 'construction-qa-ingest';
 const WORK_TYPE_MAP: Record<string, { discipline: Discipline; featureType: FeatureType }> = {
   pole_installation: { discipline: 'civil', featureType: 'pole' },
   cable_stringing: { discipline: 'optical', featureType: 'cable_span' },
-  dome_joint: { discipline: 'splicing', featureType: 'joint' },
+  dome_joint: { discipline: 'optical', featureType: 'joint' },
   activation: { discipline: 'civil', featureType: 'pole' }, // default — overridden per-row below
 };
 
@@ -34,7 +34,7 @@ const WORK_TYPE_MAP: Record<string, { discipline: Discipline; featureType: Featu
 const FEATURE_TYPE_DISCIPLINE: Record<string, { discipline: Discipline; featureType: FeatureType }> = {
   pole: { discipline: 'civil', featureType: 'pole' },
   cable_span: { discipline: 'optical', featureType: 'cable_span' },
-  joint: { discipline: 'splicing', featureType: 'joint' },
+  joint: { discipline: 'optical', featureType: 'joint' },
 };
 
 /**

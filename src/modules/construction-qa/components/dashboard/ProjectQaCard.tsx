@@ -55,12 +55,12 @@ interface ProjectQaCardProps {
 export function ProjectQaCard({ project }: ProjectQaCardProps) {
   const router = useRouter();
 
-  const approved = project.civil.approved + project.optical.approved + project.splicing.approved;
+  const approved = project.civil.approved + project.optical.approved;
   const total = project.total_features;
   const approvalPct = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-  const pending = project.civil.pending + project.optical.pending + project.splicing.pending;
-  const rejected = project.civil.rejected + project.optical.rejected + project.splicing.rejected;
+  const pending = project.civil.pending + project.optical.pending;
+  const rejected = project.civil.rejected + project.optical.rejected;
 
   return (
     <button
@@ -109,7 +109,7 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
       </div>
 
       {/* Discipline breakdown */}
-      <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+      <div className="grid grid-cols-2 gap-2 mb-3 text-center">
         <div className="bg-gray-800/50 rounded px-2 py-1.5">
           <div className="text-xs text-gray-500">Civil</div>
           <div className="text-sm font-medium text-gray-300">{project.civil.total}</div>
@@ -117,10 +117,6 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
         <div className="bg-gray-800/50 rounded px-2 py-1.5">
           <div className="text-xs text-gray-500">Optical</div>
           <div className="text-sm font-medium text-gray-300">{project.optical.total}</div>
-        </div>
-        <div className="bg-gray-800/50 rounded px-2 py-1.5">
-          <div className="text-xs text-gray-500">Splicing</div>
-          <div className="text-sm font-medium text-gray-300">{project.splicing.total}</div>
         </div>
       </div>
 

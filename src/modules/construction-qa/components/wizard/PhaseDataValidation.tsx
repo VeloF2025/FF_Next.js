@@ -163,6 +163,26 @@ function getValidationFields(review: Props['review']): ValidationField[] {
       ];
 
     case 'optical':
+      // For joint features (dome/main_joint), show joint-specific fields
+      if (review.feature_type === 'joint') {
+        return [
+          {
+            label: 'Joint Type',
+            extractedField: 'extracted_joint_type',
+            referenceField: 'joint_cable_cap',
+            extractedValue: review.extracted_joint_type,
+            referenceValue: review.joint_cable_cap,
+          },
+          {
+            label: 'Splice Count',
+            extractedField: 'extracted_splice_count',
+            referenceField: 'extracted_splice_count',
+            extractedValue: review.extracted_splice_count,
+            referenceValue: review.extracted_splice_count,
+          },
+        ];
+      }
+      // For cable_span features, show span-specific fields
       return [
         {
           label: 'Cable Type',
@@ -191,24 +211,6 @@ function getValidationFields(review: Props['review']): ValidationField[] {
           referenceField: 'span_length_m',
           extractedValue: review.span_length_m,
           referenceValue: review.span_length_m,
-        },
-      ];
-
-    case 'splicing':
-      return [
-        {
-          label: 'Joint Type',
-          extractedField: 'extracted_joint_type',
-          referenceField: 'joint_cable_cap',
-          extractedValue: review.extracted_joint_type,
-          referenceValue: review.joint_cable_cap,
-        },
-        {
-          label: 'Splice Count',
-          extractedField: 'extracted_splice_count',
-          referenceField: 'extracted_splice_count',
-          extractedValue: review.extracted_splice_count,
-          referenceValue: review.extracted_splice_count,
         },
       ];
 

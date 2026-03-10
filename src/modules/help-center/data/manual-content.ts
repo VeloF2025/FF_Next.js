@@ -1322,7 +1322,7 @@ The Field App Portal integrates with:
 ---
 
 ### 5.5 Construction QA
-The Construction QA module provides structured quality assurance workflows for civil, optical, and splicing activities on fiber network construction projects. It integrates with QField for photo capture, the VLM AI service for automated photo validation, and WhatsApp for team feedback.
+The Construction QA module provides structured quality assurance workflows for civil and optical activities on fiber network construction projects. It integrates with QField for photo capture, the VLM AI service for automated photo validation, and WhatsApp for team feedback.
 
 **Navigation:** Sidebar → **Field Operations**
 
@@ -1334,9 +1334,8 @@ The Construction QA module provides structured quality assurance workflows for c
 
 Construction QA manages the complete quality inspection lifecycle for fiber network builds:
 
-- **Civil Works** — Trench preparation, conduit installation, manhole construction
-- **Optical Works** — Cable pulling, slack storage, termination points
-- **Splicing** — Splice closures, loss measurements, documentation
+- **Civil Works** — Trench preparation, conduit installation, pole planting
+- **Optical Works** — Dome joint installation, splice closures, loss measurements, documentation
 
 Each inspection follows a 5-phase workflow adapted from the Activate QA process, customized for construction disciplines.
 
@@ -1469,7 +1468,7 @@ The OTDR Testing tab provides management of optical time-domain reflectometer te
 
 **Navigation:** Field Operations → **OTDR Testing**
 
-OTDR traces are linked to splicing reviews and used to verify splice loss measurements. Each trace records:
+OTDR traces are linked to optical reviews and used to verify splice loss measurements. Each trace records:
 - Fiber identifier and direction
 - Splice loss measurement (target ≤ 0.1dB)
 - Trace file attachment (SOR format)
@@ -1484,7 +1483,7 @@ Export filtered Construction QA data to Excel (.xlsx) format.
 **Export Options:**
 - **Project** — Required; select which project to export
 - **Date Range** — Optional; filter by created date (From / To)
-- **Discipline** — Optional; filter by civil, optical, or splicing
+- **Discipline** — Optional; filter by civil or optical
 
 **Exported Columns:** Feature ID, Type, Discipline, Zone, PON, Photos, AI Confidence, VLM Status, Workflow Status, QA Decision, Priority, Created, Updated.
 
