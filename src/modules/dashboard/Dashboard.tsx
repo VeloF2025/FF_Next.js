@@ -164,7 +164,7 @@ export function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {[
             { title: 'Progress Today', icon: Activity, color: 'bg-blue-500/20 text-blue-400', route: '/reports/progress-today', permission: null },
-            { title: 'Activations', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/activate', permission: Permission.ANALYTICS_READ },
+            { title: 'Activations', icon: FileText, color: 'bg-emerald-500/20 text-emerald-400', route: '/reports/weekly-activations', permission: Permission.ANALYTICS_READ },
             { title: 'Report 3', icon: Target, color: 'bg-purple-500/20 text-purple-400', route: '/reports/placeholder-3', permission: null },
             { title: 'Report 4', icon: PieChart, color: 'bg-amber-500/20 text-amber-400', route: '/reports/placeholder-4', permission: null },
             { title: 'Report 5', icon: Clock, color: 'bg-cyan-500/20 text-cyan-400', route: '/reports/placeholder-5', permission: null },
