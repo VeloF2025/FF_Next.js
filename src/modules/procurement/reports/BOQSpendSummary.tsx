@@ -25,6 +25,7 @@ interface Totals {
   boqValue: number;
   totalOrdered: number;
   confirmedSpend: number;
+  remainingBudget: number;
 }
 
 function fmtZAR(n: number) {
@@ -126,8 +127,10 @@ export function BOQSpendSummary() {
         </div>
         <div className="bg-[var(--ff-bg-secondary)] border border-amber-500/30 rounded-lg p-4">
           <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Remaining Budget</p>
-          <p className="text-xl font-bold text-amber-400">{fmtZAR(Math.max(0, totals.boqValue - totals.totalOrdered))}</p>
-          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">{100 - overallOrdPct}% unallocated</p>
+          <p className="text-xl font-bold text-amber-400">{fmtZAR(totals.remainingBudget)}</p>
+          <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+            {totals.boqValue > 0 ? Math.round((totals.remainingBudget / totals.boqValue) * 100) : 0}% unallocated
+          </p>
         </div>
       </div>
 
@@ -210,7 +213,7 @@ export function BOQSpendSummary() {
                 <td className="px-4 py-3 text-right font-semibold text-purple-400">{fmtZAR(totals.totalOrdered)}</td>
                 <td className="px-4 py-3 text-right font-semibold text-green-400">{fmtZAR(totals.confirmedSpend)}</td>
                 <td className="px-4 py-3 text-right font-semibold text-[var(--ff-text-secondary)]">
-                  {fmtZAR(Math.max(0, totals.boqValue - totals.totalOrdered))}
+                  {fmtZAR(totals.remainingBudget)}
                 </td>
                 <td className="px-4 py-3">
                   <ProgressBar ordered={totals.totalOrdered} confirmed={totals.confirmedSpend} total={totals.boqValue} />

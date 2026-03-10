@@ -30,13 +30,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           FROM purchase_order_items poi
           JOIN purchase_orders po ON po.id = poi.purchase_order_id
           WHERE po.project_id::text = p.id::text
+            AND po.status NOT IN ('draft', 'cancelled')
         )::numeric as total_ordered,
         (
           SELECT COALESCE(SUM(poi.total_price), 0)
           FROM purchase_order_items poi
           JOIN purchase_orders po ON po.id = poi.purchase_order_id
           WHERE po.project_id::text = p.id::text
-            AND po.status IN ('received', 'partially_received', 'invoiced', 'paid')
+            AND po.status IN ('received', 'partially_received', 'closed')
         )::numeric as confirmed_spend,
         (
           SELECT COUNT(DISTINCT po.id)
@@ -73,6 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       boqValue: summary.reduce((s, r) => s + r.boqValue, 0),
       totalOrdered: summary.reduce((s, r) => s + r.totalOrdered, 0),
       confirmedSpend: summary.reduce((s, r) => s + r.confirmedSpend, 0),
+      remainingBudget: summary.reduce((s, r) => s + r.remainingBudget, 0),
     };
 
     return apiResponse.success(res, { projects: summary, totals });
