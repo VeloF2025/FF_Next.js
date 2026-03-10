@@ -27,6 +27,7 @@ export interface ApprovalItem {
   workflowName: string;
   levelName: string;
   approverRole: string | null;
+  approverName: string | null;
 }
 
 const typeConfig: Record<WorkflowType, { label: string; color: string; icon: typeof FileText }> = {
@@ -105,7 +106,9 @@ export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) 
             </div>
             <div className="text-sm text-[var(--ff-text-secondary)]">
               {item.workflowName} &middot; {item.levelName}
-              {item.approverRole && <span className="text-[var(--ff-text-tertiary)]"> &middot; Role: {item.approverRole}</span>}
+              {item.approverName && (
+                <span className="text-[var(--ff-text-tertiary)]"> &middot; <span className="text-amber-400">{item.approverName}</span></span>
+              )}
             </div>
             <div className="text-sm text-[var(--ff-text-tertiary)] mt-1">
               Requested by <span className="text-[var(--ff-text-secondary)]">{item.requestedByName}</span> on {fmtDate(item.requestedAt)}

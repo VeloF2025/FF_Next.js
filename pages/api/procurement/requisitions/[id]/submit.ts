@@ -98,6 +98,7 @@ export default withAuth(withErrorHandler(async (
               document_number,
               document_amount,
               requested_by,
+              requested_by_name,
               status
             ) VALUES (
               ${workflow.id},
@@ -107,6 +108,7 @@ export default withAuth(withErrorHandler(async (
               ${updated!.requisition_number},
               ${amount},
               ${userId || 'system'},
+              ${userName || 'Unknown'},
               'pending'
             )
           `;
@@ -114,7 +116,8 @@ export default withAuth(withErrorHandler(async (
 
           // Notify approvers via bell notification + inbox message
           const approvers = await sql`
-            SELECT u.id, u.name, u.email FROM users u
+            SELECT u.id, COALESCE(u.first_name || ' ' || u.last_name, u.email) as name, u.email
+            FROM users u
             JOIN approval_levels al ON al.id = ${level.id}
             WHERE (
               (al.approver_type = 'user' AND u.id::text = al.approver_user_id::text)
@@ -122,7 +125,7 @@ export default withAuth(withErrorHandler(async (
             )
           `;
 
-          const approverIds = approvers.map((a: { id: string }) => a.id);
+          const approverIds = approvers.map((a: Record<string, unknown>) => a.id as string);
           if (approverIds.length > 0) {
             const formattedAmount = new Intl.NumberFormat('en-ZA', {
               style: 'currency', currency: 'ZAR',

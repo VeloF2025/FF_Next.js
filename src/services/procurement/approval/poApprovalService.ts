@@ -154,12 +154,14 @@ class POApprovalService {
 
       if (level.approverType === 'user' && level.approverUserId) {
         const result = await sql`
-          SELECT id, name, email FROM users WHERE id = ${level.approverUserId}
+          SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
+          FROM users WHERE id = ${level.approverUserId}
         `;
         approvers = result.map(r => ({ id: r.id, name: r.name, email: r.email }));
       } else if (level.approverType === 'role' && level.approverRole) {
         const result = await sql`
-          SELECT id, name, email FROM users WHERE role = ${level.approverRole}
+          SELECT id, COALESCE(first_name || ' ' || last_name, email) as name, email
+          FROM users WHERE role = ${level.approverRole}
         `;
         approvers = result.map(r => ({ id: r.id, name: r.name, email: r.email }));
       }
