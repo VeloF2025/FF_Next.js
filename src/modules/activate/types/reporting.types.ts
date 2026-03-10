@@ -467,7 +467,8 @@ export type ReportCategory =
   | 'mismatches'
   | 'gaps' // Installed but Not Activated - money spent, never went live
   | 'progress' // Activation Progress - Project > Zone > PON tracking
-  | 'maturity'; // Maturity Tracking - time to reach milestones, velocity, projections
+  | 'maturity' // Maturity Tracking - time to reach milestones, velocity, projections
+  | 'penetration'; // Penetration Curve - activation % over time, drill down Project > Zone > PON
 
 // ============================================================================
 // SERIAL MISMATCH TRACKING TYPES (Installation vs Activation)
@@ -1491,4 +1492,33 @@ export interface MaturityTrackingResponse {
   hierarchy: ProjectMaturityNode[];
   /** Flat table data */
   flat: FlatMaturityRow[];
+}
+
+// ============================================================================
+// PENETRATION CURVE REPORT TYPES
+// ============================================================================
+
+export type PenetrationGroupBy = 'project' | 'zone' | 'pon';
+export type PenetrationGranularity = 'daily' | 'weekly';
+
+export interface PenetrationPoint {
+  date: string;
+  daily_activated: number;
+  cumulative: number;
+  penetration_pct: number;
+}
+
+export interface PenetrationSeries {
+  key: string;
+  label: string;
+  total_scope: number;
+  points: PenetrationPoint[];
+}
+
+export interface PenetrationCurveResponse {
+  date_range: { from: string; to: string };
+  group_by: PenetrationGroupBy;
+  granularity: PenetrationGranularity;
+  series: PenetrationSeries[];
+  dates: string[];
 }
