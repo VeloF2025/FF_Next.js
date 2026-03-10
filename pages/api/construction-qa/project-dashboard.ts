@@ -20,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows] = await Promise.all([
+    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows, polesWithPhotosRows] = await Promise.all([
       // QA stats per project per discipline
       sql`
         SELECT
@@ -84,6 +84,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         FROM construction_qa_reviews
         GROUP BY project_id, feature_type
       `,
+      // Poles with assigned photos (distinct pole numbers that have QA photos)
+      sql`
+        SELECT project_id, COUNT(DISTINCT feature_id)::int AS assigned_count
+        FROM construction_qa_reviews
+        WHERE feature_type = 'pole' AND photo_count > 0
+        GROUP BY project_id
+      `,
     ]);
 
     const otdrMap = new Map<string, number>();
@@ -92,17 +99,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Build infrastructure map: project_id → { poles, joints, cable_spans }
-    const emptyInfra = () => ({ total: 0, planted: 0, qa_total: 0, qa_approved: 0 });
+    const emptyInfra = () => ({ total: 0, planted: 0, assigned: 0, qa_total: 0, qa_approved: 0 });
     const emptyInfrastructure = () => ({
       poles: emptyInfra(),
       joints: emptyInfra(),
       cable_spans: emptyInfra(),
     });
 
+    type InfraEntry = { total: number; planted: number; assigned: number; qa_total: number; qa_approved: number };
     const infraMap = new Map<string, {
-      poles: { total: number; planted: number; qa_total: number; qa_approved: number };
-      joints: { total: number; planted: number; qa_total: number; qa_approved: number };
-      cable_spans: { total: number; planted: number; qa_total: number; qa_approved: number };
+      poles: InfraEntry;
+      joints: InfraEntry;
+      cable_spans: InfraEntry;
     }>();
 
     // Poles from dedicated query (includes matched photo-based planted)
@@ -119,6 +127,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const pid = row.project_id;
       if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
       infraMap.get(pid)!.poles.planted += Number(row.unmatched_planted);
+    }
+
+    // Poles with assigned photos
+    for (const row of polesWithPhotosRows) {
+      const pid = row.project_id;
+      if (!infraMap.has(pid)) infraMap.set(pid, emptyInfrastructure());
+      infraMap.get(pid)!.poles.assigned = Number(row.assigned_count);
     }
 
     // Joints + cable_spans

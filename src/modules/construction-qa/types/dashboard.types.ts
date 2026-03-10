@@ -24,6 +24,7 @@ export interface DisciplineStats {
 export interface InfraStats {
   total: number;
   planted: number;     // poles only (0 for joints/cable_spans)
+  assigned: number;    // poles with QA photos assigned
   qa_total: number;
   qa_approved: number;
 }

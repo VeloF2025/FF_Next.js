@@ -12,15 +12,16 @@ import { useRouter } from 'next/router';
 import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable } from 'lucide-react';
 import type { ProjectDashboardRow, InfraStats } from '../../types/dashboard.types';
 
-function InfraStat({ label, icon: Icon, stats, showPlanted }: {
+function InfraStat({ label, icon: Icon, stats, showAssignment }: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   stats: InfraStats;
-  showPlanted?: boolean;
+  showAssignment?: boolean;
 }) {
   const qaPct = stats.total > 0 && stats.qa_total > 0
     ? Math.round((stats.qa_approved / stats.total) * 100)
     : 0;
+  const unassigned = stats.total - (stats.assigned || 0);
   return (
     <div className="bg-gray-800/50 rounded px-2 py-1.5">
       <div className="flex items-center gap-1 mb-0.5">
@@ -28,12 +29,17 @@ function InfraStat({ label, icon: Icon, stats, showPlanted }: {
         <span className="text-xs text-gray-500">{label}</span>
       </div>
       <div className="text-sm font-medium text-gray-300">{stats.total > 0 ? stats.total.toLocaleString() : '-'}</div>
-      {showPlanted && (
-        <div className="text-[10px] text-blue-400">
-          {stats.planted > 0 ? `${stats.planted.toLocaleString()} planted` : '-'}
-        </div>
+      {showAssignment && stats.total > 0 && (
+        <>
+          <div className="text-[10px] text-green-400">
+            {stats.assigned > 0 ? `${stats.assigned.toLocaleString()} assigned` : '-'}
+          </div>
+          <div className="text-[10px] text-amber-400">
+            {unassigned > 0 ? `${unassigned.toLocaleString()} unassigned` : '-'}
+          </div>
+        </>
       )}
-      <div className="text-[10px] text-green-400">
+      <div className="text-[10px] text-blue-400">
         {stats.qa_total > 0
           ? `${stats.qa_approved} QA'd (${qaPct}%)`
           : <span className="text-gray-600">-</span>}
@@ -120,7 +126,7 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
 
       {/* Infrastructure stats — matches table columns: Poles(Total/Planted/QA'd), Joints(Total/QA'd), Spans(Total/QA'd) */}
       <div className="grid grid-cols-3 gap-2 mb-3">
-        <InfraStat label="Poles" icon={Milestone} stats={project.infrastructure.poles} showPlanted />
+        <InfraStat label="Poles" icon={Milestone} stats={project.infrastructure.poles} showAssignment />
         <InfraStat label="Joints" icon={CircleDot} stats={project.infrastructure.joints} />
         <InfraStat label="Spans" icon={Cable} stats={project.infrastructure.cable_spans} />
       </div>
