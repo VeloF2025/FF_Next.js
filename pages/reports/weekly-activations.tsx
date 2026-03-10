@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { ArrowLeft, RefreshCw, ChevronRight, ChevronDown, Zap, TrendingUp } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ChevronRight, ChevronDown, Zap, TrendingUp, Filter, X } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Permission } from '@/types/auth.types';
@@ -67,6 +67,8 @@ export default function ActivationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
+  const [projectFilter, setProjectFilter] = useState<string>('');
+
   // Three independent expand sets
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
@@ -112,11 +114,37 @@ export default function ActivationsPage() {
     return next;
   };
 
-  const grouped = useMemo(() => groupWeeks(data?.weeks ?? []), [data]);
+  // Unique projects across all weeks (for filter dropdown)
+  const allProjects = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const week of data?.weeks ?? []) {
+      for (const p of week.projects) {
+        map.set(p.project_id, p.project_name);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
 
-  const allTimeTotal = data?.weeks.reduce((s, w) => s + w.total, 0) ?? 0;
+  // Apply project filter to weeks (recalculate per-week totals for filtered view)
+  const filteredWeeks = useMemo(() => {
+    const weeks = data?.weeks ?? [];
+    if (!projectFilter) return weeks;
+    return weeks
+      .map(week => {
+        const projects = week.projects.filter(p => p.project_id === projectFilter);
+        const total = projects.reduce((s, p) => s + p.count, 0);
+        return { ...week, total, projects };
+      })
+      .filter(week => week.total > 0);
+  }, [data, projectFilter]);
+
+  const grouped = useMemo(() => groupWeeks(filteredWeeks), [filteredWeeks]);
+
+  const allTimeTotal = filteredWeeks.reduce((s, w) => s + w.total, 0);
   const allTimeRevenue = allTimeTotal * REVENUE_PER_ACTIVATION;
-  const currentWeek = data?.weeks[0] ?? null;
+  const currentWeek = filteredWeeks[0] ?? null;
   const currentWeekRevenue = (currentWeek?.total ?? 0) * REVENUE_PER_ACTIVATION;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -228,6 +256,43 @@ export default function ActivationsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Filter bar */}
+        <div className="mb-4 flex flex-wrap items-center gap-3 p-3 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
+            <Filter className="w-3.5 h-3.5" />
+            Filters
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-[var(--ff-text-secondary)]">Project</label>
+            <div className="relative">
+              <select
+                value={projectFilter}
+                onChange={e => setProjectFilter(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-1.5 rounded-md text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-emerald-500/50 cursor-pointer"
+              >
+                <option value="">All projects</option>
+                {allProjects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--ff-text-tertiary)] pointer-events-none" />
+            </div>
+            {projectFilter && (
+              <button
+                onClick={() => setProjectFilter('')}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <X className="w-3 h-3" /> Clear
+              </button>
+            )}
+          </div>
+          {projectFilter && (
+            <span className="ml-auto text-xs text-[var(--ff-text-tertiary)]">
+              Showing {filteredWeeks.length} week{filteredWeeks.length !== 1 ? 's' : ''} with activations
+            </span>
+          )}
         </div>
 
         {/* Loading skeleton */}
