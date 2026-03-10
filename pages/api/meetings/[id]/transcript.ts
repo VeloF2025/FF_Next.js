@@ -1,5 +1,5 @@
 // 🟢 WORKING: Retrieve transcript for a specific meeting (VTT or plain text)
-// Access is restricted to meeting participants; hein@velocityfibre.co.za bypasses the check
+// Access restricted to meeting participants only; hein@ sees all
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
@@ -43,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
-  const isOwner = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
     return apiResponse.forbidden(res, 'User email is required for transcript access');
@@ -58,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   try {
     // Fetch meeting row — owner gets unconditional access, others require participant match
-    const rows = isOwner
+    const rows = isHein
       ? await sql`
           SELECT id, raw_transcript, participants
           FROM meetings

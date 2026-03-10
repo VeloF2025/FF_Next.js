@@ -1,5 +1,5 @@
 // 🟢 WORKING: Stream a meeting recording MP4 with Range request support for video seeking
-// Access restricted to meeting participants; hein@velocityfibre.co.za bypasses the check
+// Access restricted to meeting participants only; hein@ sees all
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   const authReq = req as AuthenticatedNextApiRequest;
   const userEmail = authReq.user?.email?.toLowerCase();
-  const isOwner = userEmail === 'hein@velocityfibre.co.za';
+  const isHein = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
     res.status(403).json({ error: 'User email is required for recording access' });
@@ -58,7 +58,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
   try {
     // Fetch recording metadata with participant-based access control
-    const rows = isOwner
+    const rows = isHein
       ? await sql`
           SELECT id, recording_path, recording_size_bytes, audio_url, video_url
           FROM meetings
