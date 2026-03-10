@@ -155,8 +155,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     logger.info('Face photo uploaded', { staffId, facePhotoUrl });
 
-    // Record VLM learning metric (fire-and-forget)
-    recordCorrectExtraction('staff', 'id_extraction', 0.8).catch(() => {});
+    // Record VLM learning metric (fire-and-forget, but log failures)
+    recordCorrectExtraction('staff', 'id_extraction', 0.8).catch((err) => {
+      logger.warn('Failed to record VLM learning metric', { error: err, module: 'extract-id-photo', staffId });
+    });
 
     // Step 6: Update staff record with the extracted face photo URL
     await sql`
