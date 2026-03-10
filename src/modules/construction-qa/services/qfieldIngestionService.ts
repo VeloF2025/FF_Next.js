@@ -15,6 +15,7 @@
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { parseQFieldCaptureDate } from '@/lib/exifUtils';
+import { copyQFieldPhotoToStorage } from '@/services/qaPhotoStorageService';
 import type { Discipline, FeatureType } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -245,8 +246,9 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
 
         // Insert photo records and track earliest capture date
         let earliestCapture: Date | null = null;
+        const featureId = sample.feature_id as string;
         for (const photo of featurePhotos) {
-          const capturedAt = await insertPhoto(reviewId, projectId, photo);
+          const capturedAt = await insertPhoto(reviewId, projectId, photo, featureId);
           if (capturedAt && (!earliestCapture || capturedAt < earliestCapture)) {
             earliestCapture = capturedAt;
           }
@@ -397,6 +399,7 @@ async function insertPhoto(
   reviewId: string,
   projectId: string,
   qfPhoto: Record<string, unknown>,
+  featureId: string,
 ): Promise<Date | null> {
   const photoKey = qfPhoto.photo_key as string;
   const filename = photoKey.split('/').pop() || photoKey;
@@ -412,6 +415,11 @@ async function insertPhoto(
   // Extract capture date from QField filename
   const capturedAt = parseQFieldCaptureDate(photoKey);
 
+  // Copy photo from MinIO to local storage for fast serving
+  const localPath = await copyQFieldPhotoToStorage(photoKey, projectId, featureId, filename);
+  const source = localPath ? 'local' : 'qfield';
+  const storageKey = localPath || photoKey;
+
   await sql`
     INSERT INTO construction_qa_photos (
       review_id, project_id, source, storage_key, filename, mime_type,
@@ -420,8 +428,8 @@ async function insertPhoto(
     ) VALUES (
       ${reviewId}::uuid,
       ${projectId}::uuid,
-      'qfield',
-      ${photoKey},
+      ${source},
+      ${storageKey},
       ${filename},
       ${mimeType},
       ${qfPhoto.vlm_confidence != null ? Number(qfPhoto.vlm_confidence) >= 0.6 : null},
