@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import { ProcurementDocumentPanel, useProcurementDocuments } from '@/modules/procurement/documents';
+import { POItemsTable } from '@/modules/procurement/orders/components/POItemsTable';
 
 // Types
 type POStatus = string;
@@ -324,7 +325,7 @@ export default function PurchaseOrderDetailPage() {
 
     return (
       <div className="flex items-center gap-2">
-        {purchaseOrder.odooPoId && !isEditing && (
+        {['draft', 'pending_approval'].includes(purchaseOrder.status) && !isEditing && (
           <button
             onClick={startEditing}
             disabled={actionLoading}
@@ -792,47 +793,12 @@ export default function PurchaseOrderDetailPage() {
           )}
 
           {activeTab === 'items' && (
-            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[var(--ff-border-light)]">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Description</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Code</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Ordered</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Received</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Pending</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">UOM</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Unit Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Line Total</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ff-border-light)]">
-                  {purchaseOrder.items.map((item) => {
-                    const receiptStatus = getItemReceiptStatus(item);
-                    return (
-                      <tr key={item.id} className="hover:bg-[var(--ff-bg-hover)]">
-                        <td className="px-4 py-3 text-[var(--ff-text-tertiary)]">{item.lineNumber}</td>
-                        <td className="px-4 py-3 text-[var(--ff-text-primary)]">{item.description}</td>
-                        <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.itemCode || '-'}</td>
-                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{item.quantityOrdered}</td>
-                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{item.quantityReceived}</td>
-                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{item.quantityPending}</td>
-                        <td className="px-4 py-3 text-[var(--ff-text-secondary)]">{item.unitOfMeasure}</td>
-                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)]">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-4 py-3 text-right text-[var(--ff-text-primary)] font-medium">{formatCurrency(item.lineTotal)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`text-sm font-medium ${receiptStatus.color}`}>
-                            {receiptStatus.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <POItemsTable
+              poId={purchaseOrder.id}
+              items={purchaseOrder.items}
+              canEdit={['draft', 'pending_approval'].includes(purchaseOrder.status)}
+              onItemsUpdated={fetchPurchaseOrder}
+            />
           )}
 
           {activeTab === 'receipts' && (

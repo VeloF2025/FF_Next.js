@@ -423,13 +423,68 @@ async function handlePatch(req: NextApiRequest, res: NextApiResponse, id: string
         return apiResponse.success(res, { id, status: 'cancelled', action: 'cancelled' });
       }
 
-      case 'update_fields': {
-        // Allow field edits on Odoo-imported POs only
-        const checkOdoo = await sql`SELECT odoo_po_id FROM purchase_orders WHERE id = ${id}`;
-        if (!checkOdoo[0]?.odoo_po_id) {
-          return apiResponse.badRequest(res, 'Field editing is only allowed for Odoo-imported POs');
+      case 'update_items': {
+        if (!['draft', 'pending_approval'].includes(currentStatus)) {
+          return apiResponse.badRequest(res, 'Items can only be edited on draft or pending POs');
+        }
+        const { items: itemUpdates } = req.body;
+        if (!Array.isArray(itemUpdates) || itemUpdates.length === 0) {
+          return apiResponse.badRequest(res, 'Items array is required');
         }
 
+        for (const item of itemUpdates) {
+          if (!item.id) continue;
+          const qty = parseFloat(item.quantityOrdered);
+          const price = parseFloat(item.unitPrice);
+          if (isNaN(qty) || isNaN(price) || qty < 0 || price < 0) continue;
+          const total = qty * price;
+          await sql`
+            UPDATE purchase_order_items
+            SET quantity_ordered = ${qty}, unit_price = ${price}, total_price = ${total}, updated_at = NOW()
+            WHERE id = ${item.id} AND purchase_order_id = ${id}
+          `;
+        }
+
+        // Recalculate PO totals
+        const totalsResult = await sql`
+          SELECT COALESCE(SUM(total_price), 0)::numeric as subtotal
+          FROM purchase_order_items WHERE purchase_order_id = ${id}
+        `;
+        const subtotal = parseFloat(totalsResult[0]?.subtotal) || 0;
+        const poTax = await sql`SELECT tax_rate FROM purchase_orders WHERE id = ${id}`;
+        const taxRate = parseFloat(poTax[0]?.tax_rate) || 15;
+        const taxAmount = subtotal * (taxRate / 100);
+        const totalAmount = subtotal + taxAmount;
+
+        await sql`
+          UPDATE purchase_orders
+          SET subtotal = ${subtotal}, tax_amount = ${taxAmount}, total_amount = ${totalAmount}, updated_at = NOW()
+          WHERE id = ${id}
+        `;
+
+        await sql`
+          INSERT INTO purchase_order_history (purchase_order_id, action, notes, created_by, created_at)
+          VALUES (${id}, 'edited', ${`Line items updated (${itemUpdates.length} items)`}, ${userId}, NOW())
+        `;
+
+        log.info('PO line items updated', { id, itemCount: itemUpdates.length, newTotal: totalAmount });
+
+        createAuditLog({
+          entityType: 'purchase_order',
+          entityId: id,
+          action: 'update',
+          performedBy: userId,
+          performedByName: userName,
+          newValues: { subtotal, taxAmount, totalAmount, itemsUpdated: itemUpdates.length },
+        });
+
+        return apiResponse.success(res, { id, action: 'items_updated', subtotal, taxAmount, totalAmount });
+      }
+
+      case 'update_fields': {
+        if (!['draft', 'pending_approval'].includes(currentStatus)) {
+          return apiResponse.badRequest(res, 'Fields can only be edited on draft or pending POs');
+        }
         const { fields } = req.body;
         if (!fields || typeof fields !== 'object') {
           return apiResponse.badRequest(res, 'Fields object is required');
