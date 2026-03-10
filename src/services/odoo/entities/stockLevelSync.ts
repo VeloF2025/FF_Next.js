@@ -9,7 +9,7 @@
  * - Groups by product and location (aggregates multiple quants)
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockQuant } from '../odooClient';
 

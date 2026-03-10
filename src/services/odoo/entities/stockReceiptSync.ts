@@ -9,7 +9,7 @@
  * - Odoo stock.move → FF goods_receipt_items
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
 
