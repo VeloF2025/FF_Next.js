@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { ArrowLeft, RefreshCw, ChevronRight, ChevronDown, Zap, TrendingUp } from 'lucide-react';
@@ -13,14 +13,64 @@ function formatRevenue(amount: number): string {
   return `R ${amount.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-export default function WeeklyActivationsPage() {
+// ── Grouping helpers ──────────────────────────────────────────────────────────
+
+interface MonthGroup {
+  key: string;          // e.g. "2026-03"
+  label: string;        // e.g. "March 2026"
+  total: number;
+  weeks: WeekRow[];
+}
+
+interface YearGroup {
+  year: number;
+  total: number;
+  months: MonthGroup[];
+}
+
+function groupWeeks(weeks: WeekRow[]): YearGroup[] {
+  const yearMap = new Map<number, Map<string, MonthGroup>>();
+
+  for (const week of weeks) {
+    const date = new Date(week.week_start + 'T00:00:00');
+    const year = date.getFullYear();
+    const monthKey = `${year}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const monthLabel = date.toLocaleString('en-ZA', { month: 'long', year: 'numeric' });
+
+    if (!yearMap.has(year)) yearMap.set(year, new Map());
+    const months = yearMap.get(year)!;
+
+    if (!months.has(monthKey)) {
+      months.set(monthKey, { key: monthKey, label: monthLabel, total: 0, weeks: [] });
+    }
+    const m = months.get(monthKey)!;
+    m.total += week.total;
+    m.weeks.push(week);
+  }
+
+  return Array.from(yearMap.entries())
+    .sort(([a], [b]) => b - a)
+    .map(([year, months]) => ({
+      year,
+      total: Array.from(months.values()).reduce((s, m) => s + m.total, 0),
+      months: Array.from(months.values()).sort((a, b) => b.key.localeCompare(a.key)),
+    }));
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function ActivationsPage() {
   const router = useRouter();
   const { hasPermission } = useAuth();
   const [data, setData] = useState<WeeklyActivationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Three independent expand sets
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -46,27 +96,35 @@ export default function WeeklyActivationsPage() {
     fetchData();
   }, [fetchData, hasPermission, router]);
 
-  const toggleWeek = (weekStart: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(weekStart)) {
-        next.delete(weekStart);
-      } else {
-        next.add(weekStart);
-      }
-      return next;
-    });
+  // Auto-expand current year + current month on load
+  useEffect(() => {
+    if (!data?.weeks.length) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const monthKey = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setExpandedYears(new Set([year]));
+    setExpandedMonths(new Set([monthKey]));
+  }, [data]);
+
+  const toggle = <T,>(set: Set<T>, key: T): Set<T> => {
+    const next = new Set(set);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
   };
 
-  const allTimeTotal = data?.weeks.reduce((sum: number, w: WeekRow) => sum + w.total, 0) ?? 0;
+  const grouped = useMemo(() => groupWeeks(data?.weeks ?? []), [data]);
+
+  const allTimeTotal = data?.weeks.reduce((s, w) => s + w.total, 0) ?? 0;
   const allTimeRevenue = allTimeTotal * REVENUE_PER_ACTIVATION;
   const currentWeek = data?.weeks[0] ?? null;
   const currentWeekRevenue = (currentWeek?.total ?? 0) * REVENUE_PER_ACTIVATION;
 
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <AppLayout>
       <Head>
-        <title>Weekly Activations | FibreFlow</title>
+        <title>Activations | FibreFlow</title>
       </Head>
 
       <div className="ff-page-container">
@@ -80,8 +138,8 @@ export default function WeeklyActivationsPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Weekly Activations</h1>
-              <p className="text-sm text-[var(--ff-text-secondary)]">OES activations grouped by ISO week · Revenue @ R3,105/activation</p>
+              <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Activations</h1>
+              <p className="text-sm text-[var(--ff-text-secondary)]">OES activations by project · Revenue @ R3,105/activation</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -101,16 +159,15 @@ export default function WeeklyActivationsPage() {
           </div>
         </div>
 
-        {/* Error state */}
+        {/* Error */}
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
             {error}
           </div>
         )}
 
-        {/* Summary bar */}
+        {/* Summary bar — 4 cards */}
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Current week WTD */}
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-emerald-500/40 relative overflow-hidden">
             <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">WTD</div>
             <div className="flex items-center gap-3">
@@ -120,11 +177,7 @@ export default function WeeklyActivationsPage() {
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">This Week</p>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {loading ? (
-                    <span className="inline-block w-16 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
-                  ) : (
-                    (currentWeek?.total ?? 0).toLocaleString()
-                  )}
+                  {loading ? <span className="inline-block w-16 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /> : (currentWeek?.total ?? 0).toLocaleString()}
                 </p>
                 {!loading && currentWeek && (
                   <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">{currentWeek.week_label}</p>
@@ -132,7 +185,7 @@ export default function WeeklyActivationsPage() {
               </div>
             </div>
           </div>
-          {/* Current week revenue WTD */}
+
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-blue-500/40 relative overflow-hidden">
             <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">WTD</div>
             <div className="flex items-center gap-3">
@@ -142,16 +195,12 @@ export default function WeeklyActivationsPage() {
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">This Week Revenue</p>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {loading ? (
-                    <span className="inline-block w-28 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
-                  ) : (
-                    formatRevenue(currentWeekRevenue)
-                  )}
+                  {loading ? <span className="inline-block w-28 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /> : formatRevenue(currentWeekRevenue)}
                 </p>
               </div>
             </div>
           </div>
-          {/* All-time activations */}
+
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-emerald-500/10">
@@ -160,16 +209,12 @@ export default function WeeklyActivationsPage() {
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">All-time Activations</p>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {loading ? (
-                    <span className="inline-block w-24 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
-                  ) : (
-                    allTimeTotal.toLocaleString()
-                  )}
+                  {loading ? <span className="inline-block w-24 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /> : allTimeTotal.toLocaleString()}
                 </p>
               </div>
             </div>
           </div>
-          {/* All-time revenue */}
+
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/10">
@@ -178,11 +223,7 @@ export default function WeeklyActivationsPage() {
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">All-time Revenue</p>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-                  {loading ? (
-                    <span className="inline-block w-36 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
-                  ) : (
-                    formatRevenue(allTimeRevenue)
-                  )}
+                  {loading ? <span className="inline-block w-36 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" /> : formatRevenue(allTimeRevenue)}
                 </p>
               </div>
             </div>
@@ -192,120 +233,128 @@ export default function WeeklyActivationsPage() {
         {/* Loading skeleton */}
         {loading && (
           <div className="rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 px-4 py-4 border-b border-[var(--ff-border-light)] last:border-b-0"
-              >
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[var(--ff-border-light)] last:border-b-0">
                 <div className="w-4 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
                 <div className="flex-1 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
                 <div className="w-20 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
                 <div className="w-28 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
-                <div className="w-16 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
               </div>
             ))}
           </div>
         )}
 
         {/* Empty state */}
-        {!loading && data && data.weeks.length === 0 && (
+        {!loading && (!data || data.weeks.length === 0) && (
           <div className="rounded-lg border border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] p-12 text-center">
             <Zap className="w-10 h-10 text-[var(--ff-text-tertiary)] mx-auto mb-3" />
             <p className="text-sm text-[var(--ff-text-secondary)]">No activation data found</p>
-            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
-              Activations from active projects will appear here once imported
-            </p>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">Activations from active projects will appear here once imported</p>
           </div>
         )}
 
-        {/* Collapsible table */}
-        {!loading && data && data.weeks.length > 0 && (
+        {/* ── Tiered table: Year → Month → Week → Projects ── */}
+        {!loading && grouped.length > 0 && (
           <div className="rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
-            {/* Table header */}
-            <div className="grid grid-cols-[2rem_1fr_8rem_12rem_10rem] gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
+
+            {/* Column headers */}
+            <div className="grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-2 bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)]">
               <div />
-              <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Week</span>
+              <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">Period</span>
               <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide text-right">Activations</span>
               <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide text-right">Revenue Estimate</span>
-              <span className="text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide text-right">Projects</span>
             </div>
 
-            {data.weeks.map((week: WeekRow, idx: number) => {
-              const isExpanded = expanded.has(week.week_start);
-              const weekRevenue = week.total * REVENUE_PER_ACTIVATION;
+            {grouped.map((yearGroup, yi) => {
+              const yearExpanded = expandedYears.has(yearGroup.year);
               return (
-                <div key={week.week_start}>
-                  {/* Week row */}
+                <div key={yearGroup.year} className={yi > 0 ? 'border-t border-[var(--ff-border-light)]' : ''}>
+
+                  {/* ── Year row ── */}
                   <button
-                    onClick={() => toggleWeek(week.week_start)}
-                    className={`w-full grid grid-cols-[2rem_1fr_8rem_12rem_10rem] gap-2 px-4 py-3 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors ${
-                      idx > 0 ? 'border-t border-[var(--ff-border-light)]' : ''
-                    }`}
+                    onClick={() => setExpandedYears(toggle(expandedYears, yearGroup.year))}
+                    className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-3 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors bg-[var(--ff-bg-secondary)]"
                   >
                     <div className="flex items-center">
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-[var(--ff-text-tertiary)]" />
-                      )}
+                      {yearExpanded
+                        ? <ChevronDown className="w-4 h-4 text-emerald-400" />
+                        : <ChevronRight className="w-4 h-4 text-emerald-400" />}
                     </div>
-                    <span className="text-sm font-medium text-[var(--ff-text-primary)]">
-                      {week.week_label}
-                    </span>
-                    <span className="text-sm font-semibold text-emerald-400 text-right">
-                      {week.total.toLocaleString()}
-                    </span>
-                    <span className="text-sm font-semibold text-blue-400 text-right">
-                      {formatRevenue(weekRevenue)}
-                    </span>
-                    <span className="text-xs text-[var(--ff-text-tertiary)] text-right self-center">
-                      {isExpanded ? '▾' : '▸'} {week.projects.length} project{week.projects.length !== 1 ? 's' : ''}
-                    </span>
+                    <span className="text-sm font-bold text-[var(--ff-text-primary)]">{yearGroup.year}</span>
+                    <span className="text-sm font-bold text-emerald-400 text-right">{yearGroup.total.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-blue-400 text-right">{formatRevenue(yearGroup.total * REVENUE_PER_ACTIVATION)}</span>
                   </button>
 
-                  {/* Project sub-rows */}
-                  {isExpanded && (
-                    <div className="bg-[var(--ff-surface-primary,var(--ff-bg-secondary))] border-t border-[var(--ff-border-light)]">
-                      {week.projects.map((project: WeekRow['projects'][number], pIdx: number) => {
-                        const projectRevenue = project.count * REVENUE_PER_ACTIVATION;
-                        return (
-                          <div
-                            key={project.project_id}
-                            className={`grid grid-cols-[2rem_1fr_8rem_12rem_10rem] gap-2 px-4 py-2.5 ${
-                              pIdx < week.projects.length - 1 ? 'border-b border-[var(--ff-border-light)]/50' : ''
-                            }`}
-                          >
-                            <div />
-                            <span className="text-sm text-[var(--ff-text-secondary)] pl-4">
-                              — {project.project_name}
-                            </span>
-                            <span className="text-sm text-[var(--ff-text-primary)] text-right font-medium">
-                              {project.count.toLocaleString()}
-                            </span>
-                            <span className="text-sm text-[var(--ff-text-secondary)] text-right">
-                              {formatRevenue(projectRevenue)}
-                            </span>
-                            <div />
+                  {yearExpanded && yearGroup.months.map((monthGroup, mi) => {
+                    const monthExpanded = expandedMonths.has(monthGroup.key);
+                    return (
+                      <div key={monthGroup.key} className={mi > 0 ? 'border-t border-[var(--ff-border-light)]/60' : 'border-t border-[var(--ff-border-light)]/60'}>
+
+                        {/* ── Month row ── */}
+                        <button
+                          onClick={() => setExpandedMonths(toggle(expandedMonths, monthGroup.key))}
+                          className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-2.5 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                        >
+                          <div className="flex items-center pl-4">
+                            {monthExpanded
+                              ? <ChevronDown className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" />
+                              : <ChevronRight className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" />}
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          <span className="text-sm font-semibold text-[var(--ff-text-primary)] pl-1">{monthGroup.label}</span>
+                          <span className="text-sm font-semibold text-emerald-400 text-right">{monthGroup.total.toLocaleString()}</span>
+                          <span className="text-sm font-semibold text-blue-400 text-right">{formatRevenue(monthGroup.total * REVENUE_PER_ACTIVATION)}</span>
+                        </button>
+
+                        {monthExpanded && monthGroup.weeks.map((week, wi) => {
+                          const weekExpanded = expandedWeeks.has(week.week_start);
+                          return (
+                            <div key={week.week_start} className={wi > 0 ? 'border-t border-[var(--ff-border-light)]/40' : 'border-t border-[var(--ff-border-light)]/40'}>
+
+                              {/* ── Week row ── */}
+                              <button
+                                onClick={() => setExpandedWeeks(toggle(expandedWeeks, week.week_start))}
+                                className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-2 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
+                              >
+                                <div className="flex items-center pl-8">
+                                  {weekExpanded
+                                    ? <ChevronDown className="w-3 h-3 text-[var(--ff-text-tertiary)]" />
+                                    : <ChevronRight className="w-3 h-3 text-[var(--ff-text-tertiary)]" />}
+                                </div>
+                                <span className="text-sm text-[var(--ff-text-primary)] pl-1">{week.week_label}</span>
+                                <span className="text-sm text-emerald-400 text-right">{week.total.toLocaleString()}</span>
+                                <span className="text-sm text-blue-400 text-right">{formatRevenue(week.total * REVENUE_PER_ACTIVATION)}</span>
+                              </button>
+
+                              {/* ── Project rows ── */}
+                              {weekExpanded && week.projects.map((project, pi) => (
+                                <div
+                                  key={project.project_id}
+                                  className={`grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-1.5 bg-[var(--ff-bg-secondary)] ${
+                                    pi < week.projects.length - 1 ? 'border-b border-[var(--ff-border-light)]/30' : ''
+                                  }`}
+                                >
+                                  <div />
+                                  <span className="text-xs text-[var(--ff-text-secondary)] pl-14">— {project.project_name}</span>
+                                  <span className="text-xs text-[var(--ff-text-primary)] text-right font-medium">{project.count.toLocaleString()}</span>
+                                  <span className="text-xs text-[var(--ff-text-secondary)] text-right">{formatRevenue(project.count * REVENUE_PER_ACTIVATION)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
 
-            {/* All-time total footer row */}
-            <div className="grid grid-cols-[2rem_1fr_8rem_12rem_10rem] gap-2 px-4 py-3 border-t-2 border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
+            {/* All-time footer */}
+            <div className="grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-3 border-t-2 border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
               <div />
               <span className="text-sm font-semibold text-[var(--ff-text-primary)]">All time total</span>
-              <span className="text-sm font-bold text-emerald-400 text-right">
-                {allTimeTotal.toLocaleString()}
-              </span>
-              <span className="text-sm font-bold text-blue-400 text-right">
-                {formatRevenue(allTimeRevenue)}
-              </span>
-              <div />
+              <span className="text-sm font-bold text-emerald-400 text-right">{allTimeTotal.toLocaleString()}</span>
+              <span className="text-sm font-bold text-blue-400 text-right">{formatRevenue(allTimeRevenue)}</span>
             </div>
           </div>
         )}
