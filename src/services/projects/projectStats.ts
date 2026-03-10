@@ -2,7 +2,7 @@
  * Project Statistics Service - Migrated to Neon PostgreSQL
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import {
   Project,

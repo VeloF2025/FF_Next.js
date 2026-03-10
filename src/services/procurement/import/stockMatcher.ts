@@ -11,7 +11,7 @@
  * The matcher accounts for this by parsing technical codes into keywords.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import { log } from '@/lib/logger';
 import { fiberDomainMatch } from './fiberDomainMatcher';

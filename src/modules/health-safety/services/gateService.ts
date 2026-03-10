@@ -5,7 +5,7 @@
  * Contractors MUST pass all gate requirements before being assigned to projects.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import type { GateCheckResult, HSDocumentType, DocumentStatus } from '../types/compliance.types';
 import type { RAGStatus } from '../types/audit.types';
 import { REQUIRED_DOCUMENTS, DOCUMENT_TYPES } from '../types/compliance.types';

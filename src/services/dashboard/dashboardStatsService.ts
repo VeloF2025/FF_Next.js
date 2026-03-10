@@ -7,7 +7,7 @@
 import { analyticsApi } from '@/services/api/analyticsApi';
 import { log } from '@/lib/logger';
 import { staffService } from '@/services/staffService';
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 
 // Lazy initialize SQL client for deprecated methods (prevents SSR/client mismatch)
 let _sql: NeonQueryFunction<false, false> | null = null;

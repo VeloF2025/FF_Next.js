@@ -15,7 +15,7 @@
  * - Comprehensive error handling
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@/lib/db-neon';
 import ws from 'ws';
 import { log } from '@/lib/logger';
 import type { UnifiedReview, UpdateUnifiedReviewPayload } from '../types/unified.types';

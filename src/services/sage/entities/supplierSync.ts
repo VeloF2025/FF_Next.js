@@ -6,7 +6,7 @@
  * - Push FF suppliers to Sage (when not matched)
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageSupplier } from '../sageClient';
 

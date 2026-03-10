@@ -6,7 +6,7 @@
  * Same pattern as invoiceSync.ts but for AR.
  */
 
-import { NeonQueryFunction } from '@neondatabase/serverless';
+import { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageCustomerInvoice } from '../sageClient';
 

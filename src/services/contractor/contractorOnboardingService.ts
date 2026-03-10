@@ -3,7 +3,7 @@
  * Manages contractor onboarding workflow stages
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 
 const sql = neon(process.env.DATABASE_URL || '');
 

@@ -3,7 +3,7 @@
  * Optimized connection management for better performance and reliability
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 

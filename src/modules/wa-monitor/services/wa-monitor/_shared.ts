@@ -3,7 +3,7 @@
  * Private - not re-exported from barrel
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import type { QaReviewDrop } from '../../types/wa-monitor.types';
 
 /**

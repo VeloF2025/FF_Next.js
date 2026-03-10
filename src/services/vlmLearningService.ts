@@ -11,7 +11,7 @@
  * @module services/vlmLearningService
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { createHash } from 'crypto';
 import type {

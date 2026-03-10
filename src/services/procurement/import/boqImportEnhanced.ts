@@ -8,7 +8,7 @@
  * Created: 2026-01-17
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import * as XLSX from 'xlsx';
 import { MaterialMatcher, MatchInput, MatchOptions } from './materialMatcher';
 import { CategoryMapper } from './categoryMapper';

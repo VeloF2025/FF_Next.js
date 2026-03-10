@@ -4,7 +4,7 @@
  * Fully migrated to use Neon PostgreSQL
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { RFQStatus } from '@/types/procurement.types';
 import { RFQCrud } from './rfqCrud';
 import { EmailNotificationService } from './notifications/emailNotificationService';

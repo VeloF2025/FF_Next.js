@@ -1,6 +1,6 @@
 // 🟢 WORKING: Microsoft Graph webhook subscriptions — create, renew, and query expiring subs
 import { graphFetch } from './auth';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';

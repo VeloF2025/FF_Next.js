@@ -3,7 +3,7 @@
  * Handles permission checks and field filtering for staff sensitive data
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { userHasPermission } from '@/lib/permissions';
 import {
   STAFF_SENSITIVE_PERMISSION,

@@ -3,7 +3,7 @@
  * Database-driven RBAC with module/page/tab/action hierarchy
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 
 const sql = neon(process.env.DATABASE_URL!);
 

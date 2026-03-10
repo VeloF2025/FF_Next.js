@@ -5,7 +5,7 @@
  * Handles full and incremental syncs with checksum-based change detection.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OneMapClient, OneMapRecord, createOneMapClient } from './oneMapClient';
 import crypto from 'crypto';

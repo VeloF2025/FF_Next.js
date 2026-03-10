@@ -3,7 +3,7 @@
  * Query operations and statistics for RFQs
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQ, RFQStatus } from '@/types/procurement.types';
 

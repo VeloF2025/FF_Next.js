@@ -5,7 +5,7 @@
  */
 
 import type { NextApiRequest } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { parse } from 'cookie';
 import crypto from 'crypto';
 import type { PortalSession } from './types';

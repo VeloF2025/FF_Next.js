@@ -9,7 +9,7 @@
  * NOTE: Sage API returns PascalCase properties (ID, SupplierID, Total, etc.)
  */
 
-import { NeonQueryFunction } from '@neondatabase/serverless';
+import { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageSupplierPayment } from '../sageClient';
 

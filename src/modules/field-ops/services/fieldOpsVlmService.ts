@@ -10,7 +10,7 @@
  * @module field-ops/services/fieldOpsVlmService
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('fieldOpsVlmService');

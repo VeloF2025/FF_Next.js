@@ -14,7 +14,7 @@
  * @module field-ops/services/fieldOpsPhotoService
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import fs from 'fs';
 

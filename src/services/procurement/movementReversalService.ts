@@ -4,7 +4,7 @@
  * reverts stock_quant changes, and if serial was involved reverts to previous_status.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { createAuditLog } from '@/services/procurement/auditService';
 

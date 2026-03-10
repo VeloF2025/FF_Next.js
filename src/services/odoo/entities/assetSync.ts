@@ -7,7 +7,7 @@
  * Sprint 3: Asset-Procurement Integration
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import {
   OdooClient,

@@ -5,7 +5,7 @@
  * Same pattern as supplierSync but for the customer/client side.
  */
 
-import { NeonQueryFunction } from '@neondatabase/serverless';
+import { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient } from '../sageClient';
 

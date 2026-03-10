@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 
 // Mock the Neon connection
 vi.mock('@neondatabase/serverless', () => ({

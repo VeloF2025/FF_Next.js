@@ -16,7 +16,7 @@
  * - contractor_stock_accountability: Blocking status
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 
 // ==================== TYPES ====================
 

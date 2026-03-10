@@ -6,7 +6,7 @@
  * @module notifications/services/notificationBus
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import {
   DEFAULT_CHANNEL_PREFERENCES,

@@ -3,7 +3,7 @@
  * Database-backed session handling for token revocation and multi-device support
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 import type { Session } from './types';

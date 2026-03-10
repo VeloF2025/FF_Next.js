@@ -7,7 +7,7 @@
  * Created: 2026-01-17
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { TextProcessor } from '@/lib/utils/catalog/textProcessor';
 import type {
   FiberBudgetCategoryCode,

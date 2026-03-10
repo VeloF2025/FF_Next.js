@@ -6,7 +6,7 @@
  * This service is designed for direct use inside API route handlers.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   AuditActionValue,

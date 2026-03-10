@@ -1,5 +1,5 @@
 // 🟢 WORKING: Core orchestrator — processes a single Teams call record into a meeting row
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { fetchCallRecordById } from './call-records';
 import {

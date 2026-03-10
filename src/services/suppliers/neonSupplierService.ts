@@ -3,7 +3,7 @@
  * Direct PostgreSQL implementation for supplier management
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { 
   Supplier, 
   SupplierStatus,
