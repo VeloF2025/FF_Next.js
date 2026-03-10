@@ -34,6 +34,7 @@ import type {
   ProjectSummary
 } from '../../src/types/procurement/portal.types';
 import { ProcurementOverview } from '@/modules/procurement/components/ProcurementOverview';
+import { BOQSpendSummary } from '@/modules/procurement/reports/BOQSpendSummary';
 
 interface ProcurementPageProps {
   initialProject?: Project;
@@ -301,7 +302,7 @@ export default function ProcurementPage({
               {activeTab === 'stock' && <StockTabContent />}
               {activeTab === 'field-stock' && <FieldStockTabContent />}
               {activeTab === 'suppliers' && <SuppliersTabContent />}
-              {activeTab === 'reports' && <PlaceholderTab title="Procurement Reports" icon={ClipboardList} description="Generate and view reports" />}
+              {activeTab === 'reports' && <BOQSpendSummary />}
             </div>
           </div>
         </div>
