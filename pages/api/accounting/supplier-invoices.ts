@@ -4,10 +4,10 @@
  * POST /api/accounting/supplier-invoices - Create draft invoice
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getSupplierInvoices,
@@ -15,7 +15,7 @@ import {
 } from '@/modules/accounting/services/supplierInvoiceService';
 import type { SupplierInvoiceStatus } from '@/modules/accounting/types/ap.types';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const { status, supplier_id, match_status, limit, offset } = req.query;
@@ -43,8 +43,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.badRequest(res, 'invoiceNumber, supplierId, invoiceDate, and items are required');
       }
 
-      const userId = (req as unknown as { user?: { id: string } }).user?.id;
-      if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
+      // User identity comes from JWT (req.user), never from client request body
+      const userId = req.user.id;
 
       const invoice = await createSupplierInvoice({
         invoiceNumber, supplierId: String(supplierId), purchaseOrderId, grnId,
