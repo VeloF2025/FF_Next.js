@@ -6,10 +6,10 @@
  * Body: { entries: [{ originalCategory, standardCategory, glCode }] }
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
 
@@ -19,13 +19,13 @@ interface CategoryMapEntry {
   glCode: number | string;
 }
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
-    const userId = (req as unknown as { user?: { id: string } }).user?.id || '';
+    const userId = req.user.id;
     const { entries } = req.body as { entries: CategoryMapEntry[] };
 
     if (!Array.isArray(entries) || entries.length === 0) {
@@ -76,7 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           gl_account_id, auto_create_entry, priority, created_by
         ) VALUES (
           ${ruleName}, 'description', 'contains', ${pattern},
-          ${glAccountId}::UUID, false, 100, ${userId || null}
+          ${glAccountId}::UUID, false, 100, ${userId}
         )
       `;
       created++;

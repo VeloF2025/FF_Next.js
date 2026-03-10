@@ -3,10 +3,10 @@
  * POST — run monthly depreciation for all eligible assets
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { sql } from '@/lib/neon';
 import { log } from '@/lib/logger';
 import { postAssetDepreciationToGL } from '@/modules/accounting/services/glCrossModuleHooks';
@@ -14,10 +14,10 @@ import { postAssetDepreciationToGL } from '@/modules/accounting/services/glCross
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
 
-  const userId = String((req as unknown as { user?: { id: string } }).user?.id || '');
+  const userId = String(req.user.id);
 
   // Find assets eligible for depreciation:
   // - Status = available or assigned (active assets)
