@@ -2,6 +2,7 @@
  * POTransactionDetail — Expandable PO transaction list for BOQ Spend Summary.
  */
 
+import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 
 export interface POTransaction {
@@ -57,7 +58,15 @@ export function POTransactionDetail({ transactions, loading }: Props) {
         <tbody className="divide-y divide-[var(--ff-border-light)]">
           {transactions.map((tx) => (
             <tr key={tx.id} className="hover:bg-[var(--ff-bg-hover)]">
-              <td className="py-1.5 pr-3 text-[var(--ff-text-primary)] font-mono">{tx.poNumber}</td>
+              <td className="py-1.5 pr-3 font-mono">
+                <Link
+                  href={`/procurement/purchase-orders/${tx.id}`}
+                  className="text-purple-400 hover:text-purple-300 underline decoration-purple-400/30 hover:decoration-purple-300"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {tx.poNumber}
+                </Link>
+              </td>
               <td className="py-1.5 pr-3 text-[var(--ff-text-secondary)]">{tx.supplierName}</td>
               <td className="py-1.5 pr-3 text-[var(--ff-text-tertiary)]">
                 {tx.orderDate ? new Date(tx.orderDate).toLocaleDateString('en-ZA') : '—'}
