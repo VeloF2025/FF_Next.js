@@ -78,10 +78,12 @@ interface ChangeEntry {
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
+  active: { label: 'Active', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   uploaded: { label: 'Uploaded', color: 'bg-blue-500/20 text-blue-400', icon: FileText },
   mapping: { label: 'Mapping', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
   mapped: { label: 'Mapped', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
   approved: { label: 'Approved', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
+  superseded: { label: 'Superseded', color: 'bg-orange-500/20 text-orange-400', icon: Clock },
   archived: { label: 'Archived', color: 'bg-gray-500/20 text-gray-400', icon: Clock },
 };
 
