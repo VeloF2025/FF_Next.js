@@ -15,7 +15,8 @@ import {
   Package,
   Eye,
   Edit,
-  Loader2
+  Loader2,
+  Download,
 } from 'lucide-react';
 import type { Asset, AssetCategory } from '@/modules/assets/types';
 import { ASSET_STATUS_CONFIG } from '@/modules/assets/constants/assetStatus';
@@ -51,6 +52,7 @@ export function AssetListClient() {
   const [statusFilter, setStatusFilter] = useState(searchParams?.get('status') || '');
   const [categoryFilter, setCategoryFilter] = useState(searchParams?.get('categoryId') || '');
   const [categories, setCategories] = useState<AssetCategory[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -135,6 +137,33 @@ export function AssetListClient() {
     router.push(`/assets/list?${params.toString()}`);
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.set('search', searchTerm);
+      if (statusFilter) params.set('status', statusFilter);
+      if (categoryFilter) params.set('categoryId', categoryFilter);
+
+      const response = await fetch(`/api/assets/export?${params.toString()}`);
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `assets-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      log.error('Export failed', { err }, 'AssetListClient');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   function getStatusBadge(status: string) {
     const config = ASSET_STATUS_CONFIG[status as keyof typeof ASSET_STATUS_CONFIG];
     if (!config) return null;
@@ -195,6 +224,19 @@ export function AssetListClient() {
           <option value="out_for_calibration">Out for Calibration</option>
           <option value="retired">Retired</option>
         </select>
+
+        <button
+          onClick={handleExport}
+          disabled={exporting}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {exporting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          Export CSV
+        </button>
       </div>
 
       {/* Table */}
