@@ -1,6 +1,7 @@
 /**
  * Project Document Manager Component
  * Full document management for pipeline projects - view, upload, delete
+ * Supports marking documents as "required" (compulsory) for the project
  */
 
 'use client';
@@ -17,10 +18,9 @@ import {
   Loader2,
   X,
   FolderOpen,
-  Download,
-  Eye,
-  Filter,
   Search,
+  Shield,
+  Star,
 } from 'lucide-react';
 
 interface Document {
@@ -41,6 +41,7 @@ interface Document {
   reference_number: string | null;
   issuing_authority: string | null;
   is_verified: boolean;
+  is_required: boolean;
   uploaded_by: string | null;
   created_at: string;
   smartsheet_attachment_id: string | null;
@@ -68,8 +69,7 @@ const DOCUMENT_TYPES: { value: string; label: string }[] = [
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return '-';
-  // Standard YYYY-MM-DD format
-  return new Date(date).toISOString().split('T')[0];
+  return new Date(date).toISOString().split('T')[0] ?? '-';
 }
 
 function formatFileSize(bytes: number | null | undefined): string {
@@ -107,22 +107,16 @@ function getDocTypeIcon(docType: string): string {
 
 /**
  * Convert document URL to proxy URL for viewing
- * Handles various URL formats:
- * - https://vf.fibreflow.app/pipeline/{projectId}/{filename}
- * - http://100.96.203.105:8091/pipeline/{projectId}/{filename}
- * - External URLs (passed through as-is)
  */
 function getDocumentViewUrl(fileUrl: string | null, filePath: string | null): string | null {
   if (!fileUrl && !filePath) return null;
 
-  // If we have a file_path, use it directly with the proxy
   if (filePath) {
     return `/api/pipeline/documents/${filePath}`;
   }
 
   if (!fileUrl) return null;
 
-  // Check if it's a known storage URL pattern
   const storagePatterns = [
     /https?:\/\/vf\.fibreflow\.app\/(pipeline\/[^/]+\/.+)$/,
     /https?:\/\/dev\.fibreflow\.app\/(pipeline\/[^/]+\/.+)$/,
@@ -138,7 +132,6 @@ function getDocumentViewUrl(fileUrl: string | null, filePath: string | null): st
     }
   }
 
-  // For external URLs (like example.com), return as-is
   return fileUrl;
 }
 
@@ -151,16 +144,17 @@ export function ProjectDocumentManager({
   const [documents, setDocuments] = useState<Document[]>([]);
   const [byApproval, setByApproval] = useState<Record<string, Document[]>>({});
   const [projectLevel, setProjectLevel] = useState<Document[]>([]);
+  const [requiredDocs, setRequiredDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [togglingRequired, setTogglingRequired] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped');
 
-  // Upload form state
   const [uploadData, setUploadData] = useState({
     document_type: 'supporting_doc',
     document_name: '',
@@ -171,6 +165,7 @@ export function ProjectDocumentManager({
     expiry_date: '',
     reference_number: '',
     issuing_authority: '',
+    is_required: false,
   });
 
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -214,6 +209,7 @@ export function ProjectDocumentManager({
       setDocuments(data.data?.documents || []);
       setByApproval(data.data?.byApproval || {});
       setProjectLevel(data.data?.projectLevel || []);
+      setRequiredDocs(data.data?.requiredDocs || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load documents');
     } finally {
@@ -258,6 +254,7 @@ export function ProjectDocumentManager({
         expiry_date: '',
         reference_number: '',
         issuing_authority: '',
+        is_required: false,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload document');
@@ -284,6 +281,26 @@ export function ProjectDocumentManager({
       setError(err instanceof Error ? err.message : 'Failed to delete document');
     } finally {
       setDeleting(null);
+    }
+  }
+
+  async function handleToggleRequired(docId: string, currentValue: boolean) {
+    setTogglingRequired(docId);
+    try {
+      const response = await fetch(
+        `/api/pipeline/projects/${projectId}/documents?docId=${docId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_required: !currentValue }),
+        }
+      );
+      if (!response.ok) throw new Error('Failed to update document');
+      await fetchDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update document');
+    } finally {
+      setTogglingRequired(null);
     }
   }
 
@@ -394,6 +411,31 @@ export function ProjectDocumentManager({
         </div>
       ) : viewMode === 'grouped' ? (
         <div className="space-y-6">
+          {/* Required documents */}
+          {requiredDocs.filter((d) => filteredDocs.some((fd) => fd.id === d.id)).length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Required Documents ({requiredDocs.filter((d) => filteredDocs.some((fd) => fd.id === d.id)).length})
+              </h4>
+              <div className="space-y-2">
+                {requiredDocs
+                  .filter((d) => filteredDocs.some((fd) => fd.id === d.id))
+                  .map((doc) => (
+                    <DocumentRow
+                      key={doc.id}
+                      doc={doc}
+                      onDelete={handleDelete}
+                      onToggleRequired={handleToggleRequired}
+                      deleting={deleting}
+                      togglingRequired={togglingRequired}
+                      readonly={readonly}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Project-level documents */}
           {projectLevel.length > 0 && (
             <div>
@@ -409,7 +451,9 @@ export function ProjectDocumentManager({
                       key={doc.id}
                       doc={doc}
                       onDelete={handleDelete}
+                      onToggleRequired={handleToggleRequired}
                       deleting={deleting}
+                      togglingRequired={togglingRequired}
                       readonly={readonly}
                     />
                   ))}
@@ -433,7 +477,9 @@ export function ProjectDocumentManager({
                       key={doc.id}
                       doc={doc}
                       onDelete={handleDelete}
+                      onToggleRequired={handleToggleRequired}
                       deleting={deleting}
+                      togglingRequired={togglingRequired}
                       readonly={readonly}
                     />
                   ))}
@@ -449,7 +495,9 @@ export function ProjectDocumentManager({
               key={doc.id}
               doc={doc}
               onDelete={handleDelete}
+              onToggleRequired={handleToggleRequired}
               deleting={deleting}
+              togglingRequired={togglingRequired}
               readonly={readonly}
               showApproval
             />
@@ -588,6 +636,24 @@ export function ProjectDocumentManager({
                 />
               </div>
 
+              {/* Required Document Toggle */}
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <input
+                  type="checkbox"
+                  id="is_required"
+                  checked={uploadData.is_required}
+                  onChange={(e) => setUploadData({ ...uploadData, is_required: e.target.checked })}
+                  className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                />
+                <label htmlFor="is_required" className="text-sm font-medium flex items-center gap-1.5">
+                  <Shield className="w-4 h-4 text-amber-500" />
+                  Required Document
+                </label>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  Shows in Required Documents section
+                </span>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Description</label>
                 <textarea
@@ -627,13 +693,17 @@ export function ProjectDocumentManager({
 function DocumentRow({
   doc,
   onDelete,
+  onToggleRequired,
   deleting,
+  togglingRequired,
   readonly,
   showApproval = false,
 }: {
   doc: Document;
   onDelete: (id: string, name: string) => void;
+  onToggleRequired?: (id: string, currentValue: boolean) => void;
   deleting: string | null;
+  togglingRequired?: string | null;
   readonly: boolean;
   showApproval?: boolean;
 }) {
@@ -643,6 +713,11 @@ function DocumentRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium text-foreground truncate">{doc.document_name}</p>
+          {doc.is_required && (
+            <span className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded flex items-center gap-0.5">
+              <Shield className="w-3 h-3" /> Required
+            </span>
+          )}
           {doc.is_verified && <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />}
           {doc.smartsheet_attachment_id && (
             <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">Smartsheet</span>
@@ -681,6 +756,24 @@ function DocumentRow({
           >
             <ExternalLink className="w-4 h-4 text-muted-foreground" />
           </a>
+        )}
+        {!readonly && onToggleRequired && (
+          <button
+            onClick={() => onToggleRequired(doc.id, doc.is_required)}
+            disabled={togglingRequired === doc.id}
+            className={`p-2 rounded-lg transition-colors ${
+              doc.is_required
+                ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                : 'text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            title={doc.is_required ? 'Remove from required' : 'Mark as required'}
+          >
+            {togglingRequired === doc.id ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Star className={`w-4 h-4 ${doc.is_required ? 'fill-current' : ''}`} />
+            )}
+          </button>
         )}
         {!readonly && (
           <button
