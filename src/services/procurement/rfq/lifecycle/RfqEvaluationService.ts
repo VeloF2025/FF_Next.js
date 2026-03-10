@@ -3,7 +3,7 @@
  * Evaluates and compares supplier responses
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQStatus } from '@/types/procurement.types';
 import { RfqCrudService } from '../core/RfqCrudService';

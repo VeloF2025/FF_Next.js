@@ -4,7 +4,7 @@
  * THE KEY SERVICE FOR TRACEABILITY
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { query } from './db';
 import type {

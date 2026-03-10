@@ -3,7 +3,7 @@
  * Handles email notifications for birthdays, document expiry, and compliance alerts
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { formatDisplayDateShort, formatDisplayDate } from '@/utils/dateFormat';
 import { log } from '@/lib/logger';
 

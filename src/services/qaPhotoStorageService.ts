@@ -11,7 +11,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

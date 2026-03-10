@@ -8,7 +8,7 @@
  * - Integration with approval_requests table
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
 import { notify } from '@/modules/notifications/services';

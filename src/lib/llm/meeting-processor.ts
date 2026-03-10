@@ -12,7 +12,7 @@
 
 import { getOpenAIClient } from './client';
 import { chunkTranscript } from './chunker';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

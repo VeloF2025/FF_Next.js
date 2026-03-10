@@ -7,7 +7,7 @@
  * @module lib/wa-digest/generateDailyDigest
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';

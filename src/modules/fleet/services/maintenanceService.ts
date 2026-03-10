@@ -3,7 +3,7 @@
  * Provides methods for service intervals, service history, and predictive maintenance
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   ServiceInterval,

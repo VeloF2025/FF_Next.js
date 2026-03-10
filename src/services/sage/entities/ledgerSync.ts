@@ -11,7 +11,7 @@
  * - Rate limiting (60 req/min via delay)
  */
 
-import { NeonQueryFunction } from '@neondatabase/serverless';
+import { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient, SageDetailedLedgerTransaction } from '../sageClient';
 

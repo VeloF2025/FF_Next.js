@@ -4,7 +4,7 @@
  * Used during document upload and verification to ensure documents belong to the correct person
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

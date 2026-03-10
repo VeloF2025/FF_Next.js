@@ -4,7 +4,7 @@
  * Syncs suppliers from Odoo (res.partner) to FibreFlow (suppliers table)
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooPartner } from '../odooClient';
 

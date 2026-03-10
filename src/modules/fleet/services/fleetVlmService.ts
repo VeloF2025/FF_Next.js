@@ -10,7 +10,7 @@
 
 import { log } from '@/lib/logger';
 import sharp from 'sharp';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import {
   OdometerExtractionResult,
   LicensePlateExtractionResult,

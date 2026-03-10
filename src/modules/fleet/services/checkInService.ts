@@ -3,7 +3,7 @@
  * Business logic for daily pre-trip inspections
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import {
   CheckTemplate,
   CheckItem,

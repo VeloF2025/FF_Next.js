@@ -3,7 +3,7 @@
  * Handles automated reminder notifications for RFQs
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQStatus } from '@/types/procurement.types';
 import { RfqNotificationService } from './RfqNotificationService';

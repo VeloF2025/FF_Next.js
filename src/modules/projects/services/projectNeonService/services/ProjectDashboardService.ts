@@ -5,7 +5,7 @@
  * TDD Phase: GREEN - Implementation complete
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 

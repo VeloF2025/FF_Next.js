@@ -4,7 +4,7 @@
  * Replaces Firebase notification system
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

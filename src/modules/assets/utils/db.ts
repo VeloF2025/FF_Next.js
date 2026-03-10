@@ -5,7 +5,7 @@
  * This module is self-contained and uses its own connection.
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 let sql: NeonQueryFunction<false, false> | null = null;

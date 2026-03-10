@@ -7,7 +7,7 @@
  * Pattern: OpenAI-compatible chat/completions API with image_url messages.
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { getChecklist } from '../types/construction.types';
 import type { Discipline, VlmStepResult, VlmOverallResult } from '../types';

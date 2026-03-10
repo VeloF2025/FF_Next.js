@@ -3,7 +3,7 @@
  * Handles notification creation and sending for RFQs
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { getNotificationMessage } from '../utils/rfqMessageTemplates';
 

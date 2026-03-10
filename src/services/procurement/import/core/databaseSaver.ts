@@ -4,7 +4,7 @@
  * UPDATED: Real database operations
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { ProcurementContext } from '../../../../types/procurement/base.types';
 import { ImportConfig, MappingResults, SaveResult } from './types';
 import { log } from '../../../../lib/logger';

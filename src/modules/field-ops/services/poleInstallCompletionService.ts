@@ -9,7 +9,7 @@
  * @module field-ops/services/poleInstallCompletionService
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('poleInstallCompletionService');

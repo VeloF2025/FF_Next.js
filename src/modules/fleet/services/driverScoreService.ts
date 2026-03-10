@@ -5,7 +5,7 @@
  * Note: Uses simplified model where fleet_vehicles.assigned_driver_id tracks current driver
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   ScorePeriod,

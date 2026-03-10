@@ -5,7 +5,7 @@
  * @module qfield-qa/services/qfieldNotificationService
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { notify } from '@/modules/notifications/services';
 

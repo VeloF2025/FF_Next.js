@@ -3,7 +3,7 @@
  * Records all actions performed on staff records for compliance and auditing
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

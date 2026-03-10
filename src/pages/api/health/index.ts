@@ -10,7 +10,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { queryCache } from '@/lib/queryCache';
 
 const sql = neon(process.env.DATABASE_URL || '');

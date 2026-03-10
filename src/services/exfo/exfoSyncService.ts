@@ -9,7 +9,7 @@
  * - Measurement detail enrichment
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { fetchAllResults, getMeasurementDetails } from './exfoApiService';
 import type {

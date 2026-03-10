@@ -4,7 +4,7 @@
  * Syncs fleet vehicles, service logs, and odometer readings from Odoo to FibreFlow
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import {
   OdooClient,

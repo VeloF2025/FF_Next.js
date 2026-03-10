@@ -3,7 +3,7 @@
  * Handles all phase, step, and task operations using Neon PostgreSQL
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { 
   Phase, 
   Step, 

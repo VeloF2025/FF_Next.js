@@ -3,7 +3,7 @@
  * Core create, read, update, delete operations for RFQs
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQ, RFQFormData, RFQStatus } from '@/types/procurement.types';
 import { RfqItemService } from './RfqItemService';

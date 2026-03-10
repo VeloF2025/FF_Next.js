@@ -3,7 +3,7 @@
  * Analyzes headers + sample data to auto-detect column mappings.
  */
 import * as XLSX from 'xlsx';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   BOQTargetField,

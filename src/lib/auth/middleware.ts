@@ -9,7 +9,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse, NextApiHandler } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { verifyToken } from './jwt';
 import type { AuthUser, AuthRole } from './types';
 import { ROLE_HIERARCHY } from './types';

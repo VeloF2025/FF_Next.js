@@ -4,7 +4,7 @@
  * Handles stale WebSocket connections with automatic reconnection
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 
 // Lazy initialization to prevent connection attempts in browser
 let sqlInstance: ReturnType<typeof neon> | null = null;

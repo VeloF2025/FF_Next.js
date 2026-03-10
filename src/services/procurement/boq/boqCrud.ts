@@ -4,7 +4,7 @@
  * Migrated from Firebase to Neon PostgreSQL
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { BOQ, BOQFormData, BOQStatusType } from '@/types/procurement/boq.types';
 import { log } from '@/lib/logger';
 

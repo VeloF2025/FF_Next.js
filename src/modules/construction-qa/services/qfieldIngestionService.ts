@@ -12,7 +12,7 @@
  *   dome_joint        → optical (feature_type: joint)
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { parseQFieldCaptureDate } from '@/lib/exifUtils';
 import { copyQFieldPhotoToStorage } from '@/services/qaPhotoStorageService';

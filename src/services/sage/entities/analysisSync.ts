@@ -5,7 +5,7 @@
  * Upserts into sage_analysis_types and sage_analysis_categories.
  */
 
-import { NeonQueryFunction } from '@neondatabase/serverless';
+import { NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { SageClient } from '../sageClient';
 

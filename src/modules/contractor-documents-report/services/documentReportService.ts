@@ -4,7 +4,7 @@
  * Aggregates contractor document data from database and generates reports
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import type {
   ContractorDocumentReport,
   DocumentInfo,

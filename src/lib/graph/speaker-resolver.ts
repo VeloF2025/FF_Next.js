@@ -1,6 +1,6 @@
 // 🟢 WORKING: Resolve Graph user IDs to display names, emails, and FibreFlow user IDs
 import { graphFetch } from './auth';
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type { CallRecord } from './call-records';
 

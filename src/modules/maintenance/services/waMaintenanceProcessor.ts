@@ -10,7 +10,7 @@
  * @module maintenance/services/waMaintenanceProcessor
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 
 // ============================================================================

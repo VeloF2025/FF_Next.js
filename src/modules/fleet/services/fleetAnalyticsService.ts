@@ -3,7 +3,7 @@
  * Provides methods for KPI dashboard, TCO calculations, cost trends, and analytics snapshots
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   FleetKPIs,

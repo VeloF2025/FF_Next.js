@@ -12,7 +12,7 @@
  * - stock_consumptions: Create consumption record
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 
 // ==================== TYPES ====================
 

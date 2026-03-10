@@ -7,7 +7,7 @@
  * Purpose: Store AI evaluation results for installation drops
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import type { EvaluationResult } from '../types';
 import { log } from '@/lib/logger';
 

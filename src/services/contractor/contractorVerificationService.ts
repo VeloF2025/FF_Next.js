@@ -3,7 +3,7 @@
  * Orchestrates company verification, director matching, and individual checks
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { createVerificationClient, type IVerificationProvider } from '@/services/searchworks/searchWorksClient';
 import { validateSaId } from '@/lib/saIdValidation';
