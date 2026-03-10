@@ -29,6 +29,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
+import { BOQSpendSummary } from '@/modules/procurement/reports/BOQSpendSummary';
 
 // Report period options
 const PERIODS = [
@@ -344,6 +345,11 @@ export default function ProcurementReportsPage() {
             </div>
           ) : (
             <>
+              {/* BOQ Spend vs Budget */}
+              <div className="mb-6">
+                <BOQSpendSummary />
+              </div>
+
               {/* Summary Cards */}
               <div className="mb-6 grid grid-cols-4 gap-4">
                 <div className="p-4 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg">
