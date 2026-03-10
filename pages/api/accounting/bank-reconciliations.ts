@@ -4,10 +4,10 @@
  * POST /api/accounting/bank-reconciliations - Start new reconciliation
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   getReconciliations,
@@ -15,7 +15,7 @@ import {
   startReconciliation,
 } from '@/modules/accounting/services/bankReconciliationService';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const { bank_account_id, id } = req.query;
@@ -39,13 +39,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
       const { bankAccountId, statementDate, statementBalance } = req.body;
-      const userId = (req as unknown as { user?: { id: string } }).user?.id;
-      if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
+      // User identity comes from JWT (req.user), never from client request body
+      const userId = req.user.id;
 
       if (!bankAccountId || !statementDate || statementBalance === undefined) {
         return apiResponse.badRequest(res, 'bankAccountId, statementDate, and statementBalance are required');
       }
-      if (!userId) return apiResponse.unauthorized(res, 'Unauthorized');
 
       const recon = await startReconciliation(
         String(bankAccountId), String(statementDate),
