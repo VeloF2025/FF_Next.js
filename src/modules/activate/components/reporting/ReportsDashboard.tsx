@@ -44,6 +44,7 @@ import { SerialMismatchReports } from './SerialMismatchReports';
 import { InstallationGapsReports } from './InstallationGapsReports';
 import { ActivationProgressReport } from './ActivationProgressReport';
 import { MaturityTrackingReport } from './MaturityTrackingReport';
+import { PenetrationCurveReport } from './PenetrationCurveReport';
 
 interface CategoryTab {
   id: ReportCategory;
@@ -112,6 +113,12 @@ const categories: CategoryTab[] = [
     label: 'Maturity Tracking',
     icon: Clock,
     description: 'Time from first installation to maturity - milestones, velocity, projections',
+  },
+  {
+    id: 'penetration',
+    label: 'Penetration Curve',
+    icon: TrendingUp,
+    description: 'Penetration % over time — drill down Project → Zone → PON',
   },
 ];
 
@@ -490,6 +497,9 @@ export function ReportsDashboard() {
           <MaturityTrackingReport
             projectId={filters.project}
           />
+        )}
+        {activeCategory === 'penetration' && (
+          <PenetrationCurveReport filters={filters} refreshKey={refreshKey} />
         )}
       </div>
     </div>
