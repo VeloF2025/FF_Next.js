@@ -744,6 +744,7 @@ export default function BOQDetailPage() {
                       {showProcurement && lifecycleData && (
                         <>
                           <th className="px-3 py-3 text-right text-xs font-semibold text-purple-400 tracking-wide w-28">Ordered</th>
+                          <th className="px-3 py-3 text-right text-xs font-semibold text-amber-400 tracking-wide w-28">Remaining</th>
                           <th className="px-3 py-3 text-right text-xs font-semibold text-green-400 tracking-wide w-28">Delivered</th>
                           <th className="px-3 py-3 text-right text-xs font-semibold text-blue-400 tracking-wide w-28">Invoiced</th>
                           <th className="px-3 py-3 text-right text-xs font-semibold text-emerald-400 tracking-wide w-28">Paid</th>
@@ -821,6 +822,7 @@ export default function BOQDetailPage() {
                                 <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
                                 <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
                                 <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
+                                <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)] text-right">--</td>
                                 <td className="px-3 py-2 text-sm text-[var(--ff-text-tertiary)]">--</td>
                               </>
                             );
@@ -838,6 +840,24 @@ export default function BOQDetailPage() {
                                       />
                                     </div>
                                   ) : <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  {(() => {
+                                    const remaining = item.quantity - lc.orderedQty;
+                                    if (lc.orderedQty === 0) return <span className="text-sm text-[var(--ff-text-tertiary)]">--</span>;
+                                    return (
+                                      <div>
+                                        <div className={`text-sm font-medium ${remaining <= 0 ? 'text-green-400' : 'text-amber-400'}`}>
+                                          {remaining <= 0 ? 'Fully ordered' : `${remaining} ${lc.uom}`}
+                                        </div>
+                                        {remaining > 0 && (
+                                          <div className="text-xs text-[var(--ff-text-tertiary)]">
+                                            {formatCurrency(remaining * (item.unitPrice || 0))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                   {lc.receivedQty > 0 ? (
@@ -889,6 +909,9 @@ export default function BOQDetailPage() {
                         <>
                           <td className="px-3 py-3 text-sm font-bold text-purple-400 text-right whitespace-nowrap">
                             {formatCurrency(lifecycleData.summary.totalOrderedValue)}
+                          </td>
+                          <td className="px-3 py-3 text-sm font-bold text-amber-400 text-right whitespace-nowrap">
+                            {formatCurrency(lifecycleData.summary.totalBoqValue - lifecycleData.summary.totalOrderedValue)}
                           </td>
                           <td className="px-3 py-3 text-sm font-bold text-green-400 text-right whitespace-nowrap">
                             {formatCurrency(lifecycleData.summary.totalReceivedValue)}
