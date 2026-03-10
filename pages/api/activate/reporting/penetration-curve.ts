@@ -65,14 +65,14 @@ async function handler(
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Missing or invalid parameters');
     }
 
-    const dateFromStr = Array.isArray(dateFrom) ? dateFrom[0] : dateFrom;
-    const dateToStr = Array.isArray(dateTo) ? dateTo[0] : dateTo;
-    const groupByMode = (Array.isArray(groupBy) ? groupBy[0] : groupBy) as PenetrationGroupBy;
-    const granularityMode = (Array.isArray(granularity) ? granularity[0] : granularity) as PenetrationGranularity;
+    const dateFromStr = String(Array.isArray(dateFrom) ? dateFrom[0] : dateFrom) as string;
+    const dateToStr = String(Array.isArray(dateTo) ? dateTo[0] : dateTo) as string;
+    const groupByMode = String(Array.isArray(groupBy) ? groupBy[0] : groupBy) as PenetrationGroupBy;
+    const granularityMode = String(Array.isArray(granularity) ? granularity[0] : granularity) as PenetrationGranularity;
 
     // Validate drill-down requirements
-    const projectFilter = project ? (Array.isArray(project) ? project[0] : project) : null;
-    const zoneFilter = zone ? parseInt(Array.isArray(zone) ? zone[0] : zone, 10) : null;
+    const projectFilter = project ? String(Array.isArray(project) ? project[0] : project) : null;
+    const zoneFilter = zone ? parseInt(String(Array.isArray(zone) ? zone[0] : zone), 10) : null;
 
     if ((groupByMode === 'zone' || groupByMode === 'pon') && !projectFilter) {
       return apiResponse.error(
@@ -264,8 +264,8 @@ async function handler(
 
       // If no data, create empty date range
       if (allDates.size === 0) {
-        const start = new Date(dateFromStr);
-        const end = new Date(dateToStr);
+        const start = new Date(dateFromStr!);
+        const end = new Date(dateToStr!);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           allDates.add(d.toISOString().split('T')[0]);
         }

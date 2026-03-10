@@ -46,6 +46,12 @@ interface ChartPoint {
   [key: string]: unknown;
 }
 
+interface CustomTooltipPayload {
+  name: string;
+  value: number;
+  color: string;
+}
+
 export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurveReportProps) {
   // State
   const [data, setData] = useState<PenetrationCurveResponse | null>(null);
@@ -151,7 +157,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   const chartData = getChartData();
 
   // Custom tooltip
-  const CustomTooltip = (props: TooltipProps<number, string>) => {
+  const CustomTooltip = (props: TooltipProps<number, string> & { payload?: CustomTooltipPayload[]; label?: string }) => {
     const { active, payload, label } = props;
     if (!active || !payload || !data) return null;
 
@@ -269,7 +275,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
             <XAxis
               dataKey="date"
               stroke="var(--muted-foreground)"
-              tickFormatter={(date) => {
+              tickFormatter={(date: string) => {
                 const d = new Date(date);
                 return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
               }}
@@ -277,7 +283,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
             <YAxis
               stroke="var(--muted-foreground)"
               domain={[0, 100]}
-              tickFormatter={(val) => `${val}%`}
+              tickFormatter={(val: number) => `${val}%`}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend 
