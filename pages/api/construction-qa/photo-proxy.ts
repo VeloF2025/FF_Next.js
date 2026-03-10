@@ -22,11 +22,7 @@ const STORAGE_ROOT = process.env.QA_PHOTO_STORAGE || '/home/velo/storage/qa-phot
 // SharePoint Graph API config (credentials from .env)
 const SP_TENANT_ID = process.env.SP_TENANT_ID || 'f22e6344-a35d-43b0-ad8c-a247f513c1ee';
 const SP_CLIENT_ID = process.env.SP_CLIENT_ID || '075bd672-bffa-45ba-9fd0-724535e612db';
-const SP_CLIENT_SECRET = process.env.SP_CLIENT_SECRET;
-
-if (!SP_CLIENT_SECRET) {
-  throw new Error('SP_CLIENT_SECRET environment variable not set');
-}
+const SP_CLIENT_SECRET = process.env.SP_CLIENT_SECRET || '';
 
 // Token cache (tokens last ~3600s, cache for 3000s)
 let spTokenCache: { token: string; expiresAt: number } | null = null;
@@ -199,6 +195,11 @@ async function proxyLocalPhoto(storageKey: string, res: NextApiResponse): Promis
  * storage_key format: "sharepoint:{driveId}:{itemId}"
  */
 async function proxySharePointPhoto(storageKey: string, res: NextApiResponse): Promise<void> {
+  if (!SP_CLIENT_SECRET) {
+    res.status(503).json({ error: 'SharePoint credentials not configured' });
+    return;
+  }
+
   // Parse key: "sharepoint:{driveId}:{itemId}"
   const parts = storageKey.split(':');
   if (parts.length < 3 || parts[0] !== 'sharepoint') {
