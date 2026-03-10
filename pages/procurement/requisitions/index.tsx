@@ -221,7 +221,7 @@ export default function RequisitionsPage() {
                       Urgency
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
-                      Est. Total
+                      Est. Total (incl.)
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide">
                       Status
@@ -264,7 +264,7 @@ export default function RequisitionsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-[var(--ff-text-primary)]">
-                          {formatCurrency(req.estimatedTotal)}
+                          {formatCurrency(Math.round((req.estimatedTotal || 0) * 1.15 * 100) / 100)}
                         </td>
                         <td className="px-4 py-3">
                           <span

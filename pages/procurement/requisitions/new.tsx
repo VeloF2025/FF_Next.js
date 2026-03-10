@@ -401,7 +401,7 @@ export default function NewRequisitionPage() {
                       UOM *
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-32">
-                      Unit Price
+                      Unit Price (excl.)
                     </th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-32">
                       Line Total
@@ -494,13 +494,23 @@ export default function NewRequisitionPage() {
           <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6 mb-6">
             <h2 className="text-lg font-medium text-[var(--ff-text-primary)] mb-4">Summary</h2>
 
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
               <div className="text-[var(--ff-text-secondary)]">
                 <span className="font-medium">{items.filter((i) => i.itemDescription.trim()).length}</span> item(s)
               </div>
-              <div className="text-right">
-                <p className="text-sm text-[var(--ff-text-tertiary)]">Estimated Total</p>
-                <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">{formatCurrency(estimatedTotal)}</p>
+              <div className="text-right space-y-1">
+                <div className="flex justify-between gap-8">
+                  <span className="text-sm text-[var(--ff-text-tertiary)]">Subtotal (excl. VAT)</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">{formatCurrency(estimatedTotal)}</span>
+                </div>
+                <div className="flex justify-between gap-8">
+                  <span className="text-sm text-[var(--ff-text-tertiary)]">VAT (15%)</span>
+                  <span className="text-sm text-[var(--ff-text-secondary)]">{formatCurrency(Math.round(estimatedTotal * 0.15 * 100) / 100)}</span>
+                </div>
+                <div className="flex justify-between gap-8 border-t border-[var(--ff-border-light)] pt-1">
+                  <span className="text-sm text-[var(--ff-text-tertiary)] font-medium">Total (incl. VAT)</span>
+                  <span className="text-2xl font-semibold text-[var(--ff-text-primary)]">{formatCurrency(Math.round((estimatedTotal * 1.15) * 100) / 100)}</span>
+                </div>
               </div>
             </div>
           </div>

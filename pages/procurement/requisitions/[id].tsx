@@ -587,9 +587,21 @@ export default function RequisitionDetailPage() {
                         <span className="text-[var(--ff-text-primary)]">{requisition.itemCount}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[var(--ff-text-secondary)]">Estimated Total</span>
-                        <span className="text-[var(--ff-text-primary)] font-semibold">
+                        <span className="text-[var(--ff-text-secondary)]">Subtotal (excl. VAT)</span>
+                        <span className="text-[var(--ff-text-primary)]">
                           {formatCurrency(requisition.estimatedTotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[var(--ff-text-secondary)]">VAT (15%)</span>
+                        <span className="text-[var(--ff-text-primary)]">
+                          {formatCurrency(Math.round(requisition.estimatedTotal * 0.15 * 100) / 100)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-[var(--ff-border-light)] pt-2">
+                        <span className="text-[var(--ff-text-secondary)] font-medium">Total (incl. VAT)</span>
+                        <span className="text-[var(--ff-text-primary)] font-semibold">
+                          {formatCurrency(Math.round(requisition.estimatedTotal * 1.15 * 100) / 100)}
                         </span>
                       </div>
                     </div>
@@ -644,7 +656,7 @@ export default function RequisitionDetailPage() {
                           UOM
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-32">
-                          Unit Price
+                          Unit Price (excl.)
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-[var(--ff-text-tertiary)] tracking-wide w-32">
                           Line Total
@@ -690,11 +702,29 @@ export default function RequisitionDetailPage() {
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
+                        <td colSpan={5} className="px-4 py-2 text-right text-sm text-[var(--ff-text-secondary)]">
+                          Subtotal ({requisition.itemCount} items)
+                        </td>
+                        <td className="px-4 py-2 text-right text-sm text-[var(--ff-text-secondary)]">
+                          {formatCurrency(requisition.estimatedTotal)}
+                        </td>
+                        <td></td>
+                      </tr>
+                      <tr className="bg-[var(--ff-bg-tertiary)]">
+                        <td colSpan={5} className="px-4 py-1 text-right text-sm text-[var(--ff-text-secondary)]">
+                          VAT (15%)
+                        </td>
+                        <td className="px-4 py-1 text-right text-sm text-[var(--ff-text-secondary)]">
+                          {formatCurrency(Math.round(requisition.estimatedTotal * 0.15 * 100) / 100)}
+                        </td>
+                        <td></td>
+                      </tr>
+                      <tr className="bg-[var(--ff-bg-tertiary)] border-t border-[var(--ff-border-light)]">
                         <td colSpan={5} className="px-4 py-3 text-right font-medium text-[var(--ff-text-primary)]">
-                          Total ({requisition.itemCount} items)
+                          Total (incl. VAT)
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-[var(--ff-text-primary)]">
-                          {formatCurrency(requisition.estimatedTotal)}
+                          {formatCurrency(Math.round(requisition.estimatedTotal * 1.15 * 100) / 100)}
                         </td>
                         <td></td>
                       </tr>

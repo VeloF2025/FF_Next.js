@@ -5,7 +5,7 @@
  */
 
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react';
-import { calcLineTotal, formatCurrency } from './requisitionUtils';
+import { calcLineTotal, calcVat, formatCurrency, VAT_RATE } from './requisitionUtils';
 import { StockItemSearch } from '@/modules/procurement/components/StockItemSearch';
 import { BOQLinePicker } from './BOQLinePicker';
 import type { BOQLineUtilization } from '@/types/procurement/boq-utilization.types';
@@ -108,7 +108,7 @@ export function RequisitionItemsTable({
                 UOM *
               </th>
               <th className="px-3 py-2 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-32">
-                Unit Price (ZAR)
+                Unit Price (excl.)
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-32">
                 Line Total
@@ -276,13 +276,23 @@ export function RequisitionItemsTable({
         </table>
       </div>
 
-      {/* Running estimated total */}
+      {/* Running estimated total with VAT breakdown */}
       <div className="mt-4 flex justify-end border-t border-[var(--ff-border-light)] pt-4">
-        <div className="text-right">
-          <p className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide mb-1">Estimated Total</p>
-          <p className="text-2xl font-semibold text-[var(--ff-text-primary)]">
-            {formatCurrency(estimatedTotal)}
-          </p>
+        <div className="text-right space-y-1">
+          <div className="flex justify-between gap-8">
+            <span className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">Subtotal (excl. VAT)</span>
+            <span className="text-sm text-[var(--ff-text-secondary)]">{formatCurrency(estimatedTotal)}</span>
+          </div>
+          <div className="flex justify-between gap-8">
+            <span className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide">VAT ({VAT_RATE}%)</span>
+            <span className="text-sm text-[var(--ff-text-secondary)]">{formatCurrency(calcVat(estimatedTotal))}</span>
+          </div>
+          <div className="flex justify-between gap-8 border-t border-[var(--ff-border-light)] pt-1">
+            <span className="text-xs text-[var(--ff-text-tertiary)] uppercase tracking-wide font-medium">Total (incl. VAT)</span>
+            <span className="text-2xl font-semibold text-[var(--ff-text-primary)]">
+              {formatCurrency(estimatedTotal + calcVat(estimatedTotal))}
+            </span>
+          </div>
         </div>
       </div>
     </div>
