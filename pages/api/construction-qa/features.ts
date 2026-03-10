@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Parse filters
     const projectId = req.query.projectId as string || '';
-    const discipline = req.query.discipline as string || 'civil';
+    const discipline = req.query.discipline as string || '';
     const zoneNo = req.query.zoneNo as string || '';
     const ponNo = req.query.ponNo as string || '';
     const workflowStatus = req.query.workflowStatus as string || '';
@@ -48,9 +48,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const offset = (page - 1) * pageSize;
 
     // Build WHERE conditions
-    const conditions: string[] = ['r.discipline = $1'];
-    const params: (string | number)[] = [discipline];
-    let paramIdx = 2;
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    let paramIdx = 1;
+
+    if (discipline) {
+      conditions.push(`r.discipline = $${paramIdx}`);
+      params.push(discipline);
+      paramIdx++;
+    }
 
     if (projectId) {
       conditions.push(`r.project_id = $${paramIdx}::uuid`);
@@ -96,7 +102,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIdx++;
     }
 
-    const whereClause = conditions.join(' AND ');
+    const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';
 
     // Fetch features with project name
     const featuresQuery = `
@@ -137,10 +143,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       WHERE ${whereClause}
     `;
 
-    // Stats query (always filtered by discipline, optionally by project)
-    const statsConditions: string[] = ['discipline = $1'];
-    const statsParams: (string | number)[] = [discipline];
-    let statsParamIdx = 2;
+    // Stats query (optionally filtered by discipline and project)
+    const statsConditions: string[] = [];
+    const statsParams: (string | number)[] = [];
+    let statsParamIdx = 1;
+
+    if (discipline) {
+      statsConditions.push(`discipline = $${statsParamIdx}`);
+      statsParams.push(discipline);
+      statsParamIdx++;
+    }
 
     if (projectId) {
       statsConditions.push(`project_id = $${statsParamIdx}::uuid`);
@@ -148,7 +160,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       statsParamIdx++;
     }
 
-    const statsWhere = statsConditions.join(' AND ');
+    const statsWhere = statsConditions.length > 0 ? statsConditions.join(' AND ') : '1=1';
     const statsQuery = `
       SELECT
         COUNT(*) AS total,

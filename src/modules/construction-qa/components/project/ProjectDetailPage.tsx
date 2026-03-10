@@ -304,6 +304,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
           highlightId={highlightId}
           dateFrom={dateFrom}
           dateTo={dateTo}
+          parentDiscipline={discipline}
         />
       )}
     </div>
