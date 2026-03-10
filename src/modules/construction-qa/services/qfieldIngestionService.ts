@@ -302,13 +302,15 @@ async function upsertReview(
   `;
 
   if (existing.length > 0) {
-    // Update photo count
+    // Update photo count from actual photo records (not additive — prevents drift)
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const existingRow = existing[0]!;
-    const totalPhotos = Number(existingRow.photo_count) + newPhotoCount;
     await sql`
       UPDATE construction_qa_reviews
-      SET photo_count = ${totalPhotos},
+      SET photo_count = (
+            SELECT COUNT(*)::int FROM construction_qa_photos
+            WHERE review_id = ${existingRow.id}::uuid
+          ),
           last_photo_at = NOW(),
           updated_at = NOW()
       WHERE id = ${existingRow.id}::uuid

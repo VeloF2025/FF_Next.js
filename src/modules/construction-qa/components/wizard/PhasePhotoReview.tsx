@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult, type DragStart } from '@hello-pangea/dnd';
 import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical, X as XIcon } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
@@ -40,7 +40,6 @@ interface Props {
 }
 
 export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onStepChange, onPhotoStepChange }: Props) {
-  const [expandedStep, setExpandedStep] = useState<number | null>(1);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -55,6 +54,20 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
       unassigned.push(photo);
     }
   }
+
+  // Auto-expand the first step that has photos (fallback to step 1)
+  const [expandedStep, setExpandedStep] = useState<number | null>(1);
+  const hasAutoExpanded = useRef(false);
+  useEffect(() => {
+    if (!hasAutoExpanded.current && photos.length > 0) {
+      hasAutoExpanded.current = true;
+      const firstWithPhotos = checklist.find(s => {
+        const count = photos.filter(p => p.checklist_step === s.step).length;
+        return count > 0;
+      })?.step ?? 1;
+      setExpandedStep(firstWithPhotos);
+    }
+  }, [photos, checklist]);
 
   // Flat list of all photos for lightbox navigation (step photos first, then unassigned)
   const allPhotos = useMemo(() => {
