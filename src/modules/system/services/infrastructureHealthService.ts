@@ -3,7 +3,7 @@
  * Comprehensive health checking for all FibreFlow infrastructure
  */
 
-import { neon } from '@neondatabase/serverless';
+import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type {
   ServiceStatus,

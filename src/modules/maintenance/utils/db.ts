@@ -15,7 +15,7 @@
  * parameterized queries to tagged template literals.
  */
 
-import { neon, NeonQueryFunction } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:db');
