@@ -2,6 +2,7 @@
  * API: Pipeline Project Documents
  * GET /api/pipeline/projects/[id]/documents - Get all documents for a project
  * POST /api/pipeline/projects/[id]/documents - Upload document to project
+ * PATCH /api/pipeline/projects/[id]/documents?docId=xxx - Update document (e.g. toggle is_required)
  * DELETE /api/pipeline/projects/[id]/documents?docId=xxx - Delete document
  */
 
@@ -25,6 +26,8 @@ async function handler(
       return handleGet(req, res, projectId);
     case 'POST':
       return handlePost(req, res, projectId);
+    case 'PATCH':
+      return handlePatch(req, res, projectId, docId as string);
     case 'DELETE':
       return handleDelete(req, res, projectId, docId as string);
     default:
@@ -63,6 +66,7 @@ async function handleGet(
         d.uploaded_by,
         d.created_at,
         d.smartsheet_attachment_id,
+        d.is_required,
         a.approval_type_id,
         at.name as approval_type_name,
         at.code as approval_type_code
@@ -74,12 +78,15 @@ async function handleGet(
       ORDER BY d.created_at DESC
     `;
 
-    // Group by approval for easier display
+    // Group documents for display
     const byApproval: Record<string, typeof documents> = {};
     const projectLevel: typeof documents = [];
+    const requiredDocs: typeof documents = [];
 
     for (const doc of documents) {
-      if (doc.approval_id) {
+      if (doc.is_required) {
+        requiredDocs.push(doc);
+      } else if (doc.approval_id) {
         const key = doc.approval_type_name || 'Other';
         if (!byApproval[key]) byApproval[key] = [];
         byApproval[key].push(doc);
@@ -92,6 +99,7 @@ async function handleGet(
       documents,
       byApproval,
       projectLevel,
+      requiredDocs,
       total: documents.length,
     });
   } catch (error) {
@@ -121,6 +129,7 @@ async function handlePost(
       issuing_authority,
       uploaded_by,
       approval_id,
+      is_required = false,
     } = req.body;
 
     if (!document_name || !file_name) {
@@ -145,6 +154,7 @@ async function handlePost(
         reference_number,
         issuing_authority,
         uploaded_by,
+        is_required,
         created_at
       ) VALUES (
         ${projectId},
@@ -163,12 +173,49 @@ async function handlePost(
         ${reference_number || null},
         ${issuing_authority || null},
         ${uploaded_by || null},
+        ${is_required},
         NOW()
       )
       RETURNING id
     `;
 
     return apiResponse.success(res, { id: result[0].id }, 201);
+  } catch (error) {
+    return apiResponse.internalError(res, error);
+  }
+}
+
+async function handlePatch(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  projectId: string,
+  docId: string
+) {
+  if (!docId) {
+    return apiResponse.badRequest(res, 'docId query parameter is required');
+  }
+
+  try {
+    const { is_required } = req.body;
+
+    if (typeof is_required !== 'boolean') {
+      return apiResponse.badRequest(res, 'is_required (boolean) is required');
+    }
+
+    const result = await sql`
+      UPDATE pipeline_approval_documents
+      SET is_required = ${is_required}, updated_at = NOW()
+      WHERE id = ${docId}
+        AND pipeline_project_id = ${projectId}
+        AND is_active = true
+      RETURNING id, is_required
+    `;
+
+    if (result.length === 0) {
+      return apiResponse.notFound(res, 'Document', docId);
+    }
+
+    return apiResponse.success(res, result[0]);
   } catch (error) {
     return apiResponse.internalError(res, error);
   }
