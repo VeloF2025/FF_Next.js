@@ -3,24 +3,24 @@
  * POST — create invoice with line items
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/neon';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = any;
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
 
   const { clientId, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, taxRate, notes, items } = req.body;
   if (!clientId) return apiResponse.badRequest(res, 'clientId is required');
   if (!items || !Array.isArray(items) || items.length === 0) return apiResponse.badRequest(res, 'items required');
 
-  const userId = (req as unknown as { user?: { id: string } }).user?.id || 'system';
+  const userId = req.user.id;
 
   // Calculate totals
   const rate = taxRate ?? 15;

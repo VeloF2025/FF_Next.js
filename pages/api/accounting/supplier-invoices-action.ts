@@ -4,10 +4,10 @@
  *   action: approve | cancel | match
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import {
   approveSupplierInvoice,
@@ -15,14 +15,14 @@ import {
   performThreeWayMatch,
 } from '@/modules/accounting/services/supplierInvoiceService';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
 
   try {
-    const { action, invoiceId, userId: bodyUserId } = req.body;
-    const userId = bodyUserId || (req as unknown as { user?: { id: string } }).user?.id;
+    const { action, invoiceId } = req.body;
+    const userId = req.user.id;
 
     if (!action || !invoiceId) {
       return apiResponse.badRequest(res, 'action and invoiceId are required');
@@ -30,7 +30,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     switch (action) {
       case 'approve': {
-        if (!userId) return apiResponse.badRequest(res, 'userId is required for approve');
         const invoice = await approveSupplierInvoice(invoiceId, userId);
         return apiResponse.success(res, invoice);
       }

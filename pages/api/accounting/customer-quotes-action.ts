@@ -3,19 +3,19 @@
  * POST — perform actions on a quote (send, accept, decline, convert)
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { updateQuoteStatus, convertToInvoice } from '@/modules/accounting/services/quoteService';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
 
   const { id, action } = req.body;
   if (!id || !action) return apiResponse.badRequest(res, 'id and action are required');
 
-  const userId = (req as unknown as { user?: { id: string } }).user?.id;
+  const userId = req.user.id;
 
   switch (action) {
     case 'send': {
