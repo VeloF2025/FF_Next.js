@@ -60,6 +60,8 @@ export default function WeeklyActivationsPage() {
 
   const allTimeTotal = data?.weeks.reduce((sum: number, w: WeekRow) => sum + w.total, 0) ?? 0;
   const allTimeRevenue = allTimeTotal * REVENUE_PER_ACTIVATION;
+  const currentWeek = data?.weeks[0] ?? null;
+  const currentWeekRevenue = (currentWeek?.total ?? 0) * REVENUE_PER_ACTIVATION;
 
   return (
     <AppLayout>
@@ -107,11 +109,53 @@ export default function WeeklyActivationsPage() {
         )}
 
         {/* Summary bar */}
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Current week WTD */}
+          <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-emerald-500/40 relative overflow-hidden">
+            <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">WTD</div>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-emerald-500/20">
                 <Zap className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">This Week</p>
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                  {loading ? (
+                    <span className="inline-block w-16 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
+                  ) : (
+                    (currentWeek?.total ?? 0).toLocaleString()
+                  )}
+                </p>
+                {!loading && currentWeek && (
+                  <p className="text-xs text-[var(--ff-text-tertiary)] mt-0.5">{currentWeek.week_label}</p>
+                )}
+              </div>
+            </div>
+          </div>
+          {/* Current week revenue WTD */}
+          <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-blue-500/40 relative overflow-hidden">
+            <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">WTD</div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-[var(--ff-text-secondary)]">This Week Revenue</p>
+                <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
+                  {loading ? (
+                    <span className="inline-block w-28 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
+                  ) : (
+                    formatRevenue(currentWeekRevenue)
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* All-time activations */}
+          <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/10">
+                <Zap className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
               </div>
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">All-time Activations</p>
@@ -125,13 +169,14 @@ export default function WeeklyActivationsPage() {
               </div>
             </div>
           </div>
+          {/* All-time revenue */}
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <TrendingUp className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
               </div>
               <div>
-                <p className="text-sm text-[var(--ff-text-secondary)]">Estimated Revenue</p>
+                <p className="text-sm text-[var(--ff-text-secondary)]">All-time Revenue</p>
                 <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
                   {loading ? (
                     <span className="inline-block w-36 h-8 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
