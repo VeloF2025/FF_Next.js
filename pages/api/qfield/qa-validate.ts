@@ -343,9 +343,11 @@ async function processOneValidation(
       needsRetake,
     }, 'Validation completed');
 
-    // Record VLM learning metric (fire-and-forget)
+    // Record VLM learning metric (fire-and-forget, but log failures)
     if (vlmResult.confidence >= 0.7) {
-      recordCorrectExtraction('qfield', 'qfield_photo_qa', vlmResult.confidence).catch(() => {});
+      recordCorrectExtraction('qfield', 'qfield_photo_qa', vlmResult.confidence).catch((err) => {
+        log.warn('Failed to record VLM learning metric', { error: err, module: 'qfield-qa-validate', photoId: validation.id });
+      });
     }
 
     return {

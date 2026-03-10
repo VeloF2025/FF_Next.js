@@ -44,9 +44,18 @@ function ProgressBar({ ordered, confirmed, total }: { ordered: number; confirmed
   const ordPct = Math.min((ordered / total) * 100, 100);
   const confPct = Math.min((confirmed / total) * 100, 100);
   const overBudget = ordered > total;
+  const label = `Budget progress: ${Math.round(confPct)}% confirmed, ${Math.round(ordPct)}% ordered${overBudget ? ' (over budget)' : ''}`;
 
   return (
-    <div className="relative h-2 rounded-full overflow-hidden" style={{ background: overBudget ? 'rgba(239,68,68,0.15)' : 'var(--ff-bg-tertiary)' }}>
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={Math.round(confPct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className="relative h-2 rounded-full overflow-hidden"
+      style={{ background: overBudget ? 'rgba(239,68,68,0.15)' : 'var(--ff-bg-tertiary)' }}
+    >
       <div
         className="absolute inset-y-0 left-0 transition-all"
         style={{ width: `${ordPct}%`, background: overBudget ? 'rgba(239,68,68,0.4)' : 'rgba(168,85,247,0.35)' }}
@@ -202,7 +211,7 @@ export function BOQSpendSummary() {
       {/* Project Table */}
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
-          <TrendingUp className="h-4 w-4 text-purple-400" />
+          <TrendingUp className="h-4 w-4 text-purple-400" aria-hidden="true" />
           <h4 className="text-sm font-medium text-[var(--ff-text-primary)]">BOQ Spend by Project</h4>
         </div>
 
@@ -210,12 +219,12 @@ export function BOQSpendSummary() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Project</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Budget</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-purple-400/80 uppercase">Ordered</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-green-400/80 uppercase">Confirmed</th>
-                <th className="px-4 py-2.5 text-right text-xs font-medium text-amber-400/80 uppercase">Remaining</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-44">Progress</th>
+                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Project</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Budget</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-purple-400/80 uppercase">Ordered</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-green-400/80 uppercase">Confirmed</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-amber-400/80 uppercase">Remaining</th>
+                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-44">Progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -232,8 +241,8 @@ export function BOQSpendSummary() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           {isExpanded
-                            ? <ChevronDown className="h-4 w-4 text-purple-400 shrink-0" />
-                            : <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)] shrink-0" />
+                            ? <ChevronDown className="h-4 w-4 text-purple-400 shrink-0" aria-hidden="true" />
+                            : <ChevronRight className="h-4 w-4 text-[var(--ff-text-tertiary)] shrink-0" aria-hidden="true" />
                           }
                           <div>
                             <div className="text-[var(--ff-text-primary)] font-medium">{p.projectName}</div>
@@ -250,7 +259,7 @@ export function BOQSpendSummary() {
                         </span>
                         {overBudget && (
                           <div className="flex items-center justify-end gap-1 text-xs text-red-400 mt-0.5">
-                            <AlertTriangle className="h-3 w-3" />
+                            <AlertTriangle className="h-3 w-3" aria-label="Over budget warning" />
                             {p.orderedPercent}%
                           </div>
                         )}

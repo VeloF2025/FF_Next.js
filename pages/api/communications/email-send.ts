@@ -79,7 +79,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         UPDATE email_outbox
         SET status = 'failed', error_message = ${errorMsg}
         WHERE id = ${outboxId}::uuid
-      `.catch(() => {});
+      `.catch((err) => {
+        log.warn('Failed to update email outbox with failure status', { error: err, outboxId }, 'EmailCompose');
+      });
     }
 
     return apiResponse.internalError(res, error);
