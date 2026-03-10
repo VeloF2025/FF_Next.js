@@ -22,6 +22,7 @@ interface PonFeaturesPanelProps {
   highlightId?: string;
   dateFrom?: string;
   dateTo?: string;
+  parentDiscipline?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,14 +35,14 @@ const STATUS_COLORS: Record<string, string> = {
   unidentified: 'bg-gray-500/20 text-gray-400',
 };
 
-export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFrom, dateTo }: PonFeaturesPanelProps) {
+export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFrom, dateTo, parentDiscipline }: PonFeaturesPanelProps) {
   const router = useRouter();
   const [features, setFeatures] = useState<PonFeatureRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [total, setTotal] = useState(0);
-  const [discipline, setDiscipline] = useState('');
+  const [discipline, setDiscipline] = useState(parentDiscipline || '');
   const [status, setStatus] = useState('');
 
   const fetchFeatures = useCallback(async () => {
@@ -78,6 +79,11 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
   useEffect(() => {
     fetchFeatures();
   }, [fetchFeatures]);
+
+  // Sync with parent discipline filter
+  useEffect(() => {
+    setDiscipline(parentDiscipline || '');
+  }, [parentDiscipline]);
 
   // Reset page when filters change
   useEffect(() => {
