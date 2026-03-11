@@ -57,6 +57,9 @@ interface OltRecordTableProps {
 
   // Render investigation context row
   renderContextRow?: (record: OltRecord) => React.ReactNode;
+
+  // Investigate ticketing selection
+  isSelectable?: (record: OltRecord) => boolean;
 }
 
 export function OltRecordTable({
@@ -82,7 +85,9 @@ export function OltRecordTable({
   getInvestigationContext,
   displacedInfo,
   renderContextRow,
+  isSelectable,
 }: OltRecordTableProps) {
+  const showCheckboxes = mode === 'pending' || (mode === 'investigate' && !!onToggleSelect);
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -106,7 +111,7 @@ export function OltRecordTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-              {mode === 'pending' && (
+              {showCheckboxes && (
                 <th className="w-12 py-3 px-4">
                   <button
                     onClick={onToggleSelectAll}
@@ -136,9 +141,9 @@ export function OltRecordTable({
                     selectedIds?.has(record.id) ? 'bg-[var(--ff-accent)]/10' : ''
                   }`}
                 >
-                  {mode === 'pending' && (
+                  {showCheckboxes && (
                     <td className="w-12 py-3 px-4">
-                      {record.olt_serial ? (
+                      {(mode === 'pending' ? record.olt_serial : isSelectable?.(record)) ? (
                         <button
                           onClick={() => onToggleSelect?.(record.id)}
                           className="text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)]"

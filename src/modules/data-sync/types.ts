@@ -199,6 +199,7 @@ export interface OltRecord {
   import_filename?: string;
   import_date?: string;
   project?: string;
+  maintenance_ticket_id?: string | null;
 }
 
 export interface InvestigationContext {

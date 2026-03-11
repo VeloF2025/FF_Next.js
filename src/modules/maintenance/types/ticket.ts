@@ -51,6 +51,7 @@ export enum TicketSource {
   HSE_REPORT = 'hse_report', // From Health & Safety module
   WA_MAINTENANCE = 'wa_maintenance', // From WhatsApp maintenance tracking group
   PP_DATA = 'pp_data', // From PP Data investigation
+  OLT_MISMATCH = 'olt_mismatch', // From OLT report serial mismatch
 }
 
 /**
@@ -67,6 +68,7 @@ export enum TicketType {
   HSE_NEAR_MISS = 'hse_near_miss', // Near miss for tracking and prevention
   // Investigation types
   SERIAL_MISMATCH = 'serial_mismatch', // Serial number mismatch investigation
+  OLT_INVESTIGATION = 'olt_investigation', // OLT serial mismatch investigation
   // Pre-provision
   PRE_PROVISION = 'pre_provision', // PP Data ONT investigation
 }

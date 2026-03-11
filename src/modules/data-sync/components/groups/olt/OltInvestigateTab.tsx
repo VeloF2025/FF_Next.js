@@ -1,5 +1,5 @@
 /**
- * OltInvestigateTab — records needing investigation with cross-DR swap panel
+ * OltInvestigateTab — records needing investigation with cross-DR swap panel + bulk ticketing
  */
 
 'use client';
@@ -17,11 +17,13 @@ import {
   XCircle,
   CheckCircle,
   ArrowLeftRight,
+  Ticket,
 } from 'lucide-react';
 import type { OltRecord, OltStats, InvestigationContext, SwapLookupResult } from '../../../types';
 import { OltRecordTable } from './OltRecordTable';
 import { OltResolveModal } from './OltResolveModal';
 import { OltEscalateModal } from './OltEscalateModal';
+import { CreateOltTicketsModal } from './CreateOltTicketsModal';
 
 interface OltInvestigateTabProps {
   records: OltRecord[];
@@ -58,6 +60,12 @@ export function OltInvestigateTab({
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [showEscalateModal, setShowEscalateModal] = useState<string | null>(null);
 
+  // Ticketing state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [creatingTickets, setCreatingTickets] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
+
   // Cross-DR swap state
   const [swapLookups, setSwapLookups] = useState<Record<string, SwapLookupResult>>({});
   const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
@@ -70,6 +78,7 @@ export function OltInvestigateTab({
     } else {
       fetchRecords('needs_investigation');
     }
+    setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [investigateSubFilter]);
 
@@ -82,6 +91,71 @@ export function OltInvestigateTab({
   };
 
   const investigateSubCounts = stats.investigateBreakdown || { cross_dr: 0, not_found: 0, other: 0 };
+
+  // Selection helpers
+  const isSelectable = (record: OltRecord) =>
+    !record.maintenance_ticket_id &&
+    ['needs_investigation', 'not_found', 'empty_serial'].includes(record.fix_status || '');
+
+  const selectableOnPage = records.filter(isSelectable);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === selectableOnPage.length && selectableOnPage.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableOnPage.map(r => r.id)));
+    }
+  };
+
+  const handleSelectAllNotFound = async () => {
+    setSelectingAll(true);
+    try {
+      const res = await fetch('/api/system/olt-report/records?status=needs_investigation&limit=10000&fields=id,fix_status,maintenance_ticket_id');
+      const data = await res.json();
+      const allRecords = (data.data?.records || data.records || []) as OltRecord[];
+      const ticketable = allRecords.filter((r: OltRecord) =>
+        !r.maintenance_ticket_id &&
+        ['needs_investigation', 'not_found', 'empty_serial'].includes(r.fix_status || '')
+      );
+      setSelectedIds(new Set(ticketable.map((r: OltRecord) => r.id)));
+      toast.success(`Selected ${ticketable.length} records for ticketing`);
+    } catch {
+      toast.error('Failed to load all records');
+    } finally {
+      setSelectingAll(false);
+    }
+  };
+
+  const handleCreateTickets = async (params: { ticket_type: string; priority: string; notes: string; assigned_team_id?: string }) => {
+    setCreatingTickets(true);
+    try {
+      const res = await fetch('/api/system/olt-report/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_ids: Array.from(selectedIds), ...params }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to create tickets');
+      const { created, skipped } = result.data;
+      toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
+      setShowTicketModal(false);
+      setSelectedIds(new Set());
+      fetchRecords('needs_investigation', investigateSubFilter !== 'all' ? investigateSubFilter : undefined);
+      fetchStats();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create tickets');
+    } finally {
+      setCreatingTickets(false);
+    }
+  };
 
   // Cross-DR lookup
   const handleSwapLookup = async (record: OltRecord) => {
@@ -188,7 +262,7 @@ export function OltInvestigateTab({
       const isExpanded = expandedContexts.has(record.id);
       return (
         <tr key={`${record.id}-ctx`} className="border-b border-[var(--ff-border-light)]">
-          <td colSpan={5} className="py-1.5 px-4">
+          <td colSpan={7} className="py-1.5 px-4">
             <button
               onClick={() => toggleContext(record.id)}
               className="w-full bg-purple-500/5 border border-purple-500/20 rounded-lg text-xs text-left hover:bg-purple-500/10 transition-colors"
@@ -335,28 +409,54 @@ export function OltInvestigateTab({
   return (
     <>
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-        {/* Sub-filter bar */}
+        {/* Sub-filter bar + ticket actions */}
         {records.length > 0 && (
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ff-border-light)]">
-            <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
-            {([
-              { key: 'all', label: 'All', count: stats.needs_investigation },
-              { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.cross_dr },
-              { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
-              { key: 'other', label: 'Other', count: investigateSubCounts.other },
-            ] as const).map(({ key, label, count }) => (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)]">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
+              {([
+                { key: 'all', label: 'All', count: stats.needs_investigation },
+                { key: 'needs_investigation', label: 'Cross-DR Conflict', count: investigateSubCounts.cross_dr },
+                { key: 'not_found', label: 'Not on 1Map', count: investigateSubCounts.not_found },
+                { key: 'other', label: 'Other', count: investigateSubCounts.other },
+              ] as const).map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => { setInvestigateSubFilter(key); setPage(1); }}
+                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${
+                    investigateSubFilter === key
+                      ? 'bg-[var(--ff-accent)] text-white border-[var(--ff-accent)]'
+                      : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:border-[var(--ff-accent)]'
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
               <button
-                key={key}
-                onClick={() => { setInvestigateSubFilter(key); setPage(1); }}
-                className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-                  investigateSubFilter === key
-                    ? 'bg-[var(--ff-accent)] text-white border-[var(--ff-accent)]'
-                    : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:border-[var(--ff-accent)]'
-                }`}
+                onClick={handleSelectAllNotFound}
+                disabled={selectingAll}
+                className="px-3 py-1.5 bg-amber-600 text-white text-xs rounded hover:bg-amber-700
+                           disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
-                {label} ({count})
+                {selectingAll ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Loading...</>
+                ) : (
+                  <><Ticket className="w-3 h-3" /> Ticket All ({stats.needs_investigation})</>
+                )}
               </button>
-            ))}
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={() => setShowTicketModal(true)}
+                  className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700
+                             flex items-center gap-1.5"
+                >
+                  <Ticket className="w-3 h-3" />
+                  Create {selectedIds.size} Ticket{selectedIds.size !== 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -375,6 +475,10 @@ export function OltInvestigateTab({
           expandedContexts={expandedContexts}
           onToggleContext={toggleContext}
           renderContextRow={renderContextRow}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
+          isSelectable={isSelectable}
         />
       </div>
 
@@ -393,6 +497,14 @@ export function OltInvestigateTab({
           onClose={() => setShowEscalateModal(null)}
           onEscalated={onResolved}
           setError={setError}
+        />
+      )}
+      {showTicketModal && (
+        <CreateOltTicketsModal
+          selectedCount={selectedIds.size}
+          onConfirm={handleCreateTickets}
+          onClose={() => setShowTicketModal(false)}
+          loading={creatingTickets}
         />
       )}
     </>

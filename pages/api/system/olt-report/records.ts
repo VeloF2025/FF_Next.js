@@ -116,6 +116,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.escalated_at,
         r.resolved_at,
         r.created_at,
+        r.maintenance_ticket_id,
         i.filename as import_filename,
         i.imported_at as import_date,
         COALESCE(i.project, p.project_name) as project
