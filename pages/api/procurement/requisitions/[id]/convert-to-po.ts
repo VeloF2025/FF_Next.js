@@ -177,12 +177,14 @@ export default withAuth(withErrorHandler(async (
 
     const newPO = poResult[0]!;
 
-    // Insert PO items
+    // Insert PO items (must include tax_rate + tax_amount — tr_poi_totals trigger
+    // recalculates PO totals from item-level tax_amount)
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!;
       const unitPrice = Number(item.estimated_unit_price) || 0;
       const quantity = Number(item.quantity) || 0;
       const lineTotal = Math.round(unitPrice * quantity * 100) / 100;
+      const itemTaxAmount = Math.round(lineTotal * (taxRate / 100) * 100) / 100;
 
       await sql`
         INSERT INTO purchase_order_items (
@@ -194,6 +196,8 @@ export default withAuth(withErrorHandler(async (
           quantity_ordered,
           uom,
           unit_price,
+          tax_rate,
+          tax_amount,
           total_price,
           requisition_item_id
         ) VALUES (
@@ -205,6 +209,8 @@ export default withAuth(withErrorHandler(async (
           ${quantity},
           ${item.uom || 'EA'},
           ${unitPrice},
+          ${taxRate},
+          ${itemTaxAmount},
           ${lineTotal},
           ${item.id}
         )
