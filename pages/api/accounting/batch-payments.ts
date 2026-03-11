@@ -31,7 +31,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'POST') {
-    const userId = req.user.id;
+    const userId = req.user.id;  // User identity from JWT only
     try {
       const item = await createBatch(req.body, userId);
       return apiResponse.success(res, item);

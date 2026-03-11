@@ -172,8 +172,9 @@ export default function CustomerStatementDetailPage() {
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Link href="/accounting/customer-statements" className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)]">
-                  <ArrowLeft className="h-5 w-5 text-[var(--ff-text-secondary)]" />
+                <Link href="/accounting/customer-statements" className="p-3 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors" title="Back to Customer Statements">
+                  <ArrowLeft className="h-5 w-5 text-[var(--ff-text-secondary)]" aria-hidden="true" />
+                  <span className="sr-only">Back to Customer Statements</span>
                 </Link>
                 <div className="p-2 rounded-lg bg-purple-500/10">
                   <ClipboardList className="h-6 w-6 text-purple-500" />

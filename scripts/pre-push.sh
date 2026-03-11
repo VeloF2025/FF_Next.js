@@ -40,9 +40,14 @@ VIOLATION_FILES=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   # Determine range of commits to check
   if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    # New branch — check all commits
-    RANGE="$local_sha"
-    DIFF_CMD="git show --name-only --format= $RANGE"
+    # New branch — scope to commits unique to this branch only
+    MERGE_BASE=$(git merge-base origin/master HEAD 2>/dev/null)
+    if [ -n "$MERGE_BASE" ]; then
+      RANGE="$MERGE_BASE..$local_sha"
+    else
+      RANGE="$local_sha"
+    fi
+    DIFF_CMD="git diff --name-only $RANGE"
   else
     # Existing branch — check only new commits
     RANGE="$remote_sha..$local_sha"
