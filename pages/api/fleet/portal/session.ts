@@ -9,7 +9,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import {
-import { log } from '@/lib/logger';
   verifyPortalSession,
 } from '@/modules/fleet/portal/portalSessionUtils';
 
