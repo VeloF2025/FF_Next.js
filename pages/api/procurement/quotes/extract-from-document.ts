@@ -234,6 +234,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       try {
         fs.unlinkSync(tempFilePath);
       } catch {
+        log.error('ExtractFromDocumentApi', 'Operation failed', { error });
         // Ignore cleanup errors
       }
     }

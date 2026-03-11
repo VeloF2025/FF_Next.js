@@ -147,7 +147,7 @@ async function handler(
           if (validation.suggestedAction === 'reject') {
             log.warn('FleetVlmApi', `ODO rejected by validation: ${validation.warning}`);
             // Write raw VLM response to debug log for diagnosis without SSH (e.g. digit drop issues)
-            try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch {}
+            try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('FleetVlmApi', 'Failed to write odometer debug log', { error: e }); }
             result.error = validation.warning || 'Reading failed validation';
           } else {
             await recordOdometerReading({
@@ -160,7 +160,7 @@ async function handler(
               discrepancyReason: validation.warning || undefined,
             });
             log.info('FleetVlmApi', `Recorded odometer reading: ${odometerResult.reading} km (validation: ${validation.suggestedAction})`);
-            if (validation.suggestedAction === 'verify') { try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch {} }
+            if (validation.suggestedAction === 'verify') { try { require('fs').appendFileSync('/home/velo/vlm-odometer-debug.log', JSON.stringify({ ts: new Date().toISOString(), vehicleId, reading: odometerResult.reading, rawResponse: odometerResult.rawResponse, warning: validation.warning }) + '\n'); } catch (e) { log.error('FleetVlmApi', 'Failed to write odometer debug log', { error: e }); } }
           }
         }
         break;
@@ -295,6 +295,7 @@ export async function checkVlmHealthEndpoint(
     const isHealthy = await checkFleetVlmHealth();
     return apiResponse.success(res, { healthy: isHealthy });
   } catch (error) {
+    log.error('FleetVlmApi', 'VLM health check failed', { error });
     return apiResponse.internalError(res, error);
   }
 }

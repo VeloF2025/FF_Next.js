@@ -201,6 +201,7 @@ async function handler(
           fs.writeFileSync(failedPath, imageBuffer);
           log.info('Failed extraction photo saved', { path: failedPath });
         } catch (saveErr) {
+          log.error('VerifyPlateApi', 'Operation failed', { error });
           // Ignore save errors
         }
 

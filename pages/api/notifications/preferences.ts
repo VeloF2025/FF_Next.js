@@ -15,6 +15,7 @@ import {
   getRegisteredEventTypes,
 } from '@/modules/notifications/constants';
 import type { MergedPreference } from '@/modules/notifications/types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -67,6 +68,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, merged);
   } catch (error) {
+    log.error('PreferencesApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }
@@ -107,6 +109,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { updated: preferences.length });
   } catch (error) {
+    log.error('PreferencesApi', 'Operation failed', { error });
     return apiResponse.internalError(res, error);
   }
 }

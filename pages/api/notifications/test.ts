@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { notify } from '@/modules/notifications/services';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -40,6 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { sent: true, to: authReq.user.id });
   } catch (error) {
+    log.error('TestApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

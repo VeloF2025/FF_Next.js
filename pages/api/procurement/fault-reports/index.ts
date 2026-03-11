@@ -137,6 +137,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       total: Number(countRows[0]?.total ?? 0),
     });
   } catch (error) {
+    log.error('IndexApi', 'Failed to fetch fault reports', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch fault reports');
   }
 }
@@ -228,6 +229,7 @@ async function handlePost(
 
     return apiResponse.created(res, faultReport!, 'Fault report created successfully');
   } catch (error) {
+    log.error('IndexApi', 'Failed to create fault report', { error });
     return apiResponse.databaseError(res, error, 'Failed to create fault report');
   }
 }

@@ -14,6 +14,7 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { CreateTemplateInput } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { templateId } = req.query;
@@ -53,6 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
+    log.error('TemplateidApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

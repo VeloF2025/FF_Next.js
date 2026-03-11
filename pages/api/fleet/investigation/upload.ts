@@ -365,6 +365,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       vehicleInfo: parseResult.vehicleInfo,
     }, 'GPS investigation completed successfully');
   } catch (error: any) {
+    log.error('UploadApi', 'Operation failed', { error });
     // Handle formidable errors
     if (error.message?.includes('maxFileSize')) {
       return apiResponse.error(res, ErrorCode.PAYLOAD_TOO_LARGE, 'File size exceeds 50MB limit');

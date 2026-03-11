@@ -8,6 +8,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { updateAnomalyStatus } from '@/modules/fleet/services';
 import type { AnomalyStatus } from '@/modules/fleet/types/fuel-analytics.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -36,6 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, anomaly);
   } catch (error) {
+    log.error('IdApi', 'Operation failed', { error });
     if (error instanceof Error && error.message === 'Anomaly not found') {
       return apiResponse.notFound(res, 'Anomaly', id);
     }

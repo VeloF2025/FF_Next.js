@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { getVehicleFuelStats } from '@/modules/fleet/services';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -21,6 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, stats);
   } catch (error) {
+    log.error('VehiclesApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

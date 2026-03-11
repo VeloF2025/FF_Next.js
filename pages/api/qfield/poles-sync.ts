@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: NextApiRequest,
@@ -102,6 +103,7 @@ async function handler(
       res.end();
     });
   } catch (error: any) {
+    log.error('PolesSyncApi', 'Operation failed', { error });
     sendLog('error', `Error: ${error.message}`);
     sendLog('complete', 'Poles sync failed', {
       success: false,

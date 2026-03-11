@@ -12,6 +12,7 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { CreateCheckItemInput } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { itemId } = req.query;
@@ -43,6 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['PUT', 'DELETE']);
     }
   } catch (error) {
+    log.error('ItemidApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

@@ -85,6 +85,7 @@ async function handleGet(res: NextApiResponse, faultId: string) {
 
     return apiResponse.success(res, detail);
   } catch (error) {
+    log.error('FaultidApi', 'Failed to fetch fault report', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch fault report');
   }
 }
@@ -163,6 +164,7 @@ async function handlePut(
 
     return apiResponse.success(res, updated!, 'Fault report updated');
   } catch (error) {
+    log.error('FaultidApi', 'Failed to update fault report', { error });
     return apiResponse.databaseError(res, error, 'Failed to update fault report');
   }
 }

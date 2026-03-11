@@ -105,6 +105,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
       log.info('QFieldProjectAPI', `Updated QField project: ${id}`);
       return res.status(200).json({ success: true, data: updateResult.rows[0] });
     } catch (err) {
+      log.error('IdApi', 'Operation failed', { error });
       await client.query('ROLLBACK');
       throw err;
     } finally {

@@ -9,6 +9,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -158,6 +159,7 @@ export default withAuth(withErrorHandler(async (
       counts: { ...counts, total },
     });
   } catch (error) {
+    log.error('AllApi', 'Failed to fetch approvals', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch approvals');
   }
 }));

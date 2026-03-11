@@ -69,6 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           });
         }
       } catch {
+        log.error('GpkgLayersApi', 'Operation failed', { error });
         // Skip non-JSON lines (mc may emit warnings)
       }
     }

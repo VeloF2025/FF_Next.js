@@ -17,6 +17,7 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { vehicleId, availability, stats, lastReading, limit, offset, status } = req.query;
@@ -71,6 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, records);
   } catch (error) {
+    log.error('VehicleidApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

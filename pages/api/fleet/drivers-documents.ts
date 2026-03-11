@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -132,6 +133,7 @@ async function handler(
       summary,
     });
   } catch (error) {
+    log.error('DriversDocumentsApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

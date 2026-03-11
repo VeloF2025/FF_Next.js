@@ -164,6 +164,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
     try {
       quoteComparison = await poApprovalService.getQuoteComparisonForApproval(id);
     } catch {
+      log.error('IdApi', 'Operation failed', { error });
       // Quote comparison is optional
     }
 
