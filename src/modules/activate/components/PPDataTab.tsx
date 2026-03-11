@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  Search, Map, RefreshCw, Loader2, AlertCircle, XCircle, Download, CheckCircle2, Wrench,
+  Search, RefreshCw, Loader2, AlertCircle, XCircle, Download, CheckCircle2, Wrench,
 } from 'lucide-react';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import toast from 'react-hot-toast';
@@ -168,34 +168,20 @@ export function PPDataTab() {
       if (d.steps.local_scan.resolved > 0) parts.push(`Local: ${d.steps.local_scan.resolved}`);
       if (d.steps.wa_cross_ref.resolved > 0) parts.push(`WA cross-ref: ${d.steps.wa_cross_ref.resolved}`);
       if (d.steps.wa_photo_vlm.resolved > 0) parts.push(`VLM photos: ${d.steps.wa_photo_vlm.resolved}`);
-      toast.success(
-        d.total_resolved > 0
-          ? `Resolved ${d.total_resolved} PPs (${parts.join(', ')})`
-          : 'No new matches found across all sources'
-      );
+      const msg = d.total_resolved > 0
+        ? `Resolved ${d.total_resolved} PPs (${parts.join(', ')})`
+        : 'No new matches found across all sources';
+      toast.success(d.onemap_started ? `${msg} — 1Map search running...` : msg);
       fetchStats();
       fetchRecords();
+      // 1Map lookup runs in background — start polling for its progress
+      if (d.onemap_started) {
+        setTimeout(() => fetchLookupStatus(), 2000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Resolve all failed');
     } finally {
       setIsResolving(false);
-    }
-  };
-
-  const handle1MapLookup = async () => {
-    setError(null);
-    try {
-      const res = await fetch('/api/activate/pp-data-resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: '1map-lookup' }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || '1Map lookup failed');
-      toast.success('1Map per-serial search started');
-      setTimeout(() => fetchLookupStatus(), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '1Map lookup failed');
     }
   };
 
@@ -267,7 +253,6 @@ export function PPDataTab() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const is1MapRunning = lookupStatus?.status === 'running';
 
   return (
     <div className="space-y-6">
@@ -386,26 +371,16 @@ export function PPDataTab() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleResolveAll}
-            disabled={isResolving}
+            disabled={isResolving || lookupStatus?.status === 'running'}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700
                        disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isResolving ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Resolving...</>
+            ) : lookupStatus?.status === 'running' ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> 1Map Searching...</>
             ) : (
               <><Search className="w-4 h-4" /> Resolve All</>
-            )}
-          </button>
-          <button
-            onClick={handle1MapLookup}
-            disabled={is1MapRunning}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700
-                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {is1MapRunning ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Searching...</>
-            ) : (
-              <><Map className="w-4 h-4" /> 1Map Serial Search</>
             )}
           </button>
           {stats && stats.notFound > 0 && (

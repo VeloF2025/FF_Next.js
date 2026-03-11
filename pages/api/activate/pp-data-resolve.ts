@@ -798,15 +798,23 @@ async function handler(
     }
 
     if (action === 'resolve-all') {
-      // Pipeline: local-scan → WA cross-ref → WA photo VLM — each step only processes remaining not_found
+      // Pipeline: local-scan → WA cross-ref → WA photo VLM → 1Map (background)
       const localResult = await runLocalResolution();
       const crossRefResult = await runWACrossReference();
       const vlmResult = await runWAPhotoVLMScan();
+
+      // Fire-and-forget 1Map lookup for remaining unresolved serials (has its own progress tracker)
+      run1MapLookup().catch(err => {
+        logger.error('Background 1Map lookup failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
 
       return res.status(200).json({
         success: true,
         data: {
           total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
+          onemap_started: true,
           steps: {
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
