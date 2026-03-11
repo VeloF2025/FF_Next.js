@@ -71,6 +71,8 @@ export function PPDataTab() {
   const [totalPages, setTotalPages] = useState(1);
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -80,7 +82,7 @@ export function PPDataTab() {
   const [creatingTickets, setCreatingTickets] = useState(false);
 
   // Clear selection when filters or page change
-  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus]);
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -101,6 +103,8 @@ export function PPDataTab() {
       });
       if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
+      if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+      if (filterDateTo) params.set('dateTo', filterDateTo);
 
       const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
@@ -111,7 +115,7 @@ export function PPDataTab() {
     } catch {
       // Non-fatal
     }
-  }, [page, filterProject, filterStatus]);
+  }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo]);
 
   const fetchLookupStatus = useCallback(async () => {
     try {
@@ -461,12 +465,41 @@ export function PPDataTab() {
               <option value="located_local">Found (Local)</option>
               <option value="activated">Activated</option>
             </select>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-[var(--ff-text-tertiary)]">From</label>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
+                className="px-2 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
+                           text-[var(--ff-text-primary)] text-sm"
+              />
+              <label className="text-xs text-[var(--ff-text-tertiary)]">To</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
+                className="px-2 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
+                           text-[var(--ff-text-primary)] text-sm"
+              />
+              {(filterDateFrom || filterDateTo) && (
+                <button
+                  onClick={() => { setFilterDateFrom(''); setFilterDateTo(''); setPage(1); }}
+                  className="p-1 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+                  title="Clear dates"
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <div className="ml-auto">
               <button
                 onClick={() => {
                   const params = new URLSearchParams({ action: 'export' });
                   if (filterProject) params.set('project', filterProject);
                   if (filterStatus) params.set('status', filterStatus);
+                  if (filterDateFrom) params.set('dateFrom', filterDateFrom);
+                  if (filterDateTo) params.set('dateTo', filterDateTo);
                   window.open(`/api/activate/import-pp-data?${params}`, '_blank');
                 }}
                 className="px-3 py-1.5 text-sm rounded border border-[var(--ff-border-light)]

@@ -73,6 +73,8 @@ async function handler(
     const offset = (page - 1) * limit;
     const project = req.query.project as string;
     const status = req.query.status as string;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -85,6 +87,14 @@ async function handler(
     if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
+    }
+    if (dateFrom) {
+      whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      whereClause += ` AND pp.date_registered <= $${paramIndex++}::date`;
+      params.push(dateTo);
     }
 
     const countResult = await pool.query(
@@ -121,6 +131,8 @@ async function handler(
   if (action === 'export') {
     const project = req.query.project as string;
     const status = req.query.status as string;
+    const exportDateFrom = req.query.dateFrom as string;
+    const exportDateTo = req.query.dateTo as string;
 
     let whereClause = '';
     const params: string[] = [];
@@ -133,6 +145,14 @@ async function handler(
     if (status) {
       whereClause += ` AND resolution_status = $${paramIndex++}`;
       params.push(status);
+    }
+    if (exportDateFrom) {
+      whereClause += ` AND date_registered >= $${paramIndex++}::date`;
+      params.push(exportDateFrom);
+    }
+    if (exportDateTo) {
+      whereClause += ` AND date_registered <= $${paramIndex++}::date`;
+      params.push(exportDateTo);
     }
 
     const dataResult = await pool.query(
