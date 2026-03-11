@@ -20,6 +20,7 @@ import {
 import { log } from '@/lib/logger';
 import { formatDisplayDate } from '@/utils/dateFormat';
 import type { WorkflowState } from '../useWorkflowState';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
 
 // 🟢 WORKING: full type coverage
 interface Step6ReceiveProps {
@@ -187,6 +188,20 @@ export const Step6Receive: React.FC<Step6ReceiveProps> = ({ state, onComplete, o
             Record delivery first, then return here to continue.
           </p>
         </div>
+      )}
+
+      {/* Inline document upload — Delivery Note + GRV */}
+      {!loading && grns.length > 0 && state.poId && (
+        <ProcurementDocumentPanel
+          entityType="purchase_order"
+          entityId={state.poId}
+          allowedTypes={[
+            { value: 'delivery_note', label: 'Delivery Note' },
+            { value: 'grv', label: 'GRV (Goods Received Voucher)' },
+            { value: 'image', label: 'Photo / Proof of Delivery' },
+            { value: 'other', label: 'Other' },
+          ]}
+        />
       )}
 
       {/* Action row */}

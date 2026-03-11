@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
 
 // 🟢 WORKING: full type coverage
 interface Step7PaymentRequestProps {
@@ -214,6 +215,19 @@ export const Step7PaymentRequest: React.FC<Step7PaymentRequestProps> = ({ state,
           />
         </FormField>
       </div>
+
+      {/* Inline document upload — Supplier Invoice */}
+      {state.poId && (
+        <ProcurementDocumentPanel
+          entityType="purchase_order"
+          entityId={state.poId}
+          allowedTypes={[
+            { value: 'invoice', label: 'Supplier Invoice' },
+            { value: 'receipt', label: 'Receipt' },
+            { value: 'other', label: 'Other' },
+          ]}
+        />
+      )}
 
       {/* Navigation */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

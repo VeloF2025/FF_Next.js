@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
+import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
 
 // 🟢 WORKING: full type coverage
 interface Step5OrderProps {
@@ -210,6 +211,21 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
             View {docLabel}
           </button>
         </div>
+
+        {/* Inline document upload — Supplier Quote + PO doc */}
+        {docId && (
+          <ProcurementDocumentPanel
+            entityType={isRfq ? 'rfq_response' : 'purchase_order'}
+            entityId={docId}
+            allowedTypes={[
+              { value: 'quote_pdf', label: 'Supplier Quote' },
+              { value: 'purchase_order', label: 'Purchase Order' },
+              { value: 'contract', label: 'Contract' },
+              { value: 'other', label: 'Other' },
+            ]}
+          />
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={() => onComplete({})}
