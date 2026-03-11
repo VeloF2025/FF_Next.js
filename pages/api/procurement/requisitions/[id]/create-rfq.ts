@@ -1,9 +1,19 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { Resend } from 'resend';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Temporary RFQ notification recipients until supplier emails are wired
+const RFQ_NOTIFY_EMAILS = [
+  'lizelle@velocityfibre.co.za',
+  'jacques@velocityfibre.co.za',
+  'hein@velocityfibre.co.za',
+];
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -44,11 +54,13 @@ export default withAuth(withErrorHandler(async (
     `;
 
     if (existingRfq.length > 0) {
-      return apiResponse.error(
-        res,
-        'CONFLICT',
-        `RFQ ${existingRfq[0].rfq_number} already exists for this requisition`
-      );
+      // Return existing RFQ instead of erroring — allows wizard to recover
+      const existing = existingRfq[0];
+      return apiResponse.success(res, {
+        id: existing.id as string,
+        rfqNumber: existing.rfq_number as string,
+        alreadyExists: true,
+      }, 'RFQ already exists for this requisition');
     }
 
     // Get requisition items
@@ -124,7 +136,7 @@ export default withAuth(withErrorHandler(async (
             addedSuppliers.push(result[0]);
           }
         } catch (e) {
-          log.error('CreateRfqApi', 'Operation failed', { error });
+          log.error('CreateRfqApi', 'Failed to add supplier', { error: e });
           // Skip invalid supplier IDs
         }
       }
@@ -136,6 +148,23 @@ export default withAuth(withErrorHandler(async (
       SET status = 'rfq_created', updated_at = NOW()
       WHERE id = ${requisitionId}
     `;
+
+    // Send RFQ email notification
+    const projectName = await getProjectName(requisition.project_id);
+    void sendRfqEmail({
+      rfqNumber,
+      requisitionNumber: requisition.requisition_number as string,
+      projectName,
+      deadline,
+      items: reqItems.map((item: Record<string, unknown>) => ({
+        description: item.description as string,
+        quantity: Number(item.quantity),
+        uom: (item.uom as string) || 'EA',
+        specifications: (item.specifications as string) || '',
+      })),
+    }).catch((err) => {
+      log.error('CreateRfqApi', 'Failed to send RFQ email', { error: err });
+    });
 
     // Log creation
     logCreate('rfq', rfqId, {
@@ -164,3 +193,120 @@ export default withAuth(withErrorHandler(async (
     return apiResponse.databaseError(res, error, 'Failed to create RFQ from requisition');
   }
 }));
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function getProjectName(projectId: string | null): Promise<string> {
+  if (!projectId) return 'Unassigned';
+  const rows = await sql`SELECT project_name FROM projects WHERE id = ${projectId}`;
+  return (rows[0]?.project_name as string) || 'Unassigned';
+}
+
+interface RfqEmailData {
+  rfqNumber: string;
+  requisitionNumber: string;
+  projectName: string;
+  deadline: string;
+  items: { description: string; quantity: number; uom: string; specifications: string }[];
+}
+
+async function sendRfqEmail(data: RfqEmailData): Promise<void> {
+  const deadlineDate = new Date(data.deadline).toLocaleDateString('en-ZA', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+
+  const itemRows = data.items
+    .map(
+      (item, i) =>
+        `<tr>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${i + 1}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(item.description)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(item.uom)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${escapeHtml(item.specifications)}</td>
+        </tr>`
+    )
+    .join('');
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;color:#1f2937;">
+      <div style="background:#4f46e5;padding:24px 32px;border-radius:8px 8px 0 0;">
+        <h1 style="color:#fff;margin:0;font-size:22px;">Request for Quotation</h1>
+        <p style="color:#c7d2fe;margin:6px 0 0;font-size:14px;">FibreFlow Procurement</p>
+      </div>
+      <div style="background:#fff;padding:24px 32px;border:1px solid #e5e7eb;border-top:none;">
+        <p style="font-size:15px;line-height:1.6;">
+          You are invited to submit a quotation for the following items:
+        </p>
+        <table style="width:100%;margin:16px 0;font-size:14px;">
+          <tr style="background:#f3f4f6;">
+            <td style="padding:8px 12px;font-weight:bold;">RFQ Number</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.rfqNumber)}</td>
+            <td style="padding:8px 12px;font-weight:bold;">Requisition</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.requisitionNumber)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 12px;font-weight:bold;">Project</td>
+            <td style="padding:8px 12px;">${escapeHtml(data.projectName)}</td>
+            <td style="padding:8px 12px;font-weight:bold;">Response Due</td>
+            <td style="padding:8px 12px;color:#dc2626;font-weight:600;">${deadlineDate}</td>
+          </tr>
+        </table>
+
+        <h2 style="font-size:16px;margin:24px 0 12px;color:#374151;">Items to Quote</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f9fafb;">
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">#</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Description</th>
+              <th style="padding:8px 12px;text-align:center;border-bottom:2px solid #d1d5db;">Qty</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">UOM</th>
+              <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d1d5db;">Specifications</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+
+        <div style="margin-top:24px;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;">
+          <p style="margin:0;font-size:14px;color:#1e40af;">
+            Please submit your quotation by <strong>${deadlineDate}</strong>.
+            Reply to this email or contact the procurement team with any questions.
+          </p>
+        </div>
+      </div>
+      <div style="padding:16px 32px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+        <p style="margin:0;font-size:12px;color:#6b7280;">
+          This is an automated notification from FibreFlow Procurement.
+          Prices are intentionally excluded — please provide your best quote.
+        </p>
+      </div>
+    </div>
+  `;
+
+  const result = await resend.emails.send({
+    from: 'FibreFlow Procurement <procurement@fibreflow.app>',
+    to: RFQ_NOTIFY_EMAILS,
+    subject: `RFQ ${data.rfqNumber} — ${data.projectName} — Please Quote`,
+    html,
+  });
+
+  if (result.error) {
+    log.error('CreateRfqApi', 'Resend email failed', { error: result.error });
+  } else {
+    log.info('CreateRfqApi', 'RFQ email sent', {
+      rfqNumber: data.rfqNumber,
+      emailId: result.data?.id,
+      recipients: RFQ_NOTIFY_EMAILS,
+    });
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
