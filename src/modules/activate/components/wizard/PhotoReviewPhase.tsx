@@ -17,6 +17,9 @@ import type {
   VlmCategorizationResult,
   VlmCategorizationStatus,
   Photo,
+  AutoApprovalResult,
+  AutoApprovalSummary,
+  AutoApprovalTier,
 } from '../../types/unified.types';
 import { STEP_LABELS, PHOTO_REJECTION_REASONS } from '../../utils/stepMapper';
 import { WizardProgressOverlay, type CategorizationPhase } from './WizardProgressOverlay';
@@ -35,6 +38,8 @@ interface CategorizationState {
   results: VlmCategorizationResult[];
   categorizedAt: string | null;
   approvedAt: string | null;
+  autoApprovalTiers: Map<string, AutoApprovalResult>;
+  autoApprovalSummary: AutoApprovalSummary | null;
 }
 
 export function PhotoReviewPhase({
@@ -49,6 +54,8 @@ export function PhotoReviewPhase({
     results: [],
     categorizedAt: null,
     approvedAt: null,
+    autoApprovalTiers: new Map(),
+    autoApprovalSummary: null,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -65,6 +72,39 @@ export function PhotoReviewPhase({
 
   // Categorization progress phase
   const [categorizationPhase, setCategorizationPhase] = useState<CategorizationPhase | null>(null);
+
+  // Helper: parse auto-approval tiers from API response into a Map
+  const parseTiers = useCallback((tiersArray?: AutoApprovalResult[]): Map<string, AutoApprovalResult> => {
+    const map = new Map<string, AutoApprovalResult>();
+    if (tiersArray) {
+      for (const t of tiersArray) {
+        map.set(t.photo_filename, t);
+      }
+    }
+    return map;
+  }, []);
+
+  // Helper: get tier for a photo (default to review_recommended if unknown)
+  const getTier = useCallback((filename: string): AutoApprovalTier => {
+    return state.autoApprovalTiers.get(filename)?.tier || 'review_recommended';
+  }, [state.autoApprovalTiers]);
+
+  // Helper: pre-approve auto_approved tier photos in the approvals map
+  const initAutoApprovals = useCallback((
+    results: VlmCategorizationResult[],
+    tiersMap: Map<string, AutoApprovalResult>,
+    existingApprovals: Map<string, { approved: boolean; overrideStep?: number }>
+  ) => {
+    const newApprovals = new Map(existingApprovals);
+    for (const result of results) {
+      const tier = tiersMap.get(result.photo_filename)?.tier;
+      // Auto-approve high confidence photos that don't already have a human decision
+      if (tier === 'auto_approved' && !newApprovals.has(result.photo_filename) && result.human_approved === null) {
+        newApprovals.set(result.photo_filename, { approved: true });
+      }
+    }
+    return newApprovals;
+  }, []);
 
   // Build flat lightbox photo list from categorization results
   const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
@@ -95,14 +135,18 @@ export function PhotoReviewPhase({
       const data = await response.json();
 
       if (data.success) {
+        const tiersMap = parseTiers(data.data.autoApprovalTiers);
+
         setState({
           status: data.data.status || 'pending',
           results: data.data.categorizations || [],
           categorizedAt: data.data.categorizedAt,
           approvedAt: data.data.approvedAt,
+          autoApprovalTiers: tiersMap,
+          autoApprovalSummary: data.data.autoApprovalSummary || null,
         });
 
-        // Initialize approvals from existing results
+        // Initialize approvals from existing results + auto-approve high-confidence
         if (data.data.categorizations) {
           const existingApprovals = new Map<string, { approved: boolean; overrideStep?: number }>();
           data.data.categorizations.forEach((result: VlmCategorizationResult) => {
@@ -113,7 +157,8 @@ export function PhotoReviewPhase({
               });
             }
           });
-          setApprovals(existingApprovals);
+          const withAutoApprovals = initAutoApprovals(data.data.categorizations, tiersMap, existingApprovals);
+          setApprovals(withAutoApprovals);
         }
       } else {
         setError(data.message || 'Failed to load categorization state');
@@ -149,13 +194,19 @@ export function PhotoReviewPhase({
         setCategorizationPhase('complete');
         await new Promise(resolve => setTimeout(resolve, 600));
 
+        const tiersMap = parseTiers(data.data.autoApprovalTiers);
+        const results = data.data.categorizations || [];
+
         setState({
           status: 'categorized',
-          results: data.data.categorizations || [],
+          results,
           categorizedAt: new Date().toISOString(),
           approvedAt: null,
+          autoApprovalTiers: tiersMap,
+          autoApprovalSummary: data.data.autoApprovalSummary || null,
         });
-        setApprovals(new Map());
+        // Pre-approve auto_approved tier photos
+        setApprovals(initAutoApprovals(results, tiersMap, new Map()));
         log.info('PhotoReviewPhase', `Categorization complete for ${dropNumber}`);
       } else {
         setError(data.error?.message || data.message || 'Categorization failed');
@@ -736,22 +787,24 @@ export function PhotoReviewPhase({
         />
       )}
 
-      {/* Header */}
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
+      {/* Header with auto-approval summary */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">
-              Review AI Categorizations
+            <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+              AI Categorization Review
             </h4>
-            <p className="text-yellow-600 dark:text-yellow-400 text-sm">
-              Review each photo&apos;s category. Approve or override as needed.
+            <p className="text-blue-600 dark:text-blue-400 text-sm">
+              {state.autoApprovalSummary
+                ? `${state.autoApprovalSummary.autoApproved} auto-approved, ${state.autoApprovalSummary.reviewRecommended + state.autoApprovalSummary.humanRequired} need review`
+                : 'Review each photo\u2019s category. Approve or override as needed.'}
             </p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={runCategorization}
               disabled={isProcessing}
-              className="px-3 py-1 text-sm border border-yellow-600 text-yellow-600 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/30 disabled:opacity-50"
+              className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50"
             >
               Re-run
             </button>
@@ -764,6 +817,32 @@ export function PhotoReviewPhase({
             </button>
           </div>
         </div>
+
+        {/* Tier breakdown badges */}
+        {state.autoApprovalSummary && (
+          <div className="flex gap-2 flex-wrap">
+            {state.autoApprovalSummary.autoApproved > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                {state.autoApprovalSummary.autoApproved} auto-approved
+              </span>
+            )}
+            {state.autoApprovalSummary.reviewRecommended > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300">
+                {state.autoApprovalSummary.reviewRecommended} review recommended
+              </span>
+            )}
+            {state.autoApprovalSummary.humanRequired > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                {state.autoApprovalSummary.humanRequired} needs attention
+              </span>
+            )}
+            {state.autoApprovalSummary.overallAccuracy !== null && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                AI accuracy: {Math.round(state.autoApprovalSummary.overallAccuracy * 100)}%
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -772,16 +851,30 @@ export function PhotoReviewPhase({
         </div>
       )}
 
-      {/* Photo grid - sorted by step number */}
+      {/* Photo grid - sorted by tier (human_required first, then review, then auto) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2">
         {[...state.results]
-          .sort((a, b) => a.vlm_predicted_step - b.vlm_predicted_step)
+          .sort((a, b) => {
+            const tierOrder: Record<AutoApprovalTier, number> = { human_required: 0, review_recommended: 1, auto_approved: 2 };
+            const tierA = tierOrder[getTier(a.photo_filename)] ?? 1;
+            const tierB = tierOrder[getTier(b.photo_filename)] ?? 1;
+            if (tierA !== tierB) return tierA - tierB;
+            return a.vlm_predicted_step - b.vlm_predicted_step;
+          })
           .map((result) => {
           const approval = approvals.get(result.photo_filename);
           const isApproved = approval?.approved !== false;
           const overrideStep = approval?.overrideStep;
           const rejectionReason = approval?.rejectionReason;
           const photoUrl = `/api/activate/photo/${dropNumber}/${result.photo_filename}`;
+          const tier = getTier(result.photo_filename);
+
+          // Tier-based border/background styles
+          const tierStyles: Record<AutoApprovalTier, string> = {
+            auto_approved: 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10',
+            review_recommended: 'border-yellow-300 dark:border-yellow-700 bg-yellow-50/50 dark:bg-yellow-900/10',
+            human_required: 'border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/10',
+          };
 
           return (
             <div
@@ -789,9 +882,7 @@ export function PhotoReviewPhase({
               className={`border rounded-lg p-3 ${
                 !isApproved
                   ? 'border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-900/20'
-                  : result.vlm_confidence < 0.5
-                  ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
-                  : 'border-border bg-card'
+                  : tierStyles[tier] || 'border-border bg-card'
               }`}
             >
               <div className="flex gap-3">
@@ -813,7 +904,7 @@ export function PhotoReviewPhase({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-medium text-foreground text-sm">
                       Step {result.vlm_predicted_step}: {STEP_LABELS[result.vlm_predicted_step]}
                     </span>
@@ -822,6 +913,16 @@ export function PhotoReviewPhase({
                     >
                       {Math.round(result.vlm_confidence * 100)}%
                     </span>
+                    {tier === 'auto_approved' && (
+                      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200">
+                        AI
+                      </span>
+                    )}
+                    {tier === 'human_required' && (
+                      <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200">
+                        Review
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {result.vlm_identified_as}
@@ -910,7 +1011,7 @@ export function PhotoReviewPhase({
           disabled={isProcessing}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
         >
-          {isProcessing ? 'Saving...' : 'Save & Continue →'}
+          {isProcessing ? 'Saving...' : state.autoApprovalSummary ? 'Confirm & Continue →' : 'Save & Continue →'}
         </button>
       </div>
     </div>
