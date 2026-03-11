@@ -5,6 +5,7 @@
 
 import { Send, ShoppingCart, ArrowLeft, AlertCircle } from 'lucide-react';
 import type { WorkflowState } from '../useWorkflowState';
+import { calcVat } from './requisitionUtils';
 
 // 🟢 WORKING: strategy card definitions
 const STRATEGIES: {
@@ -60,14 +61,15 @@ const THRESHOLD = 10_000;
 
 function getHint(estimatedTotal?: number): { message: string; recommended: 'rfq' | 'direct_po' } | null {
   if (estimatedTotal === undefined || estimatedTotal <= 0) return null;
-  if (estimatedTotal >= THRESHOLD) {
+  const totalInclVat = estimatedTotal + calcVat(estimatedTotal);
+  if (totalInclVat >= THRESHOLD) {
     return {
-      message: `Your estimate is ${formatCurrency(estimatedTotal)}, which meets the RFQ threshold. We recommend requesting competitive quotes.`,
+      message: `Your estimate is ${formatCurrency(totalInclVat)} (incl. VAT), which meets the RFQ threshold. We recommend requesting competitive quotes.`,
       recommended: 'rfq',
     };
   }
   return {
-    message: `Your estimate is ${formatCurrency(estimatedTotal)}, which is under R10,000. Either option works — Direct PO is faster.`,
+    message: `Your estimate is ${formatCurrency(totalInclVat)} (incl. VAT), which is under R10,000. Either option works — Direct PO is faster.`,
     recommended: 'direct_po',
   };
 }

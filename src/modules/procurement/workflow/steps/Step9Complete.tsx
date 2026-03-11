@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import type { WorkflowState } from '../useWorkflowState';
+import { calcVat } from './requisitionUtils';
 
 // 🟢 WORKING: full type coverage
 interface Step9CompleteProps {
@@ -48,7 +49,13 @@ const STEP_LABELS: [number, string, React.FC<{ style?: React.CSSProperties }>][]
 export const Step9Complete: React.FC<Step9CompleteProps> = ({ state, onReset }) => {
   const router = useRouter();
 
-  const totalAmount = state.invoiceAmount ?? state.estimatedTotal;
+  const rawAmount = state.invoiceAmount ?? state.estimatedTotal;
+  // invoiceAmount is already VAT-inclusive; estimatedTotal is excl. VAT
+  const totalAmount = state.invoiceAmount
+    ? rawAmount
+    : rawAmount !== undefined
+      ? rawAmount + calcVat(rawAmount)
+      : undefined;
   const isRfq = state.strategy === 'rfq';
   const paymentApproved = state.paymentApprovalStatus === 'approved';
 

@@ -19,6 +19,7 @@ import {
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
+import { calcVat } from './requisitionUtils';
 
 // 🟢 WORKING: full type coverage
 interface Step5OrderProps {
@@ -250,7 +251,7 @@ export const Step5Order: React.FC<Step5OrderProps> = ({ state, onComplete, onBac
         <p style={{ fontSize: 13, color: 'var(--ff-text-secondary)' }}>
           Requisition <strong style={{ color: 'var(--ff-text-primary)' }}>{state.requisitionNumber}</strong>
           {state.estimatedTotal !== undefined && (
-            <> &mdash; Estimated: <strong style={{ color: 'var(--ff-text-primary)' }}>{formatCurrency(state.estimatedTotal)}</strong></>
+            <> &mdash; Estimated: <strong style={{ color: 'var(--ff-text-primary)' }}>{formatCurrency(state.estimatedTotal + calcVat(state.estimatedTotal))}</strong> <span style={{ fontSize: 11 }}>(incl. VAT)</span></>
           )}
         </p>
       </div>

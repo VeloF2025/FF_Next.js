@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { WorkflowState } from '../useWorkflowState';
 import { log } from '@/lib/logger';
+import { calcVat } from './requisitionUtils';
 
 interface Step4ApprovalProps {
   state: WorkflowState;
@@ -162,7 +163,7 @@ export function Step4Approval({ state, onComplete, onBack }: Step4ApprovalProps)
             This requisition was automatically approved — under the R10,000 threshold.
           </p>
           <p className="text-sm text-[var(--ff-text-tertiary)] mb-6">
-            Estimated total: {formatCurrency(state.estimatedTotal)}
+            Estimated total: {state.estimatedTotal !== undefined ? formatCurrency(state.estimatedTotal + calcVat(state.estimatedTotal)) : '-'} (incl. VAT)
           </p>
           <button
             onClick={() => onComplete({ approvalStatus: 'auto_approved' })}
@@ -217,7 +218,7 @@ export function Step4Approval({ state, onComplete, onBack }: Step4ApprovalProps)
           <div>
             <h2 className="text-lg font-semibold text-[var(--ff-text-primary)]">Approval Gate</h2>
             <p className="text-sm text-[var(--ff-text-secondary)]">
-              {state.requisitionNumber || 'Requisition'} — {formatCurrency(state.estimatedTotal)}
+              {state.requisitionNumber || 'Requisition'} — {state.estimatedTotal !== undefined ? formatCurrency(state.estimatedTotal + calcVat(state.estimatedTotal)) : '-'} (incl. VAT)
             </p>
           </div>
         </div>

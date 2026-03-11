@@ -16,6 +16,7 @@ import {
 import { log } from '@/lib/logger';
 import type { WorkflowState } from '../useWorkflowState';
 import { ProcurementDocumentPanel } from '@/modules/procurement/documents/components/ProcurementDocumentPanel';
+import { calcVat } from './requisitionUtils';
 
 // 🟢 WORKING: full type coverage
 interface Step7PaymentRequestProps {
@@ -75,11 +76,12 @@ export const Step7PaymentRequest: React.FC<Step7PaymentRequestProps> = ({ state,
   };
 
   const invoiceAmountNum = form.invoiceAmount ? Number(form.invoiceAmount) : undefined;
-  const estimate = state.estimatedTotal;
+  const estimateExclVat = state.estimatedTotal;
+  const estimateInclVat = estimateExclVat !== undefined ? estimateExclVat + calcVat(estimateExclVat) : undefined;
   const hasVarianceWarning =
     invoiceAmountNum !== undefined &&
-    estimate !== undefined &&
-    Math.abs(invoiceAmountNum - estimate) / estimate > AMOUNT_VARIANCE_THRESHOLD;
+    estimateInclVat !== undefined &&
+    Math.abs(invoiceAmountNum - estimateInclVat) / estimateInclVat > AMOUNT_VARIANCE_THRESHOLD;
 
   const handleSubmit = async () => {
     if (!validate()) return;
@@ -184,15 +186,15 @@ export const Step7PaymentRequest: React.FC<Step7PaymentRequestProps> = ({ state,
           <div style={{ display: 'flex', gap: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 8, padding: '10px 14px' }}>
             <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
             <p style={{ fontSize: 13, color: 'var(--ff-text-primary)', margin: 0 }}>
-              Invoice amount differs by more than 10% from estimate ({formatCurrency(estimate)}). Finance may require additional justification.
+              Invoice amount differs by more than 10% from estimate ({formatCurrency(estimateInclVat)} incl. VAT). Finance may require additional justification.
             </p>
           </div>
         )}
 
         {/* Estimate vs actual */}
-        {invoiceAmountNum !== undefined && estimate !== undefined && !hasVarianceWarning && (
+        {invoiceAmountNum !== undefined && estimateInclVat !== undefined && !hasVarianceWarning && (
           <p style={{ fontSize: 13, color: 'var(--ff-text-secondary)' }}>
-            Estimated: {formatCurrency(estimate)} &mdash; Invoice: {formatCurrency(invoiceAmountNum)}
+            Estimated: {formatCurrency(estimateInclVat)} (incl. VAT) &mdash; Invoice: {formatCurrency(invoiceAmountNum)}
           </p>
         )}
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { WorkflowState } from '../useWorkflowState';
 import { log } from '@/lib/logger';
+import { calcVat } from './requisitionUtils';
 
 // 🟢 WORKING: display helpers
 const formatCurrency = (value?: number) => {
@@ -31,7 +32,8 @@ function getApprovalRouting(estimatedTotal?: number): {
   detail: string;
   variant: 'auto' | 'manual';
 } {
-  if ((estimatedTotal ?? 0) < THRESHOLD) {
+  const totalInclVat = estimatedTotal !== undefined ? estimatedTotal + calcVat(estimatedTotal) : 0;
+  if (totalInclVat < THRESHOLD) {
     return {
       variant: 'auto',
       label: 'Auto-Approved',
@@ -224,10 +226,17 @@ export function Step3Submit({ state, onComplete, onBack }: Step3SubmitProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[var(--ff-border-light)]">
           {/* Estimated total */}
           <div>
-            <p className="text-xs text-[var(--ff-text-tertiary)] mb-1">Estimated Total</p>
+            <p className="text-xs text-[var(--ff-text-tertiary)] mb-1">Estimated Total (incl. VAT)</p>
             <p className="text-2xl font-bold text-[var(--ff-text-primary)]">
-              {formatCurrency(state.estimatedTotal)}
+              {state.estimatedTotal !== undefined
+                ? formatCurrency(state.estimatedTotal + calcVat(state.estimatedTotal))
+                : '—'}
             </p>
+            {state.estimatedTotal !== undefined && (
+              <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                Excl. VAT: {formatCurrency(state.estimatedTotal)} + VAT: {formatCurrency(calcVat(state.estimatedTotal))}
+              </p>
+            )}
           </div>
 
           {/* Project */}
