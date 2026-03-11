@@ -17,12 +17,12 @@ import {
   SEVERITY_TO_PRIORITY,
   SEVERITY_SLA_HOURS,
 } from '@/modules/health-safety/types/ticket.types';
-import { createTicket } from '@/modules/maintenance/services/ticketService';
+import { createTicket } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
   TicketType,
   TicketPriority,
-} from '@/modules/maintenance/types/ticket';
+} from '@/modules/noc/types/ticket';
 import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);

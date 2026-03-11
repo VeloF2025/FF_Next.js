@@ -6,11 +6,11 @@
  * @example
  * ```tsx
  * import { ModulePage } from '@/components/module-page';
- * import { maintenanceConfig } from '@/modules/navigation';
+ * import { nocConfig } from '@/modules/navigation';
  *
  * export default function MaintenancePage() {
  *   return (
- *     <ModulePage config={maintenanceConfig}>
+ *     <ModulePage config={nocConfig}>
  *       <MaintenanceDashboard />
  *     </ModulePage>
  *   );
@@ -44,7 +44,7 @@ export {
   getModuleConfigByPath,
   getActiveTabByPath,
   getActiveSubTabByPath,
-  maintenanceConfig,
+  nocConfig,
   fleetConfig,
   assetsConfig,
   procurementConfig,

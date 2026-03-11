@@ -11,6 +11,6 @@ export { DataSyncPage } from './components/DataSyncPage';
 export { OverviewDashboard } from './components/OverviewDashboard';
 
 // Group components
-export { MaintenanceGroup } from './components/groups/MaintenanceGroup';
+export { NocGroup } from './components/groups/NocGroup';
 export { ActivateGroup } from './components/groups/ActivateGroup';
 export { OltReportGroup } from './components/groups/OltReportGroup';

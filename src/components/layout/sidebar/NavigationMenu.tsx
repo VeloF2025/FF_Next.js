@@ -71,8 +71,8 @@ export function NavigationMenu({ visibleNavItems, isCollapsed, sidebarStyles, th
   }, [activeSectionId]);
 
   // Compute the active path for each section (most specific match wins)
-  // This prevents parent routes (e.g., /maintenance) from being highlighted
-  // when a child route (e.g., /maintenance/import) is active
+  // This prevents parent routes (e.g., /noc) from being highlighted
+  // when a child route (e.g., /noc/import) is active
   const activePathBySection = useMemo(() => {
     const result: Record<string, string | null> = {};
 

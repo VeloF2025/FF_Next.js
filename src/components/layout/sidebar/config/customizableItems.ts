@@ -64,13 +64,13 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
     permissions: [],
     rbacKey: 'projects.list',
   },
-  'maintenance': {
-    to: '/maintenance',
+  'noc': {
+    to: '/noc',
     icon: Ticket,
-    label: 'Maintenance',
-    shortLabel: 'Maint',
+    label: 'NOC',
+    shortLabel: 'NOC',
     permissions: [],
-    rbacKey: 'maintenance.main',
+    rbacKey: 'noc.main',
   },
   'analytics': {
     to: '/analytics',
@@ -165,6 +165,7 @@ export const CUSTOMIZABLE_ITEMS: Record<string, NavItem> = {
 // Legacy ID remapping: users who had 'meetings' pinned now get 'communications'
 const LEGACY_REMAP: Record<string, string> = {
   'meetings': 'communications',
+  'maintenance': 'noc',
 };
 
 /**

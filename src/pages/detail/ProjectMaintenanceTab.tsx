@@ -97,25 +97,25 @@ export function ProjectMaintenanceTab({ projectId }: ProjectMaintenanceTabProps)
           label="Open"
           value={data.open}
           color="red"
-          onClick={() => router.push(`/maintenance?project=${projectId}&status=open`)}
+          onClick={() => router.push(`/noc?project=${projectId}&status=open`)}
         />
         <StatusCard
           label="In Progress"
           value={data.inProgress}
           color="yellow"
-          onClick={() => router.push(`/maintenance?project=${projectId}&status=in_progress`)}
+          onClick={() => router.push(`/noc?project=${projectId}&status=in_progress`)}
         />
         <StatusCard
           label="Resolved"
           value={data.resolved}
           color="green"
-          onClick={() => router.push(`/maintenance?project=${projectId}&status=resolved`)}
+          onClick={() => router.push(`/noc?project=${projectId}&status=resolved`)}
         />
         <StatusCard
           label="Closed"
           value={data.closed}
           color="gray"
-          onClick={() => router.push(`/maintenance?project=${projectId}&status=closed`)}
+          onClick={() => router.push(`/noc?project=${projectId}&status=closed`)}
         />
       </div>
 
@@ -228,7 +228,7 @@ export function ProjectMaintenanceTab({ projectId }: ProjectMaintenanceTabProps)
               <strong>{data.priorityBreakdown.critical} critical ticket{data.priorityBreakdown.critical > 1 ? 's' : ''}</strong> require immediate attention.
             </div>
             <button
-              onClick={() => router.push(`/maintenance?project=${projectId}&priority=critical`)}
+              onClick={() => router.push(`/noc?project=${projectId}&priority=critical`)}
               className="ml-auto px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm transition-colors"
             >
               View
@@ -240,13 +240,13 @@ export function ProjectMaintenanceTab({ projectId }: ProjectMaintenanceTabProps)
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-4">
         <button
-          onClick={() => router.push(`/maintenance/new?project=${projectId}`)}
+          onClick={() => router.push(`/noc/new?project=${projectId}`)}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
         >
           Create Ticket
         </button>
         <button
-          onClick={() => router.push(`/maintenance?project=${projectId}`)}
+          onClick={() => router.push(`/noc?project=${projectId}`)}
           className="px-4 py-2 bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-border-light)] text-[var(--ff-text-primary)] rounded-lg text-sm font-medium transition-colors"
         >
           View All Tickets

@@ -14,10 +14,10 @@ import {
 } from './registry';
 
 // Module configs - import and register
-import { maintenanceConfig } from './modules/maintenance.config';
+import { nocConfig } from './modules/noc.config';
 
 // Auto-register all module configs
-registerModuleConfig(maintenanceConfig);
+registerModuleConfig(nocConfig);
 
 // Re-export everything
 export {
@@ -29,5 +29,5 @@ export {
   getActiveSubTabByPath,
   hasConfigs,
   clearRegistry,
-  maintenanceConfig,
+  nocConfig,
 };

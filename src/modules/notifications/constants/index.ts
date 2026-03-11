@@ -11,15 +11,15 @@ import type { ChannelPreferences, NotificationSeverity } from '../types';
 
 export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
   // -- Maintenance --
-  'maintenance.ticket_assigned':    { in_app: true, email: true,  whatsapp: false },
-  'maintenance.ticket_stepped':     { in_app: true, email: false, whatsapp: false },
-  'maintenance.ticket_transferred': { in_app: true, email: true,  whatsapp: true  },
-  'maintenance.qa_rejected':        { in_app: true, email: true,  whatsapp: true  },
-  'maintenance.qa_approved':        { in_app: true, email: false, whatsapp: false },
-  'maintenance.escalation_created': { in_app: true, email: true,  whatsapp: true  },
-  'maintenance.sla_warning':        { in_app: true, email: true,  whatsapp: true  },
-  'maintenance.ticket_closed':      { in_app: true, email: false, whatsapp: false },
-  'maintenance.ticket_team_assigned': { in_app: true, email: true,  whatsapp: true  },
+  'noc.ticket_assigned':    { in_app: true, email: true,  whatsapp: false },
+  'noc.ticket_stepped':     { in_app: true, email: false, whatsapp: false },
+  'noc.ticket_transferred': { in_app: true, email: true,  whatsapp: true  },
+  'noc.qa_rejected':        { in_app: true, email: true,  whatsapp: true  },
+  'noc.qa_approved':        { in_app: true, email: false, whatsapp: false },
+  'noc.escalation_created': { in_app: true, email: true,  whatsapp: true  },
+  'noc.sla_warning':        { in_app: true, email: true,  whatsapp: true  },
+  'noc.ticket_closed':      { in_app: true, email: false, whatsapp: false },
+  'noc.ticket_team_assigned': { in_app: true, email: true,  whatsapp: true  },
 
   // -- Activate / QField --
   'activate.qa_rejected':           { in_app: true, email: true,  whatsapp: true  },
@@ -53,15 +53,15 @@ export const DEFAULT_CHANNEL_PREFERENCES: Record<string, ChannelPreferences> = {
 // =============================================================================
 
 export const EVENT_ICONS: Record<string, string> = {
-  'maintenance.ticket_assigned':    'wrench',
-  'maintenance.ticket_stepped':     'arrow-right',
-  'maintenance.ticket_transferred': 'arrow-right-left',
-  'maintenance.qa_rejected':        'x-circle',
-  'maintenance.qa_approved':        'check-circle',
-  'maintenance.escalation_created': 'alert-triangle',
-  'maintenance.sla_warning':        'clock',
-  'maintenance.ticket_closed':      'check-square',
-  'maintenance.ticket_team_assigned': 'users',
+  'noc.ticket_assigned':    'wrench',
+  'noc.ticket_stepped':     'arrow-right',
+  'noc.ticket_transferred': 'arrow-right-left',
+  'noc.qa_rejected':        'x-circle',
+  'noc.qa_approved':        'check-circle',
+  'noc.escalation_created': 'alert-triangle',
+  'noc.sla_warning':        'clock',
+  'noc.ticket_closed':      'check-square',
+  'noc.ticket_team_assigned': 'users',
 
   'activate.qa_rejected':           'x-circle',
   'activate.qa_approved':           'check-circle',
@@ -87,15 +87,15 @@ export const EVENT_ICONS: Record<string, string> = {
 // =============================================================================
 
 export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
-  'maintenance.ticket_assigned':    'info',
-  'maintenance.ticket_stepped':     'info',
-  'maintenance.ticket_transferred': 'warning',
-  'maintenance.qa_rejected':        'error',
-  'maintenance.qa_approved':        'success',
-  'maintenance.escalation_created': 'error',
-  'maintenance.sla_warning':        'warning',
-  'maintenance.ticket_closed':      'success',
-  'maintenance.ticket_team_assigned': 'info',
+  'noc.ticket_assigned':    'info',
+  'noc.ticket_stepped':     'info',
+  'noc.ticket_transferred': 'warning',
+  'noc.qa_rejected':        'error',
+  'noc.qa_approved':        'success',
+  'noc.escalation_created': 'error',
+  'noc.sla_warning':        'warning',
+  'noc.ticket_closed':      'success',
+  'noc.ticket_team_assigned': 'info',
 
   'activate.qa_rejected':           'error',
   'activate.qa_approved':           'success',
@@ -121,15 +121,15 @@ export const EVENT_SEVERITY: Record<string, NotificationSeverity> = {
 // =============================================================================
 
 export const EVENT_LABELS: Record<string, string> = {
-  'maintenance.ticket_assigned':    'Ticket Assigned',
-  'maintenance.ticket_stepped':     'Ticket Step Changed',
-  'maintenance.ticket_transferred': 'Ticket Transferred',
-  'maintenance.qa_rejected':        'Maintenance QA Rejected',
-  'maintenance.qa_approved':        'Maintenance QA Approved',
-  'maintenance.escalation_created': 'Escalation Created',
-  'maintenance.sla_warning':        'SLA Warning',
-  'maintenance.ticket_closed':      'Ticket Closed',
-  'maintenance.ticket_team_assigned': 'Ticket Assigned to Team',
+  'noc.ticket_assigned':    'Ticket Assigned',
+  'noc.ticket_stepped':     'Ticket Step Changed',
+  'noc.ticket_transferred': 'Ticket Transferred',
+  'noc.qa_rejected':        'NOC QA Rejected',
+  'noc.qa_approved':        'NOC QA Approved',
+  'noc.escalation_created': 'Escalation Created',
+  'noc.sla_warning':        'SLA Warning',
+  'noc.ticket_closed':      'Ticket Closed',
+  'noc.ticket_team_assigned': 'Ticket Assigned to Team',
 
   'activate.qa_rejected':           'Activate QA Rejected',
   'activate.qa_approved':           'Activate QA Approved',
@@ -155,15 +155,15 @@ export const EVENT_LABELS: Record<string, string> = {
 // =============================================================================
 
 export const EVENT_GROUPS: Record<string, string> = {
-  'maintenance.ticket_assigned':    'Maintenance',
-  'maintenance.ticket_stepped':     'Maintenance',
-  'maintenance.ticket_transferred': 'Maintenance',
-  'maintenance.qa_rejected':        'Maintenance',
-  'maintenance.qa_approved':        'Maintenance',
-  'maintenance.escalation_created': 'Maintenance',
-  'maintenance.sla_warning':        'Maintenance',
-  'maintenance.ticket_closed':      'Maintenance',
-  'maintenance.ticket_team_assigned': 'Maintenance',
+  'noc.ticket_assigned':    'NOC',
+  'noc.ticket_stepped':    'NOC',
+  'noc.ticket_transferred':    'NOC',
+  'noc.qa_rejected':    'NOC',
+  'noc.qa_approved':    'NOC',
+  'noc.escalation_created':    'NOC',
+  'noc.sla_warning':    'NOC',
+  'noc.ticket_closed':    'NOC',
+  'noc.ticket_team_assigned':    'NOC',
 
   'activate.qa_rejected':           'QA / Activate',
   'activate.qa_approved':           'QA / Activate',

@@ -244,7 +244,7 @@ export function FinalDecisionPhase({
 
   const createTicket = async () => {
     try {
-      const response = await fetch('/api/maintenance/tickets', {
+      const response = await fetch('/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -273,7 +273,7 @@ export function FinalDecisionPhase({
    */
   const createSwapTicket = async (swapDetails: string) => {
     try {
-      const response = await fetch('/api/maintenance/tickets', {
+      const response = await fetch('/api/noc/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

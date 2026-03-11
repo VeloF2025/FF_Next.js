@@ -581,7 +581,7 @@ function buildTicketUrl(record: OfflineDeviceRecord): string {
   params.set('priority', priority);
   params.set('description', descriptionParts);
 
-  return `/maintenance/tickets/new?${params.toString()}`;
+  return `/noc/tickets/new?${params.toString()}`;
 }
 
 function LoadingSkeleton() {

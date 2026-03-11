@@ -6,7 +6,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 // Tab group identifiers
-export type TabGroupId = 'maintenance' | 'activate' | 'olt' | 'qfield' | 'history';
+export type TabGroupId = 'noc' | 'activate' | 'olt' | 'qfield' | 'history';
 
 // Individual tab within a group
 export interface Tab {
@@ -28,7 +28,7 @@ export interface TabGroup {
 
 // Overview dashboard stats
 export interface DataSyncStats {
-  maintenance: {
+  noc: {
     lastQContactSync: string | null;
     pendingTickets: number;
     weeklyImportsThisMonth: number;
@@ -62,7 +62,7 @@ export interface DataSyncStatsResponse {
 }
 
 // Maintenance tab IDs
-export type MaintenanceTabId =
+export type NocTabId =
   | 'qcontact'
   | 'alignment'
   | 'three-way'

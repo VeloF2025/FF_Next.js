@@ -5,7 +5,7 @@
  * Usage:
  *   const { isFeatureEnabled, isLoading } = useSystemFeatures();
  *
- *   if (isFeatureEnabled('system.data-sync.maintenance')) { ... }
+ *   if (isFeatureEnabled('system.data-sync.noc')) { ... }
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';

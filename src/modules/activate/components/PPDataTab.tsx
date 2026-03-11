@@ -203,7 +203,7 @@ export function PPDataTab() {
         body: JSON.stringify({ pp_data_ids: selectedIds, ...params }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to create tickets');
+      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
       const { created, skipped } = result.data;
       toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
       setShowTicketModal(false);
@@ -592,7 +592,7 @@ export function PPDataTab() {
                       <td className="px-3 py-2">
                         {record.ticket_uid ? (
                           <a
-                            href={`/maintenance/tickets/${record.maintenance_ticket_id}`}
+                            href={`/noc/tickets/${record.maintenance_ticket_id}`}
                             className="text-blue-400 hover:text-blue-300 text-xs font-mono"
                           >
                             {record.ticket_uid}

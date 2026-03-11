@@ -11,7 +11,7 @@ interface CommunicationsStatsCardsProps {
  * Communications Stats Cards - Following Maintenance Dashboard pattern
  *
  * Pattern: Small icon + label at top, big value below
- * @see src/modules/maintenance/components/Dashboard/TicketingDashboard.tsx
+ * @see src/modules/noc/components/Dashboard/TicketingDashboard.tsx
  */
 export function CommunicationsStatsCards({ stats }: CommunicationsStatsCardsProps) {
   const cards = [

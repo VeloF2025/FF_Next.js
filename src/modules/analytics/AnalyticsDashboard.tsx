@@ -8,7 +8,7 @@
  * - Styled refresh button
  * - Stat cards with small icon + label at top
  *
- * @see src/modules/maintenance/components/Dashboard/TicketingDashboard.tsx
+ * @see src/modules/noc/components/Dashboard/TicketingDashboard.tsx
  */
 
 import React, { useState, lazy, useCallback } from 'react';

@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import type { TabGroupId } from '../types';
 import { OverviewDashboard } from './OverviewDashboard';
-import { MaintenanceGroup } from './groups/MaintenanceGroup';
+import { NocGroup } from './groups/NocGroup';
 import { ActivateGroup } from './groups/ActivateGroup';
 import { OltReportGroup } from './groups/OltReportGroup';
 import { QFieldGroup } from './groups/QFieldGroup';
@@ -42,7 +42,7 @@ import { useSystemFeatures } from '../hooks/useSystemFeatures';
 
 // Permission keys for each group
 const GROUP_PERMISSION_KEYS: Record<TabGroupId, string> = {
-  maintenance: 'system.data-sync.maintenance',
+  noc: 'system.data-sync.noc',
   activate: 'system.data-sync.activate',
   olt: 'system.data-sync.olt',
   qfield: 'system.data-sync.qfield',
@@ -57,8 +57,8 @@ const TAB_GROUPS: {
   description: string;
 }[] = [
   {
-    id: 'maintenance',
-    label: 'Maintenance',
+    id: 'noc',
+    label: 'NOC',
     icon: Wrench,
     description: 'QContact sync, alignments, and weekly imports',
   },
@@ -284,10 +284,10 @@ export function DataSyncPage() {
           />
         )}
 
-        {activeGroup === 'maintenance' && (
-          <MaintenanceGroup
+        {activeGroup === 'noc' && (
+          <NocGroup
             activeTab={activeTab}
-            onTabChange={(tab) => handleTabChange('maintenance', tab)}
+            onTabChange={(tab) => handleTabChange('noc', tab)}
           />
         )}
 

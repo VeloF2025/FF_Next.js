@@ -18,12 +18,12 @@ import pool from '@/lib/db';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
-import { createTicket } from '@/modules/maintenance/services/ticketService';
+import { createTicket } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
   TicketType,
   TicketPriority,
-} from '@/modules/maintenance/types/ticket';
+} from '@/modules/noc/types/ticket';
 
 interface CreateTicketBody {
   id: string;

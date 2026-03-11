@@ -694,7 +694,7 @@ describe('Navigation — Main menu & breadcrumbs', () => {
             <a href="/assets">Assets</a>
           </li>
           <li>
-            <a href="/maintenance">Maintenance</a>
+            <a href="/noc">Maintenance</a>
           </li>
         </ul>
       </nav>

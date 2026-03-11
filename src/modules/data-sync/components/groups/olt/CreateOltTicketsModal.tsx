@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { TeamSelector } from '@/modules/maintenance/components/Assignment/TeamSelector';
+import { TeamSelector } from '@/modules/noc/components/Assignment/TeamSelector';
 
 interface CreateOltTicketsModalProps {
   selectedCount: number;

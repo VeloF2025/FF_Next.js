@@ -12,7 +12,7 @@ export type ModuleId =
   | 'main'
   | 'projects'
   | 'activate'
-  | 'maintenance'
+  | 'noc'
   | 'procurement'
   | 'assets'
   | 'fleet'

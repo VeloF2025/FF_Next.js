@@ -30,7 +30,7 @@ import { AICategorizationTab } from './AICategorizationTab';
 import { ActivityTab } from './ActivityTab';
 import { QaWizardContainer } from './wizard/QaWizardContainer';
 import { DrSummaryPage } from './DrSummaryPage';
-import { MaintenanceTab } from '@/modules/maintenance/components/MaintenanceTab';
+import { MaintenanceTab } from '@/modules/noc/components/MaintenanceTab';
 import { ChevronDown, ChevronRight, RefreshCw, MapPin, MessageCircle, Wrench } from 'lucide-react';
 import { log } from '@/lib/logger';
 
@@ -435,7 +435,7 @@ function PhotosTab({ review, onRefresh }: PhotosTabProps) {
     async function fetchMaintenancePhotos() {
       setMaintenanceLoading(true);
       try {
-        const response = await fetch(`/api/maintenance/wa-messages?drop_number=${review.drop_number}`);
+        const response = await fetch(`/api/noc/wa-messages?drop_number=${review.drop_number}`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data?.photos) {

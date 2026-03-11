@@ -220,7 +220,7 @@ export function useAccessibleModules(): string[] {
         'projects',
         'activate',
         'field',
-        'maintenance',
+        'noc',
         'people',
         'clients',
         'contractors',

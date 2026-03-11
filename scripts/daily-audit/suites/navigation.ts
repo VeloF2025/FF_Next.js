@@ -42,8 +42,8 @@ const navRoutes: NavRoute[] = [
   { section: 'activate', path: '/activate', name: 'QA Review', requiresAuth: true },
   { section: 'activate', path: '/activate/qa-centre', name: 'QA Centre', requiresAuth: true },
 
-  // Maintenance section
-  { section: 'maintenance', path: '/maintenance', name: 'Maintenance', requiresAuth: true },
+  // NOC section
+  { section: 'noc', path: '/noc', name: 'NOC', requiresAuth: true },
 
   // Procurement section
   { section: 'procurement', path: '/procurement', name: 'Procurement', requiresAuth: true },

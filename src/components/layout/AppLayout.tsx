@@ -261,8 +261,8 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
       };
     }
 
-    // NOC (Maintenance)
-    if (path.includes('noc') || path.includes('maintenance')) {
+    // NOC
+    if (path.includes('noc')) {
       return {
         title: 'NOC',
         breadcrumbs: ['Home', 'NOC'],

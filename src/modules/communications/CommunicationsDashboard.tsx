@@ -10,7 +10,7 @@
  *
  * Now integrated with Meetings module from Fireflies
  *
- * @see src/modules/maintenance/components/Dashboard/TicketingDashboard.tsx
+ * @see src/modules/noc/components/Dashboard/TicketingDashboard.tsx
  */
 
 import React, { useState, useEffect } from 'react';

@@ -40,8 +40,8 @@ const CATEGORY_CARDS: {
   bgColor: string;
 }[] = [
   {
-    id: 'maintenance',
-    label: 'Maintenance',
+    id: 'noc',
+    label: 'NOC',
     icon: Wrench,
     description: 'QContact sync, alignment reports, weekly imports, and offline tracking',
     color: 'text-blue-400',
@@ -132,21 +132,21 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
     if (!stats) return [];
 
     switch (id) {
-      case 'maintenance':
+      case 'noc':
         return [
           {
             label: 'Last Sync',
-            value: formatRelativeTime(stats.maintenance.lastQContactSync),
+            value: formatRelativeTime(stats.noc.lastQContactSync),
             icon: Clock,
           },
           {
             label: 'Pending Tickets',
-            value: stats.maintenance.pendingTickets.toString(),
+            value: stats.noc.pendingTickets.toString(),
             icon: RefreshCw,
           },
           {
             label: 'Weekly Imports',
-            value: stats.maintenance.weeklyImportsThisMonth.toString(),
+            value: stats.noc.weeklyImportsThisMonth.toString(),
             icon: FileSpreadsheet,
           },
         ];
@@ -248,7 +248,7 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
                 <span className="text-sm text-[var(--ff-text-secondary)]">Pending Actions</span>
               </div>
               <p className="text-3xl font-bold text-[var(--ff-text-primary)]">
-                {stats.maintenance.pendingTickets +
+                {stats.noc.pendingTickets +
                   stats.activate.pendingReview +
                   stats.olt.pendingFixes}
               </p>
@@ -368,9 +368,9 @@ export function OverviewDashboard({ onGroupSelect, accessibleGroups }: OverviewD
       <div>
         <h2 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          {(!accessibleGroups || accessibleGroups.includes('maintenance')) && (
+          {(!accessibleGroups || accessibleGroups.includes('noc')) && (
             <button
-              onClick={() => onGroupSelect('maintenance')}
+              onClick={() => onGroupSelect('noc')}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--ff-bg-tertiary)] hover:bg-[var(--ff-bg-secondary)] text-[var(--ff-text-primary)] rounded-lg transition-colors border border-[var(--ff-border-light)]"
             >
               <RefreshCw className="w-4 h-4 text-blue-400" />

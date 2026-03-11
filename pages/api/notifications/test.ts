@@ -23,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const {
-      event_type = 'maintenance.ticket_assigned',
+      event_type = 'noc.ticket_assigned',
       title = 'Test Notification',
       body = 'This is a test notification from the UNS.',
       severity = 'info',

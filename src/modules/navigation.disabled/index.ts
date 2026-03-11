@@ -11,7 +11,7 @@
  *
  * // In module pages
  * import { useNavigation, ModuleTabs, SubTabs } from '@/modules/navigation';
- * import { maintenanceConfig } from '@/modules/navigation';
+ * import { nocConfig } from '@/modules/navigation';
  * ```
  */
 
@@ -47,5 +47,5 @@ export {
   getAllModuleConfigs,
   getActiveTabByPath,
   getActiveSubTabByPath,
-  maintenanceConfig,
+  nocConfig,
 } from './config';

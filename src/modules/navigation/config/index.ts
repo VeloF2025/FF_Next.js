@@ -4,7 +4,7 @@
  */
 
 import { registerModuleConfig } from './registry';
-import { maintenanceConfig } from './modules/maintenance.config';
+import { nocConfig } from './modules/noc.config';
 import { fleetConfig } from './modules/fleet.config';
 import { assetsConfig } from './modules/assets.config';
 import { procurementConfig } from './modules/procurement.config';
@@ -14,7 +14,7 @@ import { projectsConfig } from './modules/projects.config';
 import { constructionQaConfig } from './modules/construction-qa.config';
 
 // Register all module configs
-registerModuleConfig(maintenanceConfig);
+registerModuleConfig(nocConfig);
 registerModuleConfig(fleetConfig);
 registerModuleConfig(assetsConfig);
 registerModuleConfig(procurementConfig);
@@ -33,7 +33,7 @@ export {
   getActiveSubTabByPath,
 } from './registry';
 
-export { maintenanceConfig };
+export { nocConfig };
 export { fleetConfig };
 export { assetsConfig };
 export { procurementConfig };

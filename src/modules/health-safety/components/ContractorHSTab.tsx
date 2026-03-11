@@ -572,7 +572,7 @@ function IncidentsSection({
           {incidentList.map((incident: any) => (
             <a
               key={incident.id}
-              href={`/maintenance/tickets/${incident.id}`}
+              href={`/noc/tickets/${incident.id}`}
               className="p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-3">

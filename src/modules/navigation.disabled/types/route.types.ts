@@ -12,7 +12,7 @@ export type ModuleId =
   | 'main'
   | 'projects'
   | 'activate'
-  | 'maintenance'
+  | 'noc'
   | 'procurement'
   | 'assets'
   | 'fleet'
@@ -71,7 +71,7 @@ export interface ModuleNavigationConfig {
   moduleName: string;
   /** Module description/subtitle */
   description?: string;
-  /** Base path for this module (e.g., '/maintenance') */
+  /** Base path for this module (e.g., '/noc') */
   basePath: string;
   /** Module icon */
   icon: LucideIcon;

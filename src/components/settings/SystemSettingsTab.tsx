@@ -64,17 +64,17 @@ interface ModuleGroup {
 // Data Sync sections
 const DATA_SYNC_SECTIONS: Section[] = [
   {
-    id: 'maintenance',
-    label: 'Maintenance',
+    id: 'noc',
+    label: 'NOC',
     description: 'QContact sync, alignments, and weekly imports',
     icon: Wrench,
-    groupKey: 'system.data-sync.maintenance',
+    groupKey: 'system.data-sync.noc',
     tabs: [
-      { key: 'system.data-sync.maintenance.qcontact', label: 'QContact Sync', description: 'QContact ticket synchronization' },
-      { key: 'system.data-sync.maintenance.alignment', label: 'QC Alignment', description: 'QContact alignment report' },
-      { key: 'system.data-sync.maintenance.three-way', label: '3-Way Alignment', description: 'Three-way alignment report' },
-      { key: 'system.data-sync.maintenance.weekly', label: 'Weekly Import', description: 'Weekly report import' },
-      { key: 'system.data-sync.maintenance.wa-tracking', label: 'Offline Tracking', description: 'WhatsApp offline tracking' },
+      { key: 'system.data-sync.noc.qcontact', label: 'QContact Sync', description: 'QContact ticket synchronization' },
+      { key: 'system.data-sync.noc.alignment', label: 'QC Alignment', description: 'QContact alignment report' },
+      { key: 'system.data-sync.noc.three-way', label: '3-Way Alignment', description: 'Three-way alignment report' },
+      { key: 'system.data-sync.noc.weekly', label: 'Weekly Import', description: 'Weekly report import' },
+      { key: 'system.data-sync.noc.wa-tracking', label: 'Offline Tracking', description: 'WhatsApp offline tracking' },
     ],
   },
   {
@@ -185,7 +185,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
 
 export function SystemSettingsTab() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['maintenance'])
+    new Set(['noc'])
   );
   const [features, setFeatures] = useState<Map<string, FeatureSetting>>(new Map());
   const [isLoading, setIsLoading] = useState(true);

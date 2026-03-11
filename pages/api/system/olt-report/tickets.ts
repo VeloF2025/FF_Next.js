@@ -9,8 +9,8 @@ import type { NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
-import { createTicket } from '@/modules/maintenance/services/ticketService';
-import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/maintenance/types/ticket';
+import { createTicket } from '@/modules/noc/services/ticketService';
+import { TicketSource, TicketType, TicketPriority, TicketStatus } from '@/modules/noc/types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('olt-report:tickets');
@@ -193,7 +193,7 @@ async function sendTeamNotification(
     .join(', ');
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
-  const nocUrl = `${appUrl}/maintenance/noc?source=olt_mismatch`;
+  const nocUrl = `${appUrl}/noc?source=olt_mismatch`;
 
   const subject = `${tickets.length} OLT Mismatch Tickets Assigned to ${teamName}`;
 

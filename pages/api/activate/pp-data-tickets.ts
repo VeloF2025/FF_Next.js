@@ -2,7 +2,12 @@
  * API Route: /api/activate/pp-data-tickets
  *
  * POST: Create maintenance tickets for selected PP Data records
- * Supports both located (has DR) and not_found (no DR) records.
+ * PATCH: Backfill existing PP Data tickets with enrichment data
+ *
+ * Enrichment sources:
+ * - drops table: project_id, zone_no, pon_no, pole_number, GPS, installed_by, installed_at
+ * - onemap_properties: address, contact name/phone/email, installer, install date
+ * - projects table: project UUID from project name
  */
 
 import type { NextApiResponse } from 'next';
@@ -10,8 +15,8 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
-import { createTicket } from '@/modules/maintenance/services/ticketService';
-import { TicketSource, TicketType, TicketPriority } from '@/modules/maintenance/types/ticket';
+import { createTicket } from '@/modules/noc/services/ticketService';
+import { TicketSource, TicketType, TicketPriority } from '@/modules/noc/types/ticket';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('activate:pp-data-tickets');
@@ -24,14 +29,128 @@ const VALID_TICKET_TYPES: string[] = [
   TicketType.NEW_INSTALLATION,
 ];
 
+interface EnrichmentData {
+  project_id?: string;
+  address?: string;
+  zone?: string;
+  pon?: string;
+  pole_number?: string;
+  lat?: string;
+  lng?: string;
+  client_name?: string;
+  client_contact?: string;
+  client_email?: string;
+  installer_name?: string;
+  installed_at?: string;
+}
+
+/**
+ * Fetch enrichment data for a DR number from drops + onemap_properties
+ */
+async function getEnrichmentForDR(drNumber: string, projectName?: string): Promise<EnrichmentData> {
+  const result = await pool.query(
+    `SELECT
+       d.project_id::text as drop_project_id,
+       d.address as drop_address,
+       d.zone_no::text as zone_no,
+       d.pon_no::text as pon_no,
+       d.pole_number,
+       d.latitude::text as drop_lat,
+       d.longitude::text as drop_lng,
+       d.installed_by_name,
+       d.installed_at::text as installed_at,
+       op.location_address as omap_address,
+       op.latitude::text as omap_lat,
+       op.longitude::text as omap_lng,
+       op.pole_number as omap_pole,
+       op.pons as omap_pon,
+       op.sections as omap_section,
+       TRIM(COALESCE(op.contact_name, '') || ' ' || COALESCE(op.contact_surname, '')) as client_name,
+       op.contact_number,
+       op.email_address,
+       op.installer_name as omap_installer,
+       op.installation_date::text as omap_install_date
+     FROM drops d
+     LEFT JOIN onemap_properties op ON op.drop_number = d.drop_number
+     WHERE d.drop_number = $1
+     LIMIT 1`,
+    [drNumber]
+  );
+
+  if (result.rows.length === 0) {
+    // No drop found — try project lookup at least
+    return await getProjectId(projectName);
+  }
+
+  const r = result.rows[0];
+  const enrichment: EnrichmentData = {};
+
+  // Project ID: prefer drop's project_id, fallback to name lookup
+  enrichment.project_id = r.drop_project_id || undefined;
+  if (!enrichment.project_id && projectName) {
+    const proj = await getProjectId(projectName);
+    enrichment.project_id = proj.project_id;
+  }
+
+  // Address: prefer 1Map (more detailed), fallback to drops
+  enrichment.address = r.omap_address || r.drop_address || undefined;
+
+  // Zone & PON from drops
+  enrichment.zone = r.zone_no || undefined;
+  enrichment.pon = r.pon_no || undefined;
+
+  // Pole from drops (1Map pole often null)
+  enrichment.pole_number = r.pole_number || r.omap_pole || undefined;
+
+  // GPS: prefer drops (usually present), fallback 1Map
+  enrichment.lat = r.drop_lat || r.omap_lat || undefined;
+  enrichment.lng = r.drop_lng || r.omap_lng || undefined;
+
+  // Client info from 1Map
+  const clientName = (r.client_name || '').trim();
+  enrichment.client_name = clientName || undefined;
+  enrichment.client_contact = r.contact_number || undefined;
+  enrichment.client_email = r.email_address || undefined;
+
+  // Installer
+  enrichment.installer_name = r.installed_by_name || r.omap_installer || undefined;
+  enrichment.installed_at = r.installed_at || r.omap_install_date || undefined;
+
+  return enrichment;
+}
+
+/**
+ * Look up project UUID from project name
+ */
+async function getProjectId(projectName?: string): Promise<EnrichmentData> {
+  if (!projectName) return {};
+  const result = await pool.query(
+    `SELECT id::text as project_id FROM projects WHERE project_name = $1 LIMIT 1`,
+    [projectName]
+  );
+  return { project_id: result.rows[0]?.project_id || undefined };
+}
+
 async function handler(
   req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
-  if (req.method !== 'POST') {
-    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE','PATCH']);
+  if (req.method === 'POST') {
+    return handleCreate(req, res);
   }
+  if (req.method === 'PATCH') {
+    return handleBackfill(req, res);
+  }
+  return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST', 'PATCH']);
+}
 
+/**
+ * POST: Create enriched PP Data tickets
+ */
+async function handleCreate(
+  req: AuthenticatedNextApiRequest,
+  res: NextApiResponse
+): Promise<void> {
   const { pp_data_ids, ticket_type, priority, notes, assigned_team_id } = req.body;
 
   if (!Array.isArray(pp_data_ids) || pp_data_ids.length === 0) {
@@ -47,7 +166,6 @@ async function handler(
     : TicketPriority.NORMAL;
 
   try {
-    // Fetch eligible records: (has DR OR is not_found) and not yet ticketed
     const eligible = await pool.query(
       `SELECT id, serial_number, resolved_drop_number, project, resolution_status
        FROM oes_pp_data
@@ -61,27 +179,11 @@ async function handler(
     const skipped = pp_data_ids.length - records.length;
 
     if (records.length === 0) {
-      return apiResponse.success(res, {
-        created: 0, skipped: pp_data_ids.length, tickets: [],
-      });
+      return apiResponse.success(res, { created: 0, skipped: pp_data_ids.length, tickets: [] });
     }
 
-    // Look up team name if team is assigned
-    let assignedTeamName: string | undefined;
-    if (assigned_team_id) {
-      const teamResult = await pool.query(
-        `SELECT name FROM teams WHERE id = $1`,
-        [assigned_team_id]
-      );
-      assignedTeamName = teamResult.rows[0]?.name || undefined;
-    }
-
-    logger.info('Creating PP Data maintenance tickets', {
-      eligible: records.length,
-      skipped,
-      ticket_type,
-      assigned_team_id: assigned_team_id || null,
-      assigned_team_name: assignedTeamName || null,
+    logger.info('Creating enriched PP Data tickets', {
+      eligible: records.length, skipped, ticket_type, assigned_team_id: assigned_team_id || null,
     });
 
     const tickets: { id: string; ticket_uid: string; pp_data_id: number }[] = [];
@@ -92,17 +194,37 @@ async function handler(
       const serial = record.serial_number;
       const project = record.project || 'Unknown';
 
-      // Track per-project counts for email summary
       projectCounts[project] = (projectCounts[project] || 0) + 1;
 
-      // Build title based on whether DR exists
+      // Fetch enrichment data from drops + onemap_properties
+      const enrichment = dr
+        ? await getEnrichmentForDR(dr, project)
+        : await getProjectId(project);
+
+      // Build enriched title
+      const locationParts: string[] = [];
+      if (enrichment.pole_number) locationParts.push(`Pole: ${enrichment.pole_number}`);
+      if (enrichment.zone) locationParts.push(`Zone ${enrichment.zone}`);
+      if (enrichment.pon) locationParts.push(`PON ${enrichment.pon}`);
+
       const title = dr
         ? `PP ONT ${serial} at ${dr}`
         : `PP ONT ${serial} — No DR (Project: ${project})`;
 
-      const description = dr
-        ? (notes || `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${project})`)
-        : (notes || `PP Data investigation: ONT ${serial} — not found in any source (Project: ${project}). Requires physical verification.`);
+      // Build enriched description
+      const descParts: string[] = [];
+      descParts.push(dr
+        ? `PP Data investigation: ONT ${serial} located at DR ${dr} (Project: ${project})`
+        : `PP Data investigation: ONT ${serial} — not found in any source (Project: ${project}). Requires physical verification.`);
+
+      if (locationParts.length > 0) descParts.push(`Location: ${locationParts.join(', ')}`);
+      if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
+      if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
+      if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
+      if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
+      if (enrichment.installed_at) descParts.push(`Installed: ${enrichment.installed_at}`);
+
+      const description = notes || descParts.join('\n');
 
       const ticket = await createTicket({
         source: TicketSource.PP_DATA,
@@ -113,9 +235,16 @@ async function handler(
         dr_number: dr || undefined,
         ont_serial: serial,
         created_by: req.user.id,
-        assigned_team: assignedTeamName || undefined,
         assigned_team_id: assigned_team_id || undefined,
         status: assigned_team_id ? 'assigned' : undefined,
+        project_id: enrichment.project_id || undefined,
+        address: enrichment.address || undefined,
+        zone_id: enrichment.zone || undefined,
+        pon_number: enrichment.pon || undefined,
+        // Note: pole_number maps to pole_id (UUID) column — store pole label in description instead
+        client_name: enrichment.client_name || undefined,
+        client_contact: enrichment.client_contact || undefined,
+        client_email: enrichment.client_email || undefined,
       });
 
       // Link ticket back to PP data record
@@ -124,25 +253,18 @@ async function handler(
         [ticket.id, record.id]
       );
 
-      tickets.push({
-        id: ticket.id,
-        ticket_uid: ticket.ticket_uid,
-        pp_data_id: record.id,
-      });
+      tickets.push({ id: ticket.id, ticket_uid: ticket.ticket_uid, pp_data_id: record.id });
     }
 
     logger.info('PP Data tickets created', { created: tickets.length, skipped });
 
-    // Send email notification to team members if team was assigned
     if (assigned_team_id && tickets.length > 0) {
       sendTeamNotification(assigned_team_id, tickets, projectCounts).catch((err) => {
         logger.error('Failed to send team notification email', { error: err });
       });
     }
 
-    return apiResponse.success(res, {
-      created: tickets.length, skipped, tickets,
-    });
+    return apiResponse.success(res, { created: tickets.length, skipped, tickets });
   } catch (err) {
     logger.error('Failed to create PP Data tickets', { error: err });
     return apiResponse.internalError(res, err);
@@ -150,15 +272,125 @@ async function handler(
 }
 
 /**
+ * PATCH: Backfill existing PP Data tickets with enrichment data
+ *
+ * Updates tickets that have NULL project_id, address, zone, etc.
+ * by looking up data from drops + onemap_properties tables.
+ */
+async function handleBackfill(
+  req: AuthenticatedNextApiRequest,
+  res: NextApiResponse
+): Promise<void> {
+  try {
+    // Find all pp_data tickets that need enrichment
+    const tickets = await pool.query(
+      `SELECT mt.id, mt.dr_number, mt.ont_serial, mt.description,
+              pp.project as pp_project
+       FROM maintenance_tickets mt
+       LEFT JOIN oes_pp_data pp ON pp.maintenance_ticket_id = mt.id
+       WHERE mt.source = 'pp_data'`
+    );
+
+    let updated = 0;
+    let enrichedFields = 0;
+
+    for (const ticket of tickets.rows) {
+      const dr = ticket.dr_number;
+      const projectName = ticket.pp_project;
+
+      const enrichment = dr
+        ? await getEnrichmentForDR(dr, projectName)
+        : await getProjectId(projectName);
+
+      // Build SET clause dynamically — only update NULL fields
+      const updates: string[] = [];
+      const values: any[] = [];
+      let paramIdx = 1;
+
+      const maybeSet = (column: string, value: string | undefined) => {
+        if (value) {
+          updates.push(`${column} = COALESCE(${column}, $${paramIdx})`);
+          values.push(value);
+          paramIdx++;
+        }
+      };
+
+      maybeSet('project_id', enrichment.project_id);
+      maybeSet('address', enrichment.address);
+      maybeSet('zone', enrichment.zone);
+      maybeSet('pon', enrichment.pon);
+      maybeSet('client_name', enrichment.client_name);
+      maybeSet('client_contact', enrichment.client_contact);
+      maybeSet('client_email', enrichment.client_email);
+
+      // GPS — stored as "lat,lng" text (valid_gps constraint)
+      if (enrichment.lat && enrichment.lng) {
+        const gps = `${enrichment.lat},${enrichment.lng}`;
+        updates.push(`gps_coordinates = COALESCE(gps_coordinates, $${paramIdx})`);
+        values.push(gps);
+        paramIdx++;
+      }
+
+      // Enrich description with location + contact details
+      if (enrichment.pole_number || enrichment.address || enrichment.client_name || enrichment.installer_name) {
+        const addlParts: string[] = [];
+        if (enrichment.pole_number) addlParts.push(`Pole: ${enrichment.pole_number}`);
+        if (enrichment.zone) addlParts.push(`Zone ${enrichment.zone}`);
+        if (enrichment.pon) addlParts.push(`PON ${enrichment.pon}`);
+        if (enrichment.address) addlParts.push(`Address: ${enrichment.address}`);
+        if (enrichment.client_name) addlParts.push(`End User: ${enrichment.client_name}`);
+        if (enrichment.client_contact) addlParts.push(`Contact: ${enrichment.client_contact}`);
+        if (enrichment.installer_name) addlParts.push(`Installer: ${enrichment.installer_name}`);
+        if (enrichment.installed_at) addlParts.push(`Installed: ${enrichment.installed_at}`);
+
+        const enrichmentBlock = `\n--- Enrichment Data ---\n${addlParts.join('\n')}`;
+        const currentDesc = ticket.description || '';
+
+        // Only append if not already enriched
+        if (!currentDesc.includes('--- Enrichment Data ---')) {
+          updates.push(`description = COALESCE(description, '') || $${paramIdx}`);
+          values.push(enrichmentBlock);
+          paramIdx++;
+        }
+      }
+
+      if (updates.length === 0) continue;
+
+      updates.push(`updated_at = NOW()`);
+      values.push(ticket.id);
+
+      await pool.query(
+        `UPDATE maintenance_tickets SET ${updates.join(', ')} WHERE id = $${paramIdx}`,
+        values
+      );
+
+      updated++;
+      enrichedFields += updates.length - 1; // -1 for updated_at
+    }
+
+    logger.info('PP Data tickets backfill complete', {
+      total: tickets.rows.length, updated, enrichedFields,
+    });
+
+    return apiResponse.success(res, {
+      total: tickets.rows.length,
+      updated,
+      enriched_fields: enrichedFields,
+    });
+  } catch (err) {
+    logger.error('Failed to backfill PP Data tickets', { error: err });
+    return apiResponse.internalError(res, err);
+  }
+}
+
+/**
  * Send summary email to all team members about newly created PP Data tickets.
- * Runs async (fire-and-forget) so it doesn't block the API response.
  */
 async function sendTeamNotification(
   teamId: string,
   tickets: { id: string; ticket_uid: string; pp_data_id: number }[],
   projectCounts: Record<string, number>
 ): Promise<void> {
-  // Get team name and member emails from NOC teams table
   const teamResult = await pool.query(
     `SELECT t.name AS team_name, tm.first_name, tm.email
      FROM teams t
@@ -176,14 +408,13 @@ async function sendTeamNotification(
   const teamName = members[0].team_name || 'Assigned Team';
   const ticketUids = tickets.map(t => t.ticket_uid);
 
-  // Build project breakdown
   const breakdown = Object.entries(projectCounts)
     .sort(([, a], [, b]) => b - a)
     .map(([project, count]) => `${project}: ${count}`)
     .join(', ');
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
-  const nocUrl = `${appUrl}/maintenance/noc?source=pp_data`;
+  const nocUrl = `${appUrl}/noc?source=pp_data`;
 
   const subject = `${tickets.length} PP Data Maintenance Tickets Assigned to ${teamName}`;
 
@@ -224,7 +455,6 @@ async function sendTeamNotification(
 </body>
 </html>`.trim();
 
-  // Send to each team member
   const { resend } = await import('@/lib/email/resendClient');
   const emails = members.map((m: { email: string }) => m.email);
 
@@ -236,10 +466,7 @@ async function sendTeamNotification(
   });
 
   logger.info('Team notification email sent', {
-    teamId,
-    teamName,
-    recipientCount: emails.length,
-    ticketCount: tickets.length,
+    teamId, teamName, recipientCount: emails.length, ticketCount: tickets.length,
   });
 }
 

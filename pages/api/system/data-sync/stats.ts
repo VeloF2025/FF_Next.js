@@ -20,8 +20,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Fetch maintenance stats
-    const maintenanceStats = await getMaintenanceStats();
+    // Fetch NOC stats
+    const nocStats = await getNocStats();
 
     // Fetch activate stats
     const activateStats = await getActivateStats();
@@ -33,7 +33,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const qfieldStats = await getQFieldStats();
 
     const stats: DataSyncStats = {
-      maintenance: maintenanceStats,
+      noc: nocStats,
       activate: activateStats,
       olt: oltStats,
       qfield: qfieldStats,
@@ -46,7 +46,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function getMaintenanceStats() {
+async function getNocStats() {
   try {
     // Get last QContact sync time
     const lastSyncResult = await sql`
@@ -92,7 +92,7 @@ async function getMaintenanceStats() {
       syncHealthy,
     };
   } catch (error) {
-    log.warn('Error fetching maintenance stats, returning defaults', { error });
+    log.warn('Error fetching NOC stats, returning defaults', { error });
     return {
       lastQContactSync: null,
       pendingTickets: 0,

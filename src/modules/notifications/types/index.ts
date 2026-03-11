@@ -37,7 +37,7 @@ export interface UserNotification {
 
 /** Payload passed to notify() by calling modules */
 export interface NotifyPayload {
-  /** Event type key, e.g. 'maintenance.ticket_assigned' */
+  /** Event type key, e.g. 'noc.ticket_assigned' */
   event_type: string;
   /** Title shown in bell dropdown */
   title: string;

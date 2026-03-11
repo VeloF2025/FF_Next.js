@@ -207,7 +207,7 @@ export const navigationSections = [
   'main',           // Dashboard, Meetings, Action Items
   'project',        // Projects, Clients, Contractors
   'activate',       // QA review
-  'maintenance',    // Ongoing support
+  'noc',            // Network Operations Centre
   'procurement',    // Materials
   'assets',         // Equipment
   'fleet',          // Vehicles
