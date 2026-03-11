@@ -719,14 +719,7 @@ export default function BOQDetailPage() {
               </div>
             </div>
 
-            {/* Lifecycle KPI Cards */}
-            {showProcurement && lifecycleData && (
-              <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
-                <BOQLifecycleKPIs summary={lifecycleData.summary} />
-              </div>
-            )}
-
-            {/* BOQ Utilization — budget alignment view */}
+            {/* BOQ Utilization — budget alignment view (replaces lifecycle KPI cards) */}
             {showProcurement && boq?.projectId && (
               <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
                 <BOQUtilizationTable projectId={boq.projectId} />
