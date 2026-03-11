@@ -15,7 +15,7 @@
  */
 
 import { neon } from '@/lib/db-neon';
-import { log } from '@/lib/logger';
+import { log, createLogger } from '@/lib/logger';
 import { extractSerialsFromWaPhoto } from '@/modules/activate/services/vlmExtractionService';
 import { logActivity, logWaPhotoVlmProcessed } from '@/modules/activate/services/activityLogService';
 
