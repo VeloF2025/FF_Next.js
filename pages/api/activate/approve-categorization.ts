@@ -34,7 +34,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const userId = (req as AuthenticatedNextApiRequest).user.id;
     const approvedBy = userId || 'anonymous';
 
-    const { dropNumber, approvals, approve_all } = req.body as ApproveCategorizeRequest;
+    const { dropNumber, approvals, approve_all, confirm_auto } = req.body as ApproveCategorizeRequest & { confirm_auto?: boolean };
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
@@ -42,6 +42,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
     log.info('ApproveCategorization', `Processing approval for ${dropNumber}`, {
       approve_all,
+      confirm_auto,
       approvalCount: approvals?.length || 0,
     });
 

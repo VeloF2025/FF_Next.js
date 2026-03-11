@@ -338,6 +338,10 @@ export interface CategorizePhotosResponse {
   categorizations: VlmCategorizationResult[];
   processingTimeMs: number;
   error?: string;
+  /** Auto-approval tiers for each photo */
+  autoApprovalTiers?: AutoApprovalResult[];
+  /** Summary of auto-approval breakdown */
+  autoApprovalSummary?: AutoApprovalSummary;
 }
 
 /**
@@ -363,6 +367,32 @@ export interface ApproveCategorizeResponse {
   approved_count: number;
   overridden_count: number;
   photos_metadata: Photo[];
+}
+
+/**
+ * Auto-approval tier for VLM categorization
+ * Determines how much human review is needed
+ */
+export type AutoApprovalTier = 'auto_approved' | 'review_recommended' | 'human_required';
+
+/**
+ * Auto-approval result for a single photo
+ */
+export interface AutoApprovalResult {
+  photo_filename: string;
+  tier: AutoApprovalTier;
+  reason: string;
+}
+
+/**
+ * Auto-approval summary for UI display
+ */
+export interface AutoApprovalSummary {
+  autoApproved: number;
+  reviewRecommended: number;
+  humanRequired: number;
+  totalPhotos: number;
+  overallAccuracy: number | null;
 }
 
 /**

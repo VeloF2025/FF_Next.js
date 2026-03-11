@@ -29,6 +29,11 @@ import {
   CategorizePhotosResponse,
   VlmCategorizationResult,
 } from '@/modules/activate/types/unified.types';
+import {
+  getStepAccuracy,
+  assignTiers,
+  buildSummary,
+} from '@/modules/activate/services/autoApprovalService';
 
 
 /**
@@ -136,6 +141,26 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       [JSON.stringify(categorizations), ont_barcode, ups_serial, dropNumber]
     );
 
+    // Auto-approval: assign tiers based on confidence + historical accuracy
+    let autoApprovalTiers;
+    let autoApprovalSummary;
+    try {
+      const stepAccuracy = await getStepAccuracy();
+      autoApprovalTiers = assignTiers(categorizations, stepAccuracy);
+      autoApprovalSummary = buildSummary(autoApprovalTiers, stepAccuracy);
+
+      log.info('CategorizePhotos', `Auto-approval tiers for ${dropNumber}`, {
+        auto: autoApprovalSummary.autoApproved,
+        review: autoApprovalSummary.reviewRecommended,
+        human: autoApprovalSummary.humanRequired,
+        overallAccuracy: autoApprovalSummary.overallAccuracy
+          ? `${Math.round(autoApprovalSummary.overallAccuracy * 100)}%`
+          : 'N/A',
+      });
+    } catch (tierError) {
+      log.warn('CategorizePhotos', 'Auto-approval tier assignment failed, falling back', tierError);
+    }
+
     const processingTimeMs = Date.now() - startTime;
 
     log.info('CategorizePhotos', `Categorization complete for ${dropNumber}`, {
@@ -149,6 +174,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       photoCount: categorizations.length,
       categorizations,
       processingTimeMs,
+      autoApprovalTiers,
+      autoApprovalSummary,
     };
 
     return apiResponse.success(res, response);
@@ -214,6 +241,19 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       categorizations = [];
     }
 
+    // Compute auto-approval tiers for existing results
+    let autoApprovalTiers;
+    let autoApprovalSummary;
+    if (categorizations.length > 0 && (status === 'categorized' || status === 'approved')) {
+      try {
+        const stepAccuracy = await getStepAccuracy();
+        autoApprovalTiers = assignTiers(categorizations, stepAccuracy);
+        autoApprovalSummary = buildSummary(autoApprovalTiers, stepAccuracy);
+      } catch (tierError) {
+        log.warn('CategorizePhotos', 'Failed to compute auto-approval tiers for GET', tierError);
+      }
+    }
+
     return apiResponse.success(res, {
       dropNumber,
       status,
@@ -221,6 +261,8 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse): Promise<voi
       categorizedAt: row.vlm_categorized_at,
       approvedBy: row.vlm_approved_by,
       approvedAt: row.vlm_approved_at,
+      autoApprovalTiers,
+      autoApprovalSummary,
     });
   } catch (error) {
     log.error('CategorizePhotos', 'Error getting categorization', error);
