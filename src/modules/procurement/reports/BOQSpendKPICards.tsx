@@ -39,17 +39,22 @@ export function BOQSpendKPICards({
     <>
       {/* Date Filters & Export */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-[var(--ff-text-tertiary)]" />
+        <fieldset className="flex items-center gap-2 border-0 p-0">
+          <legend className="sr-only">Filter by date range</legend>
+          <Calendar className="h-4 w-4 text-[var(--ff-text-tertiary)]" aria-hidden="true" />
+          <label htmlFor="dateFrom" className="sr-only">Start date</label>
           <input
+            id="dateFrom"
             type="date"
             value={dateFrom}
             onChange={(e) => onDateFromChange(e.target.value)}
             className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded px-2 py-1.5 text-xs text-[var(--ff-text-primary)]"
             placeholder="From"
           />
-          <span className="text-xs text-[var(--ff-text-tertiary)]">to</span>
+          <span className="text-xs text-[var(--ff-text-tertiary)]" aria-hidden="true">to</span>
+          <label htmlFor="dateTo" className="sr-only">End date</label>
           <input
+            id="dateTo"
             type="date"
             value={dateTo}
             onChange={(e) => onDateToChange(e.target.value)}
@@ -60,11 +65,12 @@ export function BOQSpendKPICards({
             <button
               onClick={() => { onDateFromChange(''); onDateToChange(''); }}
               className="text-xs text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] underline"
+              aria-label="Clear date filters"
             >
               Clear
             </button>
           )}
-        </div>
+        </fieldset>
         <div className="ml-auto">
           <button
             onClick={onExport}

@@ -236,12 +236,12 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-xl min-w-[180px]">
-        <p className="font-semibold text-xs text-muted-foreground mb-2">{elapsedLabel}</p>
+      <div className="bg-card border border-border rounded-lg p-3 shadow-xl min-w-[180px]" role="tooltip">
+        <p className="font-semibold text-xs text-muted-foreground mb-2" id="tooltip-label">{elapsedLabel}</p>
         {sorted.map((entry, idx) => (
           <div key={idx} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} aria-hidden="true" />
               <span className="text-xs text-muted-foreground truncate max-w-[120px]">{entry.name}</span>
             </div>
             <span className="text-xs font-bold tabular-nums" style={{ color: entry.color }}>
@@ -250,7 +250,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           </div>
         ))}
         {sorted.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground text-center">
+          <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground text-center" aria-live="polite">
             {groupBy !== 'pon' ? '↓ Click series to drill down' : 'PON level (deepest)'}
           </div>
         )}
@@ -290,7 +290,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     return (
       <div className="p-6">
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <TrendingUp className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <TrendingUp className="h-12 w-12 text-muted-foreground/40 mb-4" aria-hidden="true" />
           <p className="font-semibold text-muted-foreground">No activation data found</p>
           <p className="text-sm text-muted-foreground/70 mt-1">No activations recorded up to {filters.dateTo}</p>
         </div>
@@ -317,17 +317,17 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           {groupBy === 'project' ? (
             <span className="font-semibold text-foreground">All Projects</span>
           ) : (
-            <button onClick={backToProjects} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+            <button onClick={backToProjects} aria-label="Back to all projects" className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
               All Projects
             </button>
           )}
           {(groupBy === 'zone' || groupBy === 'pon') && (
             <>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               {groupBy === 'zone' ? (
                 <span className="font-semibold text-foreground">{drill.projectLabel ?? 'Project'}</span>
               ) : (
-                <button onClick={backToZones} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+                <button onClick={backToZones} aria-label={`Back to ${drill.projectLabel ?? 'Project'} zones`} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
                   {drill.projectLabel ?? 'Project'}
                 </button>
               )}
@@ -335,7 +335,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           )}
           {groupBy === 'pon' && (
             <>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <span className="font-semibold text-foreground">{drill.zoneLabel ?? 'Zone'}</span>
             </>
           )}
@@ -345,7 +345,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         <div className="flex items-center gap-3 flex-wrap">
           {canDrillDown && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground/70 italic">
-              <MousePointerClick className="h-3.5 w-3.5" />
+              <MousePointerClick className="h-3.5 w-3.5" aria-hidden="true" />
               Click a series to drill down
             </span>
           )}
@@ -361,13 +361,15 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700'
                 : 'bg-card text-muted-foreground hover:bg-accent'
             }`}
+            aria-label={`${hideZero ? 'Show all series' : 'Hide series with 0% penetration'}`}
             title="Hide series with 0% penetration"
           >
             {hideZero ? 'Showing active only' : 'Show all'}
           </button>
-          <div className="flex rounded-lg border border-border overflow-hidden">
+          <div className="flex rounded-lg border border-border overflow-hidden" role="group" aria-label="Chart granularity">
             <button
               onClick={() => setGranularity('daily')}
+              aria-pressed={granularity === 'daily'}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 granularity === 'daily'
                   ? 'bg-blue-600 text-white'
@@ -378,6 +380,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
             </button>
             <button
               onClick={() => setGranularity('weekly')}
+              aria-pressed={granularity === 'weekly'}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 granularity === 'weekly'
                   ? 'bg-blue-600 text-white'
@@ -481,6 +484,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 canDrillDown ? 'hover:shadow-md hover:scale-[1.02] cursor-pointer' : 'cursor-default'
               }`}
               style={{ borderLeftColor: color, borderLeftWidth: '3px' }}
+              aria-label={`${series.label}: ${penetration.toFixed(1)}% penetration${daysActive > 0 ? ` (${daysActive} days active)` : ''}${canDrillDown ? ', click to drill down' : ''}`}
               title={canDrillDown ? `Drill into ${series.label}` : series.label}
             >
               <p className="text-xs text-muted-foreground truncate">{series.label}</p>
@@ -491,6 +495,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 <div
                   className="h-full rounded-full transition-all"
                   style={{ width: `${pctFill}%`, backgroundColor: color }}
+                  aria-hidden="true"
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">
