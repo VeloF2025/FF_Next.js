@@ -1,10 +1,15 @@
 /**
  * PenetrationCurveReport - Activation penetration % over time with drill-down
  *
- * Purpose: Line chart showing penetration % (0-100) over time
+ * Purpose: Line chart showing penetration % (0-100) on Y-axis,
+ *          ELAPSED TIME (days/weeks since first activation) on X-axis.
+ *          All series start at Day 0 regardless of calendar start date,
+ *          making rate-of-penetration directly comparable across projects.
+ *
  * - Multi-series: Project → Zone → PON
- * - Interactive drill-down via legend clicks
- * - Breadcrumb navigation for context
+ * - Interactive drill-down via legend or badge clicks
+ * - Breadcrumb navigation showing project/zone names (not UUIDs)
+ * - X-axis = elapsed days or weeks since each series' first activation
  * - Daily/Weekly granularity toggle
  * - Summary badges showing final penetration % per series
  *
@@ -14,12 +19,13 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
-  ChevronLeft,
+  ChevronRight,
   TrendingUp,
   AlertCircle,
   Loader2,
+  MousePointerClick,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -30,11 +36,19 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  TooltipProps,
+  ReferenceLine,
 } from 'recharts';
-import type { ReportFilters, PenetrationCurveResponse, PenetrationGroupBy } from '../../types/reporting.types';
+import type {
+  ReportFilters,
+  PenetrationCurveResponse,
+  PenetrationGroupBy,
+  PenetrationSeries,
+} from '../../types/reporting.types';
 
-const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+const COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+];
 
 interface PenetrationCurveReportProps {
   filters: ReportFilters;
@@ -42,26 +56,30 @@ interface PenetrationCurveReportProps {
 }
 
 interface ChartPoint {
-  date: string;
+  elapsed: number; // days or weeks since first activation for this series
   [key: string]: unknown;
 }
 
-interface CustomTooltipPayload {
-  name: string;
-  value: number;
-  color: string;
+// Track drill-down context with both key (UUID) and display label
+interface DrillContext {
+  projectKey: string | null;
+  projectLabel: string | null;
+  zoneKey: number | null;
+  zoneLabel: string | null;
 }
 
 export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurveReportProps) {
-  // State
   const [data, setData] = useState<PenetrationCurveResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [groupBy, setGroupBy] = useState<PenetrationGroupBy>('project');
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [selectedZone, setSelectedZone] = useState<number | null>(null);
+  const [drill, setDrill] = useState<DrillContext>({
+    projectKey: null, projectLabel: null,
+    zoneKey: null, zoneLabel: null,
+  });
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('daily');
+  const [hideZero, setHideZero] = useState(true);
 
   // Fetch data
   useEffect(() => {
@@ -76,18 +94,15 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         params.set('groupBy', groupBy);
         params.set('granularity', granularity);
 
-        if (groupBy !== 'project' && selectedProject) {
-          params.set('project', selectedProject);
+        if (groupBy !== 'project' && drill.projectKey) {
+          params.set('project', drill.projectKey);
         }
-
-        if (groupBy === 'pon' && selectedZone !== null) {
-          params.set('zone', selectedZone.toString());
+        if (groupBy === 'pon' && drill.zoneKey !== null) {
+          params.set('zone', drill.zoneKey.toString());
         }
 
         const res = await fetch(`/api/activate/reporting/penetration-curve?${params}`);
-        if (!res.ok) {
-          throw new Error(`Failed to fetch: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
         const json = await res.json();
         setData(json);
       } catch (err) {
@@ -98,81 +113,147 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     };
 
     fetchData();
-  }, [filters, refreshKey, groupBy, selectedProject, selectedZone, granularity]);
+  }, [filters, refreshKey, groupBy, drill, granularity]);
 
-  // Drill-down handler
-  const handleDrillDown = (series: { key: string; label: string }) => {
+  // Drill-down handler — preserves labels for breadcrumb
+  const handleDrillDown = (series: PenetrationSeries) => {
     if (groupBy === 'project') {
       setGroupBy('zone');
-      setSelectedProject(series.key);
+      setDrill(d => ({ ...d, projectKey: series.key, projectLabel: series.label }));
     } else if (groupBy === 'zone') {
       const zoneNo = parseInt(series.key.replace('zone-', ''), 10);
       setGroupBy('pon');
-      setSelectedZone(zoneNo);
+      setDrill(d => ({ ...d, zoneKey: zoneNo, zoneLabel: series.label }));
     }
   };
 
-  // Breadcrumb navigation
-  const getBreadcrumb = () => {
-    if (groupBy === 'project') {
-      return ['All Projects'];
-    } else if (groupBy === 'zone') {
-      return [
-        { label: 'All Projects', onClick: () => { setGroupBy('project'); setSelectedProject(null); } },
-        `Project ${selectedProject ? selectedProject.substring(0, 8) : '?'}`,
-      ];
-    } else {
-      const zoneLabel = selectedZone !== null ? `Zone ${selectedZone}` : '?';
-      return [
-        { label: 'All Projects', onClick: () => { setGroupBy('project'); setSelectedProject(null); setSelectedZone(null); } },
-        { label: `Project ${selectedProject ? selectedProject.substring(0, 8) : '?'}`, onClick: () => { setGroupBy('zone'); setSelectedZone(null); } },
-        zoneLabel,
-      ];
-    }
+  const backToProjects = () => {
+    setGroupBy('project');
+    setDrill({ projectKey: null, projectLabel: null, zoneKey: null, zoneLabel: null });
   };
 
-  // Transform data for chart
-  const getChartData = (): ChartPoint[] => {
-    if (!data || data.series.length === 0) {
-      return [];
-    }
+  const backToZones = () => {
+    setGroupBy('zone');
+    setDrill(d => ({ ...d, zoneKey: null, zoneLabel: null }));
+  };
 
-    const points: ChartPoint[] = [];
-    for (const date of data.dates) {
-      const point: ChartPoint = { date };
+  // Transform API date-based data into elapsed-time-based chart data.
+  // Each series independently starts at elapsed=0 (its own first activation date).
+  // Weekly mode groups into week buckets (elapsed = weeks since first activation).
+  const { chartData, maxElapsed } = useMemo(() => {
+    if (!data || data.series.length === 0) return { chartData: [], maxElapsed: 0 };
 
-      for (const series of data.series) {
-        const seriesPoint = series.points.find((p) => p.date === date);
-        if (seriesPoint) {
-          point[series.key] = seriesPoint.penetration_pct;
+    // Build per-series elapsed→penetration maps
+    const seriesElapsedMaps = new Map<string, Map<number, number>>();
+    let globalMax = 0;
+
+    const visibleSeries = hideZero
+      ? data.series.filter(s => s.points.length > 0 && (s.points[s.points.length - 1]?.penetration_pct ?? 0) > 0)
+      : data.series;
+
+    for (const series of visibleSeries) {
+      if (series.points.length === 0) continue;
+
+      const firstDate = new Date(((series.points[0]?.date ?? '') as string) + 'T00:00:00');
+      const elapsedMap = new Map<number, number>();
+
+      for (const point of series.points) {
+        const pointDate = new Date((point.date as string) + 'T00:00:00');
+        const daysElapsed = Math.round(
+          (pointDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        const elapsed = granularity === 'weekly' ? Math.floor(daysElapsed / 7) : daysElapsed;
+
+        // For weekly buckets, keep the highest penetration (last point in the week)
+        const existing = elapsedMap.get(elapsed) ?? -1;
+        if (point.penetration_pct > existing) {
+          elapsedMap.set(elapsed, point.penetration_pct);
         }
+        if (elapsed > globalMax) globalMax = elapsed;
       }
 
-      points.push(point);
+      seriesElapsedMaps.set(series.key, elapsedMap);
     }
 
-    return points;
+    // Collect all unique elapsed values across all series
+    const allElapsed = new Set<number>();
+    for (const elapsedMap of seriesElapsedMaps.values()) {
+      for (const elapsed of elapsedMap.keys()) {
+        allElapsed.add(elapsed);
+      }
+    }
+
+    const sortedElapsed = Array.from(allElapsed).sort((a, b) => a - b);
+
+    const chartPoints: ChartPoint[] = sortedElapsed.map(elapsed => {
+      const point: ChartPoint = { elapsed };
+      for (const series of visibleSeries) {
+        const val = seriesElapsedMaps.get(series.key)?.get(elapsed);
+        if (val !== undefined) point[series.key] = val;
+        // undefined = no data at this elapsed value → gap in line (connectNulls=false)
+      }
+      return point;
+    });
+
+    return { chartData: chartPoints, maxElapsed: globalMax };
+  }, [data, granularity]);
+
+  // Smart X-axis ticks for elapsed time
+  const xAxisTicks = useMemo(() => {
+    if (maxElapsed === 0) return [0];
+
+    const step = granularity === 'weekly'
+      ? (maxElapsed <= 12 ? 1 : maxElapsed <= 26 ? 2 : 4) // weekly: every 1/2/4 weeks
+      : (maxElapsed <= 60 ? 10 : maxElapsed <= 180 ? 30 : 60); // daily: every 10/30/60 days
+
+    const ticks: number[] = [];
+    for (let i = 0; i <= maxElapsed; i += step) {
+      ticks.push(i);
+    }
+    return ticks;
+  }, [maxElapsed, granularity]);
+
+  // X-axis label formatter
+  const formatXTick = (val: number) => {
+    if (granularity === 'weekly') return `Wk ${val}`;
+    return `D${val}`;
   };
 
-  const chartData = getChartData();
+  // Custom tooltip — shows elapsed label + series values ranked desc
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ name: string; value: number; color: string }>;
+    label?: number;
+  }) => {
+    if (!active || !payload || payload.length === 0) return null;
 
-  // Custom tooltip
-  const CustomTooltip = (props: TooltipProps<number, string> & { payload?: CustomTooltipPayload[]; label?: string }) => {
-    const { active, payload, label } = props;
-    if (!active || !payload || !data) return null;
+    const elapsedLabel = granularity === 'weekly'
+      ? `Week ${label ?? 0}`
+      : `Day ${label ?? 0}`;
+
+    const sorted = [...payload]
+      .filter(e => typeof e.value === 'number')
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     return (
-      <div className="bg-card border border-border rounded p-3 shadow-lg">
-        <p className="font-semibold text-sm">{label}</p>
-        {payload.map((entry, idx) => {
-          const series = data.series.find((s) => s.key === entry.name);
-          const value = entry.value as number;
-          return (
-            <p key={idx} style={{ color: entry.color }} className="text-sm">
-              {series?.label}: {value.toFixed(1)}%
-            </p>
-          );
-        })}
+      <div className="bg-card border border-border rounded-lg p-3 shadow-xl min-w-[180px]">
+        <p className="font-semibold text-xs text-muted-foreground mb-2">{elapsedLabel}</p>
+        {sorted.map((entry, idx) => (
+          <div key={idx} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+              <span className="text-xs text-muted-foreground truncate max-w-[120px]">{entry.name}</span>
+            </div>
+            <span className="text-xs font-bold tabular-nums" style={{ color: entry.color }}>
+              {entry.value.toFixed(1)}%
+            </span>
+          </div>
+        ))}
+        {sorted.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground text-center">
+            {groupBy !== 'pon' ? '↓ Click series to drill down' : 'PON level (deepest)'}
+          </div>
+        )}
       </div>
     );
   };
@@ -180,10 +261,10 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   // Loading state
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-600" />
-          <p className="text-muted-foreground">Loading penetration curve...</p>
+      <div className="flex items-center justify-center p-16">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto text-blue-500" />
+          <p className="text-sm text-muted-foreground">Loading penetration curve...</p>
         </div>
       </div>
     );
@@ -192,12 +273,12 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   // Error state
   if (error) {
     return (
-      <div className="p-6 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-        <div className="flex gap-3">
+      <div className="p-6">
+        <div className="flex gap-3 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
           <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-red-900 dark:text-red-100">Error</h3>
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <p className="font-semibold text-sm text-red-900 dark:text-red-100">Failed to load data</p>
+            <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">{error}</p>
           </div>
         </div>
       </div>
@@ -205,95 +286,159 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   }
 
   // Empty state
-  if (!data || data.series.length === 0) {
+  if (!data || data.series.length === 0 || chartData.length === 0) {
     return (
-      <div className="p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/30">
-        <div className="flex gap-3">
-          <TrendingUp className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-gray-700 dark:text-gray-300">No Data</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">No activations found for the selected period and filters.</p>
-          </div>
+      <div className="p-6">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <TrendingUp className="h-12 w-12 text-muted-foreground/40 mb-4" />
+          <p className="font-semibold text-muted-foreground">No activation data found</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">No activations recorded up to {filters.dateTo}</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        {getBreadcrumb().map((item, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            {typeof item === 'string' ? (
-              <span className="font-medium text-foreground">{item}</span>
-            ) : (
-              <button
-                onClick={item.onClick}
-                className="text-blue-600 hover:underline flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                {item.label}
-              </button>
-            )}
-            {idx < getBreadcrumb().length - 1 && <span>/</span>}
-          </div>
-        ))}
-      </div>
+  const canDrillDown = groupBy !== 'pon';
+  const chartTitle = groupBy === 'project'
+    ? 'All Projects'
+    : groupBy === 'zone'
+    ? `${drill.projectLabel ?? 'Project'} — Zones`
+    : `${drill.projectLabel ?? 'Project'} › ${drill.zoneLabel ?? 'Zone'} — PONs`;
 
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex gap-2">
+  const xAxisLabel = granularity === 'weekly' ? 'Weeks since first activation' : 'Days since first activation';
+
+  return (
+    <div className="p-6 space-y-5">
+
+      {/* Header row: breadcrumb + controls */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-sm flex-wrap">
+          {groupBy === 'project' ? (
+            <span className="font-semibold text-foreground">All Projects</span>
+          ) : (
+            <button onClick={backToProjects} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+              All Projects
+            </button>
+          )}
+          {(groupBy === 'zone' || groupBy === 'pon') && (
+            <>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              {groupBy === 'zone' ? (
+                <span className="font-semibold text-foreground">{drill.projectLabel ?? 'Project'}</span>
+              ) : (
+                <button onClick={backToZones} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+                  {drill.projectLabel ?? 'Project'}
+                </button>
+              )}
+            </>
+          )}
+          {groupBy === 'pon' && (
+            <>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <span className="font-semibold text-foreground">{drill.zoneLabel ?? 'Zone'}</span>
+            </>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {canDrillDown && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground/70 italic">
+              <MousePointerClick className="h-3.5 w-3.5" />
+              Click a series to drill down
+            </span>
+          )}
+          {groupBy === 'pon' && (
+            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+              PON level — deepest
+            </span>
+          )}
           <button
-            onClick={() => setGranularity('daily')}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              granularity === 'daily'
-                ? 'bg-blue-600 text-white'
-                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
+            onClick={() => setHideZero(h => !h)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg border border-border transition-colors ${
+              hideZero
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700'
+                : 'bg-card text-muted-foreground hover:bg-accent'
             }`}
+            title="Hide series with 0% penetration"
           >
-            Daily
+            {hideZero ? 'Showing active only' : 'Show all'}
           </button>
-          <button
-            onClick={() => setGranularity('weekly')}
-            className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-              granularity === 'weekly'
-                ? 'bg-blue-600 text-white'
-                : 'bg-secondary text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-600'
-            }`}
-          >
-            Weekly
-          </button>
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              onClick={() => setGranularity('daily')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                granularity === 'daily'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              Daily
+            </button>
+            <button
+              onClick={() => setGranularity('weekly')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                granularity === 'weekly'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              Weekly
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Chart */}
-      <div className="bg-card border border-border rounded-lg p-4 h-96">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+      <div className="bg-card border border-border rounded-xl p-4" style={{ height: 480 }}>
+        <p className="text-xs font-medium text-muted-foreground mb-1 ml-1">
+          {chartTitle} — Penetration % · {xAxisLabel}
+        </p>
+        <ResponsiveContainer width="100%" height="92%">
+          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
             <XAxis
-              dataKey="date"
+              dataKey="elapsed"
+              type="number"
+              domain={[0, maxElapsed]}
+              ticks={xAxisTicks}
+              tickFormatter={formatXTick}
               stroke="var(--muted-foreground)"
-              tickFormatter={(date: string) => {
-                const d = new Date(date);
-                return d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
+              tick={{ fontSize: 11 }}
+              tickLine={false}
+              label={{
+                value: xAxisLabel,
+                position: 'insideBottom',
+                offset: -12,
+                style: { fontSize: 11, fill: 'var(--muted-foreground)' },
               }}
             />
             <YAxis
-              stroke="var(--muted-foreground)"
               domain={[0, 100]}
-              tickFormatter={(val: number) => `${val}%`}
+              tickFormatter={(v: number) => `${v}%`}
+              stroke="var(--muted-foreground)"
+              tick={{ fontSize: 11 }}
+              tickLine={false}
+              width={40}
             />
+            <ReferenceLine y={100} stroke="#10b981" strokeDasharray="4 2" strokeOpacity={0.4} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend 
-              onClick={(e) => {
-                const series = data.series.find((s) => s.key === e.dataKey);
-                if (series && groupBy !== 'pon') {
-                  handleDrillDown(series);
-                }
+            <Legend
+              verticalAlign="top"
+              align="right"
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{
+                paddingBottom: '8px',
+                cursor: canDrillDown ? 'pointer' : 'default',
+                fontSize: '12px',
               }}
-              wrapperStyle={{ cursor: groupBy !== 'pon' ? 'pointer' : 'default' }}
+              onClick={(e) => {
+                if (!canDrillDown) return;
+                const series = data.series.find(s => s.key === e.dataKey);
+                if (series) handleDrillDown(series);
+              }}
             />
             {data.series.map((series, idx) => (
               <Line
@@ -304,38 +449,62 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 stroke={COLORS[idx % COLORS.length]}
                 dot={false}
                 strokeWidth={2}
+                activeDot={{ r: 4, strokeWidth: 0 }}
                 isAnimationActive={false}
+                connectNulls={true}
               />
             ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Summary badges */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {data.series.map((series, idx) => {
+      {/* Summary badges — clickable for drill-down */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {(hideZero ? data.series.filter(s => s.points.length > 0 && (s.points[s.points.length - 1]?.penetration_pct ?? 0) > 0) : data.series).map((series, idx) => {
           const lastPoint = series.points[series.points.length - 1];
           const penetration = lastPoint?.penetration_pct ?? 0;
+          const color = COLORS[idx % COLORS.length];
+          const pctFill = Math.min(penetration, 100);
+          const daysActive = series.points.length > 0
+            ? Math.round(
+                (new Date(((series.points[series.points.length - 1]?.date ?? '') as string) + 'T00:00:00').getTime() -
+                 new Date(((series.points[0]?.date ?? '') as string) + 'T00:00:00').getTime()) /
+                (1000 * 60 * 60 * 24)
+              )
+            : 0;
           return (
-            <div
+            <button
               key={series.key}
-              className="p-3 rounded-lg border border-border bg-card"
-              style={{ borderLeftColor: COLORS[idx % COLORS.length], borderLeftWidth: '4px' }}
+              onClick={() => canDrillDown ? handleDrillDown(series) : undefined}
+              disabled={!canDrillDown}
+              className={`text-left p-3 rounded-xl border border-border bg-card transition-all ${
+                canDrillDown ? 'hover:shadow-md hover:scale-[1.02] cursor-pointer' : 'cursor-default'
+              }`}
+              style={{ borderLeftColor: color, borderLeftWidth: '3px' }}
+              title={canDrillDown ? `Drill into ${series.label}` : series.label}
             >
               <p className="text-xs text-muted-foreground truncate">{series.label}</p>
-              <p className="text-lg font-bold">{penetration.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground mt-1">{lastPoint?.cumulative ?? 0} / {series.total_scope}</p>
-            </div>
+              <p className="text-xl font-bold mt-0.5" style={{ color }}>
+                {penetration.toFixed(1)}%
+              </p>
+              <div className="mt-2 h-1.5 bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${pctFill}%`, backgroundColor: color }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {(lastPoint?.cumulative ?? 0).toLocaleString()} / {series.total_scope.toLocaleString()}
+              </p>
+              {daysActive > 0 && (
+                <p className="text-xs text-muted-foreground/60 mt-0.5">
+                  {daysActive}d active
+                </p>
+              )}
+            </button>
           );
         })}
       </div>
-
-      {/* Message for PON level */}
-      {groupBy === 'pon' && (
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-xs text-blue-900 dark:text-blue-100">
-          PON level — deepest drill available
-        </div>
-      )}
     </div>
   );
 }
