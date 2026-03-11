@@ -33,6 +33,11 @@ interface CostCenterOption {
   name: string;
 }
 
+interface DepartmentOption {
+  id: string;
+  name: string;
+}
+
 type SpendType = 'project' | 'cost_centre';
 
 export interface Step1RequirementsProps {
@@ -69,6 +74,7 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
 
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [costCentres, setCostCentres] = useState<CostCenterOption[]>([]);
+  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingCC, setIsLoadingCC] = useState(true);
   const [boqLines, setBoqLines] = useState<BOQLineUtilization[]>([]);
@@ -105,6 +111,20 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
         log.error('Failed to load cost centres', { err }, 'Step1Requirements');
       } finally {
         setIsLoadingCC(false);
+      }
+    };
+    load();
+  }, []);
+
+  // Load departments list
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/departments?isActive=true');
+        const json = (await res.json()) as { success: boolean; data?: DepartmentOption[] };
+        if (json.success && json.data) setDepartments(json.data);
+      } catch (err) {
+        log.error('Failed to load departments', { err }, 'Step1Requirements');
       }
     };
     load();
@@ -444,14 +464,17 @@ export function Step1Requirements({ state, onComplete }: Step1RequirementsProps)
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
               Department (Optional)
             </label>
-            <input
-              type="text"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g., Operations, Finance"
-              maxLength={100}
-              className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-            />
+            <div className="relative">
+              <select
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full px-4 py-2 pr-10 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+              >
+                <option value="">Select department</option>
+                {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+            </div>
           </div>
 
           {/* Required date */}

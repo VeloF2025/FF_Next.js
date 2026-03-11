@@ -70,8 +70,9 @@ export default function NewRequisitionPage() {
     { id: crypto.randomUUID(), itemDescription: '', quantity: '', uom: 'units', estimatedUnitPrice: '', notes: '' },
   ]);
 
-  // Projects
+  // Projects & departments
   const [projects, setProjects] = useState<Project[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
   // Form state
@@ -95,6 +96,20 @@ export default function NewRequisitionPage() {
       }
     };
     loadProjects();
+  }, []);
+
+  // Load departments
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/departments?isActive=true');
+        const json = await res.json() as { success: boolean; data?: { id: string; name: string }[] };
+        if (json.success && json.data) setDepartments(json.data);
+      } catch (err) {
+        log.error('Failed to load departments', err);
+      }
+    };
+    load();
   }, []);
 
   // Calculate totals
@@ -303,14 +318,17 @@ export default function NewRequisitionPage() {
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
                   Department (Optional)
                 </label>
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="e.g., Operations, Finance"
-                  className="w-full px-4 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                  maxLength={100}
-                />
+                <div className="relative">
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="w-full px-4 py-2 pr-10 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none"
+                  >
+                    <option value="">Select department</option>
+                    {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+                </div>
               </div>
 
               {/* Required Date */}
