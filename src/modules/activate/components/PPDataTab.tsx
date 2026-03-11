@@ -19,6 +19,11 @@ interface PPRecord {
   resolved_at: string | null;
   maintenance_ticket_id: string | null;
   ticket_uid: string | null;
+  oes_team: string | null;
+  activation_date: string | null;
+  wa_phone: string | null;
+  wa_name: string | null;
+  wa_team: string | null;
 }
 
 interface PPStats {
@@ -529,6 +534,9 @@ export function PPDataTab() {
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Registered</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Status</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">DR</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Install Team</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Activation</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">WA Technician</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Source</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Ticket</th>
                 </tr>
@@ -562,6 +570,22 @@ export function PPDataTab() {
                       <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">
                         {record.resolved_drop_number || '-'}
                       </td>
+                      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
+                        {record.oes_team || '-'}
+                      </td>
+                      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
+                        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {record.wa_name ? (
+                          <div>
+                            <span className="text-[var(--ff-text-primary)]">{record.wa_name}</span>
+                            {record.wa_phone && (
+                              <span className="block text-[var(--ff-text-tertiary)] font-mono text-[10px]">{record.wa_phone}</span>
+                            )}
+                          </div>
+                        ) : '-'}
+                      </td>
                       <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
                         {record.resolved_source || '-'}
                       </td>
@@ -582,7 +606,7 @@ export function PPDataTab() {
                 })}
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
+                    <td colSpan={11} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
                       No records found
                     </td>
                   </tr>

@@ -103,9 +103,17 @@ async function handler(
     );
 
     const dataResult = await pool.query(
-      `SELECT pp.*, mt.ticket_uid
+      `SELECT pp.*, mt.ticket_uid,
+              oa.team AS oes_team,
+              oa.activation_date,
+              dur.sender_phone AS wa_phone,
+              COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
+              wc.team AS wa_team
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
+       LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
+       LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
+       LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
        WHERE 1=1${whereClause}
        ORDER BY pp.created_at DESC
        LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
@@ -139,28 +147,36 @@ async function handler(
     let paramIndex = 1;
 
     if (project) {
-      whereClause += ` AND project = $${paramIndex++}`;
+      whereClause += ` AND pp.project = $${paramIndex++}`;
       params.push(project);
     }
     if (status) {
-      whereClause += ` AND resolution_status = $${paramIndex++}`;
+      whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }
     if (exportDateFrom) {
-      whereClause += ` AND date_registered >= $${paramIndex++}::date`;
+      whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
       params.push(exportDateFrom);
     }
     if (exportDateTo) {
-      whereClause += ` AND date_registered <= $${paramIndex++}::date`;
+      whereClause += ` AND pp.date_registered <= $${paramIndex++}::date`;
       params.push(exportDateTo);
     }
 
     const dataResult = await pool.query(
-      `SELECT serial_number, project, date_registered, resolution_status,
-              resolved_drop_number, resolved_source, resolved_at
-       FROM oes_pp_data
+      `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
+              pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
+              oa.team AS oes_team,
+              oa.activation_date,
+              dur.sender_phone AS wa_phone,
+              COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
+              wc.team AS wa_team
+       FROM oes_pp_data pp
+       LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
+       LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
+       LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
        WHERE 1=1${whereClause}
-       ORDER BY project, resolution_status, serial_number`,
+       ORDER BY pp.project, pp.resolution_status, pp.serial_number`,
       params
     );
 
@@ -182,6 +198,11 @@ async function handler(
       'Resolved DR': r.resolved_drop_number || '',
       'Source': r.resolved_source || '',
       'Resolved At': r.resolved_at ? new Date(r.resolved_at).toLocaleString() : '',
+      'Install Team': r.oes_team || '',
+      'Activation Date': r.activation_date ? new Date(r.activation_date).toLocaleDateString() : '',
+      'WA Technician': r.wa_name || '',
+      'WA Phone': r.wa_phone || '',
+      'WA Team': r.wa_team || '',
     }));
 
     const wb = XLSX.utils.book_new();
