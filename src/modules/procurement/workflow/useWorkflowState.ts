@@ -9,7 +9,7 @@ import { log } from '@/lib/logger';
 
 // 🟢 WORKING: full type coverage
 export interface WorkflowState {
-  currentStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  currentStep: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   strategy?: 'rfq' | 'direct_po';
   /** Pipeline thread (DB-backed tracking) */
   threadId?: string;
@@ -23,15 +23,20 @@ export interface WorkflowState {
   /** Step 4 */
   approvalStatus?: 'auto_approved' | 'pending' | 'approved' | 'rejected';
   approvalRequestId?: string;
-  /** Step 5 */
+  /** Step 5 — Sourcing */
   rfqId?: string;
   rfqNumber?: string;
+  /** Step 6 — Quote & Award */
+  selectedSupplierId?: string;
+  selectedSupplierName?: string;
+  awardedQuoteAmount?: number;
+  /** Step 7 — Create PO */
   poId?: string;
   poNumber?: string;
-  /** Step 6 */
+  /** Step 8 — Receive Goods */
   grnId?: string;
   grnStatus?: 'pending' | 'created' | 'confirmed';
-  /** Steps 7–8 */
+  /** Steps 9–10 */
   paymentApprovalRequestId?: string;
   invoiceAmount?: number;
   invoiceDueDate?: string;
@@ -41,7 +46,7 @@ export interface WorkflowState {
 const STORAGE_KEY = 'procurement_workflow_state';
 
 const STEP_MIN = 1;
-const STEP_MAX = 9;
+const STEP_MAX = 10;
 
 type StepNumber = WorkflowState['currentStep'];
 
