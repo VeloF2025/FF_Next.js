@@ -21,10 +21,10 @@ Given a user story (either as a file path or inline steps), you:
 ## Environment
 
 - **Local Dev**: `http://localhost:3004`
-- **Staging**: `https://vf.fibreflow.app`
+- **Dev**: `https://dev.fibreflow.app`
 - **Production**: `https://app.fibreflow.app`
 
-Default to staging (`https://vf.fibreflow.app`) unless told otherwise.
+Default to dev (`https://dev.fibreflow.app`) unless told otherwise.
 
 ## Execution Protocol
 
@@ -168,7 +168,7 @@ Use the browser-qa agent to validate the "dashboard-load" user story against sta
 ```
 
 ```
-Use the browser-qa agent to check if the staff list page loads correctly at https://vf.fibreflow.app/staff
+Use the browser-qa agent to check if the staff list page loads correctly at https://dev.fibreflow.app/staff
 ```
 
 ```

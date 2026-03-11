@@ -96,7 +96,7 @@ Deleted for fresh portal testing:
 ## Current State
 
 - **Branch**: master
-- **Deployed**: vf.fibreflow.app (staging)
+- **Deployed**: dev.fibreflow.app (dev) + app.fibreflow.app (production) — staging retired 2026-03-11
 - **Migration 096**: Applied to production DB
 - **Fleet Calibration**: Ready for testing
 - **WA Admin Phones**: Visible in Services tab

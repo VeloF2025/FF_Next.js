@@ -37,12 +37,11 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 - Benchmark system (7 tests: 2 text + 5 image)
 - Service management on Velocity Server
 
-### `infrastructure/staging.md`
+### `infrastructure/staging.md` *(DEPRECATED — Staging retired 2026-03-11)*
 **Trigger:** staging, deploy, vf.fibreflow.app, deployment
-- Staging server deployment
-- Service management
-- Rollback procedures
-- Troubleshooting common issues
+- Historical reference only — staging environment is retired
+- vf.fibreflow.app now redirects to app.fibreflow.app
+- Standalone services still live: wa-proxy (:8092), pdf-tools (:3007)
 
 ---
 

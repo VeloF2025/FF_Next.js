@@ -24,7 +24,7 @@
 Before any testing, verify:
 
 ```
-1. Server running: PORT=3005 npm start (or staging URL)
+1. Server running: PORT=3005 npm start (or production URL)
 2. Database connectivity: GET /api/health/db
 3. Authentication: User logged in with appropriate role
 4. Browser: Chrome with claude-in-chrome extension
@@ -58,7 +58,7 @@ Before any testing, verify:
 
 ### Latest Audit Results (Jan 19, 2026)
 
-**Environment:** vf.fibreflow.app (Staging)
+**Environment:** app.fibreflow.app (Production)
 
 | Module/Page | Status | Notes |
 |-------------|--------|-------|
@@ -713,7 +713,7 @@ TC-ASS-002: Maintenance
 ## Application: FibreFlow
 ## Date: [YYYY-MM-DD HH:MM]
 ## Tester: Claude Code
-## Environment: [localhost:3005 | vf.fibreflow.app]
+## Environment: [localhost:3005 | app.fibreflow.app]
 
 ---
 

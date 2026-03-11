@@ -42,10 +42,10 @@ Comprehensive architecture documentation with Mermaid diagrams for the FibreFlow
 | Environment | URL | Port |
 |-------------|-----|------|
 | Production | app.fibreflow.app | 3000 |
-| Staging | vf.fibreflow.app | 3006 |
 | Dev | dev.fibreflow.app | 3005 |
-| Backup | backup.fibreflow.app | 3005 |
 | Local | localhost:3004 | 3004 |
+
+> Staging retired 2026-03-11. `vf.fibreflow.app` redirects to production.
 
 ## Viewing Mermaid Diagrams
 

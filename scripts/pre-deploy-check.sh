@@ -2,11 +2,11 @@
 # =============================================================================
 # pre-deploy-check.sh — Deployment Safety Checks for FibreFlow
 # =============================================================================
-# Validates environment before deploying to production, staging, or dev.
+# Validates environment before deploying to production or dev.
 # Catches zombie processes, port conflicts, stale PIDs, and build readiness.
 #
 # Usage:
-#   bash scripts/pre-deploy-check.sh [prod|staging|dev]
+#   bash scripts/pre-deploy-check.sh [prod|dev]
 #   bash scripts/pre-deploy-check.sh          # defaults to production
 #
 # Exit code: 0 = safe to deploy, 1 = issues found (do NOT deploy)
@@ -16,9 +16,8 @@ ENV="${1:-prod}"
 
 case "$ENV" in
   prod|production) PORT=3000; SVC="fibreflow-production"; URL="https://app.fibreflow.app"; DIR="/home/velo/fibreflow-production" ;;
-  staging|stg)     PORT=3006; SVC="fibreflow";            URL="https://vf.fibreflow.app";  DIR="/home/velo/fibreflow-staging"   ;;
   dev)             PORT=3005; SVC="fibreflow-dev";        URL="https://dev.fibreflow.app"; DIR="/home/velo/fibreflow-dev"       ;;
-  *)               echo "Unknown env: $ENV. Use prod|staging|dev"; exit 1 ;;
+  *)               echo "Unknown env: $ENV. Use prod|dev"; exit 1 ;;
 esac
 
 PASS=0

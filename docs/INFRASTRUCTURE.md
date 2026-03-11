@@ -24,14 +24,14 @@
 
 ## FibreFlow Deployments
 
-All three environments share the **same production database** (Neon PostgreSQL).
+Both environments share the **same production database** (Neon PostgreSQL).
+
+> **Staging retired 2026-03-11.** `vf.fibreflow.app` now 301-redirects to `app.fibreflow.app`. Standalone services (wa-proxy :8092, pdf-tools :3007) still route through vf.fibreflow.app nginx block.
 
 | Environment | Port | Directory | URL | Service |
 |-------------|------|-----------|-----|---------|
 | **Production** | 3000 | `/home/velo/fibreflow-production` | app.fibreflow.app | `fibreflow-production.service` |
-| **Staging** | 3006 | `/home/velo/fibreflow-staging` | vf.fibreflow.app | `fibreflow.service` |
 | **Dev** | 3005 | `/home/velo/fibreflow-dev` | dev.fibreflow.app | `fibreflow-dev.service` |
-| **Backup (VPS)** | 3005 | `/opt/fibreflow` | backup.fibreflow.app | `fibreflow-backup.service` |
 
 All deploy directories on Velocity are under `/home/velo/`. Backup runs on VPS (72.61.197.178).
 
@@ -58,7 +58,6 @@ Claude/hein runs directly on Velocity — no SSH needed. Passwordless sudo via `
 **One-command deploy (recommended):**
 ```bash
 bash scripts/deploy-local.sh dev              # Deploy to dev (always allowed)
-bash scripts/deploy-local.sh staging          # After hours only
 bash scripts/deploy-local.sh production       # After hours only
 bash scripts/deploy-local.sh status           # Show all environments
 ```
@@ -72,10 +71,9 @@ bash scripts/deploy-local.sh status           # Show all environments
 - Restarts service + HTTP health check
 - Keeps last 3 `.next-backup-*` builds for rollback
 
-**Promotion scripts (exact commit between envs):**
+**Promotion script (exact commit between envs):**
 ```bash
-bash scripts/promote.sh dev staging          # After hours
-bash scripts/promote.sh staging production   # After hours
+bash scripts/promote.sh dev production       # After hours
 ```
 
 **Legacy:** `deploy-gate.sh` auto-redirects to `deploy-local.sh` when running on Velocity (hostname detection).
@@ -100,10 +98,7 @@ upstream fibreflow_prod {
     server 72.61.197.178:3005 backup;
 }
 
-upstream fibreflow_staging {
-    server localhost:3006;
-    server 72.61.197.178:3005 backup;
-}
+# upstream fibreflow_staging — REMOVED (staging retired 2026-03-11)
 
 upstream fibreflow_dev {
     server localhost:3005;
@@ -133,7 +128,7 @@ Hourly cron on VPS keeps backup in sync with master:
 | Domain | Points To | Proxy |
 |--------|-----------|-------|
 | **app.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3000 / VPS backup) | Yes |
-| **vf.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3006 / VPS backup) | Yes |
+| **vf.fibreflow.app** | 301 redirect → app.fibreflow.app (staging retired 2026-03-11) | Yes |
 | **dev.fibreflow.app** | Cloudflare Tunnel → nginx → upstream (localhost:3005 / VPS backup) | Yes |
 
 **Cloudflare Tunnel Service:** `cloudflared-tunnel.service`
@@ -150,7 +145,7 @@ Automated health monitoring runs every 5 minutes on Velocity:
 **Cron:** `*/5 * * * *`
 
 **Monitors:**
-- All FibreFlow services (prod, staging, dev)
+- All FibreFlow services (prod, dev)
 - Support services (VLM, QField, WA, PDFCraft, Storage)
 - Docker containers (QFieldCloud)
 
@@ -168,9 +163,7 @@ Automated health monitoring runs every 5 minutes on Velocity:
 | Service | Port | Description |
 |---------|------|-------------|
 | `fibreflow-production.service` | 3000 | Production FibreFlow |
-| `fibreflow.service` | 3006 | Staging FibreFlow |
 | `fibreflow-dev.service` | 3005 | Dev FibreFlow |
-| `fibreflow-backup.service` | 3005 (VPS) | Backup FibreFlow |
 | `fibreflow-storage.service` | 8091 | Storage API (`/srv/data/fibreflow-storage`) |
 | `pdfcraft.service` | 3007 | PDFCraft (vf.fibreflow.app/pdf-tools/) |
 
@@ -285,7 +278,7 @@ QFIELD_API_KEY=your_api_key
 |------|---------|--------|
 | 3000 | Production FibreFlow | Active |
 | 3005 | Dev FibreFlow / VPS Backup | Active |
-| 3006 | Staging FibreFlow | Active |
+| 3006 | ~~Staging FibreFlow~~ (retired 2026-03-11) | Inactive |
 | 3007 | PDFCraft | Active |
 | 3007 | PDFCraft | Active |
 | 3030 | Grafana | Active |
@@ -308,11 +301,10 @@ QFIELD_API_KEY=your_api_key
 - `/` → upstream `fibreflow_prod` (localhost:3000, VPS backup)
 - `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
 
-### vf.fibreflow.app (Staging)
-- `/` → upstream `fibreflow_staging` (localhost:3006, VPS backup)
-- `/pdf-tools/` → localhost:3007 (PDFCraft)
-- `/storage/` → localhost:8091 (Storage API) **REQUIRED for photos**
-- `/wa-proxy/` → localhost:8092 (WhatsApp proxy)
+### vf.fibreflow.app (Retired)
+- 301 redirect → `app.fibreflow.app` (staging retired 2026-03-11)
+- `/pdf-tools/` → localhost:3007 (PDFCraft) — standalone, still active
+- `/wa-proxy/` → localhost:8092 (WhatsApp proxy) — standalone, still active
 
 ### dev.fibreflow.app (Dev)
 - `/` → upstream `fibreflow_dev` (localhost:3005, VPS backup)
@@ -338,21 +330,18 @@ location /storage/ {
 ### Check Service Status
 ```bash
 sudo systemctl status fibreflow-dev.service          # Dev
-sudo systemctl status fibreflow.service               # Staging
 sudo systemctl status fibreflow-production.service    # Production
 ```
 
 ### View Logs
 ```bash
 journalctl -u fibreflow-dev -f              # Dev
-journalctl -u fibreflow -f                  # Staging
 journalctl -u fibreflow-production -f       # Production
 ```
 
 ### Restart Services (no password needed)
 ```bash
 sudo systemctl restart fibreflow-dev.service          # Dev
-sudo systemctl restart fibreflow.service               # Staging
 sudo systemctl restart fibreflow-production.service    # Production
 ```
 

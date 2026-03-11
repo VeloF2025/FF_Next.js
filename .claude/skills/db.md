@@ -37,7 +37,7 @@ Manages FibreFlow's Neon PostgreSQL schema: migrations, branch comparisons, sche
 
 ```
 production branch (ep-dry-night-a9qyh4sj)
-  └── Used by ALL environments (prod, staging, dev, VPS backup)
+  └── Used by ALL environments (prod, dev)
       ALL share the same production database
 
 hein-dev branch (ep-aged-poetry-a9bbd8e9)
@@ -45,7 +45,7 @@ hein-dev branch (ep-aged-poetry-a9bbd8e9)
       Use for migration testing before production
 ```
 
-**CRITICAL:** All 4 deployed environments (app, vf, dev, backup) share the **production** Neon branch. Schema changes affect everyone immediately.
+**CRITICAL:** Both deployed environments (app.fibreflow.app, dev.fibreflow.app) share the **production** Neon branch. Schema changes affect everyone immediately.
 
 ## Common Tasks
 

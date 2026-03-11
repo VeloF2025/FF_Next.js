@@ -83,7 +83,7 @@ if [ -z "${VALID_PROMOTIONS["$SOURCE:$TARGET"]}" ]; then
 fi
 
 if [ -z "${ENV_CONFIG[$SOURCE]}" ] || [ -z "${ENV_CONFIG[$TARGET]}" ]; then
-  error "Unknown environment. Valid: dev, staging, production"
+  error "Unknown environment. Valid: dev, production"
 fi
 
 IFS='|' read -r SRC_SVC SRC_PORT SRC_DIR SRC_URL <<< "${ENV_CONFIG[$SOURCE]}"

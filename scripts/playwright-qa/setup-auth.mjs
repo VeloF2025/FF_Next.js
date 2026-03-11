@@ -7,7 +7,7 @@
  * Usage:
  *   node scripts/playwright-qa/setup-auth.mjs [environment]
  *
- * Environments: staging (default), production, dev, local
+ * Environments: dev (default), production, local
  *
  * Requires:
  *   - FF_EMAIL env var (default: hein@velocityfibre.co.za)
@@ -18,20 +18,19 @@ import { chromium } from '/tmp/playwright-auth/node_modules/playwright/index.mjs
 import { mkdirSync } from 'fs';
 
 const ENV_URLS = {
-  staging: 'https://vf.fibreflow.app',
   production: 'https://app.fibreflow.app',
   dev: 'https://dev.fibreflow.app',
   local: 'http://localhost:3004',
 };
 
-const env = process.argv[2] || 'staging';
-const baseUrl = ENV_URLS[env] || ENV_URLS.staging;
+const env = process.argv[2] || 'dev';
+const baseUrl = ENV_URLS[env] || ENV_URLS.dev;
 const EMAIL = process.env.FF_EMAIL || 'hein@velocityfibre.co.za';
 const PASSWORD = process.env.FF_PASSWORD;
 
 if (!PASSWORD) {
   console.error('FF_PASSWORD environment variable is required.');
-  console.error('Usage: FF_PASSWORD=xxx node scripts/playwright-qa/setup-auth.mjs [staging|production|dev|local]');
+  console.error('Usage: FF_PASSWORD=xxx node scripts/playwright-qa/setup-auth.mjs [dev|production|local]');
   process.exit(1);
 }
 

@@ -1,3 +1,12 @@
+## DEPRECATED — Staging Retired 2026-03-11
+
+Staging environment has been retired. `vf.fibreflow.app` redirects to `app.fibreflow.app`.
+This document is kept for historical reference only.
+
+Standalone services still on vf.fibreflow.app: wa-proxy (:8092), pdf-tools (:3007).
+
+---
+
 # Staging Deployment Skill
 
 Deploy and monitor FibreFlow staging environment (vf.fibreflow.app).
@@ -193,8 +202,7 @@ Duration: 45 seconds
 Commits: 5
 URL: https://vf.fibreflow.app
 Status: ✅ Live and responding
-==============================
-"
+=============================="
 ```
 
 ### Rollback Flow

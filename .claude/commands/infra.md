@@ -1,12 +1,14 @@
 # /infra - Infrastructure Management & Troubleshooting
 
-Manage and troubleshoot all FibreFlow environments (dev, staging, production).
+Manage and troubleshoot all FibreFlow environments (dev, production).
+
+> **Staging retired 2026-03-11.** `vf.fibreflow.app` redirects to `app.fibreflow.app`. Standalone services (wa-proxy :8092, pdf-tools :3007) still route through vf.fibreflow.app.
 
 ## Usage
 
 ```
 /infra                    # Status of all environments
-/infra [env]              # Status of specific environment (dev|staging|prod)
+/infra [env]              # Status of specific environment (dev|prod)
 /infra fix [env]          # Auto-fix common issues
 /infra 502 [env]          # Fix 502 errors
 /infra restart [env]      # Restart all services
@@ -20,7 +22,6 @@ Manage and troubleshoot all FibreFlow environments (dev, staging, production).
 | Environment | URL | Port | Service | Directory |
 |-------------|-----|------|---------|-----------|
 | **Production** | app.fibreflow.app | 3000 | `fibreflow-production.service` | `/home/velo/fibreflow-production` |
-| **Staging** | vf.fibreflow.app | 3006 | `fibreflow.service` | `/home/velo/fibreflow-staging` |
 | **Dev** | dev.fibreflow.app | 3005 | `fibreflow-dev.service` | `/home/velo/fibreflow-dev` |
 | **Local** | localhost:3004 | 3004 | manual | Local machine |
 
@@ -34,9 +35,6 @@ Use `sudo -u velo` for deploy directories owned by velo. No SSH needed.
 # Production
 curl -s -o /dev/null -w 'PROD: %{http_code}\n' https://app.fibreflow.app/api/health
 
-# Staging
-curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/health
-
 # Dev
 curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health
 
@@ -47,14 +45,12 @@ curl -s -o /dev/null -w 'LOCAL: %{http_code}\n' http://localhost:3004/api/health
 ### Step 2: Test Localhost on Server
 ```bash
 echo "PROD (3000):" $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
-echo "STAGING (3006):" $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
 echo "DEV (3005):" $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
 ```
 
 ### Step 3: Test Nginx Proxy
 ```bash
 echo "PROD nginx:" $(curl -s -o /dev/null -w '%{http_code}' -H 'Host: app.fibreflow.app' http://127.0.0.1:80/api/health)
-echo "STAGING nginx:" $(curl -s -o /dev/null -w '%{http_code}' -H 'Host: vf.fibreflow.app' http://127.0.0.1:80/api/health)
 ```
 
 ## Decision Tree
@@ -89,34 +85,6 @@ journalctl -u fibreflow-production.service -n 50 --no-pager
 ```bash
 sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull origin master && npm run build'
 sudo systemctl restart fibreflow-production.service
-```
-
-### Staging (vf.fibreflow.app)
-
-**Restart all services:**
-```bash
-sudo systemctl restart nginx fibreflow.service cloudflared-tunnel.service && sleep 10
-```
-
-**Restart app only:**
-```bash
-sudo systemctl restart fibreflow.service
-```
-
-**View logs:**
-```bash
-journalctl -u fibreflow.service -n 50 --no-pager
-```
-
-**Deploy:**
-```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull origin master && npm run build'
-sudo systemctl restart fibreflow.service
-```
-
-**Check DATABASE_URL exists:**
-```bash
-grep DATABASE_URL /home/velo/fibreflow-staging/.env.production || echo 'MISSING DATABASE_URL!'
 ```
 
 ### Dev (dev.fibreflow.app)
@@ -201,7 +169,7 @@ sudo systemctl daemon-reload && sudo systemctl restart cloudflared-tunnel.servic
 | Hostname | Service | Notes |
 |----------|---------|-------|
 | app.fibreflow.app | localhost:3000 | Production |
-| vf.fibreflow.app | localhost:80 (nginx) | Staging (via nginx for /pdf-tools/) |
+| vf.fibreflow.app | localhost:80 (nginx) | Legacy redirect to production + standalone services (wa-proxy, pdf-tools) |
 | dev.fibreflow.app | localhost:80 (nginx) | Dev |
 | qfield.fibreflow.app | localhost:8082 | QFieldCloud |
 | support.fibreflow.app | localhost:3005 | Support portal |
@@ -249,8 +217,7 @@ sudo systemctl restart nginx
 ║                 INFRASTRUCTURE STATUS                        ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Production  (app.fibreflow.app):   [200 ✅ / 502 ❌]         ║
-║ Staging     (vf.fibreflow.app):    [200 ✅ / 502 ❌]         ║
-║ Dev         (localhost:3005):      [200 ✅ / N/A]            ║
+║ Dev         (dev.fibreflow.app):   [200 ✅ / N/A]            ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Cloudflared: [4 connections ✅ / down ❌]                    ║
 ║ Nginx:       [running ✅ / stopped ❌]                       ║

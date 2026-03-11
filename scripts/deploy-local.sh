@@ -7,7 +7,6 @@
 #
 # Usage:
 #   bash scripts/deploy-local.sh dev [--branch master]
-#   bash scripts/deploy-local.sh staging [--force]
 #   bash scripts/deploy-local.sh production [--force]
 #   bash scripts/deploy-local.sh status
 # =============================================================================
@@ -20,7 +19,6 @@ MAX_RETRIES=3
 
 declare -A ENV_MAP=(
   [dev]="fibreflow-dev.service|3005|/home/velo/fibreflow-dev|https://dev.fibreflow.app"
-  [staging]="fibreflow.service|3006|/home/velo/fibreflow-staging|https://vf.fibreflow.app"
   [production]="fibreflow-production.service|3000|/home/velo/fibreflow-production|https://app.fibreflow.app"
 )
 
@@ -66,7 +64,7 @@ if [[ "$TARGET" == "status" ]]; then
     echo -e "  Window: ${GREEN}AFTER HOURS${NC} — All envs allowed"
   fi
   echo ""
-  for env in dev staging production; do
+  for env in dev production; do
     IFS='|' read -r svc port dir url <<< "${ENV_MAP[$env]}"
     commit=$(sudo -u velo bash -c "cd $dir && git rev-parse --short HEAD 2>/dev/null" 2>/dev/null || echo "unknown")
     status=$(systemctl is-active "$svc" 2>/dev/null || echo "unknown")
@@ -78,7 +76,7 @@ fi
 
 # --- Validate target ---
 if [[ -z "${ENV_MAP[$TARGET]+x}" ]]; then
-  error "Unknown environment: $TARGET. Use dev|staging|production|status"
+  error "Unknown environment: $TARGET. Use dev|production|status"
 fi
 
 IFS='|' read -r SVC PORT DIR URL <<< "${ENV_MAP[$TARGET]}"

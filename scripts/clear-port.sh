@@ -6,7 +6,7 @@
 # Safe to run before any deployment or manual restart.
 #
 # Usage:
-#   bash scripts/clear-port.sh              # checks all FF ports (3000, 3005, 3006)
+#   bash scripts/clear-port.sh              # checks all FF ports (3000, 3005)
 #   bash scripts/clear-port.sh 3000         # check + clear specific port
 #   bash scripts/clear-port.sh --kill       # auto-kill orphans (no prompt)
 #   bash scripts/clear-port.sh 3000 --kill  # auto-kill port 3000
@@ -28,12 +28,11 @@ done
 declare -A PORT_TO_SVC
 PORT_TO_SVC[3000]="fibreflow-production"
 PORT_TO_SVC[3005]="fibreflow-dev"
-PORT_TO_SVC[3006]="fibreflow"
 
 if [ -n "$SPECIFIC_PORT" ]; then
   PORTS=("$SPECIFIC_PORT")
 else
-  PORTS=(3000 3005 3006)
+  PORTS=(3000 3005)
 fi
 
 RED='\033[0;31m'

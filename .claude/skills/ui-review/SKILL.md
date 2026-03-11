@@ -10,7 +10,7 @@ Run automated browser QA tests against FibreFlow user stories.
 ## Usage
 
 ```
-/ui-review                    # Run all critical stories against staging
+/ui-review                    # Run all critical stories against dev
 /ui-review [story-name]       # Run specific story (e.g., "dashboard-load")
 /ui-review --env local        # Run against localhost:3004
 /ui-review --env production   # Run against app.fibreflow.app
@@ -29,10 +29,10 @@ Run automated browser QA tests against FibreFlow user stories.
 ### Step 1: Determine Scope and Environment
 
 Parse the arguments:
-- No args → run all **Critical** priority stories against **staging**
+- No args → run all **Critical** priority stories against **dev**
 - Story name → run that specific story
 - `--env local` → use `http://localhost:3004`
-- `--env staging` → use `https://vf.fibreflow.app` (default)
+- `--env dev` → use `https://dev.fibreflow.app` (default)
 - `--env production` → use `https://app.fibreflow.app`
 - `--all` → include Medium priority stories too
 
@@ -70,9 +70,9 @@ After all agents complete, compile results:
 ╔══════════════════════════════════════════════════════════════╗
 ║                    UI REVIEW RESULTS                         ║
 ╠══════════════════════════════════════════════════════════════╣
-║ Environment: staging (vf.fibreflow.app)                      ║
+║ Environment: dev (dev.fibreflow.app)                         ║
 ║ Stories Run: 7                                               ║
-║ Date: 2026-02-19                                             ║
+║ Date: 2026-03-11                                             ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ RESULTS                                                      ║
 ║                                                              ║
@@ -158,5 +158,5 @@ Name it `{module}-{workflow}.md`.
 
 - Screenshots are saved to `/tmp/qa-screenshots/`
 - Browser-qa agents use Chrome DevTools and Claude-in-Chrome MCP tools
-- Stories that modify data (create, update, delete) should only run on dev/staging
+- Stories that modify data (create, update, delete) should only run on dev
 - The agent validates against what's actually on screen, not API responses

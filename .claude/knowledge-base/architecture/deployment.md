@@ -12,7 +12,6 @@ graph TB
     subgraph "Velocity Server (100.96.203.105)"
         subgraph "FibreFlow Instances"
             Prod[Production :3000<br/>app.fibreflow.app]
-            Staging[Staging :3006<br/>vf.fibreflow.app]
             Dev[Dev :3005<br/>dev.fibreflow.app]
         end
 
@@ -41,11 +40,9 @@ graph TB
     Browser --> Nginx
     Mobile --> Nginx
     Nginx --> Prod
-    Nginx --> Staging
     Nginx --> Dev
     Nginx -.->|failover| Backup
     Prod --> Neon
-    Staging --> Neon
     Dev --> Neon
     Backup --> Neon
     Prod --> VLM
@@ -63,15 +60,13 @@ upstream fibreflow_prod {
     server localhost:3000;
     server 72.61.197.178:3005 backup;
 }
-upstream fibreflow_staging {
-    server localhost:3006;
-    server 72.61.197.178:3005 backup;
-}
 upstream fibreflow_dev {
     server localhost:3005;
     server 72.61.197.178:3005 backup;
 }
 ```
+
+> Staging upstream (`fibreflow_staging`) removed — staging retired 2026-03-11. `vf.fibreflow.app` 301-redirects to production.
 
 **Triggers:** connection error, timeout, HTTP 502/503/504
 **Failover time:** ~0.3s
@@ -99,7 +94,6 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 | Service | Port | Systemd Unit | Purpose |
 |---------|------|--------------|---------|
 | Production | 3000 | `fibreflow-production.service` | Live app |
-| Staging | 3006 | `fibreflow.service` | Testing |
 | Dev | 3005 | `fibreflow-dev.service` | Development |
 | VLM | 8100 | `vllm-qwen.service` | AI analysis (Qwen3-VL-8B) |
 | QField Sync | 8095 | `qfield-sync.service` | GIS sync |
@@ -132,11 +126,12 @@ Script: `/home/velo/scripts/fibreflow-health-check-v2.sh` (every 5 min)
 ```
 /home/velo/
 ├── fibreflow-production/     # Production app (app.fibreflow.app)
-├── fibreflow-staging/        # Staging app (vf.fibreflow.app)
 └── fibreflow-dev/            # Dev app (dev.fibreflow.app)
 ```
 
-All three directories owned by `velo:velo`, same user, no permission issues.
+Both directories owned by `velo:velo`, same user, no permission issues.
+
+> **Staging retired 2026-03-11.** `vf.fibreflow.app` 301-redirects to `app.fibreflow.app`. `/home/velo/fibreflow-staging/` directory and `fibreflow.service` are no longer active.
 
 ### VPS Server
 
@@ -156,18 +151,14 @@ Claude Code runs directly on Velocity as user `hein` with passwordless sudo (con
 sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull && npm run build'
 sudo systemctl restart fibreflow-dev.service
 
-# Staging (vf.fibreflow.app)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull && npm run build'
-sudo systemctl restart fibreflow.service
-
 # Production (app.fibreflow.app)
 sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull && npm run build'
 sudo systemctl restart fibreflow-production.service
 ```
 
 **Notes:**
-- All three dirs under `/home/velo/` — same user, no permission issues
-- All three can be deployed in parallel (separate directories, separate services)
+- Both dirs under `/home/velo/` — same user, no permission issues
+- Can be deployed in parallel (separate directories, separate services)
 - For deploys from external machines (fallback): SSH key auth via `ssh velo@100.96.203.105`
 
 ### Deploy Flow
@@ -204,17 +195,13 @@ graph LR
     Main --> HeinDev
 
     Prod -.-> ProdApp[Production App]
-    Prod -.-> StagingApp[Staging App]
     HeinDev -.-> DevApp[Dev App]
 ```
 
 | Environment | Branch | Endpoint |
 |-------------|--------|----------|
 | Production | `production` | `ep-dry-night-a9qyh4sj` |
-| Staging | `production` | `ep-dry-night-a9qyh4sj` |
 | Development | `hein-dev` | `ep-aged-poetry-a9bbd8e9` |
-
-**Important**: Production and Staging share the same database!
 
 ## Nginx Configuration
 
@@ -229,15 +216,6 @@ server {
     server_name app.fibreflow.app;
     location / {
         proxy_pass http://fibreflow_prod;  # localhost:3000 → VPS:3005 backup
-        proxy_next_upstream error timeout http_502 http_503 http_504;
-    }
-}
-
-# Staging
-server {
-    server_name vf.fibreflow.app;
-    location / {
-        proxy_pass http://fibreflow_staging;  # localhost:3006 → VPS:3005 backup
         proxy_next_upstream error timeout http_502 http_503 http_504;
     }
 }
@@ -283,7 +261,6 @@ WantedBy=multi-user.target
 ```bash
 # Check all FibreFlow services
 systemctl status fibreflow-production.service
-systemctl status fibreflow.service
 systemctl status fibreflow-dev.service
 
 # Check support services
@@ -324,7 +301,6 @@ Each deployment generates a unique BUILD_ID in `.next/BUILD_ID`:
 ```bash
 # Check current build IDs
 cat /home/velo/fibreflow-production/.next/BUILD_ID    # Production
-cat /home/velo/fibreflow-staging/.next/BUILD_ID       # Staging
 cat /home/velo/fibreflow-dev/.next/BUILD_ID           # Dev
 ```
 

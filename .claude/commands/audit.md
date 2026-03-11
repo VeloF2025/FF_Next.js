@@ -32,12 +32,10 @@ Full system audit covering infrastructure, code quality, APIs, UI, and functiona
 ```bash
 # External (through Cloudflare)
 curl -s -o /dev/null -w 'PROD: %{http_code}\n' https://app.fibreflow.app/api/health
-curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/health
 curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health
 
 # Internal (localhost — run directly on Velocity)
 echo 'PROD (3000):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/health)
-echo 'STAGING (3006):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3006/api/health)
 echo 'DEV (3005):' $(curl -s -o /dev/null -w '%{http_code}' http://localhost:3005/api/health)
 ```
 
@@ -62,7 +60,6 @@ echo '=== SERVICES ==='
 echo 'nginx:' $(systemctl is-active nginx)
 echo 'cloudflared:' $(systemctl is-active cloudflared-tunnel.service)
 echo 'fibreflow-prod:' $(systemctl is-active fibreflow-production.service)
-echo 'fibreflow-staging:' $(systemctl is-active fibreflow.service)
 echo 'fibreflow-dev:' $(systemctl is-active fibreflow-dev.service)
 echo 'vllm-qwen:' $(systemctl is-active vllm-qwen.service)
 echo 'wa-monitor-prod:' $(systemctl is-active wa-monitor-prod)
@@ -485,10 +482,9 @@ Check:
 # Run from local machine
 echo "=== EXTERNAL ===" && \
 curl -s -o /dev/null -w 'PROD: %{http_code}\n' https://app.fibreflow.app/api/health && \
-curl -s -o /dev/null -w 'STAGING: %{http_code}\n' https://vf.fibreflow.app/api/health && \
 curl -s -o /dev/null -w 'DEV: %{http_code}\n' https://dev.fibreflow.app/api/health && \
 echo "=== SERVICES ===" && \
-curl -s https://vf.fibreflow.app/api/activate/health-check | jq -r '.services | to_entries[] | "\(.key): \(.value.status)"'
+curl -s https://app.fibreflow.app/api/activate/health-check | jq -r '.services | to_entries[] | "\(.key): \(.value.status)"'
 ```
 
 ### One-Command Code Quality Check
@@ -524,7 +520,6 @@ grep -rn ": any" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | wc -l
 | Check | Status |
 |-------|--------|
 | Production (app.fibreflow.app) | ✅ 200 |
-| Staging (vf.fibreflow.app) | ✅ 200 |
 | Dev (dev.fibreflow.app) | ✅ 200 |
 | Cloudflared Tunnel | ✅ 4 connections |
 | VLM Service | ✅ Active |

@@ -82,7 +82,7 @@ get_env_config() {
   local env="$1"
   local config="${ENV_MAP[$env]}"
   if [ -z "$config" ]; then
-    error "Unknown environment: $env. Use dev|staging|production"
+    error "Unknown environment: $env. Use dev|production"
   fi
   echo "$config"
 }

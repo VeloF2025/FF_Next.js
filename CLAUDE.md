@@ -30,7 +30,7 @@ src/
 | **Branch** | `production` |
 | **Endpoint** | `ep-dry-night-a9qyh4sj` |
 
-All environments (dev, staging, production, local) share this database. Schema migrations affect everyone immediately.
+All environments (dev, production, local) share this database. Schema migrations affect everyone immediately.
 
 **Connection String:** See `.claude/credentials.local.md` (gitignored, never committed)
 ```bash

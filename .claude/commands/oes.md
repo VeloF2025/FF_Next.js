@@ -13,7 +13,7 @@ Import and manage Nokia OES activation reports.
 
 ## Quick Start
 
-**Import URL**: `https://vf.fibreflow.app/activate` (staging)
+**Import URL**: `https://dev.fibreflow.app/activate` (dev)
 
 1. Navigate to URL
 2. Click "OES Import" tab
@@ -33,14 +33,14 @@ PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.ne
 PGPASSWORD='$NEON_DB_PASSWORD' psql -h ep-dry-night-a9qyh4sj-pooler.gwc.azure.neon.tech -U neondb_owner -d neondb -c "SELECT COUNT(*) FILTER (WHERE oes_confirmed = true) AS confirmed, COUNT(*) AS total FROM drops;"
 ```
 
-## Restart Staging Server
+## Restart Dev Server
 
 ```bash
-# Restart service (port 3006)
-sudo systemctl restart fibreflow.service
+# Restart service (port 3005)
+sudo systemctl restart fibreflow-dev.service
 
 # Verify
-sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost:3006/
+sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost:3005/
 ```
 
 ## Debug Issues
@@ -49,26 +49,26 @@ sleep 3 && curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost:3006/
 
 ```bash
 # Check service status
-systemctl status fibreflow.service --no-pager | head -15
+systemctl status fibreflow-dev.service --no-pager | head -15
 
 # Pull latest code and rebuild
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull && npm run build'
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull && npm run build'
 
 # Restart
-sudo systemctl restart fibreflow.service
+sudo systemctl restart fibreflow-dev.service
 ```
 
 ### Wrong Insert/Update Counts
 
 Ensure latest code deployed (commit: `fix(oes-import): use count-based approach`):
 ```bash
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git log -1 --oneline'
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git log -1 --oneline'
 ```
 
 ### View Logs
 
 ```bash
-journalctl -u fibreflow.service -n 50 --no-pager
+journalctl -u fibreflow-dev.service -n 50 --no-pager
 ```
 
 ## Expected Results
@@ -85,8 +85,7 @@ After import, you should see:
 | Port | Use | Notes |
 |------|-----|-------|
 | 3000 | Production | DO NOT TOUCH |
-| 3005 | Dev | Local development |
-| 3006 | Staging | OES import testing |
+| 3005 | Dev (dev.fibreflow.app) | OES import testing |
 
 ## Files
 

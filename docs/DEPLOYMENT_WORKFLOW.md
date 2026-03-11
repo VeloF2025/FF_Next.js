@@ -1,13 +1,15 @@
 # FibreFlow Deployment Workflow
 
-**Current as of:** 28 February 2026
+**Current as of:** 11 March 2026
 **Process Manager:** systemd
 **Server:** velo-server (local infrastructure — Claude runs directly on Velocity)
 
 ---
 
 ## Golden Rule
-**Dev → Staging → Production.** Always test on the lower environment first.
+**Dev → Production.** Always test on dev first.
+
+> **Staging retired 2026-03-11.** `vf.fibreflow.app` redirects to `app.fibreflow.app`.
 
 ---
 
@@ -18,18 +20,17 @@
 | Environment | Path | Port | Service | URL |
 |---|---|---|---|---|
 | **Production** | `/home/velo/fibreflow-production` | 3000 | `fibreflow-production.service` | app.fibreflow.app |
-| **Staging** | `/home/velo/fibreflow-staging` | 3006 | `fibreflow.service` | vf.fibreflow.app |
 | **Dev** | `/home/velo/fibreflow-dev` | 3005 | `fibreflow-dev.service` | dev.fibreflow.app |
 
 ### Time-Gated Deployment Rules
 
-| Time Window | Dev | Staging | Production |
-|-------------|-----|---------|------------|
-| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** | **BLOCKED** |
-| **After hours** + weekends | Allowed | Promote from dev | Promote from staging |
-| **Emergency** (any time) | Allowed | `--force` required | `--force` required |
+| Time Window | Dev | Production |
+|-------------|-----|------------|
+| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** |
+| **After hours** + weekends | Allowed | Promote from dev |
+| **Emergency** (any time) | Allowed | `--force` required |
 
-**Hein's approval is required for ALL staging and production deployments.**
+**Hein's approval is required for ALL production deployments.**
 
 ### Permissions
 
@@ -57,10 +58,7 @@ sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && echo "Rollback: $(git rev-p
 # Dev (always allowed)
 sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
 
-# Staging (after hours — promote EXACT commit from dev)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
-
-# Production (after hours — promote EXACT commit from staging)
+# Production (after hours — promote EXACT commit from dev)
 sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
 ```
 
@@ -77,7 +75,6 @@ free -h
 ### Step 3: Restart Service
 ```bash
 sudo systemctl restart fibreflow-dev.service          # Dev
-sudo systemctl restart fibreflow.service               # Staging
 sudo systemctl restart fibreflow-production.service    # Production
 ```
 
@@ -101,9 +98,7 @@ Use the time-gated deploy scripts instead of manual commands:
 
 ```bash
 bash scripts/deploy-gate.sh dev              # Deploy to dev (always allowed)
-bash scripts/deploy-gate.sh staging          # Blocked during business hours
-bash scripts/promote.sh dev staging          # Promote dev → staging (after hours)
-bash scripts/promote.sh staging production   # Promote staging → production (after hours)
+bash scripts/promote.sh dev production       # Promote dev → production (after hours)
 bash scripts/deploy-gate.sh status           # Show all environments
 ```
 
@@ -133,7 +128,6 @@ sudo systemctl status fibreflow-production.service
 ### Check Service Status
 ```bash
 sudo systemctl status fibreflow-production.service
-sudo systemctl status fibreflow.service
 sudo systemctl status fibreflow-dev.service
 ```
 
@@ -152,7 +146,6 @@ journalctl -u fibreflow-production --since "5 min ago" --priority=err --no-pager
 ### Restart Service
 ```bash
 sudo systemctl restart fibreflow-production.service    # No password needed
-sudo systemctl restart fibreflow.service               # Staging
 sudo systemctl restart fibreflow-dev.service           # Dev
 ```
 
@@ -199,10 +192,10 @@ sudo -u velo cat /home/velo/fibreflow-production/.env.local | grep DATABASE_URL
 5. **Rollback first, debug later** if production is down
 6. **Check disk space before builds** (need >2GB free)
 7. **Check memory before builds** (need >2GB free RAM)
-8. **Don't deploy to staging/production during business hours** (08:00-17:00 SAST) without `--force`
+8. **Don't deploy to production during business hours** (08:00-17:00 SAST) without `--force`
 9. **Verify after every deploy** (a deploy without QA is incomplete)
 10. **One deploy at a time** (never run concurrent deploys)
-11. **Hein's approval required** for all staging and production deployments
+11. **Hein's approval required** for all production deployments
 
 ---
 
@@ -243,7 +236,7 @@ When Claude deploys:
 - **docs/INFRASTRUCTURE.md** — Server architecture and services
 - **docs/DEPLOYMENT.md** — Safe deploy scripts (post-incident)
 - **scripts/deploy-gate.sh** — Time-gated deploy wrapper
-- **scripts/promote.sh** — Promotion pipeline (dev → staging → production)
+- **scripts/promote.sh** — Promotion pipeline (dev → production)
 - **scripts/safe-deploy.sh** — Atomic deploy engine
 - `/etc/sudoers.d/fibreflow-deploy` — hein passwordless sudo for deploys
 

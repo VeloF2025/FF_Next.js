@@ -11,21 +11,21 @@ cd /tmp/playwright-auth
 npm init -y && npm install playwright
 
 # Login and save auth state
-FF_PASSWORD=your-password node scripts/playwright-qa/setup-auth.mjs staging
+FF_PASSWORD=your-password node scripts/playwright-qa/setup-auth.mjs dev
 ```
 
 ## Usage
 
 ### Quick Screenshot
 ```bash
-node scripts/playwright-qa/qa-screenshot.mjs https://vf.fibreflow.app/dashboard /tmp/qa-screenshots/dash.png
-node scripts/playwright-qa/qa-screenshot.mjs https://vf.fibreflow.app/staff /tmp/qa-screenshots/staff.png --full-page
+node scripts/playwright-qa/qa-screenshot.mjs https://dev.fibreflow.app/dashboard /tmp/qa-screenshots/dash.png
+node scripts/playwright-qa/qa-screenshot.mjs https://dev.fibreflow.app/staff /tmp/qa-screenshots/staff.png --full-page
 ```
 
 ### Run User Stories
 Use the `/ui-review` slash command or invoke the `browser-qa` agent directly:
 ```
-/ui-review                      # All critical stories on staging
+/ui-review                      # All critical stories on dev
 /ui-review dashboard-load       # Specific story
 /ui-review --env local          # Against localhost
 ```
@@ -41,9 +41,8 @@ Use the `/ui-review` slash command or invoke the `browser-qa` agent directly:
 
 | Name | URL |
 |------|-----|
-| staging | https://vf.fibreflow.app |
-| production | https://app.fibreflow.app |
 | dev | https://dev.fibreflow.app |
+| production | https://app.fibreflow.app |
 | local | http://localhost:3004 |
 
 ## Architecture

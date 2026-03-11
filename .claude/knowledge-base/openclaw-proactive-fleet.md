@@ -68,7 +68,7 @@ The same root causes kept recurring (port conflicts, config drift, duplicate ser
 
 **Metrics Collection** (`collect-metrics.sh`)
 - Runs every 2 hours during Sentinel's heartbeat
-- Captures: disk_pct, mem_pct, load_1m, docker_containers, ff_prod_ms, ff_staging_ms, ff_dev_ms, mc_ms, qfield_ms
+- Captures: disk_pct, mem_pct, load_1m, docker_containers, ff_prod_ms, ff_dev_ms, mc_ms, qfield_ms (ff_staging_ms removed — staging retired 2026-03-11)
 - Appends JSONL to `sentinel/workspace/metrics/system-metrics.jsonl`
 - Monthly rotation (archive >30 days to .jsonl.gz)
 
@@ -109,7 +109,7 @@ The same root causes kept recurring (port conflicts, config drift, duplicate ser
 
 **Remediation Fast Path** (`process-remediation-queue.sh`)
 - Gene can request Sentinel to restart specific services via MC message: `REMEDIATION: restart <service>`
-- Approved list: fibreflow-dev, fibreflow (staging), fibreflow-production, mc-dashboard, mission-control-api
+- Approved list: fibreflow-dev, fibreflow-production, mc-dashboard, mission-control-api (fibreflow/staging removed — retired 2026-03-11)
 - Forbidden list: whatsapp, openclaw-*, ssh, nginx, postgresql, redis, docker (never auto-restart these)
 - Rate limit: max 3 restarts per service per hour
 - Pre/post health probes to verify the restart actually helped

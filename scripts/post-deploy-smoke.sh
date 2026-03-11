@@ -6,7 +6,7 @@
 # Checks HTTP 200 on key endpoints, response time < 5s.
 #
 # Usage:
-#   bash scripts/post-deploy-smoke.sh [prod|staging|dev]
+#   bash scripts/post-deploy-smoke.sh [prod|dev]
 #   bash scripts/post-deploy-smoke.sh          # defaults to prod
 #
 # Exit code: 0 = healthy, 1 = smoke test failed
@@ -16,9 +16,8 @@ ENV="${1:-prod}"
 
 case "$ENV" in
   prod|production) BASE_URL="https://app.fibreflow.app";  LOCAL_PORT=3000 ;;
-  staging|stg)     BASE_URL="https://vf.fibreflow.app";   LOCAL_PORT=3006 ;;
   dev)             BASE_URL="https://dev.fibreflow.app";   LOCAL_PORT=3005 ;;
-  *)               echo "Unknown env: $ENV. Use prod|staging|dev"; exit 1 ;;
+  *)               echo "Unknown env: $ENV. Use prod|dev"; exit 1 ;;
 esac
 
 PASS=0

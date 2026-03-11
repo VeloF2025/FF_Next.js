@@ -21,7 +21,7 @@ Handle all Activate module operations:
 | Setting | Value |
 |---------|-------|
 | **Navigation** | Sidebar → FIELD OPERATIONS → Activate (first item, ✨ sparkles icon) |
-| **Dashboard URL** | `https://vf.fibreflow.app/activate` |
+| **Dashboard URL** | `https://dev.fibreflow.app/activate` |
 | **Production URL** | `https://app.fibreflow.app/activate` |
 | **API Prefix** | `/api/activate/*` |
 | **Database Tables** | `dr_photo_unified_reviews`, `dr_activity_log`, `qa_correction_examples`, `oes_activations` |
@@ -478,7 +478,7 @@ WhatsApp Feedback:
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  WhatsApp User  │────▶│   Go Bridge      │────▶│  FibreFlow API  │
-│  sends DR123456 │     │  (Velocity VPS)  │     │  (Staging)      │
+│  sends DR123456 │     │  (Velocity VPS)  │     │  (Production)   │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
                                │                        │
                                ▼                        ▼
@@ -823,10 +823,10 @@ Human corrections for few-shot learning with `workflow_type`, `vlm_predicted_*`,
 
 ```bash
 # Check health via API
-curl -s https://vf.fibreflow.app/api/activate/health-check | jq .
+curl -s https://app.fibreflow.app/api/activate/health-check | jq .
 
 # Test acknowledgment API
-curl -s -X POST https://vf.fibreflow.app/api/activate/dr-acknowledgment \
+curl -s -X POST https://app.fibreflow.app/api/activate/dr-acknowledgment \
   -H "Content-Type: application/json" \
   -d '{"dropNumber":"DR1750922","project":"Lawley"}' | jq .
 
@@ -905,7 +905,7 @@ ssh root@72.61.197.178 "grep -E 'ACK|ERROR' /opt/whatsapp-bridge/bridge.log | ta
 ```
 
 **Common Causes**:
-1. API unreachable - check staging is running
+1. API unreachable - check production is running
 2. LID format issues - check QuotedMessage is included
 3. OneMap timeout - check 1M health
 
@@ -978,18 +978,16 @@ FROM dr_photo_unified_reviews;
 - Power meter, ONT serial, DR number all missing
 
 **Root Cause**:
-Missing environment variables in staging `.env.production`:
+Missing environment variables in dev/production `.env.production`:
 - `VLM_API_URL` - Must use `localhost:8100`, not Tailscale IP
-- `NEXT_PUBLIC_APP_URL` - Must match port (`localhost:3006` for staging)
-
-**Fix**:
-See `/staging` skill → "ISSUE: VLM Extraction Failed" for full solution.
+- `NEXT_PUBLIC_APP_URL` - Must match port (`localhost:3005` for dev, `localhost:3000` for production)
 
 **Quick Fix**:
 ```bash
-# Add to .env.production
+# Add to .env.production (adjust port for environment)
 VLM_API_URL=http://localhost:8100
-NEXT_PUBLIC_APP_URL=http://localhost:3006
+NEXT_PUBLIC_APP_URL=http://localhost:3005  # dev
+# or: NEXT_PUBLIC_APP_URL=http://localhost:3000  # production
 ```
 
 ## Component Files
@@ -1116,7 +1114,7 @@ Step 6 (ONT back) is the authoritative serial source because the sticker is clea
 
 - `/photo-categorization` - **CANONICAL** photo type → step mappings (must reference this for any mapping changes)
 - `/ai-qa-validation` - VLM quality validation criteria (FiberTime standards)
-- `/deploy` - Deploy to staging
+- `/deploy` - Deploy to dev or production
 - `/oes` - OES import operations
 - `/wa-monitor` - WhatsApp monitor issues
 - `/whatsapp` - **Full WhatsApp infrastructure** (Go bridge, services, message flow, phone numbers)

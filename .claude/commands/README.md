@@ -7,7 +7,7 @@ Custom slash commands for FibreFlow development.
 ### /infra - Infrastructure Management
 ```bash
 /infra                    # Status of all environments
-/infra [env]              # Status of specific env (dev|staging|prod)
+/infra [env]              # Status of specific env (dev|prod)
 /infra fix [env]          # Auto-fix common issues
 /infra 502 [env]          # Fix 502 errors
 /infra restart [env]      # Restart all services
@@ -20,15 +20,16 @@ Comprehensive infrastructure management for all FibreFlow environments.
 
 ---
 
-### /deploy - Deploy to Staging
+### /deploy - Deploy FibreFlow
 ```bash
-/deploy              # Deploy current branch
-/deploy [branch]     # Deploy specific branch
-/deploy status       # Check staging status
+/deploy              # Deploy to dev (always allowed)
+/deploy dev          # Deploy to dev
+/deploy production   # Promote dev → production (after hours)
+/deploy status       # Check all environments
 /deploy logs         # View service logs
 ```
 
-Deploy FibreFlow to staging (vf.fibreflow.app).
+Deploy FibreFlow to dev or production.
 
 ---
 

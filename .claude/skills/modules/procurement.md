@@ -269,13 +269,18 @@ Compliance reporting required - certain actions need audit trail.
 ### Pages Return 500 Error (Requisitions, POs, GRN)
 **Symptom:** `/procurement/requisitions`, `/procurement/purchase-orders`, or `/procurement/grn` return 500 Internal Server Error.
 
-**Cause:** Stale build on staging/production server.
+**Cause:** Stale build on dev/production server.
 
 **Fix:**
 ```bash
-# On Velocity (local)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git pull && npm ci && npm run build'
-sudo systemctl restart fibreflow.service
+# On Velocity (local) — use dev or production as appropriate
+# Dev:
+sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull && npm ci && npm run build'
+sudo systemctl restart fibreflow-dev.service
+
+# Production:
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull && npm ci && npm run build'
+sudo systemctl restart fibreflow-production.service
 ```
 
 **Verified Jan 2026:** All three pages work after rebuild. The APIs (`/api/procurement/requisitions`, etc.) work fine - only the page SSR was affected.

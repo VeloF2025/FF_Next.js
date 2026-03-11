@@ -9,13 +9,13 @@ Handle daily OES (Optical Equipment Supplier) report imports by:
 2. Tracking new inserts vs updates (upsert behavior)
 3. Reconciling against drops table
 4. Troubleshooting import issues
-5. Managing staging server restarts
+5. Managing server restarts
 
 ## Quick Reference
 
 | Setting | Value |
 |---------|-------|
-| **UI URL** | `https://vf.fibreflow.app/activate` (staging) |
+| **UI URL** | `https://dev.fibreflow.app/activate` (dev) |
 | **Production** | `https://app.fibreflow.app/activate` |
 | **API Endpoint** | `/api/activate/import-oes` |
 | **Database Table** | `oes_activations` |
@@ -34,7 +34,7 @@ Main entry point for OES operations.
 /oes import             # Guide through import process
 /oes status             # Check last import stats
 /oes debug              # Diagnose import issues
-/oes restart            # Restart staging server
+/oes restart            # Restart dev server
 ```
 
 ### `/oes status`
@@ -69,8 +69,8 @@ Diagnose import issues.
 🔧 OES Import Diagnostics:
 
 Server Status:
-  Staging (3006): ✅ Running / ❌ Down
-  Service: fibreflow.service
+  Dev (3005): ✅ Running / ❌ Down
+  Service: fibreflow-dev.service
 
 API Health:
   /api/activate/import-oes: ✅ 200 / ❌ Error
@@ -98,7 +98,7 @@ Suggested Actions:
 - "Nokia OES"
 
 **Automatic Actions**:
-1. Check staging server status
+1. Check dev server status
 2. Provide import instructions
 3. Guide to correct URL
 4. Explain expected results
@@ -136,9 +136,9 @@ Suggested Actions:
 ### Trigger 4: Server Issues
 
 **User says**:
-- "restart staging"
-- "staging down"
-- "3006 not working"
+- "restart dev server"
+- "dev down"
+- "3005 not working"
 - "server not responding"
 
 **Automatic Actions**:
@@ -228,7 +228,7 @@ CREATE TABLE oes_import_batches (
 ### Standard Import Flow
 
 ```
-1. Navigate to: https://vf.fibreflow.app/activate
+1. Navigate to: https://dev.fibreflow.app/activate
    (or production: https://app.fibreflow.app/activate)
 
 2. Click "OES Import" tab
@@ -281,27 +281,30 @@ updated = total_rows - inserted = 6259 - 500 = 5759 updated
 ```bash
 # Run locally on Velocity as user hein (passwordless sudo)
 
-# Check staging server status
-systemctl status fibreflow.service --no-pager | head -15
+# Check dev server status
+systemctl status fibreflow-dev.service --no-pager | head -15
 
-# Restart staging server (port 3006)
-sudo systemctl restart fibreflow.service
+# Restart dev server (port 3005)
+sudo systemctl restart fibreflow-dev.service
 
 # View service logs
-sudo journalctl -u fibreflow.service -n 50 --no-pager
+sudo journalctl -u fibreflow-dev.service -n 50 --no-pager
 
-# Check what's using port 3006
-ss -tlnp | grep 3006
+# Check what's using port 3005
+ss -tlnp | grep 3005
 
-# HTTP health check
-curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
+# HTTP health check (dev)
+curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3005/
 
-# Pull latest code and rebuild
-cd /home/velo/fibreflow-development && git pull && npm run build
+# HTTP health check (production)
+curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3000/
 
-# Full restart sequence
-cd /home/velo/fibreflow-development && git pull && npm run build && \
-sudo systemctl restart fibreflow.service
+# Pull latest code and rebuild (dev)
+cd /home/velo/fibreflow-dev && git pull && npm run build
+
+# Full restart sequence (dev)
+cd /home/velo/fibreflow-dev && git pull && npm run build && \
+sudo systemctl restart fibreflow-dev.service
 ```
 
 ## Database Queries
@@ -365,15 +368,15 @@ Old code used `RETURNING (xmax = 0)` which caused performance issues with 6000+ 
 **Fix**:
 1. Check server has latest code (run locally on Velocity):
 ```bash
-cd /home/velo/fibreflow-development && git log -1 --oneline
+cd /home/velo/fibreflow-dev && git log -1 --oneline
 ```
 
 2. Should show commit: `fix(oes-import): use count-based approach`
 
 3. If not, pull and restart:
 ```bash
-cd /home/velo/fibreflow-development && git pull && npm run build
-sudo systemctl restart fibreflow.service
+cd /home/velo/fibreflow-dev && git pull && npm run build
+sudo systemctl restart fibreflow-dev.service
 ```
 
 ---
@@ -398,38 +401,38 @@ SELECT COUNT(*) FROM oes_activations;
 
 ---
 
-### ISSUE: Port 3006 Already in Use
+### ISSUE: Port 3005 Already in Use
 
 **Symptoms**:
-- `EADDRINUSE: address already in use :::3006`
+- `EADDRINUSE: address already in use :::3005`
 - Server won't start
 
 **Fix**:
 ```bash
-# Restart the service (it will take over port 3006) — run locally on Velocity
-sudo systemctl restart fibreflow.service
+# Restart the service (it will take over port 3005) — run locally on Velocity
+sudo systemctl restart fibreflow-dev.service
 ```
 
-**Note**: Don't try to kill processes manually. The systemd service manages port 3006.
+**Note**: Don't try to kill processes manually. The systemd service manages port 3005.
 
 ---
 
 ### ISSUE: 502 Bad Gateway
 
 **Symptoms**:
-- Can't access staging URL
+- Can't access dev URL
 - Cloudflare tunnel not working
 
 **Fix**:
 ```bash
 # Check if service is running (run locally on Velocity)
-systemctl is-active fibreflow.service
+systemctl is-active fibreflow-dev.service
 
 # If not active, restart
-sudo systemctl restart fibreflow.service
+sudo systemctl restart fibreflow-dev.service
 
 # Verify local response
-curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
+curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3005/
 ```
 
 ---
@@ -484,7 +487,7 @@ Nginx proxy_read_timeout too low for large imports (7000+ rows). The `maxDuratio
 Increase nginx proxy timeouts (run locally on Velocity):
 ```bash
 # Check current config
-sudo grep proxy_read_timeout /etc/nginx/sites-enabled/vf-fibreflow
+sudo grep proxy_read_timeout /etc/nginx/sites-enabled/dev-fibreflow
 
 # Add timeout settings to dev server block (if missing)
 # proxy_connect_timeout 300s;
@@ -503,8 +506,6 @@ sudo nginx -t && sudo systemctl reload nginx
 | 5000-8000 | 300s |
 | >8000 | 600s |
 
-**Note**: The dev.fibreflow.app server block needs explicit proxy timeout settings. The staging (vf.fibreflow.app) block has them.
-
 ## Auto-Activation Rules
 
 ### DO Automatically:
@@ -514,7 +515,7 @@ sudo nginx -t && sudo systemctl reload nginx
 - ✅ Provide SQL queries for investigation
 
 ### ASK First:
-- ❓ Restarting staging server
+- ❓ Restarting dev server
 - ❓ Running database updates
 - ❓ Modifying import code
 
@@ -525,13 +526,12 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Port Reference
 
-**IMPORTANT**: Never touch port 3000!
+**IMPORTANT**: Never touch port 3000 (production)!
 
-| Port | Environment | Notes |
-|------|-------------|-------|
-| 3000 | Production | DO NOT TOUCH |
-| 3005 | Development | Local dev |
-| 3006 | Staging | OES import testing |
+| Port | Environment | Service | Notes |
+|------|-------------|---------|-------|
+| 3000 | Production | `fibreflow-production.service` | DO NOT TOUCH |
+| 3005 | Development | `fibreflow-dev.service` | Dev and local testing |
 
 ## Quick Recovery Checklist
 
@@ -539,19 +539,19 @@ When OES import is broken (run locally on Velocity as user hein):
 
 ```bash
 # 1. Check service status
-systemctl status fibreflow.service --no-pager | head -10
+systemctl status fibreflow-dev.service --no-pager | head -10
 
 # 2. Pull latest code
-cd /home/velo/fibreflow-development && git pull
+cd /home/velo/fibreflow-dev && git pull
 
 # 3. Rebuild
-cd /home/velo/fibreflow-development && npm run build
+cd /home/velo/fibreflow-dev && npm run build
 
 # 4. Restart service
-sudo systemctl restart fibreflow.service
+sudo systemctl restart fibreflow-dev.service
 
 # 5. Verify
-sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3006/
+sleep 3 && curl -s -o /dev/null -w "%{http_code}" http://100.96.203.105:3005/
 ```
 
 ## Issue Log (Self-Improving)
@@ -633,6 +633,6 @@ Server: `/opt/qfield-sync/sync_oes_db_to_qfield.py`
 
 ## Related Skills
 
-- `/deploy` - Deploy code changes to staging
+- `/deploy` - Deploy code changes to dev
 - `/wa-monitor` - WhatsApp monitoring (sends feedback to groups)
 - `/Qfield` - Full QField management commands

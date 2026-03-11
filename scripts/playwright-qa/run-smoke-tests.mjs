@@ -8,7 +8,7 @@ import { chromium } from '/tmp/playwright-auth/node_modules/playwright/index.mjs
 import { readdirSync, readFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
-const baseUrl = process.argv[2] || 'https://vf.fibreflow.app';
+const baseUrl = process.argv[2] || 'https://dev.fibreflow.app';
 const AUTH_STATE = '/tmp/playwright-auth/auth.json';
 const SCREENSHOT_DIR = '/tmp/qa-screenshots';
 const STORIES_DIR = process.env.STORIES_DIR || '.claude/user-stories';

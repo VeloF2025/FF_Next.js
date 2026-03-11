@@ -12,7 +12,6 @@ export interface AuditConfig {
   servers: {
     fibreflow: {
       production: string;
-      staging: string;
       dev: string;
       local: string;
     };
@@ -82,8 +81,6 @@ const getBaseUrl = (): string => {
   switch (env) {
     case 'production':
       return 'https://app.fibreflow.app';
-    case 'staging':
-      return 'https://vf.fibreflow.app';
     case 'development':
       return 'https://dev.fibreflow.app';
     default:
@@ -99,7 +96,6 @@ export const config: AuditConfig = {
   servers: {
     fibreflow: {
       production: 'https://app.fibreflow.app',
-      staging: 'https://vf.fibreflow.app',
       dev: 'https://dev.fibreflow.app',
       local: 'http://localhost:3004',
     },

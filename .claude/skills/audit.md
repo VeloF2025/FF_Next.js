@@ -73,7 +73,7 @@ The audit runs automatically at 05:30 daily via systemd timer on Velocity server
 
 | Variable | Description |
 |----------|-------------|
-| `AUDIT_ENV` | Override environment (production/staging/development) |
+| `AUDIT_ENV` | Override environment (production/development) |
 | `AUDIT_LOG_LEVEL` | Log verbosity (debug/info/warn/error) |
 | `AUDIT_LOG_FILE` | Set to "true" to write log files |
 | `SLACK_AUDIT_WEBHOOK` | Slack webhook URL for notifications |

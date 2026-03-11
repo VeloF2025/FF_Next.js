@@ -127,7 +127,7 @@ Infrastructure management via WhatsApp commands from admin groups.
 | `!pending` | Show pending approvals |
 | `!approve <token>` | Approve dangerous action |
 
-**Service Aliases:** `vlm`, `qfield`, `production`, `staging`, `dev`, `grafana`, `portainer`, `pdfcraft`, `wa-feedback`, `wa-bridge`
+**Service Aliases:** `vlm`, `qfield`, `production`, `dev`, `grafana`, `portainer`, `pdfcraft`, `wa-feedback`, `wa-bridge` (staging removed — retired 2026-03-11)
 
 **How it works:**
 1. Bot polls SQLite (`/opt/whatsapp-bridge/store/messages.db`) every 2 seconds
