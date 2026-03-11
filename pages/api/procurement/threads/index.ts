@@ -46,12 +46,16 @@ async function fetchThreadsBothFilters(status: string, projectId: string) {
       t.po_total,
       t.created_by,
       t.created_at,
-      t.updated_at
+      t.updated_at,
+      t.cancelled_reason,
+      COALESCE(cu.first_name || ' ' || cu.last_name, cu.email) as cancelled_by_name,
+      t.cancelled_at
     FROM procurement_threads t
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
     LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
+    LEFT JOIN users cu ON t.cancelled_by = cu.id
     WHERE t.status = ${status}
       AND t.project_id = ${projectId}
     ORDER BY
@@ -86,12 +90,16 @@ async function fetchThreadsByStatus(status: string) {
       t.po_total,
       t.created_by,
       t.created_at,
-      t.updated_at
+      t.updated_at,
+      t.cancelled_reason,
+      COALESCE(cu.first_name || ' ' || cu.last_name, cu.email) as cancelled_by_name,
+      t.cancelled_at
     FROM procurement_threads t
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
     LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
+    LEFT JOIN users cu ON t.cancelled_by = cu.id
     WHERE t.status = ${status}
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
@@ -125,12 +133,16 @@ async function fetchThreadsByProject(projectId: string) {
       t.po_total,
       t.created_by,
       t.created_at,
-      t.updated_at
+      t.updated_at,
+      t.cancelled_reason,
+      COALESCE(cu.first_name || ' ' || cu.last_name, cu.email) as cancelled_by_name,
+      t.cancelled_at
     FROM procurement_threads t
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
     LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
+    LEFT JOIN users cu ON t.cancelled_by = cu.id
     WHERE t.project_id = ${projectId}
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
@@ -164,12 +176,16 @@ async function fetchAllThreads() {
       t.po_total,
       t.created_by,
       t.created_at,
-      t.updated_at
+      t.updated_at,
+      t.cancelled_reason,
+      COALESCE(cu.first_name || ' ' || cu.last_name, cu.email) as cancelled_by_name,
+      t.cancelled_at
     FROM procurement_threads t
     LEFT JOIN projects p ON t.project_id = p.id
     LEFT JOIN purchase_requisitions pr ON t.requisition_id = pr.id
     LEFT JOIN purchase_orders po ON t.po_id = po.id
     LEFT JOIN cost_centers cc ON pr.cost_center_id = cc.id
+    LEFT JOIN users cu ON t.cancelled_by = cu.id
     ORDER BY
       CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
       t.updated_at DESC
@@ -218,6 +234,9 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       createdBy: r['created_by'] as string | null,
       createdAt: r['created_at'] as string,
       updatedAt: r['updated_at'] as string,
+      cancelledReason: (r['cancelled_reason'] as string) || null,
+      cancelledByName: (r['cancelled_by_name'] as string) || null,
+      cancelledAt: (r['cancelled_at'] as string) || null,
     }));
 
     const active = threads.filter((t) => t.status === 'active').length;

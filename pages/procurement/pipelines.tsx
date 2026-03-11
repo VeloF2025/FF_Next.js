@@ -10,6 +10,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   GitBranch,
   Search,
@@ -28,6 +29,7 @@ import {
   Clock,
   Pause,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import { log } from '@/lib/logger';
 
@@ -89,6 +91,9 @@ interface PipelineThread {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+  cancelledReason: string | null;
+  cancelledByName: string | null;
+  cancelledAt: string | null;
 }
 
 interface Summary {
@@ -175,14 +180,33 @@ function DocBadges({ thread }: { thread: PipelineThread }) {
 
 // ── Page Component ───────────────────────────────────────────────────────────
 
+const DISCARD_REASONS = [
+  'Not proceeding with purchase',
+  'Duplicate requisition',
+  'Budget not approved',
+  'Requirements changed',
+  'Supplier no longer available',
+  'Other',
+];
+
 export default function PipelinesPage() {
   const router = useRouter();
+  const { currentUser } = useAuth();
+  const canDiscard = currentUser?.role === 'super_admin' || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+
   const [threads, setThreads] = useState<PipelineThread[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Discard modal state
+  const [discardTarget, setDiscardTarget] = useState<PipelineThread | null>(null);
+  const [discardReason, setDiscardReason] = useState('');
+  const [discardCustomReason, setDiscardCustomReason] = useState('');
+  const [isDiscarding, setIsDiscarding] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchThreads();
@@ -204,6 +228,40 @@ export default function PipelinesPage() {
       setError('Failed to connect to server');
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleDiscard() {
+    if (!discardTarget) return;
+    const reason = discardReason === 'Other' ? discardCustomReason.trim() : discardReason;
+    if (!reason || reason.length < 3) {
+      setDiscardError('Please select or enter a reason (min 3 characters)');
+      return;
+    }
+
+    setIsDiscarding(true);
+    setDiscardError(null);
+    try {
+      const res = await fetch(`/api/procurement/threads/${discardTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'discard', reason }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setDiscardError(data.error?.message || data.message || 'Failed to discard pipeline');
+        return;
+      }
+      // Close modal and refresh
+      setDiscardTarget(null);
+      setDiscardReason('');
+      setDiscardCustomReason('');
+      void fetchThreads();
+    } catch (err) {
+      log.error('Failed to discard pipeline', { error: err });
+      setDiscardError('Network error — please try again');
+    } finally {
+      setIsDiscarding(false);
     }
   }
 
@@ -439,6 +497,24 @@ export default function PipelinesPage() {
                       </div>
                     )}
 
+                    {/* Discard button (admin only, not for already cancelled) */}
+                    {canDiscard && thread.status !== 'cancelled' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDiscardTarget(thread); setDiscardError(null); }}
+                        title="Discard pipeline"
+                        className="p-2 rounded-lg text-[var(--ff-text-tertiary)] hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {/* Cancelled reason tooltip */}
+                    {thread.status === 'cancelled' && thread.cancelledReason && (
+                      <div className="shrink-0 max-w-[140px]" title={`Reason: ${thread.cancelledReason}${thread.cancelledByName ? ` — by ${thread.cancelledByName}` : ''}`}>
+                        <span className="text-xs text-red-400 truncate block">{thread.cancelledReason}</span>
+                      </div>
+                    )}
+
                     {/* Arrow */}
                     <ChevronRight className="h-5 w-5 text-[var(--ff-text-tertiary)] group-hover:text-[var(--ff-text-secondary)] shrink-0" />
                   </div>
@@ -448,6 +524,84 @@ export default function PipelinesPage() {
           )}
         </div>
       </div>
+
+      {/* Discard Modal */}
+      {discardTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setDiscardTarget(null)}>
+          <div
+            className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <Trash2 className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Discard Pipeline</h3>
+                <p className="text-sm text-[var(--ff-text-secondary)]">
+                  {discardTarget.threadNumber} {discardTarget.title ? `— ${discardTarget.title}` : ''}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-[var(--ff-text-secondary)] mb-4">
+              This will cancel the pipeline. It can still be viewed but no further actions will be possible.
+            </p>
+
+            {discardError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                <span className="text-sm text-red-400">{discardError}</span>
+              </div>
+            )}
+
+            <label className="block text-sm font-medium text-[var(--ff-text-primary)] mb-2">
+              Reason <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={discardReason}
+              onChange={(e) => { setDiscardReason(e.target.value); setDiscardError(null); }}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] focus:outline-none focus:ring-1 focus:ring-red-500/50 mb-3"
+            >
+              <option value="">-- Select a reason --</option>
+              {DISCARD_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+
+            {discardReason === 'Other' && (
+              <textarea
+                value={discardCustomReason}
+                onChange={(e) => { setDiscardCustomReason(e.target.value); setDiscardError(null); }}
+                rows={2}
+                placeholder="Describe the reason..."
+                className="w-full px-3 py-2 bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-1 focus:ring-red-500/50 resize-none mb-3"
+              />
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setDiscardTarget(null); setDiscardReason(''); setDiscardCustomReason(''); }}
+                className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] transition-colors"
+                disabled={isDiscarding}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleDiscard()}
+                disabled={isDiscarding || (!discardReason || (discardReason === 'Other' && discardCustomReason.trim().length < 3))}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDiscarding ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Discarding...</>
+                ) : (
+                  <><Trash2 className="h-4 w-4" /> Discard Pipeline</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

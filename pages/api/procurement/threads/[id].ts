@@ -6,8 +6,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-error-handler';
+import { userHasPermission } from '@/lib/permissions';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -168,5 +169,61 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
     return apiResponse.success(res, updated[0], 'Procurement thread updated');
   }
 
-  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT']);
+  // PATCH — Discard / close a pipeline thread (admin-only, RBAC-checked)
+  if (req.method === 'PATCH') {
+    const authReq = req as AuthenticatedNextApiRequest;
+    const userId = authReq.user?.id;
+
+    if (!userId) {
+      return apiResponse.unauthorized(res, 'Authentication required');
+    }
+
+    const canDiscard = await userHasPermission(userId, 'procurement.pipelines.discard', 'edit');
+    if (!canDiscard) {
+      return apiResponse.forbidden(res, 'You do not have permission to discard pipelines');
+    }
+
+    const { action, reason } = req.body as { action?: string; reason?: string };
+
+    if (action !== 'discard') {
+      return apiResponse.badRequest(res, 'Invalid action. Use { action: "discard" }');
+    }
+    if (!reason || reason.trim().length < 3) {
+      return apiResponse.badRequest(res, 'A reason is required (min 3 characters)');
+    }
+
+    // Check thread exists and is not already cancelled
+    const existing = await sql`
+      SELECT id, status, thread_number FROM procurement_threads WHERE id = ${id}
+    `;
+    if (existing.length === 0) {
+      return apiResponse.notFound(res, 'Procurement thread', id);
+    }
+    if (existing[0].status === 'cancelled') {
+      return apiResponse.badRequest(res, 'This pipeline is already cancelled');
+    }
+
+    const updated = await sql`
+      UPDATE procurement_threads
+      SET
+        status = 'cancelled',
+        cancelled_reason = ${reason.trim()},
+        cancelled_by = ${userId}::uuid,
+        cancelled_at = NOW(),
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    log.info('Procurement thread discarded', {
+      threadId: id,
+      threadNumber: existing[0].thread_number,
+      reason: reason.trim(),
+      cancelledBy: userId,
+    }, 'procurement-threads');
+
+    return apiResponse.success(res, updated[0], 'Pipeline discarded successfully');
+  }
+
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'PATCH']);
 }));
