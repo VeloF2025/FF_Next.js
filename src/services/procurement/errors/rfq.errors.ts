@@ -268,7 +268,7 @@ export class RFQSupplierError extends RFQError {
       if (supplier.rating !== undefined) {
         supplierItem.rating = supplier.rating;
       }
-      acc[supplier.category].push(supplierItem);
+      acc[supplier.category]!.push(supplierItem);
       return acc;
     }, {} as Record<string, Array<{ id: string; name: string; rating?: number }>>);
   }

@@ -21,11 +21,11 @@ export class PerformanceMetricsCalculator {
     const q3Index = Math.floor((n + 1) * 0.75) - 1;
 
     return {
-      min: sortedValues[0],
-      q1: q1Index >= 0 ? sortedValues[q1Index] : sortedValues[0],
-      median: medianIndex >= 0 ? sortedValues[medianIndex] : sortedValues[0],
-      q3: q3Index >= 0 ? sortedValues[q3Index] : sortedValues[n - 1],
-      max: sortedValues[n - 1]
+      min: sortedValues[0]!,
+      q1: q1Index >= 0 ? sortedValues[q1Index]! : sortedValues[0]!,
+      median: medianIndex >= 0 ? sortedValues[medianIndex]! : sortedValues[0]!,
+      q3: q3Index >= 0 ? sortedValues[q3Index]! : sortedValues[n - 1]!,
+      max: sortedValues[n - 1]!
     };
   }
 
@@ -158,8 +158,8 @@ export class PerformanceMetricsCalculator {
     if (ratings.length === 0) return [];
     
     const q3Index = Math.floor(ratings.length * 0.75);
-    const threshold = ratings[q3Index];
-    
+    const threshold = ratings[q3Index]!;
+
     return suppliers.filter(s => this.getSupplierRating(s) >= threshold);
   }
 
@@ -171,12 +171,12 @@ export class PerformanceMetricsCalculator {
       .map(s => this.getSupplierRating(s))
       .filter(r => r > 0)
       .sort((a, b) => a - b);
-    
+
     if (ratings.length === 0) return [];
-    
+
     const q1Index = Math.floor(ratings.length * 0.25);
-    const threshold = ratings[q1Index];
-    
+    const threshold = ratings[q1Index]!;
+
     return suppliers.filter(s => this.getSupplierRating(s) <= threshold);
   }
 

@@ -83,16 +83,16 @@ function findColumnValue(row: Record<string, any>, possibleColumns: string[]): a
     
     // Exact match first
     const exactMatch = rowKeys.find(key => key === normalizedColumn);
-    if (exactMatch && row[Object.keys(row)[rowKeys.indexOf(exactMatch)]] !== undefined) {
-      return row[Object.keys(row)[rowKeys.indexOf(exactMatch)]];
+    if (exactMatch && row[Object.keys(row)[rowKeys.indexOf(exactMatch)]!] !== undefined) {
+      return row[Object.keys(row)[rowKeys.indexOf(exactMatch)]!];
     }
     
     // Partial match (contains)
     const partialMatch = rowKeys.find(key => 
       key.includes(normalizedColumn) || normalizedColumn.includes(key)
     );
-    if (partialMatch && row[Object.keys(row)[rowKeys.indexOf(partialMatch)]] !== undefined) {
-      return row[Object.keys(row)[rowKeys.indexOf(partialMatch)]];
+    if (partialMatch && row[Object.keys(row)[rowKeys.indexOf(partialMatch)]!] !== undefined) {
+      return row[Object.keys(row)[rowKeys.indexOf(partialMatch)]!];
     }
   }
   
@@ -142,7 +142,7 @@ export function detectColumnMapping(headers: string[]): {
         }
 
         if (confidence > 0.5 && (!bestMatch || confidence > bestMatch.confidence)) {
-          bestMatch = { header: headers[index], confidence };
+          bestMatch = { header: headers[index]!, confidence };
         }
       });
     });
@@ -220,7 +220,7 @@ export function validateColumnMapping(mapping: ColumnMapping, headers: string[])
         normalizedHeaders.includes(col.toLowerCase().trim())
       );
       if (!validColumn) {
-        invalidColumns.push({ field, column: mappedColumns[0] });
+        invalidColumns.push({ field, column: mappedColumns[0]! });
         missingRequired.push(field);
       }
     }

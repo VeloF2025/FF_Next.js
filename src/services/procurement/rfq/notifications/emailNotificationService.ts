@@ -6,7 +6,7 @@
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export interface NotificationPayload {
   type: 'rfq_invitation' | 'rfq_reminder' | 'rfq_deadline' | 'rfq_evaluation' | 'rfq_award' | 

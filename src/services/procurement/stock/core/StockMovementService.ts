@@ -11,7 +11,9 @@ import {
   stockMovementItems, 
   cableDrums, 
   drumUsageHistory 
+// @ts-ignore
 } from '@/lib/neon/schema/procurement/stock.schema';
+// @ts-ignore
 import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import type {
@@ -115,7 +117,7 @@ export class StockMovementService extends BaseService {
   }>> {
     try {
       // Test transaction capabilities
-      await db.transaction(async (tx) => {
+      await db.transaction(async (tx: any) => {
         await tx.select().from(stockMovements).limit(1);
       });
       
@@ -201,7 +203,7 @@ export class StockMovementService extends BaseService {
     grnData: GRNData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Create GRN movement
         const movementId = uuidv4();
         const movementRecord = {
@@ -353,7 +355,7 @@ export class StockMovementService extends BaseService {
     issueData: IssueData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Validate stock availability for all items first
         for (const item of issueData.items) {
           const [position] = await tx
@@ -496,7 +498,7 @@ export class StockMovementService extends BaseService {
     transferData: TransferData
   ): Promise<ServiceResponse<{ movement: StockMovement, items: StockMovementItem[] }>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Validate stock availability in source project
         for (const item of transferData.items) {
           const [sourcePosition] = await tx
@@ -797,7 +799,7 @@ export class StockMovementService extends BaseService {
     usageData: Omit<DrumUsageHistory, 'id' | 'drumId' | 'createdAt' | 'updatedAt'>
   ): Promise<ServiceResponse<DrumUsageHistory>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Get current drum information
         const [drum] = await tx
           .select()

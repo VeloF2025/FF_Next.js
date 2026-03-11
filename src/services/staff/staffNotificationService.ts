@@ -460,7 +460,7 @@ This weekly summary is generated automatically by FibreFlow HR.
     const [countResult] = await sql`
       SELECT COUNT(*) as total FROM staff WHERE status = 'active' OR is_active = true
     `;
-    const totalStaff = parseInt(countResult.total as string);
+    const totalStaff = parseInt(countResult?.total as string ?? '0');
 
     const [statsResult] = await sql`
       SELECT
@@ -498,8 +498,8 @@ This weekly summary is generated automatically by FibreFlow HR.
       };
     });
 
-    const withVerifiedId = parseInt(statsResult.with_id as string);
-    const withVerifiedBank = parseInt(statsResult.with_bank as string);
+    const withVerifiedId = parseInt(statsResult?.with_id as string ?? '0');
+    const withVerifiedBank = parseInt(statsResult?.with_bank as string ?? '0');
 
     const compliancePercentage = totalStaff > 0
       ? Math.round(((withVerifiedId + withVerifiedBank) / (totalStaff * 2)) * 100)
@@ -508,10 +508,10 @@ This weekly summary is generated automatically by FibreFlow HR.
     return {
       totalStaff,
       withVerifiedId,
-      withVerifiedPassport: parseInt(statsResult.with_passport as string),
-      withVerifiedLicense: parseInt(statsResult.with_license as string),
+      withVerifiedPassport: parseInt(statsResult?.with_passport as string ?? '0'),
+      withVerifiedLicense: parseInt(statsResult?.with_license as string ?? '0'),
       withVerifiedBankDetails: withVerifiedBank,
-      withDob: parseInt(statsResult.with_dob as string),
+      withDob: parseInt(statsResult?.with_dob as string ?? '0'),
       missingDocuments,
       compliancePercentage,
     };

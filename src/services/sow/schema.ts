@@ -3,11 +3,14 @@
  * Handles database table creation and initialization
  */
 
-import { createNeonClient } from '@/lib/neon-sql';
+import { getSql } from '@/lib/neon-sql';
 import { SOWTableType } from './types';
 import { log } from '@/lib/logger';
 
-const { query } = createNeonClient(process.env.NEXT_PUBLIC_NEON_DATABASE_URL || '');
+const query = (sqlString: string) => {
+  const sql = getSql();
+  return sql([sqlString] as unknown as TemplateStringsArray);
+};
 
 /**
  * Helper function to safely create table names

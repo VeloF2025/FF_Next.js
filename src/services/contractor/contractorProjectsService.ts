@@ -23,7 +23,7 @@ export async function getContractorProjects(
   if (filter.contractorId) params.append('contractorId', filter.contractorId);
   if (filter.projectId) params.append('projectId', filter.projectId);
   if (filter.assignmentStatus && filter.assignmentStatus.length > 0) {
-    params.append('assignmentStatus', filter.assignmentStatus[0]); // Take first status for now
+    params.append('assignmentStatus', filter.assignmentStatus[0]!); // Take first status for now
   }
   if (filter.isActive !== undefined) params.append('isActive', String(filter.isActive));
 

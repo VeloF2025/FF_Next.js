@@ -53,11 +53,12 @@ const VirtualizedListComponent = <T,>({
   const visibleItems = useMemo(() => {
     const visible = [];
     for (let i = visibleRange.start; i <= visibleRange.end; i++) {
-      if (items[i]) {
+      const item = items[i];
+      if (item) {
         visible.push({
-          item: items[i],
+          item,
           index: i,
-          key: getItemKey(items[i], i)
+          key: getItemKey(item, i)
         });
       }
     }

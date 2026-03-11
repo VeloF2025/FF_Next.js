@@ -166,7 +166,7 @@ export class BOQImportService {
       job.metadata.errorRows = result.stats.errorRows;
       
       if (!result.success && result.errors.length > 0) {
-        job.error = result.errors[0].message;
+        job.error = result.errors[0]!.message;
       }
 
       this.jobs.set(job.id, job);

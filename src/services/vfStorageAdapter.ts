@@ -47,7 +47,7 @@ export class VFStorageService {
       });
       return response.ok;
     } catch (error) {
-      log.warn('VF Storage health check failed:', error);
+      log.warn('VF Storage health check failed:', { data: error });
       return false;
     }
   }
@@ -70,10 +70,10 @@ export class VFStorageService {
 
       // Handle different file types
       if (file instanceof Buffer) {
-        const blob = new Blob([file]);
+        const blob = new Blob([file as unknown as BlobPart]);
         formData.append('file', blob, fileName);
       } else {
-        formData.append('file', file, fileName);
+        formData.append('file', file as Blob, fileName);
       }
 
       const url = `${this.baseUrl}/upload/${type}/${category}`;
@@ -107,7 +107,7 @@ export class VFStorageService {
         size: result.size || (file instanceof Buffer ? file.length : 0),
       };
     } catch (error) {
-      log.error('VF Storage upload error:', error);
+      log.error('VF Storage upload error:', { data: error });
       throw error;
     }
   }
@@ -132,7 +132,7 @@ export class VFStorageService {
       const result = await response.json();
       return result.files || [];
     } catch (error) {
-      log.error('VF Storage list error:', error);
+      log.error('VF Storage list error:', { data: error });
       return [];
     }
   }
@@ -161,7 +161,7 @@ export class VFStorageService {
 
       return true;
     } catch (error) {
-      log.error('VF Storage delete error:', error);
+      log.error('VF Storage delete error:', { data: error });
       return false;
     }
   }

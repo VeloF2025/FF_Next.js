@@ -107,7 +107,7 @@ class MockVerificationClient implements IVerificationProvider {
       clear: true,
       idNumber,
       fullName,
-      checkDate: new Date().toISOString().split('T')[0],
+      checkDate: new Date().toISOString().split('T')[0] ?? '',
       records: [],
     };
   }

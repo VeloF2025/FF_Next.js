@@ -43,7 +43,7 @@ export interface StockMatchResult {
 }
 
 export class StockMatcher {
-  private sql: ReturnType<typeof neon>;
+  private sql: any;
 
   constructor(databaseUrl: string) {
     this.sql = neon(databaseUrl);
@@ -170,7 +170,7 @@ export class StockMatcher {
       if (prefixMatches.length > 0) {
         return {
           ...baseResult,
-          stockItem: prefixMatches[0],
+          stockItem: prefixMatches[0] ?? null,
           matchMethod: 'exact_code',
           matchConfidence: 0.95,
           alternatives: prefixMatches.slice(1, 4).map(s => ({ stockItem: s, score: 0.90 })),
@@ -236,12 +236,12 @@ export class StockMatcher {
     // Sort by score descending
     candidates.sort((a, b) => b.score - a.score);
 
-    if (candidates.length > 0 && candidates[0].score >= FUZZY_THRESHOLD) {
+    if (candidates.length > 0 && candidates[0]!.score >= FUZZY_THRESHOLD) {
       return {
         ...baseResult,
-        stockItem: candidates[0].stockItem,
+        stockItem: candidates[0]!.stockItem,
         matchMethod: 'fuzzy_description',
-        matchConfidence: Math.min(candidates[0].score, 0.99),
+        matchConfidence: Math.min(candidates[0]!.score, 0.99),
         alternatives: candidates.slice(1, 4),
       };
     }
@@ -346,7 +346,7 @@ export class StockMatcher {
       ORDER BY name
     `;
 
-    return rows.map(r => ({
+    return rows.map((r: any) => ({
       id: r.id as string,
       itemCode: (r.item_code || '') as string,
       name: (r.name || '') as string,

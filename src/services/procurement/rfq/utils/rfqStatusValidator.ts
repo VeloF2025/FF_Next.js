@@ -11,9 +11,11 @@ import { RFQStatus } from '@/types/procurement.types';
 export function validateStatusTransition(currentStatus: RFQStatus, newStatus: RFQStatus): boolean {
   const validTransitions: Record<RFQStatus, RFQStatus[]> = {
     [RFQStatus.DRAFT]: [RFQStatus.READY_TO_SEND, RFQStatus.CANCELLED],
+    [RFQStatus.OPEN]: [RFQStatus.ISSUED, RFQStatus.CANCELLED],
     [RFQStatus.READY_TO_SEND]: [RFQStatus.ISSUED, RFQStatus.CANCELLED],
     [RFQStatus.ISSUED]: [RFQStatus.RESPONSES_RECEIVED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
     [RFQStatus.RESPONSES_RECEIVED]: [RFQStatus.EVALUATED, RFQStatus.AWARDED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
+    [RFQStatus.EVALUATING]: [RFQStatus.EVALUATED, RFQStatus.CANCELLED],
     [RFQStatus.EVALUATED]: [RFQStatus.AWARDED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
     [RFQStatus.AWARDED]: [RFQStatus.CLOSED],
     [RFQStatus.CLOSED]: [],
@@ -29,9 +31,11 @@ export function validateStatusTransition(currentStatus: RFQStatus, newStatus: RF
 export function getAllowedTransitions(currentStatus: RFQStatus): RFQStatus[] {
   const validTransitions: Record<RFQStatus, RFQStatus[]> = {
     [RFQStatus.DRAFT]: [RFQStatus.READY_TO_SEND, RFQStatus.CANCELLED],
+    [RFQStatus.OPEN]: [RFQStatus.ISSUED, RFQStatus.CANCELLED],
     [RFQStatus.READY_TO_SEND]: [RFQStatus.ISSUED, RFQStatus.CANCELLED],
     [RFQStatus.ISSUED]: [RFQStatus.RESPONSES_RECEIVED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
     [RFQStatus.RESPONSES_RECEIVED]: [RFQStatus.EVALUATED, RFQStatus.AWARDED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
+    [RFQStatus.EVALUATING]: [RFQStatus.EVALUATED, RFQStatus.CANCELLED],
     [RFQStatus.EVALUATED]: [RFQStatus.AWARDED, RFQStatus.CLOSED, RFQStatus.CANCELLED],
     [RFQStatus.AWARDED]: [RFQStatus.CLOSED],
     [RFQStatus.CLOSED]: [],

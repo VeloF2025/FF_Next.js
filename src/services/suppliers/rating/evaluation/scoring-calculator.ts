@@ -352,8 +352,8 @@ export class ScoringCalculator {
       };
     }
 
-    const latest = historicalPerformance[historicalPerformance.length - 1];
-    const previous = historicalPerformance[historicalPerformance.length - 2];
+    const latest = historicalPerformance[historicalPerformance.length - 1]!;
+    const previous = historicalPerformance[historicalPerformance.length - 2]!;
 
     const calculateTrend = (current: number, prev: number): 'improving' | 'declining' | 'stable' => {
       const diff = current - prev;

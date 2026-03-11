@@ -11,7 +11,7 @@ import { log } from '../../../../lib/logger';
 import { sanitizeText } from '@/lib/security/sanitization';
 
 // Initialize Neon client
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class BOQImportDatabaseSaver {
   /**
@@ -125,7 +125,7 @@ export class BOQImportDatabaseSaver {
     let itemsCreated = 0;
 
     for (let i = 0; i < mappedItems.length; i++) {
-      const item = mappedItems[i];
+      const item = mappedItems[i]!;
 
       try {
         // Handle duplicate checking based on config
@@ -403,7 +403,7 @@ export class BOQImportDatabaseSaver {
       ORDER BY priority DESC, created_at ASC
     `;
 
-    return result.map((row) => ({
+    return result.map((row: any) => ({
       id: row.id,
       itemCode: row.item_code,
       description: row.description,

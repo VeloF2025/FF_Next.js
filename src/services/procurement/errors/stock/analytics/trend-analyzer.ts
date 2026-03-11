@@ -119,7 +119,7 @@ export class TrendAnalyzer {
     // Calculate velocity (first derivative)
     const velocities = [];
     for (let i = 1; i < errorCounts.length; i++) {
-      velocities.push(errorCounts[i] - errorCounts[i - 1]);
+      velocities.push(errorCounts[i]! - errorCounts[i - 1]!);
     }
     
     const avgVelocity = velocities.reduce((sum, v) => sum + v, 0) / velocities.length;
@@ -127,7 +127,7 @@ export class TrendAnalyzer {
     // Calculate acceleration (second derivative)
     const accelerations = [];
     for (let i = 1; i < velocities.length; i++) {
-      accelerations.push(velocities[i] - velocities[i - 1]);
+      accelerations.push(velocities[i]! - velocities[i - 1]!);
     }
     
     const avgAcceleration = accelerations.length > 0 
@@ -247,7 +247,7 @@ export class TrendAnalyzer {
           break;
         case 'daily':
           slotEnd.setDate(current.getDate() + 1);
-          label = current.toISOString().split('T')[0];
+          label = current.toISOString().split('T')[0]!;
           break;
         case 'weekly':
           slotEnd.setDate(current.getDate() + 7);
@@ -367,7 +367,7 @@ export class TrendAnalyzer {
     const meanX = x.reduce((sum, val) => sum + val, 0) / n;
     const meanY = y.reduce((sum, val) => sum + val, 0) / n;
 
-    const numerator = x.reduce((sum, val, i) => sum + (val - meanX) * (y[i] - meanY), 0);
+    const numerator = x.reduce((sum, val, i) => sum + (val - meanX) * (y[i]! - meanY), 0);
     const denomX = Math.sqrt(x.reduce((sum, val) => sum + Math.pow(val - meanX, 2), 0));
     const denomY = Math.sqrt(y.reduce((sum, val) => sum + Math.pow(val - meanY, 2), 0));
 

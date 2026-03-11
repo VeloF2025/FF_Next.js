@@ -72,7 +72,7 @@ export async function pullInvoicesFromSage(
 
         if (existing.length > 0) {
           // Update existing invoice
-          await updateExistingInvoice(sql, existing[0].id as string, invoice);
+          await updateExistingInvoice(sql, existing[0]!.id as string, invoice);
           result.updated++;
           continue;
         }
@@ -200,7 +200,7 @@ async function createInvoiceRecord(
     RETURNING id
   `;
 
-  return { id: result[0].id as string };
+  return { id: result[0]!.id as string };
 }
 
 /**
@@ -250,7 +250,7 @@ async function matchInvoiceToPO(
     return null;
   }
 
-  const ffSupplierId = supplierMapping[0].ff_entity_id;
+  const ffSupplierId = supplierMapping[0]!.ff_entity_id;
   const invoiceRef = invoice.Reference || '';
 
   // Try to match by PO number in invoice reference
@@ -268,8 +268,8 @@ async function matchInvoiceToPO(
     `;
 
     if (poMatch.length > 0) {
-      await linkInvoiceToPO(sql, localInvoiceId, poMatch[0].id as string);
-      return { poId: poMatch[0].id as string, projectId: poMatch[0].project_id as string };
+      await linkInvoiceToPO(sql, localInvoiceId, poMatch[0]!.id as string);
+      return { poId: poMatch[0]!.id as string, projectId: poMatch[0]!.project_id as string };
     }
   }
 
@@ -287,8 +287,8 @@ async function matchInvoiceToPO(
   `;
 
   if (amountMatch.length > 0) {
-    await linkInvoiceToPO(sql, localInvoiceId, amountMatch[0].id as string);
-    return { poId: amountMatch[0].id as string, projectId: amountMatch[0].project_id as string };
+    await linkInvoiceToPO(sql, localInvoiceId, amountMatch[0]!.id as string);
+    return { poId: amountMatch[0]!.id as string, projectId: amountMatch[0]!.project_id as string };
   }
 
   return null;
@@ -445,7 +445,7 @@ export async function manuallyMatchInvoice(
     await linkInvoiceToPO(sql, invoiceId, poId);
 
     // Create budget transaction using DB values (already snake_case)
-    const inv = invoice[0];
+    const inv = invoice[0]!;
     const sageInvoice: SageSupplierInvoice = {
       ID: inv.sage_invoice_id as string,
       SupplierID: inv.sage_supplier_id as string,
@@ -467,7 +467,7 @@ export async function manuallyMatchInvoice(
       invoiceId,
       sageInvoice,
       poId,
-      po[0].project_id as string
+      po[0]!.project_id as string
     );
 
     return true;

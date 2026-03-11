@@ -233,7 +233,7 @@ export async function extractQuoteFromMultipleImages(
 
   // For single image, use standard extraction
   if (images.length === 1) {
-    return extractQuoteFromImage(images[0], documentName);
+    return extractQuoteFromImage(images[0]!, documentName);
   }
 
   log.info('[QuoteExtraction] Processing multi-page document', {
@@ -255,33 +255,35 @@ export async function extractQuoteFromMultipleImages(
     return createErrorResult('Failed to extract from any page', startTime);
   }
 
-  const combined = validExtractions[0];
+  const combined = validExtractions[0]!;
 
   // Merge line items from subsequent pages
   for (let i = 1; i < validExtractions.length; i++) {
-    const pageItems = validExtractions[i].lineItems || [];
-    const lastLineNumber = combined.lineItems?.length || 0;
+    const pageItems = validExtractions[i]!.lineItems || [];
+    const lastLineNumber = combined!.lineItems?.length || 0;
 
     // Renumber and add items
     pageItems.forEach((item, idx) => {
-      combined.lineItems?.push({
-        ...item,
-        lineNumber: lastLineNumber + idx + 1,
-      });
+      if (combined!.lineItems) {
+        combined!.lineItems.push({
+          ...item,
+          lineNumber: lastLineNumber + idx + 1,
+        });
+      }
     });
   }
 
   // Recalculate totals if we have more items
-  if (combined.lineItems && combined.lineItems.length > 0) {
-    const subtotal = combined.lineItems.reduce(
+  if (combined!.lineItems && combined!.lineItems.length > 0) {
+    const subtotal = combined!.lineItems.reduce(
       (sum, item) => sum + (item.totalPrice || 0),
       0
     );
-    if (combined.totals) {
-      combined.totals.subtotal = subtotal;
-      if (combined.totals.vatRate) {
-        combined.totals.vatAmount = subtotal * (combined.totals.vatRate / 100);
-        combined.totals.total = subtotal + combined.totals.vatAmount;
+    if (combined!.totals) {
+      combined!.totals.subtotal = subtotal;
+      if (combined!.totals.vatRate) {
+        combined!.totals.vatAmount = subtotal * (combined!.totals.vatRate / 100);
+        combined!.totals.total = subtotal + combined!.totals.vatAmount;
       }
     }
   }
@@ -291,15 +293,18 @@ export async function extractQuoteFromMultipleImages(
     documentName,
     pageCount: images.length,
     pagesProcessed: validExtractions.length,
-    totalLineItems: combined.lineItems?.length || 0,
+    totalLineItems: combined!.lineItems?.length || 0,
     processingTimeMs,
   });
 
-  return {
-    ...combined,
+  const result = {
+    ...combined!,
     processingTimeMs,
-    extractionNotes: `Processed ${validExtractions.length} of ${images.length} pages. ${combined.extractionNotes || ''}`,
+    success: true,
+    extractionNotes: `Processed ${validExtractions.length} of ${images.length} pages. ${combined!.extractionNotes || ''}`,
   };
+
+  return result as QuoteExtractionResult & { success: boolean; error?: string; processingTimeMs: number };
 }
 
 // ============================================================================
@@ -432,7 +437,7 @@ function parseVlmResponse(responseText: string): QuoteExtractionResult {
       quoteInfo,
       lineItems,
       totals,
-      extractionNotes: normalizeString(parsed.extractionNotes),
+      extractionNotes: (normalizeString(parsed.extractionNotes) ?? undefined) as string | undefined,
       rawResponse: responseText,
     };
   } catch (error) {
@@ -488,13 +493,13 @@ function normalizeDate(value: unknown): string | null {
     // DD/MM/YYYY or DD-MM-YYYY
     const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (dmyMatch) {
-      return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+      return `${dmyMatch[3]}-${dmyMatch[2]!.padStart(2, '0')}-${dmyMatch[1]!.padStart(2, '0')}`;
     }
 
     // YYYY/MM/DD or YYYY-MM-DD
     const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
     if (ymdMatch) {
-      return `${ymdMatch[1]}-${ymdMatch[2].padStart(2, '0')}-${ymdMatch[3].padStart(2, '0')}`;
+      return `${ymdMatch[1]}-${ymdMatch[2]!.padStart(2, '0')}-${ymdMatch[3]!.padStart(2, '0')}`;
     }
 
     // If it's already in ISO format, return as is

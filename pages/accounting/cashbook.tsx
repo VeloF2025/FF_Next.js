@@ -32,8 +32,8 @@ function getDefaultDates() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   return {
-    from: start.toISOString().split('T')[0] ?? '',
-    to: now.toISOString().split('T')[0] ?? '',
+    from: start.toISOString().split('T')[0],
+    to: now.toISOString().split('T')[0],
   };
 }
 
@@ -192,7 +192,7 @@ export default function CashbookPage() {
                     <td className="px-4 py-3 text-right font-mono text-green-400">{fmt(totals.deposits)}</td>
                     <td className="px-4 py-3 text-right font-mono text-red-400">{fmt(totals.withdrawals)}</td>
                     <td className="px-4 py-3 text-right font-mono text-[var(--ff-text-primary)]">
-                      {rows.length > 0 ? fmt(rows[rows.length - 1]!.balance) : fmt(0)}
+                      {rows.length > 0 ? fmt(rows[rows.length - 1].balance) : fmt(0)}
                     </td>
                   </tr>
                 </tfoot>

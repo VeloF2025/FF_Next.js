@@ -65,7 +65,7 @@ export class DataProcessor {
       const globalRowIndex = startIndex + i;
       const row = rows[i];
 
-      const result = this.processRow(row, globalRowIndex, columnMapping);
+      const result = this.processRow(row!, globalRowIndex, columnMapping);
 
       errors.push(...result.errors);
       warnings.push(...result.warnings);

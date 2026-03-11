@@ -271,9 +271,9 @@ export class LocationMetricsCalculator {
     const uniqueCountries = new Set(distribution.map(d => d.country).filter(c => c)).size;
 
     // Find top locations
-    const topCity = distribution.length > 0 ? distribution[0].city : 'N/A';
+    const topCity = distribution.length > 0 ? distribution[0]!.city : 'N/A';
     const provinceDistribution = this.calculateProvinceDistribution(suppliers);
-    const topProvince = provinceDistribution.length > 0 ? provinceDistribution[0].province : 'N/A';
+    const topProvince = provinceDistribution.length > 0 ? provinceDistribution[0]!.province : 'N/A';
     
     const countryDistribution = new Map<string, number>();
     suppliers.forEach(supplier => {

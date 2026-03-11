@@ -11,7 +11,7 @@ import { log } from '@/lib/logger';
 import { getTrialBalance } from '@/modules/accounting/services/journalEntryService';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
+  if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!);
 
   const fiscalPeriodId = req.query.fiscal_period_id as string;
   if (!fiscalPeriodId) return apiResponse.badRequest(res, 'fiscal_period_id is required');

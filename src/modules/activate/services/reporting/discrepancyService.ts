@@ -31,11 +31,11 @@ export async function getDiscrepancyReport(
         .toISOString()
         .split('T')[0] as string);
 
-    log.info('ReportingService', 'Getting discrepancy report', {
+    log.info('Getting discrepancy report', {
       waDate,
       oesDate: actualOesDate,
       project,
-    });
+    }, 'ReportingService');
 
     // Use neon() tagged template (HTTP-based) instead of Pool (WebSocket)
     // to avoid "socket hang up" errors in production
@@ -145,7 +145,7 @@ export async function getDiscrepancyReport(
       records,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get discrepancy report', { error });
+    log.error('Failed to get discrepancy report', { error }, 'ReportingService');
     throw error;
   }
 }

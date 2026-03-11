@@ -61,6 +61,8 @@ export interface AnalyticsQuery {
   startDate?: Date;
   endDate?: Date;
   clientId?: string;
+  projectId?: string;
+  department?: string;
   status?: string[];
   includeInactive?: boolean;
 }

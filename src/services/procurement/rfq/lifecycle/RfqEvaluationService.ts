@@ -9,7 +9,7 @@ import { RFQStatus } from '@/types/procurement.types';
 import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqResponseService } from './RfqResponseService';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqEvaluationService {
   /**

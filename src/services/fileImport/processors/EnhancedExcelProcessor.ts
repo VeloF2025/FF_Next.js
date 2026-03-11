@@ -115,7 +115,7 @@ export class EnhancedExcelProcessor {
         columnCount: headers.length,
         headers,
         sheets: sheetsInfo,
-        activeSheet: workbook.SheetNames[0],
+        activeSheet: workbook.SheetNames[0] ?? '',
         formulas: this.countFormulas(targetSheet),
         images: 0, // XLSX doesn't provide image count
         charts: 0, // XLSX doesn't provide chart count
@@ -299,32 +299,32 @@ export class EnhancedExcelProcessor {
   private getSheetInfo(workbook: XLSX.WorkBook): ExcelSheetInfo[] {
     return workbook.SheetNames.map((name, index) => {
       const sheet = workbook.Sheets[name];
-      const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
-      
+      const range = XLSX.utils.decode_range(sheet?.['!ref'] || 'A1:A1');
+
       return {
         name,
         index,
         rowCount: range.e.r + 1,
         columnCount: range.e.c + 1,
-        hasData: !!sheet['!ref'],
-        ...(sheet['!ref'] && { range: sheet['!ref'] })
+        hasData: !!sheet?.['!ref'],
+        ...(sheet?.['!ref'] && { range: sheet['!ref'] })
       };
     });
   }
 
   private getTargetSheet(workbook: XLSX.WorkBook, options: ExcelProcessingOptions): XLSX.WorkSheet | null {
     if (options.sheetName) {
-      return workbook.Sheets[options.sheetName] || null;
+      return workbook.Sheets[options.sheetName] ?? null;
     }
     
     if (options.sheetIndex !== undefined) {
       const sheetName = workbook.SheetNames[options.sheetIndex];
-      return sheetName ? workbook.Sheets[sheetName] : null;
+      return sheetName ? (workbook.Sheets[sheetName] ?? null) : null;
     }
-    
+
     // Default to first sheet
     const firstSheetName = workbook.SheetNames[0];
-    return firstSheetName ? workbook.Sheets[firstSheetName] : null;
+    return firstSheetName ? (workbook.Sheets[firstSheetName] ?? null) : null;
   }
 
   private processSheetData<T>(sheetData: unknown[][], options: ExcelProcessingOptions): {

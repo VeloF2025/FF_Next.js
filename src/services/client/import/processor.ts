@@ -34,7 +34,7 @@ export async function processImportRows(rows: ClientImportRow[]): Promise<Client
   
   // Process valid rows
   for (let i = 0; i < validRows.length; i++) {
-    const row = validRows[i];
+    const row = validRows[i]!;
     const originalIndex = rows.indexOf(row);
     const rowNumber = originalIndex + 2; // +2 because row 1 is headers, and arrays are 0-indexed
     

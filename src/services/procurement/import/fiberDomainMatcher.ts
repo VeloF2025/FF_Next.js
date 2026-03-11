@@ -151,11 +151,11 @@ function parseBOQDescription(description: string): ParsedParams {
   // Extract diameter from parenthesized values BEFORE stripping them
   // "Splice Protector.40mm (2.5mm)" → extract 2.5 as secondary diameter
   const parenDiameterMatch = description.match(/\((\d+[.,]?\d*)mm\)/);
-  const parenDiameter = parenDiameterMatch ? parseFloat(parenDiameterMatch[1].replace(',', '.')) : null;
+  const parenDiameter = parenDiameterMatch ? parseFloat(parenDiameterMatch[1]!.replace(',', '.')) : null;
 
   // Check for bulk quantity: "* 300", "* 288"
   const bulkMatch = description.match(/\*\s*(\d+)/);
-  const bulkQty = bulkMatch ? parseInt(bulkMatch[1], 10) : null;
+  const bulkQty = bulkMatch ? parseInt(bulkMatch[1]!, 10) : null;
 
   let text = description.replace(/\(.*?\)/g, '').trim(); // Remove parenthetical notes
 
@@ -181,21 +181,21 @@ function parseBOQDescription(description: string): ParsedParams {
     // Length: "10m", "15m", "100m"
     const lengthMatch = part.match(/^(\d+)m$/i);
     if (lengthMatch) {
-      params.length = parseFloat(lengthMatch[1]);
+      params.length = parseFloat(lengthMatch[1]!);
     }
 
     // Diameter: "3,0mm", "8mm", "9,6mm", "13,6mm" (but NOT ranges like "9,20-9,50mm")
     if (!part.includes('-')) {
       const diaMatch = part.match(/^(\d+(?:[.,]\d+)?)mm$/i);
       if (diaMatch) {
-        params.diameter = parseFloat(diaMatch[1].replace(',', '.'));
+        params.diameter = parseFloat(diaMatch[1]!.replace(',', '.'));
       }
     }
 
     // Fiber count: "1F", "12F", "24F", "48F", "72F"
     const fiberMatch = part.match(/^(\d+)F$/i);
     if (fiberMatch) {
-      params.fiberCount = parseInt(fiberMatch[1], 10);
+      params.fiberCount = parseInt(fiberMatch[1]!, 10);
     }
 
     // Size range: "9,20-9,50mm", "100-120", "17,9mm-18,99mm"
@@ -203,8 +203,8 @@ function parseBOQDescription(description: string): ParsedParams {
     const cleanedForRange = part.replace(/mm/gi, '').trim();
     const rangeMatch = cleanedForRange.match(/^(\d+[.,]?\d*)\s*-\s*(\d+[.,]?\d*)$/);
     if (rangeMatch) {
-      const low = rangeMatch[1].replace(',', '.');
-      const high = rangeMatch[2].replace(',', '.');
+      const low = rangeMatch[1]!.replace(',', '.');
+      const high = rangeMatch[2]!.replace(',', '.');
       // Validate range: lo must be less than hi (prevents fake ranges from split errors)
       if (parseFloat(low) < parseFloat(high)) {
         params.sizeRange = low + '-' + high;
@@ -214,9 +214,9 @@ function parseBOQDescription(description: string): ParsedParams {
     // Model numbers: RN300, RN400, "RN400 Extension", ODCFD0, UMJ, CMJ
     const rnMatch = part.match(/^RN(\d+)/i);
     if (rnMatch) {
-      params.model = 'RN' + rnMatch[1];
+      params.model = 'RN' + rnMatch[1]!;
       // Also store the numeric part as length for matching MANHOLE-300 etc.
-      params.length = parseInt(rnMatch[1], 10);
+      params.length = parseInt(rnMatch[1]!, 10);
     } else if (/^(ODCFD\w*|UMJ|CMJ|MMJ)$/i.test(part)) {
       params.model = part.toUpperCase();
     }
@@ -224,7 +224,7 @@ function parseBOQDescription(description: string): ParsedParams {
     // Enclosure models: "M8 Microloop", "M16 Microloop", "M16 Microloop + bracket"
     const microloopMatch = part.match(/^M(\d+)\s*Microloop/i);
     if (microloopMatch) {
-      params.model = 'M' + microloopMatch[1] + '-MICROLOOP';
+      params.model = 'M' + microloopMatch[1]! + '-MICROLOOP';
     }
 
     // Thread/bolt sizes: M12, M14, M16
@@ -235,19 +235,19 @@ function parseBOQDescription(description: string): ParsedParams {
     // Ways: "1Way", "2Way", "4Way", "7Way", "1 WAY", "2 WAY"
     const waysMatch = part.match(/(\d+)\s*way/i);
     if (waysMatch) {
-      params.ways = parseInt(waysMatch[1], 10);
+      params.ways = parseInt(waysMatch[1]!, 10);
     }
 
     // Dimensions: "16mm*16mm", "25mm*16mm"
     const dimMatch = part.match(/^(\d+)mm\*(\d+)mm$/i);
     if (dimMatch) {
-      params.dimensions = dimMatch[1] + 'X' + dimMatch[2];
+      params.dimensions = dimMatch[1]! + 'X' + dimMatch[2]!;
     }
 
     // Length suffix: "2m", "3m", "4m" (for trunking, conduit)
     const shortLenMatch = part.match(/^(\d)m$/);
     if (shortLenMatch) {
-      params.length = parseInt(shortLenMatch[1], 10);
+      params.length = parseInt(shortLenMatch[1]!, 10);
     }
 
     // Variants
@@ -268,13 +268,13 @@ function parseBOQDescription(description: string): ParsedParams {
     // Duct sizes: "8/5", "14/10", "40/34", "14/10 YELLOW", "8/5 WHITE"
     const ductMatch = part.match(/^(\d+)\/(\d+)/);
     if (ductMatch) {
-      params.dimensions = ductMatch[1] + '-' + ductMatch[2];
+      params.dimensions = ductMatch[1]! + '-' + ductMatch[2]!;
     }
 
     // Splitter ratio: "1:8", "1:16"
     const splitMatch = part.match(/^1:(\d+)$/);
     if (splitMatch) {
-      params.model = '1-' + splitMatch[1];
+      params.model = '1-' + splitMatch[1]!;
     }
   }
 
@@ -283,7 +283,7 @@ function parseBOQDescription(description: string): ParsedParams {
   if (!params.sizeRange) {
     const fullRangeMatch = description.match(/(\d+[.,]\d+)\s*mm?\s*-\s*(\d+[.,]\d+)\s*mm/);
     if (fullRangeMatch) {
-      params.sizeRange = fullRangeMatch[1].replace(',', '.') + '-' + fullRangeMatch[2].replace(',', '.');
+      params.sizeRange = fullRangeMatch[1]!.replace(',', '.') + '-' + fullRangeMatch[2]!.replace(',', '.');
     }
   }
 
@@ -291,7 +291,7 @@ function parseBOQDescription(description: string): ParsedParams {
   // Height for poles: "5,4m.100-120" → length=5.4
   const poleHeightMatch = description.match(/(\d+[.,]\d+)m\.\d+-\d+/);
   if (poleHeightMatch) {
-    params.length = parseFloat(poleHeightMatch[1].replace(',', '.'));
+    params.length = parseFloat(poleHeightMatch[1]!.replace(',', '.'));
   }
 
   // Dead-end drop cable: "Dead-End.drop cable.2,8-3,8mm"
@@ -309,7 +309,7 @@ function parseBOQDescription(description: string): ParsedParams {
 
   // Hook ways from description
   const hookWays = description.match(/(\d)Way/i);
-  if (hookWays) params.ways = parseInt(hookWays[1], 10);
+  if (hookWays) params.ways = parseInt(hookWays[1]!, 10);
 
   // ONT type
   if (/ONT.*Wooden|ONT.*Wood/i.test(description)) params.model = 'ONT-WOOD';
@@ -351,7 +351,7 @@ function parseBOQDescription(description: string): ParsedParams {
   if (/extension/i.test(description)) params.variant = 'EXT';
 
   // Stay Set component matching via model field
-  if (/stay\s*set/i.test(description) || /stay/i.test(description.split('.')[0] || '')) {
+  if (/stay\s*set/i.test(description) || /stay/i.test(description.split('.')[0]! || '')) {
     let stayComponent = '';
     if (/bottom\s*makeoff/i.test(description)) stayComponent = 'BOTTOM-MAKEOFF';
     else if (/guy\s*grip|guygrip/i.test(description)) stayComponent = 'GUYGRIP';
@@ -365,7 +365,7 @@ function parseBOQDescription(description: string): ParsedParams {
     // Append bolt size (M12, M14, M16) to component for precise matching
     const boltMatch = description.match(/M(\d{2})/i);
     if (boltMatch && stayComponent) {
-      params.model = stayComponent + '-M' + boltMatch[1];
+      params.model = stayComponent + '-M' + boltMatch[1]!;
     } else {
       params.model = stayComponent || undefined;
     }
@@ -373,14 +373,14 @@ function parseBOQDescription(description: string): ParsedParams {
     // Extract wire gauge: "7/2mm" → dimensions "7-2"
     const gaugeMatch = description.match(/(\d+)\/(\d+)mm/);
     if (gaugeMatch) {
-      params.dimensions = gaugeMatch[1] + '-' + gaugeMatch[2];
+      params.dimensions = gaugeMatch[1]! + '-' + gaugeMatch[2]!;
     }
   }
 
   // "M12 Nuts Bolts and Washers Assembly" → Stay Set NBW-M12
   if (/nuts?\s*bolts?.*washer/i.test(description) && !params.model) {
     const boltMatch = description.match(/M(\d{2})/i);
-    params.model = boltMatch ? 'NBW-M' + boltMatch[1] : 'NBW';
+    params.model = boltMatch ? 'NBW-M' + boltMatch[1]! : 'NBW';
   }
 
   return params;
@@ -412,18 +412,18 @@ function parseStockCode(code: string): ParsedParams {
 
   // Look for numeric parts
   for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
+    const part = parts[i]!;
 
     // Fiber count: "24F", "48F", "12F"
     const fiberMatch = part.match(/^(\d+)F$/i);
     if (fiberMatch) {
-      params.fiberCount = parseInt(fiberMatch[1], 10);
+      params.fiberCount = parseInt(fiberMatch[1]!, 10);
       continue;
     }
 
     // Size range: two consecutive numeric parts like "9.2" and "9.5"
-    if (i < parts.length - 1 && /^\d+\.?\d*$/.test(part) && /^\d+\.?\d*$/.test(parts[i + 1])) {
-      const next = parts[i + 1];
+    if (i < parts.length - 1 && /^\d+\.?\d*$/.test(part) && /^\d+\.?\d*$/.test(parts[i + 1]!)) {
+      const next = parts[i + 1]!;
       const v1 = parseFloat(part);
       const v2 = parseFloat(next);
       if (v2 > v1 && v2 < v1 * 3) {
@@ -436,7 +436,7 @@ function parseStockCode(code: string): ParsedParams {
     // Dimensions: "16X16"
     const dimMatch = part.match(/^(\d+)X(\d+)$/i);
     if (dimMatch) {
-      params.dimensions = dimMatch[1] + 'X' + dimMatch[2];
+      params.dimensions = dimMatch[1]! + 'X' + dimMatch[2]!;
       continue;
     }
 
@@ -476,8 +476,8 @@ function parseStockCode(code: string): ParsedParams {
     if (part === 'LPAPC' || part === 'LCAPC') params.connectors = 'lcapc';
 
     // Hook ways: 1, 2, 3 (for HOOK-1, HOOK-2, HOOK-3)
-    if (code.startsWith('HOOK-') && /^\d+$/.test(part)) {
-      params.ways = parseInt(part, 10);
+    if (code.startsWith('HOOK-') && /^\d+$/.test(part!)) {
+      params.ways = parseInt(part!, 10);
       continue;
     }
     if (part === 'UNI') {
@@ -502,7 +502,7 @@ function parseStockCode(code: string): ParsedParams {
   // Splitter ratio: SPLIT-BF-1-8, SPLIT-CON-1-16-LCAPC
   const splitterRatioMatch = code.match(/SPLIT-(?:BF|CON)-(\d+)-(\d+)/);
   if (splitterRatioMatch) {
-    params.model = splitterRatioMatch[1] + '-' + splitterRatioMatch[2];
+    params.model = splitterRatioMatch[1]! + '-' + splitterRatioMatch[2]!;
   }
 
   // Screw variants
@@ -523,8 +523,8 @@ function parseStockCode(code: string): ParsedParams {
   if (code.startsWith('HDPE-') && !code.includes('SUBD')) {
     const mdMatch = code.match(/HDPE-(\d+)-(\d+)(\d{2})$/);
     if (mdMatch) {
-      params.ways = parseInt(mdMatch[1], 10);
-      params.dimensions = mdMatch[2] + '-' + mdMatch[3];
+      params.ways = parseInt(mdMatch[1]!, 10);
+      params.dimensions = mdMatch[2]! + '-' + mdMatch[3]!;
     }
   }
 
@@ -654,8 +654,8 @@ function scoreParamMatch(boq: ParsedParams, stock: ParsedParams): { score: numbe
   // Size range match (fuzzy overlap — ranges may differ slightly between BOQ and stock)
   if (boq.sizeRange && stock.sizeRange) {
     const parseRange = (r: string): [number, number] => {
-      const [lo, hi] = r.split('-').map(v => parseFloat(v));
-      return [lo, hi];
+      const parts = r.split('-').map(v => parseFloat(v));
+      return [parts[0]!, parts[1]!];
     };
     const [bLo, bHi] = parseRange(boq.sizeRange);
     const [sLo, sHi] = parseRange(stock.sizeRange);
@@ -778,7 +778,7 @@ export function fiberDomainMatch(
 
   // "Clear winner" logic: if best candidate is significantly better than runner-up,
   // accept it even at lower score (e.g., variant penalty separates generic from specific)
-  if (best && best.score >= 0.50 && scored.length >= 2 && (best.score - scored[1].score) >= 0.10) {
+  if (best && best.score >= 0.50 && scored.length >= 2 && (best.score - scored[1]!.score) >= 0.10) {
     return best;
   }
 

@@ -354,7 +354,7 @@ async function handler(
       return handlePatch(req, res, dropNumber);
 
     default:
-      return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PATCH']);
+      return apiResponse.methodNotAllowed(res);
   }
 }
 

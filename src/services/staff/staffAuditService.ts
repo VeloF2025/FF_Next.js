@@ -151,7 +151,7 @@ export async function getAuditLog(
       performedByName: string | null;
       createdAt: string;
     }>,
-    total: parseInt(countResult.total as string),
+    total: parseInt(countResult?.total as string ?? '0'),
   };
 }
 

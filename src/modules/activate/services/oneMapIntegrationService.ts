@@ -56,7 +56,7 @@ interface OneMapAPIResponse {
 function extractPhotoType(filename: string): string | null {
   // Pattern: DR{number}_{photo_type}_{sequence}.jpg
   const match = filename.match(/DR\d+_([a-z_]+)_\d+\.(jpg|jpeg|png)/i);
-  return match ? match[1] : null;
+  return match ? (match[1] || null) : null;
 }
 
 /**

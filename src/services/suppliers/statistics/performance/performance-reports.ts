@@ -14,7 +14,7 @@ export class PerformanceReportsGenerator {
       return 'No performance trends data available.';
     }
 
-    const latest = trends[trends.length - 1];
+    const latest = trends[trends.length - 1]!;
     const previous = trends.length > 1 ? trends[trends.length - 2] : null;
 
     let report = `Performance Trends Summary - ${latest.month} ${latest.year}\n`;
@@ -119,7 +119,7 @@ export class PerformanceReportsGenerator {
     report += `EXECUTIVE SUMMARY\n`;
     report += `${'-'.repeat(17)}\n`;
     if (trends.length > 0) {
-      const latest = trends[trends.length - 1];
+      const latest = trends[trends.length - 1]!;
       report += `Current supplier base: ${latest.totalSuppliers} active suppliers\n`;
       report += `Overall performance rating: ${latest.averageRating.toFixed(2)}/5.0\n`;
       report += `Performance score: ${latest.averagePerformance.toFixed(2)}\n`;
@@ -158,7 +158,7 @@ export class PerformanceReportsGenerator {
     const alerts: { type: 'warning' | 'info' | 'error'; message: string }[] = [];
 
     if (trends.length > 0) {
-      const latest = trends[trends.length - 1];
+      const latest = trends[trends.length - 1]!;
       const previous = trends.length > 1 ? trends[trends.length - 2] : null;
 
       kpis.totalSuppliers = { value: latest.totalSuppliers };

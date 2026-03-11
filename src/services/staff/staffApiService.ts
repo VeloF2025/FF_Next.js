@@ -169,7 +169,7 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     level: dbStaff.level as StaffMember['level'],
     status: (dbStaff.status || 'active') as StaffMember['status'],
     skills: (dbStaff.skills || []) as StaffMember['skills'],
-    certifications: (dbStaff.certifications || []) as StaffMember['certifications'],
+    certifications: (dbStaff.certifications || []) as unknown as StaffMember['certifications'],
     notes: dbStaff.notes,
     reportsTo: dbStaff.reports_to,
     currentProjectCount: dbStaff.project_count || 0,
@@ -232,7 +232,7 @@ function transformDbToStaffMember(dbStaff: DbStaff): StaffMember {
     bankName: dbStaff.bankName,
     bankAccountNumber: dbStaff.bankAccountNumber,
     bankBranchCode: dbStaff.bankBranchCode,
-    bankAccountType: dbStaff.bankAccountType,
+    bankAccountType: dbStaff.bankAccountType as StaffMember['bankAccountType'],
     bankAccountHolder: dbStaff.bankAccountHolder,
     bankDetailsVerifiedAt: dbStaff.bankDetailsVerifiedAt ? toTimestamp(dbStaff.bankDetailsVerifiedAt) : undefined,
     // SA Compliance fields
@@ -320,10 +320,10 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
     experience_years: staff.experienceYears,
     max_project_count: staff.maxProjectCount,
     // Identity document fields - use empty string or null to allow clearing
-    saIdNumber: staff.saIdNumber ?? null,
-    passportNumber: staff.passportNumber ?? null,
-    passportCountry: staff.passportCountry ?? null,
-    passportExpiry: toDateStringOrNull(staff.passportExpiry),
+    saIdNumber: staff.saIdNumber ?? undefined,
+    passportNumber: staff.passportNumber ?? undefined,
+    passportCountry: staff.passportCountry ?? undefined,
+    passportExpiry: toDateStringOrNull(staff.passportExpiry) ?? undefined,
   };
 
   // Emergency contact relationship

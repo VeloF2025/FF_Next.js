@@ -2,7 +2,23 @@
  * ContractorFilePreview - Preview and validation of import data
  */
 
-import type { ContractorImportData, ContractorImportOptions } from '@/types/contractor/import.types';
+interface ContractorRecord {
+  isValid: boolean;
+  isDuplicate: boolean;
+  companyName: string;
+  contactPerson?: string;
+  email?: string;
+  errors?: string[];
+  warnings?: string[];
+}
+
+interface ContractorImportData {
+  contractors: ContractorRecord[];
+}
+
+interface ContractorImportOptions {
+  mode: 'skipDuplicates' | 'updateExisting';
+}
 
 interface ContractorFilePreviewProps {
   data: ContractorImportData;
@@ -33,19 +49,19 @@ export function ContractorFilePreview({
           <div>
             <span className="text-muted-foreground">Valid Records:</span>
             <span className="ml-2 font-medium text-green-600">
-              {data.contractors.filter(c => c.isValid).length}
+              {data.contractors.filter((c: ContractorRecord) => c.isValid).length}
             </span>
           </div>
           <div>
             <span className="text-muted-foreground">Errors:</span>
             <span className="ml-2 font-medium text-red-600">
-              {data.contractors.filter(c => !c.isValid).length}
+              {data.contractors.filter((c: ContractorRecord) => !c.isValid).length}
             </span>
           </div>
           <div>
             <span className="text-muted-foreground">Duplicates:</span>
             <span className="ml-2 font-medium text-yellow-600">
-              {data.contractors.filter(c => c.isDuplicate).length}
+              {data.contractors.filter((c: ContractorRecord) => c.isDuplicate).length}
             </span>
           </div>
         </div>
@@ -112,7 +128,7 @@ export function ContractorFilePreview({
                     </div>
                   ) : contractor.warnings && contractor.warnings.length > 0 ? (
                     <div className="text-yellow-600 space-y-1">
-                      {contractor.warnings.slice(0, 2).map((warning, warningIndex) => (
+                      {contractor.warnings.slice(0, 2).map((warning: string, warningIndex: number) => (
                         <div key={warningIndex} className="text-xs">{warning}</div>
                       ))}
                     </div>
@@ -136,10 +152,10 @@ export function ContractorFilePreview({
         </button>
         <button
           onClick={onImport}
-          disabled={isProcessing || data.contractors.filter(c => c.isValid).length === 0}
+          disabled={isProcessing || data.contractors.filter((c: ContractorRecord) => c.isValid).length === 0}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isProcessing ? 'Importing...' : `Import ${data.contractors.filter(c => c.isValid).length} contractors`}
+          {isProcessing ? 'Importing...' : `Import ${data.contractors.filter((c: ContractorRecord) => c.isValid).length} contractors`}
         </button>
       </div>
     </div>

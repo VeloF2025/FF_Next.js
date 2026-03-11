@@ -181,7 +181,7 @@ export async function getBankTransactions(
       const wd = Number(r.credit || 0);
       running += dep - wd;
       return {
-        date: String(r.entry_date).split('T')[0] ?? '',
+        date: String(r.entry_date).split('T')[0],
         entryNumber: String(r.entry_number),
         description: String(r.description || ''),
         deposit: dep,

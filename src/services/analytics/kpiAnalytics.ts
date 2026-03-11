@@ -70,7 +70,7 @@ export class KPIAnalyticsService {
       
       if (kpi) {
         return [{
-          date: new Date().toISOString().split('T')[0],
+          date: new Date().toISOString().split('T')[0] ?? '',
           value: kpi.value,
           count: 1
         }];

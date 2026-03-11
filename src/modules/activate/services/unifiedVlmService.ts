@@ -252,7 +252,10 @@ function groupPhotosByStep(photos: Photo[]): Record<number, Photo[]> {
     if (!grouped[photo.step]) {
       grouped[photo.step] = [];
     }
-    grouped[photo.step].push(photo);
+    const step = grouped[photo.step];
+    if (step) {
+      step.push(photo);
+    }
   });
 
   return grouped;

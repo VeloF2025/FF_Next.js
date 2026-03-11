@@ -95,7 +95,7 @@ export class SupplierRatingAnalyzer {
     const n = ratings.length;
     const sumX = periods.reduce((a, b) => a + b, 0);
     const sumY = ratings.reduce((a, b) => a + b, 0);
-    const sumXY = periods.reduce((sum, x, i) => sum + x * ratings[i], 0);
+    const sumXY = periods.reduce((sum, x, i) => sum + x * ratings[i]!, 0);
     const sumXX = periods.reduce((sum, x) => sum + x * x, 0);
     
     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
@@ -106,7 +106,7 @@ export class SupplierRatingAnalyzer {
     
     // Calculate correlation coefficient
     const meanX = sumX / n;
-    const numerator = periods.reduce((sum, x, i) => sum + (x - meanX) * (ratings[i] - mean), 0);
+    const numerator = periods.reduce((sum, x, i) => sum + (x - meanX) * (ratings[i]! - mean), 0);
     const denomX = Math.sqrt(periods.reduce((sum, x) => sum + Math.pow(x - meanX, 2), 0));
     const denomY = Math.sqrt(ratings.reduce((sum, y) => sum + Math.pow(y - mean, 2), 0));
     const correlation = numerator / (denomX * denomY);
@@ -176,7 +176,7 @@ export class SupplierRatingAnalyzer {
       
       // Check for unusual review activity
       if (index > 0) {
-        const prevTrend = trends[index - 1];
+        const prevTrend = trends[index - 1]!;
         const reviewChange = Math.abs(trend.newReviews - prevTrend.newReviews);
         const reviewChangeRate = reviewChange / prevTrend.newReviews;
         

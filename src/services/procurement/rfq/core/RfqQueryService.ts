@@ -7,7 +7,7 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQ, RFQStatus } from '@/types/procurement.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqQueryService {
   /**
@@ -66,7 +66,7 @@ export class RfqQueryService {
         params
       );
 
-      const rfqs = result.map(row => ({
+      const rfqs = result.map((row: any) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,
@@ -177,7 +177,7 @@ export class RfqQueryService {
         params
       );
 
-      return result.map(row => ({
+      return result.map((row: any) => ({
         id: row.id,
         projectId: row.project_id,
         rfqNumber: row.rfq_number,
@@ -188,7 +188,7 @@ export class RfqQueryService {
         responseCount: parseInt(row.response_count) || 0,
         createdAt: row.created_at,
         updatedAt: row.updated_at
-      } as RFQ));
+      } as unknown as RFQ));
     } catch (error) {
       log.error('Error searching RFQs:', { data: error }, 'RfqQueryService');
       throw error;

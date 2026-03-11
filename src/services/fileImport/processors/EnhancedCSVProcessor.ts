@@ -53,15 +53,15 @@ export class EnhancedCSVProcessor {
       const errors: ProcessingError[] = [];
       const warnings: ProcessingWarning[] = [];
       
-      Papa.parse(file, {
+      Papa.parse(file as any, {
         header: true,
         delimiter: options.delimiter || '',
         quoteChar: options.quote || '"',
         escapeChar: options.escape || '"',
-        comments: options.comment || false,
+        comments: (options.comment || false) as string | false,
         skipEmptyLines: options.skipEmptyLines ?? true,
         dynamicTyping: options.dynamicTyping ?? true,
-        transform: options.transform,
+        transform: options.transform as any,
         transformHeader: (header: string) => {
           return options.trimWhitespace ? header.trim() : header;
         },
@@ -149,7 +149,7 @@ export class EnhancedCSVProcessor {
           const processingError = new Error(`CSV parsing failed: ${error.message}`);
           reject(processingError);
         }
-      });
+      } as any);
     });
   }
 
@@ -171,15 +171,14 @@ export class EnhancedCSVProcessor {
       let bytesProcessed = 0;
       let isFirstChunk = true;
 
-      const stream = Papa.parse(Papa.NODE_STREAM_INPUT, {
+      const stream = Papa.parse(Papa.NODE_STREAM_INPUT, ({
         header: true,
         delimiter: options.delimiter || '',
         quoteChar: options.quote || '"',
         escapeChar: options.escape || '"',
         skipEmptyLines: options.skipEmptyLines ?? true,
         dynamicTyping: options.dynamicTyping ?? true,
-        // chunkSize: options.chunkSize || this.CHUNK_SIZE, // Not available in this config
-        transform: options.transform,
+        transform: options.transform as any,
         transformHeader: (header: string) => {
           return options.trimWhitespace ? header.trim() : header;
         },
@@ -279,7 +278,7 @@ export class EnhancedCSVProcessor {
         error: (error: Papa.ParseError) => {
           reject(new Error(`Streaming CSV parsing failed: ${error.message}`));
         }
-      });
+      }) as any);
 
       // Start streaming
       const reader = file.stream().getReader();

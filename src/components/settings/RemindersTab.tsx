@@ -47,7 +47,7 @@ export function RemindersTab() {
         setReminders(data.data);
       }
     } catch (error) {
-      log.error('Failed to fetch reminders', error, 'RemindersTab');
+      log.error('Failed to fetch reminders', error as any, 'RemindersTab');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      log.error('Failed to fetch preferences', error, 'RemindersTab');
+      log.error('Failed to fetch preferences', error as any, 'RemindersTab');
     }
   };
 
@@ -80,7 +80,7 @@ export function RemindersTab() {
         setShowNewForm(false);
       }
     } catch (error) {
-      log.error('Failed to create reminder', error, 'RemindersTab');
+      log.error('Failed to create reminder', error as any, 'RemindersTab');
     }
   };
 
@@ -96,7 +96,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      log.error('Failed to update reminder', error, 'RemindersTab');
+      log.error('Failed to update reminder', error as any, 'RemindersTab');
     }
   };
 
@@ -111,7 +111,7 @@ export function RemindersTab() {
         setReminders(reminders.filter(r => r.id !== id));
       }
     } catch (error) {
-      log.error('Failed to delete reminder', error, 'RemindersTab');
+      log.error('Failed to delete reminder', error as any, 'RemindersTab');
     }
   };
 
@@ -127,7 +127,7 @@ export function RemindersTab() {
         setPreferences(data.data);
       }
     } catch (error) {
-      log.error('Failed to update preferences', error, 'RemindersTab');
+      log.error('Failed to update preferences', error as any, 'RemindersTab');
     }
   };
 

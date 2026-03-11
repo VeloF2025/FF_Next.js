@@ -11,7 +11,7 @@ import type { NotifyPayload } from '../types';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-const FROM_ADDRESS = 'FibreFlow <noreply@fibreflow.app>';
+const FROM_ADDRESS = 'FibreFlow <notifications@fibreflow.app>';
 const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.fibreflow.app';
 
 /**

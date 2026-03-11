@@ -98,7 +98,7 @@ export class ComplianceCalculator {
     if (taxDocs.length > 0) {
       const latestTaxDoc = taxDocs.sort((a, b) => 
         new Date(b.uploadedDate).getTime() - new Date(a.uploadedDate).getTime()
-      )[0];
+      )[0]!;
       
       compliance.taxCompliant = !latestTaxDoc.expiryDate || latestTaxDoc.expiryDate > now;
       if (latestTaxDoc.expiryDate) {
@@ -111,7 +111,7 @@ export class ComplianceCalculator {
     if (beeDocs.length > 0) {
       const latestBeeDoc = beeDocs.sort((a, b) => 
         new Date(b.uploadedDate).getTime() - new Date(a.uploadedDate).getTime()
-      )[0];
+      )[0]!;
       
       compliance.beeCompliant = !latestBeeDoc.expiryDate || latestBeeDoc.expiryDate > now;
       if (latestBeeDoc.expiryDate) {
@@ -126,7 +126,7 @@ export class ComplianceCalculator {
     if (insuranceDocs.length > 0) {
       const latestInsuranceDoc = insuranceDocs.sort((a, b) => 
         new Date(b.uploadedDate).getTime() - new Date(a.uploadedDate).getTime()
-      )[0];
+      )[0]!;
       
       compliance.insuranceValid = !latestInsuranceDoc.expiryDate || latestInsuranceDoc.expiryDate > now;
       if (latestInsuranceDoc.expiryDate) {
@@ -139,7 +139,7 @@ export class ComplianceCalculator {
     if (registrationDocs.length > 0) {
       const latestRegistrationDoc = registrationDocs.sort((a, b) => 
         new Date(b.uploadedDate).getTime() - new Date(a.uploadedDate).getTime()
-      )[0];
+      )[0]!;
       
       compliance.registrationValid = !latestRegistrationDoc.expiryDate || latestRegistrationDoc.expiryDate > now;
       if (latestRegistrationDoc.expiryDate) {

@@ -1050,7 +1050,7 @@ export async function getSageClientFromDb(
     throw new Error('Sage is not configured or not connected. Please configure Sage credentials in Settings.');
   }
 
-  const config = configResult[0];
+  const config = configResult[0]!;
 
   if (!config.api_key || !config.username || !config.password) {
     throw new Error('Sage credentials incomplete. Please check API Key, Username, and Password in Settings.');

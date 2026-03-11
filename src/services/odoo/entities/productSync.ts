@@ -8,7 +8,7 @@ import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient } from '../odooClient';
 
-const logger = createLogger({ module: 'odooProductSync' });
+const logger = createLogger('odooProductSync');
 
 // ============================================================================
 // Types
@@ -158,7 +158,7 @@ export async function syncProducts(
     logger.info(`Processing ${products.length} products`);
 
     // Get existing stock items with Odoo IDs
-    const existingItems = await sql<{ id: string; odoo_product_id: number }[]>`
+    const existingItems = await sql`
       SELECT id, odoo_product_id FROM stock_items WHERE odoo_product_id IS NOT NULL
     `;
     const existingByOdooId = new Map(
@@ -166,7 +166,7 @@ export async function syncProducts(
     );
 
     // Also check for existing items by item_code (in case already imported)
-    const existingByCode = await sql<{ id: string; item_code: string }[]>`
+    const existingByCode = await sql`
       SELECT id, item_code FROM stock_items
     `;
     const codeToId = new Map(

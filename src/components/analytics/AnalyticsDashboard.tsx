@@ -51,9 +51,9 @@ export function AnalyticsDashboard() {
       ]);
 
       setData({
-        projectOverview: projectOverview[0] || {},
+        projectOverview: projectOverview[0] as any || {} as any,
         kpiDashboard: transformKPIDashboardItemsToMetrics(kpiDashboard),
-        financialOverview: financialOverview[0] || {},
+        financialOverview: financialOverview[0] as any || {} as any,
         topClients,
         projectTrends
       });

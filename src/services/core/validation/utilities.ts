@@ -31,7 +31,7 @@ export class ValidationUtilities {
    */
   formatErrors(errors: string[]): string {
     if (errors.length === 0) return '';
-    if (errors.length === 1) return errors[0];
+    if (errors.length === 1) return errors[0] ?? '';
     return `• ${errors.join('\n• ')}`;
   }
 }

@@ -13,7 +13,7 @@ import {
   OdooFleetOdometer,
 } from '../odooClient';
 
-const logger = createLogger({ module: 'odooFleetSync' });
+const logger = createLogger('odooFleetSync');
 
 // ============================================================================
 // Types
@@ -142,7 +142,7 @@ export async function syncFleet(
     logger.info(`Found ${odooVehicles.length} vehicles in Odoo`);
 
     // Get existing FF vehicles with Odoo IDs
-    const existingVehicles = await sql<{ id: string; odoo_vehicle_id: number }[]>`
+    const existingVehicles = await sql`
       SELECT id, odoo_vehicle_id FROM fleet_vehicles WHERE odoo_vehicle_id IS NOT NULL
     `;
     const existingByOdooId = new Map(
@@ -200,7 +200,7 @@ export async function syncFleet(
           });
         } else {
           // Create new vehicle
-          const inserted = await sql<{ id: string }[]>`
+          const inserted = await sql`
             INSERT INTO fleet_vehicles (
               registration, vehicle_type, make, model, vin, status,
               current_odometer, odometer_unit, odoo_vehicle_id,
@@ -213,7 +213,7 @@ export async function syncFleet(
             RETURNING id
           `;
           result.vehicles.created++;
-          vehicleIdMap.set(odooVehicle.id, inserted[0].id);
+          vehicleIdMap.set(odooVehicle.id, inserted[0]!.id);
           result.details.push({
             type: 'vehicle',
             odooId: odooVehicle.id,
@@ -235,7 +235,7 @@ export async function syncFleet(
     }
 
     // Refresh vehicle ID map for existing vehicles
-    const allVehicles = await sql<{ id: string; odoo_vehicle_id: number }[]>`
+    const allVehicles = await sql`
       SELECT id, odoo_vehicle_id FROM fleet_vehicles WHERE odoo_vehicle_id IS NOT NULL
     `;
     for (const v of allVehicles) {
@@ -252,7 +252,7 @@ export async function syncFleet(
       logger.info(`Found ${serviceLogs.length} service logs in Odoo`);
 
       // Get existing service logs
-      const existingLogs = await sql<{ id: string; odoo_service_id: number }[]>`
+      const existingLogs = await sql`
         SELECT id, odoo_service_id FROM fleet_service_logs WHERE odoo_service_id IS NOT NULL
       `;
       const existingLogsByOdooId = new Map(
@@ -319,7 +319,7 @@ export async function syncFleet(
       logger.info(`Found ${odometerReadings.length} odometer readings in Odoo`);
 
       // Get existing odometer readings
-      const existingReadings = await sql<{ id: string; odoo_odometer_id: number }[]>`
+      const existingReadings = await sql`
         SELECT id, odoo_odometer_id FROM fleet_odometer_history WHERE odoo_odometer_id IS NOT NULL
       `;
       const existingReadingsByOdooId = new Map(

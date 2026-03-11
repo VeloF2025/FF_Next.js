@@ -64,11 +64,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Normalize date to YYYY-MM-DD regardless of input format
     function toISODate(val: unknown): string {
       if (!val) return '1970-01-01';
-      if (val instanceof Date) return val.toISOString().split('T')[0]!;
+      if (val instanceof Date) return val.toISOString().split('T')[0];
       const s = String(val);
-      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0]!;
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.split('T')[0];
       const d = new Date(s);
-      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0]!;
+      return isNaN(d.getTime()) ? '1970-01-01' : d.toISOString().split('T')[0];
     }
 
     // Build transaction list

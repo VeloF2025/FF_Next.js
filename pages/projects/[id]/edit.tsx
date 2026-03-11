@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { log } from '@/lib/logger';
 
 const ProjectForm = dynamic(() => import('@/modules/projects/components/ProjectForm').then(mod => mod.ProjectForm || mod.default), {
   ssr: false,
@@ -19,17 +18,17 @@ export default function EditProjectPage() {
   useEffect(() => {
     if (id) {
       // Fetch project data
-      fetch(`/api/projects/${id}`, { credentials: 'include' })
+      fetch(`/api/projects/${id}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
             setProject(data.data);
           } else {
-            log.error('Failed to fetch project', { error: data.error, projectId: id }, 'ProjectEdit');
+            console.error('Failed to fetch project:', data.error);
           }
         })
         .catch(err => {
-          log.error('Error fetching project', { error: err, projectId: id }, 'ProjectEdit');
+          console.error('Error fetching project:', err);
         })
         .finally(() => {
           setLoading(false);
@@ -37,12 +36,8 @@ export default function EditProjectPage() {
     }
   }, [id]);
 
-  const handleSubmit = async (projectData: any) => {
+  const handleSubmit = (projectData: any) => {
     // Map camelCase form fields to snake_case API fields
-    // Convert location object to string for DB storage
-    const loc = projectData.location || {};
-    const locationStr = [loc.city, loc.province].filter(Boolean).join(', ') || undefined;
-
     const apiData = {
       project_name: projectData.name || projectData.project_name,
       description: projectData.description,
@@ -53,22 +48,27 @@ export default function EditProjectPage() {
       start_date: projectData.startDate || projectData.start_date,
       end_date: projectData.endDate || projectData.end_date,
       budget: projectData.budget,
-      location: locationStr,
+      location: projectData.location,
     };
 
-    const res = await fetch(`/api/projects/${id}`, {
+    fetch(`/api/projects/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(apiData),
-    });
-
-    const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to update project');
-    }
-
-    router.push('/projects');
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          router.push('/projects');
+        } else {
+          console.error('Failed to update project:', data.error);
+        }
+      })
+      .catch(err => {
+        console.error('Error updating project:', err);
+      });
   };
 
   const handleCancel = () => {

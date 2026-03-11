@@ -3,7 +3,7 @@
  * Routes messages from workers to appropriate handlers
  */
 
-import type { WorkerResponse } from '../../types';
+import type { WorkerResponse } from '../../../types';
 
 export class MessageHandler {
   private handlers: Map<string, (response: WorkerResponse) => void> = new Map();

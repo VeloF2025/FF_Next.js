@@ -10,7 +10,7 @@ import { createLogger } from '@/lib/logger';
 import { OneMapClient, OneMapRecord, createOneMapClient } from './oneMapClient';
 import crypto from 'crypto';
 
-const logger = createLogger({ module: 'oneMapSync' });
+const logger = createLogger('oneMapSync');
 
 // Types
 export interface SyncOptions {
@@ -73,7 +73,7 @@ function generateChecksum(record: OneMapRecord): string {
 /**
  * Get enabled sites from database
  */
-async function getEnabledSites(sql: ReturnType<typeof neon>, siteCode?: string) {
+async function getEnabledSites(sql: any, siteCode?: string) {
   if (siteCode) {
     const sites = await sql`
       SELECT id, site_code, site_name, project_id
@@ -95,12 +95,12 @@ async function getEnabledSites(sql: ReturnType<typeof neon>, siteCode?: string) 
 /**
  * Get existing installation checksums for a site
  */
-async function getExistingChecksums(sql: ReturnType<typeof neon>, siteId: string): Promise<Map<string, string>> {
+async function getExistingChecksums(sql: any, siteId: string): Promise<Map<string, string>> {
   const rows = await sql`
     SELECT dr_number, checksum
     FROM onemap.drops
     WHERE site_id = ${siteId}::uuid
-  `;
+  ` as Record<string, any>[];
 
   const checksums = new Map<string, string>();
   for (const row of rows) {
@@ -113,7 +113,7 @@ async function getExistingChecksums(sql: ReturnType<typeof neon>, siteId: string
  * Upsert installation record
  */
 async function upsertInstallation(
-  sql: ReturnType<typeof neon>,
+  sql: any,
   siteId: string,
   record: OneMapRecord,
   checksum: string
@@ -180,7 +180,7 @@ async function upsertInstallation(
  * Log sync to sync_log table
  */
 async function logSync(
-  sql: ReturnType<typeof neon>,
+  sql: any,
   result: SyncResult,
   syncType: 'full' | 'incremental',
   startedAt: Date
@@ -211,7 +211,7 @@ async function logSync(
  * Update site sync timestamp
  */
 async function updateSiteSyncTime(
-  sql: ReturnType<typeof neon>,
+  sql: any,
   siteId: string,
   syncType: 'full' | 'incremental',
   totalInstallations: number
@@ -317,7 +317,7 @@ export async function syncSite(
     const totalInstallations = await sql`
       SELECT COUNT(*) as count FROM onemap.drops WHERE site_id = ${site.id}::uuid
     `;
-    await updateSiteSyncTime(sql, site.id, fullSync ? 'full' : 'incremental', parseInt(totalInstallations[0].count));
+    await updateSiteSyncTime(sql, site.id, fullSync ? 'full' : 'incremental', parseInt((totalInstallations as any[])[0].count));
 
     result.success = true;
     result.durationSeconds = (Date.now() - startedAt.getTime()) / 1000;
@@ -368,7 +368,7 @@ export async function syncAllSites(options: SyncOptions = {}): Promise<SyncSumma
   }
 
   logger.info(`Starting sync for ${sites.length} site(s)`, {
-    sites: sites.map(s => s.site_code),
+    sites: sites.map((s: any) => s.site_code),
   });
 
   const results: SyncResult[] = [];

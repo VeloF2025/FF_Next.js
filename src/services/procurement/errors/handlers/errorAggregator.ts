@@ -185,7 +185,7 @@ export class ProcurementErrorAggregator implements IErrorAggregator {
     }
 
     // Check for high error rate overall
-    if (mostCommon.length > 0 && mostCommon[0].count > 20) {
+    if (mostCommon.length > 0 && mostCommon[0]!.count > 20) {
       recommendations.push('Single error type dominates failures. Focus on resolving the primary issue first.');
     }
 

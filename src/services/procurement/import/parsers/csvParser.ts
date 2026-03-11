@@ -32,7 +32,7 @@ export class CSVParser {
           const data = lines.map(line => this.parseCSVLine(line));
           
           // Convert to object format using first row as headers
-          const headers = data[0];
+          const headers = data[0]!;
           const rows = data.slice(1).map(row => {
             const obj: Record<string, any> = {};
             headers.forEach((header, index) => {
@@ -123,7 +123,7 @@ export class CSVParser {
           const data = lines.map(line => this.parseLineWithDelimiter(line, delimiter));
           
           // Convert to object format
-          const headers = data[0];
+          const headers = data[0]!;
           const rows = data.slice(1).map(row => {
             const obj: Record<string, any> = {};
             headers.forEach((header, index) => {
@@ -228,8 +228,8 @@ export class CSVParser {
     if (lines.length === 0) return [];
     
     const data = lines.map(line => this.parseLineWithDelimiter(line, detectedDelimiter));
-    const headers = data[0];
-    
+    const headers = data[0]!;
+
     return data.slice(1).map(row => {
       const obj: Record<string, any> = {};
       headers.forEach((header, index) => {
@@ -250,16 +250,16 @@ export class CSVParser {
       return { isValid: false, errors };
     }
     
-    const headerCount = data[0].length;
-    
+    const headerCount = data[0]!.length;
+
     if (headerCount === 0) {
       errors.push('CSV file has no columns');
     }
-    
+
     // Check for consistent column count
     for (let i = 1; i < data.length; i++) {
-      if (data[i].length !== headerCount) {
-        errors.push(`Row ${i + 1} has ${data[i].length} columns, expected ${headerCount}`);
+      if (data[i]!.length !== headerCount) {
+        errors.push(`Row ${i + 1} has ${data[i]!.length} columns, expected ${headerCount}`);
       }
     }
     

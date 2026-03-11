@@ -14,13 +14,13 @@ import { ProjectStatus } from '@/types/project.types';
  * Get all projects with optional filtering
  */
 export async function getAll(filter?: ProjectFilter): Promise<Project[]> {
-  const projects = await projectApiService.getAll();
+  const projects = await projectApiService.getAll() as unknown as Project[];
   if (!filter) return projects;
 
   return projects.filter(project => {
     if (filter.status && !filter.status.includes(project.status as ProjectStatus)) return false;
-    if (filter.clientId && !filter.clientId.includes(project.client_id || '')) return false;
-    if (filter.projectType && !filter.projectType.includes(project.project_type || '')) return false;
+    if (filter.clientId && !filter.clientId.includes(project.clientId || '')) return false;
+    if (filter.projectType && !filter.projectType.includes(project.projectType || '')) return false;
     return true;
   });
 }
@@ -29,7 +29,7 @@ export async function getAll(filter?: ProjectFilter): Promise<Project[]> {
  * Get a single project by ID
  */
 export async function getById(id: string): Promise<Project | null> {
-  return projectApiService.getById(id);
+  return projectApiService.getById(id) as unknown as Project | null;
 }
 
 /**
@@ -58,12 +58,12 @@ export async function remove(id: string): Promise<void> {
  * Get projects by client ID
  */
 export async function getByClientId(clientId: string): Promise<Project[]> {
-  return projectApiService.getProjectsByClient(clientId);
+  return projectApiService.getProjectsByClient(clientId) as unknown as Project[];
 }
 
 /**
  * Get active projects
  */
 export async function getActiveProjects(): Promise<Project[]> {
-  return projectApiService.getActiveProjects();
+  return projectApiService.getActiveProjects() as unknown as Project[];
 }

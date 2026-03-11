@@ -253,7 +253,7 @@ class StaffDocumentServiceClass {
       }).length;
 
       // Check for missing required documents
-      const requiredTypes: DocumentType[] = ['id_document', 'employment_contract'];
+      const requiredTypes: DocumentType[] = ['sa_id', 'employment_contract'];
       const existingTypes = new Set(documents.map(d => d.documentType));
       const missingRequired = requiredTypes.filter(t => !existingTypes.has(t));
 

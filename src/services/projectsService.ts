@@ -53,7 +53,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error fetching projects:', error, 'ProjectsService');
+      log.error('Error fetching projects:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -68,7 +68,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error fetching project by ID:', error, 'ProjectsService');
+      log.error('Error fetching project by ID:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -88,7 +88,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error creating project:', error, 'ProjectsService');
+      log.error('Error creating project:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -108,7 +108,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error updating project:', error, 'ProjectsService');
+      log.error('Error updating project:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -122,7 +122,7 @@ class ProjectsService {
         throw new Error(`Failed to delete project: ${response.statusText}`);
       }
     } catch (error) {
-      log.error('Error deleting project:', error, 'ProjectsService');
+      log.error('Error deleting project:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -136,7 +136,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error fetching projects by client:', error, 'ProjectsService');
+      log.error('Error fetching projects by client:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -150,7 +150,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data;
     } catch (error) {
-      log.error('Error fetching project stats:', error, 'ProjectsService');
+      log.error('Error fetching project stats:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }
@@ -164,7 +164,7 @@ class ProjectsService {
       const data = await response.json();
       return data.data || [];
     } catch (error) {
-      log.error('Error searching projects:', error, 'ProjectsService');
+      log.error('Error searching projects:', { data: error } as any, 'ProjectsService');
       throw error;
     }
   }

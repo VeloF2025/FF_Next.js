@@ -2,7 +2,13 @@
  * Contractor Import Component Types and Interfaces
  */
 
-import { ContractorImportResult } from '@/types/contractor/import.types';
+export interface ContractorImportResult {
+  success: boolean;
+  message: string;
+  importedCount?: number;
+  errorCount?: number;
+  errors?: string[];
+}
 
 export interface ContractorImportProps {
   onComplete?: () => void;

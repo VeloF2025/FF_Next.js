@@ -86,14 +86,14 @@ export function DataValidationPhase({
       if (data.success) {
         setResult(data.data);
         setExtractionDone(true);
-        log.info('DataValidation', `Extraction complete for ${dropNumber}`);
+        log.info(`Extraction complete for ${dropNumber}`, {}, 'DataValidation');
       } else {
         throw new Error(data.error || 'Extraction failed');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Extraction failed';
       setError(message);
-      log.error('DataValidation', `Extraction failed for ${dropNumber}: ${message}`);
+      log.error(`Extraction failed for ${dropNumber}: ${message}`, {}, 'DataValidation');
     } finally {
       setLoading(false);
     }

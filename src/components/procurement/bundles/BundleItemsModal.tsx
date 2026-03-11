@@ -68,7 +68,7 @@ export function BundleItemsModal({
         notificationService.error(data.error?.message || 'Failed to load bundle items');
       }
     } catch (err) {
-      log.error('Failed to fetch bundle items', err);
+      log.error('Failed to fetch bundle items', err as any);
       notificationService.operationError('load', err as Error, 'bundle items');
     } finally {
       setIsLoading(false);
@@ -98,7 +98,7 @@ export function BundleItemsModal({
       const filtered = (data.data || []).filter((item: StockItem) => !existingIds.has(item.id));
       setSearchResults(filtered);
     } catch (err) {
-      log.error('Failed to search stock items', err);
+      log.error('Failed to search stock items', err as any);
     } finally {
       setIsSearching(false);
     }
@@ -135,7 +135,7 @@ export function BundleItemsModal({
         notificationService.error(data.error?.message || 'Failed to add item');
       }
     } catch (err) {
-      log.error('Failed to add item to bundle', err);
+      log.error('Failed to add item to bundle', err as any);
       notificationService.operationError('add', err as Error, 'item');
     }
   };
@@ -160,7 +160,7 @@ export function BundleItemsModal({
         notificationService.error(data.error?.message || 'Failed to update quantity');
       }
     } catch (err) {
-      log.error('Failed to update item quantity', err);
+      log.error('Failed to update item quantity', err as any);
       notificationService.operationError('update', err as Error, 'quantity');
     }
   };
@@ -182,7 +182,7 @@ export function BundleItemsModal({
         notificationService.error(data.error?.message || 'Failed to remove item');
       }
     } catch (err) {
-      log.error('Failed to remove item from bundle', err);
+      log.error('Failed to remove item from bundle', err as any);
       notificationService.operationError('remove', err as Error, 'item');
     }
   };

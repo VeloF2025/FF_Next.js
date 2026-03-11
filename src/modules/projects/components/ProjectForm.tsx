@@ -121,38 +121,18 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
   // Populate form with existing project data
   useEffect(() => {
     if (project) {
-      // Parse location: DB stores as string "City, Province", form needs object
-      // Handle corrupted data where JSON object was saved as string (e.g. '{"province":""}')
-      let locationObj = { province: '', city: '', address: '' };
-      if (project.location && typeof project.location === 'string') {
-        const loc = project.location.trim();
-        if (loc.startsWith('{')) {
-          // Corrupted JSON string — ignore it
-          locationObj = { province: '', city: '', address: '' };
-        } else {
-          const parts = loc.split(',').map((s: string) => s.trim());
-          locationObj = {
-            city: parts[0] || '',
-            province: parts[1] || '',
-            address: '',
-          };
-        }
-      } else if (project.location && typeof project.location === 'object') {
-        locationObj = project.location;
-      }
-
       const formData: ProjectFormData = {
         name: project.name || project.project_name || '',
         description: project.description || '',
         clientId: project.clientId || project.client_id || '',
         projectManagerId: project.projectManager || project.project_manager || '',
-        status: (project.status || 'planning').toLowerCase(),
-        priority: (project.priority || 'medium').toLowerCase(),
+        status: project.status || 'planning',
+        priority: project.priority || 'medium',
         // Convert ISO dates to YYYY-MM-DD format for HTML date inputs
         startDate: formatDateForInput(project.startDate || project.start_date),
         endDate: formatDateForInput(project.endDate || project.end_date),
-        budget: Number(project.budget) || 0,
-        location: locationObj,
+        budget: project.budget || 0,
+        location: project.location || {},
       };
       reset(formData);
     }
@@ -163,9 +143,8 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ project, onSubmit, onC
     try {
       await onSubmit(data);
       notificationService.success('Project updated successfully');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Failed to update project';
-      notificationService.error(message);
+    } catch (error) {
+      notificationService.error('Failed to update project');
     } finally {
       setIsSubmitting(false);
     }

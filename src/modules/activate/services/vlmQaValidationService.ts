@@ -12,8 +12,11 @@
  * NLNH Confidence: HIGH
  */
 
-import { log } from '@/lib/logger';
+import { log, createLogger } from '@/lib/logger';
 import { STEP_LABELS } from '../utils/stepMapper';
+
+// Component logger
+const logger = createLogger('VlmQaValidation');
 
 // ============================================================================
 // CONFIGURATION
@@ -300,7 +303,7 @@ async function fetchImageAsBase64(imageUrl: string): Promise<string> {
     const buffer = Buffer.from(arrayBuffer);
     return buffer.toString('base64');
   } catch (error) {
-    log.error('VlmQaValidation', `Failed to fetch/encode image ${imageUrl}: ${error}`);
+    logger.error(`Failed to fetch/encode image ${imageUrl}: ${error}`);
     throw error;
   }
 }
@@ -413,7 +416,7 @@ export async function validatePhoto(
   const stepLabel = STEP_LABELS[photo.step] || `Step ${photo.step}`;
   const criteria = STEP_QA_CRITERIA[photo.step];
 
-  log.info('VlmQaValidation', `Validating ${photo.filename} for ${drNumber} (${stepLabel})`);
+  logger.info(`Validating ${photo.filename} for ${drNumber} (${stepLabel})`);
 
   try {
     // Fetch and encode image
@@ -446,7 +449,7 @@ export async function validatePhoto(
       processingTimeMs: Date.now() - startTime,
     };
   } catch (error) {
-    log.error('VlmQaValidation', `Failed to validate ${photo.filename}: ${error}`);
+    logger.error(`Failed to validate ${photo.filename}: ${error}`);
 
     return {
       step: photo.step,
@@ -478,7 +481,7 @@ export async function validateBatch(
 ): Promise<BatchQaResult> {
   const startTime = Date.now();
 
-  log.info('VlmQaValidation', `Starting batch QA for ${drNumber}: ${photos.length} photos`);
+  logger.info(`Starting batch QA for ${drNumber}: ${photos.length} photos`);
 
   const stepResults: StepQaResult[] = [];
   const criticalIssues: string[] = [];
@@ -502,8 +505,7 @@ export async function validateBatch(
 
   const totalProcessingTimeMs = Date.now() - startTime;
 
-  log.info(
-    'VlmQaValidation',
+  logger.info(
     `Batch QA complete for ${drNumber}: ${passedCount}/${photos.length} passed (${passRate}%) in ${totalProcessingTimeMs}ms`
   );
 

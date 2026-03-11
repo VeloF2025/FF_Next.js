@@ -8,7 +8,6 @@ import {
   Truck,
   FileCheck,
   Clock,
-  Paperclip,
   LucideIcon
 } from 'lucide-react';
 
@@ -23,7 +22,6 @@ const tabs: Tab[] = [
   { key: 'items', label: 'Line Items', icon: Package },
   { key: 'delivery', label: 'Delivery', icon: Truck },
   { key: 'invoices', label: 'Invoices', icon: FileCheck },
-  { key: 'documents', label: 'Documents', icon: Paperclip },
   { key: 'history', label: 'History', icon: Clock }
 ];
 

@@ -31,14 +31,14 @@ export class ApiSOWService {
         success: result.success,
         message: result.message || `Uploaded ${result.upserted || 0} poles`,
         count: result.upserted || 0,
-        errors: result.errors || []
+        error: (result.errors || []).join('; ') || undefined
       };
     } catch (error) {
       log.error('Failed to upload poles', { data: error }, 'ApiSOWService');
       return {
         success: false,
         message: 'Failed to upload poles',
-        errors: [error instanceof Error ? error.message : 'Unknown error']
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -53,14 +53,14 @@ export class ApiSOWService {
         success: result.success,
         message: result.message || `Uploaded ${result.upserted || 0} drops`,
         count: result.upserted || 0,
-        errors: result.errors || []
+        error: (result.errors || []).join('; ') || undefined
       };
     } catch (error) {
       log.error('Failed to upload drops', { data: error }, 'ApiSOWService');
       return {
         success: false,
         message: 'Failed to upload drops',
-        errors: [error instanceof Error ? error.message : 'Unknown error']
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
@@ -75,14 +75,14 @@ export class ApiSOWService {
         success: result.success,
         message: result.message || `Uploaded ${result.upserted || 0} fibre sections`,
         count: result.upserted || 0,
-        errors: result.errors || []
+        error: (result.errors || []).join('; ') || undefined
       };
     } catch (error) {
       log.error('Failed to upload fibre', { data: error }, 'ApiSOWService');
       return {
         success: false,
         message: 'Failed to upload fibre',
-        errors: [error instanceof Error ? error.message : 'Unknown error']
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }

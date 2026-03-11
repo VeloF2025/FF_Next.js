@@ -313,11 +313,11 @@ export function fuzzySerialMatch(
     details = `No match: ${distance} character differences (max allowed: ${FUZZY_MATCH_MAX_DISTANCE})`;
   }
 
-  log.debug('QaAutoFail', `Fuzzy match: "${s1}" vs "${s2}" = ${isFuzzyMatch ? 'MATCH' : 'NO MATCH'}`, {
+  log.debug(`Fuzzy match: "${s1}" vs "${s2}" = ${isFuzzyMatch ? 'MATCH' : 'NO MATCH'}`, {
     distance,
     confidence: `${(confidence * 100).toFixed(1)}%`,
     maxAllowed: FUZZY_MATCH_MAX_DISTANCE,
-  });
+  }, 'QaAutoFail');
 
   return {
     isMatch: isFuzzyMatch,
@@ -718,7 +718,7 @@ export function getTechnicianIssueDescription(code: TechnicianIssueCode): string
  * - Missing UPS serial (from OneMap)
  */
 export function checkPrerequisites(data: DrValidationData): PrerequisitesResult {
-  log.debug('QaAutoFail', `Checking prerequisites for ${data.drNumber}`);
+  log.debug(`Checking prerequisites for ${data.drNumber}`, undefined, 'QaAutoFail');
 
   const failures: FailReasonCode[] = [];
 
@@ -764,10 +764,10 @@ export function checkPrerequisites(data: DrValidationData): PrerequisitesResult 
     },
   };
 
-  log.info('QaAutoFail', `Prerequisites ${passed ? 'PASSED' : 'FAILED'} for ${data.drNumber}`, {
+  log.info(`Prerequisites ${passed ? 'PASSED' : 'FAILED'} for ${data.drNumber}`, {
     failures,
     photoCount: data.photoCount,
-  });
+  }, 'QaAutoFail');
 
   return result;
 }
@@ -896,12 +896,12 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
         : `DR number mismatch. Serial verified via Step 6.`;
 
       if (!step6FuzzyMatch.isExactMatch) {
-        log.info('QaAutoFail', `Fuzzy match accepted for ${data.drNumber}`, {
+        log.info(`Fuzzy match accepted for ${data.drNumber}`, {
           onemapSerial,
           step6Serial,
           distance: step6FuzzyMatch.distance,
           confidence: step6FuzzyMatch.confidence,
-        });
+        }, 'QaAutoFail');
       }
     } else {
       // Step 6 matches but no Step 9 - still valid
@@ -943,7 +943,7 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
 
     details = `ONT serials don't match OneMap: OneMap=${onemapSerial}, Step6=${step6Serial || 'N/A'}, Step9=${step9Serial || 'N/A'}${debugInfo}`;
 
-    log.warn('QaAutoFail', `Serial mismatch for ${data.drNumber}`, {
+    log.warn(`Serial mismatch for ${data.drNumber}`, {
       onemapSerial,
       step6Serial,
       step9Serial,
@@ -951,7 +951,7 @@ export function validateSerialCrossReference(data: DrValidationData): SerialVali
       step9Distance: step9FuzzyMatch.distance,
       step6Confidence: step6FuzzyMatch.confidence,
       step9Confidence: step9FuzzyMatch.confidence,
-    });
+    }, 'QaAutoFail');
   }
 
   return {

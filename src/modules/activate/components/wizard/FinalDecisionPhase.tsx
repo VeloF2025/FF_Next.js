@@ -211,7 +211,7 @@ export function FinalDecisionPhase({
       const data = await response.json();
 
       if (data.success) {
-        log.info('FinalDecision', `Decision ${decision} submitted for ${dropNumber}`);
+        log.info(`Decision ${decision} submitted for ${dropNumber}`, undefined, 'FinalDecision');
 
         // Auto-create ticket for swapped serials (CRITICAL issue)
         const swapCheck = detectSwappedSerials(
@@ -221,7 +221,7 @@ export function FinalDecisionPhase({
         if (swapCheck.swapped) {
           const ticketUid = await createSwapTicket(swapCheck.details);
           if (ticketUid) {
-            log.info('FinalDecision', `Auto-created swap ticket ${ticketUid} for ${dropNumber}`);
+            log.info(`Auto-created swap ticket ${ticketUid} for ${dropNumber}`, undefined, 'FinalDecision');
           }
         }
 
@@ -236,7 +236,7 @@ export function FinalDecisionPhase({
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save decision';
-      log.error('FinalDecision', `Error: ${message}`);
+      log.error(`Error: ${message}`, undefined, 'FinalDecision');
     } finally {
       setLoading(false);
     }
@@ -257,13 +257,13 @@ export function FinalDecisionPhase({
         }),
       });
       if (response.ok) {
-        log.info('FinalDecision', `Ticket created for ${dropNumber}`);
+        log.info(`Ticket created for ${dropNumber}`, undefined, 'FinalDecision');
       } else {
         const data = await response.json();
-        log.warn('FinalDecision', `Failed to create ticket: ${data.error?.message || 'Unknown error'}`);
+        log.warn(`Failed to create ticket: ${data.error?.message || 'Unknown error'}`, undefined, 'FinalDecision');
       }
     } catch (err) {
-      log.error('FinalDecision', 'Failed to create ticket', err);
+      log.error(`Failed to create ticket: ${err}`, undefined, 'FinalDecision');
     }
   };
 
@@ -288,14 +288,14 @@ export function FinalDecisionPhase({
 
       if (response.ok) {
         const data = await response.json();
-        log.info('FinalDecision', `Swap ticket ${data.data?.ticket_uid} created for ${dropNumber}`);
+        log.info(`Swap ticket ${data.data?.ticket_uid} created for ${dropNumber}`, undefined, 'FinalDecision');
         return data.data?.ticket_uid;
       } else {
         const data = await response.json();
-        log.warn('FinalDecision', `Failed to create swap ticket: ${data.error?.message || 'Unknown error'}`);
+        log.warn(`Failed to create swap ticket: ${data.error?.message || 'Unknown error'}`, undefined, 'FinalDecision');
       }
     } catch (err) {
-      log.error('FinalDecision', 'Failed to create swap ticket', err);
+      log.error(`Failed to create swap ticket: ${err}`, undefined, 'FinalDecision');
     }
     return null;
   };
@@ -348,14 +348,14 @@ export function FinalDecisionPhase({
 
       const data = await response.json();
       if (data.success) {
-        log.info('FinalDecision', `Draft saved for ${dropNumber}`);
+        log.info(`Draft saved for ${dropNumber}`, undefined, 'FinalDecision');
         return true;
       } else {
-        log.warn('FinalDecision', `Failed to save draft: ${data.error?.message || 'Unknown error'}`);
+        log.warn(`Failed to save draft: ${data.error?.message || 'Unknown error'}`, undefined, 'FinalDecision');
         return false;
       }
     } catch (err) {
-      log.error('FinalDecision', 'Failed to save draft', err);
+      log.error(`Failed to save draft: ${err}`, undefined, 'FinalDecision');
       return false;
     } finally {
       setSavingDraft(false);

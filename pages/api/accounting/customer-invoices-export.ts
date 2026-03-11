@@ -4,11 +4,12 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 function csvCell(v: string): string { return `"${String(v || '').replace(/"/g, '""')}"`; }
 
@@ -29,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         LEFT JOIN projects p ON p.id = ci.project_id
         WHERE ci.status = ${status as string}
         ORDER BY ci.invoice_date DESC
-      ` as any[];
+      `;
     } else {
       rows = await sql`
         SELECT ci.invoice_number, c.company_name AS client_name,
@@ -39,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         LEFT JOIN clients c ON c.id = ci.client_id
         LEFT JOIN projects p ON p.id = ci.project_id
         ORDER BY ci.invoice_date DESC
-      ` as any[];
+      `;
     }
 
     const csvLines = [
@@ -71,4 +72,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withErrorHandler(handler));
+export default withAuth(handler);

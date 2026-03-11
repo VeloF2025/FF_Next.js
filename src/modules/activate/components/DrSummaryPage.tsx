@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { log } from '@/lib/logger';
 import type { DRSummary, DRState } from '../types/summary.types';
-import type { SerialVerificationResult } from '@/pages/api/activate/serial-verification';
+import type { SerialVerificationResult } from '../services/serialVerificationService';
 
 interface DrSummaryPageProps {
   dropNumber: string;
@@ -38,7 +38,7 @@ function formatDate(dateStr: string | null): string {
   try {
     const date = new Date(dateStr);
     // Standard YYYY-MM-DD format
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split('T')[0] ?? '';
   } catch {
     return dateStr;
   }
@@ -94,7 +94,7 @@ export function DrSummaryPage({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load summary';
       setError(message);
-      log.error('DrSummary', `Failed to load summary for ${dropNumber}: ${message}`);
+      log.error(`Failed to load summary for ${dropNumber}: ${message}`, {}, 'DrSummary');
     } finally {
       setLoading(false);
     }
@@ -685,7 +685,7 @@ function SerialVerificationBadge({
   ontSources: number;
   upsSources: number;
 }) {
-  const badgeStyles: Record<string, { bg: string; text: string; border: string; icon: string; glow?: string }> = {
+  const badgeStyles = {
     gold: {
       bg: 'bg-gradient-to-r from-yellow-400 to-amber-500',
       text: 'text-amber-900',
@@ -698,26 +698,30 @@ function SerialVerificationBadge({
       text: 'text-foreground',
       border: 'border-gray-400',
       icon: '✓',
+      glow: '',
     },
     bronze: {
       bg: 'bg-gradient-to-r from-orange-300 to-orange-400',
       text: 'text-orange-900',
       border: 'border-orange-400',
       icon: '◉',
+      glow: '',
     },
     warning: {
       bg: 'bg-red-100 dark:bg-red-900/50',
       text: 'text-red-700 dark:text-red-300',
       border: 'border-red-400 dark:border-red-600',
       icon: '⚠️',
+      glow: '',
     },
     none: {
       bg: 'bg-secondary',
       text: 'text-muted-foreground',
       border: 'border-border',
       icon: '',
+      glow: '',
     },
-  };
+  } as const satisfies Record<'gold' | 'silver' | 'bronze' | 'warning' | 'none', { bg: string; text: string; border: string; icon: string; glow?: string }>;
 
   const style = badgeStyles[status];
   const totalSources = Math.max(ontSources, upsSources);

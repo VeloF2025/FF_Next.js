@@ -11,9 +11,13 @@ import {
   StaffDocument,
   DOCUMENT_TYPE_LABELS,
   REQUIRED_DOCUMENTS_EMPLOYEE,
-  REQUIRED_DOCUMENTS_IC,
-  getRequiredDocuments,
+  REQUIRED_DOCUMENTS_CONTRACTOR,
 } from '@/types/staff-document.types';
+
+// Helper function to get required documents based on role
+function getRequiredDocuments(isEmployee: boolean): DocumentType[] {
+  return isEmployee ? REQUIRED_DOCUMENTS_EMPLOYEE : REQUIRED_DOCUMENTS_CONTRACTOR;
+}
 
 interface StaffDocumentChecklistProps {
   documents: StaffDocument[];

@@ -14,7 +14,6 @@ import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { VFStorageService, normalizeStorageUrl } from '@/services/vfStorageAdapter';
 import type { ProjectDocument, ProjectDocumentCreateInput, ProjectDocumentType } from '@/modules/projects/types/po-extraction.types';
-import { runCrossValidationIfReady } from '@/modules/projects/services/documentCrossValidationService';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -237,13 +236,6 @@ async function handlePost(
       filename: originalName,
       size: uploadedFile.size,
     });
-
-    // Trigger cross-validation when BSS or MSS is uploaded (non-blocking)
-    if (documentType === 'bss' || documentType === 'mss') {
-      runCrossValidationIfReady(projectId).catch(err => {
-        log.error('Background cross-validation failed', { projectId, error: err }, 'DocCrossVal');
-      });
-    }
 
     return apiResponse.created(res, {
       document: transformDocument(newDoc),

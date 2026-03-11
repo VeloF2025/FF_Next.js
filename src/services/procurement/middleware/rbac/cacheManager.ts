@@ -182,7 +182,7 @@ export class PermissionCacheManager {
     
     for (const key of this.permissionCache.keys()) {
       const [userId] = key.split(':');
-      userIds.add(userId);
+      userIds.add(userId!);
     }
     
     return Array.from(userIds);
@@ -196,7 +196,7 @@ export class PermissionCacheManager {
     
     for (const key of this.permissionCache.keys()) {
       const [, projectId] = key.split(':');
-      projectIds.add(projectId);
+      if (projectId) projectIds.add(projectId);
     }
     
     return Array.from(projectIds);

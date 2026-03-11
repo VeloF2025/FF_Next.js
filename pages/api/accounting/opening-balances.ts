@@ -65,45 +65,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         LIMIT 1
       `;
 
-      // Create opening balance journal entry and all lines atomically
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let entry: any;
+      // Create opening balance journal entry
+      const [entry] = await sql`
+        INSERT INTO gl_journal_entries (
+          id, entry_number, entry_date, description,
+          source, status, fiscal_period_id,
+          total_debit, total_credit,
+          created_by, created_at
+        ) VALUES (
+          gen_random_uuid(),
+          'OB-' || LPAD((SELECT COALESCE(MAX(CAST(SUBSTRING(entry_number FROM 4) AS INTEGER)), 0) + 1 FROM gl_journal_entries WHERE entry_number LIKE 'OB-%')::text, 4, '0'),
+          COALESCE((SELECT start_date FROM fiscal_periods WHERE id = ${period?.id || null}), CURRENT_DATE),
+          'Opening Balances',
+          'opening_balance', 'posted', ${period?.id || null},
+          ${totalDebit}, ${totalCredit},
+          ${userId}, NOW()
+        )
+        RETURNING *
+      `;
 
-      await sql`BEGIN`;
-      try {
-        const [insertedEntry] = await sql`
-          INSERT INTO gl_journal_entries (
-            id, entry_number, entry_date, description,
-            source, status, fiscal_period_id,
-            total_debit, total_credit,
-            created_by, created_at
-          ) VALUES (
-            gen_random_uuid(),
-            'OB-' || LPAD((SELECT COALESCE(MAX(CAST(SUBSTRING(entry_number FROM 4) AS INTEGER)), 0) + 1 FROM gl_journal_entries WHERE entry_number LIKE 'OB-%')::text, 4, '0'),
-            COALESCE((SELECT start_date FROM fiscal_periods WHERE id = ${period?.id || null}), CURRENT_DATE),
-            'Opening Balances',
-            'opening_balance', 'posted', ${period?.id || null},
-            ${totalDebit}, ${totalCredit},
-            ${userId}, NOW()
-          )
-          RETURNING *
-        `;
-        entry = insertedEntry;
-
-        // Create journal lines
-        for (const b of balances as { accountId: string; debit: number; credit: number }[]) {
-          if (Number(b.debit) > 0 || Number(b.credit) > 0) {
-            await sql`
-              INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
-              VALUES (gen_random_uuid(), ${entry.id}, ${b.accountId}, ${Number(b.debit) || 0}, ${Number(b.credit) || 0}, 'Opening Balance', NOW())
-            `;
-          }
+      // Create journal lines
+      for (const b of balances as { accountId: string; debit: number; credit: number }[]) {
+        if (Number(b.debit) > 0 || Number(b.credit) > 0) {
+          await sql`
+            INSERT INTO gl_journal_lines (id, journal_entry_id, gl_account_id, debit, credit, description, created_at)
+            VALUES (gen_random_uuid(), ${entry.id}, ${b.accountId}, ${Number(b.debit) || 0}, ${Number(b.credit) || 0}, 'Opening Balance', NOW())
+          `;
         }
-
-        await sql`COMMIT`;
-      } catch (txErr) {
-        await sql`ROLLBACK`;
-        throw txErr;
       }
 
       log.info('Opening balances posted', {

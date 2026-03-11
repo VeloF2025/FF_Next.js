@@ -3,7 +3,8 @@
  * Type definitions for memory monitoring and management
  */
 
-import type { MemoryStats } from '../../types';
+import type { MemoryStats } from '../../../types';
+export type { MemoryStats };
 
 /**
  * Memory event types

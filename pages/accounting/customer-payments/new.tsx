@@ -43,7 +43,7 @@ export default function NewCustomerPaymentPage() {
   ]);
 
   useEffect(() => {
-    fetch('/api/clients', { credentials: 'include' }).then(r => r.json()).then(res => {
+    fetch('/api/clients').then(r => r.json()).then(res => {
       const data = res.data || res;
       setClients(Array.isArray(data) ? data : data.clients || []);
     });
@@ -52,7 +52,7 @@ export default function NewCustomerPaymentPage() {
   // Load outstanding invoices when client changes
   useEffect(() => {
     if (!form.clientId) { setInvoices([]); return; }
-    fetch(`/api/customer-invoices?client_id=${form.clientId}&status=approved&status=sent&status=partially_paid&status=overdue`, { credentials: 'include' })
+    fetch(`/api/customer-invoices?client_id=${form.clientId}&status=approved&status=sent&status=partially_paid&status=overdue`)
       .then(r => r.json())
       .then(res => {
         const data = res.data || res;

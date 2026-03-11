@@ -8,7 +8,7 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import type { SerialStatusValue } from '@/types/procurement/stock/enums.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 // ── Transition map ──────────────────────────────────────────────────────────
 

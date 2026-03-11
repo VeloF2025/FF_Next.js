@@ -92,7 +92,7 @@ export async function pullSuppliersFromSage(
           await sql`
             UPDATE sage_entity_mappings
             SET last_synced_at = NOW(), updated_at = NOW()
-            WHERE id = ${existingMapping[0].id}
+            WHERE id = ${existingMapping[0]!.id}
           `;
           result.updated++;
           continue;
@@ -240,8 +240,8 @@ async function findMatchingFFSupplier(
 
     if (taxMatch.length > 0) {
       return {
-        id: taxMatch[0].id,
-        name: taxMatch[0].name,
+        id: taxMatch[0]!.id,
+        name: taxMatch[0]!.name,
         matchType: 'exact',
         matchConfidence: 1.0,
       };
@@ -258,8 +258,8 @@ async function findMatchingFFSupplier(
 
   if (exactMatch.length > 0) {
     return {
-      id: exactMatch[0].id,
-      name: exactMatch[0].name,
+      id: exactMatch[0]!.id,
+      name: exactMatch[0]!.name,
       matchType: 'exact',
       matchConfidence: 0.95,
     };
@@ -278,10 +278,10 @@ async function findMatchingFFSupplier(
 
   if (fuzzyMatch.length > 0) {
     return {
-      id: fuzzyMatch[0].id,
-      name: fuzzyMatch[0].name,
+      id: fuzzyMatch[0]!.id,
+      name: fuzzyMatch[0]!.name,
       matchType: 'fuzzy',
-      matchConfidence: fuzzyMatch[0].sim,
+      matchConfidence: fuzzyMatch[0]!.sim,
     };
   }
 
@@ -369,5 +369,5 @@ export async function getSupplierMapping(
     LIMIT 1
   `;
 
-  return mapping.length > 0 ? mapping[0].sage_entity_id : null;
+  return mapping.length > 0 ? mapping[0]!.sage_entity_id : null;
 }

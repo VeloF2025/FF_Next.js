@@ -3,7 +3,7 @@
  * Analyzes memory trends and provides recommendations
  */
 
-import type { MemoryStats } from '../../types';
+import type { MemoryStats } from '../../../types';
 import type { MemoryTrend, MemoryThresholds } from '../types/memory-manager.types';
 import { calculateUsageRatio } from '../utils/memoryUtils';
 
@@ -23,8 +23,8 @@ export class MemoryAnalyzer {
     if (history.length < 5) return 'stable';
 
     const recent = history.slice(-5);
-    const first = recent[0].heapUsed;
-    const last = recent[recent.length - 1].heapUsed;
+    const first = recent[0]!.heapUsed;
+    const last = recent[recent.length - 1]!.heapUsed;
 
     const change = (last - first) / first;
 

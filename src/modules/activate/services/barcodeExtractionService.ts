@@ -71,7 +71,7 @@ async function scan1DBarcode(imageBuffer: Buffer): Promise<BarcodeResult> {
             const code = result.codeResult.code;
             const format = mapQuaggaFormat(result.codeResult.format);
 
-            log.debug('BarcodeExtraction', `1D barcode found: ${code} (${format})`);
+            log.debug(`1D barcode found: ${code} (${format})`, undefined, 'BarcodeExtraction');
 
             resolve({
               success: true,
@@ -92,7 +92,7 @@ async function scan1DBarcode(imageBuffer: Buffer): Promise<BarcodeResult> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.warn('BarcodeExtraction', `1D barcode scan failed: ${message}`);
+    log.warn(`1D barcode scan failed: ${message}`, undefined, 'BarcodeExtraction');
     return {
       success: false,
       value: null,
@@ -127,7 +127,7 @@ export async function scanBarcodeFromImage(base64Image: string): Promise<Barcode
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(base64Image, 'base64');
 
-    log.debug('BarcodeExtraction', `Scanning image (${Math.round(imageBuffer.length / 1024)}KB)`);
+    log.debug(`Scanning image (${Math.round(imageBuffer.length / 1024)}KB)`, undefined, 'BarcodeExtraction');
 
     // Try 1D barcode (Code 128) - most common for Nokia ONT labels
     const code128Result = await scan1DBarcode(imageBuffer);
@@ -137,7 +137,7 @@ export async function scanBarcodeFromImage(base64Image: string): Promise<Barcode
         return code128Result;
       }
       // Return anyway, might be useful
-      log.debug('BarcodeExtraction', `1D barcode found but not ONT serial: ${code128Result.value}`);
+      log.debug(`1D barcode found but not ONT serial: ${code128Result.value}`, undefined, 'BarcodeExtraction');
       return code128Result;
     }
 
@@ -149,7 +149,7 @@ export async function scanBarcodeFromImage(base64Image: string): Promise<Barcode
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    log.error('BarcodeExtraction', `Barcode scan failed: ${message}`);
+    log.error(`Barcode scan failed: ${message}`, undefined, 'BarcodeExtraction');
     return {
       success: false,
       value: null,
@@ -180,7 +180,7 @@ export async function extractOntSerialFromBarcode(base64Image: string): Promise<
       const enhancedResult = await extractOntSerialEnhanced(base64Image);
 
       if (enhancedResult.success && enhancedResult.serial) {
-        log.info('BarcodeExtraction', `Enhanced scan found: ${enhancedResult.serial} (${enhancedResult.format}, ${enhancedResult.method})`);
+        log.info(`Enhanced scan found: ${enhancedResult.serial} (${enhancedResult.format}, ${enhancedResult.method})`, undefined, 'BarcodeExtraction');
         return {
           success: true,
           serial: enhancedResult.serial,
@@ -190,7 +190,7 @@ export async function extractOntSerialFromBarcode(base64Image: string): Promise<
       }
 
       // Enhanced service ran but found nothing - still return (skip fallback)
-      log.debug('BarcodeExtraction', `Enhanced scan found no ONT serial (${enhancedResult.processingTimeMs}ms)`);
+      log.debug(`Enhanced scan found no ONT serial (${enhancedResult.processingTimeMs}ms)`, undefined, 'BarcodeExtraction');
       return {
         success: false,
         serial: null,
@@ -198,7 +198,7 @@ export async function extractOntSerialFromBarcode(base64Image: string): Promise<
         confidence: 0,
       };
     } catch (enhancedError) {
-      log.warn('BarcodeExtraction', `Enhanced service error, falling back to Quagga: ${enhancedError}`);
+      log.warn(`Enhanced service error, falling back to Quagga: ${enhancedError}`, undefined, 'BarcodeExtraction');
       // Fall through to legacy Quagga2 scanning
     }
   }
@@ -230,7 +230,7 @@ export async function extractOntSerialFromBarcode(base64Image: string): Promise<
       };
     }
 
-    log.debug('BarcodeExtraction', `Barcode value "${result.value}" is not an ONT serial`);
+    log.debug(`Barcode value "${result.value}" is not an ONT serial`, undefined, 'BarcodeExtraction');
   }
 
   return {

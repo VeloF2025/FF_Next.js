@@ -7,7 +7,7 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { RFQItem } from '@/types/procurement.types';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqItemService {
   /**
@@ -20,7 +20,7 @@ export class RfqItemService {
         WHERE rfq_id = ${rfqId}
         ORDER BY line_number`;
 
-      return items.map(item => ({
+      return items.map((item: any) => ({
         id: item.id,
         lineNumber: item.line_number,
         itemCode: item.item_code,
@@ -85,9 +85,9 @@ export class RfqItemService {
         updates.push(`quantity = $${values.length + 1}`);
         values.push(data.quantity);
       }
-      if (data.estimatedUnitPrice !== undefined) {
+      if ((data as any).estimatedUnitPrice !== undefined) {
         updates.push(`estimated_unit_price = $${values.length + 1}`);
-        values.push(data.estimatedUnitPrice);
+        values.push((data as any).estimatedUnitPrice);
       }
 
       if (updates.length > 0) {

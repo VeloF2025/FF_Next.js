@@ -49,8 +49,8 @@ export default function NewSupplierInvoicePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/suppliers', { credentials: 'include' }).then(r => r.json()),
-      fetch('/api/accounting/chart-of-accounts', { credentials: 'include' }).then(r => r.json()),
+      fetch('/api/suppliers').then(r => r.json()),
+      fetch('/api/accounting/chart-of-accounts').then(r => r.json()),
     ]).then(([suppRes, accRes]) => {
       const suppData = suppRes.data || suppRes;
       setSuppliers(Array.isArray(suppData) ? suppData : suppData.suppliers || []);
@@ -87,7 +87,6 @@ export default function NewSupplierInvoicePage() {
       const res = await fetch('/api/accounting/supplier-invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           invoiceNumber: form.invoiceNumber,
           supplierId: form.supplierId,

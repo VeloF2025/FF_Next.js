@@ -26,7 +26,7 @@ function dedup(features: any[], keyField: string): any[] {
 /** Safely parse a value to integer — handles comma-separated strings like "67,80,81" */
 function safeInt(v: unknown): number | null {
   if (v == null) return null;
-  const s = String(v).split(',')[0].trim();
+  const s = String(v).split(',')[0]!.trim();
   const n = Number(s);
   return Number.isFinite(n) ? Math.round(n) : null;
 }

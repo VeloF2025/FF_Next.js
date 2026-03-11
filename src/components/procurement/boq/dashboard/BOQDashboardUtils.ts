@@ -35,5 +35,5 @@ export function formatRelativeTime(date: Date): string {
   if (diffHours < 1) return 'Just now';
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] || date.toISOString();
 }

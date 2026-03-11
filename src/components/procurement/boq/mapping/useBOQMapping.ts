@@ -145,6 +145,7 @@ export function useBOQMapping(boqId: string, onMappingComplete?: (count: number)
       if (!exception) return;
 
       const suggestion = exception.suggestions[suggestionIndex];
+      if (!suggestion) return;
       
       // Update BOQ item with selected mapping
       await procurementApiService.updateBOQItem(context, exception.boqItemId, {

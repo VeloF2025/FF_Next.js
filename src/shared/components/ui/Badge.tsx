@@ -2,7 +2,7 @@ import React from 'react';
 import { clsx } from 'clsx';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline';
+  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -19,6 +19,8 @@ export function Badge({
     secondary: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)]',
     destructive: 'bg-red-500/20 text-red-700 hover:bg-red-500/30',
     outline: 'text-[var(--ff-text-primary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-hover)]',
+    success: 'bg-green-500/20 text-green-400 hover:bg-green-500/30',
+    warning: 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30',
   };
 
   const sizeStyles = {

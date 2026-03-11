@@ -98,7 +98,7 @@ export function FeedbackPhase({
           }
         }
       } catch (err) {
-        log.error('FeedbackPhase', 'Failed to check DR status:', err);
+        log.error('Failed to check DR status', { error: err instanceof Error ? err.message : String(err) }, 'FeedbackPhase');
       }
     };
     checkDrStatus();
@@ -118,10 +118,10 @@ export function FeedbackPhase({
       const data = await response.json();
       if (data.success && data.data?.staff) {
         setAvailableStaff(data.data.staff);
-        log.info('FeedbackPhase', `Loaded ${data.data.staff.length} staff for ${projectName}`);
+        log.info(`Loaded ${data.data.staff.length} staff for ${projectName}`, undefined, 'FeedbackPhase');
       }
     } catch (err) {
-      log.error('FeedbackPhase', 'Failed to fetch staff:', err);
+      log.error(`Failed to fetch staff: ${err}`, undefined, 'FeedbackPhase');
     } finally {
       setLoadingStaff(false);
     }
@@ -270,7 +270,7 @@ export function FeedbackPhase({
 
       if (data.success) {
         setSent(true);
-        log.info('FeedbackPhase', `Feedback sent for ${dropNumber}`);
+        log.info(`Feedback sent for ${dropNumber}`, undefined, 'FeedbackPhase');
       } else {
         // API returns { success: false, error: { code, message } }
         const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to send feedback';
@@ -279,7 +279,7 @@ export function FeedbackPhase({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send feedback';
       setError(message);
-      log.error('FeedbackPhase', `Error sending feedback: ${message}`);
+      log.error(`Error sending feedback: ${message}`, undefined, 'FeedbackPhase');
     } finally {
       setIsSending(false);
     }

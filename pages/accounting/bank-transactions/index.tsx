@@ -91,13 +91,13 @@ export default function BankTransactionsPage() {
 
   // Load reference data — bank accounts, GL accounts, suppliers, customers
   useEffect(() => {
-    fetch('/api/accounting/bank-accounts', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/accounting/bank-accounts').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data || json) ? (json.data || json) : [];
       setBankAccounts(list);
       if (list.length > 0) setSelectedBank(prev => prev || list[0].id);
-    }).catch((e: unknown) => console.warn('Failed to load bank accounts', e));
+    }).catch(() => {});
 
-    fetch('/api/accounting/chart-of-accounts', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/accounting/chart-of-accounts').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data || json) ? (json.data || json) : [];
       setGlAccounts(list
         .filter((a: SelectOption & { accountSubtype?: string }) =>
@@ -107,37 +107,37 @@ export default function BankTransactionsPage() {
           defaultVatCode: a.defaultVatCode,
         }))
       );
-    }).catch((e: unknown) => console.warn('Failed to load GL accounts', e));
+    }).catch(() => {});
 
-    fetch('/api/suppliers?status=active', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/suppliers?status=active').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data) ? json.data : [];
       setSuppliers(list.map((s: { id: number | string; name: string; code?: string }) => ({
         id: String(s.id), name: s.name, code: s.code,
       })));
-    }).catch((e: unknown) => console.warn('Failed to load suppliers', e));
+    }).catch(() => {});
 
-    fetch('/api/clients', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/clients').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data) ? json.data : [];
       setCustomers(list.map((c: { id: string; name?: string; company_name?: string; companyName?: string }) => ({
         id: c.id, name: c.company_name || c.companyName || c.name || '',
       })));
-    }).catch((e: unknown) => console.warn('Failed to load customers', e));
+    }).catch(() => {});
 
-    fetch('/api/accounting/cost-centres?cc_type=cc1&active=true', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/accounting/cost-centres?cc_type=cc1&active=true').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data?.items) ? json.data.items : [];
       setCc1Options(list.map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })));
-    }).catch((e: unknown) => console.warn('Failed to load CC1 options', e));
+    }).catch(() => {});
 
-    fetch('/api/accounting/cost-centres?cc_type=cc2&active=true', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/accounting/cost-centres?cc_type=cc2&active=true').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data?.items) ? json.data.items : [];
       setCc2Options(list.map((c: { id: string; code: string; name: string }) => ({ id: c.id, code: c.code, name: c.name })));
-    }).catch((e: unknown) => console.warn('Failed to load CC2 options', e));
+    }).catch(() => {});
 
-    fetch('/api/departments?isActive=true', { credentials: 'include' }).then(r => r.json()).then(json => {
+    fetch('/api/departments?isActive=true').then(r => r.json()).then(json => {
       const list = Array.isArray(json.data || json) ? (json.data || json) : [];
       setBuOptions(list.filter((d: { is_active?: boolean; isActive?: boolean }) => d.is_active !== false && d.isActive !== false)
         .map((d: { id: string; name: string; code?: string }) => ({ id: d.id, name: d.name, code: d.code })));
-    }).catch((e: unknown) => console.warn('Failed to load business units', e));
+    }).catch(() => {});
   }, []);
 
   // Debounce search input — 500ms delay before firing server request

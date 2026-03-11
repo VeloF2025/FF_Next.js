@@ -69,7 +69,7 @@ const COLUMN_MAPPING = {
 } as const;
 
 export class BOQImportEnhanced {
-  private sql: ReturnType<typeof neon>;
+  private sql: any;
   private materialMatcher: MaterialMatcher;
   private categoryMapper: CategoryMapper;
 
@@ -170,7 +170,7 @@ export class BOQImportEnhanced {
     // Pre-match all items using cached materials (0 DB queries for matching)
     const matchResults: MaterialMatchResult[] = [];
     for (let i = 0; i < validRows.length; i++) {
-      const row = validRows[i];
+      const row = validRows[i]!;
       const matchResult = await this.materialMatcher.matchItemWithCache(
         {
           itemCode: row.itemCode,
@@ -203,9 +203,9 @@ export class BOQImportEnhanced {
     const matchHistoryBatch: { matchResult: MaterialMatchResult }[] = [];
 
     for (let i = 0; i < validRows.length; i++) {
-      const row = validRows[i];
-      const budgetCategoryCode = categoryResults[i];
-      const matchResult = matchResults[i];
+      const row = validRows[i]!;
+      const budgetCategoryCode = categoryResults[i]!;
+      const matchResult = matchResults[i]!;
 
       try {
         // Track stats
@@ -446,7 +446,7 @@ export class BOQImportEnhanced {
 
     if (oldBoqs.length === 0) return;
 
-    const oldBoqIds = oldBoqs.map(b => b.id as string);
+    const oldBoqIds = oldBoqs.map((b: any) => b.id as string);
 
     log.info('Superseding previous BOQ versions', {
       data: { projectId, newBoqId, supersededCount: oldBoqIds.length, oldBoqIds }

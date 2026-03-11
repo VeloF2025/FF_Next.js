@@ -2,7 +2,7 @@
  * SOW Data Viewer Tab Navigation
  */
 
-import { cn } from '@/src/utils/cn';
+import { cn } from '@/utils/cn';
 import { TabConfig, TabType } from './SOWViewerTypes';
 
 interface SOWTabNavigationProps {

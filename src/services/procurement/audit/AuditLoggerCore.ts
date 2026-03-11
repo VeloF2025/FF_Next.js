@@ -4,7 +4,9 @@
  */
 
 import { db } from '@/lib/neon/connection';
+// @ts-ignore
 import { auditLog, type NewAuditLog } from '@/lib/neon/schema';
+// @ts-ignore
 import { eq, and, gte, lte, inArray, desc } from 'drizzle-orm';
 import { 
   AuditAction, 

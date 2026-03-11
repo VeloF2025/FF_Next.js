@@ -82,17 +82,17 @@ export async function getSession(sessionId: string): Promise<Session | null> {
       AND expires_at > NOW()
   `;
 
-  if (result.length === 0) return null;
-
   const row = result[0];
+  if (!row) return null;
+
   return {
-    id: row.id,
-    userId: row.user_id,
-    tokenHash: row.token_hash,
-    expiresAt: new Date(row.expires_at),
-    createdAt: new Date(row.created_at),
-    ipAddress: row.ip_address,
-    userAgent: row.user_agent,
+    id: row.id as string,
+    userId: row.user_id as string,
+    tokenHash: row.token_hash as string,
+    expiresAt: new Date(row.expires_at as string),
+    createdAt: new Date(row.created_at as string),
+    ipAddress: row.ip_address as string | undefined,
+    userAgent: row.user_agent as string | undefined,
   };
 }
 

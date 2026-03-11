@@ -17,7 +17,7 @@ export function VersionChecker() {
   useEffect(() => {
     // Get initial version from meta tag
     const metaVersion = document.querySelector('meta[name="build-version"]')?.getAttribute('content');
-    setCurrentVersion(metaVersion);
+    setCurrentVersion(metaVersion || null);
 
     // Check for new version every 5 minutes
     const interval = setInterval(async () => {

@@ -19,7 +19,7 @@ export const clientApi = {
 
       if (filter) {
         if (filter.status?.length && filter.status.length > 0) {
-          params.append('status', filter.status[0]);
+          params.append('status', filter.status[0] as string);
         }
         if (filter.searchTerm) {
           params.append('search', filter.searchTerm);

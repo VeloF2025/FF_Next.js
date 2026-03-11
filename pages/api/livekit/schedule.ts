@@ -146,7 +146,7 @@ async function sendMeetingInvite(
 
     try {
         await resend.emails.send({
-            from: 'FibreFlow Meetings <noreply@fibreflow.app>',
+            from: 'FibreFlow Meetings <notifications@fibreflow.app>',
             to: attendee.email,
             subject: `📅 Meeting Invitation: ${meeting.title}`,
             html: emailHtml,

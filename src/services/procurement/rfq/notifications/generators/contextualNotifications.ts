@@ -160,7 +160,7 @@ export class ContextualNotificationGenerator extends BaseRFQGenerator {
     pendingActions: string[], 
     userRole: UserRole
   ): NotificationContent {
-    const primaryAction = pendingActions[0];
+    const primaryAction = pendingActions[0] ?? '';
     const actionCount = pendingActions.length;
     
     let actionText = '';

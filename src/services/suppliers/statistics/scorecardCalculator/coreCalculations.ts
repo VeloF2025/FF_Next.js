@@ -144,9 +144,9 @@ export class CoreCalculations {
     let totalWeight = 0;
     
     for (let i = 0; i < scores.length; i++) {
-      if (scores[i] > 0) { // Only include non-zero scores
-        weightedSum += scores[i] * weights[i];
-        totalWeight += weights[i];
+      if (scores[i]! > 0) { // Only include non-zero scores
+        weightedSum += scores[i]! * weights[i]!;
+        totalWeight += weights[i]!;
       }
     }
     

@@ -19,10 +19,10 @@ export class ProjectQueryOperations {
 
       if (filter) {
         if (filter.status) {
-          params.append('status', filter.status);
+          params.append('status', Array.isArray(filter.status) ? filter.status.join(',') : filter.status as string);
         }
         if (filter.clientId) {
-          params.append('clientId', filter.clientId);
+          params.append('clientId', Array.isArray(filter.clientId) ? filter.clientId.join(',') : filter.clientId as string);
         }
       }
 

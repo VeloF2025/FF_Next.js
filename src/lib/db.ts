@@ -33,3 +33,5 @@ const pool = new Pool({
 
 export default pool;
 export { pool };
+/** Alias for pool — used by system services that import { db } */
+export const db = pool;

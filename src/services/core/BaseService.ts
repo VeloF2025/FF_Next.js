@@ -3,8 +3,11 @@
  * Provides common functionality: error handling, logging, caching
  */
 
-import { FirebaseError } from 'firebase/app';
 import { log } from '@/lib/logger';
+
+interface FirebaseError extends Error {
+  code: string;
+}
 
 export interface ServiceResponse<T> {
   success: boolean;
@@ -41,11 +44,11 @@ export abstract class BaseService {
   public handleError(error: unknown, operation: string): ServiceResponse<never> {
     log.error(`[${this.serviceName}] Error in ${operation}:`, { data: error }, 'BaseService');
 
-    if (error instanceof FirebaseError) {
+    if (error instanceof Error && 'code' in error) {
       return {
         success: false,
-        error: this.mapFirebaseError(error),
-        code: error.code,
+        error: this.mapFirebaseError(error as FirebaseError),
+        code: (error as FirebaseError).code,
       };
     }
 

@@ -13,7 +13,7 @@ import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
 
-const logger = createLogger({ module: 'odooStockReceiptSync' });
+const logger = createLogger('odooStockReceiptSync');
 
 // ============================================================================
 // Types
@@ -60,10 +60,10 @@ const STATE_MAPPING: Record<string, string> = {
  * Get supplier ID by Odoo partner ID
  */
 async function getSupplierByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooPartnerId: number
 ): Promise<number | null> {
-  const rows = await sql<{ id: number }[]>`
+  const rows = await sql`
     SELECT id FROM suppliers WHERE odoo_partner_id = ${odooPartnerId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -73,10 +73,10 @@ async function getSupplierByOdooId(
  * Get PO ID by Odoo PO ID
  */
 async function getPurchaseOrderByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooPOId: number
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM purchase_orders WHERE odoo_po_id = ${odooPOId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -86,10 +86,10 @@ async function getPurchaseOrderByOdooId(
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooProductId: number
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -99,9 +99,9 @@ async function getStockItemByOdooId(
  * Get warehouse ID (default or first available)
  */
 async function getDefaultWarehouseId(
-  sql: NeonQueryFunction<false, false>
+  sql: any
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_locations
     WHERE location_type = 'warehouse'
     ORDER BY name ASC
@@ -114,10 +114,10 @@ async function getDefaultWarehouseId(
  * Get existing GRN by Odoo picking ID
  */
 async function getExistingGRN(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooPickingId: number
 ): Promise<{ id: string; grn_number: string } | null> {
-  const rows = await sql<{ id: string; grn_number: string }[]>`
+  const rows = await sql`
     SELECT id, grn_number FROM goods_receipt_notes
     WHERE odoo_picking_id = ${odooPickingId}
     LIMIT 1
@@ -130,7 +130,7 @@ async function getExistingGRN(
  * Origin format: "PO00001" or sometimes "purchase.order:123"
  */
 async function extractPOFromOrigin(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   client: OdooClient,
   origin: string | null | false
 ): Promise<string | null> {
@@ -186,12 +186,12 @@ export async function syncStockReceipts(
     const odooReceipts = await client.getCompletedReceipts({
       sinceDate,
       limit,
-    });
+    } as any);
 
     logger.info(`Found ${odooReceipts.length} receipts in Odoo`);
 
     // Get existing synced receipts to check for updates/skips
-    const existingSynced = await sql<{ odoo_picking_id: number; id: string }[]>`
+    const existingSynced = await sql`
       SELECT odoo_picking_id, id FROM goods_receipt_notes
       WHERE odoo_picking_id IS NOT NULL
     `;
@@ -222,7 +222,7 @@ export async function syncStockReceipts(
           : null;
 
         if (!supplierId && !dryRun) {
-          result.errors.push(`${receipt.name}: Supplier not found in FF (Odoo partner: ${receipt.partner_id?.[1] || 'unknown'})`);
+          result.errors.push(`${receipt.name}: Supplier not found in FF (Odoo partner: ${(receipt.partner_id as any)?.[1] || 'unknown'})`);
           result.details.push({
             odooId: receipt.id,
             odooName: receipt.name,
@@ -287,7 +287,7 @@ export async function syncStockReceipts(
           logger.debug(`Updated GRN: ${grnNumber}`, { odooId: receipt.id });
         } else {
           // Create new GRN
-          const insertResult = await sql<{ id: string; grn_number: string }[]>`
+          const insertResult = await sql`
             INSERT INTO goods_receipt_notes (
               purchase_order_id,
               supplier_id,
@@ -313,13 +313,13 @@ export async function syncStockReceipts(
               ${receipt.id},
               NOW(),
               ${'Synced from Odoo: ' + receipt.name},
-              ${receipt.create_date ? new Date(receipt.create_date) : new Date()}
+              ${(receipt as any).create_date ? new Date((receipt as any).create_date) : new Date()}
             )
             RETURNING id, grn_number
           `;
 
-          grnId = insertResult[0].id;
-          grnNumber = insertResult[0].grn_number;
+          grnId = insertResult[0]!.id;
+          grnNumber = insertResult[0]!.grn_number;
 
           result.created++;
           logger.debug(`Created GRN: ${grnNumber}`, { odooId: receipt.id });
@@ -335,7 +335,7 @@ export async function syncStockReceipts(
               : null;
 
             // Check if move already synced
-            const existingItem = await sql<{ id: string }[]>`
+            const existingItem = await sql`
               SELECT id FROM goods_receipt_items
               WHERE grn_id = ${grnId} AND odoo_move_id = ${move.id}
               LIMIT 1
@@ -349,7 +349,7 @@ export async function syncStockReceipts(
                   quantity_expected = ${move.product_uom_qty},
                   quantity_received = ${move.quantity},
                   odoo_synced_at = NOW()
-                WHERE id = ${existingItem[0].id}
+                WHERE id = ${existingItem[0]!.id}
               `;
             } else {
               // Create new item
@@ -370,15 +370,15 @@ export async function syncStockReceipts(
                 ) VALUES (
                   ${grnId},
                   ${stockItemId},
-                  ${move.product_id ? move.product_id[1].split(']')[0].replace('[', '') : null},
-                  ${move.product_id ? move.product_id[1] : 'Unknown Product'},
+                  ${move.product_id ? (move.product_id as any)[1].split(']')[0].replace('[', '') : null},
+                  ${move.product_id ? (move.product_id as any)[1] : 'Unknown Product'},
                   ${move.product_uom_qty},
                   ${move.quantity},
                   0,
-                  ${move.product_uom_id ? move.product_uom_id[1] : 'unit'},
-                  ${move.lot_id ? move.lot_id[1] : null},
+                  ${move.product_uom ? (move.product_uom as any)[1] : 'unit'},
+                  ${move.lot_ids ? (move.lot_ids as any)[1] : null},
                   ${move.id},
-                  ${move.lot_id ? move.lot_id[0] : null},
+                  ${move.lot_ids ? (move.lot_ids as any)[0] : null},
                   NOW()
                 )
               `;
@@ -482,7 +482,7 @@ export async function syncSingleReceipt(
     });
 
     if (result.errors.length > 0) {
-      return { success: false, message: result.errors[0] };
+      return { success: false, message: result.errors[0] ?? 'Unknown error' };
     }
 
     const detail = result.details.find((d) => d.odooId === odooPickingId);
@@ -512,22 +512,20 @@ export async function getStockReceiptSyncStats(
   const sql = neon(databaseUrl);
 
   const [totals, byStatus, lastSync] = await Promise.all([
-    sql<
-      Array<{ total: string; odoo_synced: string; not_synced: string }>
-    >`
+    sql`
       SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE odoo_picking_id IS NOT NULL) as odoo_synced,
         COUNT(*) FILTER (WHERE odoo_picking_id IS NULL) as not_synced
       FROM goods_receipt_notes
     `,
-    sql<Array<{ status: string; count: string }>>`
+    sql`
       SELECT status, COUNT(*) as count
       FROM goods_receipt_notes
       GROUP BY status
       ORDER BY count DESC
     `,
-    sql<Array<{ last_sync: Date | null }>>`
+    sql`
       SELECT last_sync_stock_receipts as last_sync
       FROM odoo_api_config
       LIMIT 1

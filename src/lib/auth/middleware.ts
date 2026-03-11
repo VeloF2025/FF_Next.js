@@ -136,24 +136,24 @@ async function getUserAndValidateSession(
     LIMIT 1
   `;
 
-  if (result.length === 0) return null;
-
   const row = result[0];
-  const firstName = row.first_name || '';
-  const lastName = row.last_name || '';
+  if (!row) return null;
+
+  const firstName = (row.first_name as string) || '';
+  const lastName = (row.last_name as string) || '';
 
   return {
-    id: row.id,
-    userId: row.id, // Alias for backwards compatibility
-    email: row.email,
+    id: row.id as string,
+    userId: row.id as string, // Alias for backwards compatibility
+    email: row.email as string,
     firstName,
     lastName,
-    name: `${firstName} ${lastName}`.trim() || row.email, // Full name or email as fallback
+    name: `${firstName} ${lastName}`.trim() || (row.email as string),
     role: row.role as AuthRole,
-    permissions: row.permissions || [],
-    isActive: row.is_active,
-    profilePicture: row.profile_picture,
-    department: row.department,
+    permissions: (row.permissions as string[]) || [],
+    isActive: row.is_active as boolean,
+    profilePicture: row.profile_picture as string | undefined,
+    department: row.department as string | undefined,
   };
 }
 
@@ -224,8 +224,9 @@ export function withAuth(handler: AuthenticatedHandler): NextApiHandler {
  */
 export function withRole(requiredRole: AuthRole) {
   return (handler: AuthenticatedHandler): AuthenticatedHandler => {
-    return async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
-      const userRoleLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    return async (req: NextApiRequest, res: NextApiResponse) => {
+      const authReq = req as AuthenticatedNextApiRequest;
+      const userRoleLevel = ROLE_HIERARCHY[authReq.user.role] || 0;
       const requiredRoleLevel = ROLE_HIERARCHY[requiredRole] || 0;
 
       if (userRoleLevel < requiredRoleLevel) {
@@ -249,10 +250,11 @@ export function withRole(requiredRole: AuthRole) {
  */
 export function withPermission(requiredPermission: string) {
   return (handler: AuthenticatedHandler): AuthenticatedHandler => {
-    return async (req: AuthenticatedNextApiRequest, res: NextApiResponse) => {
+    return async (req: NextApiRequest, res: NextApiResponse) => {
+      const authReq = req as AuthenticatedNextApiRequest;
       const hasPermission =
-        req.user.permissions.includes('all') ||
-        req.user.permissions.includes(requiredPermission);
+        authReq.user.permissions.includes('all') ||
+        authReq.user.permissions.includes(requiredPermission);
 
       if (!hasPermission) {
         return res.status(403).json({
@@ -407,12 +409,12 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
           }
 
           // Check expiry
-          if (new Date() < new Date(sessionData.expiresAt)) {
+          if (new Date() < new Date(sessionData.expiresAt as string)) {
             // Verify session exists in database
             const rows = await sql`
               SELECT id, is_active
               FROM fleet_portal_sessions
-              WHERE id = ${sessionData.sessionId}
+              WHERE id = ${sessionData.sessionId as string}
                 AND is_active = true
                 AND expires_at > NOW()
               LIMIT 1
@@ -420,11 +422,11 @@ export function withFleetAuth(handler: (req: FleetAuthenticatedRequest, res: Nex
 
             if (rows.length > 0) {
               fleetReq.portalSession = {
-                sessionId: sessionData.sessionId,
-                vehicleId: sessionData.vehicleId,
-                vehicleRegistration: sessionData.vehicleRegistration,
-                driverId: sessionData.driverId,
-                driverName: sessionData.driverName,
+                sessionId: sessionData.sessionId as string,
+                vehicleId: sessionData.vehicleId as string,
+                vehicleRegistration: sessionData.vehicleRegistration as string,
+                driverId: sessionData.driverId as string | null,
+                driverName: sessionData.driverName as string | null,
               };
               fleetReq.authType = 'portal';
               return handler(fleetReq, res);

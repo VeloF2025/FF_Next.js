@@ -23,12 +23,12 @@ export async function getSerialValidationReport(
   mismatchesOnly: boolean = false
 ): Promise<SerialValidationReportResponse> {
   try {
-    log.info('ReportingService', 'Getting serial validation report', {
+    log.info('Getting serial validation report', {
       dateFrom,
       dateTo,
       project,
       mismatchesOnly,
-    });
+    }, 'ReportingService');
 
     const result = await pool.query(
       `
@@ -99,9 +99,9 @@ export async function getSerialValidationReport(
       mismatches_only: mismatches,
     };
   } catch (error) {
-    log.error('ReportingService', 'Failed to get serial validation report', {
+    log.error('Failed to get serial validation report', {
       error,
-    });
+    }, 'ReportingService');
     throw error;
   }
 }

@@ -13,12 +13,12 @@ export async function importFromCSV(file: File): Promise<ClientImportResult> {
       try {
         const text = e.target?.result as string;
         const lines = text.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim());
+        const headers = lines[0]!.split(',').map(h => h.trim());
         
         const rows: ClientImportRow[] = [];
         
         for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',').map(v => v.trim());
+          const values = lines[i]!.split(',').map(v => v.trim());
           const row: any = {};
           
           headers.forEach((header, index) => {
@@ -53,9 +53,9 @@ export async function importFromExcel(file: File): Promise<ClientImportResult> {
         const workbook = XLSX.read(data, { type: 'binary' });
         
         // Get first sheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
+        const sheetName = workbook.SheetNames[0]!;
+        const worksheet = workbook.Sheets[sheetName]!;
+
         // Convert to JSON
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as ClientImportRow[];
         

@@ -388,7 +388,7 @@ export async function deleteTransactions(bankTxIds: string[]): Promise<number> {
       WHERE id = ANY(${bankTxIds}::UUID[])
         AND status = 'imported'
     `) as Row[];
-    const deleted = Array.isArray(result) ? result.length : bankTxIds.length;
+    const deleted = result.count ?? bankTxIds.length;
     log.info('Deleted bank transactions', { count: deleted, ids: bankTxIds }, 'accounting');
     return deleted;
   } catch (err) {
@@ -411,7 +411,7 @@ export async function bulkAcceptTransactions(ids: string[]): Promise<number> {
       UPDATE bank_transactions SET status = 'matched', updated_at = NOW()
       WHERE id = ANY(${ids}::UUID[]) AND status IN ('imported', 'allocated')
     `) as Row[];
-    const count = Array.isArray(result) ? result.length : ids.length;
+    const count = (result as unknown as { count?: number }).count ?? ids.length;
     log.info('Bulk accepted bank transactions', { count, ids }, 'accounting');
     return count;
   } catch (err) {

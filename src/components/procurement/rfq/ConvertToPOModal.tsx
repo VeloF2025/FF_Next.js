@@ -84,7 +84,7 @@ export function ConvertToPOModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedSupplierId(suppliers.length === 1 ? String(suppliers[0].id) : '');
+      setSelectedSupplierId(suppliers.length === 1 && suppliers[0] ? String(suppliers[0].id) : '');
       setDeliveryAddress('');
       setExpectedDeliveryDate('');
       setPaymentTerms('Net 30');
@@ -148,7 +148,7 @@ export function ConvertToPOModal({
         notificationService.error(data.error?.message || 'Failed to create Purchase Order');
       }
     } catch (err) {
-      log.error('Failed to convert RFQ to PO', err);
+      log.error('Failed to convert RFQ to PO', err as any);
       setError('An unexpected error occurred');
       notificationService.operationError('create', err as Error, 'Purchase Order');
     } finally {

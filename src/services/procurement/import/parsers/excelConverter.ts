@@ -34,7 +34,7 @@ export class ExcelConverter {
     const worksheet = workbook.Sheets[sheetName];
     
     // Convert to JSON with header row as keys
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+    const jsonData = XLSX.utils.sheet_to_json(worksheet!, {
       header: 1,
       defval: '',
       blankrows: false,
@@ -59,7 +59,7 @@ export class ExcelConverter {
     }
 
     const worksheet = workbook.Sheets[worksheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+    const jsonData = XLSX.utils.sheet_to_json(worksheet!, {
       header: 1,
       defval: '',
       blankrows: false,
@@ -100,7 +100,7 @@ export class ExcelConverter {
       xlsxOptions.range = options.range;
     }
 
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, xlsxOptions);
+    const jsonData = XLSX.utils.sheet_to_json(worksheet!, xlsxOptions);
     
     // Handle header normalization if requested
     if (options.normalizeHeaders && Array.isArray(jsonData) && jsonData.length > 0) {
@@ -112,7 +112,7 @@ export class ExcelConverter {
         // Create mapping from old to new headers
         const headerMap = new Map<string, string>();
         headers.forEach((header, index) => {
-          headerMap.set(header, normalizedHeaders[index]);
+          headerMap.set(header, normalizedHeaders[index]!);
         });
         
         // Transform all rows to use normalized headers

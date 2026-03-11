@@ -3,7 +3,19 @@
  */
 
 import { CheckCircle, AlertTriangle, X, Download } from 'lucide-react';
-import type { ContractorImportResult } from '@/types/contractor/import.types';
+
+interface ErrorDetail {
+  row: number;
+  message: string;
+}
+
+interface ContractorImportResult {
+  successCount: number;
+  totalProcessed: number;
+  errors: ErrorDetail[];
+  warnings?: string[];
+  duplicatesSkipped?: number;
+}
 
 interface ContractorImportResultsProps {
   result: ContractorImportResult;

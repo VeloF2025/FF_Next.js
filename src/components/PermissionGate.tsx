@@ -90,7 +90,8 @@ export function PermissionGate({
   // Check permissions
   let hasPermission: boolean;
   if (keysToCheck.length === 1) {
-    hasPermission = can(keysToCheck[0], action);
+    const key = keysToCheck[0];
+    hasPermission = can(key || '', action);
   } else if (requireAll) {
     hasPermission = canAll(keysToCheck, action);
   } else {

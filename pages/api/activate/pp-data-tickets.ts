@@ -229,7 +229,7 @@ async function sendTeamNotification(
   const emails = members.map((m: { email: string }) => m.email);
 
   await resend.emails.send({
-    from: 'FibreFlow <noreply@fibreflow.app>',
+    from: 'FibreFlow <notifications@fibreflow.app>',
     to: emails,
     subject,
     html,

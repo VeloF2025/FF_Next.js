@@ -46,7 +46,7 @@ export class ClerkAuthService {
   }
 
   async signInWithEmailAndPassword(email: string, password: string): Promise<User> {
-    return { ...mockUser, email, name: email.split('@')[0] };
+    return { ...mockUser, email, name: email.split('@')[0] ?? email };
   }
 
   async signInWithGoogle(): Promise<User> {
@@ -62,7 +62,7 @@ export class ClerkAuthService {
       ...mockUser,
       id: `dev-user-${Date.now()}`,
       email,
-      name: displayName || email.split('@')[0]
+      name: displayName || email.split('@')[0] || email
     };
   }
 

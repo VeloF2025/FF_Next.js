@@ -54,26 +54,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-      // Generate return number atomically inside the INSERT to avoid race conditions.
+      // Generate return number
+      const countRows = (await sql`
+        SELECT COUNT(*)::int as cnt FROM credit_notes WHERE type = 'supplier'
+      `) as Row[];
+      const countRow = countRows[0];
+      const returnNum = `DR-${String(Number(countRow?.cnt ?? 0) + 1).padStart(4, '0')}`;
+
       const createdRows = (await sql`
         INSERT INTO credit_notes (
           id, credit_note_number, type, supplier_id,
           total_amount, reason,
           status, credit_date, created_by, created_at
         ) VALUES (
-          gen_random_uuid(),
-          'DR-' || LPAD(
-            ((SELECT COUNT(*)::int FROM credit_notes WHERE type = 'supplier') + 1)::TEXT,
-            4, '0'
-          ),
-          'supplier', ${supplierId},
+          gen_random_uuid(), ${returnNum}, 'supplier', ${supplierId},
           ${amount}, ${reason || ''},
           'draft', NOW(), ${userId}, NOW()
         )
         RETURNING *
       `) as Row[];
       const created = createdRows[0];
-      const returnNum = created?.credit_note_number;
 
       log.info('Supplier return created', { id: created?.id, number: returnNum, module: 'accounting' });
       return apiResponse.success(res, { return: created });

@@ -216,7 +216,7 @@ export class SeasonalAnalyzer {
           if (pattern.averageErrors > maxDailyErrors * 0.9) {
             const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             peakPeriods.push({
-              period: dayNames[pattern.dayOfWeek],
+              period: dayNames[pattern.dayOfWeek] ?? 'Unknown',
               likelihood: pattern.averageErrors / maxDailyErrors
             });
           }

@@ -193,7 +193,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
         )}
         {activeTab === 'photos' && <PhotosTab review={review} onRefresh={refresh} />}
         {activeTab === 'feedback' && <FeedbackTab review={review} generateFeedback={generateFeedback} sendFeedback={sendFeedback} />}
-        {activeTab === 'activity' && <ActivityTab dropNumber={dropNumber} feedbackSentAt={review.feedback_sent_at} />}
+        {activeTab === 'activity' && <ActivityTab dropNumber={dropNumber} feedbackSentAt={review.feedback_sent_at ? review.feedback_sent_at instanceof Date ? review.feedback_sent_at.toISOString() : review.feedback_sent_at : null} />}
         {activeTab === 'maintenance' && <MaintenanceTab dropNumber={dropNumber} />}
         {activeTab === 'qa' && <ManualQATab review={review} updateStep={updateStep} markIncorrect={markIncorrect} />}
         {activeTab === 'categorization' && (
@@ -232,7 +232,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
     try {
       await updateStep(step, !currentValue);
     } catch (error) {
-      log.error('Failed to update step', error, 'UnifiedReviewCard.ManualQATab');
+      log.error('Failed to update step', { error: error instanceof Error ? error.message : String(error) }, 'UnifiedReviewCard.ManualQATab');
     } finally {
       setIsUpdating(false);
     }
@@ -260,7 +260,7 @@ function ManualQATab({ review, updateStep, markIncorrect }: ManualQATabProps) {
     try {
       await markIncorrect(Array.from(incorrectSteps), comments);
     } catch (error) {
-      log.error('Failed to mark incorrect', error, 'UnifiedReviewCard.ManualQATab');
+      log.error('Failed to mark incorrect', { error: error instanceof Error ? error.message : String(error) }, 'UnifiedReviewCard.ManualQATab');
     } finally {
       setIsUpdating(false);
     }
@@ -910,7 +910,7 @@ function getStepValue(review: UnifiedReview, step: number): boolean {
     10: 'step_10_signature',
   };
 
-  return review[stepFields[step]] as boolean || false;
+  return (review[stepFields[step]!] as boolean) || false;
 }
 
 /**

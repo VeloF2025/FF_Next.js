@@ -191,7 +191,7 @@ async function processBatch(
             ff_project_id = ${ffProjectId},
             ff_business_unit = ${ffBusinessUnit},
             updated_at = NOW()
-          WHERE id = ${existing[0].id}
+          WHERE id = ${existing[0]!.id}
         `;
         result.updated++;
       } else {

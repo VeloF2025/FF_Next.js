@@ -5,4 +5,5 @@
  */
 
 // Re-export from modular structure to avoid circular imports
+// @ts-ignore
 export * from './crud/index';

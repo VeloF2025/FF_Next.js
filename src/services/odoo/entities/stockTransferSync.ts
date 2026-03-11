@@ -13,7 +13,7 @@ import { neon, NeonQueryFunction } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooStockPicking, OdooStockMove } from '../odooClient';
 
-const logger = createLogger({ module: 'odooStockTransferSync' });
+const logger = createLogger('odooStockTransferSync');
 
 // ============================================================================
 // Types
@@ -48,10 +48,10 @@ export interface StockTransferSyncOptions {
  * Get stock item ID by Odoo product ID
  */
 async function getStockItemByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooProductId: number
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_items WHERE odoo_product_id = ${odooProductId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -61,11 +61,11 @@ async function getStockItemByOdooId(
  * Get FF location ID by Odoo location ID
  */
 async function getLocationByOdooId(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooLocationId: number
 ): Promise<string | null> {
   // First check odoo_location_mappings
-  const mappingRows = await sql<{ ff_location_id: string }[]>`
+  const mappingRows = await sql`
     SELECT ff_location_id FROM odoo_location_mappings
     WHERE odoo_location_id = ${odooLocationId}
     AND ff_location_id IS NOT NULL
@@ -77,7 +77,7 @@ async function getLocationByOdooId(
 
   // Fallback: check stock_locations directly (if odoo_location_id column exists)
   try {
-    const directRows = await sql<{ id: string }[]>`
+    const directRows = await sql`
       SELECT id FROM stock_locations
       WHERE odoo_location_id = ${odooLocationId}
       LIMIT 1
@@ -92,9 +92,9 @@ async function getLocationByOdooId(
  * Get default location (warehouse)
  */
 async function getDefaultLocation(
-  sql: NeonQueryFunction<false, false>
+  sql: any
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_locations
     WHERE location_type = 'warehouse'
     ORDER BY name ASC
@@ -107,10 +107,10 @@ async function getDefaultLocation(
  * Check if a movement with this odoo_move_id exists
  */
 async function getExistingMovement(
-  sql: NeonQueryFunction<false, false>,
+  sql: any,
   odooMoveId: number
 ): Promise<string | null> {
-  const rows = await sql<{ id: string }[]>`
+  const rows = await sql`
     SELECT id FROM stock_movements WHERE odoo_move_id = ${odooMoveId} LIMIT 1
   `;
   return rows.length > 0 ? rows[0].id : null;
@@ -150,7 +150,7 @@ export async function syncStockTransfers(
     const odooTransfers = await client.getCompletedTransfers({
       sinceDate,
       limit,
-    });
+    } as any);
 
     logger.info(`Found ${odooTransfers.length} internal transfers in Odoo`);
 
@@ -225,7 +225,7 @@ export async function syncStockTransfers(
               : null;
 
             if (!stockItemId) {
-              logger.warn(`Stock item not found for product ${move.product_id?.[1] || 'unknown'}`);
+              logger.warn(`Stock item not found for product ${(move.product_id as any)?.[1] || 'unknown'}`);
               continue;
             }
 
@@ -371,19 +371,19 @@ export async function getStockTransferSyncStats(
   const sql = neon(databaseUrl);
 
   const [totals, byType, lastSync] = await Promise.all([
-    sql<Array<{ total: string; odoo_synced: string }>>`
+    sql`
       SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE odoo_move_id IS NOT NULL) as odoo_synced
       FROM stock_movements
     `,
-    sql<Array<{ movement_type: string; count: string }>>`
+    sql`
       SELECT movement_type, COUNT(*) as count
       FROM stock_movements
       GROUP BY movement_type
       ORDER BY count DESC
     `,
-    sql<Array<{ last_sync: Date | null }>>`
+    sql`
       SELECT last_sync_stock_transfers as last_sync
       FROM odoo_api_config
       LIMIT 1

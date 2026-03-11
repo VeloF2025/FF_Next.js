@@ -4,13 +4,14 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { sql } from '@/lib/neon';
+import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
-import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-export default withAuth(withErrorHandler(async function handler(req: NextApiRequest, res: NextApiResponse) {
+const sql = neon(process.env.DATABASE_URL!);
+
+export default withAuth(async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 
   try {
@@ -86,4 +87,4 @@ export default withAuth(withErrorHandler(async function handler(req: NextApiRequ
     log.error('Item movement report error', { error: message });
     return apiResponse.badRequest(res, 'Failed to generate report');
   }
-}));
+});

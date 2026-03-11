@@ -11,11 +11,11 @@ import { AuthUser, handleAuthError } from '../authHelpers';
 import { log } from '@/lib/logger';
 
 // Mock AuthUser for dev mode compatibility
-const createMockAuthUser = (user: User): AuthUser => ({
+const createMockAuthUser = (user: { id: string; email: string; displayName?: string | null; name?: string; photoURL?: string | null }): AuthUser => ({
   uid: user.id,
   email: user.email,
-  displayName: user.displayName,
-  photoURL: user.photoURL,
+  displayName: user.displayName ?? user.name ?? null,
+  photoURL: user.photoURL ?? null,
   emailVerified: true,
 });
 
@@ -54,7 +54,7 @@ export class GoogleAuthentication {
       log.debug('googleAuth', { message: 'DEV MODE: Mock Google sign in (enhanced)' });
       const user = authConfig.devUser;
       await updateLastLogin(user.id);
-      return user;
+      return user as unknown as User;
     }
 
     try {

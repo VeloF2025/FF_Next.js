@@ -10,7 +10,7 @@ import { RfqCrudService } from '../core/RfqCrudService';
 import { RfqNotificationService } from '../notifications/RfqNotificationService';
 import { validateStatusTransition } from '../utils/rfqStatusValidator';
 
-const sql = neon(process.env.DATABASE_URL!);
+const sql: any = neon(process.env.DATABASE_URL!);
 
 export class RfqLifecycleService {
   /**
@@ -20,7 +20,7 @@ export class RfqLifecycleService {
     try {
       const rfq = await RfqCrudService.getById(id);
 
-      if (!validateStatusTransition(rfq.status, RFQStatus.ISSUED)) {
+      if (!validateStatusTransition(rfq.status as RFQStatus, RFQStatus.ISSUED)) {
         throw new Error(`Cannot transition from ${rfq.status} to ${RFQStatus.ISSUED}`);
       }
 
@@ -37,11 +37,11 @@ export class RfqLifecycleService {
         WHERE id = ${id}`;
 
       // Create notifications for each supplier
-      for (const supplierId of suppliers) {
+      for (const supplierId of suppliers!) {
         await RfqNotificationService.createSupplierNotification(id, supplierId, 'invitation');
       }
 
-      log.info('RFQ sent to suppliers', { rfqId: id, supplierCount: suppliers.length }, 'RfqLifecycleService');
+      log.info('RFQ sent to suppliers', { rfqId: id, supplierCount: suppliers!.length }, 'RfqLifecycleService');
     } catch (error) {
       log.error('Error sending RFQ to suppliers:', { data: error }, 'RfqLifecycleService');
       throw error;

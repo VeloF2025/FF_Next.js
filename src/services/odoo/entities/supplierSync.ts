@@ -8,7 +8,7 @@ import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
 import { OdooClient, OdooPartner } from '../odooClient';
 
-const logger = createLogger({ module: 'odooSupplierSync' });
+const logger = createLogger('odooSupplierSync');
 
 // ============================================================================
 // Types
@@ -105,7 +105,7 @@ export async function syncSuppliers(
     logger.info(`Found ${odooSuppliers.length} suppliers in Odoo`);
 
     // Get existing FF suppliers with Odoo IDs
-    const existingSuppliers = await sql<{ id: string; odoo_partner_id: number }[]>`
+    const existingSuppliers = await sql`
       SELECT id, odoo_partner_id FROM suppliers WHERE odoo_partner_id IS NOT NULL
     `;
     const existingByOdooId = new Map(
@@ -258,7 +258,7 @@ export async function syncSingleSupplier(
     const ffData = mapOdooToFF(odooSupplier);
 
     // Check if already exists
-    const existing = await sql<{ id: string }[]>`
+    const existing = await sql`
       SELECT id FROM suppliers WHERE odoo_partner_id = ${odooPartnerId}
     `;
 
@@ -285,11 +285,11 @@ export async function syncSingleSupplier(
       return {
         success: true,
         message: 'Supplier updated',
-        supplierId: existing[0].id,
+        supplierId: existing[0]!.id,
       };
     } else {
       const code = `ODOO-${odooPartnerId}`;
-      const insertResult = await sql<{ id: string }[]>`
+      const insertResult = await sql`
         INSERT INTO suppliers (
           code, name, email, phone, tax_number,
           physical_street1, physical_street2, physical_city,
@@ -308,7 +308,7 @@ export async function syncSingleSupplier(
       return {
         success: true,
         message: 'Supplier created',
-        supplierId: insertResult[0].id,
+        supplierId: insertResult[0]!.id,
       };
     }
   } catch (error) {

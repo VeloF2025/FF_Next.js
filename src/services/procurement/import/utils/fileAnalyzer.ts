@@ -83,7 +83,7 @@ export class FileAnalyzer {
           }
           
           const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+          const jsonData = XLSX.utils.sheet_to_json(worksheet!, {
             header: 1,
             range: 5, // Only read first 5 rows
             defval: '',

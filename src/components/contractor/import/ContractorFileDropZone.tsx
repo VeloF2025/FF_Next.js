@@ -46,20 +46,20 @@ export function ContractorFileDropZone({
     return null;
   };
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (!isDragOver) setIsDragOver(true);
     setDragError(null);
   }, [isDragOver]);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setIsDragOver(false);
     setDragError(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
 
@@ -67,6 +67,7 @@ export function ContractorFileDropZone({
     if (files.length === 0) return;
 
     const file = files[0];
+    if (!file) return;
     const error = validateFile(file);
     
     if (error) {
@@ -83,6 +84,7 @@ export function ContractorFileDropZone({
     if (!files || files.length === 0) return;
 
     const file = files[0];
+    if (!file) return;
     const error = validateFile(file);
     
     if (error) {

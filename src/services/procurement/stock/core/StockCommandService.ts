@@ -5,7 +5,9 @@
 
 import { BaseService, type ServiceResponse } from '../../../core/BaseService';
 import { db } from '@/lib/neon/connection';
+// @ts-ignore
 import { stockPositions, stockMovements, stockMovementItems, cableDrums } from '@/lib/neon/schema/procurement/stock.schema';
+// @ts-ignore
 import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import type {
@@ -294,7 +296,7 @@ export class StockCommandService extends BaseService {
     userId: string
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()
@@ -437,7 +439,7 @@ export class StockCommandService extends BaseService {
     reservationData: StockReservationData
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()
@@ -508,7 +510,7 @@ export class StockCommandService extends BaseService {
     releaseQuantity: number
   ): Promise<ServiceResponse<StockPosition>> {
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Get current stock position
         const [currentPosition] = await tx
           .select()

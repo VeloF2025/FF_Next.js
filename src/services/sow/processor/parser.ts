@@ -64,8 +64,9 @@ async function processExcel(file: File, _type: string): Promise<any[]> {
   });
   
   const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(worksheet, { 
+  if (!sheetName) throw new Error('Excel file has no sheets');
+  const worksheet = workbook.Sheets[sheetName]!;
+  const data = XLSX.utils.sheet_to_json(worksheet, {
     raw: false,
     dateNF: 'yyyy-mm-dd'
   });

@@ -370,7 +370,7 @@ export class ComplianceReportFormatter {
     // Top recommendations
     summary += `\nRECOMMENDations:\n`;
     if (report.topIssues.length > 0) {
-      summary += `• Address top compliance gap: ${report.topIssues[0].issue} (${report.topIssues[0].affectedSuppliers} suppliers affected)\n`;
+      summary += `• Address top compliance gap: ${report.topIssues[0]!.issue} (${report.topIssues[0]!.affectedSuppliers} suppliers affected)\n`;
     }
     
     if (parseFloat(complianceRate) < 85) {

@@ -30,7 +30,7 @@ export interface UseUnifiedReviewReturn {
   updateStep: (step: number, value: boolean) => Promise<void>;
   markIncorrect: (steps: number[], comments: Record<number, string>) => Promise<void>;
   triggerAiEvaluation: () => Promise<void>;
-  generateFeedback: () => Promise<string>;
+  generateFeedback: () => string;
   sendFeedback: (message: string) => Promise<void>;
   lock: () => Promise<void>;
   unlock: () => Promise<void>;
@@ -323,8 +323,8 @@ export function useUnifiedReview({
   /**
    * Refresh review data
    */
-  const refresh = useCallback(() => {
-    fetchReview();
+  const refresh = useCallback(async () => {
+    await fetchReview();
   }, [fetchReview]);
 
   // Initial fetch on mount

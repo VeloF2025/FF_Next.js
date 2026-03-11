@@ -76,7 +76,9 @@ export default function SupplierCodeMapper({
     setSearchQuery('');
     // Pre-search with the item description
     const item = rfqItems[idx];
-    fetchStockItems(item.description);
+    if (item) {
+      fetchStockItems(item.description);
+    }
   };
 
   const handleMapToStock = async (rfqItem: RFQItem, stockItem: StockItem) => {
@@ -118,7 +120,7 @@ export default function SupplierCodeMapper({
 
   if (rfqItems.length === 0) return null;
 
-  const selectedItem = selectedItemIdx !== null ? rfqItems[selectedItemIdx] : null;
+  const selectedItem = selectedItemIdx !== null ? rfqItems[selectedItemIdx] || null : null;
 
   return (
     <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">

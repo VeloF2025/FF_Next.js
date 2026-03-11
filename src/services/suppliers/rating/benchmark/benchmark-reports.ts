@@ -349,8 +349,8 @@ export class BenchmarkReports {
     
     // Trend insights
     if (trends.length > 1) {
-      const firstMonth = trends[0];
-      const lastMonth = trends[trends.length - 1];
+      const firstMonth = trends[0]!;
+      const lastMonth = trends[trends.length - 1]!;
       const avgChange = lastMonth.industryAverage - firstMonth.industryAverage;
       
       if (avgChange > 2) {

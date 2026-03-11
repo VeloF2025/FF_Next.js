@@ -148,7 +148,7 @@ export async function logHumanReviewCompleted(
       reviewerName = [firstRow.first_name, firstRow.last_name].filter(Boolean).join(' ');
     }
   } catch (err) {
-    log.warn('ActivityLog', `Could not look up user name for ${userId}: ${err}`);
+    log.warn(`Could not look up user name for ${userId}: ${err}`, undefined, 'ActivityLog');
   }
 
   return logActivity(

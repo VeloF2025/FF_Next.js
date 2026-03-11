@@ -16,7 +16,7 @@ import {
 } from '../odooClient';
 import type { Pool } from 'pg';
 
-const logger = createLogger({ module: 'odoo:stockMovementSync' });
+const logger = createLogger('odoo:stockMovementSync');
 
 // ============================================================================
 // Types
@@ -308,7 +308,7 @@ export class StockMovementSyncService {
    * Sync a single stock move item
    */
   private async syncMoveItem(
-    client: ReturnType<Pool['connect']> extends Promise<infer T> ? T : never,
+    client: any,
     movementId: string,
     move: OdooStockMove
   ): Promise<void> {

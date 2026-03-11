@@ -117,7 +117,7 @@ export function ImportProgressOverlay({
                 label="Sync to QField"
                 icon={<CloudCog className="w-4 h-4" />}
                 isActive={phase === 'syncing'}
-                isComplete={phase === 'complete'}
+                isComplete={(phase as ImportPhase) === 'complete'}
               />
             )}
           </div>

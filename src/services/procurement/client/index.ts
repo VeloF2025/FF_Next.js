@@ -8,10 +8,12 @@
  * use direct database connections and will NOT work in the browser.
  */
 
-export { 
+import { procurementApiService as _pApi } from './procurementClientService';
+export {
   ProcurementClientService,
-  procurementApiService 
+  procurementApiService
 } from './procurementClientService';
+const procurementApiService = _pApi;
 
 // Re-export the API types for convenience
 export type {

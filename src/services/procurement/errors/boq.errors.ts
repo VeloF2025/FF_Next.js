@@ -92,7 +92,7 @@ export class BOQMappingError extends BOQError {
   getUnmappedByReason(): Record<string, Array<{ lineNumber: number; description: string }>> {
     return this.unmappedItems.reduce((acc, item) => {
       if (!acc[item.reason]) acc[item.reason] = [];
-      acc[item.reason].push({
+      acc[item.reason]!.push({
         lineNumber: item.lineNumber,
         description: item.description
       });
