@@ -104,7 +104,7 @@ async function handler(
 
     const dataResult = await pool.query(
       `SELECT pp.*, mt.ticket_uid,
-              oa.team AS oes_team,
+              COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
@@ -112,6 +112,7 @@ async function handler(
        FROM oes_pp_data pp
        LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
+       LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
        LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
        LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
        WHERE 1=1${whereClause}
@@ -166,13 +167,14 @@ async function handler(
     const dataResult = await pool.query(
       `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
-              oa.team AS oes_team,
+              COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team
        FROM oes_pp_data pp
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
+       LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
        LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
        LEFT JOIN wa_contacts wc ON wc.sender_phone = dur.sender_phone
        WHERE 1=1${whereClause}
