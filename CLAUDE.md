@@ -103,15 +103,15 @@ Run `ls .claude/modules/` for full list (40+ modules).
 
 ## Deployment
 
-**Five Environments (all share production DB):**
+**Two Environments (all share production DB):**
 
 | Env | URL | Port | Service |
 |-----|-----|------|---------|
-| Production | app.fibreflow.app | 3000 | `fibreflow-production.service` |
-| Staging | vf.fibreflow.app | 3006 | `fibreflow.service` |
 | Dev | dev.fibreflow.app | 3005 | `fibreflow-dev.service` |
-| VPS Backup | backup.fibreflow.app | 3005 | `fibreflow-backup.service` |
+| Production | app.fibreflow.app | 3000 | `fibreflow-production.service` |
 | Local | localhost:3004 | 3004 | manual |
+
+> **Staging retired 2026-03-11.** `vf.fibreflow.app` redirects to production. Standalone services (wa-proxy, pdf-tools) still route through it.
 
 **Server Access:**
 ```bash
@@ -120,35 +120,32 @@ sudo -u velo bash -c 'whoami'     # No password needed (sudoers configured)
 ssh root@72.61.197.178             # VPS (WhatsApp services)
 ```
 
-**All deploy dirs under /home/velo/ (owned by velo, use `sudo -u velo`):**
+**Deploy dirs under /home/velo/ (owned by velo, use `sudo -u velo`):**
 ```
 /home/velo/fibreflow-dev/         # Dev (dev.fibreflow.app)
-/home/velo/fibreflow-staging/     # Staging (vf.fibreflow.app)
 /home/velo/fibreflow-production/  # Production (app.fibreflow.app)
 ```
 
 **DEPLOYMENT RULES (MANDATORY):**
 
-| Time Window | Dev | Staging | Production |
-|-------------|-----|---------|------------|
-| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** | **BLOCKED** |
-| **After hours** + weekends | Allowed | Promote from dev | Promote from staging |
-| **Emergency** (any time) | Allowed | `--force` required | `--force` required |
+| Time Window | Dev | Production |
+|-------------|-----|------------|
+| **Business hours** (08:00-17:00 SAST, Mon-Fri) | Allowed | **BLOCKED** |
+| **After hours** + weekends | Allowed | Promote from dev |
+| **Emergency** (any time) | Allowed | `--force` required |
 
-**Hein's approval is required for ALL staging and production deployments. Never deploy to staging or production without explicit approval from Hein.**
+**Hein's approval is required for ALL production deployments. Never deploy to production without explicit approval from Hein.**
 
 **Workflow:**
 1. During the day: deploy to **dev only** (`/deploy` or `/deploy dev`)
-2. After hours (with Hein's approval): promote dev → staging (`/deploy staging`)
-3. After hours (with Hein's approval): promote staging → production (`/deploy production`)
-4. Emergency: `/deploy staging --force` (requires Hein to confirm)
+2. After hours (with Hein's approval): promote dev → production (`/deploy production`)
+3. Emergency: `/deploy production --force` (requires Hein to confirm)
 
 **Deploy Scripts:**
 ```bash
 bash scripts/deploy-gate.sh dev              # Deploy to dev (always)
-bash scripts/deploy-gate.sh staging          # Blocked during business hours
-bash scripts/promote.sh dev staging          # Promote dev → staging (after hours)
-bash scripts/promote.sh staging production   # Promote staging → production (after hours)
+bash scripts/deploy-gate.sh production       # Blocked during business hours
+bash scripts/promote.sh dev production       # Promote dev → production (after hours)
 bash scripts/deploy-gate.sh status           # Show all environments
 ```
 
@@ -158,14 +155,12 @@ bash scripts/deploy-gate.sh status           # Show all environments
 sudo -u velo bash -c 'cd /home/velo/fibreflow-dev && git pull origin master && npm run build'
 sudo systemctl restart fibreflow-dev.service
 
-# Staging (after hours only — promotes EXACT commit from dev)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-staging && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
-sudo systemctl restart fibreflow.service
-
-# Production (after hours only — promotes EXACT commit from staging)
-sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git fetch origin && git checkout <COMMIT> && npm install && npm run build'
+# Production (after hours only — promotes EXACT commit from dev)
+sudo -u velo bash -c 'cd /home/velo/fibreflow-production && git pull origin master && npm run build'
 sudo systemctl restart fibreflow-production.service
 ```
+
+**Maintenance page:** Nginx serves `/var/www/html/maintenance.html` on 502/503 during restarts (auto-refreshes every 8s).
 
 **Sudoers:** `/etc/sudoers.d/fibreflow-deploy` — hein can run as velo (NOPASSWD) + restart services
 

@@ -5,14 +5,12 @@
 # Promotes a tested commit from one environment to the next.
 # Ensures the EXACT commit running on source is deployed to target.
 #
-# Promotion paths:
-#   dev → staging       (promote tested dev build to staging)
-#   staging → production (promote verified staging build to production)
+# Promotion path:
+#   dev → production (promote tested dev build to production)
 #
 # Usage:
-#   bash scripts/promote.sh dev staging          # Promote dev → staging
-#   bash scripts/promote.sh staging production   # Promote staging → production
-#   bash scripts/promote.sh dev staging --force  # Emergency (skips time gate)
+#   bash scripts/promote.sh dev production          # Promote dev → production
+#   bash scripts/promote.sh dev production --force  # Emergency (skips time gate)
 #
 # Safety:
 #   - Verifies source environment is healthy before promoting
@@ -33,14 +31,12 @@ TIMEZONE="Africa/Johannesburg"
 
 declare -A ENV_CONFIG=(
   [dev]="fibreflow-dev|3005|/home/velo/fibreflow-dev|https://dev.fibreflow.app"
-  [staging]="fibreflow|3006|/home/velo/fibreflow-staging|https://vf.fibreflow.app"
   [production]="fibreflow-production|3000|/home/velo/fibreflow-production|https://app.fibreflow.app"
 )
 
 # Valid promotion paths (source → target)
 declare -A VALID_PROMOTIONS=(
-  ["dev:staging"]=1
-  ["staging:production"]=1
+  ["dev:production"]=1
 )
 
 # --- Colors ---
@@ -74,9 +70,8 @@ done
 if [ -z "$SOURCE" ] || [ -z "$TARGET" ]; then
   echo "Usage: promote.sh <source> <target> [--force]"
   echo ""
-  echo "Promotion paths:"
-  echo "  promote.sh dev staging          # Promote dev build to staging"
-  echo "  promote.sh staging production   # Promote staging build to production"
+  echo "Promotion path:"
+  echo "  promote.sh dev production       # Promote dev build to production"
   echo ""
   echo "Options:"
   echo "  --force    Skip business hours check (emergencies only)"
@@ -84,7 +79,7 @@ if [ -z "$SOURCE" ] || [ -z "$TARGET" ]; then
 fi
 
 if [ -z "${VALID_PROMOTIONS["$SOURCE:$TARGET"]}" ]; then
-  error "Invalid promotion path: $SOURCE -> $TARGET. Valid paths: dev->staging, staging->production"
+  error "Invalid promotion path: $SOURCE -> $TARGET. Valid path: dev->production"
 fi
 
 if [ -z "${ENV_CONFIG[$SOURCE]}" ] || [ -z "${ENV_CONFIG[$TARGET]}" ]; then

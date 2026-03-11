@@ -4,14 +4,11 @@
 # =============================================================================
 # Enforces deployment rules:
 #   - DEV:        Always allowed (any time)
-#   - STAGING:    Blocked during business hours (08:00-17:00 SAST Mon-Fri)
 #   - PRODUCTION: Blocked during business hours (08:00-17:00 SAST Mon-Fri)
 #
 # Usage:
 #   bash scripts/deploy-gate.sh dev                    # Deploy to dev (always OK)
-#   bash scripts/deploy-gate.sh staging                # Blocked during business hours
 #   bash scripts/deploy-gate.sh production             # Blocked during business hours
-#   bash scripts/deploy-gate.sh staging --force        # Emergency override
 #   bash scripts/deploy-gate.sh production --force     # Emergency override
 #   bash scripts/deploy-gate.sh status                 # Show all environments
 #
@@ -36,7 +33,6 @@ fi
 
 declare -A ENV_MAP=(
   [dev]="fibreflow-dev|3005|/home/velo/fibreflow-dev|https://dev.fibreflow.app"
-  [staging]="fibreflow|3006|/home/velo/fibreflow-staging|https://vf.fibreflow.app"
   [production]="fibreflow-production|3000|/home/velo/fibreflow-production|https://app.fibreflow.app"
 )
 
@@ -111,7 +107,7 @@ show_status() {
   fi
   echo ""
 
-  for env in dev staging production; do
+  for env in dev production; do
     IFS='|' read -r svc port dir url <<< "${ENV_MAP[$env]}"
     local commit
     commit=$(get_server_commit "$dir")
@@ -145,11 +141,10 @@ fi
 
 # --- Validate target ---
 if [ -z "$TARGET" ]; then
-  echo "Usage: deploy-gate.sh <dev|staging|production|status> [--force] [--branch <branch>]"
+  echo "Usage: deploy-gate.sh <dev|production|status> [--force] [--branch <branch>]"
   echo ""
   echo "Rules:"
   echo "  dev         Always allowed"
-  echo "  staging     Blocked 08:00-17:00 SAST Mon-Fri (use --force for emergencies)"
   echo "  production  Blocked 08:00-17:00 SAST Mon-Fri (use --force for emergencies)"
   echo "  status      Show all environments"
   exit 1
