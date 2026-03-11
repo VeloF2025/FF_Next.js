@@ -247,6 +247,14 @@ async function handleCreate(
         client_email: enrichment.client_email || undefined,
       });
 
+      // Set GPS coordinates directly (createTicket doesn't handle text GPS format)
+      if (enrichment.lat && enrichment.lng) {
+        await pool.query(
+          `UPDATE maintenance_tickets SET gps_coordinates = $1 WHERE id = $2`,
+          [`${enrichment.lat},${enrichment.lng}`, ticket.id]
+        );
+      }
+
       // Link ticket back to PP data record
       await pool.query(
         `UPDATE oes_pp_data SET maintenance_ticket_id = $1 WHERE id = $2`,
@@ -274,80 +282,114 @@ async function handleCreate(
 /**
  * PATCH: Backfill existing PP Data tickets with enrichment data
  *
- * Updates tickets that have NULL project_id, address, zone, etc.
- * by looking up data from drops + onemap_properties tables.
+ * Syncs DR numbers from oes_pp_data → ticket when PP data has been resolved since creation.
+ * Updates title, description, and all enrichable fields (address, GPS, zone, PON, client info).
+ * Uses upsert logic: overwrites empty fields, preserves manually-entered data.
  */
 async function handleBackfill(
-  req: AuthenticatedNextApiRequest,
+  _req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   try {
-    // Find all pp_data tickets that need enrichment
+    // Fetch all pp_data tickets with their linked PP record
     const tickets = await pool.query(
-      `SELECT mt.id, mt.dr_number, mt.ont_serial, mt.description,
-              pp.project as pp_project
+      `SELECT mt.id, mt.dr_number, mt.ont_serial, mt.title, mt.description,
+              mt.project_id, mt.address, mt.gps_coordinates, mt.zone, mt.pon,
+              mt.client_name, mt.client_contact, mt.client_email,
+              pp.resolved_drop_number, pp.resolution_status, pp.project as pp_project
        FROM maintenance_tickets mt
-       LEFT JOIN oes_pp_data pp ON pp.maintenance_ticket_id = mt.id
+       JOIN oes_pp_data pp ON pp.maintenance_ticket_id = mt.id
        WHERE mt.source = 'pp_data'`
     );
 
     let updated = 0;
-    let enrichedFields = 0;
+    let drSynced = 0;
 
     for (const ticket of tickets.rows) {
-      const dr = ticket.dr_number;
+      // Use PP data's resolved DR (latest), fall back to ticket's existing DR
+      const ppDR = ticket.resolved_drop_number;
+      const ticketDR = ticket.dr_number;
+      const effectiveDR = ppDR || ticketDR;
       const projectName = ticket.pp_project;
+      const serial = ticket.ont_serial || '';
 
-      const enrichment = dr
-        ? await getEnrichmentForDR(dr, projectName)
+      // Track if DR was newly synced from PP data
+      const drNewlySynced = ppDR && !ticketDR;
+
+      // Fetch enrichment using the effective DR
+      const enrichment = effectiveDR
+        ? await getEnrichmentForDR(effectiveDR, projectName)
         : await getProjectId(projectName);
 
-      // Build SET clause dynamically — only update NULL fields
       const updates: string[] = [];
-      const values: any[] = [];
+      const values: (string | null)[] = [];
       let paramIdx = 1;
 
-      const maybeSet = (column: string, value: string | undefined) => {
-        if (value) {
-          updates.push(`${column} = COALESCE(${column}, $${paramIdx})`);
-          values.push(value);
+      // Helper: set field if enrichment has a value and ticket field is empty
+      const upsertField = (column: string, newValue: string | undefined, currentValue: string | null | undefined) => {
+        if (newValue && !currentValue) {
+          updates.push(`${column} = $${paramIdx}`);
+          values.push(newValue);
           paramIdx++;
         }
       };
 
-      maybeSet('project_id', enrichment.project_id);
-      maybeSet('address', enrichment.address);
-      maybeSet('zone', enrichment.zone);
-      maybeSet('pon', enrichment.pon);
-      maybeSet('client_name', enrichment.client_name);
-      maybeSet('client_contact', enrichment.client_contact);
-      maybeSet('client_email', enrichment.client_email);
+      // Sync DR number from PP data → ticket
+      if (drNewlySynced) {
+        updates.push(`dr_number = $${paramIdx}`);
+        values.push(ppDR);
+        paramIdx++;
+        drSynced++;
+      }
 
-      // GPS — stored as "lat,lng" text (valid_gps constraint)
-      if (enrichment.lat && enrichment.lng) {
-        const gps = `${enrichment.lat},${enrichment.lng}`;
-        updates.push(`gps_coordinates = COALESCE(gps_coordinates, $${paramIdx})`);
-        values.push(gps);
+      // Update title if DR was newly synced (replace "No DR" title)
+      if (drNewlySynced && ticket.title.includes('No DR')) {
+        const newTitle = `PP ONT ${serial} at ${ppDR}`;
+        updates.push(`title = $${paramIdx}`);
+        values.push(newTitle);
         paramIdx++;
       }
 
-      // Enrich description with location + contact details
-      if (enrichment.pole_number || enrichment.address || enrichment.client_name || enrichment.installer_name) {
-        const addlParts: string[] = [];
-        if (enrichment.pole_number) addlParts.push(`Pole: ${enrichment.pole_number}`);
-        if (enrichment.zone) addlParts.push(`Zone ${enrichment.zone}`);
-        if (enrichment.pon) addlParts.push(`PON ${enrichment.pon}`);
-        if (enrichment.address) addlParts.push(`Address: ${enrichment.address}`);
-        if (enrichment.client_name) addlParts.push(`End User: ${enrichment.client_name}`);
-        if (enrichment.client_contact) addlParts.push(`Contact: ${enrichment.client_contact}`);
-        if (enrichment.installer_name) addlParts.push(`Installer: ${enrichment.installer_name}`);
-        if (enrichment.installed_at) addlParts.push(`Installed: ${enrichment.installed_at}`);
+      // Upsert all enrichable fields
+      upsertField('project_id', enrichment.project_id, ticket.project_id);
+      upsertField('address', enrichment.address, ticket.address);
+      upsertField('zone', enrichment.zone, ticket.zone);
+      upsertField('pon', enrichment.pon, ticket.pon);
+      upsertField('client_name', enrichment.client_name, ticket.client_name);
+      upsertField('client_contact', enrichment.client_contact, ticket.client_contact);
+      upsertField('client_email', enrichment.client_email, ticket.client_email);
 
-        const enrichmentBlock = `\n--- Enrichment Data ---\n${addlParts.join('\n')}`;
+      // GPS
+      if (enrichment.lat && enrichment.lng && !ticket.gps_coordinates) {
+        updates.push(`gps_coordinates = $${paramIdx}`);
+        values.push(`${enrichment.lat},${enrichment.lng}`);
+        paramIdx++;
+      }
+
+      // Build enrichment block for description
+      const descParts: string[] = [];
+      if (effectiveDR) descParts.push(`DR: ${effectiveDR}`);
+      if (enrichment.pole_number) descParts.push(`Pole: ${enrichment.pole_number}`);
+      if (enrichment.zone) descParts.push(`Zone ${enrichment.zone}`);
+      if (enrichment.pon) descParts.push(`PON ${enrichment.pon}`);
+      if (enrichment.address) descParts.push(`Address: ${enrichment.address}`);
+      if (enrichment.client_name) descParts.push(`End User: ${enrichment.client_name}`);
+      if (enrichment.client_contact) descParts.push(`Contact: ${enrichment.client_contact}`);
+      if (enrichment.installer_name) descParts.push(`Installer: ${enrichment.installer_name}`);
+      if (enrichment.installed_at) descParts.push(`Installed: ${enrichment.installed_at}`);
+
+      if (descParts.length > 0) {
         const currentDesc = ticket.description || '';
+        const enrichmentBlock = `\n--- Enrichment Data ---\n${descParts.join('\n')}`;
 
-        // Only append if not already enriched
-        if (!currentDesc.includes('--- Enrichment Data ---')) {
+        if (currentDesc.includes('--- Enrichment Data ---')) {
+          // Replace existing enrichment block
+          const baseDesc = currentDesc.split('\n--- Enrichment Data ---')[0];
+          updates.push(`description = $${paramIdx}`);
+          values.push(baseDesc + enrichmentBlock);
+          paramIdx++;
+        } else {
+          // Append new enrichment block
           updates.push(`description = COALESCE(description, '') || $${paramIdx}`);
           values.push(enrichmentBlock);
           paramIdx++;
@@ -365,17 +407,16 @@ async function handleBackfill(
       );
 
       updated++;
-      enrichedFields += updates.length - 1; // -1 for updated_at
     }
 
     logger.info('PP Data tickets backfill complete', {
-      total: tickets.rows.length, updated, enrichedFields,
+      total: tickets.rows.length, updated, drSynced,
     });
 
     return apiResponse.success(res, {
       total: tickets.rows.length,
       updated,
-      enriched_fields: enrichedFields,
+      dr_synced: drSynced,
     });
   } catch (err) {
     logger.error('Failed to backfill PP Data tickets', { error: err });

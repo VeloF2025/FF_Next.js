@@ -75,6 +75,7 @@ async function handler(
     const status = req.query.status as string;
     const dateFrom = req.query.dateFrom as string;
     const dateTo = req.query.dateTo as string;
+    const search = (req.query.search as string || '').trim();
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -96,9 +97,16 @@ async function handler(
       whereClause += ` AND pp.date_registered <= $${paramIndex++}::date`;
       params.push(dateTo);
     }
+    if (search) {
+      whereClause += ` AND (pp.serial_number ILIKE $${paramIndex} OR pp.resolved_drop_number ILIKE $${paramIndex} OR mt.ticket_uid ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) as total FROM oes_pp_data pp WHERE 1=1${whereClause}`,
+      `SELECT COUNT(*) as total FROM oes_pp_data pp
+       LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
+       WHERE 1=1${whereClause}`,
       params
     );
 

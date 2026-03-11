@@ -78,6 +78,8 @@ export function PPDataTab() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -86,8 +88,17 @@ export function PPDataTab() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [creatingTickets, setCreatingTickets] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchText);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
   // Clear selection when filters or page change
-  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo]);
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -110,6 +121,7 @@ export function PPDataTab() {
       if (filterStatus) params.set('status', filterStatus);
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
       if (filterDateTo) params.set('dateTo', filterDateTo);
+      if (debouncedSearch) params.set('search', debouncedSearch);
 
       const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
@@ -120,7 +132,7 @@ export function PPDataTab() {
     } catch {
       // Non-fatal
     }
-  }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo]);
+  }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchLookupStatus = useCallback(async () => {
     try {
@@ -444,6 +456,25 @@ export function PPDataTab() {
       {stats && stats.total > 0 && (
         <div className="border border-[var(--ff-border-light)] rounded-lg overflow-hidden">
           <div className="bg-[var(--ff-bg-primary)] px-4 py-3 border-b border-[var(--ff-border-light)] flex flex-wrap gap-3 items-center">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)]" />
+              <input
+                type="text"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search serial, DR, ticket..."
+                className="pl-8 pr-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
+                           text-[var(--ff-text-primary)] text-sm w-56 placeholder:text-[var(--ff-text-tertiary)]"
+              />
+              {searchText && (
+                <button
+                  onClick={() => setSearchText('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             <select
               value={filterProject}
               onChange={(e) => { setFilterProject(e.target.value); setPage(1); }}

@@ -22,12 +22,13 @@ import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
 import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { Search, Users } from 'lucide-react';
+import { Search, Users, User } from 'lucide-react';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban';
-type TicketScope = 'all' | 'my_team';
+type TicketScope = 'all' | 'my_tickets' | 'my_team';
 
 // Icons for view toggle
 const TableIcon = () => (
@@ -48,6 +49,7 @@ export default function TicketsListPageClient() {
   const [ticketScope, setTicketScope] = useState<TicketScope>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const { teamIds } = useMyTeams();
+  const { currentUser } = useAuth();
 
   // Read status filter from URL params (Active/Completed sub-tabs)
   const statusFilter = searchParams?.get('status') || undefined;
@@ -59,7 +61,7 @@ export default function TicketsListPageClient() {
       setViewMode(saved);
     }
     const savedScope = localStorage.getItem('ticketsScope') as TicketScope | null;
-    if (savedScope && (savedScope === 'all' || savedScope === 'my_team')) {
+    if (savedScope && (savedScope === 'all' || savedScope === 'my_tickets' || savedScope === 'my_team')) {
       setTicketScope(savedScope);
     }
   }, []);
@@ -79,8 +81,9 @@ export default function TicketsListPageClient() {
   const filters: TicketFilters = useMemo(() => ({
     search: searchTerm || undefined,
     status: statusFilter as any,
+    assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
     assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds[0] : undefined,
-  }), [searchTerm, statusFilter, ticketScope, teamIds]);
+  }), [searchTerm, statusFilter, ticketScope, teamIds, currentUser?.id]);
 
   return (
     <ModulePage config={nocConfig} hideHeader>
@@ -101,6 +104,19 @@ export default function TicketsListPageClient() {
                 `}
               >
                 All Tickets
+              </button>
+              <button
+                onClick={() => handleScopeChange('my_tickets')}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all
+                  ${ticketScope === 'my_tickets'
+                    ? 'bg-blue-500 text-white shadow-sm'
+                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
+                  }
+                `}
+              >
+                <User className="w-3.5 h-3.5" />
+                My Tickets
               </button>
               <button
                 onClick={() => handleScopeChange('my_team')}
