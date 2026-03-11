@@ -3,6 +3,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -123,6 +124,7 @@ export default withAuth(withErrorHandler(async (
             addedSuppliers.push(result[0]);
           }
         } catch (e) {
+          log.error('CreateRfqApi', 'Operation failed', { error });
           // Skip invalid supplier IDs
         }
       }
@@ -158,6 +160,7 @@ export default withAuth(withErrorHandler(async (
     }, 'RFQ created from requisition successfully');
 
   } catch (error: any) {
+    log.error('CreateRfqApi', 'Failed to create RFQ from requisition', { error });
     return apiResponse.databaseError(res, error, 'Failed to create RFQ from requisition');
   }
 }));

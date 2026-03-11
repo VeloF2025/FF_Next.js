@@ -65,6 +65,7 @@ async function checkQFieldConnection(): Promise<'connected' | 'disconnected' | '
     await qfieldApiRequest('/projects/');
     return 'connected';
   } catch (error: any) {
+    log.error('QFieldCloud connection check failed', { error }, 'qfield-sync-dashboard');
     // Network/auth error → disconnected; unexpected error → error
     const msg = error?.message || '';
     if (msg.includes('timeout') || msg.includes('ECONNREFUSED') || msg.includes('ENOTFOUND')) {
@@ -80,6 +81,7 @@ async function checkDatabaseConnection(): Promise<'connected' | 'disconnected' |
     const result = await sql`SELECT 1 as connected`;
     return result && result[0]?.connected === 1 ? 'connected' : 'disconnected';
   } catch (error) {
+    log.error('Database connection check failed', { error }, 'qfield-sync-dashboard');
     return 'error';
   }
 }
@@ -131,6 +133,7 @@ async function getCurrentSyncJob() {
 
     return null;
   } catch (error) {
+    log.error('Failed to fetch current sync job', { error }, 'qfield-sync-dashboard');
     // Table might not exist yet
     return null;
   }
@@ -162,6 +165,7 @@ async function getRecentSyncJobs() {
       recordsFailed: job.records_failed || 0,
     }));
   } catch (error) {
+    log.error('Failed to fetch recent sync jobs', { error }, 'qfield-sync-dashboard');
     // Table might not exist yet
     return [];
   }
@@ -193,6 +197,7 @@ async function getSyncStatistics() {
       nextScheduledSync: null, // Calculate based on config
     };
   } catch (error) {
+    log.error('Failed to fetch sync statistics', { error }, 'qfield-sync-dashboard');
     // Return default stats if table doesn't exist
     return {
       lastSync: null,
@@ -227,6 +232,7 @@ async function getUnresolvedConflicts() {
       resolvedBy: conflict.resolved_by,
     }));
   } catch (error) {
+    log.error('Failed to fetch unresolved conflicts', { error }, 'qfield-sync-dashboard');
     // Table might not exist yet
     return [];
   }

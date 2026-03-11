@@ -11,6 +11,7 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
 import { logDocumentVerified, logDocumentRejected } from '@/services/staff/staffAuditService';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentVerifyAPI');
@@ -21,6 +22,7 @@ async function getVerifierName(verifierId: string): Promise<string> {
     const [verifier] = await sql`SELECT name FROM staff WHERE id = ${verifierId}`;
     return (verifier?.name as string) || 'Unknown';
   } catch {
+    log.error('VerifyApi', 'Operation failed', { error });
     return 'Unknown';
   }
 }

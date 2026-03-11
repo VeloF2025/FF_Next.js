@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -137,6 +138,7 @@ export default withAuth(withErrorHandler(async (
       summary,
     });
   } catch (error) {
+    log.error('PendingApi', 'Failed to fetch pending approvals', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch pending approvals');
   }
 }));

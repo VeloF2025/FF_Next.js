@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type { FaultAnalytics, FaultTypeValue } from '@/types/procurement/fault.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -160,6 +161,7 @@ export default withAuth(withErrorHandler(async (
 
     return apiResponse.success(res, analytics);
   } catch (error) {
+    log.error('AnalyticsApi', 'Failed to fetch fault analytics', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch fault analytics');
   }
 }));

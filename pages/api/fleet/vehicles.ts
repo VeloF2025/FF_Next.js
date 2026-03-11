@@ -15,6 +15,7 @@ import { getSql } from '@/lib/neon-sql';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import type { FleetVehicle, VehicleType, OwnershipType, VehicleStatus } from '@/modules/fleet/types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 const getSqlInstance = () => getSql();
 
@@ -520,6 +521,7 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
         const newVehicleArr = newVehicle as Record<string, unknown>[];
         return apiResponse.created(res, newVehicleArr[0], 'Vehicle created successfully');
       } catch (error: any) {
+        log.error('FleetVehiclesApi', 'Failed to create vehicle', { error, registration: body.registration });
         if (error.message?.includes('fleet_vehicles_registration_key') || error.code === '23505') {
           return apiResponse.error(
             res,
@@ -623,6 +625,7 @@ export default withFleetAuth(withErrorHandler(async (req: NextApiRequest, res: N
 
         return apiResponse.success(res, updatedVehicleArr[0], 'Vehicle updated successfully');
       } catch (error: any) {
+        log.error('FleetVehiclesApi', 'Failed to update vehicle', { error, id, registration: body.registration });
         if (error.message?.includes('fleet_vehicles_registration_key') || error.code === '23505') {
           return apiResponse.error(
             res,

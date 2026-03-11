@@ -13,6 +13,7 @@ import {
 } from '@/modules/fleet/services/checkInService';
 import type { CreateCheckRecordInput, CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -75,6 +76,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
     }
   } catch (error) {
+    log.error('RecordsApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

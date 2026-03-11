@@ -8,6 +8,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -79,6 +80,7 @@ export default withAuth(withErrorHandler(async (
         }
       );
     } catch (error) {
+      log.error('IndexApi', 'Failed to fetch requisitions', { error });
       return apiResponse.databaseError(res, error, 'Failed to fetch requisitions');
     }
   } else if (req.method === 'POST') {
@@ -212,6 +214,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.created(res, result, 'Purchase requisition created successfully');
     } catch (error) {
+      log.error('IndexApi', 'Failed to create requisition', { error });
       return apiResponse.databaseError(res, error, 'Failed to create requisition');
     }
   } else {

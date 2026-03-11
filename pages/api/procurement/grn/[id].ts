@@ -6,6 +6,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -115,6 +116,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, result);
     } catch (error) {
+      log.error('ProcurementGrnDetailApi', 'Failed to fetch GRN', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to fetch GRN');
     }
   } else if (req.method === 'PATCH') {
@@ -153,6 +155,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, updated, 'GRN updated successfully');
     } catch (error) {
+      log.error('ProcurementGrnDetailApi', 'Failed to update GRN', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to update GRN');
     }
   } else if (req.method === 'DELETE') {
@@ -185,6 +188,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.noContent(res);
     } catch (error) {
+      log.error('ProcurementGrnDetailApi', 'Failed to delete GRN', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to delete GRN');
     }
   } else {

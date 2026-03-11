@@ -8,6 +8,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { getCheckRecords } from '@/modules/fleet/services/checkInService';
 import type { CheckRecordStatus } from '@/modules/fleet/types/check-in.types';
 import { withFleetAuth } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id: vehicleId, limit, offset, status } = req.query;
@@ -34,6 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
     }
   } catch (error) {
+    log.error('CheckRecordsApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

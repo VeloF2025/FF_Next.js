@@ -277,6 +277,7 @@ async function validatePhoto(photoKey: string, workType: string): Promise<VLMRes
       throw new Error('No JSON found in VLM response');
     }
   } catch {
+    log.error('QaValidateApi', 'Operation failed', { error });
     // If parsing fails, create a default response
     vlmData = {
       valid: false,

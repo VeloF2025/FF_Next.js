@@ -4,6 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { listAuditLogs } from '@/services/procurement/auditService';
 import type { AuditLogFilter, AuditEntityTypeValue, AuditActionValue } from '@/types/procurement/audit.types';
+import { log } from '@/lib/logger';
 
 export default withAuth(withErrorHandler(async (
   req: NextApiRequest,
@@ -42,6 +43,7 @@ export default withAuth(withErrorHandler(async (
       total,
     });
   } catch (error) {
+    log.error('IndexApi', 'Failed to fetch audit logs', { error });
     return apiResponse.databaseError(res, error, 'Failed to fetch audit logs');
   }
 }));

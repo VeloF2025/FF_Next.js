@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 import { getNotifications } from '@/modules/notifications/services';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -24,6 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const notifications = await getNotifications(authReq.user.id, limit, offset, unreadOnly);
     return apiResponse.success(res, notifications);
   } catch (error) {
+    log.error('IndexApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

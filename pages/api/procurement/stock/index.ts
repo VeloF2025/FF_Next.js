@@ -94,6 +94,7 @@ export default withAuth(withErrorHandler(async (
           LIMIT 50
         `;
       } catch {
+        log.error('IndexApi', 'Operation failed', { error });
         // stock_movements table might not have data yet
         movements = [];
       }

@@ -9,6 +9,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { getFuelAnomalies, runAnomalyDetection } from '@/modules/fleet/services';
 import type { AnomalyStatus, AnomalySeverity } from '@/modules/fleet/types/fuel-analytics.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -35,6 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error) {
+      log.error('FleetFuelAnomaliesApi', 'Failed to fetch fuel anomalies', { error });
       return apiResponse.internalError(res, error);
     }
   }
@@ -51,6 +53,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return apiResponse.success(res, result);
     } catch (error) {
+      log.error('FleetFuelAnomaliesApi', 'Failed to run anomaly detection', { error });
       return apiResponse.internalError(res, error);
     }
   }

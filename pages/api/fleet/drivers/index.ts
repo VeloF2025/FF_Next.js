@@ -8,6 +8,7 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import type {
+import { log } from '@/lib/logger';
   FleetDriver,
   DriverDashboardStats,
   DriversApiResponse,

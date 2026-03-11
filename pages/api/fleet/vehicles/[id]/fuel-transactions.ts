@@ -464,6 +464,7 @@ async function handleVlmScan(
       const receiptResult = await extractFuelReceipt(body.receiptPhotoBase64);
       results.receipt = receiptResult;
     } catch (error) {
+      log.error('FleetVehicleFuelTransactionsApi', 'Failed to extract fuel receipt via VLM', { error });
       results.receipt = {
         amountRand: null,
         litres: null,
@@ -484,6 +485,7 @@ async function handleVlmScan(
       const odometerResult = await extractOdometerReading(body.odometerPhotoBase64);
       results.odometer = odometerResult;
     } catch (error) {
+      log.error('FleetVehicleFuelTransactionsApi', 'Failed to extract odometer reading via VLM', { error });
       results.odometer = {
         reading: null,
         confidence: 0,
@@ -499,6 +501,7 @@ async function handleVlmScan(
       const fuelGaugeResult = await extractFuelLevel(body.fuelGaugePhotoBase64);
       results.fuelGauge = fuelGaugeResult;
     } catch (error) {
+      log.error('FleetVehicleFuelTransactionsApi', 'Failed to extract fuel gauge reading via VLM', { error });
       results.fuelGauge = {
         level: null,
         confidence: 0,

@@ -93,6 +93,7 @@ export default withAuth(withErrorHandler(async (
         }
       );
     } catch (error) {
+      log.error('IndexApi', 'Failed to fetch GRNs', { error });
       return apiResponse.databaseError(res, error, 'Failed to fetch GRNs');
     }
   } else if (req.method === 'POST') {
@@ -204,6 +205,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.created(res, grn!, 'Goods receipt note created successfully');
     } catch (error) {
+      log.error('IndexApi', 'Failed to create GRN', { error });
       return apiResponse.databaseError(res, error, 'Failed to create GRN');
     }
   } else {

@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { logUpdate, logDelete } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -99,6 +100,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, result);
     } catch (error) {
+      log.error('ProcurementRequisitionDetailApi', 'Failed to fetch requisition', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to fetch requisition');
     }
   } else if (req.method === 'PUT') {
@@ -134,6 +136,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, updated, 'Requisition updated successfully');
     } catch (error) {
+      log.error('ProcurementRequisitionDetailApi', 'Failed to update requisition', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to update requisition');
     }
   } else if (req.method === 'DELETE') {
@@ -158,6 +161,7 @@ export default withAuth(withErrorHandler(async (
 
       return apiResponse.success(res, { id }, 'Requisition deleted successfully');
     } catch (error) {
+      log.error('ProcurementRequisitionDetailApi', 'Failed to delete requisition', { error, id });
       return apiResponse.databaseError(res, error, 'Failed to delete requisition');
     }
   } else {

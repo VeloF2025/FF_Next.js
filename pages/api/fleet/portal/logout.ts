@@ -46,6 +46,7 @@ export default async function handler(
 
     return apiResponse.success(res, { loggedOut: true });
   } catch (error) {
+    log.error('LogoutApi', 'Internal error', { error });
     return apiResponse.internalError(res, error);
   }
 }

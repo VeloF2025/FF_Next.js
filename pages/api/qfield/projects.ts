@@ -95,6 +95,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       log.info('QFieldProjectsAPI', `Created QField project: ${name}`, { qfield_project_id });
       return res.status(201).json({ success: true, data: newProject });
     } catch (err) {
+      log.error('ProjectsApi', 'Operation failed', { error });
       await client.query('ROLLBACK');
       throw err;
     } finally {
