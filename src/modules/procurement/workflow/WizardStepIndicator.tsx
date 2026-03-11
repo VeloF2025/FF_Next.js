@@ -1,5 +1,5 @@
 /**
- * WizardStepIndicator — 9-step visual progress bar for the Procurement Workflow Wizard.
+ * WizardStepIndicator — 10-step visual progress bar for the Procurement Workflow Wizard.
  * Pattern based on SOWStepProgress. Responsive: shows labels on nearby steps only;
  * collapses to circles on very narrow viewports.
  */
@@ -11,12 +11,13 @@ const STEPS: { id: number; label: string }[] = [
   { id: 1, label: 'Requirements' },
   { id: 2, label: 'Strategy' },
   { id: 3, label: 'Submit' },
-  { id: 4, label: 'Approval Gate' },
-  { id: 5, label: 'Create Order' },
-  { id: 6, label: 'Receive Goods' },
-  { id: 7, label: 'Payment Request' },
-  { id: 8, label: 'Payment Approval' },
-  { id: 9, label: 'Complete' },
+  { id: 4, label: 'Approval' },
+  { id: 5, label: 'Sourcing' },
+  { id: 6, label: 'Quote & Award' },
+  { id: 7, label: 'Create PO' },
+  { id: 8, label: 'Receive Goods' },
+  { id: 9, label: 'Payment' },
+  { id: 10, label: 'Complete' },
 ];
 
 export interface WizardStepIndicatorProps {
@@ -88,7 +89,7 @@ function Connector({ leftStepCompleted }: { leftStepCompleted: boolean }) {
 }
 
 /**
- * WizardStepIndicator renders a horizontal 9-step progress indicator.
+ * WizardStepIndicator renders a horizontal 10-step progress indicator.
  * Labels are shown only for completed, current, and the next upcoming step
  * to conserve horizontal space. On mobile the labels are hidden entirely
  * via `hidden sm:block`.
@@ -114,7 +115,7 @@ export function WizardStepIndicator({ currentStep, completedSteps }: WizardStepI
                 {/* Label — hidden on mobile, shown on sm+ only for relevant steps */}
                 <span
                   className={[
-                    'hidden sm:block text-xs text-center whitespace-nowrap max-w-[72px] leading-tight transition-colors duration-200',
+                    'hidden sm:block text-xs text-center whitespace-nowrap max-w-[64px] leading-tight transition-colors duration-200',
                     isCompleted
                       ? 'text-green-500 font-medium'
                       : isCurrent

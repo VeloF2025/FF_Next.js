@@ -1,4 +1,4 @@
-// WORKING: Procurement Workflow Wizard — 9-step orchestrator with DB thread tracking
+// WORKING: Procurement Workflow Wizard — 10-step orchestrator with DB thread tracking
 import { useEffect } from 'react';
 import { WizardStepIndicator } from './WizardStepIndicator';
 import { useWorkflowState, type WorkflowState } from './useWorkflowState';
@@ -7,6 +7,8 @@ import { Step2Strategy } from './steps/Step2Strategy';
 import { Step3Submit } from './steps/Step3Submit';
 import { Step4Approval } from './steps/Step4Approval';
 import { Step5Order } from './steps/Step5Order';
+import { Step6QuoteAward } from './steps/Step6QuoteAward';
+import { Step7CreatePO } from './steps/Step7CreatePO';
 import { Step6Receive } from './steps/Step6Receive';
 import { Step7PaymentRequest } from './steps/Step7PaymentRequest';
 import { Step8PaymentApproval } from './steps/Step8PaymentApproval';
@@ -109,17 +111,13 @@ export function ProcurementWorkflowWizard() {
 
     // Thread sync: create on first step completion, update on subsequent steps
     if (!state.threadId && state.currentStep === 1) {
-      // Create a new thread after Step 1 (requirements defined)
       const thread = await createThread(merged, merged.projectName ?? 'system');
       if (thread) {
         setState({ ...update, currentStep: nextStep, threadId: thread.id, threadNumber: thread.threadNumber });
         return;
       }
     } else if (state.threadId) {
-      // Update existing thread with latest data
-      const threadUpdate: Record<string, unknown> = {
-        currentStep: nextStep,
-      };
+      const threadUpdate: Record<string, unknown> = { currentStep: nextStep };
       if (update.strategy) threadUpdate.strategy = update.strategy;
       if (update.requisitionId) threadUpdate.requisitionId = update.requisitionId;
       if (update.rfqId) threadUpdate.rfqId = update.rfqId;
@@ -127,7 +125,8 @@ export function ProcurementWorkflowWizard() {
       if (update.grnId) threadUpdate.grnId = update.grnId;
       if (update.estimatedTotal) threadUpdate.estimatedTotal = update.estimatedTotal;
       if (update.paymentApprovalRequestId) threadUpdate.paymentApprovalId = update.paymentApprovalRequestId;
-      if (nextStep === 9) threadUpdate.status = 'completed';
+      if (update.awardedQuoteAmount) threadUpdate.poTotal = update.awardedQuoteAmount;
+      if (nextStep === 10) threadUpdate.status = 'completed';
 
       updateThread(state.threadId, threadUpdate);
     }
@@ -156,7 +155,7 @@ export function ProcurementWorkflowWizard() {
       )}
 
       {/* Step Indicator — hidden on completion */}
-      {state.currentStep < 9 && (
+      {state.currentStep < 10 && (
         <div className="mb-8">
           <WizardStepIndicator
             currentStep={state.currentStep}
@@ -183,15 +182,18 @@ export function ProcurementWorkflowWizard() {
           <Step5Order state={state} onComplete={handleComplete} onBack={handleBack} />
         )}
         {state.currentStep === 6 && (
-          <Step6Receive state={state} onComplete={handleComplete} onBack={handleBack} />
+          <Step6QuoteAward state={state} onComplete={handleComplete} onBack={handleBack} />
         )}
         {state.currentStep === 7 && (
-          <Step7PaymentRequest state={state} onComplete={handleComplete} onBack={handleBack} />
+          <Step7CreatePO state={state} onComplete={handleComplete} onBack={handleBack} />
         )}
         {state.currentStep === 8 && (
-          <Step8PaymentApproval state={state} onComplete={handleComplete} onBack={handleBack} />
+          <Step6Receive state={state} onComplete={handleComplete} onBack={handleBack} />
         )}
         {state.currentStep === 9 && (
+          <Step7PaymentRequest state={state} onComplete={handleComplete} onBack={handleBack} />
+        )}
+        {state.currentStep === 10 && (
           <Step9Complete state={state} onReset={resetState} />
         )}
       </div>
