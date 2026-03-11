@@ -103,17 +103,19 @@ async function handlePost(
       return apiResponse.notFound(res, 'Unified review', dropNumber);
     }
 
-    // 2. Check if feedback already sent
+    // 2. Check if feedback already sent (autoGenerate flag allows resending)
     if (review.feedback_sent && !autoGenerate) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'Feedback already sent for this review. Use autoGenerate=true to resend.');
     }
 
     // 3. Generate or use provided message
+    // Always prefer a provided message — autoGenerate only bypasses the
+    // feedback_sent guard above, it should NOT override a custom message.
     let feedbackMessage: string;
 
-    if (message && !autoGenerate) {
+    if (message) {
       feedbackMessage = message;
-      log.info(`Using provided feedback message for ${dropNumber}`);
+      log.info(`Using provided feedback message for ${dropNumber}`, { isResend: review.feedback_sent });
     } else {
       feedbackMessage = generateAutoFeedback(review);
       log.info(`Auto-generated feedback message for ${dropNumber}`);

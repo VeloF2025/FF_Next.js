@@ -783,6 +783,8 @@ interface FeedbackTabProps {
 function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProps) {
   const [message, setMessage] = useState(review.feedback_message || '');
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [justSent, setJustSent] = useState(false);
 
   const handleGenerateFeedback = () => {
     const generated = generateFeedback();
@@ -793,14 +795,20 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
     if (!message.trim()) return;
 
     setIsSending(true);
+    setSendError(null);
     try {
       await sendFeedback(message);
+      setJustSent(true);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Failed to send feedback';
+      setSendError(msg);
       log.error('Failed to send feedback', error, 'UnifiedReviewCard.FeedbackTab');
     } finally {
       setIsSending(false);
     }
   };
+
+  const alreadySent = review.feedback_sent;
 
   return (
     <div className="space-y-6">
@@ -816,6 +824,23 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
         </button>
       </div>
 
+      {/* Previously sent notice */}
+      {alreadySent && !justSent && (
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
+          Feedback was previously sent
+          {review.feedback_sent_at && (
+            <span> on {new Date(review.feedback_sent_at).toLocaleString()}</span>
+          )}. You can edit the message below and resend.
+        </div>
+      )}
+
+      {/* Just sent confirmation */}
+      {justSent && (
+        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-800 dark:text-green-200">
+          Feedback sent successfully.
+        </div>
+      )}
+
       {/* Message Editor */}
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-2">
@@ -823,32 +848,43 @@ function FeedbackTab({ review, generateFeedback, sendFeedback }: FeedbackTabProp
         </label>
         <textarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => { setMessage(e.target.value); setJustSent(false); }}
           rows={10}
           placeholder="Enter feedback message or click 'Generate Auto-Feedback' to create one automatically..."
           className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground placeholder-gray-500 dark:placeholder-gray-400"
         />
       </div>
 
+      {/* Error display */}
+      {sendError && (
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+          {sendError}
+        </div>
+      )}
+
       {/* Send Button */}
       <div className="flex justify-end gap-3">
-        {review.feedback_sent && (
-          <span className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-            ✓ Feedback Sent
-            {review.feedback_sent_at && (
-              <span className="ml-2 text-xs">
-                {new Date(review.feedback_sent_at).toLocaleString()}
-              </span>
-            )}
-          </span>
-        )}
         <button
           onClick={handleSendFeedback}
-          disabled={isSending || !message.trim() || review.feedback_sent}
+          disabled={isSending || !message.trim()}
           className="px-6 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
-          <span>📤</span>
-          {isSending ? 'Sending...' : 'Send to WhatsApp'}
+          {isSending ? (
+            <>
+              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              Sending...
+            </>
+          ) : alreadySent ? (
+            <>
+              <span>🔄</span>
+              Resend Feedback
+            </>
+          ) : (
+            <>
+              <span>📤</span>
+              Send to WhatsApp
+            </>
+          )}
         </button>
       </div>
     </div>

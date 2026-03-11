@@ -219,7 +219,8 @@ export function useUnifiedReview({
   }, [review]);
 
   /**
-   * Send feedback to WhatsApp (Phase 4 endpoint - placeholder)
+   * Send feedback to WhatsApp
+   * Automatically sets autoGenerate=true when resending (feedback already sent)
    */
   const sendFeedback = useCallback(
     async (message: string) => {
@@ -228,16 +229,22 @@ export function useUnifiedReview({
       }
 
       try {
-        log.info(`Sending feedback for ${dropNumber}`);
+        const isResend = review.feedback_sent;
+        log.info(`${isResend ? 'Resending' : 'Sending'} feedback for ${dropNumber}`);
 
         const response = await fetch(`/api/activate/send-feedback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dropNumber, message }),
+          body: JSON.stringify({
+            dropNumber,
+            message,
+            autoGenerate: isResend, // bypass feedback_sent guard on resend
+          }),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to send feedback');
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error?.message || 'Failed to send feedback');
         }
 
         // Refresh review to update feedback_sent status
