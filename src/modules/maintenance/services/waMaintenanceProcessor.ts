@@ -59,9 +59,12 @@ const CONTEXT_WINDOW_MINUTES = parseInt(
   10
 );
 
-// Target group JID for Mohadin QA
-const MAINTENANCE_GROUP_JID =
-  process.env.MAINTENANCE_WA_GROUP_JID || '120363424360693693@g.us';
+// Known maintenance group JIDs (must match wa-message.ts allowlist)
+const MAINTENANCE_GROUP_JIDS = new Set([
+  process.env.MAINTENANCE_WA_GROUP_JID || '120363424360693693@g.us', // Mohadin Maintenance
+  '120363423947610853@g.us', // Lawley Maintenance
+  '120363422808656601@g.us', // Marketing Activations (DR submissions)
+]);
 
 // DR number regex pattern (DR followed by 6-8 digits)
 // Allow optional space/dash between DR and number (e.g., "DR1856394", "DR 1856394", "DR-1856394")
@@ -277,9 +280,9 @@ export async function processMaintenanceMessage(
   const logger = createLogger('waMaintenanceProcessor');
 
   // Validate group
-  if (message.group_jid !== MAINTENANCE_GROUP_JID) {
+  if (!MAINTENANCE_GROUP_JIDS.has(message.group_jid)) {
     logger.warn(
-      { groupJid: message.group_jid, expected: MAINTENANCE_GROUP_JID },
+      { groupJid: message.group_jid, allowedGroups: [...MAINTENANCE_GROUP_JIDS] },
       'Message from unexpected group, ignoring'
     );
     throw new Error(`Message from unexpected group: ${message.group_jid}`);

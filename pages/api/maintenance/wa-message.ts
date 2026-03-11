@@ -25,6 +25,7 @@ const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 const MAINTENANCE_GROUP_JIDS = new Set([
   '120363424360693693@g.us', // Mohadin Maintenance
   '120363423947610853@g.us', // Lawley Maintenance
+  '120363422808656601@g.us', // Marketing Activations (DR submissions)
 ]);
 
 interface ApiResponse {
