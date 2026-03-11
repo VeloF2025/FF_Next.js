@@ -52,7 +52,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     // Get BOQ items with budget category names
     const items = await sql`
-      SELECT bi.*, bc.name as budget_category_name
+      SELECT bi.*, bc.category_name as budget_category_name
       FROM boq_items bi
       LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
       WHERE bi.boq_id::text = ${id}

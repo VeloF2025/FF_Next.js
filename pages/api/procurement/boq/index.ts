@@ -34,7 +34,7 @@ export default withAuth(async (
         // Get BOQ items if we have BOQs
         if (boqData.length > 0) {
           items = await sql`
-            SELECT bi.*, bc.name as budget_category_name
+            SELECT bi.*, bc.category_name as budget_category_name
             FROM boq_items bi
             LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
             WHERE bi.project_id = ${projectId}
@@ -66,7 +66,7 @@ export default withAuth(async (
         if (boqData.length > 0) {
           const boqIds = boqData.map(b => b.id);
           items = await sql`
-            SELECT bi.*, bc.name as budget_category_name
+            SELECT bi.*, bc.category_name as budget_category_name
             FROM boq_items bi
             LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
             WHERE bi.boq_id = ANY(${boqIds})
