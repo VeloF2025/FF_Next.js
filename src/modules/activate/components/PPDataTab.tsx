@@ -63,7 +63,7 @@ function isSelectable(r: PPRecord): boolean {
 }
 
 export function PPDataTab() {
-  const [isScanning, setIsScanning] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<PPStats | null>(null);
   const [records, setRecords] = useState<PPRecord[]>([]);
@@ -152,24 +152,33 @@ export function PPDataTab() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [fetchLookupStatus]);
 
-  const handleLocalScan = async () => {
-    setIsScanning(true);
+  const handleResolveAll = async () => {
+    setIsResolving(true);
     setError(null);
     try {
       const res = await fetch('/api/activate/pp-data-resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'local-scan' }),
+        body: JSON.stringify({ action: 'resolve-all' }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Scan failed');
-      toast.success(`Local scan: ${result.data.total_resolved} new matches found`);
+      if (!res.ok) throw new Error(result.error || 'Resolve all failed');
+      const d = result.data;
+      const parts: string[] = [];
+      if (d.steps.local_scan.resolved > 0) parts.push(`Local: ${d.steps.local_scan.resolved}`);
+      if (d.steps.wa_cross_ref.resolved > 0) parts.push(`WA cross-ref: ${d.steps.wa_cross_ref.resolved}`);
+      if (d.steps.wa_photo_vlm.resolved > 0) parts.push(`VLM photos: ${d.steps.wa_photo_vlm.resolved}`);
+      toast.success(
+        d.total_resolved > 0
+          ? `Resolved ${d.total_resolved} PPs (${parts.join(', ')})`
+          : 'No new matches found across all sources'
+      );
       fetchStats();
       fetchRecords();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Scan failed');
+      setError(err instanceof Error ? err.message : 'Resolve all failed');
     } finally {
-      setIsScanning(false);
+      setIsResolving(false);
     }
   };
 
@@ -376,15 +385,15 @@ export function PPDataTab() {
       {stats && stats.total > 0 && (
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={handleLocalScan}
-            disabled={isScanning}
+            onClick={handleResolveAll}
+            disabled={isResolving}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700
                        disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isScanning ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Scanning...</>
+            {isResolving ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Resolving...</>
             ) : (
-              <><Search className="w-4 h-4" /> Scan Local Data</>
+              <><Search className="w-4 h-4" /> Resolve All</>
             )}
           </button>
           <button

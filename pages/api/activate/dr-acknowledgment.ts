@@ -288,22 +288,33 @@ function buildSerialWarningLines(
 /**
  * Update onemap_status in dr_photo_unified_reviews
  * Creates record if not exists (UPSERT)
+ * Also persists ONT/UPS serials when available so PP scan can match later
  */
 async function updateOneMapStatus(
   dropNumber: string,
-  status: 'found' | 'not_found' | 'resolved'
+  status: 'found' | 'not_found' | 'resolved',
+  ontSerial?: string | null,
+  upsSerial?: string | null
 ): Promise<void> {
   try {
     await pool.query(
-      `INSERT INTO dr_photo_unified_reviews (drop_number, onemap_status, onemap_checked_at, created_at, updated_at)
-       VALUES ($1, $2, NOW(), NOW(), NOW())
+      `INSERT INTO dr_photo_unified_reviews (
+         drop_number, onemap_status, onemap_checked_at,
+         ont_serial_scanned, ups_serial_scanned,
+         created_at, updated_at
+       ) VALUES ($1, $2, NOW(), $3, $4, NOW(), NOW())
        ON CONFLICT (drop_number) DO UPDATE SET
          onemap_status = $2,
          onemap_checked_at = NOW(),
+         ont_serial_scanned = COALESCE(EXCLUDED.ont_serial_scanned, dr_photo_unified_reviews.ont_serial_scanned),
+         ups_serial_scanned = COALESCE(EXCLUDED.ups_serial_scanned, dr_photo_unified_reviews.ups_serial_scanned),
          updated_at = NOW()`,
-      [dropNumber, status]
+      [dropNumber, status, ontSerial || null, upsSerial || null]
     );
-    log.info('DrAcknowledgment', `Set onemap_status=${status} for ${dropNumber}`);
+    log.info('DrAcknowledgment', `Set onemap_status=${status} for ${dropNumber}`, {
+      ontSerial: ontSerial || null,
+      upsSerial: upsSerial || null,
+    });
   } catch (error) {
     log.warn('DrAcknowledgment', `Failed to update onemap_status for ${dropNumber}`, { error });
   }
@@ -679,7 +690,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         const data = (await response.json()) as OneMapRecordResponse;
         found = true;
         photoCount = data.photo_count || data.local_photos?.length || 0;
-        ontSerial = extractOntSerial(data.ont_barcode);
+        ontSerial = extractOntSerial(data.ont_barcode ?? null);
         upsSerial = data.ups_serial || null;
 
         log.info('DrAcknowledgment', `OneMap data for ${dropNumber}`, {
@@ -786,8 +797,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       );
       // Mark for QA re-review and reset workflow
       await markForRework(dropNumber, photoCount);
-      // Track 1Map status
-      await updateOneMapStatus(dropNumber, 'found');
+      // Track 1Map status + persist serials for PP scan matching
+      await updateOneMapStatus(dropNumber, 'found', ontSerial, upsSerial);
     } else if (!found) {
       // DR not in 1Map - check drops table as fallback
       const dropsRecord = await checkDropsTable(dropNumber);
@@ -826,8 +837,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     } else {
       // Normal first submission found in 1Map
       ackResult = generateAckMessage(dropNumber, found, photoCount, ontSerial, upsSerial, waPhotoCheck, vlmResult, duplicates);
-      // Track 1Map status
-      await updateOneMapStatus(dropNumber, 'found');
+      // Track 1Map status + persist serials for PP scan matching
+      await updateOneMapStatus(dropNumber, 'found', ontSerial, upsSerial);
     }
 
     const duration = Date.now() - startTime;

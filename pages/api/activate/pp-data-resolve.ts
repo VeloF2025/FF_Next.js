@@ -15,6 +15,7 @@ import { createLogger } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createOneMapClient } from '@/services/onemap';
+import { extractWaPhotoSerials } from '@/modules/activate/services/serialVerificationService';
 
 const logger = createLogger('PPDataResolve');
 
@@ -371,7 +372,8 @@ async function run1MapLookup(): Promise<{
       ]);
 
       if (searchResult.success && searchResult.result && searchResult.result.length > 0) {
-        const match = searchResult.result[0];
+        const match = searchResult.result[0] as Record<string, unknown> | undefined;
+        if (!match) { results.total_not_found++; continue; }
 
         // Verify the serial actually appears in this record's data
         const recordStr = JSON.stringify(match).toUpperCase();
@@ -389,20 +391,20 @@ async function run1MapLookup(): Promise<{
             WHERE id = $3
               AND resolution_status = 'not_found'
           `, [
-            match.drp || null,
+            (match.drp as string) || null,
             JSON.stringify({
-              pole: match.pole,
-              site: match.site,
-              prop_id: match.prop_id,
+              pole: match.pole as string,
+              site: match.site as string,
+              prop_id: match.prop_id as string,
               matched_in: 'full_text_search',
-              search_results_count: searchResult.result.length,
+              search_results_count: searchResult.result!.length,
             }),
             ppId,
           ]);
           results.total_resolved++;
 
           logger.debug('Serial matched via 1Map search', {
-            serial, project, dr: match.drp, pole: match.pole,
+            serial, project, dr: match.drp as string, pole: match.pole as string,
           });
         } else {
           results.total_not_found++;
@@ -459,6 +461,313 @@ async function run1MapLookup(): Promise<{
   return results;
 }
 
+/**
+ * Cross-reference unresolved PP serials against WA-submitted DRs via BOSS API.
+ *
+ * For DRs that were submitted via WhatsApp but never had ont_serial_scanned saved,
+ * re-query the BOSS API (1Map cache) to get the serial, then match against PPs.
+ * Also backfills ont_serial_scanned on the unified_reviews record for future scans.
+ */
+async function runWACrossReference(): Promise<{
+  total_drs_checked: number;
+  total_resolved: number;
+  total_backfilled: number;
+  total_errors: number;
+}> {
+  const BOSS_API_HOST = process.env.BOSS_API_HOST || 'http://100.96.203.105:8003';
+  const results = { total_drs_checked: 0, total_resolved: 0, total_backfilled: 0, total_errors: 0 };
+
+  // Get unresolved PP serials grouped by project
+  const unresolvedResult = await pool.query(`
+    SELECT id, serial_number, project, date_registered
+    FROM oes_pp_data
+    WHERE resolution_status = 'not_found'
+    ORDER BY project, date_registered DESC
+  `);
+
+  if (unresolvedResult.rows.length === 0) {
+    logger.info('WA cross-ref: no unresolved PPs');
+    return results;
+  }
+
+  // Build a lookup map: serial → PP record(s)
+  const serialToPP = new Map<string, Array<{ id: number; project: string; date_registered: string }>>();
+  for (const row of unresolvedResult.rows) {
+    const serial = (row.serial_number as string).toUpperCase();
+    if (!serialToPP.has(serial)) serialToPP.set(serial, []);
+    serialToPP.get(serial)!.push({
+      id: row.id as number,
+      project: row.project as string,
+      date_registered: row.date_registered as string,
+    });
+  }
+
+  // Get WA-submitted DRs that have no ont_serial_scanned — these are the gap
+  // Limit to DRs from the last 30 days with onemap_status='found' (serial was available at ACK time)
+  const drsResult = await pool.query(`
+    SELECT drop_number, project, wa_received_at
+    FROM dr_photo_unified_reviews
+    WHERE ont_serial_scanned IS NULL
+      AND onemap_status = 'found'
+      AND wa_group_jid IS NOT NULL
+      AND created_at > NOW() - INTERVAL '30 days'
+    ORDER BY created_at DESC
+  `);
+
+  if (drsResult.rows.length === 0) {
+    logger.info('WA cross-ref: no DRs with missing serials to check');
+    return results;
+  }
+
+  logger.info('WA cross-ref: checking DRs via BOSS API', {
+    unresolvedPPs: unresolvedResult.rows.length,
+    drsToCheck: drsResult.rows.length,
+  });
+
+  // For each DR, query BOSS API to get the ONT serial
+  for (const dr of drsResult.rows) {
+    const dropNumber = dr.drop_number as string;
+    results.total_drs_checked++;
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${BOSS_API_HOST}/api/record/${dropNumber}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) continue;
+
+      const data = await response.json() as { ont_barcode?: string | null; ups_serial?: string | null };
+      if (!data.ont_barcode) continue;
+
+      // Extract clean serial from barcode format: (S)SERIAL(23S)...
+      let ontSerial = data.ont_barcode;
+      const serialMatch = ontSerial.match(/\(S\)([^(]+)/);
+      if (serialMatch && serialMatch[1]) {
+        ontSerial = serialMatch[1].trim();
+      } else if (!ontSerial.includes('(')) {
+        ontSerial = ontSerial.trim();
+      }
+
+      const ontUpper = ontSerial.toUpperCase();
+
+      // Backfill ont_serial_scanned on the unified_reviews record
+      await pool.query(`
+        UPDATE dr_photo_unified_reviews
+        SET ont_serial_scanned = $1,
+            ups_serial_scanned = COALESCE(ups_serial_scanned, $2),
+            updated_at = NOW()
+        WHERE drop_number = $3
+          AND ont_serial_scanned IS NULL
+      `, [ontSerial, data.ups_serial || null, dropNumber]);
+      results.total_backfilled++;
+
+      // Check if this serial matches any unresolved PP
+      const ppMatches = serialToPP.get(ontUpper);
+      if (ppMatches && ppMatches.length > 0) {
+        for (const pp of ppMatches) {
+          await pool.query(`
+            UPDATE oes_pp_data
+            SET resolution_status = 'located_unified',
+                resolved_drop_number = $1,
+                resolved_source = 'wa_cross_reference',
+                resolved_details = jsonb_build_object(
+                  'method', 'boss_api_backfill',
+                  'project', $2,
+                  'ont_serial', $3
+                ),
+                resolved_at = NOW(), updated_at = NOW()
+            WHERE id = $4
+              AND resolution_status = 'not_found'
+          `, [dropNumber, dr.project || pp.project, ontSerial, pp.id]);
+          results.total_resolved++;
+        }
+        // Remove from map so we don't double-match
+        serialToPP.delete(ontUpper);
+      }
+    } catch (err) {
+      results.total_errors++;
+      if (err instanceof Error && err.name !== 'AbortError') {
+        logger.warn('WA cross-ref: BOSS API error', { dropNumber, error: err.message });
+      }
+    }
+
+    // Rate limit: 100ms between BOSS API calls (local network, fast)
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  logger.info('WA cross-ref complete', results);
+  return results;
+}
+
+/**
+ * Layer 4: Scan WA photos via VLM for unresolved PP serials.
+ *
+ * For PPs we still can't link to a DR, find WA activation photos from the same
+ * date range that haven't been VLM-processed yet. Run VLM on them to extract
+ * ONT serials, then match against unresolved PP serials.
+ *
+ * This catches cases where:
+ * - The technician sent a sticker photo but VLM never ran on it
+ * - The VLM result wasn't matched because the photo's DR had no serial stored
+ */
+async function runWAPhotoVLMScan(): Promise<{
+  total_photos_found: number;
+  total_vlm_processed: number;
+  total_pp_matched: number;
+  total_errors: number;
+  drs_scanned: number;
+}> {
+  const results = {
+    total_photos_found: 0,
+    total_vlm_processed: 0,
+    total_pp_matched: 0,
+    total_errors: 0,
+    drs_scanned: 0,
+  };
+
+  // Get unresolved PP date range to scope the photo search
+  const ppDatesResult = await pool.query(`
+    SELECT DISTINCT date_registered
+    FROM oes_pp_data
+    WHERE resolution_status = 'not_found'
+      AND date_registered IS NOT NULL
+    ORDER BY date_registered DESC
+    LIMIT 14
+  `);
+
+  if (ppDatesResult.rows.length === 0) {
+    logger.info('WA photo VLM scan: no unresolved PPs with dates');
+    return results;
+  }
+
+  // Build PP serial lookup
+  const ppSerialsResult = await pool.query(`
+    SELECT id, serial_number, project
+    FROM oes_pp_data
+    WHERE resolution_status = 'not_found'
+  `);
+  const serialToPP = new Map<string, Array<{ id: number; project: string }>>();
+  for (const row of ppSerialsResult.rows) {
+    const serial = (row.serial_number as string).toUpperCase();
+    if (!serialToPP.has(serial)) serialToPP.set(serial, []);
+    serialToPP.get(serial)!.push({ id: row.id as number, project: row.project as string });
+  }
+
+  const dates = ppDatesResult.rows.map(r => r.date_registered as string);
+  const minDate = dates[dates.length - 1];
+  const maxDate = dates[0];
+
+  // Find DRs that have unprocessed WA photos in the date range
+  const photoDrsResult = await pool.query(`
+    SELECT DISTINCT wp.drop_number
+    FROM wa_photos wp
+    WHERE wp.purpose = 'activation'
+      AND wp.drop_number IS NOT NULL
+      AND wp.vlm_processed = false
+      AND wp.message_timestamp >= $1::date
+      AND wp.message_timestamp < ($2::date + INTERVAL '1 day')
+    ORDER BY wp.drop_number
+  `, [minDate, maxDate]);
+
+  results.total_photos_found = photoDrsResult.rows.length;
+
+  if (photoDrsResult.rows.length === 0) {
+    // No unprocessed photos — check if already-processed photos match any PPs
+    // This handles the case where VLM ran but scan #7 missed due to case mismatch
+    const alreadyProcessedMatch = await pool.query(`
+      UPDATE oes_pp_data pp
+      SET resolution_status = 'located_local',
+          resolved_drop_number = wp.drop_number,
+          resolved_source = 'wa_photos_vlm_rescan',
+          resolved_details = jsonb_build_object(
+            'vlm_confidence', wp.vlm_confidence::text,
+            'method', 'case_insensitive_rescan'
+          ),
+          resolved_at = NOW(), updated_at = NOW()
+      FROM wa_photos wp
+      WHERE UPPER(wp.vlm_ont_serial) = UPPER(pp.serial_number)
+        AND wp.drop_number IS NOT NULL
+        AND wp.vlm_processed = true
+        AND pp.resolution_status = 'not_found'
+    `);
+    results.total_pp_matched = alreadyProcessedMatch.rowCount || 0;
+    if (results.total_pp_matched > 0) {
+      logger.info('WA photo VLM scan: matched via case-insensitive rescan', {
+        matched: results.total_pp_matched,
+      });
+    }
+    logger.info('WA photo VLM scan: no unprocessed photos in date range', { minDate, maxDate });
+    return results;
+  }
+
+  logger.info('WA photo VLM scan: processing photos', {
+    drsWithPhotos: photoDrsResult.rows.length,
+    dateRange: `${minDate} to ${maxDate}`,
+    unresolvedPPs: ppSerialsResult.rows.length,
+  });
+
+  // Process each DR's photos via VLM
+  for (const row of photoDrsResult.rows) {
+    const dropNumber = row.drop_number as string;
+    results.drs_scanned++;
+
+    try {
+      const extraction = await extractWaPhotoSerials(dropNumber, {
+        force: false, // Only unprocessed
+        timeoutMs: 10000,
+      });
+
+      results.total_vlm_processed += extraction.photosProcessed;
+
+      // Check if extracted serial matches any PP
+      if (extraction.bestOnt) {
+        const ontUpper = extraction.bestOnt.serial.toUpperCase();
+        const ppMatches = serialToPP.get(ontUpper);
+        if (ppMatches && ppMatches.length > 0) {
+          for (const pp of ppMatches) {
+            await pool.query(`
+              UPDATE oes_pp_data
+              SET resolution_status = 'located_local',
+                  resolved_drop_number = $1,
+                  resolved_source = 'wa_photo_vlm_scan',
+                  resolved_details = jsonb_build_object(
+                    'method', 'vlm_photo_extraction',
+                    'vlm_ont_serial', $2,
+                    'vlm_confidence', $3::text,
+                    'project', $4
+                  ),
+                  resolved_at = NOW(), updated_at = NOW()
+              WHERE id = $5
+                AND resolution_status = 'not_found'
+            `, [dropNumber, extraction.bestOnt.serial, extraction.bestOnt.confidence, pp.project, pp.id]);
+            results.total_pp_matched++;
+          }
+          serialToPP.delete(ontUpper);
+        }
+      }
+
+      logger.debug('WA photo VLM scan: processed DR', {
+        dropNumber,
+        photosProcessed: extraction.photosProcessed,
+        ontFound: extraction.bestOnt?.serial || null,
+      });
+    } catch (err) {
+      results.total_errors++;
+      logger.warn('WA photo VLM scan: extraction failed', {
+        dropNumber,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  logger.info('WA photo VLM scan complete', results);
+  return results;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -488,7 +797,26 @@ async function handler(
       });
     }
 
-    return res.status(400).json({ error: 'Invalid action. Use "local-scan" or "1map-lookup".' });
+    if (action === 'resolve-all') {
+      // Pipeline: local-scan → WA cross-ref → WA photo VLM — each step only processes remaining not_found
+      const localResult = await runLocalResolution();
+      const crossRefResult = await runWACrossReference();
+      const vlmResult = await runWAPhotoVLMScan();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
+          steps: {
+            local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
+            wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
+            wa_photo_vlm: { resolved: vlmResult.total_pp_matched, photos_processed: vlmResult.total_vlm_processed, drs_scanned: vlmResult.drs_scanned },
+          },
+        },
+      });
+    }
+
+    return res.status(400).json({ error: 'Invalid action. Use "local-scan", "1map-lookup", or "resolve-all".' });
   } catch (error) {
     logger.error('Resolution failed', {
       error: error instanceof Error ? error.message : String(error),
