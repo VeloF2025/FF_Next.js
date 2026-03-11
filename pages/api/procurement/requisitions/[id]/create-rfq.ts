@@ -1,12 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const smtpTransport = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 465),
+  secure: true,
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
 
 // Temporary RFQ notification recipients until supplier emails are wired
 const RFQ_NOTIFY_EMAILS = [
@@ -285,22 +290,18 @@ async function sendRfqEmail(data: RfqEmailData): Promise<void> {
     </div>
   `;
 
-  const result = await resend.emails.send({
-    from: 'FibreFlow Procurement <procurement@fibreflow.app>',
-    to: RFQ_NOTIFY_EMAILS,
+  const info = await smtpTransport.sendMail({
+    from: `"Velocity Fibre Procurement" <${process.env.SMTP_FROM || 'procurement@velocityfibre.co.za'}>`,
+    to: RFQ_NOTIFY_EMAILS.join(', '),
     subject: `RFQ ${data.rfqNumber} — ${data.projectName} — Please Quote`,
     html,
   });
 
-  if (result.error) {
-    log.error('CreateRfqApi', 'Resend email failed', { error: result.error });
-  } else {
-    log.info('CreateRfqApi', 'RFQ email sent', {
-      rfqNumber: data.rfqNumber,
-      emailId: result.data?.id,
-      recipients: RFQ_NOTIFY_EMAILS,
-    });
-  }
+  log.info('CreateRfqApi', 'RFQ email sent via SMTP', {
+    rfqNumber: data.rfqNumber,
+    messageId: info.messageId,
+    recipients: RFQ_NOTIFY_EMAILS,
+  });
 }
 
 function escapeHtml(str: string): string {
