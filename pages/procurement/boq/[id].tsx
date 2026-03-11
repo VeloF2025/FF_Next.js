@@ -15,6 +15,7 @@ import {
 import { Button } from '@/shared/components/ui/Button';
 import StockItemMapper from '@/components/procurement/boq/StockItemMapper';
 import { BOQLifecycleKPIs } from '@/components/procurement/boq/BOQLifecycleKPIs';
+import { BOQUtilizationTable } from '@/components/procurement/boq/BOQUtilizationTable';
 import { BOQItemLinksPopover } from '@/components/procurement/boq/BOQItemLinksPopover';
 import type { BOQLifecycleResponse, BOQLifecycleLine, LifecycleStatus } from '@/types/procurement/boq-lifecycle.types';
 import { notificationService } from '@/services/core/NotificationService';
@@ -722,6 +723,13 @@ export default function BOQDetailPage() {
             {showProcurement && lifecycleData && (
               <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
                 <BOQLifecycleKPIs summary={lifecycleData.summary} />
+              </div>
+            )}
+
+            {/* BOQ Utilization — budget alignment view */}
+            {showProcurement && boq?.projectId && (
+              <div className="px-6 py-4 border-b border-[var(--ff-border-light)]">
+                <BOQUtilizationTable projectId={boq.projectId} />
               </div>
             )}
 
