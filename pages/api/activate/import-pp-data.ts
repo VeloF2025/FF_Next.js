@@ -36,7 +36,8 @@ async function handler(
         COUNT(*) FILTER (WHERE resolution_status LIKE 'located_%') as located,
         COUNT(*) FILTER (WHERE resolution_status = 'not_found') as not_found,
         COUNT(DISTINCT project) as projects,
-        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL) as ticketed
+        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NOT NULL) as ticketed,
+        COUNT(*) FILTER (WHERE maintenance_ticket_id IS NULL AND resolution_status != 'activated') as unticketed
       FROM oes_pp_data
     `);
 
@@ -57,6 +58,7 @@ async function handler(
       notFound: parseInt(stats.not_found, 10),
       projects: parseInt(stats.projects, 10),
       ticketed: parseInt(stats.ticketed, 10),
+      unticketed: parseInt(stats.unticketed, 10),
       lastImport: lastImport
         ? {
             date: lastImport.created_at,
@@ -85,7 +87,9 @@ async function handler(
       whereClause += ` AND pp.project = $${paramIndex++}`;
       params.push(project);
     }
-    if (status) {
+    if (status === 'unticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated'`;
+    } else if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }
@@ -159,7 +163,9 @@ async function handler(
       whereClause += ` AND pp.project = $${paramIndex++}`;
       params.push(project);
     }
-    if (status) {
+    if (status === 'unticketed') {
+      whereClause += ` AND pp.maintenance_ticket_id IS NULL AND pp.resolution_status != 'activated'`;
+    } else if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }

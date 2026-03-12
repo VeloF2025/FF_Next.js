@@ -33,6 +33,7 @@ interface PPStats {
   notFound: number;
   projects: number;
   ticketed: number;
+  unticketed: number;
   lastImport: {
     date: string;
     filename: string;
@@ -62,9 +63,9 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }>
   activated: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-800 dark:text-green-300', label: 'Activated' },
 };
 
-/** Check if a record is eligible for ticket selection (located or not_found, no existing ticket) */
+/** Check if a record is eligible for ticket selection (any unticketed, non-activated record) */
 function isSelectable(r: PPRecord): boolean {
-  return (r.resolved_drop_number !== null || r.resolution_status === 'not_found') && r.maintenance_ticket_id === null;
+  return r.maintenance_ticket_id === null && r.resolution_status !== 'activated';
 }
 
 export function PPDataTab() {
@@ -229,28 +230,25 @@ export function PPDataTab() {
     }
   };
 
-  // Select all not_found records across all pages
-  const [selectingAllNotFound, setSelectingAllNotFound] = useState(false);
-  const handleSelectAllNotFound = async () => {
-    setSelectingAllNotFound(true);
+  // Select all unticketed records across all pages
+  const [selectingAllUnticketed, setSelectingAllUnticketed] = useState(false);
+  const handleSelectAllUnticketed = async () => {
+    setSelectingAllUnticketed(true);
     try {
-      const params = new URLSearchParams({ action: 'list', status: 'not_found', limit: '10000' });
+      const params = new URLSearchParams({ action: 'list', status: 'unticketed', limit: '10000' });
       const res = await fetch(`/api/activate/import-pp-data?${params}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        const notFoundIds = data.data
-          .filter((r: PPRecord) => r.maintenance_ticket_id === null)
-          .map((r: PPRecord) => r.id);
-        setSelectedIds(notFoundIds);
-        // Switch filter to not_found so user can see the selection
-        setFilterStatus('not_found');
+        const ids = data.data.map((r: PPRecord) => r.id);
+        setSelectedIds(ids);
+        setFilterStatus('unticketed');
         setPage(1);
-        toast.success(`Selected ${notFoundIds.length} not-found records`);
+        toast.success(`Selected ${ids.length} unticketed records`);
       }
     } catch {
-      toast.error('Failed to fetch not-found records');
+      toast.error('Failed to fetch unticketed records');
     } finally {
-      setSelectingAllNotFound(false);
+      setSelectingAllUnticketed(false);
     }
   };
 
@@ -404,17 +402,17 @@ export function PPDataTab() {
               <><Search className="w-4 h-4" /> Resolve All</>
             )}
           </button>
-          {stats && stats.notFound > 0 && (
+          {stats && stats.unticketed > 0 && (
             <button
-              onClick={handleSelectAllNotFound}
-              disabled={selectingAllNotFound}
+              onClick={handleSelectAllUnticketed}
+              disabled={selectingAllUnticketed}
               className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700
                          disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {selectingAllNotFound ? (
+              {selectingAllUnticketed ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
               ) : (
-                <><Wrench className="w-4 h-4" /> Ticket All Not Found ({stats.notFound})</>
+                <><Wrench className="w-4 h-4" /> Ticket All Unticketed ({stats.unticketed})</>
               )}
             </button>
           )}
@@ -493,6 +491,7 @@ export function PPDataTab() {
                          text-[var(--ff-text-primary)] text-sm"
             >
               <option value="">All Statuses</option>
+              <option value="unticketed">Unticketed</option>
               <option value="not_found">Not Found</option>
               <option value="located_oes">Found (OES)</option>
               <option value="located_unified">Found (Unified)</option>

@@ -170,8 +170,8 @@ async function handleCreate(
       `SELECT id, serial_number, resolved_drop_number, project, resolution_status
        FROM oes_pp_data
        WHERE id = ANY($1)
-         AND (resolved_drop_number IS NOT NULL OR resolution_status = 'not_found')
-         AND maintenance_ticket_id IS NULL`,
+         AND maintenance_ticket_id IS NULL
+         AND resolution_status != 'activated'`,
       [pp_data_ids]
     );
 
