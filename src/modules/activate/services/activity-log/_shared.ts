@@ -39,7 +39,9 @@ export type ActivityEventType =
   | 'MANUAL_SERIAL_EDIT'
   | 'SERIAL_VERIFICATION_COMPUTED'
   | 'STATUS_UPDATE'
-  | 'ONT_SWAP_REPORTED';
+  | 'ONT_SWAP_REPORTED'
+  | 'auto_qa_completed'
+  | 'auto_qa_reset';
 
 /**
  * Serial change source types
@@ -251,6 +253,16 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'ONT Swap Reported',
     icon: '🔄',
     iconColor: 'text-orange-500',
+  },
+  auto_qa_completed: {
+    title: 'Auto-QA Completed',
+    icon: '🤖',
+    iconColor: 'text-blue-500',
+  },
+  auto_qa_reset: {
+    title: 'Auto-QA Reset',
+    icon: '↩',
+    iconColor: 'text-yellow-500',
   },
 };
 
