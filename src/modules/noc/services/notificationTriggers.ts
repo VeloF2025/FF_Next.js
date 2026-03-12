@@ -24,6 +24,7 @@ import { createLogger } from '@/lib/logger';
 import { query, queryOne } from '../utils/db';
 import { getDefaultWhatsAppService } from './whatsappService';
 import { notify } from '@/modules/notifications/services';
+import { deliverEmail } from '@/modules/notifications/services/emailDelivery';
 import type { Ticket, TicketStatus } from '../types/ticket';
 import { RecipientType, NotificationUseCase } from '../types/whatsapp';
 import type { WhatsAppNotification, NotificationVariables } from '../types/whatsapp';
@@ -611,6 +612,25 @@ export function resetDefaultNotificationTriggerService(): void {
 }
 
 // ============================================================================
+// Email Body Builder
+// ============================================================================
+
+function buildAssignmentEmailBody(ticket: Ticket): string {
+  const lines: string[] = [];
+  lines.push(`Ticket ${ticket.ticket_uid} has been assigned to you.`);
+  lines.push('');
+  lines.push(`Title: ${ticket.title}`);
+  if (ticket.ticket_type) lines.push(`Type: ${ticket.ticket_type.replace(/_/g, ' ')}`);
+  if (ticket.priority) lines.push(`Priority: ${ticket.priority}`);
+  if (ticket.dr_number) lines.push(`DR Number: ${ticket.dr_number}`);
+  if (ticket.address) lines.push(`Address: ${ticket.address}`);
+  if (ticket.pon_number) lines.push(`PON: ${ticket.pon_number}`);
+  lines.push('');
+  lines.push('Please review the ticket and take the required action.');
+  return lines.join('\n');
+}
+
+// ============================================================================
 // Helper Functions for Integration
 // ============================================================================
 
@@ -629,17 +649,22 @@ export async function triggerOnTicketAssignment(
   ticket: Ticket,
   previousStatus: TicketStatus
 ): Promise<TriggerResult> {
-  // UNS: fire-and-forget in-app notification
+  // UNS: fire-and-forget in-app notification + email
   if (ticket.assigned_to) {
-    notify({
+    const emailPayload = {
       event_type: 'noc.ticket_assigned',
       title: `Ticket ${ticket.ticket_uid} assigned to you`,
-      body: ticket.title || undefined,
-      action_url: `/app/noc/tickets/${ticket.id}`,
+      body: buildAssignmentEmailBody(ticket),
+      action_url: `/noc/tickets/${ticket.id}`,
       source_module: 'maintenance',
       source_id: ticket.id,
       recipient_user_ids: [ticket.assigned_to],
-    }).catch(() => {});
+    };
+
+    notify(emailPayload).catch(() => {});
+    deliverEmail(ticket.assigned_to, emailPayload, null).catch((err) => {
+      logger.error('Failed to send assignment email', { error: err, ticket_id: ticket.id });
+    });
   }
 
   const service = getDefaultNotificationTriggerService();
@@ -835,17 +860,28 @@ export async function triggerOnTeamAssignment(
     return [];
   }
 
-  // UNS: fire-and-forget in-app notification to all members
+  // UNS: fire-and-forget in-app notification + email to all members
   const memberIds = members.map((m) => m.id);
-  notify({
+  const teamEmailPayload = {
     event_type: 'noc.ticket_team_assigned',
     title: `Ticket ${ticket.ticket_uid} assigned to your team`,
-    body: ticket.title || undefined,
-    action_url: `/app/noc/tickets/${ticket.id}`,
+    body: buildAssignmentEmailBody(ticket),
+    action_url: `/noc/tickets/${ticket.id}`,
     source_module: 'maintenance',
     source_id: ticket.id,
     recipient_user_ids: memberIds,
-  }).catch(() => {});
+  };
+
+  notify(teamEmailPayload).catch(() => {});
+
+  // Send email to each team member
+  for (const member of members) {
+    deliverEmail(member.id, teamEmailPayload, null).catch((err) => {
+      logger.error('Failed to send team assignment email', {
+        error: err, ticket_id: ticket.id, member_id: member.id,
+      });
+    });
+  }
 
   // WA template notifications — one per member with a phone
   const service = getDefaultNotificationTriggerService();
