@@ -25,10 +25,17 @@ export function MeetingsDashboard() {
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'teams' | 'fireflies'>('all');
+  const [page, setPage] = useState(1);
+  const [totalMeetings, setTotalMeetings] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const PAGE_SIZE = 50;
   const router = useRouter();
 
   useEffect(() => {
-    loadMeetings(sourceFilter);
+    setPage(1);
+    setMeetings([]);
+    loadMeetings(sourceFilter, 1, true);
     // Auto-sync from Fireflies in background on page load
     syncFromFireflies();
   }, [sourceFilter]);
@@ -37,58 +44,81 @@ export function MeetingsDashboard() {
     return p.displayName || p.name || p.email || 'Unknown';
   };
 
-  const loadMeetings = async (source?: string) => {
+  const transformMeeting = (m: any): Meeting => {
+    const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
+      ? m.participants.map((p: any) => ({
+          name: p.name || '',
+          email: p.email || '',
+          displayName: p.displayName || '',
+        }))
+      : [];
+
+    return {
+      id: m.id,
+      title: m.title,
+      type: 'team' as const,
+      date: new Date(m.date),
+      time: new Date(m.date).toLocaleTimeString(),
+      duration: `${m.duration} min`,
+      location: 'Virtual',
+      isVirtual: true,
+      meetingLink: m.transcript_url || m.join_url,
+      organizer: m.organizer_name || (m.source === 'teams' ? 'Teams' : 'Fireflies'),
+      participants: rawParticipants.map(getAttendeeDisplayName),
+      rawParticipants,
+      agenda: m.summary?.outline || m.summary?.keywords || [],
+      status: 'completed' as const,
+      notes: m.summary?.action_items || '',
+      actionItems: [],
+      summary: m.summary,
+      firefliesId: m.fireflies_id,
+      source: m.source || 'fireflies',
+      processingStatus: m.processing_status || 'completed',
+      hasTranscript: Boolean(m.has_transcript),
+      hasRecording: Boolean(m.has_recording),
+      organizerName: m.organizer_name,
+      organizerEmail: m.organizer_email,
+    };
+  };
+
+  const loadMeetings = async (source?: string, pageNum = 1, reset = false) => {
     try {
-      const filterParam = source && source !== 'all' ? `?source=${source}` : '';
-      const response = await fetch(`/api/meetings${filterParam}`);
+      const params = new URLSearchParams();
+      if (source && source !== 'all') params.set('source', source);
+      params.set('page', String(pageNum));
+      params.set('limit', String(PAGE_SIZE));
+      const queryString = params.toString();
+
+      const response = await fetch(`/api/meetings?${queryString}`);
       const data = await response.json();
 
       if (data.meetings) {
-        const transformedMeetings = data.meetings.map((m: any) => {
-          const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
-            ? m.participants.map((p: any) => ({
-                name: p.name || '',
-                email: p.email || '',
-                displayName: p.displayName || '',
-              }))
-            : [];
+        const transformed = data.meetings.map(transformMeeting);
 
-          return {
-            id: m.id,
-            title: m.title,
-            type: 'team' as const,
-            date: new Date(m.date),
-            time: new Date(m.date).toLocaleTimeString(),
-            duration: `${m.duration} min`,
-            location: 'Virtual',
-            isVirtual: true,
-            meetingLink: m.transcript_url || m.join_url,
-            organizer: m.organizer_name || (m.source === 'teams' ? 'Teams' : 'Fireflies'),
-            participants: rawParticipants.map(getAttendeeDisplayName),
-            rawParticipants,
-            agenda: m.summary?.outline || m.summary?.keywords || [],
-            status: 'completed' as const,
-            notes: m.summary?.action_items || '',
-            actionItems: [],
-            summary: m.summary,
-            firefliesId: m.fireflies_id,
-            source: m.source || 'fireflies',
-            processingStatus: m.processing_status || 'completed',
-            hasTranscript: Boolean(m.has_transcript),
-            hasRecording: Boolean(m.has_recording),
-            organizerName: m.organizer_name,
-            organizerEmail: m.organizer_email,
-          };
-        });
-
-        setMeetings(transformedMeetings);
+        if (reset || pageNum === 1) {
+          setMeetings(transformed);
+        } else {
+          setMeetings(prev => [...prev, ...transformed]);
+        }
+        setTotalMeetings(data.total ?? transformed.length);
+        setTotalPages(data.totalPages ?? 1);
         setUpcomingMeetings([]);
       }
     } catch (error) {
       log.error('Failed to load meetings', { error }, 'MeetingsDashboard');
-      setMeetings([]);
+      if (reset || pageNum === 1) {
+        setMeetings([]);
+      }
       setUpcomingMeetings([]);
     }
+  };
+
+  const handleLoadMore = async () => {
+    const nextPage = page + 1;
+    setIsLoadingMore(true);
+    setPage(nextPage);
+    await loadMeetings(sourceFilter, nextPage, false);
+    setIsLoadingMore(false);
   };
 
   const syncFromFireflies = async () => {
@@ -96,7 +126,8 @@ export function MeetingsDashboard() {
       const response = await fetch('/api/meetings?action=sync', { method: 'POST' });
       const data = await response.json();
       if (data.success && data.synced > 0) {
-        await loadMeetings();
+        setPage(1);
+        await loadMeetings(sourceFilter, 1, true);
       }
     } catch (error) {
       // Silent fail - background sync shouldn't disrupt UX
@@ -116,7 +147,8 @@ export function MeetingsDashboard() {
 
       if (data.success) {
         setSyncMessage(`Synced ${data.synced} meetings from Fireflies`);
-        await loadMeetings(sourceFilter);
+        setPage(1);
+        await loadMeetings(sourceFilter, 1, true);
       } else {
         setSyncMessage(`Sync failed: ${data.error}`);
       }
@@ -141,7 +173,7 @@ export function MeetingsDashboard() {
 
       if (response.ok) {
         setSyncMessage('Teams sync started (processing in background)');
-        setTimeout(() => loadMeetings(sourceFilter), 5000);
+        setTimeout(() => { setPage(1); loadMeetings(sourceFilter, 1, true); }, 5000);
       } else {
         const data = await response.json();
         setSyncMessage(`Teams sync failed: ${data.error?.message || 'Unknown error'}`);
@@ -262,7 +294,7 @@ export function MeetingsDashboard() {
         </div>
       </div>
 
-      <MeetingStatsCards meetings={meetings} />
+      <MeetingStatsCards meetings={meetings} totalMeetings={totalMeetings} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
@@ -311,6 +343,22 @@ export function MeetingsDashboard() {
             onEditMeeting={handleEditMeeting}
             onDeleteMeeting={handleDeleteMeeting}
           />
+
+          {/* Load More */}
+          {page < totalPages && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors disabled:opacity-50"
+              >
+                {isLoadingMore ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : null}
+                {isLoadingMore ? 'Loading...' : `Load More (${meetings.length} of ${totalMeetings})`}
+              </button>
+            </div>
+          )}
         </div>
 
         <MeetingsSidebar

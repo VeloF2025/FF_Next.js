@@ -4,11 +4,12 @@ import type { Meeting } from '../types/meeting.types';
 
 interface MeetingStatsCardsProps {
   meetings: Meeting[];
+  totalMeetings?: number;
 }
 
-export function MeetingStatsCards({ meetings }: MeetingStatsCardsProps) {
+export function MeetingStatsCards({ meetings, totalMeetings }: MeetingStatsCardsProps) {
   const stats = {
-    totalMeetings: meetings.length,
+    totalMeetings: totalMeetings ?? meetings.length,
     totalAttendees: meetings.reduce((sum, m) => sum + (m.participants?.length || 0), 0),
     actionItems: meetings.reduce((sum, m) => sum + m.actionItems.filter(a => !a.completed).length, 0),
     totalMinutes: meetings.reduce((sum, m) => {
