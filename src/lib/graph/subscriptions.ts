@@ -40,8 +40,8 @@ export async function createWebhookSubscription(
     throw new Error('GRAPH_WEBHOOK_SECRET required for webhook subscriptions');
   }
 
-  // Graph enforces a maximum of 3 days for callRecords subscriptions
-  const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  // Graph enforces a maximum of 4230 minutes (~2.94 days) for callRecords subscriptions
+  const expiresAt = new Date(Date.now() + 4200 * 60 * 1000);
 
   const body = {
     changeType: 'created',
@@ -89,7 +89,7 @@ export async function createWebhookSubscription(
  * @param subscriptionId - The Graph subscription ID to renew
  */
 export async function renewSubscription(subscriptionId: string): Promise<void> {
-  const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 4200 * 60 * 1000);
 
   const response = await graphFetch(
     `${GRAPH_BASE}/subscriptions/${subscriptionId}`,
