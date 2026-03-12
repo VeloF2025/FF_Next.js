@@ -461,9 +461,14 @@ export async function listTickets(
 
     if (filters.assigned_to) {
       // assigned_to column stores staff.id, but auth provides users.id
-      // Use subquery to resolve user_id → staff_id
-      whereClauses.push(`assigned_to IN (SELECT s.id FROM staff s WHERE s.user_id = $${paramCounter} UNION ALL SELECT $${paramCounter}::uuid)`);
-      values.push(filters.assigned_to);
+      // Look up staff_id first, fall back to the value as-is
+      const staffLookup = await queryOne<{ id: string }>(
+        `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
+        [filters.assigned_to]
+      );
+      const resolvedId = staffLookup?.id || filters.assigned_to;
+      whereClauses.push(`assigned_to = $${paramCounter}`);
+      values.push(resolvedId);
       paramCounter++;
     }
 
