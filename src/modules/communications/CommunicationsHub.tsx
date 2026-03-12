@@ -49,7 +49,7 @@ export default function CommunicationsHub() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [showCreateActionItem, setShowCreateActionItem] = useState(false);
-  const { data, stats, isLoading, getStatusColor, refetch } = useCommunications();
+  const { data, stats, isLoading, isLoadingMore, hasMoreMeetings, loadMoreMeetings, getStatusColor, refetch } = useCommunications();
 
   // Sync active tab with URL param
   useEffect(() => {
@@ -242,9 +242,9 @@ export default function CommunicationsHub() {
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
-                  {tab.key === 'meetings' && data.meetings.length > 0 && (
+                  {tab.key === 'meetings' && stats.totalMeetings > 0 && (
                     <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 rounded-full">
-                      {data.meetings.length}
+                      {stats.totalMeetings}
                     </span>
                   )}
                 </button>
@@ -314,6 +314,10 @@ export default function CommunicationsHub() {
                   meetings={data.meetings}
                   getStatusColor={getStatusColor}
                   onRefresh={handleRefresh}
+                  totalMeetings={stats.totalMeetings}
+                  hasMore={hasMoreMeetings}
+                  isLoadingMore={isLoadingMore}
+                  onLoadMore={loadMoreMeetings}
                 />
               )
             )}

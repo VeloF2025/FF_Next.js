@@ -17,72 +17,97 @@ export function useCommunications() {
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalMeetings, setTotalMeetings] = useState(0);
+  const [meetingPage, setMeetingPage] = useState(1);
+  const [meetingTotalPages, setMeetingTotalPages] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
+  const PAGE_SIZE = 50;
+
+  const transformMeeting = (m: Record<string, unknown>): Meeting => {
+    const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
+      ? (m.participants as Array<Record<string, unknown>>).map(p => ({
+          name: (p.name as string) || '',
+          email: (p.email as string) || '',
+          displayName: (p.displayName as string) || '',
+        }))
+      : [];
+
+    const source = (m.source as string) || 'fireflies';
+
+    return {
+      id: m.id as string,
+      title: m.title as string,
+      type: 'team' as const,
+      date: new Date(m.date as string),
+      time: new Date(m.date as string).toLocaleTimeString(),
+      duration: `${m.duration} min`,
+      location: 'Virtual',
+      isVirtual: true,
+      meetingLink: (m.transcript_url as string) || (m.join_url as string) || undefined,
+      organizer: (m.organizer_name as string) || (source === 'teams' ? 'Teams' : 'Fireflies'),
+      participants: rawParticipants.map(getAttendeeDisplayName),
+      rawParticipants,
+      agenda: (m.summary as Record<string, unknown>)?.outline as string[]
+        || (m.summary as Record<string, unknown>)?.keywords as string[]
+        || [],
+      status: 'completed' as const,
+      notes: (m.summary as Record<string, unknown>)?.action_items as string || '',
+      actionItems: [],
+      summary: m.summary as Meeting['summary'],
+      firefliesId: m.fireflies_id as string,
+      source: source as Meeting['source'],
+      processingStatus: ((m.processing_status as string) || 'completed') as Meeting['processingStatus'],
+      hasTranscript: Boolean(m.has_transcript),
+      hasRecording: Boolean(m.has_recording),
+      organizerName: m.organizer_name as string | undefined,
+      organizerEmail: m.organizer_email as string | undefined,
+      transcriptUrl: m.transcript_url as string | undefined,
+    };
+  };
+
+  const loadData = useCallback(async (pageNum = 1, append = false) => {
+    if (!append) setIsLoading(true);
     try {
-      const response = await fetch('/api/meetings');
+      const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE) });
+      const response = await fetch(`/api/meetings?${params}`);
       const data = await response.json();
 
       if (data.meetings) {
-        const transformedMeetings: Meeting[] = data.meetings.map((m: Record<string, unknown>) => {
-          const rawParticipants: MeetingAttendee[] = Array.isArray(m.participants)
-            ? (m.participants as Array<Record<string, unknown>>).map(p => ({
-                name: (p.name as string) || '',
-                email: (p.email as string) || '',
-                displayName: (p.displayName as string) || '',
-              }))
-            : [];
+        const transformed = data.meetings.map((m: Record<string, unknown>) => transformMeeting(m));
 
-          const source = (m.source as string) || 'fireflies';
-
-          return {
-            id: m.id as string,
-            title: m.title as string,
-            type: 'team' as const,
-            date: new Date(m.date as string),
-            time: new Date(m.date as string).toLocaleTimeString(),
-            duration: `${m.duration} min`,
-            location: 'Virtual',
-            isVirtual: true,
-            meetingLink: (m.transcript_url as string) || (m.join_url as string) || undefined,
-            organizer: (m.organizer_name as string) || (source === 'teams' ? 'Teams' : 'Fireflies'),
-            participants: rawParticipants.map(getAttendeeDisplayName),
-            rawParticipants,
-            agenda: (m.summary as Record<string, unknown>)?.outline as string[]
-              || (m.summary as Record<string, unknown>)?.keywords as string[]
-              || [],
-            status: 'completed' as const,
-            notes: (m.summary as Record<string, unknown>)?.action_items as string || '',
-            actionItems: [],
-            summary: m.summary as Meeting['summary'],
-            firefliesId: m.fireflies_id as string,
-            source: source as Meeting['source'],
-            processingStatus: ((m.processing_status as string) || 'completed') as Meeting['processingStatus'],
-            hasTranscript: Boolean(m.has_transcript),
-            hasRecording: Boolean(m.has_recording),
-            organizerName: m.organizer_name as string | undefined,
-            organizerEmail: m.organizer_email as string | undefined,
-            transcriptUrl: m.transcript_url as string | undefined,
-          };
-        });
-
-        setMeetings(transformedMeetings);
+        if (append) {
+          setMeetings(prev => [...prev, ...transformed]);
+        } else {
+          setMeetings(transformed);
+        }
+        setTotalMeetings(data.total ?? transformed.length);
+        setMeetingTotalPages(data.totalPages ?? 1);
       } else {
-        setMeetings([]);
+        if (!append) setMeetings([]);
       }
 
       setActionItems([]);
       setNotifications([]);
     } catch (error) {
       log.error('Failed to load communications data:', error);
-      setMeetings([]);
-      setActionItems([]);
-      setNotifications([]);
+      if (!append) {
+        setMeetings([]);
+        setActionItems([]);
+        setNotifications([]);
+      }
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const loadMoreMeetings = useCallback(async () => {
+    const nextPage = meetingPage + 1;
+    setIsLoadingMore(true);
+    setMeetingPage(nextPage);
+    await loadData(nextPage, true);
+    setIsLoadingMore(false);
+  }, [meetingPage, loadData]);
 
   useEffect(() => {
     loadData();
@@ -111,9 +136,9 @@ export function useCommunications() {
     }
   };
 
-  // Calculate stats from actual meeting data
+  // Calculate stats from actual meeting data (totalMeetings from server for accuracy)
   const stats: CommunicationsStats = {
-    totalMeetings: meetings.length,
+    totalMeetings: totalMeetings || meetings.length,
     completedMeetings: meetings.filter(m => m.status === 'completed').length,
     upcomingMeetings: meetings.filter(m => m.status === 'scheduled').length,
     pendingActions: actionItems.filter(a => a.status === 'pending').length,
@@ -133,6 +158,9 @@ export function useCommunications() {
     data,
     stats,
     isLoading,
+    isLoadingMore,
+    hasMoreMeetings: meetingPage < meetingTotalPages,
+    loadMoreMeetings,
     getPriorityColor,
     getStatusColor,
     refetch: loadData

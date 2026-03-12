@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Calendar, Search } from 'lucide-react';
+import { Calendar, Search, RefreshCw } from 'lucide-react';
 import type { Meeting } from '@/modules/meetings/types/meeting.types';
 import { MeetingsList } from '@/modules/meetings/components/MeetingsList';
 import { MeetingDetailModal } from '@/modules/meetings/components/MeetingDetailModal';
@@ -19,6 +19,10 @@ interface CommunicationsMeetingsTabProps {
   meetings: Meeting[];
   getStatusColor: (status: string) => string;
   onRefresh?: () => Promise<void>;
+  totalMeetings?: number;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 type MeetingFilter = 'all' | 'upcoming' | 'past' | 'cancelled';
@@ -27,7 +31,11 @@ type SourceFilter = 'all' | 'teams' | 'fireflies';
 export function CommunicationsMeetingsTab({
   meetings,
   getStatusColor,
-  onRefresh
+  onRefresh,
+  totalMeetings,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: CommunicationsMeetingsTabProps) {
   const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
@@ -183,6 +191,20 @@ export function CommunicationsMeetingsTab({
           onEditMeeting={handleEditMeeting}
           onDeleteMeeting={handleDeleteMeeting}
         />
+      )}
+
+      {/* Load More */}
+      {hasMore && onLoadMore && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-hover)] transition-colors disabled:opacity-50"
+          >
+            {isLoadingMore && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {isLoadingMore ? 'Loading...' : `Load More (${meetings.length} of ${totalMeetings ?? '?'})`}
+          </button>
+        </div>
       )}
 
       {/* Meeting Detail Modal */}
