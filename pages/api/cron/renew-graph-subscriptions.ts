@@ -4,6 +4,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import {
   getExpiringSubscriptions,
+  getActiveSubscriptionCount,
   renewSubscription,
   createWebhookSubscription,
 } from '@/lib/graph/subscriptions';
@@ -56,17 +57,34 @@ export default async function handler(
   }
 
   try {
+    let renewed = 0;
+    let recreated = 0;
+    let failed = 0;
+    let bootstrapped = false;
+
+    // Bootstrap: create a subscription if none exist (first run or all expired)
+    const activeCount = await getActiveSubscriptionCount();
+    if (activeCount === 0) {
+      log.info('No active subscriptions found — bootstrapping new subscription', {}, LOGGER);
+      try {
+        await createWebhookSubscription(WEBHOOK_URL);
+        bootstrapped = true;
+        recreated++;
+        log.info('Webhook subscription bootstrapped', { webhookUrl: WEBHOOK_URL }, LOGGER);
+      } catch (bootstrapError: unknown) {
+        failed++;
+        const msg = bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError);
+        log.error('Subscription bootstrap failed', { error: msg }, LOGGER);
+      }
+    }
+
     const expiring = await getExpiringSubscriptions();
 
     log.info(
       'Subscription renewal check',
-      { expiringSoon: expiring.length },
+      { expiringSoon: expiring.length, activeCount, bootstrapped },
       LOGGER
     );
-
-    let renewed = 0;
-    let recreated = 0;
-    let failed = 0;
 
     for (const sub of expiring) {
       try {
@@ -109,6 +127,8 @@ export default async function handler(
 
     res.status(200).json({
       success: true,
+      activeCount,
+      bootstrapped,
       expiring: expiring.length,
       renewed,
       recreated,

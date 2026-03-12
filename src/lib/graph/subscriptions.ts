@@ -137,3 +137,18 @@ export async function getExpiringSubscriptions(): Promise<ExpiringSubscription[]
     expiresAt: r.expires_at as string,
   }));
 }
+
+/**
+ * Returns the count of active, non-expired subscriptions.
+ * Used to detect when no webhook subscription exists and one needs to be bootstrapped.
+ */
+export async function getActiveSubscriptionCount(): Promise<number> {
+  const rows = await sql`
+    SELECT COUNT(*) as cnt
+    FROM graph_subscriptions
+    WHERE status = 'active'
+      AND expires_at > NOW()
+  `;
+
+  return Number(rows[0]?.cnt ?? 0);
+}

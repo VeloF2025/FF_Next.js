@@ -21,8 +21,14 @@ export interface ParsedUtterance {
   text: string;
 }
 
+/** Result of resolving an online meeting from a join URL */
+export interface OnlineMeetingInfo {
+  id: string;
+  subject: string | null;
+}
+
 /**
- * Resolves the Graph onlineMeeting ID for a meeting identified by its join URL.
+ * Resolves the Graph onlineMeeting ID and subject for a meeting identified by its join URL.
  * Returns null if the meeting cannot be found (e.g. organizer mismatch).
  *
  * @param organizerUserId - Graph user ID of the meeting organizer
@@ -32,8 +38,23 @@ export async function fetchOnlineMeetingId(
   organizerUserId: string,
   joinUrl: string
 ): Promise<string | null> {
+  const info = await fetchOnlineMeetingInfo(organizerUserId, joinUrl);
+  return info?.id ?? null;
+}
+
+/**
+ * Resolves the Graph onlineMeeting ID and subject for a meeting identified by its join URL.
+ * Returns null if the meeting cannot be found (e.g. organizer mismatch).
+ *
+ * @param organizerUserId - Graph user ID of the meeting organizer
+ * @param joinUrl - The joinWebUrl from the callRecord
+ */
+export async function fetchOnlineMeetingInfo(
+  organizerUserId: string,
+  joinUrl: string
+): Promise<OnlineMeetingInfo | null> {
   const encodedUrl = encodeURIComponent(joinUrl);
-  const url = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings?$filter=joinWebUrl eq '${encodedUrl}'`;
+  const url = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings?$filter=joinWebUrl eq '${encodedUrl}'&$select=id,subject`;
 
   const response = await graphFetch(url);
 
@@ -47,7 +68,10 @@ export async function fetchOnlineMeetingId(
   }
 
   const data = await response.json();
-  return (data.value as Array<{ id: string }>)?.[0]?.id ?? null;
+  const meeting = (data.value as Array<{ id: string; subject?: string }>)?.[0];
+  if (!meeting) return null;
+
+  return { id: meeting.id, subject: meeting.subject ?? null };
 }
 
 /**

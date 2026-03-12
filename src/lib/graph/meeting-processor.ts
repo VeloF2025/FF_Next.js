@@ -3,7 +3,7 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { fetchCallRecordById } from './call-records';
 import {
-  fetchOnlineMeetingId,
+  fetchOnlineMeetingInfo,
   listTranscripts,
   downloadTranscriptContent,
   parseVttSpeakers,
@@ -128,22 +128,28 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
   try {
     // 5. Fetch transcript and recording (requires joinWebUrl + a resolved organizer)
     if (callRecord.joinWebUrl && organizerParticipant) {
-      const onlineMeetingId = await fetchOnlineMeetingId(
+      const meetingInfo = await fetchOnlineMeetingInfo(
         organizerParticipant.graphUserId,
         callRecord.joinWebUrl
       );
 
-      if (onlineMeetingId) {
+      // Update title from calendar subject if available
+      if (meetingInfo?.subject) {
+        await sql`UPDATE meetings SET title = ${meetingInfo.subject}, updated_at = NOW() WHERE id = ${meetingId}`;
+        log.info('Title updated from calendar subject', { meetingId, subject: meetingInfo.subject }, LOGGER);
+      }
+
+      if (meetingInfo?.id) {
         await fetchAndStoreTranscript(
           meetingId,
           organizerParticipant.graphUserId,
-          onlineMeetingId
+          meetingInfo.id
         );
 
         await fetchAndStoreRecording(
           meetingId,
           organizerParticipant.graphUserId,
-          onlineMeetingId
+          meetingInfo.id
         );
       }
     }

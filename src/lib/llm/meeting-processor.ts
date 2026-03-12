@@ -37,6 +37,7 @@ export interface ActionItem {
  * All fields map directly to the JSON schema requested in SYSTEM_PROMPT.
  */
 export interface MeetingSummary {
+  suggested_title: string;
   overview: string;
   keywords: string[];
   outline: string[];
@@ -77,6 +78,7 @@ IMPORTANT — Language handling:
 
 Output schema:
 {
+  "suggested_title": "Short descriptive meeting title (5-8 words, e.g. 'Operations Targets Dashboard Review')",
   "overview": "2-4 sentence executive summary",
   "keywords": ["keyword1", "keyword2"],
   "outline": ["Topic 1: brief description", "Topic 2: brief description"],
@@ -147,6 +149,7 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
   if (!transcript) {
     log.warn('No transcript available', { meetingId }, logger);
     const minimal: MeetingSummary = {
+      suggested_title: '',
       overview: 'No transcript available for analysis.',
       keywords: [],
       outline: [],
@@ -217,6 +220,7 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
       combinedSummary = parsed;
     } else {
       // Merge multi-chunk results — deduplicate keywords, append the rest
+      // Keep the first chunk's suggested_title (most likely to capture the meeting topic)
       combinedSummary.overview += ' ' + parsed.overview;
       combinedSummary.keywords = [...new Set([...combinedSummary.keywords, ...parsed.keywords])];
       combinedSummary.outline.push(...parsed.outline);
@@ -249,17 +253,37 @@ export async function processWithLLM(meetingId: number): Promise<MeetingSummary>
 // ---------------------------------------------------------------------------
 
 /**
- * Persist the merged summary JSON to the meetings row and mark as completed.
+ * Persist the merged summary JSON to the meetings row.
+ * If the LLM provided a suggested_title and the current title is still generic
+ * ("Teams Meeting - ..."), update the title too.
  */
 async function writeSummary(meetingId: number, summary: MeetingSummary): Promise<void> {
-  await sql`
-    UPDATE meetings
-    SET summary            = ${JSON.stringify(summary)},
-        processing_status  = 'completed',
-        processed_at       = NOW(),
-        updated_at         = NOW()
-    WHERE id = ${meetingId}
-  `;
+  const suggestedTitle = summary.suggested_title?.trim();
+
+  if (suggestedTitle) {
+    // Only override generic auto-generated titles, not calendar subjects
+    await sql`
+      UPDATE meetings
+      SET summary            = ${JSON.stringify(summary)},
+          title              = CASE
+                                 WHEN title LIKE 'Teams Meeting -%' THEN ${suggestedTitle}
+                                 ELSE title
+                               END,
+          processing_status  = 'completed',
+          processed_at       = NOW(),
+          updated_at         = NOW()
+      WHERE id = ${meetingId}
+    `;
+  } else {
+    await sql`
+      UPDATE meetings
+      SET summary            = ${JSON.stringify(summary)},
+          processing_status  = 'completed',
+          processed_at       = NOW(),
+          updated_at         = NOW()
+      WHERE id = ${meetingId}
+    `;
+  }
 }
 
 /**
