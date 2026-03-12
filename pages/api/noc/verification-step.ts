@@ -75,14 +75,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const payload: UpdateVerificationStepPayload = req.body;
 
     // Execute update - merge payload with current values
+    // Use 'in' operator to detect explicit null (e.g. photo_url: null for delete)
+    const photoUrl = 'photo_url' in payload ? payload.photo_url : currentStep.photo_url;
+    const photoVerified = 'photo_verified' in payload ? payload.photo_verified : currentStep.photo_verified;
+
     const result = (await sql`
       UPDATE maintenance_verification_steps
       SET
         is_complete = ${payload.is_complete ?? currentStep.is_complete},
         completed_at = ${payload.is_complete === true ? new Date().toISOString() : payload.is_complete === false ? null : currentStep.completed_at},
         completed_by = ${payload.is_complete === false ? null : (payload.completed_by ?? currentStep.completed_by)},
-        photo_url = ${payload.photo_url ?? currentStep.photo_url},
-        photo_verified = ${payload.photo_verified ?? currentStep.photo_verified},
+        photo_url = ${photoUrl},
+        photo_verified = ${photoVerified},
         notes = ${payload.notes ?? currentStep.notes}
       WHERE ticket_id = ${ticketId} AND step_number = ${stepNum}
       RETURNING *
