@@ -21,6 +21,10 @@ export function useCommunications() {
   const [meetingPage, setMeetingPage] = useState(1);
   const [meetingTotalPages, setMeetingTotalPages] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [serverStats, setServerStats] = useState<{
+    total: number; teams: number; fireflies: number;
+    withTranscripts: number; withRecordings: number;
+  } | null>(null);
 
   const PAGE_SIZE = 50;
 
@@ -83,6 +87,7 @@ export function useCommunications() {
         }
         setTotalMeetings(data.total ?? transformed.length);
         setMeetingTotalPages(data.totalPages ?? 1);
+        if (data.stats) setServerStats(data.stats);
       } else {
         if (!append) setMeetings([]);
       }
@@ -136,16 +141,16 @@ export function useCommunications() {
     }
   };
 
-  // Calculate stats from actual meeting data (totalMeetings from server for accuracy)
+  // Use server-provided stats for accurate counts (not limited by page size)
   const stats: CommunicationsStats = {
-    totalMeetings: totalMeetings || meetings.length,
+    totalMeetings: serverStats?.total ?? (totalMeetings || meetings.length),
     completedMeetings: meetings.filter(m => m.status === 'completed').length,
     upcomingMeetings: meetings.filter(m => m.status === 'scheduled').length,
     pendingActions: actionItems.filter(a => a.status === 'pending').length,
-    teamsMeetings: meetings.filter(m => m.source === 'teams').length,
-    firefliesMeetings: meetings.filter(m => m.source === 'fireflies').length,
-    withTranscripts: meetings.filter(m => m.hasTranscript).length,
-    withRecordings: meetings.filter(m => m.hasRecording).length,
+    teamsMeetings: serverStats?.teams ?? meetings.filter(m => m.source === 'teams').length,
+    firefliesMeetings: serverStats?.fireflies ?? meetings.filter(m => m.source === 'fireflies').length,
+    withTranscripts: serverStats?.withTranscripts ?? meetings.filter(m => m.hasTranscript).length,
+    withRecordings: serverStats?.withRecordings ?? meetings.filter(m => m.hasRecording).length,
   };
 
   const data: CommunicationsData = {

@@ -172,12 +172,48 @@ async function handler(
 
       const total = Number(totalRows[0]?.cnt ?? 0);
 
+      // Lightweight stats breakdown (one query, no participant filter — admin sees global counts)
+      const statsRows = isHein
+        ? await sql`
+            SELECT
+              COUNT(*) as total,
+              COUNT(*) FILTER (WHERE source = 'teams') as teams,
+              COUNT(*) FILTER (WHERE source = 'fireflies') as fireflies,
+              COUNT(*) FILTER (WHERE raw_transcript IS NOT NULL OR transcript_url IS NOT NULL) as with_transcripts,
+              COUNT(*) FILTER (WHERE recording_path IS NOT NULL) as with_recordings
+            FROM meetings
+          `
+        : await sql`
+            SELECT
+              COUNT(*) as total,
+              COUNT(*) FILTER (WHERE source = 'teams') as teams,
+              COUNT(*) FILTER (WHERE source = 'fireflies') as fireflies,
+              COUNT(*) FILTER (WHERE raw_transcript IS NOT NULL OR transcript_url IS NOT NULL) as with_transcripts,
+              COUNT(*) FILTER (WHERE recording_path IS NOT NULL) as with_recordings
+            FROM meetings
+            WHERE EXISTS (
+              SELECT 1 FROM jsonb_array_elements(participants) AS p
+              WHERE LOWER(p->>'email') = ${userEmail}
+                 OR LOWER(p->>'name') = ${userName}
+                 OR LOWER(p->>'displayName') = ${userName}
+            )
+          `;
+
+      const statsRow = statsRows[0];
+
       return res.status(200).json({
         meetings,
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        stats: {
+          total: Number(statsRow?.total ?? 0),
+          teams: Number(statsRow?.teams ?? 0),
+          fireflies: Number(statsRow?.fireflies ?? 0),
+          withTranscripts: Number(statsRow?.with_transcripts ?? 0),
+          withRecordings: Number(statsRow?.with_recordings ?? 0),
+        },
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
