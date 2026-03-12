@@ -99,9 +99,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
     const stat = fs.statSync(meeting.recording_path);
     const fileSize = stat.size;
     const rangeHeader = req.headers.range;
+    const contentType = meeting.recording_path.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4';
 
     if (rangeHeader) {
-      // Partial content response for Range requests (video seeking)
+      // Partial content response for Range requests (seeking)
       const parts = rangeHeader.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0]!, 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
@@ -117,7 +118,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
-        'Content-Type': 'video/mp4',
+        'Content-Type': contentType,
       });
 
       const stream = fs.createReadStream(meeting.recording_path, { start, end });
@@ -135,7 +136,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       // Full file delivery
       res.writeHead(200, {
         'Content-Length': fileSize,
-        'Content-Type': 'video/mp4',
+        'Content-Type': contentType,
         'Accept-Ranges': 'bytes',
       });
 

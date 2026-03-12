@@ -30,7 +30,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
     { key: 'summary', label: 'Summary', icon: FileText },
     { key: 'action_items', label: 'Action Items', icon: CheckCircle },
     { key: 'transcript', label: 'Transcript', icon: MessageSquare, disabled: !meeting.hasTranscript },
-    { key: 'recording', label: 'Recording', icon: Film, disabled: !meeting.hasRecording && !(meeting.source === 'fireflies' && meeting.transcriptUrl) },
+    { key: 'recording', label: 'Recording', icon: Film, disabled: !meeting.hasRecording },
   ];
 
   const handleExport = (type: 'summary' | 'transcript' | 'action-items') => {
@@ -101,7 +101,7 @@ export function MeetingDetailModal({ meeting, isOpen, onClose }: MeetingDetailMo
             <TranscriptView meetingId={meeting.id} transcriptUrl={meeting.transcriptUrl} />
           )}
           {activeTab === 'recording' && (
-            <RecordingPlayer meetingId={meeting.id} hasRecording={meeting.hasRecording} transcriptUrl={meeting.transcriptUrl} source={meeting.source} />
+            <RecordingPlayer meetingId={meeting.id} hasRecording={meeting.hasRecording} source={meeting.source} />
           )}
         </div>
 
