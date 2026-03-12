@@ -95,9 +95,11 @@ export function PhotoUpload({
       setUploadProgress(0);
 
       try {
-        // 🟢 WORKING: Upload to Velo server via API
+        // Upload to unified storage API
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('type', 'maintenance');
+        formData.append('category', 'verification-photos');
 
         // Start progress indicator
         const progressInterval = setInterval(() => {
@@ -110,8 +112,7 @@ export function PhotoUpload({
           });
         }, 100);
 
-        // Upload to maintenance attachments API
-        const response = await fetch('/api/noc/attachments/upload', {
+        const response = await fetch('/api/storage/upload', {
           method: 'POST',
           body: formData,
         });
@@ -128,7 +129,7 @@ export function PhotoUpload({
 
         // Notify parent component with the storage URL
         if (onPhotoUploaded) {
-          onPhotoUploaded(result.storage_url || result.url);
+          onPhotoUploaded(result.url);
         }
 
         setIsUploading(false);
