@@ -15,7 +15,7 @@
 'use client';
 
 import React, { useCallback, useState, useRef } from 'react';
-import { Upload, X, Image as ImageIcon, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, CheckCircle, AlertCircle, Maximize2 } from 'lucide-react';
 import { VelocityButton } from '@/components/ui/VelocityButton';
 import { cn } from '@/lib/utils';
 
@@ -58,6 +58,7 @@ export function PhotoUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [showLightbox, setShowLightbox] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 🟢 WORKING: Validate file before upload
@@ -194,34 +195,66 @@ export function PhotoUpload({
     [onPhotoDeleted]
   );
 
-  // 🟢 WORKING: Render uploaded photo preview
+  // Render uploaded photo preview with lightbox
   if (photoUrl) {
     return (
-      <div className={cn('relative', compact ? 'w-16 h-16' : 'w-24 h-24')}>
-        <img
-          src={photoUrl}
-          alt="Photo for step"
-          className="w-full h-full object-cover rounded-lg border border-[var(--ff-border-light)]"
-        />
+      <>
+        <div className={cn('relative group', compact ? 'w-16 h-16' : 'w-32 h-32')}>
+          <img
+            src={photoUrl}
+            alt="Photo for step"
+            className="w-full h-full object-cover rounded-lg border border-[var(--ff-border-light)] cursor-pointer transition-opacity hover:opacity-90"
+            onClick={() => setShowLightbox(true)}
+          />
 
-        {/* Verified badge */}
-        {photoVerified && (
-          <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
-            <CheckCircle className="w-3 h-3 text-[var(--ff-text-primary)]" />
+          {/* Enlarge overlay on hover */}
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            onClick={() => setShowLightbox(true)}
+          >
+            <Maximize2 className="w-5 h-5 text-white" />
+          </div>
+
+          {/* Verified badge */}
+          {photoVerified && (
+            <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
+              <CheckCircle className="w-3 h-3 text-[var(--ff-text-primary)]" />
+            </div>
+          )}
+
+          {/* Delete button */}
+          {!disabled && (
+            <button
+              onClick={handleDelete}
+              className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors z-10"
+              title="Delete photo"
+            >
+              <X className="w-3 h-3 text-[var(--ff-text-primary)]" />
+            </button>
+          )}
+        </div>
+
+        {/* Lightbox modal */}
+        {showLightbox && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowLightbox(false)}
+          >
+            <button
+              onClick={() => setShowLightbox(false)}
+              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+            <img
+              src={photoUrl}
+              alt="Photo for step (enlarged)"
+              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         )}
-
-        {/* Delete button */}
-        {!disabled && (
-          <button
-            onClick={handleDelete}
-            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-1 transition-colors"
-            title="Delete photo"
-          >
-            <X className="w-3 h-3 text-[var(--ff-text-primary)]" />
-          </button>
-        )}
-      </div>
+      </>
     );
   }
 
