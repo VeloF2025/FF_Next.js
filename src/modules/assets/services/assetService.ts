@@ -118,6 +118,8 @@ function transformRow(row: Record<string, unknown>): Asset {
 
 /**
  * Generate unique asset number
+ * Uses MAX to find the highest existing number rather than COUNT,
+ * which breaks when assets are deleted (gaps in sequence cause collisions).
  */
 async function generateAssetNumber(categoryCode: string): Promise<string> {
   const sql = getDbConnection();
@@ -125,11 +127,14 @@ async function generateAssetNumber(categoryCode: string): Promise<string> {
   const prefix = `${categoryCode}-${year}`;
 
   const [result] = await sql`
-    SELECT COUNT(*)::int as count FROM assets
-    WHERE asset_number LIKE ${prefix + '%'}
+    SELECT MAX(
+      CAST(SPLIT_PART(asset_number, '-', 3) AS INTEGER)
+    ) as max_num
+    FROM assets
+    WHERE asset_number LIKE ${prefix + '-%'}
   `;
 
-  const nextNum = ((result?.count as number) || 0) + 1;
+  const nextNum = ((result?.max_num as number) || 0) + 1;
   return `${prefix}-${nextNum.toString().padStart(5, '0')}`;
 }
 
@@ -397,11 +402,12 @@ export const assetService = {
         data: transformRow(row),
       };
     } catch (error) {
-      log.error('Failed to create asset', { error, input }, 'assetService');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      log.error('Failed to create asset', { error: errorMessage, input }, 'assetService');
       return {
         success: false,
         data: null,
-        error: 'Failed to create asset',
+        error: `Failed to create asset: ${errorMessage}`,
       };
     }
   },
