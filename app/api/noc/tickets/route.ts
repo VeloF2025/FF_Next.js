@@ -51,6 +51,11 @@ const VALID_TYPES: TicketType[] = [
   TicketType.MODIFICATION,
   TicketType.ONT_SWAP,
   TicketType.INCIDENT,
+  TicketType.PRE_PROVISION,
+  TicketType.SERIAL_MISMATCH,
+  TicketType.OLT_INVESTIGATION,
+  TicketType.HSE_INCIDENT,
+  TicketType.HSE_NEAR_MISS,
 ];
 
 const VALID_PRIORITIES: TicketPriority[] = [

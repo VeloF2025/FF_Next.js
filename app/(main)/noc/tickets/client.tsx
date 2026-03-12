@@ -24,7 +24,7 @@ import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { Search, Users, User } from 'lucide-react';
+import { Search, Users, User, Filter, X } from 'lucide-react';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban';
@@ -48,6 +48,8 @@ export default function TicketsListPageClient() {
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [ticketScope, setTicketScope] = useState<TicketScope>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterSource, setFilterSource] = useState('');
   const { teamIds } = useMyTeams();
   const { currentUser } = useAuth();
 
@@ -81,9 +83,13 @@ export default function TicketsListPageClient() {
   const filters: TicketFilters = useMemo(() => ({
     search: searchTerm || undefined,
     status: statusFilter as any,
+    ticket_type: filterType || undefined,
+    source: filterSource || undefined,
     assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
     assigned_team_id: ticketScope === 'my_team' && teamIds.length > 0 ? teamIds[0] : undefined,
-  }), [searchTerm, statusFilter, ticketScope, teamIds, currentUser?.id]);
+  }), [searchTerm, statusFilter, filterType, filterSource, ticketScope, teamIds, currentUser?.id]);
+
+  const hasActiveFilters = filterType || filterSource;
 
   return (
     <ModulePage config={nocConfig} hideHeader>
@@ -158,6 +164,60 @@ export default function TicketsListPageClient() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            {/* Type & Source Filters */}
+            <div className="flex items-center gap-2">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className={`px-2.5 py-1.5 rounded-lg text-sm border transition-colors
+                  ${filterType
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                    : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                  }`}
+              >
+                <option value="">All Types</option>
+                <option value="fault_repair">Fault Repair</option>
+                <option value="new_installation">New Installation</option>
+                <option value="modification">Modification</option>
+                <option value="ont_swap">ONT Swap</option>
+                <option value="pre_provision">Pre-Provision</option>
+                <option value="serial_mismatch">Serial Mismatch</option>
+                <option value="olt_investigation">OLT Investigation</option>
+                <option value="incident">Incident</option>
+                <option value="hse_incident">HSE Incident</option>
+                <option value="hse_near_miss">HSE Near Miss</option>
+              </select>
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value)}
+                className={`px-2.5 py-1.5 rounded-lg text-sm border transition-colors
+                  ${filterSource
+                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                    : 'bg-[var(--ff-bg-secondary)] border-[var(--ff-border-light)] text-[var(--ff-text-secondary)]'
+                  }`}
+              >
+                <option value="">All Sources</option>
+                <option value="pp_data">PP Data</option>
+                <option value="qcontact">QContact</option>
+                <option value="manual">Manual</option>
+                <option value="wa_maintenance">WhatsApp</option>
+                <option value="weekly_report">Weekly Report</option>
+                <option value="construction">Construction</option>
+                <option value="olt_mismatch">OLT Mismatch</option>
+                <option value="qa_review">QA Review</option>
+                <option value="ad_hoc">Ad Hoc</option>
+              </select>
+              {hasActiveFilters && (
+                <button
+                  onClick={() => { setFilterType(''); setFilterSource(''); }}
+                  className="p-1.5 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] rounded"
+                  title="Clear filters"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
             {/* View Toggle */}
             <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
               <button
