@@ -15,7 +15,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
+import { verifyToken } from '@/lib/auth/jwt';
 import {
   listTickets,
   createTicket
@@ -178,9 +180,26 @@ export async function POST(req: NextRequest) {
   try {
     const body: CreateTicketPayload = await req.json();
 
-    // Set created_by from auth header (falls back to 'system' for automated sources)
-    const createdBy = req.headers.get('x-user-id') || 'system';
-    body.created_by = createdBy;
+    // Extract user ID from JWT cookie for created_by (UUID column)
+    const cookieStore = await cookies();
+    const token = cookieStore.get('ff_auth_token')?.value;
+    if (token) {
+      const payload = await verifyToken(token);
+      if (payload?.sub) {
+        body.created_by = payload.sub;
+      }
+    }
+
+    if (!body.created_by) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Authentication required' },
+          meta: { timestamp: new Date().toISOString() },
+        },
+        { status: 401 }
+      );
+    }
 
     // Validate required fields
     const errors: Record<string, string> = {};
