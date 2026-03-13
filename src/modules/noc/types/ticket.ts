@@ -52,6 +52,7 @@ export enum TicketSource {
   WA_MAINTENANCE = 'wa_maintenance', // From WhatsApp maintenance tracking group
   PP_DATA = 'pp_data', // From PP Data investigation
   OLT_MISMATCH = 'olt_mismatch', // From OLT report serial mismatch
+  DEV_OPS = 'dev_ops', // FibreFlow application issues
 }
 
 /**
@@ -71,6 +72,8 @@ export enum TicketType {
   OLT_INVESTIGATION = 'olt_investigation', // OLT serial mismatch investigation
   // Pre-provision
   PRE_PROVISION = 'pre_provision', // PP Data ONT investigation
+  // DevOps
+  DEV_OPS = 'dev_ops', // FibreFlow application bug/error/feature
 }
 
 /**
@@ -241,6 +244,13 @@ export interface CreateTicketPayload {
   client_name?: string;
   client_contact?: string;
   client_email?: string;
+  // DevOps fields (dev_ops tickets only)
+  error_url?: string;
+  stack_trace?: string;
+  affected_module?: string;
+  environment?: 'production' | 'dev' | 'local';
+  steps_to_reproduce?: string;
+  browser_info?: string;
 }
 
 /**

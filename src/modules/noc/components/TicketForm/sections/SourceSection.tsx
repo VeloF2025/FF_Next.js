@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Tag, AlertTriangle, Zap, Wrench, PlusCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { Tag, Wrench, PlusCircle, RefreshCw, AlertCircle, ShieldAlert, Search, FileSearch, Bug } from 'lucide-react';
 import {
   TicketSource,
   TicketType,
@@ -33,6 +33,12 @@ const TICKET_TYPE_ICONS: Record<TicketType, React.ReactNode> = {
   [TicketType.MODIFICATION]: <RefreshCw className="w-4 h-4" />,
   [TicketType.ONT_SWAP]: <RefreshCw className="w-4 h-4" />,
   [TicketType.INCIDENT]: <AlertCircle className="w-4 h-4" />,
+  [TicketType.HSE_INCIDENT]: <ShieldAlert className="w-4 h-4" />,
+  [TicketType.HSE_NEAR_MISS]: <ShieldAlert className="w-4 h-4" />,
+  [TicketType.SERIAL_MISMATCH]: <Search className="w-4 h-4" />,
+  [TicketType.OLT_INVESTIGATION]: <Search className="w-4 h-4" />,
+  [TicketType.PRE_PROVISION]: <FileSearch className="w-4 h-4" />,
+  [TicketType.DEV_OPS]: <Bug className="w-4 h-4" />,
 };
 
 export function SourceSection({ formData, errors, setField, disabled }: SourceSectionProps) {
@@ -72,7 +78,7 @@ export function SourceSection({ formData, errors, setField, disabled }: SourceSe
         <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-2">
           Ticket Type <span className="text-red-400">*</span>
         </label>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
           {Object.entries(TICKET_TYPE_LABELS).map(([value, label]) => {
             const isSelected = formData.ticket_type === value;
             return (

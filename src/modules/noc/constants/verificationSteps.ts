@@ -593,6 +593,52 @@ const HSE_NEAR_MISS_STEPS: VerificationStepTemplate[] = [
 ];
 
 /**
+ * Type-specific step definitions for dev_ops tickets
+ */
+const DEV_OPS_STEPS: VerificationStepTemplate[] = [
+  {
+    step_number: 1,
+    step_name: 'Issue Reproduction',
+    step_description: 'Reproduce the reported issue. Confirm environment, URL, and steps.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'investigation',
+  },
+  {
+    step_number: 2,
+    step_name: 'Root Cause Analysis',
+    step_description: 'Identify the root cause. Check logs, stack traces, and related code.',
+    photo_required: false,
+    required_for_qa: true,
+    category: 'investigation',
+  },
+  {
+    step_number: 3,
+    step_name: 'Fix Implementation',
+    step_description: 'Implement the fix on a feature branch. Link PR to ticket.',
+    photo_required: false,
+    required_for_qa: true,
+    category: 'installation',
+  },
+  {
+    step_number: 4,
+    step_name: 'Testing & Verification',
+    step_description: 'Test the fix in dev environment. Verify the issue is resolved.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'testing',
+  },
+  {
+    step_number: 5,
+    step_name: 'Deployment',
+    step_description: 'Deploy fix to production. Verify in production environment.',
+    photo_required: true,
+    required_for_qa: true,
+    category: 'documentation',
+  },
+];
+
+/**
  * Map of ticket types to their verification step arrays.
  * new_installation uses the default 12-step template.
  * // WORKING: Type-specific step checklists
@@ -608,6 +654,7 @@ export const VERIFICATION_STEPS_BY_TICKET_TYPE: Record<string, VerificationStepT
   pre_provision: PRE_PROVISION_STEPS,
   hse_incident: HSE_INCIDENT_STEPS,
   hse_near_miss: HSE_NEAR_MISS_STEPS,
+  dev_ops: DEV_OPS_STEPS,
 };
 
 /**

@@ -234,6 +234,31 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       throw new Error('Failed to create ticket');
     }
 
+    // Insert DevOps-specific details if this is a dev_ops ticket
+    if (payload.ticket_type === TicketType.DEV_OPS) {
+      await query(
+        `INSERT INTO dev_ticket_details (
+          ticket_id,
+          error_url,
+          stack_trace,
+          affected_module,
+          environment,
+          steps_to_reproduce,
+          browser_info
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          ticket.id,
+          payload.error_url || null,
+          payload.stack_trace || null,
+          payload.affected_module || null,
+          payload.environment || 'production',
+          payload.steps_to_reproduce || null,
+          payload.browser_info || null,
+        ]
+      );
+      logger.info('DevOps ticket details saved', { ticket_id: ticket.id });
+    }
+
     logger.info('Ticket created successfully', {
       id: ticket.id,
       ticket_uid: ticket.ticket_uid

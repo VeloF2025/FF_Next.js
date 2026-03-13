@@ -69,6 +69,14 @@ export interface TicketFormData {
   // Section 7: Fault Attribution (maintenance only)
   fault_cause: FaultCause | '';
   fault_cause_details: string;
+
+  // Section 8: DevOps (dev_ops tickets only)
+  error_url: string;
+  stack_trace: string;
+  affected_module: string;
+  environment: string;
+  steps_to_reproduce: string;
+  browser_info: string;
 }
 
 export interface TicketFormErrors {
@@ -131,6 +139,12 @@ const initialFormData: TicketFormData = {
   assigned_team_id: '',
   fault_cause: '',
   fault_cause_details: '',
+  error_url: '',
+  stack_trace: '',
+  affected_module: '',
+  environment: '',
+  steps_to_reproduce: '',
+  browser_info: '',
 };
 
 // ==================== Validation ====================
@@ -188,7 +202,7 @@ function validateFormData(data: TicketFormData): TicketFormErrors {
     }
   }
 
-  // Fault cause required for maintenance tickets
+  // Fault cause required for fault_repair tickets only (not DevOps or others)
   if (data.ticket_type === TicketType.FAULT_REPAIR && !data.fault_cause) {
     errors.fault_cause = 'Fault cause is required for maintenance tickets';
   }
@@ -353,6 +367,14 @@ export function useTicketForm(): UseTicketFormResult {
       payload.assigned_team_id = formData.assigned_team_id;
     }
 
+    // DevOps-specific fields (only for dev_ops ticket type)
+    if (formData.error_url.trim()) payload.error_url = formData.error_url.trim();
+    if (formData.stack_trace.trim()) payload.stack_trace = formData.stack_trace.trim();
+    if (formData.affected_module.trim()) payload.affected_module = formData.affected_module.trim();
+    if (formData.environment) payload.environment = formData.environment as CreateTicketPayload['environment'];
+    if (formData.steps_to_reproduce.trim()) payload.steps_to_reproduce = formData.steps_to_reproduce.trim();
+    if (formData.browser_info.trim()) payload.browser_info = formData.browser_info.trim();
+
     try {
       const ticket = await createTicketMutation.mutateAsync(payload);
       // Redirect to ticket detail on success
@@ -414,6 +436,8 @@ export const TICKET_SOURCE_LABELS: Record<TicketSource, string> = {
   [TicketSource.HSE_REPORT]: 'H&S Report',
   [TicketSource.WA_MAINTENANCE]: 'WhatsApp',
   [TicketSource.PP_DATA]: 'PP Data',
+  [TicketSource.OLT_MISMATCH]: 'OLT Mismatch',
+  [TicketSource.DEV_OPS]: 'DevOps',
 };
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
@@ -425,7 +449,9 @@ export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   [TicketType.HSE_INCIDENT]: 'H&S Incident',
   [TicketType.HSE_NEAR_MISS]: 'H&S Near Miss',
   [TicketType.SERIAL_MISMATCH]: 'Serial Mismatch',
+  [TicketType.OLT_INVESTIGATION]: 'OLT Investigation',
   [TicketType.PRE_PROVISION]: 'Pre-Provision',
+  [TicketType.DEV_OPS]: 'DevOps',
 };
 
 export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {

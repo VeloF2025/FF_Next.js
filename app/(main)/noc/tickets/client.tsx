@@ -218,6 +218,7 @@ export default function TicketsListPageClient() {
                 <option value="incident">Incident</option>
                 <option value="hse_incident">HSE Incident</option>
                 <option value="hse_near_miss">HSE Near Miss</option>
+                <option value="dev_ops">DevOps</option>
               </select>
               <select
                 value={filterSource}
@@ -238,6 +239,7 @@ export default function TicketsListPageClient() {
                 <option value="olt_mismatch">OLT Mismatch</option>
                 <option value="qa_review">QA Review</option>
                 <option value="ad_hoc">Ad Hoc</option>
+                <option value="dev_ops">DevOps</option>
               </select>
               <select
                 value={filterDatePreset}

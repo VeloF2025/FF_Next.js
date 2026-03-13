@@ -26,6 +26,7 @@ import {
   ClientSection,
   AssignmentSection,
   FaultSection,
+  DevOpsSection,
 } from './sections';
 
 interface TicketFormProps {
@@ -34,10 +35,40 @@ interface TicketFormProps {
   initialValues?: Partial<TicketFormData>;
 }
 
+/** Section visibility configuration per ticket type */
+interface SectionVisibility {
+  location: boolean;
+  equipment: boolean;
+  client: boolean;
+  fault: boolean;
+  devops: boolean;
+}
+
+const SECTIONS_BY_TYPE: Record<string, SectionVisibility> = {
+  fault_repair:      { location: true,  equipment: true,  client: true,  fault: true,  devops: false },
+  new_installation:  { location: true,  equipment: true,  client: true,  fault: false, devops: false },
+  modification:      { location: true,  equipment: true,  client: true,  fault: false, devops: false },
+  ont_swap:          { location: true,  equipment: true,  client: false, fault: false, devops: false },
+  incident:          { location: true,  equipment: false, client: true,  fault: false, devops: false },
+  hse_incident:      { location: true,  equipment: false, client: false, fault: false, devops: false },
+  hse_near_miss:     { location: true,  equipment: false, client: false, fault: false, devops: false },
+  serial_mismatch:   { location: true,  equipment: true,  client: false, fault: false, devops: false },
+  olt_investigation: { location: true,  equipment: true,  client: false, fault: false, devops: false },
+  pre_provision:     { location: true,  equipment: true,  client: false, fault: false, devops: false },
+  dev_ops:           { location: false, equipment: false, client: false, fault: false, devops: true  },
+};
+
+const DEFAULT_SECTIONS: SectionVisibility = {
+  location: true, equipment: true, client: true, fault: false, devops: false,
+};
+
 export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
   const router = useRouter();
   const form = useTicketForm();
   const initializedRef = useRef(false);
+
+  // Determine which sections to show based on the selected ticket type
+  const sections = SECTIONS_BY_TYPE[form.formData.ticket_type] ?? DEFAULT_SECTIONS;
 
   // Pre-populate form with initial values on mount
   useEffect(() => {
@@ -105,40 +136,46 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         />
       </div>
 
-      {/* Section 3: Location (DR Lookup) */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-        <LocationSection
-          formData={form.formData}
-          errors={form.errors}
-          setField={form.setField}
-          drLookup={form.drLookup}
-          onLookupDR={form.lookupDR}
-          onClearDRLookup={form.clearDRLookup}
-          disabled={form.isSubmitting}
-        />
-      </div>
+      {/* Section 3: Location (DR Lookup) — hidden for DevOps tickets */}
+      {sections.location && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+          <LocationSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            drLookup={form.drLookup}
+            onLookupDR={form.lookupDR}
+            onClearDRLookup={form.clearDRLookup}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
 
-      {/* Section 4: Equipment Information */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-        <EquipmentSection
-          formData={form.formData}
-          errors={form.errors}
-          setField={form.setField}
-          disabled={form.isSubmitting}
-        />
-      </div>
+      {/* Section 4: Equipment Information — hidden for DevOps/HSE/Incident tickets */}
+      {sections.equipment && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+          <EquipmentSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
 
-      {/* Section 5: Client Information */}
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-        <ClientSection
-          formData={form.formData}
-          errors={form.errors}
-          setField={form.setField}
-          disabled={form.isSubmitting}
-        />
-      </div>
+      {/* Section 5: Client Information — hidden for DevOps/HSE/investigation tickets */}
+      {sections.client && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+          <ClientSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
 
-      {/* Section 6: Assignment */}
+      {/* Section 6: Assignment — always shown */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
         <AssignmentSection
           formData={form.formData}
@@ -149,13 +186,27 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         />
       </div>
 
-      {/* Section 7: Fault Attribution (Maintenance Only) */}
-      <FaultSection
-        formData={form.formData}
-        errors={form.errors}
-        setField={form.setField}
-        disabled={form.isSubmitting}
-      />
+      {/* Section 7: DevOps Details — shown only for dev_ops tickets */}
+      {sections.devops && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+          <DevOpsSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
+
+      {/* Section 8: Fault Attribution — only for fault_repair tickets */}
+      {sections.fault && (
+        <FaultSection
+          formData={form.formData}
+          errors={form.errors}
+          setField={form.setField}
+          disabled={form.isSubmitting}
+        />
+      )}
 
       {/* Form Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-[var(--ff-border-light)]">

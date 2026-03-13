@@ -10,3 +10,4 @@ export { EquipmentSection } from './EquipmentSection';
 export { ClientSection } from './ClientSection';
 export { AssignmentSection } from './AssignmentSection';
 export { FaultSection } from './FaultSection';
+export { DevOpsSection } from './DevOpsSection';
