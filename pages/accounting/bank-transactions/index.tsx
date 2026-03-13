@@ -826,7 +826,7 @@ export default function BankTransactionsPage() {
           <div className="px-6 py-3 border-t border-[var(--ff-border-light)] flex items-center justify-between">
             <div className="flex items-center gap-1">
               <button disabled={page <= 1} onClick={() => setPage(1)}
-                className="px-2 py-1 rounded text-xs text-[var(--ff-text-secondary)] disabled:opacity-30">First</button>
+                className="px-3 py-2 rounded text-xs text-[var(--ff-text-secondary)] disabled:opacity-30">First</button>
               {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
                 const p = totalPages <= 10 ? i + 1
                   : page <= 5 ? i + 1
@@ -841,7 +841,7 @@ export default function BankTransactionsPage() {
                 );
               })}
               <button disabled={page >= totalPages} onClick={() => setPage(totalPages)}
-                className="px-2 py-1 rounded text-xs text-[var(--ff-text-secondary)] disabled:opacity-30">Last</button>
+                className="px-3 py-2 rounded text-xs text-[var(--ff-text-secondary)] disabled:opacity-30">Last</button>
             </div>
             <span className="text-xs text-[var(--ff-text-tertiary)]">
               Displaying {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}

@@ -30,6 +30,33 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 
 ## Infrastructure Skills
 
+### `vlm-serial-accuracy.md`
+**Trigger:** /vlm-accuracy, autoresearch, VLM accuracy, serial accuracy, power meter accuracy, odometer accuracy, plate accuracy, fuel accuracy, improve VLM, improve extraction
+- Autoresearch loop for ALL VLM extraction types (14 types across 5 modules)
+- Covers: serials (ONT/UPS), power meter, plates, odometer, fuel, categorization, QA, screenshots
+- Ground truth comparison, confusion analysis, retest methodology
+- Prompt engineering with evidence-based statistics
+- Key services: vlmExtractionService, fleetVlmService, vlmConstructionService, categorizationVlmService
+- Research scripts: retest-vlm-serials.ts, analyze-confusion-patterns.ts
+
+### `vlm-categorization.md`
+**Trigger:** /vlm-categorization, /vlm-cat, photo categorization, step mapping accuracy, categorization accuracy, photo classification, step confusion, HITL learning, few-shot learning, categorization prompt, photo step mapping, miscategorized photos, wrong step, categorization errors
+- Photo-to-step mapping accuracy for the 10-step DR installation checklist
+- Confusion matrix: which steps get confused (Steps 3/4, 6/8, 1/8, 6/9)
+- HITL few-shot learning effectiveness — measuring correction rate trends
+- Step coverage gaps per DR (missing steps, unclassifiable photos)
+- Prompt engineering for `buildCategorizationPrompt()` in categorizationVlmService.ts
+- Batch processing edge cases, bypass rate analysis
+- SQL queries: accuracy, confusion matrix, canonical example management
+- Improvement workflow: measure → inspect → fix → deploy → monitor
+
+### `vlm-ops.md`
+**Trigger:** /vlm, VLM down, restart VLM, GPU issues, benchmark VLM, VLM slow
+- VLM (Qwen3-VL-8B-Instruct) service management and troubleshooting
+- GPU setup (RTX 5090 compute-only mode)
+- Benchmark system (7 tests: 2 text + 5 image)
+- Service management on Velocity Server
+
 ### `infrastructure/vlm.md`
 **Trigger:** VLM, Qwen3, model, GPU, benchmark, categorization service
 - VLM (Qwen3-VL-8B-Instruct) configuration and troubleshooting
@@ -42,6 +69,20 @@ Skills are automatically loaded when relevant keywords or contexts are detected.
 - Historical reference only — staging environment is retired
 - vf.fibreflow.app now redirects to app.fibreflow.app
 - Standalone services still live: wa-proxy (:8092), pdf-tools (:3007)
+
+---
+
+## NOC Skills
+
+### `noc-devops-agent.md`
+**Trigger:** /noc, /noc-agent, noc devops, devops ticket, fibreflow bug, application error, debug ticket, troubleshoot ticket, app crash, UI broken, 500 error
+- Autonomous DevOps ticket agent — triages, diagnoses, and fixes FibreFlow application issues
+- Fetches open DevOps tickets from NOC queue, prioritizes by SLA
+- Uses codebase, logs, browser automation, and other skills to diagnose root causes
+- Implements fixes via PR workflow, updates ticket verification steps
+- Knows common FibreFlow bug patterns (double-wrap, conditional SQL, Neon numerics)
+- Module-specific diagnostics for Activate, Procurement, Dashboard, QField, Fleet, etc.
+- Escalation rules for issues beyond agent scope (schema changes, data corruption, security)
 
 ---
 
