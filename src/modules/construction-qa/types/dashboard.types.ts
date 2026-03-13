@@ -48,6 +48,18 @@ export interface ProjectDashboardRow {
   civil: DisciplineStats;
   optical: DisciplineStats;
   infrastructure: InfrastructureInventory;
+  photo_completeness?: PhotoCompleteness;
+}
+
+/** Photo step completeness per project */
+export interface PhotoCompleteness {
+  complete_7: number;
+  steps_4_to_6: number;
+  steps_1_to_3: number;
+  no_photos: number;
+  total_reviews: number;
+  completeness_pct: number;
+  most_missing_step: string | null;
 }
 
 // =============================================================================

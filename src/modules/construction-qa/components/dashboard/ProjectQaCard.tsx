@@ -9,7 +9,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable } from 'lucide-react';
+import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable, ClipboardCheck } from 'lucide-react';
 import type { ProjectDashboardRow, InfraStats } from '../../types/dashboard.types';
 
 function InfraStat({ label, icon: Icon, stats, showAssignment }: {
@@ -126,6 +126,59 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
         <InfraStat label="Joints" icon={CircleDot} stats={project.infrastructure.joints} />
         <InfraStat label="Spans" icon={Cable} stats={project.infrastructure.cable_spans} />
       </div>
+
+      {/* Photo Completeness */}
+      {project.photo_completeness && project.photo_completeness.total_reviews > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="flex items-center gap-1 text-xs text-gray-400">
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              Photo Steps (7-step)
+            </span>
+            <span className={`text-xs font-medium ${
+              project.photo_completeness.completeness_pct >= 50 ? 'text-green-400' :
+              project.photo_completeness.completeness_pct >= 20 ? 'text-yellow-400' : 'text-red-400'
+            }`}>
+              {project.photo_completeness.completeness_pct}%
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden flex">
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${(project.photo_completeness.complete_7 / project.photo_completeness.total_reviews) * 100}%` }}
+              title={`${project.photo_completeness.complete_7} complete (all 7 steps)`}
+            />
+            <div
+              className="h-full bg-yellow-500 transition-all"
+              style={{ width: `${(project.photo_completeness.steps_4_to_6 / project.photo_completeness.total_reviews) * 100}%` }}
+              title={`${project.photo_completeness.steps_4_to_6} partial (4-6 steps)`}
+            />
+            <div
+              className="h-full bg-orange-500 transition-all"
+              style={{ width: `${(project.photo_completeness.steps_1_to_3 / project.photo_completeness.total_reviews) * 100}%` }}
+              title={`${project.photo_completeness.steps_1_to_3} incomplete (1-3 steps)`}
+            />
+            <div
+              className="h-full bg-red-500/60 transition-all"
+              style={{ width: `${(project.photo_completeness.no_photos / project.photo_completeness.total_reviews) * 100}%` }}
+              title={`${project.photo_completeness.no_photos} no photos`}
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-[10px] text-green-400">{project.photo_completeness.complete_7} full</span>
+            <span className="text-[10px] text-yellow-400">{project.photo_completeness.steps_4_to_6} partial</span>
+            <span className="text-[10px] text-orange-400">{project.photo_completeness.steps_1_to_3} low</span>
+            {project.photo_completeness.no_photos > 0 && (
+              <span className="text-[10px] text-red-400">{project.photo_completeness.no_photos} none</span>
+            )}
+          </div>
+          {project.photo_completeness.most_missing_step && (
+            <div className="text-[10px] text-gray-500 mt-0.5">
+              Most skipped: {project.photo_completeness.most_missing_step}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Meta row — matches table: Zones, PONs, Photos, OTDR */}
       <div className="flex items-center gap-4 text-xs text-gray-500">

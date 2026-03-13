@@ -41,6 +41,7 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
             <th colSpan={3} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Poles</th>
             <th colSpan={2} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Joints</th>
             <th colSpan={2} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Spans</th>
+            <th colSpan={3} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Photo Steps</th>
             <th colSpan={4} className="text-center px-2 py-1.5 border-l border-[var(--border-color)]">Meta</th>
           </tr>
           {/* Sub-header row */}
@@ -61,6 +62,10 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
             {/* Spans */}
             <th className="text-right px-2 py-2 font-medium border-l border-[var(--border-color)]">Total</th>
             <th className="text-right px-2 py-2 font-medium">QA&apos;d</th>
+            {/* Photo Steps */}
+            <th className="text-right px-2 py-2 font-medium border-l border-[var(--border-color)]">7/7</th>
+            <th className="text-right px-2 py-2 font-medium">Partial</th>
+            <th className="text-right px-2 py-2 font-medium">%</th>
             {/* Meta */}
             <th className="text-right px-2 py-2 font-medium border-l border-[var(--border-color)]">Zones</th>
             <th className="text-right px-2 py-2 font-medium">PONs</th>
@@ -121,6 +126,25 @@ export function ProjectQaTable({ projects }: ProjectQaTableProps) {
                 </td>
                 <td className="text-right px-2 py-3 font-mono">
                   <QaCell stats={cable_spans} />
+                </td>
+                {/* Photo Steps */}
+                <td className="text-right px-2 py-3 font-mono border-l border-[var(--border-color)]">
+                  {p.photo_completeness && p.photo_completeness.total_reviews > 0
+                    ? <span className="text-green-400">{p.photo_completeness.complete_7}</span>
+                    : dash}
+                </td>
+                <td className="text-right px-2 py-3 font-mono">
+                  {p.photo_completeness && p.photo_completeness.total_reviews > 0
+                    ? <span className="text-yellow-400">{p.photo_completeness.steps_4_to_6 + p.photo_completeness.steps_1_to_3}</span>
+                    : dash}
+                </td>
+                <td className="text-right px-2 py-3 font-mono">
+                  {p.photo_completeness && p.photo_completeness.total_reviews > 0
+                    ? <span className={
+                        p.photo_completeness.completeness_pct >= 50 ? 'text-green-400' :
+                        p.photo_completeness.completeness_pct >= 20 ? 'text-yellow-400' : 'text-red-400'
+                      }>{p.photo_completeness.completeness_pct}%</span>
+                    : dash}
                 </td>
                 {/* Meta */}
                 <td className="text-right px-2 py-3 text-gray-300 font-mono border-l border-[var(--border-color)]">{p.zone_count}</td>
