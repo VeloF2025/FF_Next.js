@@ -167,6 +167,83 @@ def is_photo_value(val):
     return any(ext in s.lower() for ext in [".jpg", ".jpeg", ".png", ".heic"])
 
 
+# ── PON/zone sync ─────────────────────────────────────────────────────────────
+
+def sync_pon_zone(cur, conn, ff_project_id, rows, columns, label_col):
+    """
+    Sync pon_no and zone_no from GPKG to poles table.
+
+    Handles two patterns:
+    1. Direct columns: pon_no + zone_no (most projects)
+    2. Block label: BL column like VTN_TOG_Z0A_B048 → extract number → pon_no
+    """
+    col_set = set(columns)
+
+    # Detect which pattern this GPKG uses
+    has_pon_no = "pon_no" in col_set
+    has_zone_no = "zone_no" in col_set
+    has_bl = "BL" in col_set
+
+    if not has_pon_no and not has_bl:
+        return 0  # No PON data in this GPKG
+
+    updates = []
+    for row in rows:
+        label = row[label_col] if label_col in row.keys() else None
+        if not label:
+            continue
+        label = str(label).strip()
+        if not label:
+            continue
+
+        pon_no = None
+        zone_no = None
+
+        if has_pon_no:
+            # Direct pon_no column (Lawley, Mamelodi, Etwatwa, THM1, THM3)
+            raw_pon = row["pon_no"]
+            if raw_pon is not None:
+                try:
+                    pon_no = int(str(raw_pon).strip().split(",")[0])  # Handle "30,035" → 30
+                except (ValueError, IndexError):
+                    pass
+            if has_zone_no:
+                raw_zone = row["zone_no"]
+                if raw_zone is not None:
+                    try:
+                        zone_no = int(str(raw_zone).strip())
+                    except ValueError:
+                        pass
+        elif has_bl:
+            # Block label pattern (Tonga): VTN_TOG_Z0A_B048 → pon_no=48
+            bl = row["BL"]
+            if bl:
+                m = re.search(r"_B(\d+)$", str(bl).strip())
+                if m:
+                    pon_no = int(m.group(1))
+                    zone_no = 1  # Tonga is all zone 1
+
+        if pon_no is not None:
+            updates.append((pon_no, zone_no, ff_project_id, label))
+
+    if not updates:
+        return 0
+
+    # Batch update — only where values differ
+    psycopg2.extras.execute_batch(cur, """
+        UPDATE poles SET
+            pon_no = COALESCE(%s, pon_no),
+            zone_no = COALESCE(%s, zone_no),
+            updated_at = NOW()
+        WHERE project_id = %s AND pole_number = %s
+          AND (pon_no IS DISTINCT FROM %s OR zone_no IS DISTINCT FROM %s)
+    """, [(p, z, pid, lbl, p, z) for p, z, pid, lbl in updates], page_size=200)
+
+    updated = cur.rowcount
+    conn.commit()
+    return updated
+
+
 # ── MinIO helpers ─────────────────────────────────────────────────────────────
 
 def minio_download_latest(qf_project_id, gpkg_path, dest_path):
@@ -427,6 +504,25 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 photos_upserted += 1
 
         db.close()
+
+        # ── Sync PON/zone assignments from GPKG to poles + reviews ──
+        if not dry_run:
+            poles_pon_updated = sync_pon_zone(cur, conn, ff_id, rows, columns, label_col)
+            if poles_pon_updated > 0:
+                print(f"  PON/zone: {poles_pon_updated} poles updated, cascading to reviews...")
+                cur.execute("""
+                    UPDATE construction_qa_reviews r
+                    SET zone_no = p.zone_no, pon_no = p.pon_no, updated_at = NOW()
+                    FROM poles p
+                    WHERE r.project_id = %s
+                      AND r.feature_type = 'pole'
+                      AND r.feature_id = p.pole_number
+                      AND p.project_id = r.project_id
+                      AND (r.zone_no IS DISTINCT FROM p.zone_no OR r.pon_no IS DISTINCT FROM p.pon_no)
+                """, (ff_id,))
+                reviews_updated = cur.rowcount
+                conn.commit()
+                print(f"  PON/zone: {reviews_updated} reviews updated")
 
         if not dry_run:
             # Update sync state
