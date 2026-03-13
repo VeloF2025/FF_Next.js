@@ -12,7 +12,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult, type DragStart } from '@hello-pangea/dnd';
-import { CheckCircle, ChevronDown, ChevronRight, Image, AlertTriangle, Maximize2, GripVertical, X as XIcon } from 'lucide-react';
+import { CheckCircle, ChevronDown, ChevronRight, Image, ImageOff, AlertTriangle, Maximize2, GripVertical, X as XIcon } from 'lucide-react';
 import type { ChecklistStep, Discipline } from '../../types';
 import { PhotoLightbox } from './PhotoLightbox';
 
@@ -263,11 +263,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                                         : 'border-[var(--border-color)]'
                                     }`}
                                   >
-                                    <img
-                                      src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+                                    <QaPhoto
+                                      storageKey={photo.storage_key}
+                                      source={photo.source}
                                       alt={photo.filename || 'Photo'}
                                       className="w-full h-full object-cover"
-                                      loading="lazy"
                                       draggable={false}
                                     />
                                   </div>
@@ -342,11 +342,11 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                                   : 'border-[var(--border-color)]'
                               }`}
                             >
-                              <img
-                                src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+                              <QaPhoto
+                                storageKey={photo.storage_key}
+                                source={photo.source}
                                 alt={photo.filename || 'Photo'}
                                 className="w-full h-full object-cover"
-                                loading="lazy"
                                 draggable={false}
                               />
                             </div>
@@ -565,11 +565,11 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
 
             {/* Photo thumbnail */}
             <div className="aspect-square bg-gray-900 flex items-center justify-center">
-              <img
-                src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(photo.storage_key)}&source=${photo.source}`}
+              <QaPhoto
+                storageKey={photo.storage_key}
+                source={photo.source}
                 alt={photo.filename || 'Photo'}
                 className="w-full h-full object-cover"
-                loading="lazy"
                 draggable={false}
               />
             </div>
@@ -609,5 +609,36 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
         </div>
       )}
     </Draggable>
+  );
+}
+
+/** Image component with fallback placeholder for photos not yet synced from QField. */
+function QaPhoto({ storageKey, source, alt, className, draggable }: {
+  storageKey: string;
+  source: string;
+  alt: string;
+  className?: string;
+  draggable?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800/60 text-gray-500 gap-1 p-1">
+        <ImageOff className="w-6 h-6 text-gray-600" />
+        <span className="text-[9px] text-center leading-tight">Pending sync</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}`}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      draggable={draggable}
+      onError={() => setFailed(true)}
+    />
   );
 }

@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, RotateCcw, ImageOff } from 'lucide-react';
 
 interface LightboxPhoto {
   id: string;
@@ -39,6 +39,7 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [imgFailed, setImgFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const photo = photos[currentIndex];
@@ -47,6 +48,7 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
   const resetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setImgFailed(false);
   };
 
   const goNext = useCallback(() => {
@@ -180,15 +182,24 @@ export function PhotoLightbox({ photos, initialIndex, onClose }: Props) {
         onMouseLeave={handleMouseUp}
         style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
       >
-        <img
-          src={photoUrl}
-          alt={photo.filename || 'Photo'}
-          className="max-w-full max-h-full object-contain transition-transform duration-150"
-          style={{
-            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-          }}
-          draggable={false}
-        />
+        {imgFailed ? (
+          <div className="flex flex-col items-center justify-center gap-3 text-gray-500">
+            <ImageOff className="w-16 h-16 text-gray-600" />
+            <p className="text-sm">Photo not yet synced from QField</p>
+            <p className="text-xs text-gray-600">{photo.filename}</p>
+          </div>
+        ) : (
+          <img
+            src={photoUrl}
+            alt={photo.filename || 'Photo'}
+            className="max-w-full max-h-full object-contain transition-transform duration-150"
+            style={{
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            }}
+            draggable={false}
+            onError={() => setImgFailed(true)}
+          />
+        )}
 
         {/* Prev arrow */}
         {currentIndex > 0 && (

@@ -17,6 +17,7 @@ import {
   getYesterdaySAST,
   type QaStatusFilter,
   type SerialStatusFilter,
+  type ReviewSourceFilter,
 } from '../context';
 import type {
   QaWizardPhase,
@@ -657,6 +658,24 @@ function QaCentrePageContent() {
                   </select>
                 </div>
 
+                {/* Review Source Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground mb-2">
+                    Review Source
+                  </label>
+                  <select
+                    value={filters.reviewSourceFilter}
+                    onChange={(e) => updateFilter('reviewSourceFilter', e.target.value as ReviewSourceFilter)}
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-card text-foreground"
+                  >
+                    <option value="all">All</option>
+                    <option value="ai_pending">AI Reviewed (Awaiting Human)</option>
+                    <option value="ai_reviewed">AI Reviewed (All)</option>
+                    <option value="human_reviewed">Human Reviewed</option>
+                    <option value="not_reviewed">Not Reviewed</option>
+                  </select>
+                </div>
+
                 {/* Project Filter */}
                 <div>
                   <label className="block text-sm font-medium text-muted-foreground mb-2">
@@ -792,10 +811,19 @@ function QaCentrePageContent() {
                     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                   };
 
-                  // Get QA Review Status (Pending vs Reviewed)
+                  // Get QA Review Status — differentiate AI vs Human
                   const getQaReviewStatus = () => {
-                    if (drop.feedbackSent) return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
-                    if (drop.qaDecision) return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
+                    if (drop.feedbackSent) {
+                      return drop.autoQaProcessed
+                        ? { label: 'Human ✓', color: 'bg-green-700 text-green-100' }
+                        : { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
+                    }
+                    if (drop.autoQaProcessed) {
+                      return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
+                    }
+                    if (drop.qaDecision) {
+                      return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
+                    }
                     return { label: 'Pending', color: 'bg-gray-600 text-gray-200' };
                   };
 

@@ -42,6 +42,7 @@ import { log } from '@/lib/logger';
 export type StatusFilter = 'all' | 'installed' | 'activated' | 'not_reviewed' | 'reviewed';
 export type QaStatusFilter = 'all' | 'pending' | 'passed' | 'failed' | 'rework';
 export type SerialStatusFilter = 'all' | 'valid' | 'swapped' | 'missing' | 'invalid';
+export type ReviewSourceFilter = 'all' | 'ai_pending' | 'ai_reviewed' | 'human_reviewed' | 'not_reviewed';
 
 export interface ActivateFilters {
   searchTerm: string;
@@ -50,6 +51,7 @@ export interface ActivateFilters {
   statusFilter: StatusFilter;
   qaStatusFilter: QaStatusFilter;
   serialStatusFilter: SerialStatusFilter;
+  reviewSourceFilter: ReviewSourceFilter;
   projectFilter: string;
   resubmissionsOnly: boolean;
 }
@@ -100,6 +102,7 @@ const defaultFilters: ActivateFilters = {
   statusFilter: 'all',
   qaStatusFilter: 'all',
   serialStatusFilter: 'all',
+  reviewSourceFilter: 'all',
   projectFilter: 'all',
   resubmissionsOnly: false,
 };
@@ -182,6 +185,7 @@ export function ActivateDataProvider({
       status: filters.statusFilter !== 'all' ? filters.statusFilter : undefined,
       qaStatus: filters.qaStatusFilter !== 'all' ? filters.qaStatusFilter : undefined,
       serialStatus: filters.serialStatusFilter !== 'all' ? filters.serialStatusFilter : undefined,
+      reviewSource: filters.reviewSourceFilter !== 'all' ? filters.reviewSourceFilter : undefined,
       resubmissionsOnly: filters.resubmissionsOnly || undefined,
       search: filters.searchTerm.trim() || undefined,
       page: page ?? currentPage,

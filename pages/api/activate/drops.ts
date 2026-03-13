@@ -64,6 +64,8 @@ interface UnifiedDrop {
   submission_count: number;
   is_resubmission: boolean;
   previous_photo_count: number | null;
+  auto_qa_processed: boolean;
+  auto_qa_processed_at: string | null;
 }
 
 interface ProjectStats {
@@ -139,6 +141,7 @@ async function getPaginatedDrops(
     qaStatus?: string;
     serialStatus?: string;
     resubmissionsOnly?: boolean;
+    reviewSource?: string;
   }
 ): Promise<{ drops: UnifiedDrop[]; pagination: any }> {
   const offset = (page - 1) * pageSize;
@@ -225,6 +228,16 @@ async function getPaginatedDrops(
     conditions.push('u.submission_count > 1');
   }
 
+  if (filters?.reviewSource === 'ai_pending') {
+    conditions.push('u.auto_qa_processed = true AND (u.feedback_sent IS NULL OR u.feedback_sent = false)');
+  } else if (filters?.reviewSource === 'ai_reviewed') {
+    conditions.push('u.auto_qa_processed = true');
+  } else if (filters?.reviewSource === 'human_reviewed') {
+    conditions.push('u.feedback_sent = true');
+  } else if (filters?.reviewSource === 'not_reviewed') {
+    conditions.push('u.auto_qa_processed = false AND (u.qa_decision IS NULL)');
+  }
+
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // Use CTE for better query optimization
@@ -254,6 +267,8 @@ async function getPaginatedDrops(
       COALESCE(u.sender_phone, wp.sender_phone) as sender_phone,
       u.qa_phase,
       u.qa_decision,
+      u.auto_qa_processed,
+      u.auto_qa_processed_at,
       u.submission_count,
       COALESCE(u.submission_count, 1) > 1 as is_resubmission,
       (u.submission_history->0->>'photo_count')::int as previous_photo_count,
@@ -868,7 +883,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus, serialStatus, resubmissionsOnly } = req.query;
+    const { id, dropNumber, search, page, skipSummary, dateFrom, dateTo, project, status, qaStatus, serialStatus, resubmissionsOnly, reviewSource } = req.query;
 
     if (id && typeof id === 'string') {
       const drop = await getDropById(id);
@@ -910,6 +925,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       qaStatus: qaStatus && typeof qaStatus === 'string' ? qaStatus : undefined,
       serialStatus: serialStatus && typeof serialStatus === 'string' ? serialStatus : undefined,
       resubmissionsOnly: resubmissionsOnly === 'true',
+      reviewSource: reviewSource && typeof reviewSource === 'string' ? reviewSource : undefined,
       search: searchTerm,
     };
 
