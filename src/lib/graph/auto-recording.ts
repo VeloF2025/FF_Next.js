@@ -45,7 +45,7 @@ export interface AutoRecordingResult {
  * Fetches internal users in the tenant (VelocityFibre/BlitzFibre domains only).
  * Skips external/guest accounts (#EXT#) and service accounts.
  */
-async function getInternalUsers(): Promise<{ id: string; displayName: string; mail: string }[]> {
+export async function getInternalUsers(): Promise<{ id: string; displayName: string; mail: string }[]> {
   const users: { id: string; displayName: string; mail: string }[] = [];
   let url = `${GRAPH_BASE}/users?$filter=accountEnabled eq true&$select=id,displayName,mail,userPrincipalName&$top=100`;
 

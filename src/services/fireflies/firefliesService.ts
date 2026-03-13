@@ -1,9 +1,13 @@
 /**
  * Fireflies.ai API Service
- * Fetches meeting transcripts and summaries
+ * Fetches meeting transcripts and summaries, downloads recordings
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 const FIREFLIES_API_URL = 'https://api.fireflies.ai/graphql';
+const RECORDINGS_BASE = process.env.MEETING_RECORDINGS_PATH || '/home/velo/meeting-recordings';
 
 interface FirefliesSpeaker {
   id: number;
@@ -22,6 +26,7 @@ interface FirefliesTranscript {
   date: string;
   duration: number;
   transcript_url: string;
+  audio_url: string | null;
   summary: {
     keywords: string[];
     action_items: string[];
@@ -98,6 +103,7 @@ export async function fetchFirefliesTranscripts(apiKey: string) {
         date
         duration
         transcript_url
+        audio_url
         summary {
           keywords
           action_items
@@ -134,31 +140,49 @@ export async function fetchFirefliesTranscripts(apiKey: string) {
   return data.data.transcripts as FirefliesTranscript[];
 }
 
+async function downloadRecording(url: string, destPath: string): Promise<number> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const dir = path.dirname(destPath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(destPath, buffer);
+  return buffer.length;
+}
+
 export async function syncFirefliesToNeon(apiKey: string, sql: any) {
   const transcripts = await fetchFirefliesTranscripts(apiKey);
 
+  let newRecordings = 0;
   for (const transcript of transcripts) {
     const merged = mergeParticipants(transcript);
 
-    await sql`
+    // Upsert meeting with source = 'fireflies'
+    const rows = await sql`
       INSERT INTO meetings (
         fireflies_id,
+        source,
         title,
         meeting_date,
         duration,
         transcript_url,
         summary,
         participants,
+        processing_status,
         created_at,
         updated_at
       ) VALUES (
         ${transcript.id},
+        'fireflies',
         ${transcript.title},
         TO_TIMESTAMP(${transcript.date} / 1000.0),
         ${Math.floor(transcript.duration || 0)},
         ${transcript.transcript_url},
         ${JSON.stringify(transcript.summary)},
         ${JSON.stringify(merged)},
+        'completed',
         NOW(),
         NOW()
       )
@@ -171,7 +195,31 @@ export async function syncFirefliesToNeon(apiKey: string, sql: any) {
         summary = ${JSON.stringify(transcript.summary)},
         participants = ${JSON.stringify(merged)},
         updated_at = NOW()
+      RETURNING id, recording_path, meeting_date
     `;
+
+    // Download recording if not already on disk
+    const row = rows[0];
+    if (row && !row.recording_path && transcript.audio_url) {
+      try {
+        const date = new Date(row.meeting_date as string);
+        const yyyy = date.getFullYear().toString();
+        const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+        const filePath = path.join(RECORDINGS_BASE, yyyy, mm, `${row.id}.mp3`);
+
+        if (!fs.existsSync(filePath)) {
+          const sizeBytes = await downloadRecording(transcript.audio_url, filePath);
+          await sql`
+            UPDATE meetings
+            SET recording_path = ${filePath}, recording_size_bytes = ${sizeBytes}, updated_at = NOW()
+            WHERE id = ${row.id}
+          `;
+          newRecordings++;
+        }
+      } catch {
+        // Non-fatal — recording download failure shouldn't block sync
+      }
+    }
   }
 
   return transcripts.length;
