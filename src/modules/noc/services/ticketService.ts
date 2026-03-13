@@ -145,6 +145,17 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
     throw new Error('Invalid ticket_type value');
   }
 
+  // Resolve user_id → staff_id for assigned_to (FK references staff table)
+  if (payload.assigned_to) {
+    const staffRow = await queryOne<{ id: string }>(
+      `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
+      [payload.assigned_to]
+    );
+    if (staffRow) {
+      payload = { ...payload, assigned_to: staffRow.id };
+    }
+  }
+
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
   const status = payload.status || TicketStatus.OPEN;
@@ -304,6 +315,17 @@ export async function updateTicket(
   logger.info('Updating ticket', { id, fields: Object.keys(payload) });
 
   try {
+    // Resolve user_id → staff_id for assigned_to (FK references staff table)
+    if (payload.assigned_to) {
+      const staffRow = await queryOne<{ id: string }>(
+        `SELECT id FROM staff WHERE user_id = $1 LIMIT 1`,
+        [payload.assigned_to]
+      );
+      if (staffRow) {
+        payload = { ...payload, assigned_to: staffRow.id };
+      }
+    }
+
     // 🟢 WORKING: Build dynamic UPDATE query based on provided fields
     const updateFields: string[] = [];
     const values: any[] = [];
