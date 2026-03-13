@@ -126,6 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.resolved_at,
         r.created_at,
         r.maintenance_ticket_id,
+        mt.ticket_uid,
         i.filename as import_filename,
         i.imported_at as import_date,
         COALESCE(i.project, p.project_name) as project
@@ -133,6 +134,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       LEFT JOIN olt_report_imports i ON r.import_id = i.id
       LEFT JOIN drops d ON r.drop_number = d.drop_number
       LEFT JOIN projects p ON d.project_id = p.id
+      LEFT JOIN maintenance_tickets mt ON r.maintenance_ticket_id = mt.id
       ${whereClause}
       ORDER BY r.created_at DESC
       LIMIT $${limitIdx} OFFSET $${offsetIdx}

@@ -200,6 +200,7 @@ export interface OltRecord {
   import_date?: string;
   project?: string;
   maintenance_ticket_id?: string | null;
+  ticket_uid?: string | null;
 }
 
 export interface InvestigationContext {

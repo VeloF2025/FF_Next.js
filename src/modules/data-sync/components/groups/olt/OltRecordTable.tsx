@@ -130,6 +130,7 @@ export function OltRecordTable({
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">OLT Serial</th>
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">1Map Serial</th>
               <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Status</th>
+              <th className="text-left py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Ticket</th>
               <th className="text-right py-3 px-4 text-[var(--ff-text-secondary)] font-medium">Actions</th>
             </tr>
           </thead>
@@ -219,6 +220,18 @@ export function OltRecordTable({
                       }
                       return null;
                     })()}
+                  </td>
+                  <td className="py-3 px-4">
+                    {record.ticket_uid ? (
+                      <a
+                        href={`/noc/tickets/${record.maintenance_ticket_id}`}
+                        className="text-blue-400 hover:text-blue-300 text-xs font-mono"
+                      >
+                        {record.ticket_uid}
+                      </a>
+                    ) : (
+                      <span className="text-[var(--ff-text-tertiary)]">-</span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
