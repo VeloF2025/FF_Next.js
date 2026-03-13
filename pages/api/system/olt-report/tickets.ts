@@ -65,16 +65,6 @@ async function handler(
       });
     }
 
-    // Look up team name if assigned
-    let assignedTeamName: string | undefined;
-    if (assigned_team_id) {
-      const teamResult = await pool.query(
-        `SELECT name FROM teams WHERE id = $1`,
-        [assigned_team_id]
-      );
-      assignedTeamName = teamResult.rows[0]?.name || undefined;
-    }
-
     logger.info('Creating OLT mismatch maintenance tickets', {
       eligible: records.length,
       skipped,
@@ -95,7 +85,9 @@ async function handler(
       let project = 'Unknown';
       try {
         if (record.investigation_context) {
-          const ctx = JSON.parse(record.investigation_context);
+          const ctx = typeof record.investigation_context === 'string'
+            ? JSON.parse(record.investigation_context)
+            : record.investigation_context;
           project = ctx.belongsToTeam || project;
         }
       } catch { /* ignore parse errors */ }
@@ -126,7 +118,6 @@ async function handler(
         dr_number: dr,
         ont_serial: oltSerial,
         created_by: req.user.id,
-        assigned_team: assignedTeamName || undefined,
         assigned_team_id: assigned_team_id || undefined,
         status: assigned_team_id ? TicketStatus.ASSIGNED : undefined,
       });
@@ -157,8 +148,10 @@ async function handler(
       created: tickets.length, skipped, tickets,
     });
   } catch (err) {
-    logger.error('Failed to create OLT mismatch tickets', { error: err });
-    return apiResponse.internalError(res, err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : undefined;
+    logger.error('Failed to create OLT mismatch tickets', { error: errMsg, stack: errStack });
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, `Ticket creation failed: ${errMsg}`);
   }
 }
 
