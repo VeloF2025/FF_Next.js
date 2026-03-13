@@ -23,6 +23,8 @@ import {
   Trash2,
   Download,
   Database,
+  Plus,
+  FolderOpen,
 } from 'lucide-react';
 import { QFieldImportPanel } from '@/modules/qfield-import';
 import { useSOWUpload } from '@/modules/projects/components/SOWUploadSection/hooks/useSOWUpload';
@@ -51,9 +53,13 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
   const [uploadState, setUploadState] = useState<Record<string, DocumentUploadState>>({});
   const [showCreatePO, setShowCreatePO] = useState(false);
 
+  const [multiUploadState, setMultiUploadState] = useState<{ uploading: boolean; error: string | null; count: number }>({ uploading: false, error: null, count: 0 });
+  const [selectedDocType, setSelectedDocType] = useState<ProjectDocumentType>('other');
+
   // File input refs
   const bssInputRef = useRef<HTMLInputElement>(null);
   const mssInputRef = useRef<HTMLInputElement>(null);
+  const multiFileInputRef = useRef<HTMLInputElement>(null);
 
   // SOW data hooks - use summary counts for display
   const { data: sowData } = useProjectSOW(projectId);
@@ -147,6 +153,47 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
         ...prev,
         [documentType]: { uploading: false, error: message },
       }));
+    }
+  };
+
+  // Multi-file upload handler
+  const handleMultiFileUpload = async (files: FileList) => {
+    setMultiUploadState({ uploading: true, error: null, count: files.length });
+
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentType', selectedDocType);
+
+        const response = await fetch(`/api/projects/${projectId}/documents`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          errors.push(`${file.name}: ${result.error || 'Upload failed'}`);
+        } else {
+          successCount++;
+        }
+      } catch (err) {
+        errors.push(`${file.name}: ${err instanceof Error ? err.message : 'Upload failed'}`);
+      }
+    }
+
+    await fetchData();
+    setMultiUploadState({
+      uploading: false,
+      error: errors.length > 0 ? errors.join('; ') : null,
+      count: successCount,
+    });
+
+    if (multiFileInputRef.current) {
+      multiFileInputRef.current.value = '';
     }
   };
 
@@ -294,6 +341,128 @@ export function ProjectDocumentsTab({ projectId }: ProjectDocumentsTabProps) {
             />
           </div>
         </div>
+      </section>
+
+      {/* General Documents Section — Multi-file Upload */}
+      <section className="bg-[var(--ff-bg-card)] rounded-lg border border-[var(--ff-border-light)]">
+        <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-[var(--ff-text-primary)]">General Documents</h3>
+            <p className="text-sm text-[var(--ff-text-secondary)] mt-1">
+              Upload contracts, amendments, wayleaves, permits, and other project documents
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedDocType}
+              onChange={(e) => setSelectedDocType(e.target.value as ProjectDocumentType)}
+              className="px-3 py-1.5 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg text-sm text-[var(--ff-text-primary)]"
+            >
+              <option value="contract">Contract</option>
+              <option value="amendment">Amendment</option>
+              <option value="wayleave">Wayleave</option>
+              <option value="permit">Permit</option>
+              <option value="other">Other</option>
+            </select>
+            <button
+              onClick={() => multiFileInputRef.current?.click()}
+              disabled={multiUploadState.uploading}
+              className="px-3 py-1.5 bg-[var(--ff-accent)] hover:bg-[var(--ff-accent-hover)] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {multiUploadState.uploading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Uploading {multiUploadState.count} file(s)...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  Upload Documents
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        <div className="p-4">
+          {/* Existing general documents */}
+          {(() => {
+            const generalDocs = documents.filter(
+              (d) => !['bss', 'mss'].includes(d.documentType) && d.isActive
+            );
+            if (generalDocs.length > 0) {
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {generalDocs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-3 p-3 bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-[var(--ff-accent)]/20 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5 text-[var(--ff-accent)]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--ff-text-primary)] truncate">
+                          {doc.documentName}
+                        </p>
+                        <p className="text-xs text-[var(--ff-text-secondary)]">
+                          {doc.documentType.toUpperCase()} | {formatDisplayDate(doc.uploadedAt)}
+                        </p>
+                      </div>
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-[var(--ff-text-secondary)] hover:text-[var(--ff-accent)] hover:bg-[var(--ff-accent)]/10 rounded-lg transition-colors"
+                        title="Open document"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <div className="text-center py-8">
+                <FolderOpen className="w-12 h-12 mx-auto text-[var(--ff-text-tertiary)] mb-3" />
+                <p className="text-sm text-[var(--ff-text-secondary)]">No general documents uploaded yet</p>
+                <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+                  Select a document type and click &quot;Upload Documents&quot; to add multiple files at once
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Upload error */}
+          {multiUploadState.error && (
+            <div className="mt-3 flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{multiUploadState.error}</span>
+            </div>
+          )}
+
+          {/* Upload success */}
+          {!multiUploadState.uploading && multiUploadState.count > 0 && !multiUploadState.error && (
+            <div className="mt-3 flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-xs text-green-400">
+              <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              <span>Successfully uploaded {multiUploadState.count} document(s)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Hidden multi-file input */}
+        <input
+          ref={multiFileInputRef}
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              handleMultiFileUpload(e.target.files);
+            }
+          }}
+          className="hidden"
+        />
       </section>
 
       {/* SOW Data Import Section */}
