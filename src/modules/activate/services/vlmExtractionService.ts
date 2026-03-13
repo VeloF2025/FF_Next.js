@@ -174,10 +174,9 @@ const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from th
 
 THE SERIAL FORMAT (memorize this):
 - Pattern: ALCLB4 + two hex chars + four hex chars = exactly 12 characters
-- The 7th character is almost always "8" (e.g., ALCLB4**8**F3528)
-- The 8th character is usually F, D, E, or C (e.g., ALCLB48**F**3528)
+- The 7th character is "8" (64%), "7" (26%), or "6" (10%) — read it carefully, do NOT assume "8"
 - Hex chars only: 0-9 and A-F. Never letters like M, N, P, R, S, Y, Z.
-- Most common: ALCLB48F____ (79%), ALCLB48D____ (14%), ALCLB48E____ (3%)
+- Top patterns: ALCLB48D (20%), ALCLB477 (15%), ALCLB48C (12%), ALCLB48A (9%), ALCLB48F (6%)
 
 WHERE TO FIND IT:
 - Look for the "S/N:" field on the white product label
@@ -194,7 +193,7 @@ WHERE TO FIND IT:
 ⚠️ CRITICAL VALIDATION — check your answer:
 1. Is it exactly 12 characters? If not, re-read. You likely dropped a character.
 2. Does it start with ALCLB4? If not, you're reading the wrong field.
-3. Is the 7th char "8"? If not, double-check — it's "8" in 98% of devices.
+3. Is the 7th char "8", "7", or "6"? Read the actual character — don't guess.
 4. Are all characters hex (0-9, A-F)? Letters like M, N, P, R, Y mean OCR error.
 5. Does it look like "ALCL" + digits only (no "B4")? You're reading something else.
 
@@ -222,9 +221,8 @@ Look for THREE items:
 
 2. ONT SERIAL NUMBER - on a small white sticker attached to the front:
    FORMAT: ALCLB4 + 6 hex characters = exactly 12 characters total
-   - The 7th char is almost always "8" (ALCLB4**8**XXXXX) — 98% of devices
-   - The 8th char is usually F, D, E, or C
-   - Most common: ALCLB48F____ (79%), ALCLB48D____ (14%), ALCLB48E____ (3%)
+   - The 7th char is "8" (64%), "7" (26%), or "6" (10%) — read it carefully, do NOT assume "8"
+   - Top patterns: ALCLB48D (20%), ALCLB477 (15%), ALCLB48C (12%), ALCLB48A (9%), ALCLB48F (6%)
    - Only hex chars after ALCLB4: digits 0-9 and letters A-F
    - NEVER letters like M, N, P, R, S, Y, Z — those mean you misread
 
@@ -235,7 +233,7 @@ Look for THREE items:
    - Any number without the "ALCLB4" prefix
 
    ⚠️ VALIDATION CHECKLIST (check before answering):
-   - Exactly 12 characters? If 11, you dropped a char (usually the "8" at position 7)
+   - Exactly 12 characters? If 11, you dropped a char (usually at position 7)
    - Starts with ALCLB4? If "ALCL" + random chars, you read the wrong label
    - Only hex after ALCLB4? M/N/P/R/Y = misread
    - Looks like a phone number or DR number? WRONG field
@@ -364,12 +362,19 @@ function normalizeSerial(serial: string | null): string | null {
     s = prefix + suffix;
   }
 
-  // Auto-fix: VLM drops the '8' at position 7 ~40% of the time
-  // ALCLB4F4646 (11 chars) → ALCLB48F4646 (12 chars) when the rest matches
-  if (s.length === 11 && s.startsWith('ALCLB4') && !s.startsWith('ALCLB48')) {
-    const candidate = s.substring(0, 6) + '8' + s.substring(6);
-    logger.debug(`Auto-inserted '8' at pos 7: ${serial} → ${candidate}`);
-    s = candidate;
+  // Auto-fix: If VLM returns 11 chars starting with ALCLB4, try inserting the most
+  // likely 7th char ('8' at 64%, '7' at 26%, '6' at 10%) if it makes a valid suffix.
+  // Only insert if the 7th char is NOT already 8/7/6 (meaning a different char was dropped).
+  if (s.length === 11 && s.startsWith('ALCLB4')) {
+    const c7 = s[6]; // Current 7th char (0-indexed position 6)
+    // If the 7th char looks like it belongs at position 8+ (hex suffix char),
+    // the VLM likely dropped the actual 7th char. Try inserting '8' (most common).
+    if (c7 !== '8' && c7 !== '7' && c7 !== '6') {
+      const candidate = s.substring(0, 6) + '8' + s.substring(6);
+      logger.debug(`Auto-inserted '8' at pos 7: ${serial} → ${candidate}`);
+      s = candidate;
+    }
+    // Otherwise leave as-is — the VLM may have dropped a later char
   }
 
   return s;
@@ -1385,27 +1390,33 @@ export interface WaPhotoExtractionResult {
  */
 const WA_PHOTO_SERIAL_PROMPT = `You are extracting device serial numbers from a WhatsApp-submitted installation photo.
 
-This photo shows a printed sticker with TWO serial numbers that need to be captured:
+This photo shows a printed sticker with TWO serial numbers:
 
 1. ONT SERIAL NUMBER:
-   - Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
+   FORMAT: ALCLB4 + 6 hex characters = exactly 12 characters
+   - The 7th char is "8" (64%), "7" (26%), or "6" (10%) — read carefully, don't assume
+   - Top patterns: ALCLB48D (20%), ALCLB477 (15%), ALCLB48C (12%), ALCLB48A (9%), ALCLB48F (6%)
+   - Only hex chars (0-9, A-F) after the ALCLB4 prefix
+   - NEVER letters M, N, P, R, S, Y, Z — those mean you misread
    - Usually labeled "S/N:" or "ONT Serial"
-   - 11-12 characters total
-   ❌ Do NOT extract SSID values (start with "ALHN-" like ALHN-C397)
+   ❌ Do NOT extract SSID values (start with "ALHN-")
+   ❌ Do NOT extract model/part numbers (start with "STN")
 
 2. UPS SERIAL NUMBER:
    - Starts with "GU18W" followed by 8-10 alphanumeric characters
    - Usually labeled "UPS Serial" or "Gizzu Serial"
    - 13-15 characters total
 
-Both serials should be on the same sticker/label.
-Read the ACTUAL text from the photo. Do NOT guess or invent serial numbers.
+⚠️ VALIDATION (check before answering):
+- ONT serial must be exactly 12 chars starting with ALCLB4
+- If you read 11 chars, you likely dropped a char at position 7
+- If chars after ALCLB4 include M/N/P/R/Y, re-read — those aren't hex
 
 Respond in this exact JSON format:
 {
   "ontSerial": {
     "found": true/false,
-    "serial": "<serial starting with ALCL or ALCB, or null>",
+    "serial": "<12-char serial starting with ALCLB4, or null>",
     "confidence": <0.0 to 1.0>
   },
   "upsSerial": {
@@ -1415,11 +1426,7 @@ Respond in this exact JSON format:
   }
 }
 
-IMPORTANT:
-- Only extract serials you can ACTUALLY READ in the photo
-- If text is blurry or partially visible, lower the confidence score
-- Return null for any serial you cannot confidently read
-- NEVER return a serial you are not sure about - null is better than wrong`;
+CRITICAL: Only extract serials you can ACTUALLY READ. null is better than wrong.`;
 
 /**
  * Serials used as examples in VLM prompts — if the model returns
