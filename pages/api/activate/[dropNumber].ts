@@ -183,7 +183,11 @@ async function handleGet(
         installer_name,
         qcontact_name,
         qcontact_phone,
-        qcontact_email
+        qcontact_email,
+        -- Auto-QA fields
+        auto_qa_processed,
+        auto_qa_processed_at,
+        auto_qa_results
       FROM dr_photo_unified_reviews
       WHERE drop_number = $1
       LIMIT 1;

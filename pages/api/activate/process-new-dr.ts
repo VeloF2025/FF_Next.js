@@ -687,9 +687,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            created_at, updated_at, submission_history, is_oes_only,
            subscriber_name, subscriber_phone, subscriber_email, subscriber_language,
            signup_agent, installer_name,
-           qcontact_name, qcontact_phone, qcontact_email
+           qcontact_name, qcontact_phone, qcontact_email,
+           auto_qa_eligible_at
          ) VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), $9, $9, $10, FALSE,
-           $11, $12, $13, $14, $15, $16, $17, $18, $19)
+           $11, $12, $13, $14, $15, $16, $17, $18, $19,
+           NOW() + INTERVAL '30 minutes')
          ON CONFLICT (drop_number) DO UPDATE SET
            project = COALESCE(EXCLUDED.project, dr_photo_unified_reviews.project),
            submission_count = COALESCE(dr_photo_unified_reviews.submission_count, 1),
@@ -700,6 +702,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            wa_original_text = COALESCE(EXCLUDED.wa_original_text, dr_photo_unified_reviews.wa_original_text),
            wa_group_jid = COALESCE(EXCLUDED.wa_group_jid, dr_photo_unified_reviews.wa_group_jid),
            wa_received_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() ELSE dr_photo_unified_reviews.wa_received_at END,
+           auto_qa_eligible_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() + INTERVAL '30 minutes' ELSE dr_photo_unified_reviews.auto_qa_eligible_at END,
            submission_history = COALESCE(EXCLUDED.submission_history, dr_photo_unified_reviews.submission_history),
            is_oes_only = FALSE,
            subscriber_name = COALESCE(EXCLUDED.subscriber_name, dr_photo_unified_reviews.subscriber_name),
@@ -765,10 +768,12 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            created_at, updated_at, is_oes_only,
            subscriber_name, subscriber_phone, subscriber_email, subscriber_language,
            signup_agent, installer_name,
-           qcontact_name, qcontact_phone, qcontact_email
+           qcontact_name, qcontact_phone, qcontact_email,
+           auto_qa_eligible_at
          )
          VALUES ($1, $2, 1, $3, $4, $5, $6, $7, $8, NOW(), NOW(), NOW(), FALSE,
-           $9, $10, $11, $12, $13, $14, $15, $16, $17)
+           $9, $10, $11, $12, $13, $14, $15, $16, $17,
+           NOW() + INTERVAL '30 minutes')
          ON CONFLICT (drop_number) DO UPDATE SET
            project = COALESCE(EXCLUDED.project, dr_photo_unified_reviews.project),
            submission_count = COALESCE(dr_photo_unified_reviews.submission_count, 1),
@@ -779,6 +784,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
            wa_original_text = COALESCE(EXCLUDED.wa_original_text, dr_photo_unified_reviews.wa_original_text),
            wa_group_jid = COALESCE(EXCLUDED.wa_group_jid, dr_photo_unified_reviews.wa_group_jid),
            wa_received_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() ELSE dr_photo_unified_reviews.wa_received_at END,
+           auto_qa_eligible_at = CASE WHEN EXCLUDED.wa_message_id IS NOT NULL THEN NOW() + INTERVAL '30 minutes' ELSE dr_photo_unified_reviews.auto_qa_eligible_at END,
            is_oes_only = FALSE,
            subscriber_name = COALESCE(EXCLUDED.subscriber_name, dr_photo_unified_reviews.subscriber_name),
            subscriber_phone = COALESCE(EXCLUDED.subscriber_phone, dr_photo_unified_reviews.subscriber_phone),

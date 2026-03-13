@@ -13,7 +13,9 @@ import { PhotoReviewPhase } from './PhotoReviewPhase';
 import { DataValidationPhase } from './DataValidationPhase';
 import { FinalDecisionPhase } from './FinalDecisionPhase';
 import { FeedbackPhase } from './FeedbackPhase';
+import { AutoQaFeedbackPhase } from './AutoQaFeedbackPhase';
 import { WizardProgressOverlay, type Sync1MapPhase } from './WizardProgressOverlay';
+import type { AutoQaResults } from '../../services/autoQaCommentGenerator';
 
 interface QaWizardContainerProps {
   dropNumber: string;
@@ -136,6 +138,8 @@ export function QaWizardContainer({
     previousPhotoCount: number | null;
     previousFeedback: string | null;
   } | null>(null);
+  // Auto-QA results (if DR was processed by automated QA)
+  const [autoQaResults, setAutoQaResults] = useState<AutoQaResults | null>(null);
 
   // Load initial state from API
   useEffect(() => {
@@ -321,6 +325,21 @@ export function QaWizardContainer({
           }
         }
       }
+      // Check for auto-QA results
+      try {
+        const autoQaResponse = await fetch(`/api/activate/${encodeURIComponent(dropNumber)}`);
+        if (autoQaResponse.ok) {
+          const autoQaData = await autoQaResponse.json();
+          if (autoQaData.success && autoQaData.data?.auto_qa_processed && autoQaData.data?.auto_qa_results) {
+            setAutoQaResults(autoQaData.data.auto_qa_results);
+            setState((prev) => ({ ...prev, phase: 'feedback' }));
+            log.info('QaWizard', `Auto-QA results loaded for ${dropNumber}`);
+          }
+        }
+      } catch {
+        log.warn('QaWizard', `Could not check auto-QA status for ${dropNumber}`);
+      }
+
     // Brief complete animation
       setSyncPhase('complete');
       await new Promise(resolve => setTimeout(resolve, 600));
@@ -571,6 +590,20 @@ export function QaWizardContainer({
         );
 
       case 'feedback':
+        if (autoQaResults) {
+          return (
+            <AutoQaFeedbackPhase
+              dropNumber={dropNumber}
+              project={project || undefined}
+              autoQaResults={autoQaResults}
+              onComplete={handleFeedbackSent}
+              onBack={() => {
+                setAutoQaResults(null);
+                goToPhase('prerequisites');
+              }}
+            />
+          );
+        }
         return (
           <FeedbackPhase
             dropNumber={dropNumber}
