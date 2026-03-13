@@ -110,9 +110,7 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 6: ONT Back After Install
   'ph_ont': 6,
   'ph_ont_back': 6,
-  'ph_drop': 6,
   'ph_cbl_r': 6,
-  'ph_bl': 6,
 
   // Step 7: Power Meter Reading
   'ph_powm': 7,
@@ -126,6 +124,8 @@ export const PHOTO_TYPE_TO_STEP: Record<string, number> = {
   // Step 9: Green Lights on ONT
   'ph_lights': 9,
   'ph_led': 9,
+  'ph_bl': 9,    // "blinking lights" — front panel with green indicator lights
+  'ph_drop': 9,  // front panel showing DR number sticker + green lights
 
   // Step 10: Signature
   'ph_sign1': 10,
@@ -197,10 +197,10 @@ export const STEP_TO_PHOTO_TYPES: Record<number, string[]> = {
   3: ['ph_entry_out', 'ph_hm_ln'],
   4: ['ph_entry_in', 'ph_hm_en'],
   5: ['ph_wall'],
-  6: ['ph_ont', 'ph_ont_back', 'ph_drop', 'ph_cbl_r', 'ph_bl'],
+  6: ['ph_ont', 'ph_ont_back', 'ph_cbl_r'],
   7: ['ph_powm', 'ph_powm1', 'ph_powm2'],
   8: ['ph_after', 'ph_final'],
-  9: ['ph_lights', 'ph_led'],
+  9: ['ph_lights', 'ph_led', 'ph_bl', 'ph_drop'],
   10: ['ph_sign1', 'ph_sign2', 'ph_signature'],
 };
 
