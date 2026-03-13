@@ -28,7 +28,7 @@ interface OltFixableTabProps {
   handleFix: (record: OltRecord) => Promise<void>;
   isStatusMismatch: (record: OltRecord) => boolean;
   getInvestigationContext: (record: OltRecord) => InvestigationContext | null;
-  fetchRecords: (status: string, subStatus?: string) => Promise<void>;
+  fetchRecords: (status: string, subStatus?: string, search?: string) => Promise<void>;
   fetchStats: () => Promise<void>;
 }
 

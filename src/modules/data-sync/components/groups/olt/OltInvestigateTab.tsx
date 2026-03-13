@@ -36,7 +36,7 @@ interface OltInvestigateTabProps {
   setError: (e: string | null) => void;
   isStatusMismatch: (record: OltRecord) => boolean;
   getInvestigationContext: (record: OltRecord) => InvestigationContext | null;
-  fetchRecords: (status: string, subStatus?: string) => Promise<void>;
+  fetchRecords: (status: string, subStatus?: string, search?: string) => Promise<void>;
   fetchStats: () => Promise<void>;
 }
 
@@ -59,6 +59,8 @@ export function OltInvestigateTab({
   const [expandedContexts, setExpandedContexts] = useState<Set<string>>(new Set());
   const [showResolveModal, setShowResolveModal] = useState<string | null>(null);
   const [showEscalateModal, setShowEscalateModal] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
   // Ticketing state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -71,16 +73,22 @@ export function OltInvestigateTab({
   const [swapLoading, setSwapLoading] = useState<Set<string>>(new Set());
   const [swapErrors, setSwapErrors] = useState<Record<string, string>>({});
 
-  // Re-fetch when sub-filter changes
+  // Debounce search input
   useEffect(() => {
-    if (investigateSubFilter !== 'all') {
-      fetchRecords('needs_investigation', investigateSubFilter);
-    } else {
-      fetchRecords('needs_investigation');
-    }
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchText);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText, setPage]);
+
+  // Re-fetch when sub-filter or search changes
+  useEffect(() => {
+    const sub = investigateSubFilter !== 'all' ? investigateSubFilter : undefined;
+    fetchRecords('needs_investigation', sub, debouncedSearch || undefined);
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [investigateSubFilter]);
+  }, [investigateSubFilter, debouncedSearch]);
 
   const toggleContext = (id: string) => {
     setExpandedContexts(prev => {
@@ -409,10 +417,31 @@ export function OltInvestigateTab({
   return (
     <>
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)]">
-        {/* Sub-filter bar + ticket actions */}
-        {records.length > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)]">
-            <div className="flex items-center gap-2">
+        {/* Search + Sub-filter bar + ticket actions */}
+        {(records.length > 0 || debouncedSearch) && (
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ff-border-light)] gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              {/* Search input */}
+              <div className="relative w-52 shrink-0">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)]" />
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Search DR, serial..."
+                  className="w-full pl-8 pr-7 py-1.5 rounded bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)]
+                             text-[var(--ff-text-primary)] text-xs placeholder:text-[var(--ff-text-tertiary)]
+                             focus:outline-none focus:ring-1 focus:ring-[var(--ff-accent)]/50"
+                />
+                {searchText && (
+                  <button
+                    onClick={() => setSearchText('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)]"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <span className="text-xs text-[var(--ff-text-secondary)] mr-1">Filter:</span>
               {([
                 { key: 'all', label: 'All', count: stats.needs_investigation },

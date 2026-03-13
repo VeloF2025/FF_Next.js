@@ -28,6 +28,7 @@ import {
   triggerOnTicketAssignment,
   triggerOnTeamAssignment,
 } from '@/modules/noc/services/notificationTriggers';
+import { markLinkedDataSyncResolved } from '@/modules/noc/services/dataSyncResolution';
 import type { UpdateTicketPayload } from '@/modules/noc/types/ticket';
 import { TicketStatus } from '@/modules/noc/types/ticket';
 
@@ -233,6 +234,14 @@ export async function PUT(
             logger.error('Team assignment notification error', { ticketId, error: err.message });
           });
       }
+    }
+
+    // When ticket is resolved/closed, mark linked Data Sync records as resolved
+    if (body.status && ['resolved', 'closed'].includes(body.status)) {
+      markLinkedDataSyncResolved(ticketId)
+        .catch(err => {
+          logger.error('Data Sync resolution error', { ticketId, error: err.message });
+        });
     }
 
     return NextResponse.json({

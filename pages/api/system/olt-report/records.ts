@@ -74,6 +74,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
+    // Optional search filter (DR number, OLT serial)
+    const search = req.query.search ? String(req.query.search).trim() : null;
+    if (search) {
+      params.push(`%${search}%`);
+      const searchIdx = params.length;
+      const cond = `(r.drop_number ILIKE $${searchIdx} OR r.olt_serial ILIKE $${searchIdx} OR r.wrong_onemap_serial ILIKE $${searchIdx})`;
+      whereClause = whereClause ? `${whereClause} AND ${cond}` : `WHERE ${cond}`;
+    }
+
     // Optional date range filter
     if (dateFrom) {
       params.push(dateFrom);

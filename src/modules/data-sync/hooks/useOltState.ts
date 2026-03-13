@@ -78,7 +78,7 @@ export interface UseOltStateReturn {
 
   // Fetch functions
   fetchStats: () => Promise<void>;
-  fetchRecords: (status: string, subStatus?: string) => Promise<void>;
+  fetchRecords: (status: string, subStatus?: string, search?: string) => Promise<void>;
   fetchImports: () => Promise<void>;
   fetchAutoDetectStatus: () => Promise<void>;
 
@@ -167,12 +167,13 @@ export function useOltState(
   }, [dateFilter, customDate]);
 
   const fetchRecords = useCallback(
-    async (status: string, subStatus?: string) => {
+    async (status: string, subStatus?: string, search?: string) => {
       setIsLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams({ status, page: String(page), pageSize: String(pageSize) });
         if (subStatus && subStatus !== 'all') params.set('subStatus', subStatus);
+        if (search) params.set('search', search);
         const res = await fetch(`/api/system/olt-report/records?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
