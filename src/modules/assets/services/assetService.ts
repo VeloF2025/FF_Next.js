@@ -128,7 +128,7 @@ async function generateAssetNumber(categoryCode: string): Promise<string> {
 
   const [result] = await sql`
     SELECT MAX(
-      CAST(SPLIT_PART(asset_number, '-', 3) AS INTEGER)
+      CAST(SUBSTRING(asset_number FROM '[0-9]+$') AS INTEGER)
     ) as max_num
     FROM assets
     WHERE asset_number LIKE ${prefix + '-%'}
@@ -407,7 +407,7 @@ export const assetService = {
       return {
         success: false,
         data: null,
-        error: `Failed to create asset: ${errorMessage}`,
+        error: 'Failed to create asset. Please try again or contact support.',
       };
     }
   },
