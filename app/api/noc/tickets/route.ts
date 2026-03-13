@@ -178,6 +178,10 @@ export async function POST(req: NextRequest) {
   try {
     const body: CreateTicketPayload = await req.json();
 
+    // Set created_by from auth header (falls back to 'system' for automated sources)
+    const createdBy = req.headers.get('x-user-id') || 'system';
+    body.created_by = createdBy;
+
     // Validate required fields
     const errors: Record<string, string> = {};
 
