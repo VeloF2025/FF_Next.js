@@ -20,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows, polesWithPhotosRows] = await Promise.all([
+    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows, polesWithPhotosRows, completenessRows] = await Promise.all([
       // QA stats per project per discipline
       sql`
         SELECT
@@ -91,11 +91,75 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE feature_type = 'pole' AND photo_count > 0
         GROUP BY project_id
       `,
+      // Photo step completeness per project
+      sql`
+        SELECT
+          r.project_id,
+          COUNT(*)::int AS total_reviews,
+          COUNT(*) FILTER (WHERE sc.steps_with_photos >= 7)::int AS complete_7,
+          COUNT(*) FILTER (WHERE sc.steps_with_photos BETWEEN 4 AND 6)::int AS steps_4_to_6,
+          COUNT(*) FILTER (WHERE sc.steps_with_photos BETWEEN 1 AND 3)::int AS steps_1_to_3,
+          COUNT(*) FILTER (WHERE COALESCE(sc.steps_with_photos, 0) = 0)::int AS no_photos,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_1)::int AS missing_step_1,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_2)::int AS missing_step_2,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_3)::int AS missing_step_3,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_4)::int AS missing_step_4,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_5)::int AS missing_step_5,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_6)::int AS missing_step_6,
+          COUNT(*) FILTER (WHERE NOT sc.has_step_7)::int AS missing_step_7
+        FROM construction_qa_reviews r
+        LEFT JOIN (
+          SELECT
+            review_id,
+            COUNT(DISTINCT checklist_step) FILTER (WHERE checklist_step BETWEEN 1 AND 7)::int AS steps_with_photos,
+            BOOL_OR(checklist_step = 1) AS has_step_1,
+            BOOL_OR(checklist_step = 2) AS has_step_2,
+            BOOL_OR(checklist_step = 3) AS has_step_3,
+            BOOL_OR(checklist_step = 4) AS has_step_4,
+            BOOL_OR(checklist_step = 5) AS has_step_5,
+            BOOL_OR(checklist_step = 6) AS has_step_6,
+            BOOL_OR(checklist_step = 7) AS has_step_7
+          FROM construction_qa_photos
+          GROUP BY review_id
+        ) sc ON sc.review_id = r.id
+        GROUP BY r.project_id
+      `,
     ]);
 
     const otdrMap = new Map<string, number>();
     for (const row of otdrRows) {
       otdrMap.set(row.project_id, Number(row.otdr_count));
+    }
+
+    // Build photo completeness map
+    const stepLabels: Record<number, string> = {
+      1: 'Before', 2: 'During', 3: 'Depth', 4: 'End Plates', 5: 'Compaction', 6: 'Level', 7: 'After',
+    };
+    const completenessMap = new Map<string, {
+      complete_7: number; steps_4_to_6: number; steps_1_to_3: number;
+      no_photos: number; total_reviews: number; completeness_pct: number;
+      most_missing_step: string | null;
+    }>();
+    for (const row of completenessRows) {
+      const total = Number(row.total_reviews);
+      const complete7 = Number(row.complete_7);
+      let maxMissing = 0;
+      let maxStep = 0;
+      for (let s = 1; s <= 7; s++) {
+        const missing = Number(row[`missing_step_${s}`]);
+        if (missing > maxMissing) { maxMissing = missing; maxStep = s; }
+      }
+      completenessMap.set(row.project_id, {
+        complete_7: complete7,
+        steps_4_to_6: Number(row.steps_4_to_6),
+        steps_1_to_3: Number(row.steps_1_to_3),
+        no_photos: Number(row.no_photos),
+        total_reviews: total,
+        completeness_pct: total > 0 ? Math.round((complete7 / total) * 100) : 0,
+        most_missing_step: maxStep > 0 && total > 0
+          ? `${stepLabels[maxStep]} (${Math.round((maxMissing / total) * 100)}%)`
+          : null,
+      });
     }
 
     // Build infrastructure map: project_id → { poles, joints, cable_spans }
@@ -191,6 +255,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           civil: emptyDiscipline(),
           optical: emptyDiscipline(),
           infrastructure: infraMap.get(pid) || emptyInfrastructure(),
+          photo_completeness: completenessMap.get(pid) || undefined,
         });
       }
       const proj = projectMap.get(pid)!;
