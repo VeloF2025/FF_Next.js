@@ -170,34 +170,33 @@ Only extract the dBm value, not other readings.`;
  * - ONT P/N: STN0145844A ← NOT the serial (model/part number)
  * - MAC ID: 804E3CBE680 ← NOT the serial (MAC address)
  */
-const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from a Nokia/Alcatel device label.
+const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from the BACK of a Nokia/Alcatel device.
 
-CRITICAL: The label has MULTIPLE fields. You must find the CORRECT one:
+THE SERIAL FORMAT (memorize this):
+- Pattern: ALCLB4 + two hex chars + four hex chars = exactly 12 characters
+- The 7th character is almost always "8" (e.g., ALCLB4**8**F3528)
+- The 8th character is usually F, D, E, or C (e.g., ALCLB48**F**3528)
+- Hex chars only: 0-9 and A-F. Never letters like M, N, P, R, S, Y, Z.
+- Most common: ALCLB48F____ (79%), ALCLB48D____ (14%), ALCLB48E____ (3%)
 
-✅ CORRECT - Find the "S/N:" field (Serial Number):
-   - ALWAYS starts with "ALCLB4" followed by 6 hexadecimal characters (0-9, A-F)
-   - ALWAYS exactly 12 characters total (e.g., ALCLB48F3528)
-   - Located on a WHITE sticker, usually has a barcode above it
-   - Common prefixes: ALCLB48D, ALCLB477, ALCLB48C, ALCLB48A, ALCLB480, ALCLB48F
+WHERE TO FIND IT:
+- Look for the "S/N:" field on the white product label
+- Below the MAC ID line, above or near the barcode
+- The barcode encodes this same serial
 
-❌ WRONG - Do NOT extract these fields:
-   - SSID fields (start with "ALHN-" like ALHN-C397) - these are WiFi names
-   - ONT P/N (like STN0145844A) - this is the part/model number
-   - MAC ID (like 804E3CBE680) - this is the MAC address
-   - Admin IP (like 192.168.1.254) - this is an IP address
+❌ DO NOT EXTRACT THESE (common mistakes):
+- SSID: starts with "ALHN-" (WiFi name)
+- Part number: starts with "STN" (model number)
+- MAC: 12 hex chars without "ALCLB4" prefix
+- IP address: 192.168.x.x
+- DR number: DR followed by digits
 
-The S/N field is typically:
-- On the main white product label
-- Below the MAC ID line
-- Above or near the barcode
-- Format: S/N: ALCLB4XXXXXX (exactly 12 characters)
-
-COMMON MISTAKES TO AVOID:
-- Do NOT drop characters. The serial is ALWAYS 12 characters, never 10 or 11.
-- Do NOT confuse digit 6 with 8, or 0 with 8. Read carefully.
-- If your reading is not exactly 12 characters starting with ALCLB4, re-read the label.
-
-Read the ACTUAL text from the photo. Do NOT guess or invent serial numbers.
+⚠️ CRITICAL VALIDATION — check your answer:
+1. Is it exactly 12 characters? If not, re-read. You likely dropped a character.
+2. Does it start with ALCLB4? If not, you're reading the wrong field.
+3. Is the 7th char "8"? If not, double-check — it's "8" in 98% of devices.
+4. Are all characters hex (0-9, A-F)? Letters like M, N, P, R, Y mean OCR error.
+5. Does it look like "ALCL" + digits only (no "B4")? You're reading something else.
 
 Respond in this exact JSON format:
 {
@@ -207,9 +206,8 @@ Respond in this exact JSON format:
   "confidence": <0.0 to 1.0>
 }
 
-IMPORTANT: If you cannot find a 12-character field starting with ALCLB4, set found to false.
-Do NOT return SSID values (ALHN-*) as the serial.
-NEVER return a serial you are not sure about - null is better than wrong.`;
+If you cannot confidently read a 12-character serial starting with ALCLB4, return found: false.
+Returning null is ALWAYS better than guessing.`;
 
 /**
  * Prompt for Step 9 front panel extraction (ONT serial + DR number)
@@ -218,28 +216,31 @@ NEVER return a serial you are not sure about - null is better than wrong.`;
  */
 const STEP9_FRONT_PROMPT = `You are analyzing the FRONT of a Nokia/Alcatel ONT device with installation labels.
 
-Look for these THREE items:
+Look for THREE items:
 
-1. GREEN STATUS LIGHTS - Are the indicator LEDs illuminated (green)?
-   - Look for lit LEDs labeled POWER, PON, LAN, WLAN, etc.
+1. GREEN STATUS LIGHTS - Are LEDs illuminated (POWER, PON, LAN, WLAN)?
 
-2. ONT SERIAL NUMBER - A sticker/label with the device serial:
-   ✅ CORRECT: ALWAYS starts with "ALCLB4" followed by 6 hex characters (0-9, A-F)
-   ✅ ALWAYS exactly 12 characters (e.g., ALCLB48F3528, ALCLB48DED6B)
-   ❌ WRONG: Do NOT extract SSID (starts with "ALHN-" like ALHN-C397)
-   - May be on a small white sticker on the front
-   - Read the ACTUAL text, do NOT guess
-   - If your reading is not 12 characters starting with ALCLB4, re-read carefully
+2. ONT SERIAL NUMBER - on a small white sticker attached to the front:
+   FORMAT: ALCLB4 + 6 hex characters = exactly 12 characters total
+   - The 7th char is almost always "8" (ALCLB4**8**XXXXX) — 98% of devices
+   - The 8th char is usually F, D, E, or C
+   - Most common: ALCLB48F____ (79%), ALCLB48D____ (14%), ALCLB48E____ (3%)
+   - Only hex chars after ALCLB4: digits 0-9 and letters A-F
+   - NEVER letters like M, N, P, R, S, Y, Z — those mean you misread
 
-3. DR NUMBER - A handwritten or printed label:
-   - Format: "DR" followed by 6-7 digits (e.g., DR1736721)
-   - Often on a yellow/white sticker or written on tape
-   - This is the drop/installation reference number
+   ⚠️ THESE ARE NOT THE SERIAL (frequently confused):
+   - DR numbers (DR1736721) — this is the drop reference, NOT the serial
+   - Model numbers (840F, 8408) — these are Nokia product codes
+   - SSID (ALHN-C397) — this is a WiFi network name
+   - Any number without the "ALCLB4" prefix
 
-COMMON MISTAKES TO AVOID:
-- Do NOT drop characters. The serial is ALWAYS 12 characters.
-- Do NOT confuse 6 with 8, or 0 with 8. Read carefully.
-- Common prefixes: ALCLB48D, ALCLB477, ALCLB48C, ALCLB48A, ALCLB480, ALCLB48F
+   ⚠️ VALIDATION CHECKLIST (check before answering):
+   - Exactly 12 characters? If 11, you dropped a char (usually the "8" at position 7)
+   - Starts with ALCLB4? If "ALCL" + random chars, you read the wrong label
+   - Only hex after ALCLB4? M/N/P/R/Y = misread
+   - Looks like a phone number or DR number? WRONG field
+
+3. DR NUMBER - handwritten/printed label: "DR" + 6-7 digits (e.g., DR1736721)
 
 Respond in this exact JSON format:
 {
@@ -247,7 +248,7 @@ Respond in this exact JSON format:
   "ontSerial": {
     "found": true/false,
     "serial": "<12-char serial starting with ALCLB4, or null>",
-    "rawText": "<exact text from label>",
+    "rawText": "<exact text you read from the sticker>",
     "confidence": <0.0 to 1.0>
   },
   "drNumber": {
@@ -258,8 +259,8 @@ Respond in this exact JSON format:
   }
 }
 
-IMPORTANT: Only extract serials starting with ALCLB4, exactly 12 chars. Ignore SSID values (ALHN-*).
-NEVER return a serial you are not sure about - null is better than wrong.`;
+CRITICAL: If you cannot read a clear 12-char serial starting with ALCLB4, return found: false.
+Returning null is ALWAYS better than guessing. Do NOT invent or fabricate serial numbers.`;
 
 /**
  * Build a confirmation prompt for verifying a known serial is visible
@@ -318,17 +319,20 @@ function isValidOntSerial(serial: string | null): boolean {
 
   // Must start with ALCLB4 (all Nokia ONTs in this network)
   if (!s.startsWith('ALCLB4')) {
-    // Fall back to ALCL/ALCB for edge cases
-    if (!s.startsWith('ALCL') && !s.startsWith('ALCB')) {
-      logger.debug(`Rejected non-ALC serial: ${serial}`);
-      return false;
-    }
+    logger.debug(`Rejected non-ALCLB4 serial: ${serial}`);
+    return false;
   }
 
   // Must be exactly 12 chars (all OES-confirmed serials are 12 chars)
-  // Allow 11-13 for slight OCR flexibility
-  if (s.length < 11 || s.length > 13) {
+  if (s.length !== 12) {
     logger.debug(`Rejected serial with wrong length (${s.length}): ${serial}`);
+    return false;
+  }
+
+  // Suffix after ALCLB4 must be hex only (0-9, A-F)
+  const suffix = s.substring(6);
+  if (!/^[0-9A-F]{6}$/.test(suffix)) {
+    logger.debug(`Rejected serial with non-hex suffix: ${serial}`);
     return false;
   }
 
@@ -337,14 +341,36 @@ function isValidOntSerial(serial: string | null): boolean {
 
 /**
  * Clean and normalize extracted serial
- * Fixes common OCR errors like missing characters
+ * Fixes common VLM extraction errors based on OES ground truth analysis
  */
 function normalizeSerial(serial: string | null): string | null {
   if (!serial) return null;
   let s = serial.trim().toUpperCase();
 
-  // Remove any spaces or dashes that shouldn't be there
-  s = s.replace(/[\s-]/g, '');
+  // Remove any spaces, dashes, or commas
+  s = s.replace(/[\s\-,]/g, '');
+
+  // Fix non-hex chars in the suffix (after ALCLB4) — common VLM OCR errors
+  if (s.startsWith('ALCLB4') && s.length >= 7) {
+    const prefix = s.substring(0, 6);
+    let suffix = s.substring(6);
+    // Replace common OCR misreads with closest hex char
+    suffix = suffix.replace(/[GI]/g, '6'); // G/I → 6
+    suffix = suffix.replace(/[O]/g, '0');  // O → 0
+    suffix = suffix.replace(/[S]/g, '5');  // S → 5
+    suffix = suffix.replace(/[Z]/g, '2');  // Z → 2
+    // Remove any remaining non-hex chars
+    suffix = suffix.replace(/[^0-9A-F]/g, '');
+    s = prefix + suffix;
+  }
+
+  // Auto-fix: VLM drops the '8' at position 7 ~40% of the time
+  // ALCLB4F4646 (11 chars) → ALCLB48F4646 (12 chars) when the rest matches
+  if (s.length === 11 && s.startsWith('ALCLB4') && !s.startsWith('ALCLB48')) {
+    const candidate = s.substring(0, 6) + '8' + s.substring(6);
+    logger.debug(`Auto-inserted '8' at pos 7: ${serial} → ${candidate}`);
+    s = candidate;
+  }
 
   return s;
 }
@@ -1403,6 +1429,13 @@ IMPORTANT:
 const PROMPT_EXAMPLE_SERIALS = new Set([
   'ALCLB6A9C97',
   'ALCLB48CC3CA',
+  'ALCLB48F2939',
+  'ALCL12345678',
+  'ALCLM1234567',
+  'ALCL8400821',
+  'ALCL6400821',
+  'ALCL8408021',
+  'ALCL84080311',
   'GU18W220901234',
 ]);
 
