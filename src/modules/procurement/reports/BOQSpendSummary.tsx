@@ -197,11 +197,11 @@ export function BOQSpendSummary() {
       <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg px-4 py-3">
         <div className="flex justify-between text-xs text-[var(--ff-text-tertiary)] mb-1.5">
           <span>
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" />
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" aria-hidden="true" />
             Confirmed {overallConfPct}%
           </span>
           <span>
-            <span className="inline-block w-2 h-2 rounded-full bg-purple-500/40 mr-1" />
+            <span className="inline-block w-2 h-2 rounded-full bg-purple-500/40 mr-1" aria-hidden="true" />
             Ordered {overallOrdPct}%
           </span>
         </div>
@@ -219,12 +219,12 @@ export function BOQSpendSummary() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
-                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">Project</th>
-                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)] uppercase">BOQ Budget</th>
-                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-purple-400/80 uppercase">Ordered</th>
-                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-green-400/80 uppercase">Confirmed</th>
-                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-amber-400/80 uppercase">Remaining</th>
-                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] uppercase w-44">Progress</th>
+                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)]">Project</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-[var(--ff-text-tertiary)]">BOQ budget</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-purple-400/80">Ordered</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-green-400/80">Confirmed</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-medium text-amber-400/80">Remaining</th>
+                <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-[var(--ff-text-tertiary)] w-44">Progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -235,8 +235,17 @@ export function BOQSpendSummary() {
                   <>
                     <tr
                       key={p.projectId}
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
                       className="hover:bg-[var(--ff-bg-hover)] transition-colors cursor-pointer"
                       onClick={() => toggleProject(p.projectId)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleProject(p.projectId);
+                        }
+                      }}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
