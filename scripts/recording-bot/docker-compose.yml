@@ -1,0 +1,34 @@
+# Recording Bot Docker Compose
+# Runs the screenappai/meeting-bot as a template — actual instances are
+# launched dynamically by the dispatcher (src/lib/recording-bot/dispatcher.ts)
+#
+# This compose file is for initial setup and testing only.
+# Production containers are launched via `docker run` from the dispatcher.
+#
+# Setup:
+#   1. docker compose pull
+#   2. Create bot-recordings directory: mkdir -p /home/velo/bot-recordings
+#   3. Install faster-whisper: pip install faster-whisper
+#   4. Add Presence.Read.All permission to Azure AD app
+
+services:
+  # One-shot test recording (not a long-running service)
+  recording-bot-test:
+    image: ghcr.io/screenappai/meeting-bot:latest
+    container_name: ff-recorder-test
+    shm_size: '1gb'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+    environment:
+      - MEETING_URL=${TEST_MEETING_URL:-https://teams.microsoft.com/l/meetup-join/test}
+      - BOT_NAME=VF Recorder
+      - CALLBACK_URL=https://app.fibreflow.app/api/recording-bot/callback
+      - RECORDING_ID=0
+      - MAX_DURATION_MS=10800000
+    volumes:
+      - /home/velo/bot-recordings/test:/output
+    profiles:
+      - test

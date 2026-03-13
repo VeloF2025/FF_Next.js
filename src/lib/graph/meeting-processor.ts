@@ -7,7 +7,9 @@ import {
   listTranscripts,
   downloadTranscriptContent,
   parseVttSpeakers,
+  type OnlineMeetingInfo,
 } from './transcripts';
+import type { ResolvedParticipant } from './speaker-resolver';
 import { listRecordings, downloadRecordingToDisk } from './recordings';
 import { resolveParticipants } from './speaker-resolver';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
@@ -126,11 +128,14 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
   log.info('Meeting upserted', { meetingId, callRecordId, durationMinutes }, LOGGER);
 
   try {
-    // 5. Fetch transcript and recording (requires joinWebUrl + a resolved organizer)
-    if (callRecord.joinWebUrl && organizerParticipant) {
-      const meetingInfo = await fetchOnlineMeetingInfo(
-        organizerParticipant.graphUserId,
-        callRecord.joinWebUrl
+    // 5. Fetch transcript and recording
+    // Try organizer first, then fall back to all participants (handles "Meet Now" calls
+    // where the onlineMeeting resource may be under a different participant)
+    if (callRecord.joinWebUrl) {
+      const { userId: resolvedUserId, meetingInfo } = await resolveOnlineMeeting(
+        callRecord.joinWebUrl,
+        organizerParticipant,
+        participants
       );
 
       // Update title from calendar subject if available
@@ -139,18 +144,9 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
         log.info('Title updated from calendar subject', { meetingId, subject: meetingInfo.subject }, LOGGER);
       }
 
-      if (meetingInfo?.id) {
-        await fetchAndStoreTranscript(
-          meetingId,
-          organizerParticipant.graphUserId,
-          meetingInfo.id
-        );
-
-        await fetchAndStoreRecording(
-          meetingId,
-          organizerParticipant.graphUserId,
-          meetingInfo.id
-        );
+      if (meetingInfo?.id && resolvedUserId) {
+        await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id);
+        await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
       }
     }
 
@@ -183,6 +179,57 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
 
     throw error;
   }
+}
+
+// Only try internal tenant users when resolving onlineMeeting
+const INTERNAL_DOMAINS = ['velocityfibre.co.za', 'blitzfibre.com'];
+
+/**
+ * Resolves the onlineMeeting resource by trying the organizer first,
+ * then falling back to every other tenant participant. This handles
+ * "Meet Now" calls where the meeting may live under a non-organizer user.
+ */
+async function resolveOnlineMeeting(
+  joinWebUrl: string,
+  organizerParticipant: ResolvedParticipant | null,
+  participants: ResolvedParticipant[]
+): Promise<{ userId: string | null; meetingInfo: OnlineMeetingInfo | null }> {
+  // Build ordered candidate list: organizer first, then other internal participants
+  const candidateUserIds: string[] = [];
+
+  if (organizerParticipant) {
+    candidateUserIds.push(organizerParticipant.graphUserId);
+  }
+
+  for (const p of participants) {
+    if (p.graphUserId && !candidateUserIds.includes(p.graphUserId)) {
+      const domain = p.email?.split('@')[1]?.toLowerCase();
+      if (domain && INTERNAL_DOMAINS.includes(domain)) {
+        candidateUserIds.push(p.graphUserId);
+      }
+    }
+  }
+
+  for (const userId of candidateUserIds) {
+    const meetingInfo = await fetchOnlineMeetingInfo(userId, joinWebUrl);
+    if (meetingInfo?.id) {
+      if (userId !== organizerParticipant?.graphUserId) {
+        log.info(
+          'onlineMeeting resolved via non-organizer participant',
+          { userId: userId.substring(0, 8), candidates: candidateUserIds.length },
+          LOGGER
+        );
+      }
+      return { userId, meetingInfo };
+    }
+  }
+
+  log.info(
+    'Could not resolve onlineMeeting via any participant',
+    { candidates: candidateUserIds.length, joinUrl: joinWebUrl.substring(0, 60) },
+    LOGGER
+  );
+  return { userId: null, meetingInfo: null };
 }
 
 /**
