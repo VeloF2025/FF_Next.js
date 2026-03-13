@@ -5,7 +5,7 @@
 - **Framework**: Next.js 14+ with App Router
 - **Auth**: PostgreSQL-based authentication (role-based)
 - **Database**: Neon PostgreSQL (direct SQL)
-- **Storage**: Firebase Storage (files/images)
+- **Storage**: VF Storage (self-hosted on 100.96.203.105:8091, served via vf.fibreflow.app/storage/)
 
 ## Essential Directory Structure
 ```
@@ -53,6 +53,16 @@ npm run lint && npm run type-check  # Quality checks
 npm test                            # Vitest
 npm run antihall                    # Validate code references
 ```
+
+## Git Workflow (MANDATORY)
+
+**ALL changes MUST go through a Pull Request.** No exceptions.
+
+- **NEVER commit directly to master** — always create a feature/fix branch and open a PR
+- **NEVER edit files in deploy directories** (`/home/velo/fibreflow-dev/`, `/home/velo/fibreflow-production/`) — these are deploy targets, not workspaces. All code changes happen in `/home/hein/Workspace/FF_Next.js/`
+- **Branch naming**: `feature/<name>`, `fix/<name>`, `refactor/<name>`
+- **Emergency hotfixes** still require a PR — use `ALLOW_MASTER_COMMIT=1` only if explicitly authorized by Hein
+- After merging a PR, deploy to dev by pulling in the deploy directory — never by editing files there
 
 ## Development Guidelines
 

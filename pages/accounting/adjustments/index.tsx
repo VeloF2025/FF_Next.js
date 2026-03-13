@@ -92,8 +92,8 @@ export default function AdjustmentsPage() {
             </button>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={() => router.push('/accounting/adjustments?type=customer')} className={`px-3 py-1 rounded text-sm ${entityType === 'customer' ? 'bg-amber-600 text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}>Customer</button>
-            <button onClick={() => router.push('/accounting/adjustments?type=supplier')} className={`px-3 py-1 rounded text-sm ${entityType === 'supplier' ? 'bg-amber-600 text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}>Supplier</button>
+            <button onClick={() => router.push('/accounting/adjustments?type=customer')} className={`px-4 py-2 rounded text-sm ${entityType === 'customer' ? 'bg-amber-600 text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}>Customer</button>
+            <button onClick={() => router.push('/accounting/adjustments?type=supplier')} className={`px-4 py-2 rounded text-sm ${entityType === 'supplier' ? 'bg-amber-600 text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}>Supplier</button>
           </div>
         </div>
 
