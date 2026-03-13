@@ -151,7 +151,7 @@ export function OltInvestigateTab({
         body: JSON.stringify({ record_ids: Array.from(selectedIds), ...params }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to create tickets');
+      if (!res.ok) throw new Error(result.error?.message || result.error || 'Failed to create tickets');
       const { created, skipped } = result.data;
       toast.success(`Created ${created} ticket${created !== 1 ? 's' : ''}${skipped > 0 ? ` (${skipped} skipped)` : ''}`);
       setShowTicketModal(false);
