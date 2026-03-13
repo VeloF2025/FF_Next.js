@@ -16,7 +16,7 @@ export { SerialScanner } from './serials/SerialScanner';
 export { ConsumptionRecorder } from './consumption/ConsumptionRecorder';
 
 // Pickings
-export { PickingList, SignatureCapture, CreatePickingForm } from './pickings';
+export { PickingList, PickingDetail, SignatureCapture, CreatePickingForm } from './pickings';
 
 // Returns
 export { ReturnList, CreateReturnModal, ReturnInspectionForm } from './returns';
