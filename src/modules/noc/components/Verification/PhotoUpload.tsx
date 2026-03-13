@@ -184,6 +184,28 @@ export function PhotoUpload({
     }
   }, [disabled, isUploading]);
 
+  // 🟢 WORKING: Handle clipboard paste (Ctrl+V / Cmd+V)
+  const handlePaste = useCallback(
+    (event: React.ClipboardEvent) => {
+      if (disabled || isUploading) return;
+
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            handleFileUpload(file);
+            break;
+          }
+        }
+      }
+    },
+    [disabled, isUploading, handleFileUpload]
+  );
+
   // 🟢 WORKING: Handle delete photo
   const handleDelete = useCallback(
     (event: React.MouseEvent) => {
@@ -278,6 +300,8 @@ export function PhotoUpload({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onPaste={handlePaste}
+        tabIndex={disabled || isUploading ? -1 : 0}
         className={cn(
           'border-2 border-dashed rounded-lg transition-all cursor-pointer',
           compact ? 'p-2' : 'p-4',
@@ -308,15 +332,18 @@ export function PhotoUpload({
                 <span className="text-xs text-[var(--ff-text-primary)]">Upload Photo</span>
               </>
             ) : (
-              <VelocityButton
-                variant="glass"
-                size="sm"
-                disabled={disabled}
-                className="pointer-events-none"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Photo
-              </VelocityButton>
+              <div className="flex flex-col items-center space-y-1">
+                <VelocityButton
+                  variant="glass"
+                  size="sm"
+                  disabled={disabled}
+                  className="pointer-events-none"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Photo
+                </VelocityButton>
+                <span className="text-xs text-[var(--ff-text-secondary)]">Drop, paste, or click to upload</span>
+              </div>
             )}
           </div>
         )}

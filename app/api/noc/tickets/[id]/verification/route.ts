@@ -1,20 +1,24 @@
 /**
  * Verification Steps API Route
  *
- * 🟢 WORKING: Production-ready API endpoint for retrieving verification steps
+ * // WORKING: Production-ready API endpoint for retrieving verification steps
  *
  * GET /api/noc/tickets/[id]/verification - List all verification steps
+ * POST /api/noc/tickets/[id]/verification - Initialize verification steps
  *
  * Features:
- * - Returns all 12 verification steps for a ticket (ordered by step_number)
+ * - Returns type-specific verification steps for a ticket (ordered by step_number)
  * - UUID format validation
  * - Proper error handling with standard API responses
  * - Follows Zero Tolerance protocol (no console.log, proper error handling)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { getVerificationSteps, initializeVerificationSteps } from '@/modules/noc/services/verificationService';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 const logger = createLogger('maintenance:api:verification');
 
@@ -152,9 +156,9 @@ export async function GET(
 // ==================== POST /api/noc/tickets/[id]/verification ====================
 
 /**
- * 🟢 WORKING: Initialize verification steps for a ticket
+ * // WORKING: Initialize type-specific verification steps for a ticket
  *
- * Creates all 12 verification steps for a ticket.
+ * Creates verification steps based on the ticket's type column.
  * Returns error if steps already exist.
  *
  * Response (201):
@@ -178,8 +182,19 @@ export async function POST(
 
     logger.info('Initializing verification steps', { ticketId });
 
-    // Initialize all 12 verification steps
-    const steps = await initializeVerificationSteps(ticketId);
+    // Fetch ticket type so we can select the correct step checklist
+    const ticketRows = await sql`
+      SELECT type FROM maintenance_tickets WHERE id = ${ticketId}
+    `;
+
+    if (ticketRows.length === 0) {
+      return notFoundError('Ticket', ticketId);
+    }
+
+    const ticketType = String(ticketRows[0]?.type ?? 'new_installation');
+
+    // Initialize type-specific verification steps
+    const steps = await initializeVerificationSteps(ticketId, ticketType);
 
     return NextResponse.json({
       success: true,

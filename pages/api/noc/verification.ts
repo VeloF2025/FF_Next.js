@@ -7,7 +7,7 @@
  * Query params:
  * - ticketId: UUID of the ticket (required)
  *
- * 🟢 WORKING: Flat route to avoid Vercel nested dynamic route issues
+ * // WORKING: Flat route to avoid Vercel nested dynamic route issues
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -15,22 +15,24 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
 import {
-  VERIFICATION_STEP_TEMPLATES,
-  TOTAL_VERIFICATION_STEPS,
+  getStepsForTicketType,
 } from '@/modules/noc/constants/verificationSteps';
 import type {
   VerificationStep,
   VerificationProgress,
-  VerificationStepNumber,
 } from '@/modules/noc/types/verification';
 import { withAuth } from '@/lib/auth';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 /**
- * Initialize verification steps for a ticket if they don't exist
+ * Initialize type-specific verification steps for a ticket if they don't exist.
+ * Reads the ticket's `type` column to select the correct step checklist.
  */
-async function initializeVerificationSteps(ticketId: string): Promise<VerificationStep[]> {
+async function initializeVerificationSteps(
+  ticketId: string,
+  ticketType: string
+): Promise<VerificationStep[]> {
   // Check if steps already exist
   const existing = await sql`
     SELECT * FROM maintenance_verification_steps
@@ -42,24 +44,14 @@ async function initializeVerificationSteps(ticketId: string): Promise<Verificati
     return existing as VerificationStep[];
   }
 
-  // Create all 12 steps
-  const stepNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as VerificationStepNumber[];
-  const insertValues = stepNumbers.map((num) => {
-    const template = VERIFICATION_STEP_TEMPLATES[num];
-    return {
-      ticket_id: ticketId,
-      step_number: num,
-      step_name: template.step_name,
-      step_description: template.step_description,
-      photo_required: template.photo_required,
-    };
-  });
+  // Resolve the correct step list for this ticket type
+  const templates = getStepsForTicketType(ticketType);
 
-  // Insert all steps
-  for (const step of insertValues) {
+  // Insert each step sequentially
+  for (const template of templates) {
     await sql`
       INSERT INTO maintenance_verification_steps (ticket_id, step_number, step_name, step_description, photo_required)
-      VALUES (${step.ticket_id}, ${step.step_number}, ${step.step_name}, ${step.step_description}, ${step.photo_required})
+      VALUES (${ticketId}, ${template.step_number}, ${template.step_name}, ${template.step_description}, ${template.photo_required})
     `;
   }
 
@@ -70,25 +62,33 @@ async function initializeVerificationSteps(ticketId: string): Promise<Verificati
     ORDER BY step_number
   `;
 
-  log.info('Initialized verification steps for ticket', { ticketId, count: created.length });
+  log.info('Initialized verification steps for ticket', {
+    ticketId,
+    ticketType,
+    count: created.length,
+  });
+
   return created as VerificationStep[];
 }
 
 /**
- * Calculate verification progress
+ * Calculate verification progress using the actual number of steps for this ticket.
  */
 function calculateProgress(steps: VerificationStep[]): VerificationProgress {
+  const totalSteps = steps.length;
   const completedSteps = steps.filter((s) => s.is_complete).length;
-  const pendingSteps = TOTAL_VERIFICATION_STEPS - completedSteps;
-  const progressPercentage = Math.round((completedSteps / TOTAL_VERIFICATION_STEPS) * 100);
+  const pendingSteps = totalSteps - completedSteps;
+  const progressPercentage = totalSteps > 0
+    ? Math.round((completedSteps / totalSteps) * 100)
+    : 0;
 
   return {
     ticket_id: steps[0]?.ticket_id || '',
-    total_steps: TOTAL_VERIFICATION_STEPS,
+    total_steps: totalSteps,
     completed_steps: completedSteps,
     pending_steps: pendingSteps,
     progress_percentage: progressPercentage,
-    all_steps_complete: completedSteps === TOTAL_VERIFICATION_STEPS,
+    all_steps_complete: totalSteps > 0 && completedSteps === totalSteps,
     steps,
   };
 }
@@ -109,17 +109,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // GET - Fetch verification steps
   if (req.method === 'GET') {
     try {
-      // Verify ticket exists
+      // Verify ticket exists and fetch its type
       const ticket = await sql`
-        SELECT id FROM maintenance_tickets WHERE id = ${ticketId}
+        SELECT id, type FROM maintenance_tickets WHERE id = ${ticketId}
       `;
 
       if (ticket.length === 0) {
         return apiResponse.notFound(res, 'Ticket', ticketId);
       }
 
+      const ticketType = String(ticket[0]?.type ?? 'new_installation');
+
       // Get or initialize steps
-      const steps = await initializeVerificationSteps(ticketId);
+      const steps = await initializeVerificationSteps(ticketId, ticketType);
 
       return apiResponse.success(res, steps);
     } catch (error) {
@@ -131,17 +133,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // POST - Get verification progress
   if (req.method === 'POST') {
     try {
-      // Verify ticket exists
+      // Verify ticket exists and fetch its type
       const ticket = await sql`
-        SELECT id FROM maintenance_tickets WHERE id = ${ticketId}
+        SELECT id, type FROM maintenance_tickets WHERE id = ${ticketId}
       `;
 
       if (ticket.length === 0) {
         return apiResponse.notFound(res, 'Ticket', ticketId);
       }
 
+      const ticketType = String(ticket[0]?.type ?? 'new_installation');
+
       // Get or initialize steps
-      const steps = await initializeVerificationSteps(ticketId);
+      const steps = await initializeVerificationSteps(ticketId, ticketType);
 
       // Calculate progress
       const progress = calculateProgress(steps);

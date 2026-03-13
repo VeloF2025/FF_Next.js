@@ -27,8 +27,7 @@ import {
   VerificationProgress,
 } from '../types/verification';
 import {
-  VERIFICATION_STEP_TEMPLATES,
-  TOTAL_VERIFICATION_STEPS,
+  getStepsForTicketType,
 } from '../constants/verificationSteps';
 import { createLogger } from '@/lib/logger';
 
@@ -47,22 +46,27 @@ function isValidUUID(id: string): boolean {
 }
 
 /**
- * Initialize 12 verification steps for a new ticket
+ * Initialize type-specific verification steps for a new ticket.
  *
- * Creates all 12 standard verification steps in a single transaction.
- * Steps are initialized from templates with default incomplete state.
+ * Selects the correct step checklist based on the ticket type and creates all
+ * steps in a single transaction. Defaults to the 12-step new_installation
+ * checklist when no ticket type is provided.
  *
  * @param ticketId - UUID of the ticket
+ * @param ticketType - Value of the `type` column from maintenance_tickets (optional, defaults to 'new_installation')
  * @returns Array of created verification steps
  * @throws {Error} If ticket doesn't exist or steps already initialized
  */
-export async function initializeVerificationSteps(ticketId: string): Promise<VerificationStep[]> {
-  // 🟢 WORKING: Validate ticket ID format
+export async function initializeVerificationSteps(
+  ticketId: string,
+  ticketType: string = 'new_installation'
+): Promise<VerificationStep[]> {
+  // WORKING: Validate ticket ID format
   if (!isValidUUID(ticketId)) {
     throw new Error('Invalid ticket ID format');
   }
 
-  // 🟢 WORKING: Check if ticket exists
+  // WORKING: Check if ticket exists
   const ticketExists = await queryOne<{ id: string }>(
     'SELECT id FROM maintenance_tickets WHERE id = $1',
     [ticketId]
@@ -72,7 +76,7 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
     throw new Error('Ticket not found');
   }
 
-  // 🟢 WORKING: Check if steps already initialized
+  // WORKING: Check if steps already initialized
   const existingSteps = await query<VerificationStep>(
     'SELECT id FROM maintenance_verification_steps WHERE ticket_id = $1 LIMIT 1',
     [ticketId]
@@ -82,13 +86,14 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
     throw new Error('Verification steps already initialized for this ticket');
   }
 
-  // 🟢 WORKING: Initialize all 12 steps in a transaction
+  // WORKING: Resolve the correct step list for this ticket type
+  const templates = getStepsForTicketType(ticketType);
+
+  // WORKING: Initialize all steps in a transaction
   const steps = await transaction(async (txn) => {
     const createdSteps: VerificationStep[] = [];
 
-    for (let stepNumber = 1; stepNumber <= TOTAL_VERIFICATION_STEPS; stepNumber++) {
-      const template = VERIFICATION_STEP_TEMPLATES[stepNumber as VerificationStepNumber];
-
+    for (const template of templates) {
       const insertQuery = `
         INSERT INTO maintenance_verification_steps (
           ticket_id,
@@ -133,6 +138,7 @@ export async function initializeVerificationSteps(ticketId: string): Promise<Ver
 
     logger.info('Initialized verification steps', {
       ticketId,
+      ticketType,
       stepCount: createdSteps.length,
     });
 
@@ -363,15 +369,18 @@ export async function calculateProgress(ticketId: string): Promise<VerificationP
     throw new Error('No verification steps found for this ticket');
   }
 
-  // 🟢 WORKING: Calculate progress metrics
+  // WORKING: Calculate progress metrics using actual step count for this ticket type
+  const totalSteps = steps.length;
   const completedSteps = steps.filter((s) => s.is_complete).length;
-  const pendingSteps = steps.length - completedSteps;
-  const progressPercentage = Math.round((completedSteps / TOTAL_VERIFICATION_STEPS) * 100);
-  const allStepsComplete = completedSteps === TOTAL_VERIFICATION_STEPS;
+  const pendingSteps = totalSteps - completedSteps;
+  const progressPercentage = totalSteps > 0
+    ? Math.round((completedSteps / totalSteps) * 100)
+    : 0;
+  const allStepsComplete = totalSteps > 0 && completedSteps === totalSteps;
 
   const progress: VerificationProgress = {
     ticket_id: ticketId,
-    total_steps: TOTAL_VERIFICATION_STEPS,
+    total_steps: totalSteps,
     completed_steps: completedSteps,
     pending_steps: pendingSteps,
     progress_percentage: progressPercentage,
@@ -381,7 +390,7 @@ export async function calculateProgress(ticketId: string): Promise<VerificationP
 
   logger.debug('Calculated verification progress', {
     ticketId,
-    progress: `${completedSteps}/${TOTAL_VERIFICATION_STEPS}`,
+    progress: `${completedSteps}/${totalSteps}`,
     percentage: progressPercentage,
   });
 
@@ -414,7 +423,9 @@ export async function isAllStepsComplete(ticketId: string): Promise<boolean> {
     return false;
   }
 
-  const allComplete = result.completed === TOTAL_VERIFICATION_STEPS;
+  // Compare completed count against the actual number of steps stored for this ticket,
+  // not the fixed default of 12.
+  const allComplete = Number(result.completed) === Number(result.total);
 
   logger.debug('Checked verification completion', {
     ticketId,
