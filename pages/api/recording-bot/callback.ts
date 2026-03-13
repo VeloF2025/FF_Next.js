@@ -3,6 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { transcribeAudio } from '@/lib/recording-bot/transcriber';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
 
@@ -39,20 +40,20 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
     return;
   }
 
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization;
   if (!cronSecret || !authHeader || authHeader !== `Bearer ${cronSecret}`) {
-    res.status(401).json({ error: 'Unauthorized' });
+    apiResponse.unauthorized(res);
     return;
   }
 
   const body = req.body as CallbackPayload;
   if (!body?.recording_id) {
-    res.status(400).json({ error: 'Missing recording_id' });
+    apiResponse.badRequest(res, 'Missing recording_id');
     return;
   }
 
@@ -65,7 +66,7 @@ export default async function handler(
       SET status = 'failed', error = ${body.error ?? 'Unknown error'}, completed_at = NOW()
       WHERE id = ${body.recording_id}
     `;
-    res.status(200).json({ success: true });
+    apiResponse.success(res, { recordingId: body.recording_id, status: 'failed' });
     return;
   }
 
@@ -81,7 +82,7 @@ export default async function handler(
   `;
 
   // Respond immediately, process in background
-  res.status(202).json({ success: true, message: 'Processing queued' });
+  apiResponse.success(res, { recordingId: body.recording_id, status: 'processing' }, 'Processing queued', 202);
 
   // Background: transcribe + enrich
   setImmediate(async () => {

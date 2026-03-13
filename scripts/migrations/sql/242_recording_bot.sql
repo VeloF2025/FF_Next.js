@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS bot_recordings (
   dispatched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at    TIMESTAMPTZ,         -- When bot joined the meeting
   completed_at  TIMESTAMPTZ,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_bot_recordings_status ON bot_recordings(status);
