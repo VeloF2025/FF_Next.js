@@ -57,6 +57,7 @@ const QFIELD_TO_FIBREFLOW: Record<string, string> = {
   // Additional projects
   '47eb39f5-d6a8-4ce7-9421-9133872c1951': '7003dc06-9af7-4a7c-bc6c-a177d77784f2', // MAM Pole Audit (offline) → Mamelodi
   '380147aa-0c25-4b09-a745-2480addd8cca': 'c7255076-1d2f-41ce-97bb-858b8c87ee27', // ETWpoc1 → Etwatwa
+  '7fe59cdc-b1d5-475d-8448-5cf2e9f7175b': 'ce3bf310-d6ba-4ede-ab36-a8c902a5efc6', // Tonga Site Audit 2026 → Tonga
 };
 
 /** Reverse map: FibreFlow project UUID → QFieldCloud project UUIDs */
@@ -170,7 +171,9 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
         qpv.vlm_raw_response,
         qpv.needs_retake,
         qpv.validated_at,
-        qpv.created_at
+        qpv.created_at,
+        qpv.checklist_step,
+        qpv.step_label
       FROM qfield_photo_validations qpv
       WHERE qpv.feature_id IS NOT NULL
         AND qpv.project_id IN (${qfPlaceholders})
@@ -260,6 +263,33 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
           await sql`
             UPDATE construction_qa_reviews
             SET last_photo_at = LEAST(last_photo_at, ${earliestCapture.toISOString()}::timestamptz)
+            WHERE id = ${reviewId}::uuid
+          `;
+        }
+
+        // Update civil step booleans from assigned checklist_step values
+        if (mapping.discipline === 'civil') {
+          await sql`
+            WITH photo_steps AS (
+              SELECT
+                bool_or(checklist_step = 1) AS s1, bool_or(checklist_step = 2) AS s2,
+                bool_or(checklist_step = 3) AS s3, bool_or(checklist_step = 4) AS s4,
+                bool_or(checklist_step = 5) AS s5, bool_or(checklist_step = 6) AS s6,
+                bool_or(checklist_step = 7) AS s7, bool_or(checklist_step = 8) AS s8
+              FROM construction_qa_photos
+              WHERE review_id = ${reviewId}::uuid
+            )
+            UPDATE construction_qa_reviews SET
+              civil_step_01_before_photo = COALESCE(ps.s1, false),
+              civil_step_02_during_photo = COALESCE(ps.s2, false),
+              civil_step_03_depth_photo = COALESCE(ps.s3, false),
+              civil_step_04_end_plates = COALESCE(ps.s4, false),
+              civil_step_05_compaction = COALESCE(ps.s5, false),
+              civil_step_06_level_check = COALESCE(ps.s6, false),
+              civil_step_07_after_photo = COALESCE(ps.s7, false),
+              civil_step_08_signature = COALESCE(ps.s8, false),
+              updated_at = NOW()
+            FROM photo_steps ps
             WHERE id = ${reviewId}::uuid
           `;
         }
@@ -422,11 +452,15 @@ async function insertPhoto(
   const source = localPath ? 'local' : 'qfield';
   const storageKey = localPath || photoKey;
 
+  const checklistStep = qfPhoto.checklist_step != null ? Number(qfPhoto.checklist_step) : null;
+  const stepLabel = (qfPhoto.step_label as string) || null;
+
   await sql`
     INSERT INTO construction_qa_photos (
       review_id, project_id, source, storage_key, filename, mime_type,
       vlm_valid, vlm_confidence, vlm_feedback,
-      needs_retake, captured_at
+      needs_retake, captured_at,
+      checklist_step, step_label
     ) VALUES (
       ${reviewId}::uuid,
       ${projectId}::uuid,
@@ -438,7 +472,9 @@ async function insertPhoto(
       ${qfPhoto.vlm_confidence != null ? Number(qfPhoto.vlm_confidence) : null},
       ${(qfPhoto.vlm_feedback as string) || null},
       ${Boolean(qfPhoto.needs_retake)},
-      ${capturedAt ? capturedAt.toISOString() : null}
+      ${capturedAt ? capturedAt.toISOString() : null},
+      ${checklistStep},
+      ${stepLabel}
     )
   `;
 
