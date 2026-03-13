@@ -312,6 +312,31 @@ export function classifyErrorPattern(
     if (vlm.startsWith('ALHN-')) return 'ssid_not_serial';
     if (vlm.startsWith('STN')) return 'part_number_not_serial';
     if (/^[0-9A-F]{12}$/i.test(vlm)) return 'mac_not_serial';
+
+    // Serial-specific digit confusion (hex chars, not just numeric)
+    if (vlm.length !== correct.length) return 'length_mismatch' as ErrorPattern;
+    let diffCount = 0;
+    const diffs: string[] = [];
+    for (let i = 0; i < vlm.length; i++) {
+      if (vlm[i] !== correct[i]) {
+        diffCount++;
+        diffs.push(`${vlm[i]}${correct[i]}`);
+      }
+    }
+    if (diffCount === 1 && diffs[0]) {
+      const pair = diffs[0];
+      const confusions: Record<string, ErrorPattern> = {
+        '17': 'digit_1_7', '71': 'digit_1_7',
+        '16': 'digit_1_6', '61': 'digit_1_6',
+        '68': 'digit_6_8', '86': 'digit_6_8',
+        '80': 'digit_8_0', '08': 'digit_8_0',
+        '94': 'digit_9_4', '49': 'digit_9_4',
+        '23': 'digit_2_3', '32': 'digit_2_3',
+      };
+      return confusions[pair] || `single_char_${diffCount}` as ErrorPattern;
+    }
+    if (diffCount <= 3) return `multi_char_${diffCount}` as ErrorPattern;
+    return 'totally_wrong' as ErrorPattern;
   }
 
   // Check for odometer digit confusion
