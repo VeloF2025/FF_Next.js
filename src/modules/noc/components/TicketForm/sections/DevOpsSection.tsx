@@ -1,17 +1,19 @@
 /**
  * DevOps Section - DevOps-specific fields for FibreFlow application issues
- * // WORKING: Form section for DevOps ticket classification and details
+ * // WORKING: Form section with screenshot-first VLM analysis + manual fields
  */
 
 'use client';
 
 import { Bug } from 'lucide-react';
 import { type TicketFormData, type TicketFormErrors } from '../../../hooks/useTicketForm';
+import { ScreenshotUploader } from './ScreenshotUploader';
 
 interface DevOpsSectionProps {
   formData: TicketFormData;
   errors: TicketFormErrors;
   setField: <K extends keyof TicketFormData>(field: K, value: TicketFormData[K]) => void;
+  setFields: (fields: Partial<TicketFormData>) => void;
   disabled?: boolean;
 }
 
@@ -38,7 +40,28 @@ const ENVIRONMENTS: { value: string; label: string; color: string }[] = [
   { value: 'local', label: 'Local', color: 'bg-blue-500/20 border-blue-500 text-blue-400' },
 ];
 
-export function DevOpsSection({ formData, errors, setField, disabled }: DevOpsSectionProps) {
+export function DevOpsSection({ formData, errors, setField, setFields, disabled }: DevOpsSectionProps) {
+  const handleFieldsExtracted = (fields: Record<string, string>) => {
+    // Map VLM output to form fields (including title/description which live in DetailsSection)
+    const mapped: Partial<TicketFormData> = {};
+    if (fields.title) mapped.title = fields.title;
+    if (fields.description) mapped.description = fields.description;
+    if (fields.affected_module) mapped.affected_module = fields.affected_module;
+    if (fields.environment) mapped.environment = fields.environment;
+    if (fields.error_url) mapped.error_url = fields.error_url;
+    if (fields.stack_trace) mapped.stack_trace = fields.stack_trace;
+    if (fields.steps_to_reproduce) mapped.steps_to_reproduce = fields.steps_to_reproduce;
+    if (fields.browser_info) mapped.browser_info = fields.browser_info;
+    if (fields.priority_suggestion) {
+      const priorityMap: Record<string, string> = {
+        low: 'low', normal: 'normal', high: 'high', urgent: 'urgent', critical: 'critical',
+      };
+      const p = priorityMap[fields.priority_suggestion];
+      if (p) mapped.priority = p as TicketFormData['priority'];
+    }
+    setFields(mapped);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-lg font-semibold text-[var(--ff-text-primary)]">
@@ -48,6 +71,9 @@ export function DevOpsSection({ formData, errors, setField, disabled }: DevOpsSe
           Application Issue
         </span>
       </div>
+
+      {/* Screenshot Upload + VLM Analysis */}
+      <ScreenshotUploader onFieldsExtracted={handleFieldsExtracted} disabled={disabled} />
 
       {/* Affected Module */}
       <div>

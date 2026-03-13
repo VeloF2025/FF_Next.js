@@ -126,7 +126,20 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         />
       </div>
 
-      {/* Section 2: Ticket Details */}
+      {/* Section 2a: DevOps Details — shown BEFORE details for dev_ops tickets (screenshot-first) */}
+      {sections.devops && (
+        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
+          <DevOpsSection
+            formData={form.formData}
+            errors={form.errors}
+            setField={form.setField}
+            setFields={form.setFields}
+            disabled={form.isSubmitting}
+          />
+        </div>
+      )}
+
+      {/* Section 2b: Ticket Details */}
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
         <DetailsSection
           formData={form.formData}
@@ -186,19 +199,7 @@ export function TicketForm({ onCancel, initialValues }: TicketFormProps) {
         />
       </div>
 
-      {/* Section 7: DevOps Details — shown only for dev_ops tickets */}
-      {sections.devops && (
-        <div className="bg-[var(--ff-bg-secondary)] rounded-lg p-6 border border-[var(--ff-border-light)]">
-          <DevOpsSection
-            formData={form.formData}
-            errors={form.errors}
-            setField={form.setField}
-            disabled={form.isSubmitting}
-          />
-        </div>
-      )}
-
-      {/* Section 8: Fault Attribution — only for fault_repair tickets */}
+      {/* Section 7: Fault Attribution — only for fault_repair tickets */}
       {sections.fault && (
         <FaultSection
           formData={form.formData}

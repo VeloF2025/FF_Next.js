@@ -43,6 +43,7 @@ const VALID_SOURCES: TicketSource[] = [
   TicketSource.ONT_SWAP,
   TicketSource.MANUAL,
   TicketSource.PP_DATA,
+  TicketSource.DEV_OPS,
 ];
 
 const VALID_TYPES: TicketType[] = [
@@ -56,6 +57,7 @@ const VALID_TYPES: TicketType[] = [
   TicketType.OLT_INVESTIGATION,
   TicketType.HSE_INCIDENT,
   TicketType.HSE_NEAR_MISS,
+  TicketType.DEV_OPS,
 ];
 
 const VALID_PRIORITIES: TicketPriority[] = [
