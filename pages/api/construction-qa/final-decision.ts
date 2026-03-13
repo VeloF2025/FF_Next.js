@@ -143,11 +143,33 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
+    // Push QA notes back to QField GPKG (async, non-blocking)
+    let qfieldPushed = false;
+    if (decision === 'FAIL' || decision === 'REWORK_NEEDED') {
+      try {
+        const pushUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/api/construction-qa/push-qfield-comment`;
+        fetch(pushUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: req.headers.cookie || '',
+          },
+          body: JSON.stringify({ reviewId }),
+        }).catch(err => {
+          log.warn('QField push-back fire-and-forget failed', { module: 'construction-qa', error: String(err) });
+        });
+        qfieldPushed = true;
+      } catch (pushErr) {
+        log.warn('QField push-back failed', { module: 'construction-qa', error: (pushErr as Error).message });
+      }
+    }
+
     return apiResponse.success(res, {
       reviewId,
       decision,
       waSent,
       waError,
+      qfieldPushed,
     });
   } catch (error) {
     log.error('Final decision error', { module: 'construction-qa', error: (error as Error).message });

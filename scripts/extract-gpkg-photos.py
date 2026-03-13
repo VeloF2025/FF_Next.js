@@ -546,6 +546,58 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             pass
 
 
+def resolve_unversioned_keys(conn):
+    """Resolve unversioned storage keys in both qfield_photo_validations and construction_qa_photos."""
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Fix qfield_photo_validations
+    cur.execute("""
+        SELECT DISTINCT photo_key FROM qfield_photo_validations
+        WHERE photo_key NOT LIKE '%%/v2%%' AND photo_key IS NOT NULL
+    """)
+    qpv_keys = [r["photo_key"] for r in cur.fetchall()]
+
+    # Fix construction_qa_photos
+    cur.execute("""
+        SELECT DISTINCT storage_key FROM construction_qa_photos
+        WHERE source = 'qfield' AND storage_key NOT LIKE '%%/v2%%' AND storage_key IS NOT NULL
+    """)
+    cqp_keys = [r["storage_key"] for r in cur.fetchall()]
+
+    all_keys = set(qpv_keys + cqp_keys)
+    if not all_keys:
+        return
+
+    print(f"\n  Resolving {len(all_keys)} unversioned storage keys...")
+    resolved = 0
+
+    for key in all_keys:
+        # Extract project_id and dcim_path from key like projects/{uuid}/files/DCIM/filename.jpg
+        parts = key.split("/")
+        if len(parts) < 4 or parts[0] != "projects":
+            continue
+        qf_id = parts[1]
+        dcim_path = "/".join(parts[3:])  # DCIM/filename.jpg
+
+        versioned = minio_resolve_photo_version(qf_id, dcim_path)
+        if not versioned:
+            continue
+
+        # Update both tables
+        cur.execute(
+            "UPDATE qfield_photo_validations SET photo_key = %s WHERE photo_key = %s",
+            (versioned, key),
+        )
+        cur.execute(
+            "UPDATE construction_qa_photos SET storage_key = %s WHERE storage_key = %s",
+            (versioned, key),
+        )
+        resolved += 1
+
+    conn.commit()
+    print(f"  Resolved {resolved}/{len(all_keys)} keys to versioned paths")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract GPKG photo references → qfield_photo_validations")
     parser.add_argument("--project", type=str, help="Process single project by name")
@@ -589,6 +641,10 @@ def main():
             f2, u2 = extract_project(conn, f"{name} (alt)", alt, args.dry_run, args.force)
             total_found += f2
             total_upserted += u2
+
+    # ── Resolve previously-unversioned storage keys ──────────────────────────
+    if not args.dry_run:
+        resolve_unversioned_keys(conn)
 
     print(f"\n{'='*60}")
     print(f"TOTAL: {total_found} photos found, {total_upserted} new upserted")

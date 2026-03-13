@@ -66,62 +66,94 @@ export default withAuth(withPermission('construction-qa.qa-centre')(handler));
 
 async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void> {
   const objectPath = key.startsWith('/') ? key.slice(1) : key;
-  const mcPath = `local/${MINIO_BUCKET}/${objectPath}`;
-  const escapedPath = mcPath.replace(/'/g, "'\\''");
-  const command = `docker exec qfieldcloud-minio-1 mc cat '${escapedPath}' 2>&1`;
 
+  // Try the exact path first, then resolve latest version for unversioned keys
+  const pathsToTry = [objectPath];
+
+  // If key looks unversioned (no /v2 suffix), try resolving the latest version
+  if (!objectPath.includes('/v2')) {
+    const resolved = await resolveLatestVersion(objectPath);
+    if (resolved) {
+      pathsToTry.unshift(resolved); // Try resolved version first
+    }
+  }
+
+  for (const tryPath of pathsToTry) {
+    const mcPath = `local/${MINIO_BUCKET}/${tryPath}`;
+    const escapedPath = mcPath.replace(/'/g, "'\\''");
+    const command = `docker exec qfieldcloud-minio-1 mc cat '${escapedPath}' 2>&1`;
+
+    try {
+      const { stdout } = await execAsync(command, {
+        encoding: 'buffer',
+        maxBuffer: 50 * 1024 * 1024,
+      });
+
+      if (!stdout || stdout.length === 0) continue;
+
+      // Check for mc error messages
+      const firstBytes = stdout.slice(0, 100).toString('utf-8');
+      if (firstBytes.startsWith('mc:') || firstBytes.includes('ERROR') || firstBytes.includes('does not exist')) {
+        continue;
+      }
+
+      // Verify image magic bytes
+      const isJpeg = stdout[0] === 0xff && stdout[1] === 0xd8 && stdout[2] === 0xff;
+      const isPng = stdout[0] === 0x89 && stdout[1] === 0x50 && stdout[2] === 0x4e && stdout[3] === 0x47;
+      if (!isJpeg && !isPng && stdout.length < 1000) continue;
+
+      // Content type from extension
+      const ext = tryPath.split('.').pop()?.toLowerCase() || 'jpg';
+      const contentTypes: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
+      };
+
+      res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      res.setHeader('Content-Length', stdout.length);
+      res.send(stdout);
+      return;
+    } catch (execError) {
+      const err = execError as { stderr?: string; message?: string };
+      const errorMsg = err.stderr || err.message || '';
+
+      if (errorMsg.includes('Cannot connect to the Docker daemon') || errorMsg.includes('No such container')) {
+        res.status(503).json({ error: 'Photo proxy only available on staging/production server' });
+        return;
+      }
+
+      // Try next path
+      continue;
+    }
+  }
+
+  res.status(404).json({ error: 'Photo not found', key: objectPath });
+}
+
+/** Resolve an unversioned MinIO key to its latest version. */
+async function resolveLatestVersion(objectPath: string): Promise<string | null> {
   try {
-    const { stdout } = await execAsync(command, {
-      encoding: 'buffer',
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    const mcPath = `local/${MINIO_BUCKET}/${objectPath}/`;
+    const escapedPath = mcPath.replace(/'/g, "'\\''");
+    const { stdout } = await execAsync(
+      `docker exec qfieldcloud-minio-1 mc ls '${escapedPath}' 2>/dev/null`,
+      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 },
+    );
 
-    if (!stdout || stdout.length === 0) {
-      res.status(404).json({ error: 'Photo not found or empty', key: objectPath });
-      return;
-    }
+    if (!stdout || !stdout.trim()) return null;
 
-    // Check for mc error messages
-    const firstBytes = stdout.slice(0, 100).toString('utf-8');
-    if (firstBytes.startsWith('mc:') || firstBytes.includes('ERROR') || firstBytes.includes('does not exist')) {
-      res.status(404).json({ error: 'Photo not found', key: objectPath });
-      return;
-    }
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    if (lines.length === 0) return null;
 
-    // Verify image magic bytes
-    const isJpeg = stdout[0] === 0xff && stdout[1] === 0xd8 && stdout[2] === 0xff;
-    const isPng = stdout[0] === 0x89 && stdout[1] === 0x50 && stdout[2] === 0x4e && stdout[3] === 0x47;
-    if (!isJpeg && !isPng && stdout.length < 1000) {
-      res.status(404).json({ error: 'Invalid image data', key: objectPath });
-      return;
-    }
+    // Last line has latest version: "... v20260310120500-7bc5005f"
+    const parts = lines[lines.length - 1].trim().split(/\s+/);
+    const version = parts[parts.length - 1].replace(/\/$/, '');
+    if (!version.startsWith('v2')) return null;
 
-    // Content type from extension
-    const ext = objectPath.split('.').pop()?.toLowerCase() || 'jpg';
-    const contentTypes: Record<string, string> = {
-      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-      gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-    };
-
-    res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-    res.setHeader('Content-Length', stdout.length);
-    res.send(stdout);
-  } catch (execError) {
-    const err = execError as { stderr?: string; message?: string };
-    const errorMsg = err.stderr || err.message || '';
-
-    if (errorMsg.includes('does not exist') || errorMsg.includes('not found') || errorMsg.includes('404')) {
-      res.status(404).json({ error: 'Photo not found', key: objectPath });
-      return;
-    }
-
-    if (errorMsg.includes('Cannot connect to the Docker daemon') || errorMsg.includes('No such container')) {
-      res.status(503).json({ error: 'Photo proxy only available on staging/production server' });
-      return;
-    }
-
-    throw execError;
+    return `${objectPath}/${version}`;
+  } catch {
+    return null;
   }
 }
 
