@@ -12,37 +12,30 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { findEligibleDRs, processOneDR, type AutoQaProcessResult } from '@/modules/activate/services/autoQaProcessor';
 
-interface AutoQaResponse {
-  success: boolean;
-  processed: number;
-  succeeded: number;
-  failed: number;
-  skipped: number;
-  results: AutoQaProcessResult[];
-  timestamp: string;
-}
-
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<AutoQaResponse | { error: string }>
+  res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET' && req.method !== 'POST') {
-    res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 
-  // Verify cron secret in production
-  const authHeader = req.headers.authorization;
+  // Always require bearer token regardless of environment
   const cronSecret = process.env.CRON_SECRET;
 
-  if (process.env.NODE_ENV === 'production' && cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      log.error('AutoQaCron', 'Unauthorized request');
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  if (!cronSecret) {
+    log.error('AutoQaCron', 'CRON_SECRET environment variable not configured');
+    return apiResponse.error(res, ErrorCode.INTERNAL_ERROR, 'Server misconfigured: CRON_SECRET not set');
+  }
+
+  const authHeader = req.headers.authorization;
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    log.error('AutoQaCron', 'Unauthorized request');
+    return apiResponse.unauthorized(res, 'Invalid or missing cron secret');
   }
 
   const limit = Number(req.query.limit) || Number(req.body?.limit) || 10;
@@ -54,13 +47,12 @@ export default async function handler(
 
     if (eligibleDRs.length === 0) {
       log.info('AutoQaCron', 'No DRs eligible for auto-QA');
-      return res.status(200).json({
-        success: true,
+      return apiResponse.success(res, {
         processed: 0,
         succeeded: 0,
         failed: 0,
         skipped: 0,
-        results: [],
+        results: [] as AutoQaProcessResult[],
         timestamp: new Date().toISOString(),
       });
     }
@@ -88,8 +80,7 @@ export default async function handler(
 
     log.info('AutoQaCron', `Completed: ${succeeded} succeeded, ${skipped} skipped, ${failed} failed`);
 
-    return res.status(200).json({
-      success: true,
+    return apiResponse.success(res, {
       processed: eligibleDRs.length,
       succeeded,
       failed,
@@ -98,8 +89,7 @@ export default async function handler(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
-    log.error('AutoQaCron', `Fatal error: ${errMsg}`);
-    return res.status(500).json({ error: errMsg });
+    log.error('AutoQaCron', `Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+    return apiResponse.internalError(res, error);
   }
 }

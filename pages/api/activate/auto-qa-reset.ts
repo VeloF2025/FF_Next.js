@@ -39,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
       [dropNumber]
     );
 
-    await logActivity(dropNumber, 'auto_qa_reset', {
+    await logActivity(dropNumber, 'AUTO_QA_RESET', {
       reason: 'Human operator rejected auto-QA, requesting manual review',
     }, 'system');
 
