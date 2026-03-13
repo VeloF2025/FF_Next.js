@@ -1,11 +1,12 @@
 'use client';
 
 /**
- * KanbanBoard Component (Enhanced)
+ * KanbanBoard Component
  *
  * Main Kanban board for ticket workflow management.
- * Uses @hello-pangea/dnd for drag-and-drop with framer-motion animations.
- * Features: WIP limits, accessibility, touch support.
+ * Uses @hello-pangea/dnd for drag-and-drop.
+ * Quick-move buttons let users advance/revert tickets without dragging.
+ * Optimistic updates for instant visual feedback.
  */
 
 import { useMemo, useState, useCallback } from 'react';
@@ -36,9 +37,12 @@ const COLUMN_CONFIG: ColumnConfig[] = [
   { status: 'closed' },
 ];
 
+// Ordered status flow for quick-move navigation
+const STATUS_FLOW: DatabaseStatus[] = COLUMN_CONFIG.map(c => c.status);
+
 // Map legacy/unmapped statuses to a visible column
 const STATUS_COLUMN_MAP: Record<string, DatabaseStatus> = {
-  new: 'open',            // legacy 'new' → 'open'
+  new: 'open',
   qa_in_progress: 'pending_qa',
   qa_rejected: 'in_progress',
   qa_approved: 'resolved',
@@ -52,6 +56,8 @@ const COMPLETED_STATUSES: DatabaseStatus[] = ['resolved', 'closed'];
 
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Optimistic status overrides: ticketId → new status (applied instantly, cleared on API response)
+  const [optimisticMoves, setOptimisticMoves] = useState<Record<string, DatabaseStatus>>({});
 
   // Strip meta status filter (active/completed) — Kanban needs all statuses for columns
   const { status: metaStatus, ...apiFilters } = filters || {};
@@ -59,37 +65,37 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   // Fetch all tickets (no status filter for Kanban view)
   const { tickets, isLoading, isError, error, refetch } = useTickets({
     ...apiFilters,
-    pageSize: 2000, // Load all tickets for Kanban columns
+    pageSize: 2000,
   });
 
   // Determine which columns to show based on sub-tab filter
   const visibleColumns = useMemo(() => {
-    if (metaStatus === 'completed') return COLUMN_CONFIG.filter(c => COMPLETED_STATUSES.includes(c.status));
-    if (metaStatus === 'active') return COLUMN_CONFIG.filter(c => ACTIVE_STATUSES.includes(c.status));
+    if ((metaStatus as string) === 'completed') return COLUMN_CONFIG.filter(c => COMPLETED_STATUSES.includes(c.status));
+    if ((metaStatus as string) === 'active') return COLUMN_CONFIG.filter(c => ACTIVE_STATUSES.includes(c.status));
     return COLUMN_CONFIG;
   }, [metaStatus]);
 
   const updateTicket = useUpdateTicket();
 
-  // Group tickets by status
+  // Group tickets by status (with optimistic overrides applied)
   const ticketsByStatus = useMemo(() => {
     const grouped: Record<DatabaseStatus, Ticket[]> = {} as Record<DatabaseStatus, Ticket[]>;
 
-    // Initialize all statuses with empty arrays
     COLUMN_CONFIG.forEach(({ status }) => {
       grouped[status] = [];
     });
 
-    // Sort tickets into their status buckets (with fallback mapping)
     tickets.forEach((ticket) => {
-      const rawStatus = ticket.status as string;
+      // Apply optimistic move if present
+      const optimisticStatus = optimisticMoves[ticket.id];
+      const rawStatus = optimisticStatus || (ticket.status as string);
       const mappedStatus = (STATUS_COLUMN_MAP[rawStatus] || rawStatus) as DatabaseStatus;
       if (grouped[mappedStatus]) {
         grouped[mappedStatus].push(ticket);
       }
     });
 
-    // Sort tickets within each column by priority (critical first) and then by created date
+    // Sort by priority then created date
     const priorityOrder = ['critical', 'urgent', 'high', 'normal', 'low'];
     Object.keys(grouped).forEach((status) => {
       grouped[status as DatabaseStatus].sort((a, b) => {
@@ -101,34 +107,56 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     });
 
     return grouped;
-  }, [tickets]);
+  }, [tickets, optimisticMoves]);
 
-  // Handle drag end (status change)
-  const handleDragEnd = useCallback(async (result: DropResult) => {
-    const { draggableId, destination, source } = result;
-
-    // No destination or dropped in same place
-    if (!destination || destination.droppableId === source.droppableId) {
-      return;
-    }
-
-    const newStatus = destination.droppableId as DatabaseStatus;
-    const ticket = tickets.find((t) => t.id === draggableId);
-
-    if (!ticket) return;
-
+  // Move a ticket to a new status (shared by drag-and-drop and quick-move)
+  const moveTicket = useCallback(async (ticketId: string, newStatus: DatabaseStatus) => {
     setErrorMessage(null);
+
+    // Optimistic: move card instantly
+    setOptimisticMoves(prev => ({ ...prev, [ticketId]: newStatus }));
 
     try {
       await updateTicket.mutateAsync({
-        id: draggableId,
+        id: ticketId,
         payload: { status: newStatus as any },
       });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to update ticket status');
       refetch();
+    } finally {
+      // Clear optimistic override — real data takes over from refetch/cache
+      setOptimisticMoves(prev => {
+        const next = { ...prev };
+        delete next[ticketId];
+        return next;
+      });
     }
-  }, [tickets, ticketsByStatus, updateTicket, refetch]);
+  }, [updateTicket, refetch]);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    const { draggableId, destination, source } = result;
+    if (!destination || destination.droppableId === source.droppableId) return;
+    await moveTicket(draggableId, destination.droppableId as DatabaseStatus);
+  }, [moveTicket]);
+
+  // Handle quick-move (chevron buttons)
+  const handleQuickMove = useCallback(async (ticketId: string, direction: 'forward' | 'backward') => {
+    const ticket = tickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+
+    const currentStatus = (optimisticMoves[ticketId] || STATUS_COLUMN_MAP[ticket.status as string] || ticket.status) as DatabaseStatus;
+    const currentIndex = STATUS_FLOW.indexOf(currentStatus);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'forward' ? currentIndex + 1 : currentIndex - 1;
+    if (newIndex < 0 || newIndex >= STATUS_FLOW.length) return;
+
+    const nextStatus = STATUS_FLOW[newIndex];
+    if (!nextStatus) return;
+    await moveTicket(ticketId, nextStatus);
+  }, [tickets, optimisticMoves, moveTicket]);
 
   if (isLoading) {
     return (
@@ -198,7 +226,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
         </span>
         <span className="text-[var(--ff-text-muted)]">|</span>
         <span className="text-[var(--ff-text-secondary)]">
-          Drag cards to change status
+          Drag or use <span className="inline-flex items-center gap-0.5 text-blue-400"><svg className="w-3 h-3 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg></span> to move tickets
         </span>
         {updateTicket.isPending && (
           <span className="flex items-center gap-2 text-blue-400">
@@ -208,11 +236,11 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
         )}
       </div>
 
-      {/* Kanban Columns with DragDropContext */}
+      {/* Kanban Columns */}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto pb-4">
           <div className="flex gap-4 h-[calc(100vh-280px)] min-h-[500px]">
-            {visibleColumns.map(({ status }) => (
+            {visibleColumns.map(({ status }, colIndex) => (
               <Droppable key={status} droppableId={status}>
                 {(provided, snapshot) => (
                   <div
@@ -225,6 +253,9 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
                       tickets={ticketsByStatus[status]}
                       isDraggingOver={snapshot.isDraggingOver}
                       isUpdating={updateTicket.isPending}
+                      onQuickMove={handleQuickMove}
+                      canMoveForward={colIndex < visibleColumns.length - 1}
+                      canMoveBackward={colIndex > 0}
                     />
                     {provided.placeholder}
                   </div>
