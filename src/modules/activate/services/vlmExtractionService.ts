@@ -175,9 +175,10 @@ const ONT_SERIAL_BACK_PROMPT = `You are extracting the ONT serial number from a 
 CRITICAL: The label has MULTIPLE fields. You must find the CORRECT one:
 
 ✅ CORRECT - Find the "S/N:" field (Serial Number):
-   - Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
-   - Exactly 11-12 characters total
+   - ALWAYS starts with "ALCLB4" followed by 6 hexadecimal characters (0-9, A-F)
+   - ALWAYS exactly 12 characters total (e.g., ALCLB48F3528)
    - Located on a WHITE sticker, usually has a barcode above it
+   - Common prefixes: ALCLB48D, ALCLB477, ALCLB48C, ALCLB48A, ALCLB480, ALCLB48F
 
 ❌ WRONG - Do NOT extract these fields:
    - SSID fields (start with "ALHN-" like ALHN-C397) - these are WiFi names
@@ -189,19 +190,24 @@ The S/N field is typically:
 - On the main white product label
 - Below the MAC ID line
 - Above or near the barcode
-- Format: S/N: ALCLXXXXXXXX or SN: ALCLXXXXXXXX
+- Format: S/N: ALCLB4XXXXXX (exactly 12 characters)
+
+COMMON MISTAKES TO AVOID:
+- Do NOT drop characters. The serial is ALWAYS 12 characters, never 10 or 11.
+- Do NOT confuse digit 6 with 8, or 0 with 8. Read carefully.
+- If your reading is not exactly 12 characters starting with ALCLB4, re-read the label.
 
 Read the ACTUAL text from the photo. Do NOT guess or invent serial numbers.
 
 Respond in this exact JSON format:
 {
   "found": true/false,
-  "serial": "<serial starting with ALCL or ALCB, or null>",
+  "serial": "<12-char serial starting with ALCLB4, or null>",
   "rawText": "<exact text you read from the S/N field>",
   "confidence": <0.0 to 1.0>
 }
 
-IMPORTANT: If you cannot find a field starting with ALCL or ALCB, set found to false.
+IMPORTANT: If you cannot find a 12-character field starting with ALCLB4, set found to false.
 Do NOT return SSID values (ALHN-*) as the serial.
 NEVER return a serial you are not sure about - null is better than wrong.`;
 
@@ -218,23 +224,29 @@ Look for these THREE items:
    - Look for lit LEDs labeled POWER, PON, LAN, WLAN, etc.
 
 2. ONT SERIAL NUMBER - A sticker/label with the device serial:
-   ✅ CORRECT: Starts with "ALCL" or "ALCB" followed by 7-8 alphanumeric characters
+   ✅ CORRECT: ALWAYS starts with "ALCLB4" followed by 6 hex characters (0-9, A-F)
+   ✅ ALWAYS exactly 12 characters (e.g., ALCLB48F3528, ALCLB48DED6B)
    ❌ WRONG: Do NOT extract SSID (starts with "ALHN-" like ALHN-C397)
-   - The serial is 11-12 characters total
    - May be on a small white sticker on the front
    - Read the ACTUAL text, do NOT guess
+   - If your reading is not 12 characters starting with ALCLB4, re-read carefully
 
 3. DR NUMBER - A handwritten or printed label:
    - Format: "DR" followed by 6-7 digits (e.g., DR1736721)
    - Often on a yellow/white sticker or written on tape
    - This is the drop/installation reference number
 
+COMMON MISTAKES TO AVOID:
+- Do NOT drop characters. The serial is ALWAYS 12 characters.
+- Do NOT confuse 6 with 8, or 0 with 8. Read carefully.
+- Common prefixes: ALCLB48D, ALCLB477, ALCLB48C, ALCLB48A, ALCLB480, ALCLB48F
+
 Respond in this exact JSON format:
 {
   "greenLightsVisible": true/false,
   "ontSerial": {
     "found": true/false,
-    "serial": "<serial starting with ALCL or ALCB, or null>",
+    "serial": "<12-char serial starting with ALCLB4, or null>",
     "rawText": "<exact text from label>",
     "confidence": <0.0 to 1.0>
   },
@@ -246,7 +258,8 @@ Respond in this exact JSON format:
   }
 }
 
-IMPORTANT: Only extract serials starting with ALCL or ALCB. Ignore SSID values (ALHN-*).`;
+IMPORTANT: Only extract serials starting with ALCLB4, exactly 12 chars. Ignore SSID values (ALHN-*).
+NEVER return a serial you are not sure about - null is better than wrong.`;
 
 /**
  * Build a confirmation prompt for verifying a known serial is visible
@@ -260,7 +273,7 @@ EXPECTED SERIAL: ${expectedSerial}
 Your task: Check if this exact serial (or very close match) is visible anywhere in the photo.
 
 The serial should:
-- Start with "ALCL" or "ALCB"
+- Start with "ALCLB4" and be exactly 12 characters
 - Be on a white sticker/label
 - May be near a barcode or under "S/N:" text
 
@@ -303,14 +316,18 @@ function isValidOntSerial(serial: string | null): boolean {
     return false;
   }
 
-  // Must start with ALCL or ALCB
-  if (!s.startsWith('ALCL') && !s.startsWith('ALCB')) {
-    logger.debug(`Rejected non-ALC serial: ${serial}`);
-    return false;
+  // Must start with ALCLB4 (all Nokia ONTs in this network)
+  if (!s.startsWith('ALCLB4')) {
+    // Fall back to ALCL/ALCB for edge cases
+    if (!s.startsWith('ALCL') && !s.startsWith('ALCB')) {
+      logger.debug(`Rejected non-ALC serial: ${serial}`);
+      return false;
+    }
   }
 
-  // Should be 11-12 chars (allowing some flexibility for OCR errors)
-  if (s.length < 10 || s.length > 14) {
+  // Must be exactly 12 chars (all OES-confirmed serials are 12 chars)
+  // Allow 11-13 for slight OCR flexibility
+  if (s.length < 11 || s.length > 13) {
     logger.debug(`Rejected serial with wrong length (${s.length}): ${serial}`);
     return false;
   }
@@ -708,6 +725,24 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
     }
 
     // Step 2: Always call VLM for DR number and green lights (and serial fallback)
+    // Inject few-shot corrections from OES ground truth
+    let step9Prompt = STEP9_FRONT_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'activate',
+        analysisType: 'ont_serial_front',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      if (examples.length > 0) {
+        const fewShotSection = buildVlmFewShotPrompt(examples);
+        step9Prompt = `${STEP9_FRONT_PROMPT}\n\n${fewShotSection}`;
+        logger.debug(`Injected ${examples.length} few-shot examples for Step 9`);
+      }
+    } catch (fewShotError) {
+      logger.warn(`Few-shot retrieval failed for Step 9: ${fewShotError}`);
+    }
+
     const result = await callVlmExtraction<{
       greenLightsVisible: boolean;
       ontSerial: {
@@ -722,7 +757,7 @@ export async function extractStep9Data(photoUrl: string): Promise<Step9Extractio
         rawText: string | null;
         confidence: number;
       };
-    }>(base64, STEP9_FRONT_PROMPT, 'Step 9 front extraction');
+    }>(base64, step9Prompt, 'Step 9 front extraction');
 
     if (!result.success || !result.data) {
       // Even if VLM fails, return barcode result if we have it
