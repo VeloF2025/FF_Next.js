@@ -110,6 +110,14 @@ export async function GET(req: NextRequest) {
       filters.sla_breached = searchParams.get('sla_breached') === 'true';
     }
 
+    // Date range filters
+    if (searchParams.has('created_after')) {
+      filters.created_after = new Date(searchParams.get('created_after')!);
+    }
+    if (searchParams.has('created_before')) {
+      filters.created_before = new Date(searchParams.get('created_before')!);
+    }
+
     // Search term
     if (searchParams.has('search')) {
       filters.search = searchParams.get('search')!;

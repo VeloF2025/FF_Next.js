@@ -65,7 +65,7 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   // Fetch all tickets (no status filter for Kanban view)
   const { tickets, isLoading, isError, error, refetch } = useTickets({
     ...apiFilters,
-    pageSize: 2000,
+    pageSize: 10000, // Load all tickets for Kanban columns
   });
 
   // Determine which columns to show based on sub-tab filter

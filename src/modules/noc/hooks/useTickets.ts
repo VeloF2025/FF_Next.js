@@ -55,6 +55,8 @@ async function fetchTickets(filters?: TicketFilters): Promise<TicketListResult> 
     if (filters.qa_ready !== undefined) params.append('qa_ready', String(filters.qa_ready));
     if (filters.sla_breached !== undefined) params.append('sla_breached', String(filters.sla_breached));
     if (filters.search) params.append('search', filters.search);
+    if (filters.created_after) params.append('created_after', new Date(filters.created_after).toISOString());
+    if (filters.created_before) params.append('created_before', new Date(filters.created_before).toISOString());
     if (filters.sort) params.append('sort', filters.sort);
     if (filters.page !== undefined) params.append('page', String(filters.page));
     if (filters.pageSize !== undefined) params.append('pageSize', String(filters.pageSize));

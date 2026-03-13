@@ -544,6 +544,19 @@ export async function listTickets(
       paramCounter++;
     }
 
+    // Date range filter
+    if (filters.created_after) {
+      whereClauses.push(`created_at >= $${paramCounter}`);
+      values.push(new Date(filters.created_after).toISOString());
+      paramCounter++;
+    }
+
+    if (filters.created_before) {
+      whereClauses.push(`created_at < $${paramCounter}`);
+      values.push(new Date(filters.created_before).toISOString());
+      paramCounter++;
+    }
+
     // 🟢 WORKING: Search filter - searches ticket_uid, dr_number, title, and description
     // Each column needs its own parameter index because the neon HTTP driver
     // splits by $N placeholders to build tagged template literals.
