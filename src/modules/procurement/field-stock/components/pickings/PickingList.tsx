@@ -243,8 +243,8 @@ export function PickingList({ onCreateNew, onSelectPicking }: PickingListProps) 
       ) : (
         <div className="divide-y divide-gray-200 rounded-lg border border-border bg-white dark:divide-gray-700 dark:border-gray-700 dark:bg-gray-800">
           {filteredPickings.map((picking) => {
-            const typeConfig = PICKING_TYPE_CONFIG[picking.pickingType];
-            const statusConfig = STATUS_CONFIG[picking.status];
+            const typeConfig = PICKING_TYPE_CONFIG[picking.pickingType] || PICKING_TYPE_CONFIG.transfer;
+            const statusConfig = STATUS_CONFIG[picking.status] || STATUS_CONFIG.draft;
 
             return (
               <div

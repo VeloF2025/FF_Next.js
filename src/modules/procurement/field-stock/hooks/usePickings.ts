@@ -34,6 +34,37 @@ interface UsePickingsReturn {
 
 const API_BASE = '/api/procurement/field-stock/pickings';
 
+/** Map snake_case DB row to camelCase StockPicking */
+function mapPicking(row: Record<string, unknown>): StockPicking {
+  return {
+    id: row.id as string,
+    pickingNumber: (row.pickingNumber ?? row.picking_number) as string,
+    pickingType: (row.pickingType ?? row.picking_type) as PickingType,
+    sourceLocationId: (row.sourceLocationId ?? row.source_location_id) as string,
+    destinationLocationId: (row.destinationLocationId ?? row.destination_location_id) as string,
+    projectId: (row.projectId ?? row.project_id) as string | undefined,
+    jobReference: (row.jobReference ?? row.job_reference) as string | undefined,
+    jobType: (row.jobType ?? row.job_type) as StockPicking['jobType'],
+    contractorId: (row.contractorId ?? row.contractor_id) as string | undefined,
+    contractorName: (row.contractorName ?? row.contractor_name) as string | undefined,
+    teamName: (row.teamName ?? row.team_name) as string | undefined,
+    technicianId: (row.technicianId ?? row.technician_id) as string | undefined,
+    technicianName: (row.technicianName ?? row.technician_name) as string | undefined,
+    signatureData: (row.signatureData ?? row.signature_data) as string | undefined,
+    signedAt: (row.signedAt ?? row.signed_at) as Date | undefined,
+    signedBy: (row.signedBy ?? row.signed_by) as string | undefined,
+    status: (row.status) as PickingStatus,
+    scheduledDate: (row.scheduledDate ?? row.scheduled_date) as Date | undefined,
+    effectiveDate: (row.effectiveDate ?? row.effective_date) as Date | undefined,
+    requestedBy: (row.requestedBy ?? row.requested_by) as string | undefined,
+    approvedBy: (row.approvedBy ?? row.approved_by) as string | undefined,
+    approvedAt: (row.approvedAt ?? row.approved_at) as Date | undefined,
+    notes: row.notes as string | undefined,
+    createdAt: (row.createdAt ?? row.created_at) as Date,
+    updatedAt: (row.updatedAt ?? row.updated_at) as Date,
+  };
+}
+
 export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn {
   const { autoFetch = false, defaultFilters = {} } = options;
   const [pickings, setPickings] = useState<StockPicking[]>([]);
@@ -65,7 +96,8 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
       }
 
       const data = await response.json();
-      setPickings(data.data || []);
+      const raw = data.data || [];
+      setPickings(raw.map((r: Record<string, unknown>) => mapPicking(r)));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch pickings';
       setError(message);
@@ -90,7 +122,7 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     }
 
     const data = await response.json();
-    const newPicking = data.data as StockPicking;
+    const newPicking = mapPicking(data.data as Record<string, unknown>);
     setPickings(prev => [newPicking, ...prev]);
     return newPicking;
   }, []);
@@ -109,7 +141,7 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     }
 
     const data = await response.json();
-    const updated = data.data as StockPicking;
+    const updated = mapPicking(data.data as Record<string, unknown>);
     setPickings(prev => prev.map(p => p.id === pickingId ? updated : p));
     return updated;
   }, []);
@@ -128,7 +160,7 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     }
 
     const data = await response.json();
-    const updated = data.data as StockPicking;
+    const updated = mapPicking(data.data as Record<string, unknown>);
     setPickings(prev => prev.map(p => p.id === pickingId ? updated : p));
     return updated;
   }, []);
@@ -149,7 +181,7 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     }
 
     const data = await response.json();
-    const updated = data.data as StockPicking;
+    const updated = mapPicking(data.data as Record<string, unknown>);
     setPickings(prev => prev.map(p => p.id === pickingId ? updated : p));
     return updated;
   }, []);
@@ -183,7 +215,7 @@ export function usePickings(options: UsePickingsOptions = {}): UsePickingsReturn
     }
 
     const data = await response.json();
-    return data.data as StockPicking;
+    return mapPicking(data.data as Record<string, unknown>);
   }, []);
 
   // Auto-fetch on mount if enabled
