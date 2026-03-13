@@ -12,6 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
@@ -226,7 +227,7 @@ function cleanup(paths: string[]) {
 
 // ==================== Handler ====================
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -328,3 +329,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     cleanup(cleanupPaths);
   }
 }
+
+export default withAuth(handler);

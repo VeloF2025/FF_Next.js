@@ -2,278 +2,34 @@
  * ScreenshotUploader - Multi-media DevOps ticket creation
  *
  * Accepts screenshots, screen recordings, and voice memos.
- * - Images: client-side resize → VLM analysis → auto-fill fields
- * - Videos: server-side frame extraction + Whisper transcription → auto-fill
- * - Audio: server-side Whisper transcription → LLM field extraction → auto-fill
+ * AI analyses the media and auto-fills ticket fields.
  *
  * // WORKING: VLM + Whisper pipeline for DevOps tickets
  */
 
 'use client';
 
-import React, { useCallback, useState, useRef } from 'react';
+import React from 'react';
 import {
   Camera, Upload, Loader2, CheckCircle, AlertCircle, X,
   Maximize2, Monitor, Video, Mic, FileVideo, FileAudio,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useScreenshotUploader } from './useScreenshotUploader';
+import { ACCEPTED_TYPES, ANALYSING_MESSAGES } from './screenshotUtils';
 
 interface ScreenshotUploaderProps {
   onFieldsExtracted: (fields: Record<string, string>) => void;
   disabled?: boolean;
 }
 
-type MediaType = 'image' | 'video' | 'audio';
-
-interface MediaPreview {
-  dataUrl: string;
-  name: string;
-  type: MediaType;
-}
-
-const MAX_DIMENSION = 1280;
-const ACCEPTED_TYPES = 'image/*,video/*,audio/*,.mp4,.webm,.mov,.mp3,.wav,.ogg,.m4a';
-
-const ANALYSING_MESSAGES: Record<MediaType, { title: string; subtitle: string }> = {
-  image: {
-    title: 'Analysing screenshot with AI...',
-    subtitle: 'Extracting error details, module, and environment',
-  },
-  video: {
-    title: 'Processing screen recording...',
-    subtitle: 'Extracting frames + transcribing audio — this may take 30-60 seconds',
-  },
-  audio: {
-    title: 'Transcribing voice memo...',
-    subtitle: 'Converting speech to text and extracting issue details',
-  },
-};
-
-function getMediaType(file: File): MediaType {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type.startsWith('video/')) return 'video';
-  if (file.type.startsWith('audio/')) return 'audio';
-  // Fallback: check extension
-  const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)) return 'video';
-  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) return 'audio';
-  return 'image';
-}
-
-function getMaxSize(type: MediaType): number {
-  return type === 'image' ? 10 : 50; // MB
-}
-
-/** Resize image client-side using canvas to stay within VLM limits */
-function resizeImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-          const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-          width = Math.round(width * ratio);
-          height = Math.round(height * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas not supported'));
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = reader.result as string;
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
-}
-
-/** Create a video thumbnail from the first frame */
-function createVideoThumbnail(file: File): Promise<string> {
-  return new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.muted = true;
-    video.onloadeddata = () => {
-      video.currentTime = 0.5;
-    };
-    video.onseeked = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.min(video.videoWidth, 320);
-      canvas.height = Math.min(video.videoHeight, 240);
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
-      } else {
-        resolve('');
-      }
-      URL.revokeObjectURL(video.src);
-    };
-    video.onerror = () => resolve('');
-    video.src = URL.createObjectURL(file);
-  });
-}
-
-function extractApiFields(data: Record<string, string>): Record<string, string> {
-  const fields: Record<string, string> = {};
-  if (data.title) fields.title = data.title;
-  if (data.description) fields.description = data.description;
-  if (data.affected_module) fields.affected_module = data.affected_module;
-  if (data.environment) fields.environment = data.environment;
-  if (data.error_url) fields.error_url = data.error_url;
-  if (data.stack_trace) fields.stack_trace = data.stack_trace;
-  if (data.steps_to_reproduce) fields.steps_to_reproduce = data.steps_to_reproduce;
-  if (data.browser_info) fields.browser_info = data.browser_info;
-  if (data.priority_suggestion) fields.priority_suggestion = data.priority_suggestion;
-  return fields;
-}
-
 export function ScreenshotUploader({ onFieldsExtracted, disabled }: ScreenshotUploaderProps) {
-  const [previews, setPreviews] = useState<MediaPreview[]>([]);
-  const [isAnalysing, setIsAnalysing] = useState(false);
-  const [analysingType, setAnalysingType] = useState<MediaType>('image');
-  const [isDragging, setIsDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [analysisComplete, setAnalysisComplete] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showLightbox, setShowLightbox] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ==================== Image Processing ====================
-  const processImage = useCallback(async (file: File) => {
-    const dataUrl = await resizeImage(file);
-    setPreviews(prev => [...prev, { dataUrl, name: file.name || 'screenshot.png', type: 'image' }]);
-
-    const response = await fetch('/api/noc/devops-vlm-analyse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: dataUrl }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Analysis failed' }));
-      throw new Error(err.error?.message || err.error || `Analysis failed (${response.status})`);
-    }
-
-    const result = await response.json();
-    return extractApiFields(result.data);
-  }, []);
-
-  // ==================== Video/Audio Processing ====================
-  const processMedia = useCallback(async (file: File, mediaType: MediaType) => {
-    // Generate thumbnail for video
-    if (mediaType === 'video') {
-      const thumb = await createVideoThumbnail(file);
-      setPreviews(prev => [...prev, {
-        dataUrl: thumb || '',
-        name: file.name || 'recording',
-        type: 'video',
-      }]);
-    } else {
-      setPreviews(prev => [...prev, {
-        dataUrl: '',
-        name: file.name || 'voice-memo',
-        type: 'audio',
-      }]);
-    }
-
-    // Upload file to media analysis endpoint
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/noc/devops-media-analyse', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({ error: 'Media analysis failed' }));
-      throw new Error(err.error?.message || err.error || `Media analysis failed (${response.status})`);
-    }
-
-    const result = await response.json();
-    return extractApiFields(result.data);
-  }, []);
-
-  // ==================== Unified File Handler ====================
-  const processFile = useCallback(async (file: File) => {
-    const mediaType = getMediaType(file);
-    const maxSize = getMaxSize(mediaType);
-
-    if (file.size > maxSize * 1024 * 1024) {
-      setError(`File too large (max ${maxSize}MB for ${mediaType})`);
-      return;
-    }
-
-    setError(null);
-    setIsAnalysing(true);
-    setAnalysingType(mediaType);
-    setAnalysisComplete(false);
-
-    try {
-      const fields = mediaType === 'image'
-        ? await processImage(file)
-        : await processMedia(file, mediaType);
-
-      onFieldsExtracted(fields);
-      setAnalysisComplete(true);
-
-      const typeLabel = mediaType === 'image' ? 'screenshot' : mediaType === 'video' ? 'screen recording' : 'voice memo';
-      setSuccessMessage(`Fields auto-populated from ${typeLabel} — review and edit below`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Analysis failed';
-      setError(msg);
-    } finally {
-      setIsAnalysing(false);
-    }
-  }, [processImage, processMedia, onFieldsExtracted]);
-
-  // ==================== Event Handlers ====================
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [processFile]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  }, [processFile]);
-
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    if (disabled || isAnalysing) return;
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item && (item.type.startsWith('image/') || item.type.startsWith('video/'))) {
-        const file = item.getAsFile();
-        if (file) { processFile(file); break; }
-      }
-    }
-  }, [disabled, isAnalysing, processFile]);
-
-  const removePreview = useCallback((index: number) => {
-    setPreviews(prev => prev.filter((_, i) => i !== index));
-  }, []);
+  const {
+    previews, isAnalysing, analysingType, isDragging, error,
+    analysisComplete, successMessage, showLightbox,
+    setShowLightbox, setError, fileInputRef,
+    handleFileInput, handleDragOver, handleDragLeave, handleDrop, handlePaste, removePreview,
+  } = useScreenshotUploader({ onFieldsExtracted, disabled });
 
   const analysingMsg = ANALYSING_MESSAGES[analysingType];
 

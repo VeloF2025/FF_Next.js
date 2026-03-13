@@ -10,6 +10,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { withAuth } from '@/lib/auth';
 
 const logger = createLogger('noc:devops-vlm');
 
@@ -61,7 +62,7 @@ Important:
 - Detect the module from the sidebar navigation highlight or page content
 - Return ONLY valid JSON, no markdown fences or extra text`;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['POST']);
   }
@@ -162,3 +163,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return apiResponse.internalError(res, err instanceof Error ? err : new Error('Unknown error'));
   }
 }
+
+export default withAuth(handler);
