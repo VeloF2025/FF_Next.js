@@ -20,9 +20,12 @@ import {
   findAssigneeEmail,
 } from '../../src/services/action-items/actionItemsParser';
 
-// Load environment variables
+// Load environment variables — try .env.local first, fallback to .env.production
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.production' });
+dotenv.config({ path: '.env.local' });
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: '.env.production' });
+}
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
