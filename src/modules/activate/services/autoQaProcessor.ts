@@ -82,7 +82,7 @@ export async function findEligibleDRs(limit: number = 10): Promise<EligibleDR[]>
        AND data_validation_completed = true
        AND (qa_decision IS NULL OR qa_decision_is_draft = true)
        AND (human_review_status IS NULL OR human_review_status != 'completed')
-     ORDER BY auto_qa_eligible_at ASC
+     ORDER BY auto_qa_eligible_at DESC
      LIMIT $1`,
     [limit]
   );
