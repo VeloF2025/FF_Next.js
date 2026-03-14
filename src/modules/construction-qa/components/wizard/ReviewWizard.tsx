@@ -427,9 +427,15 @@ export function ReviewWizard({ reviewId }: ReviewWizardProps) {
             {review.project_name} · {review.discipline} ·{' '}
             {review.zone_no !== null ? `Z${review.zone_no}` : ''}{' '}
             {review.pon_no !== null ? `P${review.pon_no}` : ''}
-            {review.last_photo_at ? (
-              <> · Planted {new Date(review.last_photo_at as string).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</>
-            ) : null}
+            {(() => {
+              // Pole Plant Date = Step 7 (After Photo) date, fall back to last_photo_at
+              const step7Photo = photos.find(p => p.checklist_step === 7 && (p as Record<string, unknown>).captured_at);
+              const plantedAt = (step7Photo as Record<string, unknown>)?.captured_at as string
+                || review.last_photo_at as string;
+              return plantedAt ? (
+                <> · Planted {new Date(plantedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+              ) : null;
+            })()}
           </p>
         </div>
         <div className="flex items-center gap-2">

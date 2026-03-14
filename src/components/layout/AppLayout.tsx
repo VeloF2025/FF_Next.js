@@ -13,6 +13,10 @@ const Footer = dynamic(() => import('./Footer').then(mod => ({ default: mod.Foot
 const ChatWidget = dynamic(() => import('@/modules/help-center/components/ChatWidget').then(mod => ({ default: mod.ChatWidget })), { ssr: false });
 const AccountingNav = dynamic(() => import('@/components/accounting/AccountingNav').then(mod => ({ default: mod.AccountingNav })), { ssr: false });
 const ProcurementNav = dynamic(() => import('@/components/procurement/ProcurementNav').then(mod => ({ default: mod.ProcurementNav })), { ssr: false });
+const FleetNav = dynamic(() => import('@/components/fleet/FleetNav').then(mod => ({ default: mod.FleetNav })), { ssr: false });
+const SOWNav = dynamic(() => import('@/components/sow/SOWNav').then(mod => ({ default: mod.SOWNav })), { ssr: false });
+const AnalyticsNav = dynamic(() => import('@/components/analytics/AnalyticsNav').then(mod => ({ default: mod.AnalyticsNav })), { ssr: false });
+const SystemNav = dynamic(() => import('@/components/system/SystemNav').then(mod => ({ default: mod.SystemNav })), { ssr: false });
 
 interface PageMeta {
   title: string;
@@ -322,8 +326,13 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
   }
 
   const pageMeta = getPageMeta();
-  const isAccounting = (pathname || '').startsWith('/accounting');
-  const isProcurement = (pathname || '').startsWith('/procurement');
+  const p = pathname || '';
+  const isAccounting = p.startsWith('/accounting');
+  const isProcurement = p.startsWith('/procurement');
+  const isFleet = p.startsWith('/fleet');
+  const isSOW = p.startsWith('/sow');
+  const isAnalytics = ['/analytics', '/enhanced-kpis', '/kpi-dashboard', '/reports'].some(prefix => p.startsWith(prefix));
+  const isSystem = ['/system', '/settings', '/deployment'].some(prefix => p.startsWith(prefix));
 
   return (
     <div className="flex h-screen bg-[var(--ff-background-primary)] overflow-hidden">
@@ -362,6 +371,10 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
         {/* Module sub-navigation (Sage-style tabs with dropdowns) */}
         {isAccounting && <AccountingNav />}
         {isProcurement && <ProcurementNav />}
+        {isFleet && <FleetNav />}
+        {isSOW && <SOWNav />}
+        {isAnalytics && <AnalyticsNav />}
+        {isSystem && <SystemNav />}
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-[var(--ff-background-primary)]">
