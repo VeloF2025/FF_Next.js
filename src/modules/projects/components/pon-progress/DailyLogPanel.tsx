@@ -116,9 +116,9 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
 
   return createPortal(
     <div className="fixed inset-0" style={{ zIndex: 99999, isolation: 'isolate' }}>
-      {/* Backdrop overlay — covers entire viewport */}
+      {/* Backdrop overlay — covers entire viewport, visible on dark theme */}
       <div
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
 
