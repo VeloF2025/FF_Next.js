@@ -108,16 +108,22 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
     grouped.set(entry.log_date, existing);
   }
 
+  // Lock body scroll when panel is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
   return createPortal(
-    <>
+    <div className="fixed inset-0" style={{ zIndex: 99999, isolation: 'isolate' }}>
       {/* Backdrop overlay — covers entire viewport */}
       <div
-        className="fixed inset-0 bg-black/50 z-[9998]"
+        className="absolute inset-0 bg-black/60"
         onClick={onClose}
       />
 
       {/* Panel — rendered at body level via portal */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[var(--ff-card-bg)] border-l border-[var(--ff-border-light)] shadow-2xl z-[9999] flex flex-col">
+      <div className="absolute inset-y-0 right-0 w-full max-w-lg bg-[var(--ff-card-bg)] border-l border-[var(--ff-border-light)] shadow-2xl flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between shrink-0">
           <div>
@@ -262,7 +268,7 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
           )}
         </div>
       </div>
-    </>,
+    </div>,
     document.body
   );
 }
