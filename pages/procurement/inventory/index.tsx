@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
+
 import { useTabPersistence } from '@/modules/procurement/hooks';
 import { StatCard, StatCardGrid } from '@/components/ui/StatCard';
 import {
@@ -1286,10 +1286,6 @@ export default function InventoryPage({ projectId }: InventoryPageProps) {
             </div>
           </div>
 
-          {/* Main Category Tab Navigation - Constant Position */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="inventory" categoriesOnly />
-          </div>
         </div>
 
         {/* Sub-page Header with Sub-tabs */}

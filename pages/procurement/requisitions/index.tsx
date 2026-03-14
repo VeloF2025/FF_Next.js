@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
+
 import {
   FileInput,
   Plus,
@@ -130,10 +130,6 @@ export default function RequisitionsPage() {
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="requisitions" categoriesOnly />
-          </div>
         </div>
 
         {/* Content */}

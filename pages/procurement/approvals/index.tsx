@@ -1,7 +1,6 @@
 // WORKING: Approvals page — all statuses with filtering
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import Link from 'next/link';
 import {
   ClipboardCheck, Search, AlertCircle, AlertTriangle,
@@ -135,9 +134,6 @@ export default function ApprovalsPage() {
                 </Link>
               </div>
             </div>
-          </div>
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="overview" />
           </div>
         </div>
 

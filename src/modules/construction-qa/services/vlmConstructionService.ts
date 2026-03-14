@@ -321,13 +321,42 @@ function buildPhotoPrompt(
   stepDef: { label: string; vlmCheck: string; notes?: string } | null,
   fewShotSection = '',
 ): string {
-  const base = `You are a construction quality assurance AI inspector for fiber network installations.
-Discipline: ${discipline}
-${step ? `Checklist Step ${step}: ${stepDef?.label || 'Unknown'}` : 'General photo evaluation'}
+  // When step is null or 0, use multi-step classification mode
+  const isClassification = !step || !stepDef;
 
-${stepDef?.vlmCheck ? `Check: ${stepDef.vlmCheck}` : ''}
-${stepDef?.notes ? `Notes: ${stepDef.notes}` : ''}
-${fewShotSection ? `\n${fewShotSection}\n` : ''}
+  const classificationBlock = isClassification ? `
+You must CLASSIFY which checklist step this photo belongs to.
+
+CIVIL CHECKLIST STEPS:
+  Step 1 - Before Photo: Ground markings visible (circle/square/X painted on ground indicating pole hole location)
+  Step 2 - During Photo: Workers actively digging a hole or pouring concrete — action in progress
+  Step 3 - Depth Photo: Measuring tape or ruler placed inside hole showing depth measurement
+  Step 4 - End Plates: Metal rectangular end-plates or cap plates bolted to the top or base of the pole, close-up
+  Step 5 - Compaction / Backfill: Sand+cement mix packed around pole base, compacted surface — NOT loose heaps
+  Step 6 - Level Check: Spirit level (bubble level tool) held against the upright pole
+  Step 7 - After Photo: Wide shot from distance showing the full pole standing upright in the ground
+
+⚠️ CLASSIFICATION TIPS:
+- If you see metal plates/caps on a pole → Step 4 (End Plates), NOT Step 2
+- If you see packed/compacted ground around pole base → Step 5 (Compaction), NOT Step 2
+- If you see a wide outdoor shot with a pole standing → Step 7 (After Photo), NOT Step 2
+- If you see ground markings before any digging → Step 1 (Before Photo)
+- Step 2 (During) ONLY if workers are actively digging or there is an open hole being dug
+- Do NOT default to "Unrelated" unless the photo truly shows nothing related to pole installation
+
+Respond with this JSON:
+{
+  "classified_step": <1-7 or 0 if truly unrelated>,
+  "step_label": "<label from the list above>",
+  "valid": true/false,
+  "confidence": 0.0-1.0,
+  "issues": ["list of specific issues found"],
+  "feedback": "one sentence of actionable feedback",
+  "extracted_data": {}
+}
+` : '';
+
+  const validationBlock = !isClassification ? `
 Evaluate this photo and respond with ONLY a JSON object:
 {
   "valid": true/false,
@@ -337,10 +366,19 @@ Evaluate this photo and respond with ONLY a JSON object:
   "extracted_data": { any relevant data extracted from the photo }
 }
 
-Be strict but fair. A photo must clearly show the required element to pass.`;
+Be strict but fair. A photo must clearly show the required element to pass.` : '';
+
+  const base = `You are a construction quality assurance AI inspector for fiber network installations.
+Discipline: ${discipline}
+${!isClassification ? `Checklist Step ${step}: ${stepDef?.label || 'Unknown'}` : 'Photo Step Classification'}
+
+${stepDef?.vlmCheck ? `Check: ${stepDef.vlmCheck}` : ''}
+${stepDef?.notes ? `Notes: ${stepDef.notes}` : ''}
+${fewShotSection ? `\n${fewShotSection}\n` : ''}${classificationBlock}${validationBlock}`;
 
   return base;
 }
+
 
 /**
  * Build a URL for the VLM to access the photo.

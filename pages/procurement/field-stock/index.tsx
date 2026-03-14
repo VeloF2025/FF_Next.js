@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
+
 import {
   FieldStockDashboard,
   LocationList,
@@ -291,10 +291,6 @@ export default function FieldStockPage() {
             </div>
           </div>
 
-          {/* Main Category Tab Navigation - Constant Position */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="field-stock" categoriesOnly />
-          </div>
         </div>
 
         {/* Sub-page Header */}

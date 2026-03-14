@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import {
   BarChart3,
   TrendingUp,
@@ -291,10 +290,6 @@ export default function ProcurementReportsPage() {
             </div>
           </div>
 
-          {/* Main Category Tab Navigation - Constant Position */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="reports" categoriesOnly />
-          </div>
         </div>
 
         {/* Page-specific controls */}

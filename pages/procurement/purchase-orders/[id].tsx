@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import {
   ArrowLeft,
   ShoppingCart,
@@ -587,10 +586,6 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Procurement Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="purchase-orders" categoriesOnly />
-          </div>
         </div>
 
         {/* Content Tabs */}

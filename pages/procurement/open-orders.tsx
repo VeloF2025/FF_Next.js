@@ -9,7 +9,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import {
   Inbox,
   FileText,
@@ -169,9 +168,6 @@ export default function OpenOrdersPage() {
                 filenamePrefix="open-orders"
               />
             </div>
-          </div>
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="open-orders" />
           </div>
         </div>
 

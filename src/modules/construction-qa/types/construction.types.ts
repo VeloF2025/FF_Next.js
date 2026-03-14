@@ -130,7 +130,7 @@ export const CIVIL_CHECKLIST: readonly ChecklistStep[] = [
     step: 4,
     label: 'End Plates',
     required: true,
-    vlmCheck: 'End plates visible and clear on pole',
+    vlmCheck: 'Metal rectangular end-plates or cap plates bolted to the top or base of the pole, close-up shot of hardware',
     notes: 'Phase A Pre-Install — metal plates at base or top of pole',
   },
   {

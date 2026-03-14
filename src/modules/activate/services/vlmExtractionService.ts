@@ -240,6 +240,14 @@ Look for THREE items:
 
 3. DR NUMBER - handwritten/printed label: "DR" + 6-7 digits (e.g., DR1736721)
 
+   ⚠️ DR NUMBER RULES:
+   - CRITICAL: Read ONLY from THIS photo. Do NOT reuse a DR number from memory or previous photos.
+   - Format: "DR" followed by 6-7 numeric digits ONLY (no letters after "DR")
+   - If you cannot read it clearly, return found: false — never guess or invent
+   - Common digit confusion on handwritten labels: 9↔4, 8↔6, 0↔8, 5↔3
+   - Pay extra attention to the last 2-3 digits (most error-prone on handwritten labels)
+   - If it looks like a serial number (ALCLB4...) or phone number, you're reading the WRONG field
+
 Respond in this exact JSON format:
 {
   "greenLightsVisible": true/false,

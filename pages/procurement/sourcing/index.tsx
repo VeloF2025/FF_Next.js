@@ -8,7 +8,6 @@ import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
 import { AppLayout } from '@/components/layout';
 import { useTabPersistence } from '@/modules/procurement/hooks';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import {
   ShoppingCart,
   Truck,
@@ -89,11 +88,6 @@ export default function SourcingPage({ projectId, projectName }: SourcingPagePro
   return (
     <AppLayout>
       <div className="min-h-screen bg-[var(--ff-bg-primary)]">
-        {/* Main Category Navigation - for navigating between Procurement sections */}
-        <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 pt-4">
-          <ProcurementTabs activeTab={activeTab as any} categoriesOnly />
-        </div>
-
         {/* Page Header */}
         <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)]">
           <div className="px-6 py-4">

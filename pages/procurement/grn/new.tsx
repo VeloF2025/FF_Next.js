@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import {
   PackageCheck,
   Plus,
@@ -332,11 +331,6 @@ export default function NewGRNPage() {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="grn" categoriesOnly />
           </div>
         </div>
 

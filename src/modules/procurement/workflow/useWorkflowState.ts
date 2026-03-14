@@ -91,10 +91,13 @@ function buildInitialState(
   urlApprovalId: string | undefined,
   urlThreadId: string | undefined,
 ): WorkflowState {
-  const base: WorkflowState = persisted ?? { ...DEFAULT_STATE };
+  // No URL params at all → fresh wizard (don't resume from localStorage)
+  if (!urlThreadId && !urlStep && !urlReqId && !urlApprovalId) {
+    return { ...DEFAULT_STATE };
+  }
 
-  // If a threadId is provided via URL and differs from persisted, load the thread from DB
-  if (urlThreadId && urlThreadId !== base.threadId) {
+  // threadId in URL → load that specific thread
+  if (urlThreadId) {
     return {
       ...DEFAULT_STATE,
       threadId: urlThreadId,
@@ -102,6 +105,8 @@ function buildInitialState(
     };
   }
 
+  // Other URL params (step, reqId, approvalId) → merge with persisted state
+  const base: WorkflowState = persisted ?? { ...DEFAULT_STATE };
   return {
     ...base,
     currentStep: urlStep ?? base.currentStep,

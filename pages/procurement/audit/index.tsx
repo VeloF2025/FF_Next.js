@@ -4,7 +4,6 @@
  */
 
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { AuditLogTable, AuditActivitySummary } from '@/modules/procurement/audit';
 import { ShoppingCart, ScrollText } from 'lucide-react';
 
@@ -26,11 +25,6 @@ export default function AuditLogPage() {
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Main Category Tab Navigation */}
-          <div className="border-t border-[var(--ff-border-light)] px-6">
-            <ProcurementTabs activeTab="reports" categoriesOnly />
           </div>
         </div>
 

@@ -6,7 +6,6 @@ import type { Project } from '../../src/types/project.types';
 import { ProjectType, ProjectStatus, Priority } from '../../src/types/project.types';
 import { AlertCircle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ProcurementTabs } from '../../src/modules/procurement/components/ProcurementTabs';
 import { ProcurementFilters } from '../../src/modules/procurement/components/ProcurementFilters';
 import { ProcurementPortalProvider } from '../../src/modules/procurement/context/ProcurementPortalProvider';
 import { useProcurementPermissions } from '../../src/modules/procurement/hooks/useProcurementPermissions';
@@ -258,11 +257,6 @@ export default function ProcurementPage({
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="px-6 border-t border-[var(--ff-border-light)]">
-              <ProcurementTabs />
             </div>
           </div>
 

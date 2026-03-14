@@ -12,6 +12,7 @@ const Header = dynamic(() => import('./Header').then(mod => ({ default: mod.Head
 const Footer = dynamic(() => import('./Footer').then(mod => ({ default: mod.Footer })), { ssr: false });
 const ChatWidget = dynamic(() => import('@/modules/help-center/components/ChatWidget').then(mod => ({ default: mod.ChatWidget })), { ssr: false });
 const AccountingNav = dynamic(() => import('@/components/accounting/AccountingNav').then(mod => ({ default: mod.AccountingNav })), { ssr: false });
+const ProcurementNav = dynamic(() => import('@/components/procurement/ProcurementNav').then(mod => ({ default: mod.ProcurementNav })), { ssr: false });
 
 interface PageMeta {
   title: string;
@@ -322,6 +323,7 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
 
   const pageMeta = getPageMeta();
   const isAccounting = (pathname || '').startsWith('/accounting');
+  const isProcurement = (pathname || '').startsWith('/procurement');
 
   return (
     <div className="flex h-screen bg-[var(--ff-background-primary)] overflow-hidden">
@@ -357,8 +359,9 @@ export function AppLayout({ children, hideHeader = false }: AppLayoutProps) {
           />
         )}
 
-        {/* Accounting sub-navigation (Sage-style tabs with dropdowns) */}
+        {/* Module sub-navigation (Sage-style tabs with dropdowns) */}
         {isAccounting && <AccountingNav />}
+        {isProcurement && <ProcurementNav />}
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto bg-[var(--ff-background-primary)]">

@@ -357,7 +357,7 @@ export async function syncFleet(
                 source, recorded_at, created_at, synced_at
               ) VALUES (
                 ${ffData.vehicle_id}::uuid, ${ffData.odoo_odometer_id}, ${ffData.reading_date},
-                ${ffData.reading}, ${ffData.unit}, 'odoo', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                ${ffData.reading}, ${ffData.unit}, 'odoo', ${ffData.reading_date}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
               )
             `;
             result.odometer.created++;

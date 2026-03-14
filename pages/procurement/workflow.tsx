@@ -1,6 +1,5 @@
 // WORKING: Procurement Workflow Wizard page
 import { AppLayout } from '@/components/layout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { ProcurementWorkflowWizard } from '@/modules/procurement/workflow/ProcurementWorkflowWizard';
 import { Workflow } from 'lucide-react';
 
@@ -24,9 +23,6 @@ export default function ProcurementWorkflowPage() {
                 </p>
               </div>
             </div>
-          </div>
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="requisitions" categoriesOnly />
           </div>
         </div>
 

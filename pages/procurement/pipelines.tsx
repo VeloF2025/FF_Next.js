@@ -9,7 +9,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ProcurementTabs } from '@/modules/procurement/components/ProcurementTabs';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   GitBranch,
@@ -306,9 +305,6 @@ export default function PipelinesPage() {
                 New Pipeline
               </button>
             </div>
-          </div>
-          <div className="px-6 border-t border-[var(--ff-border-light)]">
-            <ProcurementTabs activeTab="pipelines" />
           </div>
         </div>
 

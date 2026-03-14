@@ -339,6 +339,18 @@ export function classifyErrorPattern(
     return 'totally_wrong' as ErrorPattern;
   }
 
+  // Check for CQA step mis-assignment
+  if (analysisType === 'construction_photo_qa') {
+    const vlmStep = parseInt(vlm.charAt(0));
+    const correctStep = parseInt(correct.charAt(0));
+    if (!isNaN(vlmStep) && !isNaN(correctStep)) {
+      if (vlmStep === 0) return 'step_classified_unrelated' as ErrorPattern;
+      if (vlmStep === 2 && correctStep !== 2) return 'step_2_overassigned' as ErrorPattern;
+      return `step_${vlmStep}_to_${correctStep}` as ErrorPattern;
+    }
+    return 'step_misassignment' as ErrorPattern;
+  }
+
   // Check for odometer digit confusion
   if (analysisType === 'odometer') {
     const pattern = detectDigitConfusionPattern(vlm, correct);
