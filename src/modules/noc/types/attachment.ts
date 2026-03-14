@@ -11,6 +11,7 @@
  */
 export enum FileType {
   PHOTO = 'photo',
+  VIDEO = 'video',
   DOCUMENT = 'document',
   EXCEL = 'excel',
   PDF = 'pdf',

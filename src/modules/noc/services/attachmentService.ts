@@ -46,6 +46,10 @@ const DEFAULT_ALLOWED_TYPES = [
   'image/png',
   'image/gif',
   'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
   'application/pdf',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -93,6 +97,9 @@ export function validateFileUpload(
 function getFileTypeFromMimeType(mimeType: string): FileType {
   if (mimeType.startsWith('image/')) {
     return FileType.PHOTO;
+  }
+  if (mimeType.startsWith('video/')) {
+    return FileType.VIDEO;
   }
   if (mimeType === 'application/pdf') {
     return FileType.PDF;

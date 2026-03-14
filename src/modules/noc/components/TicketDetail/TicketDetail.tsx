@@ -23,6 +23,7 @@ import {
   CheckSquare,
   History,
   MessageSquare,
+  Paperclip,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTicket } from '../../hooks/useTicket';
@@ -36,6 +37,7 @@ import { QAReadinessCheck } from '../QAReadiness/QAReadinessCheck';
 import { AssignmentPanel } from '../Assignment/AssignmentPanel';
 import { RelatedTickets } from './RelatedTickets';
 import { NotesTab } from './NotesTab';
+import { AttachmentsTab } from './AttachmentsTab';
 import { useTicketNotes } from '../../hooks/useTicketNotesWithMutations';
 
 interface TicketDetailProps {
@@ -47,7 +49,7 @@ interface TicketDetailProps {
   backLink?: string;
 }
 
-type TabKey = 'overview' | 'activity' | 'notes' | 'verification';
+type TabKey = 'overview' | 'activity' | 'notes' | 'attachments' | 'verification';
 
 interface Tab {
   key: TabKey;
@@ -113,6 +115,7 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
     { key: 'overview', label: 'Overview', icon: FileText },
     { key: 'activity', label: 'Activity', icon: Activity, badge: activitySummary.total },
     { key: 'notes', label: 'Notes', icon: MessageSquare, badge: notesSummary.total },
+    { key: 'attachments', label: 'Attachments', icon: Paperclip },
     { key: 'verification', label: 'Verification', icon: CheckSquare },
   ];
 
@@ -378,6 +381,13 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
 
           {/* Notes Tab */}
           {activeTab === 'notes' && <NotesTab ticketId={ticketId} />}
+
+          {/* Attachments Tab */}
+          {activeTab === 'attachments' && (
+            <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg p-6">
+              <AttachmentsTab ticketId={ticketId} />
+            </div>
+          )}
 
           {/* Verification Tab */}
           {activeTab === 'verification' && (

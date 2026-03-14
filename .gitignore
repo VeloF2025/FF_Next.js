@@ -136,3 +136,17 @@ CHANGELOG.md.backup.*
 # Generated documentation and runtime data
 docs/wa-digests/
 # docs/schema/ contains DATABASE_SCHEMA_INDEX.md (keep tracked)
+
+# Claude Code local-only (session state, not team-shared)
+.claude/session/
+.claude/metrics/
+.claude/settings.local.json
+.claude/worktrees/
+
+# Python cache
+scripts/__pycache__/
+
+# Local uploads and test artifacts
+public/uploads/qa-photos/
+tests/e2e-results/
+metrics/
