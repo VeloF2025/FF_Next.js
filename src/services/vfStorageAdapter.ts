@@ -76,7 +76,7 @@ export class VFStorageService {
         formData.append('file', file as Blob, fileName);
       }
 
-      const url = `${this.baseUrl}/upload/${type}/${category}`;
+      const url = `${this.baseUrl}/upload/${type}/${encodeURIComponent(category)}`;
       log.info(`Uploading to VF Storage: ${url}`);
 
       const response = await fetch(url, {
