@@ -39,6 +39,7 @@ import { ProjectIncomeTab } from './detail/ProjectIncomeTab';
 import { ProjectDocumentsTab } from './detail/ProjectDocumentsTab';
 // PON Stages & Pre-Reqs Tabs
 import { PonStageTracker } from '@/modules/projects/components/pon-stages/PonStageTracker';
+import { PonProgressTracker } from '@/modules/projects/components/pon-progress/PonProgressTracker';
 import { ProjectPrereqs } from '@/modules/projects/components/prereqs/ProjectPrereqs';
 
 interface ProjectDetailProps {
@@ -66,6 +67,7 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
     // Build tab aliases
     'build': 'pon-stages',
     'stages': 'pon-stages',
+    'progress': 'pon-progress',
     'pre-reqs': 'prereqs',
   };
 
@@ -313,6 +315,10 @@ export function ProjectDetail({ projectId }: ProjectDetailProps) {
 
       {activeTab === 'pon-stages' && (
         <PonStageTracker projectId={id!} />
+      )}
+
+      {activeTab === 'pon-progress' && (
+        <PonProgressTracker projectId={id!} />
       )}
 
       {activeTab === 'prereqs' && (
