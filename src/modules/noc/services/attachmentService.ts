@@ -412,8 +412,7 @@ export async function listAttachmentsForTicket(
       ORDER BY uploaded_at DESC
     `;
 
-    const result = await query<TicketAttachment>(sql, params);
-    const attachments = result.rows;
+    const attachments = await query<TicketAttachment>(sql, params);
 
     // Calculate statistics
     const total = attachments.length;
@@ -526,11 +525,10 @@ export async function getPhotoEvidenceSummary(
       ORDER BY uploaded_at DESC
     `;
 
-    const attachmentsResult = await query<TicketAttachment>(attachmentsSql, [
+    const photos = await query<TicketAttachment>(attachmentsSql, [
       ticketId,
       FileType.PHOTO
     ]);
-    const photos = attachmentsResult.rows;
 
     // Get verification steps with photo status
     const stepsSql = `
@@ -543,12 +541,11 @@ export async function getPhotoEvidenceSummary(
       ORDER BY step_number
     `;
 
-    const stepsResult = await query<{
+    const steps = await query<{
       step_number: number;
       verification_step_id: string;
       photo_verified: boolean;
     }>(stepsSql, [ticketId]);
-    const steps = stepsResult.rows;
 
     // Count photos by step
     const photosByStep: Record<number, number> = {};
