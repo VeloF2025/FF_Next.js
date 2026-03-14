@@ -51,6 +51,15 @@ interface RawRow {
   activation_complete: string;
   activation_first_date: string | null;
   activation_last_date: string | null;
+  maintenance_total: string;
+  maintenance_complete: string;
+  maintenance_first_date: string | null;
+  maintenance_last_date: string | null;
+  cwc_target_date: string | null;
+  optical_target_date: string | null;
+  activation_target_date: string | null;
+  maintenance_target_date: string | null;
+  blockage: string | null;
   overall_stage: string;
   last_synced_at: string;
 }
@@ -132,6 +141,11 @@ async function handler(
           atp_first_date::text, atp_last_date::text,
           activation_total::text, activation_complete::text,
           activation_first_date::text, activation_last_date::text,
+          maintenance_total::text, maintenance_complete::text,
+          maintenance_first_date::text, maintenance_last_date::text,
+          cwc_target_date::text, optical_target_date::text,
+          activation_target_date::text, maintenance_target_date::text,
+          blockage,
           overall_stage,
           last_synced_at::text
         FROM pon_stage_tracking
@@ -158,6 +172,12 @@ async function handler(
         optical: makeStageData(Number(row.optical_total), Number(row.optical_complete), row.optical_first_date, row.optical_last_date),
         atp: makeStageData(Number(row.atp_total), Number(row.atp_passed), row.atp_first_date, row.atp_last_date),
         activation: makeStageData(Number(row.activation_total), Number(row.activation_complete), row.activation_first_date, row.activation_last_date),
+        maintenance: makeStageData(Number(row.maintenance_total), Number(row.maintenance_complete), row.maintenance_first_date, row.maintenance_last_date),
+        cwc_target_date: row.cwc_target_date,
+        optical_target_date: row.optical_target_date,
+        activation_target_date: row.activation_target_date,
+        maintenance_target_date: row.maintenance_target_date,
+        blockage: row.blockage,
         overall_stage: row.overall_stage as OverallStage,
         last_synced_at: row.last_synced_at,
       }));
