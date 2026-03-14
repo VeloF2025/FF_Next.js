@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import type { PonDailyLogEntry, ProgressCategory, DelayReason } from '@/types/pon-stages.types';
 import { DELAY_REASON_LABELS } from '@/types/pon-stages.types';
 
@@ -107,16 +108,16 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
     grouped.set(entry.log_date, existing);
   }
 
-  return (
+  return createPortal(
     <>
-      {/* Backdrop overlay */}
+      {/* Backdrop overlay — covers entire viewport */}
       <div
-        className="fixed inset-0 bg-black/40 z-40"
+        className="fixed inset-0 bg-black/50 z-[9998]"
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[var(--ff-card-bg)] border-l border-[var(--ff-border-light)] shadow-2xl z-50 flex flex-col animate-slide-in">
+      {/* Panel — rendered at body level via portal */}
+      <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[var(--ff-card-bg)] border-l border-[var(--ff-border-light)] shadow-2xl z-[9999] flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-[var(--ff-border-light)] flex items-center justify-between shrink-0">
           <div>
@@ -261,6 +262,7 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
