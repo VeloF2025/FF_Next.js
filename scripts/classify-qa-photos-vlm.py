@@ -433,6 +433,11 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
     else:
         source_filter = f"AND p.source = '{source}'"
 
+    # Always exclude photos whose binary hasn't been confirmed in MinIO yet.
+    # pending_upload = ingested from GPKG but file not in MinIO
+    # missing        = pending_upload record older than 7 days, still not found
+    upload_status_filter = "AND COALESCE(p.upload_status, 'available') = 'available'"
+
     # Classification filter — skip already-classified unless reclassifying
     if steps_only:
         step_list = ",".join(str(int(s)) for s in steps_only)
@@ -455,6 +460,7 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         WHERE r.discipline = %s
           {classify_filter}
           {source_filter}
+          {upload_status_filter}
           {project_filter}
         ORDER BY pr.project_name, r.feature_id
         LIMIT %s

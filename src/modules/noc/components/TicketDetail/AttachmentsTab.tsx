@@ -63,27 +63,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
 
   useEffect(() => { fetchAttachments(); }, [fetchAttachments]);
 
-  // Clipboard paste handler
-  useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of Array.from(items)) {
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            e.preventDefault();
-            uploadFile(file);
-          }
-        }
-      }
-    };
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketId, user]);
-
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     if (!user?.id) return;
     setUploading(true);
     try {
@@ -104,7 +84,26 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
     } finally {
       setUploading(false);
     }
-  };
+  }, [ticketId, user, fetchAttachments]);
+
+  // Clipboard paste handler — Ctrl+V anywhere on the page uploads pasted images
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            uploadFile(file);
+          }
+        }
+      }
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [uploadFile]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

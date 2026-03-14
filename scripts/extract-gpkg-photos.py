@@ -246,6 +246,58 @@ def sync_pon_zone(cur, conn, ff_project_id, rows, columns, label_col):
 
 # ── MinIO helpers ─────────────────────────────────────────────────────────────
 
+def minio_list_dcim_directory(qf_project_id):
+    """Batch-list the entire DCIM directory for a QFieldCloud project.
+
+    Returns a dict mapping filename → versioned storage key (or None if unversioned).
+    An empty dict means the DCIM directory does not exist or is inaccessible.
+
+    By listing once per project we avoid one docker exec call per photo (which
+    would be ~1 s per call for a project with 500 photos).
+    """
+    dcim_prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/DCIM/"
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "qfieldcloud-minio-1", "mc", "ls", "--recursive", dcim_prefix],
+            capture_output=True, text=True, timeout=60,
+        )
+        if result.returncode != 0:
+            print(f"    WARN: mc ls DCIM failed for {qf_project_id}: {result.stderr.strip()[:120]}")
+            return {}
+
+        # mc ls --recursive output lines look like:
+        #   [date] [time]     123  DCIM/IMG_0001.jpg/v20260310120500-7bc5005f
+        # We parse filename and the versioned segment from each entry.
+        dcim_files = {}  # filename.jpg -> versioned storage key
+        for line in result.stdout.strip().split("\n"):
+            parts = line.strip().split()
+            if not parts:
+                continue
+            # Last token is the path relative to the dcim_prefix
+            rel_path = parts[-1].rstrip("/")  # e.g. DCIM/IMG_0001.jpg/v20260310...
+            # Normalize: strip leading DCIM/ if mc includes it
+            if rel_path.startswith("DCIM/"):
+                rel_path = rel_path[len("DCIM/"):]
+            # Expected format: filename.jpg/v{version}
+            slash_idx = rel_path.rfind("/")
+            if slash_idx == -1:
+                continue
+            filename = rel_path[:slash_idx]   # e.g. IMG_0001.jpg
+            version_seg = rel_path[slash_idx + 1:]  # e.g. v20260310120500-7bc5005f
+            if not version_seg.startswith("v"):
+                continue
+            # Store: keep latest version (sorted lexicographically — timestamps are ISO-like)
+            existing_ver = dcim_files.get(filename)
+            if existing_ver is None or version_seg > existing_ver.rsplit("/", 1)[-1]:
+                dcim_files[filename] = (
+                    f"projects/{qf_project_id}/files/DCIM/{filename}/{version_seg}"
+                )
+        return dcim_files
+    except Exception as e:
+        print(f"    WARN: minio_list_dcim_directory error: {e}")
+        return {}
+
+
 def minio_download_latest(qf_project_id, gpkg_path, dest_path):
     """Download the latest version of a GPKG from MinIO."""
     prefix = f"local/{MINIO_BUCKET}/projects/{qf_project_id}/files/{gpkg_path}/"
@@ -388,6 +440,12 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             db.close()
             return 0, 0
 
+        # ── Batch-list MinIO DCIM directory once per project ─────────────────
+        # dcim_index maps filename.jpg -> versioned storage key (or absent if not uploaded)
+        print(f"  Listing MinIO DCIM directory...")
+        dcim_index = minio_list_dcim_directory(qf_id)
+        print(f"  MinIO DCIM files found: {len(dcim_index)}")
+
         # Get existing photo keys in qfield_photo_validations for this project
         cur.execute(
             "SELECT photo_key FROM qfield_photo_validations WHERE project_id = %s",
@@ -404,7 +462,27 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
 
         photos_found = 0
         photos_upserted = 0
-        version_cache = {}  # dcim_path -> full_key
+        photos_skipped_missing = 0
+
+        def _resolve_key(dcim_path):
+            """Return (storage_key, upload_status) for a DCIM-relative path.
+
+            Uses the pre-fetched dcim_index for O(1) lookup instead of per-file
+            docker exec calls. Falls back to the slow individual resolution only
+            when the batch listing was empty (docker unavailable etc.).
+            """
+            filename = dcim_path.replace("DCIM/", "").lstrip("/")
+            if dcim_index:
+                versioned = dcim_index.get(filename)
+                if versioned:
+                    return versioned, "available"
+                # File referenced in GPKG but absent from MinIO
+                return f"projects/{qf_id}/files/{dcim_path}", "pending_upload"
+            # Batch listing failed — fall back to individual resolution
+            versioned = minio_resolve_photo_version(qf_id, dcim_path)
+            if versioned:
+                return versioned, "available"
+            return f"projects/{qf_id}/files/{dcim_path}", "pending_upload"
 
         for row in rows:
             feature_id = row[label_col] if label_col in row.keys() else None
@@ -423,15 +501,12 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 dcim_path = str(val).strip()
                 photos_found += 1
 
-                # Build the storage key — try to resolve versioned path
-                if dcim_path in version_cache:
-                    full_key = version_cache[dcim_path]
-                else:
-                    full_key = minio_resolve_photo_version(qf_id, dcim_path)
-                    if not full_key:
-                        # Fallback: unversioned path
-                        full_key = f"projects/{qf_id}/files/{dcim_path}"
-                    version_cache[dcim_path] = full_key
+                full_key, upload_status = _resolve_key(dcim_path)
+
+                if upload_status == "pending_upload":
+                    print(f"    SKIP (not in MinIO): {dcim_path}")
+                    photos_skipped_missing += 1
+                    continue
 
                 # Skip if already in DB (either validations or photos table)
                 if full_key in existing_keys:
@@ -471,13 +546,12 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 dcim_path = str(val).strip()
                 photos_found += 1
 
-                if dcim_path in version_cache:
-                    full_key = version_cache[dcim_path]
-                else:
-                    full_key = minio_resolve_photo_version(qf_id, dcim_path)
-                    if not full_key:
-                        full_key = f"projects/{qf_id}/files/{dcim_path}"
-                    version_cache[dcim_path] = full_key
+                full_key, upload_status = _resolve_key(dcim_path)
+
+                if upload_status == "pending_upload":
+                    print(f"    SKIP (not in MinIO): {dcim_path}")
+                    photos_skipped_missing += 1
+                    continue
 
                 if full_key in existing_keys:
                     continue
@@ -502,6 +576,9 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
                 ))
                 existing_keys.add(full_key)
                 photos_upserted += 1
+
+        if photos_skipped_missing:
+            print(f"  Skipped {photos_skipped_missing} photos not yet uploaded to MinIO")
 
         db.close()
 
@@ -536,7 +613,7 @@ def extract_project(conn, project_name, config, dry_run=False, force=False):
             """, (qf_id, config["gpkg_path"], version, len(rows)))
             conn.commit()
 
-        print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}")
+        print(f"  Photos found: {photos_found}, New upserted: {photos_upserted}, Skipped (no MinIO): {photos_skipped_missing}")
         return photos_found, photos_upserted
 
     finally:
