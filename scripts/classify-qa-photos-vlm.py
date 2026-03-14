@@ -566,6 +566,7 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
                 cur.execute("""
                     UPDATE construction_qa_photos
                     SET checklist_step = 0, step_label = 'Unrelated',
+                        vlm_valid = false,
                         vlm_confidence = %s, vlm_feedback = %s, vlm_processed_at = NOW(), updated_at = NOW()
                     WHERE id = %s::uuid
                 """, (confidence, reason[:500], photo_id))
@@ -587,13 +588,17 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         if discipline == "splicing" and sub_type:
             review_sub_types[review_id] = sub_type
 
+        # vlm_valid = true only when confidence >= 0.80 (high enough to trust the classification)
+        is_valid = confidence >= 0.80
+
         if not dry_run:
             cur.execute("""
                 UPDATE construction_qa_photos
                 SET checklist_step = %s, step_label = %s,
+                    vlm_valid = %s,
                     vlm_confidence = %s, vlm_feedback = %s, vlm_processed_at = NOW(), updated_at = NOW()
                 WHERE id = %s::uuid
-            """, (step, step_label, confidence, reason[:500], photo_id))
+            """, (step, step_label, is_valid, confidence, reason[:500], photo_id))
 
         # Commit every 25 photos
         if not dry_run and (i + 1) % 25 == 0:
@@ -657,6 +662,84 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
             print(f"    {s:2d}. {label:30s} {count:4d} {bar}")
 
     print(f"    {'':2s}  {'Unrelated':30s} {stats['unrelated']:4d}")
+    print(f"{'='*70}")
+
+    # -- Step 5: Recompute step booleans & auto-approve (civil only) -----------
+    if discipline == "civil" and not dry_run and stats["classified"] > 0:
+        print(f"\n  [Post-classify] Recomputing step booleans (vlm_valid=true required)...")
+        cur.execute("""
+            WITH photo_steps AS (
+                SELECT
+                    p.review_id,
+                    bool_or(p.checklist_step = 1 AND COALESCE(p.vlm_valid, false) = true) AS has_step1,
+                    bool_or(p.checklist_step = 2 AND COALESCE(p.vlm_valid, false) = true) AS has_step2,
+                    bool_or(p.checklist_step = 3 AND COALESCE(p.vlm_valid, false) = true) AS has_step3,
+                    bool_or(p.checklist_step = 4 AND COALESCE(p.vlm_valid, false) = true) AS has_step4,
+                    bool_or(p.checklist_step = 5 AND COALESCE(p.vlm_valid, false) = true) AS has_step5,
+                    bool_or(p.checklist_step = 6 AND COALESCE(p.vlm_valid, false) = true) AS has_step6,
+                    bool_or(p.checklist_step = 7 AND COALESCE(p.vlm_valid, false) = true) AS has_step7,
+                    bool_or(p.checklist_step = 8 AND COALESCE(p.vlm_valid, false) = true) AS has_step8,
+                    COUNT(*) AS photo_cnt
+                FROM construction_qa_photos p
+                GROUP BY p.review_id
+            )
+            UPDATE construction_qa_reviews r
+            SET
+                civil_step_01_before_photo = COALESCE(ps.has_step1, false),
+                civil_step_02_during_photo = COALESCE(ps.has_step2, false),
+                civil_step_03_depth_photo = COALESCE(ps.has_step3, false),
+                civil_step_04_end_plates = COALESCE(ps.has_step4, false),
+                civil_step_05_compaction = COALESCE(ps.has_step5, false),
+                civil_step_06_level_check = COALESCE(ps.has_step6, false),
+                civil_step_07_after_photo = COALESCE(ps.has_step7, false),
+                civil_step_08_signature = COALESCE(ps.has_step8, false),
+                photo_count = COALESCE(ps.photo_cnt, 0),
+                updated_at = NOW()
+            FROM photo_steps ps
+            WHERE r.id = ps.review_id
+              AND r.discipline = 'civil'
+              AND (
+                r.civil_step_01_before_photo IS DISTINCT FROM COALESCE(ps.has_step1, false)
+                OR r.civil_step_02_during_photo IS DISTINCT FROM COALESCE(ps.has_step2, false)
+                OR r.civil_step_03_depth_photo IS DISTINCT FROM COALESCE(ps.has_step3, false)
+                OR r.civil_step_04_end_plates IS DISTINCT FROM COALESCE(ps.has_step4, false)
+                OR r.civil_step_05_compaction IS DISTINCT FROM COALESCE(ps.has_step5, false)
+                OR r.civil_step_06_level_check IS DISTINCT FROM COALESCE(ps.has_step6, false)
+                OR r.civil_step_07_after_photo IS DISTINCT FROM COALESCE(ps.has_step7, false)
+                OR r.civil_step_08_signature IS DISTINCT FROM COALESCE(ps.has_step8, false)
+                OR r.photo_count IS DISTINCT FROM COALESCE(ps.photo_cnt, 0)
+              )
+            RETURNING r.id
+        """)
+        booleans_fixed = cur.rowcount
+        conn.commit()
+        print(f"  Booleans recomputed: {booleans_fixed} reviews")
+
+        # Auto-approve: all 7 step booleans true (via vlm_valid), steps 3-7 required, step 1 or 2
+        print(f"  [Post-classify] Auto-approving eligible reviews...")
+        cur.execute("""
+            UPDATE construction_qa_reviews
+            SET workflow_status = 'approved', qa_decision = 'PASS', updated_at = NOW()
+            WHERE discipline = 'civil'
+              AND workflow_status IN ('pending', 'retake_required', 'unidentified')
+              AND photo_count >= 7
+              AND COALESCE(civil_step_03_depth_photo, false) = true
+              AND COALESCE(civil_step_04_end_plates, false) = true
+              AND COALESCE(civil_step_05_compaction, false) = true
+              AND COALESCE(civil_step_06_level_check, false) = true
+              AND COALESCE(civil_step_07_after_photo, false) = true
+              AND (COALESCE(civil_step_01_before_photo, false) = true
+                   OR COALESCE(civil_step_02_during_photo, false) = true)
+            RETURNING id, feature_id
+        """)
+        auto_approved = cur.fetchall()
+        conn.commit()
+        print(f"  Auto-approved: {len(auto_approved)} reviews")
+        for a in auto_approved[:10]:
+            print(f"    {a[1]}")
+        if len(auto_approved) > 10:
+            print(f"    ... and {len(auto_approved) - 10} more")
+
     print(f"{'='*70}")
 
     cur.close()
