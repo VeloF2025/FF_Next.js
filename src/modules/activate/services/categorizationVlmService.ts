@@ -70,22 +70,24 @@ function buildCategorizationPrompt(
 Your task is to analyze ${photoCount} photos and categorize each one into one of these 10 installation steps:
 
 STEP CATEGORIES:
-1. House Photo - Property exterior for location verification (house, building, address visible)
-2. Cable from Pole - Aerial fiber drop from utility pole to house
-3. Cable Entry Outside - EXTERIOR view of where cable enters building (close-up of entry point, conduit, exterior wall)
-4. Cable Entry Inside - INTERIOR view of cable routing from entry point toward ONT
-5. Wall for Installation - Wall surface with mounting bracket and power outlet before ONT install
-6. ONT Back After Install - Back panel of ONT showing fiber and power cable connections
-7. Power Meter Reading - Optical power meter display showing dBm reading
-8. Final Installation - Wide shot of complete setup (ONT mounted, UPS/GIZZU connected, cables managed)
-9. Green Lights on ONT - Front panel of ONT with illuminated indicator lights
-10. Signature - Customer signature on completion form
+1. House Photo - Property exterior showing the BUILDING for location verification. Must show the structure itself, not just sky/poles.
+2. Cable from Pole - The AERIAL SPAN of fiber cable between a utility pole and the house. Cable crossing open air/sky. NOT just a pole alone, NOT cable along a wall.
+3. Cable Entry Outside - EXTERIOR close-up of where cable ENTERS the building through wall/roof. Cable penetrating exterior wall, conduit, grommet. Cable transitioning from OUTSIDE to INSIDE.
+4. Cable Entry Inside - INTERIOR view showing cable ROUTING from entry point along walls/ceiling. Cable running along interior wall, cable clips, indoor path. Cable is TRAVELING, not yet at destination.
+5. Wall for Installation - The DESTINATION wall surface where ONT will be mounted. Mounting bracket, power outlet nearby, clean wall section. NO cable routing as main subject.
+6. ONT Back After Install - BACK panel of ONT showing fiber port and power cable connections. Yellow fiber connector, power cable. Camera angle BEHIND the ONT.
+7. Power Meter Reading - Optical power meter display showing dBm reading (typically -18 to -25 dBm). Handheld meter screen with numbers.
+8. Final Installation - WIDE shot of COMPLETE setup from a distance: ONT + UPS/GIZZU + wall + surroundings. Key = WIDE FRAMING showing full context, even if green lights visible.
+9. Green Lights on ONT - CLOSE-UP of ONT FRONT panel focused on indicator lights (POWER, LINK, LAN, 2.4GHz, 5GHz, INTERNET). Nokia/Fibertime branding, LED labels, green dots.
+10. Signature - Customer signature on paper/tablet completion form. Handwriting, form fields, sign here marks.
 
 KEY DIFFERENTIATORS for commonly confused categories:
-- Step 3 vs Step 4: OUTSIDE (exterior wall, weather elements) vs INSIDE (interior wall, indoor lighting)
+- Step 1 vs Step 2: Step 1 = BUILDING/HOUSE visible. Step 2 = CABLE in AIR between pole and house. Pole+sky with no house = Step 2, not Step 1.
+- Step 2 vs Step 3: Step 2 = cable in AIR (aerial span, crossing sky). Step 3 = cable at WALL (entering building). Cable along roofline/wall = Step 3. Cable spanning open air = Step 2.
+- Step 3 vs Step 4: Step 3 = OUTSIDE (exterior wall, daylight). Step 4 = INSIDE (interior wall, indoor lighting). Sky or exterior materials = Step 3. Enclosed indoor = Step 4.
+- Step 4 vs Step 5: Step 4 = cable ROUTING/traveling along walls. Step 5 = TARGET wall (bracket, outlet). Cable as main subject = Step 4. Wall surface as main subject = Step 5.
 - Step 6 vs Step 8: ONT BACK only (cables) vs FULL SETUP wide shot (ONT + UPS + cables)
-- Step 1 vs Step 8: House ONLY (no equipment) vs House with visible installation
-- Step 9 vs Step 6: FRONT of ONT (lights) vs BACK of ONT (cables)`;
+- Step 8 vs Step 9: FRAMING is key. Step 8 = WIDE shot (ONT + UPS + wall + surroundings). Step 9 = CLOSE-UP of front panel lights only. UPS and wall visible = Step 8 even if lights visible.`;
 
   // Inject few-shot examples from human corrections (HITL learning)
   if (fewShotExamples && fewShotExamples.length > 0) {
