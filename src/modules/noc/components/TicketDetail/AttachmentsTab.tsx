@@ -269,9 +269,9 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
                   )}
                   <button
                     type="button"
+                    aria-label="Delete attachment"
                     onClick={(e) => { e.stopPropagation(); handleDelete(att.id, att.filename); }}
-                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Delete attachment"
+                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 opacity-100 transition-opacity"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -285,6 +285,9 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
       {/* Full-size Preview Modal */}
       {previewUrl && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image/Video preview"
           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           style={{ zIndex: 99999 }}
           onClick={() => setPreviewUrl(null)}
