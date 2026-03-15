@@ -1,12 +1,12 @@
+---
+name: final-audit
+description: Production readiness testing for FibreFlow. Comprehensive end-to-end validation of features, APIs, forms, themes, and functions before go-live. USE WHEN user says 'final audit', 'production ready test', 'go-live test', '/final-audit', or before deploying to production.
+disable-model-invocation: true
+---
+
 # Final Audit - Production Readiness Testing
 
 **Purpose:** Comprehensive end-to-end testing skill that validates EVERY feature, button, modal, API, form, theme, and function before going live. This is the ultimate QA gate for FibreFlow.
-
-## USE WHEN
-- Before deploying to production
-- After major feature releases
-- When user says "final audit", "production ready test", "go-live test"
-- When comprehensive E2E validation is needed
 
 ## Quick Reference
 

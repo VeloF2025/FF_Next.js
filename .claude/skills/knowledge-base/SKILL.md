@@ -1,15 +1,11 @@
+---
+name: knowledge-base
+description: Knowledge base update skill for FibreFlow. Scan codebase, refresh module profiles, update learnings and session state. USE WHEN user says '/kb', 'update knowledge base', 'refresh knowledge', 'scan modules', 'sync knowledge'.
+---
+
 # Knowledge Base Update Skill
 
 Update the FibreFlow knowledge base by scanning the codebase and refreshing module profiles, learnings, and session state.
-
-## Triggers
-
-USE WHEN user says:
-- "kb", "KB", "/kb"
-- "update knowledge base", "update kb"
-- "refresh knowledge", "refresh kb"
-- "scan modules", "update modules"
-- "sync knowledge"
 
 ## What This Skill Does
 

@@ -1,4 +1,6 @@
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
+
 import { SOWStatus } from './enums.types';
 
 // Core SOW Entity

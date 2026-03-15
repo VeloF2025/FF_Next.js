@@ -6,4 +6,4 @@
 export * from './sow/index';
 
 // Re-export Timestamp for backward compatibility
-export { Timestamp } from 'firebase/firestore';
+export type Timestamp = string | Date;

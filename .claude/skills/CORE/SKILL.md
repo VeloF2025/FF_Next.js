@@ -1,5 +1,5 @@
 ---
-name: CORE
+name: core
 description: FibreFlow PAI Core - Response format, protocols, and quality standards. AUTO-LOADS at session start. USE WHEN any session begins OR user asks about PAI protocols, response format, or quality standards.
 ---
 

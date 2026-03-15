@@ -1,9 +1,6 @@
 ---
 name: module-context
-description: Load and provide context about FibreFlow modules for accurate code assistance
-version: 1.0
-author: PAI Integration
-tags: [context, modules, documentation, codebase]
+description: Load and provide context about FibreFlow modules for accurate code assistance. USE WHEN user mentions working on a specific module, asks about module dependencies or structure, wants to modify code in a module, or says '/module'.
 ---
 
 # Module Context Skill

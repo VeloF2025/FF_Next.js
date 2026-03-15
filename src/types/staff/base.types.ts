@@ -2,7 +2,9 @@
  * Staff Base Types - Core staff member definitions
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
+
 import {
   Department, Position, StaffLevel, StaffStatus, ContractType,
   Skill, Certification, Equipment, TrainingRecord,

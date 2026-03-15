@@ -62,7 +62,6 @@ export interface SystemHealthResponse {
 
   apps: {
     production: ServiceStatus;
-    staging: ServiceStatus;
     dev: ServiceStatus;
     backup: ServiceStatus;
   };

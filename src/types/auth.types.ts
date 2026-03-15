@@ -1,4 +1,11 @@
-import { User as FirebaseUser } from 'firebase/auth';
+/** Minimal representation of an authenticated session user (replaces firebase/auth User) */
+export interface FirebaseUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+}
 
 export interface User {
   id: string;

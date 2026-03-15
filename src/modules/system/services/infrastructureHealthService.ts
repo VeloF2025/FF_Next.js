@@ -27,7 +27,6 @@ const VPS_HOST = '72.61.197.178';
 const SERVICE_ENDPOINTS = {
   apps: {
     production: { url: `http://${VELOCITY_HOST}:3000/api/health`, timeout: 10000 },
-    staging: { url: `http://${VELOCITY_HOST}:3006/api/health`, timeout: 10000 },
     dev: { url: `http://${VELOCITY_HOST}:3005/api/health`, timeout: 10000 },
     backup: { url: `http://${VPS_HOST}:3005/api/health`, timeout: 15000 },
   },
@@ -407,7 +406,6 @@ export async function performHealthCheck(
   const [
     // Apps
     productionStatus,
-    stagingStatus,
     devStatus,
     backupStatus,
     // AI
@@ -430,7 +428,6 @@ export async function performHealthCheck(
   ] = await Promise.all([
     // Apps
     checkHttpEndpoint(SERVICE_ENDPOINTS.apps.production.url, SERVICE_ENDPOINTS.apps.production.timeout),
-    checkHttpEndpoint(SERVICE_ENDPOINTS.apps.staging.url, SERVICE_ENDPOINTS.apps.staging.timeout),
     checkHttpEndpoint(SERVICE_ENDPOINTS.apps.dev.url, SERVICE_ENDPOINTS.apps.dev.timeout),
     checkHttpEndpoint(SERVICE_ENDPOINTS.apps.backup.url, SERVICE_ENDPOINTS.apps.backup.timeout),
     // AI
@@ -477,7 +474,6 @@ export async function performHealthCheck(
   // Collect all statuses for summary
   const allStatuses: ServiceStatus[] = [
     productionStatus,
-    stagingStatus,
     devStatus,
     backupStatus,
     vlmStatus,
@@ -518,7 +514,6 @@ export async function performHealthCheck(
 
     apps: {
       production: productionStatus,
-      staging: stagingStatus,
       dev: devStatus,
       backup: backupStatus,
     },

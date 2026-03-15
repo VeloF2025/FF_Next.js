@@ -2,7 +2,8 @@
  * Staff Timesheet Types - Time tracking and work records
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
 
 export interface Timesheet {
   id?: string;

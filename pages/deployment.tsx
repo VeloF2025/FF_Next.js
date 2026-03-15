@@ -189,7 +189,6 @@ function RunRow({ run }: { run: GithubRun }) {
 
 const SVC_LABELS: Record<string, string> = {
   'fibreflow': 'Prod',
-  'fibreflow-staging': 'Staging',
   'fibreflow-dev': 'Dev',
 };
 

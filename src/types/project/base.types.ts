@@ -2,7 +2,8 @@
  * Base project types and interfaces
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
 
 export interface Project {
   id: string;

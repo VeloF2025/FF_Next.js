@@ -27,14 +27,13 @@ interface DeployHealthResponse {
 
 const SERVICES = [
   { name: 'FibreFlow Prod', port: 3000, url: 'http://localhost:3000/api/health' },
-  { name: 'FibreFlow Staging', port: 3006, url: 'http://localhost:3006/api/health' },
   { name: 'FibreFlow Dev', port: 3005, url: 'http://localhost:3005/api/health' },
   { name: 'GazTime API', port: 3333, url: 'http://localhost:3333/api/health' },
   { name: 'MC v1 API', port: 4000, url: 'http://localhost:4000/health' },
   { name: 'MC v2 API', port: 4001, url: 'http://localhost:4001/health' },
 ]
 
-const SYSTEMD_SERVICES = ['fibreflow-production', 'fibreflow-staging', 'fibreflow-dev', 'gaztime-api', 'mc-v2-api']
+const SYSTEMD_SERVICES = ['fibreflow-production', 'fibreflow-dev', 'gaztime-api', 'mc-v2-api']
 
 async function checkService(service: { name: string; port: number; url: string }): Promise<ServiceHealth> {
   const start = Date.now()

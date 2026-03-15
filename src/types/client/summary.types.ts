@@ -3,7 +3,9 @@
  * Summary statistics and metrics interfaces
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
+
 import { Client } from './core.types';
 
 export interface ClientSummary {

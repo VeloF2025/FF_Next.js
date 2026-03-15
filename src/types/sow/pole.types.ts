@@ -2,7 +2,9 @@
  * SOW Pole Types - Pole-related data structures
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
+
 import { PoleStatus, PoleType, ValidationStatus } from './enums.types';
 
 // Pole Data Structure

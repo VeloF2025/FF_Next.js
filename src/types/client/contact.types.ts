@@ -3,7 +3,9 @@
  * Communication tracking and interaction types
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
+
 import { ContactMethod, ContactPurpose, ContactOutcome } from './enums';
 
 export interface ContactHistory {

@@ -2,7 +2,8 @@
  * Staff Enums - All enumeration types for staff management
  */
 
-import { Timestamp } from 'firebase/firestore';
+/** Timestamp values from Neon PostgreSQL are returned as strings or Date objects */
+type Timestamp = string | Date;
 
 // Department Enums
 export enum Department {

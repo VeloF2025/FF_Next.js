@@ -9,6 +9,7 @@
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "build:turbo": "next build --turbo",
     "start": "next start",
+    "postinstall": "node scripts/setup-eslint-plugin.js",
     "analyze": "ANALYZE=true next build",
     "analyze:bundle": "BUNDLE_ANALYZE=true next build",
     "test": "vitest",

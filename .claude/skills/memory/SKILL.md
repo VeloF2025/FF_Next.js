@@ -1,16 +1,11 @@
+---
+name: memory
+description: Memory and knowledge system management for FibreFlow. Route knowledge to correct location, audit hierarchy, slim CLAUDE.md. USE WHEN user says '/memory', 'memory check', 'memory audit', 'where should this go', 'knowledge audit', 'CLAUDE.md is too big', 'persist this', 'save this knowledge'.
+---
+
 # Memory Management Skill
 
 Manage the progressive knowledge system - ensure CLAUDE.md stays slim, route knowledge to the right location, and maintain the knowledge hierarchy.
-
-## Triggers
-
-USE WHEN user says:
-- "/memory", "memory check", "memory audit"
-- "where should this go", "where does this belong"
-- "knowledge audit", "context audit"
-- "CLAUDE.md is too big", "slim down claude"
-- "persist this", "save this knowledge"
-- "update knowledge system"
 
 ## Knowledge Hierarchy
 

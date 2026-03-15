@@ -39,7 +39,7 @@ export function SOWColumnMapper({ file, onMapped, onError }: SOWColumnMapperProp
         log.debug('Calling column mapping service', {}, 'SOWColumnMapper');
 
         // Call the column mapping service
-        const response = await fetch('http://localhost:5001/map-columns', {
+        const response = await fetch('/api/sow/map-columns', {
           method: 'POST',
           body: formData,
         });
@@ -62,7 +62,7 @@ export function SOWColumnMapper({ file, onMapped, onError }: SOWColumnMapperProp
         previewFormData.append('file', file);
         previewFormData.append('config_name', 'pole');
 
-        const previewResponse = await fetch('http://localhost:5001/preview-columns', {
+        const previewResponse = await fetch('/api/sow/preview-columns', {
           method: 'POST',
           body: previewFormData,
         });

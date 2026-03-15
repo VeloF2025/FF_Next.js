@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { FirebaseTest } from '@/components/dev/FirebaseTest';
 import { StaffDebug } from '@/components/dev/StaffDebug';
 import { ProjectsDebug } from '@/components/dev/ProjectsDebug';
 import { ClientsDebug } from '@/components/dev/ClientsDebug';
@@ -57,10 +56,6 @@ const router = createBrowserRouter([
           // Procurement routes (nested)
           procurementRoutes,
           // Debug routes
-          {
-            path: 'firebase-test',
-            element: <FirebaseTest />,
-          },
           {
             path: 'staff-debug',
             element: <StaffDebug />,
