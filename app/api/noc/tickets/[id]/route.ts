@@ -16,11 +16,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
+import { verifyToken } from '@/lib/auth/jwt';
 import {
   getTicketById,
   updateTicket,
-  deleteTicket
+  deleteTicket,
+  logTicketChanges,
+  logTicketActivity,
 } from '@/modules/noc/services/ticketService';
 import { enrichTicketData } from '@/modules/noc/services/ticketEnrichmentService';
 import { syncOutboundUpdate } from '@/modules/noc/services/qcontactSyncOutbound';
@@ -186,13 +190,39 @@ export async function PUT(
       fieldsToUpdate: Object.keys(body)
     });
 
-    // Capture old state for assignment-change detection
+    // Extract authenticated user for activity logging
+    const cookieStore = await cookies();
+    const token = cookieStore.get('ff_auth_token')?.value;
+    let actingUser: { id?: string; name?: string; email?: string } = {};
+    if (token) {
+      const jwt = await verifyToken(token);
+      if (jwt) {
+        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string };
+      }
+    }
+
+    // Capture old state for change detection
     const oldTicket = await getTicketById(ticketId);
 
     const updatedTicket = await updateTicket(ticketId, body);
 
     if (!updatedTicket) {
       return notFoundError('Ticket', ticketId);
+    }
+
+    // Log all field changes to activity trail (non-blocking)
+    if (oldTicket) {
+      logTicketChanges({
+        ticketId,
+        oldTicket: oldTicket as unknown as Record<string, any>,
+        newTicket: updatedTicket as unknown as Record<string, any>,
+        payload: body as Record<string, any>,
+        userId: actingUser.id,
+        userName: actingUser.name,
+        userEmail: actingUser.email,
+      }).catch(err => {
+        logger.error('Activity logging error', { ticketId, error: err.message });
+      });
     }
 
     // Sync changes to QContact in real-time (async, non-blocking)
@@ -277,11 +307,34 @@ export async function DELETE(
 
     logger.info('Soft deleting ticket', { ticketId });
 
+    // Extract authenticated user for activity logging
+    const cookieStore = await cookies();
+    const token = cookieStore.get('ff_auth_token')?.value;
+    let actingUser: { id?: string; name?: string; email?: string } = {};
+    if (token) {
+      const jwt = await verifyToken(token);
+      if (jwt) {
+        actingUser = { id: jwt.sub, name: jwt.name as string, email: jwt.email as string };
+      }
+    }
+
     const deletedTicket = await deleteTicket(ticketId);
 
     if (!deletedTicket) {
       return notFoundError('Ticket', ticketId);
     }
+
+    // Log cancellation to activity trail
+    logTicketActivity({
+      ticketId,
+      activityType: 'cancelled',
+      description: 'Ticket cancelled',
+      userId: actingUser.id,
+      userName: actingUser.name,
+      userEmail: actingUser.email,
+    }).catch(err => {
+      logger.error('Activity logging error on delete', { ticketId, error: err.message });
+    });
 
     // Sync cancellation to QContact (async, non-blocking)
     syncOutboundUpdate(ticketId, { status: TicketStatus.CANCELLED })

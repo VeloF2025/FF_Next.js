@@ -39,6 +39,145 @@ import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('maintenance:service');
 
+// ==================== Activity Logging ====================
+
+/** Human-readable labels for field names */
+const FIELD_LABELS: Record<string, string> = {
+  status: 'Status',
+  priority: 'Priority',
+  assigned_to: 'Assigned To',
+  assigned_team_id: 'Assigned Team',
+  assigned_team: 'Assigned Team',
+  assigned_contractor_id: 'Assigned Contractor',
+  title: 'Title',
+  description: 'Description',
+  fault_cause: 'Fault Cause',
+  fault_cause_details: 'Fault Cause Details',
+  dr_number: 'DR Number',
+  project_id: 'Project',
+  zone_id: 'Zone',
+  pole_number: 'Pole',
+  pon_number: 'PON',
+  address: 'Address',
+  ont_serial: 'ONT Serial',
+  ont_rx_level: 'ONT RX Level',
+  ont_model: 'ONT Model',
+  qa_ready: 'QA Ready',
+  sla_due_at: 'SLA Due',
+  sla_breached: 'SLA Breached',
+  guarantee_status: 'Guarantee Status',
+  is_billable: 'Billable',
+  billing_classification: 'Billing Classification',
+};
+
+/**
+ * Log an activity event for a ticket.
+ * Used for KPI tracking: who worked on what, when, and what changed.
+ */
+export async function logTicketActivity(params: {
+  ticketId: string;
+  activityType: 'update' | 'note' | 'assignment' | 'status_change' | 'created' | 'cancelled';
+  description: string;
+  fieldChanges?: Record<string, { from: any; to: any }>;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+}): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO maintenance_activities (ticket_id, activity_type, description, field_changes, created_by_name, created_by_email, source)
+       VALUES ($1, $2, $3, $4, $5, $6, 'fibreflow')`,
+      [
+        params.ticketId,
+        params.activityType,
+        params.description,
+        params.fieldChanges ? JSON.stringify(params.fieldChanges) : null,
+        params.userName || null,
+        params.userEmail || null,
+      ]
+    );
+  } catch (error) {
+    logger.error('Failed to log ticket activity', { error, params });
+  }
+}
+
+/**
+ * Compare old and new ticket state, log all field changes as activities.
+ * This is the core audit trail for KPI tracking.
+ */
+export async function logTicketChanges(params: {
+  ticketId: string;
+  oldTicket: Record<string, any>;
+  newTicket: Record<string, any>;
+  payload: Record<string, any>;
+  userId?: string;
+  userName?: string;
+  userEmail?: string;
+}): Promise<void> {
+  const { ticketId, oldTicket, newTicket, payload, userId, userName, userEmail } = params;
+  const trackedFields = Object.keys(FIELD_LABELS);
+  const fieldChanges: Record<string, { from: any; to: any }> = {};
+
+  for (const field of trackedFields) {
+    if (!(field in payload)) continue;
+    const oldVal = oldTicket[field];
+    const newVal = newTicket[field];
+    if (String(oldVal ?? '') !== String(newVal ?? '')) {
+      fieldChanges[field] = { from: oldVal ?? null, to: newVal ?? null };
+    }
+  }
+
+  if (Object.keys(fieldChanges).length === 0) return;
+
+  // Determine primary activity type and description
+  const statusChanged = 'status' in fieldChanges;
+  const assignmentChanged = 'assigned_to' in fieldChanges || 'assigned_team_id' in fieldChanges;
+
+  // Log status change as its own activity
+  if (statusChanged) {
+    const from = fieldChanges.status.from || 'none';
+    const to = fieldChanges.status.to;
+    await logTicketActivity({
+      ticketId,
+      activityType: 'status_change',
+      description: `Status changed from ${from} to ${to}`,
+      fieldChanges: { status: fieldChanges.status },
+      userId, userName, userEmail,
+    });
+  }
+
+  // Log assignment change as its own activity
+  if (assignmentChanged) {
+    const parts: string[] = [];
+    if (fieldChanges.assigned_to) parts.push('assignee');
+    if (fieldChanges.assigned_team_id) parts.push('team');
+    await logTicketActivity({
+      ticketId,
+      activityType: 'assignment',
+      description: `${parts.join(' and ')} changed`,
+      fieldChanges: Object.fromEntries(
+        Object.entries(fieldChanges).filter(([k]) => k.startsWith('assigned'))
+      ),
+      userId, userName, userEmail,
+    });
+  }
+
+  // Log remaining field changes as a single update activity
+  const otherChanges = Object.fromEntries(
+    Object.entries(fieldChanges).filter(([k]) => k !== 'status' && !k.startsWith('assigned'))
+  );
+  if (Object.keys(otherChanges).length > 0) {
+    const changedLabels = Object.keys(otherChanges).map(k => FIELD_LABELS[k] || k);
+    await logTicketActivity({
+      ticketId,
+      activityType: 'update',
+      description: `Updated: ${changedLabels.join(', ')}`,
+      fieldChanges: otherChanges,
+      userId, userName, userEmail,
+    });
+  }
+}
+
 /**
  * UUID validation regex
  */

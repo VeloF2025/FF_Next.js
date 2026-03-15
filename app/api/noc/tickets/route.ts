@@ -20,7 +20,8 @@ import { createLogger } from '@/lib/logger';
 import { verifyToken } from '@/lib/auth/jwt';
 import {
   listTickets,
-  createTicket
+  createTicket,
+  logTicketActivity,
 } from '@/modules/noc/services/ticketService';
 import {
   TicketSource,
@@ -250,6 +251,16 @@ export async function POST(req: NextRequest) {
     });
 
     const ticket = await createTicket(body);
+
+    // Log ticket creation to activity trail
+    logTicketActivity({
+      ticketId: ticket.id,
+      activityType: 'created',
+      description: `Ticket created: ${body.title || ticket.ticket_uid}`,
+      userId: body.created_by,
+    }).catch(err => {
+      logger.error('Activity logging error on create', { ticketId: ticket.id, error: err.message });
+    });
 
     return NextResponse.json(
       {
