@@ -228,8 +228,9 @@ export function TicketDetail({ ticketId, compact = false, backLink }: TicketDeta
                 </div>
               )}
 
-              {/* QA Readiness Check (on overview) */}
-              {(ticket.status === 'in_progress' ||
+              {/* QA Readiness Check (on overview) — only for field tickets, not dev_ops */}
+              {ticket.type !== 'dev_ops' &&
+                (ticket.status === 'in_progress' ||
                 ticket.status === 'pending_qa' ||
                 ticket.status === 'qa_in_progress') && (
                 <QAReadinessCheck ticketId={ticketId} />
