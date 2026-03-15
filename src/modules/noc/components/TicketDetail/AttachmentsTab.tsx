@@ -63,13 +63,15 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
 
   useEffect(() => { fetchAttachments(); }, [fetchAttachments]);
 
+  const userId = user?.id || user?.uid || '';
+
   const uploadFile = useCallback(async (file: File) => {
-    if (!user?.id) return;
+    if (!userId) return;
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('uploaded_by', user.id);
+      formData.append('uploaded_by', userId);
 
       const res = await fetch(`/api/noc/tickets/${ticketId}/attachments`, {
         method: 'POST',
@@ -84,7 +86,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
     } finally {
       setUploading(false);
     }
-  }, [ticketId, user, fetchAttachments]);
+  }, [ticketId, userId, fetchAttachments]);
 
   // Clipboard paste handler — Ctrl+V anywhere on the page uploads pasted images
   useEffect(() => {
