@@ -612,7 +612,8 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
   );
 }
 
-/** Image component with fallback placeholder for photos not yet synced from QField. */
+/** Image component with fallback placeholder for photos not yet synced from QField.
+ *  Shows a retry button so users can re-attempt loading after a sync completes. */
 function QaPhoto({ storageKey, source, alt, className, draggable }: {
   storageKey: string;
   source: string;
@@ -621,19 +622,33 @@ function QaPhoto({ storageKey, source, alt, className, draggable }: {
   draggable?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const handleRetry = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFailed(false);
+    setRetryCount(c => c + 1);
+  }, []);
 
   if (failed) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800/60 text-gray-500 gap-1 p-1">
-        <ImageOff className="w-6 h-6 text-gray-600" />
-        <span className="text-[9px] text-center leading-tight">Pending sync</span>
+      <div
+        className="w-full h-full flex flex-col items-center justify-center bg-gray-800/60 text-gray-500 gap-1 p-1 cursor-pointer hover:bg-gray-700/60 transition-colors"
+        onClick={handleRetry}
+        title="Click to retry loading"
+      >
+        <ImageOff className="w-5 h-5 text-gray-600" />
+        <span className="text-[9px] text-center leading-tight text-yellow-500/80">
+          {source === 'qfield' ? 'Awaiting QField sync' : 'Load failed'}
+        </span>
+        <span className="text-[8px] text-blue-400 hover:text-blue-300">tap to retry</span>
       </div>
     );
   }
 
   return (
     <img
-      src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}`}
+      src={`/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}${retryCount > 0 ? `&_t=${retryCount}` : ''}`}
       alt={alt}
       className={className}
       loading="lazy"

@@ -128,7 +128,8 @@ async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void>
     }
   }
 
-  res.status(404).json({ error: 'Photo not found', key: objectPath });
+  res.setHeader('Cache-Control', 'no-cache, max-age=0');
+  res.status(404).json({ error: 'Photo not found in storage — may be awaiting QField sync', key: objectPath });
 }
 
 /** Resolve an unversioned MinIO key to its latest version. */
@@ -170,6 +171,7 @@ async function proxyStoragePhoto(storageKey: string, res: NextApiResponse): Prom
 
   const filePath = path.join(STORAGE_ROOT, normalized);
   if (!fs.existsSync(filePath)) {
+    res.setHeader('Cache-Control', 'no-cache, max-age=0');
     res.status(404).json({ error: 'Photo not found in storage', key: storageKey });
     return;
   }
@@ -203,6 +205,7 @@ async function proxyLocalPhoto(storageKey: string, res: NextApiResponse): Promis
 
   const filePath = path.join(process.cwd(), 'public', 'uploads', normalized);
   if (!fs.existsSync(filePath)) {
+    res.setHeader('Cache-Control', 'no-cache, max-age=0');
     res.status(404).json({ error: 'Local photo not found', key: storageKey });
     return;
   }

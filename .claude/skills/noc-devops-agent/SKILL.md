@@ -187,6 +187,59 @@ curl -X PUT "http://localhost:3004/api/noc/tickets/<id>/verification/2" \
   }'
 ```
 
+#### MANDATORY: Upload Screenshots as Ticket Attachments
+
+**Every screenshot taken during ticket work MUST be uploaded as a ticket attachment.**
+Screenshots that only exist in `/tmp/` are lost when the session ends. The attachment API persists them permanently.
+
+**How to upload a screenshot to a ticket:**
+
+```bash
+# 1. Take screenshot using browser tools (saves to /tmp/screenshot-*.png)
+# 2. Upload to ticket attachments API:
+node -e "
+const fs = require('fs');
+const path = require('path');
+
+const TICKET_ID = '<ticket-id>';
+const FILE_PATH = '/tmp/screenshot.png';
+const USER_ID = '<user-uid>';  // Use Hein's uid from auth context
+const IS_EVIDENCE = 'true';    // true for verification step screenshots
+
+const FormData = require('form-data');  // Built into Node 18+
+const form = new FormData();
+form.append('file', fs.createReadStream(FILE_PATH));
+form.append('uploaded_by', USER_ID);
+form.append('is_evidence', IS_EVIDENCE);
+
+fetch('http://localhost:3004/api/noc/tickets/' + TICKET_ID + '/attachments', {
+  method: 'POST',
+  body: form,
+}).then(r => r.json()).then(j => console.log(JSON.stringify(j, null, 2)));
+"
+```
+
+**Or use the helper script:**
+
+```bash
+# Upload screenshot to ticket attachments
+node scripts/noc-attach-screenshot.js <ticket-id> <file-path> [--evidence]
+```
+
+**When to upload screenshots:**
+
+| Phase | Screenshot | `is_evidence` |
+|-------|-----------|---------------|
+| Step 1: Issue Reproduction | Screenshot showing the bug | `true` |
+| Step 4: Testing & Verification | Screenshot showing fix works on dev | `true` |
+| Step 5: Deployment | Screenshot showing fix works on prod | `true` |
+| Diagnosis (optional) | Console errors, network tab, etc. | `false` |
+
+**After fix is deployed and verified**, upload the "after" screenshot showing the issue is resolved:
+1. Navigate to the affected page in the browser
+2. Take a screenshot
+3. Upload it with `is_evidence=true`
+4. This provides proof-of-fix that persists on the ticket permanently
 
 ## Common Patterns (Known Issues)
 
