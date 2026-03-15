@@ -20,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows, polesWithPhotosRows, completenessRows] = await Promise.all([
+    const [qaRows, otdrRows, poleRows, unmatchedPlantedRows, infraRows, qaByFeatureRows, polesWithPhotosRows, completenessRows, reviewAttributionRows] = await Promise.all([
       // QA stats per project per discipline
       sql`
         SELECT
@@ -124,11 +124,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ) sc ON sc.review_id = r.id
         GROUP BY r.project_id
       `,
+      // AI vs human approval attribution per project
+      sql`
+        SELECT
+          project_id,
+          COUNT(*) FILTER (
+            WHERE qa_decision = 'PASS' AND qa_decision_by = 'VLM Auto-Approve'
+          )::int AS ai_approved,
+          COUNT(*) FILTER (
+            WHERE qa_decision = 'PASS'
+              AND qa_decision_by IS NOT NULL
+              AND qa_decision_by != 'VLM Auto-Approve'
+          )::int AS human_approved
+        FROM construction_qa_reviews
+        GROUP BY project_id
+      `,
     ]);
 
     const otdrMap = new Map<string, number>();
     for (const row of otdrRows) {
       otdrMap.set(row.project_id, Number(row.otdr_count));
+    }
+
+    // Build AI vs human approval attribution map
+    const attributionMap = new Map<string, { ai_approved: number; human_approved: number }>();
+    for (const row of reviewAttributionRows) {
+      attributionMap.set(row.project_id, {
+        ai_approved: Number(row.ai_approved),
+        human_approved: Number(row.human_approved),
+      });
     }
 
     // Build photo completeness map
@@ -234,9 +258,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       zone_count: number;
       pon_count: number;
       otdr_count: number;
+      ai_approved: number;
+      human_approved: number;
       civil: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       optical: { total: number; pending: number; approved: number; rejected: number; rework_needed: number };
       infrastructure: typeof emptyInfrastructure extends () => infer R ? R : never;
+      photo_completeness?: {
+        complete_7: number; steps_4_to_6: number; steps_1_to_3: number;
+        no_photos: number; total_reviews: number; completeness_pct: number;
+        most_missing_step: string | null;
+      };
     }>();
 
     const emptyDiscipline = () => ({ total: 0, pending: 0, approved: 0, rejected: 0, rework_needed: 0 });
@@ -252,6 +283,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           zone_count: 0,
           pon_count: 0,
           otdr_count: otdrMap.get(pid) || 0,
+          ai_approved: attributionMap.get(pid)?.ai_approved ?? 0,
+          human_approved: attributionMap.get(pid)?.human_approved ?? 0,
           civil: emptyDiscipline(),
           optical: emptyDiscipline(),
           infrastructure: infraMap.get(pid) || emptyInfrastructure(),

@@ -96,6 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.vlm_status,
         r.workflow_status,
         r.qa_decision,
+        r.qa_decision_by,
         r.priority,
         r.assigned_to,
         r.updated_at

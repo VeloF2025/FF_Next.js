@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, Bot, User } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { log } from '@/lib/logger';
 import type { PonFeatureRow } from '../../types/dashboard.types';
@@ -187,12 +187,23 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
                   </td>
                   <td className="px-4 py-2.5 text-center text-sm">
                     {f.qa_decision ? (
-                      <span className={`font-medium ${
-                        f.qa_decision === 'PASS' ? 'text-green-400' :
-                        f.qa_decision === 'FAIL' ? 'text-red-400' : 'text-orange-400'
-                      }`}>
-                        {f.qa_decision}
-                      </span>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className={`font-medium ${
+                          f.qa_decision === 'PASS' ? 'text-green-400' :
+                          f.qa_decision === 'FAIL' ? 'text-red-400' : 'text-orange-400'
+                        }`}>
+                          {f.qa_decision}
+                        </span>
+                        {f.qa_decision_by && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+                            {f.qa_decision_by === 'VLM Auto-Approve' ? (
+                              <><Bot className="w-2.5 h-2.5" /> VLM</>
+                            ) : (
+                              <><User className="w-2.5 h-2.5" /> {f.qa_decision_by}</>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-gray-500">—</span>
                     )}

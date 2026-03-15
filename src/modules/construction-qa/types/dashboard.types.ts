@@ -45,6 +45,10 @@ export interface ProjectDashboardRow {
   zone_count: number;
   pon_count: number;
   otdr_count: number;
+  /** Reviews approved by VLM auto-approval */
+  ai_approved: number;
+  /** Reviews approved by a human reviewer */
+  human_approved: number;
   civil: DisciplineStats;
   optical: DisciplineStats;
   infrastructure: InfrastructureInventory;
@@ -110,6 +114,8 @@ export interface PonFeatureRow {
   vlm_status: string;
   workflow_status: WorkflowStatus;
   qa_decision: string | null;
+  /** Reviewer attribution: 'VLM Auto-Approve' for AI, human name otherwise */
+  qa_decision_by: string | null;
   priority: string;
   assigned_to: string | null;
   updated_at: string;
