@@ -18,7 +18,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createLogger } from '@/lib/logger';
 import {
   uploadAttachment,
-  listAttachmentsForTicket
+  listAttachmentsForTicket,
+  deleteAttachment,
 } from '@/modules/noc/services/attachmentService';
 import {
   FileType,
@@ -231,6 +232,37 @@ export async function GET(
           timestamp: new Date().toISOString(),
         },
       },
+      { status: 500 }
+    );
+  }
+}
+
+// ==================== DELETE /api/noc/tickets/[id]/attachments?attachment_id=X ====================
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: ticketId } = await params;
+    const { searchParams } = new URL(req.url);
+    const attachmentId = searchParams.get('attachment_id');
+
+    if (!attachmentId || !UUID_REGEX.test(attachmentId)) {
+      return NextResponse.json(
+        { success: false, error: { code: 'VALIDATION_ERROR', message: 'Valid attachment_id required' } },
+        { status: 422 }
+      );
+    }
+
+    logger.info('Deleting attachment', { ticket_id: ticketId, attachment_id: attachmentId });
+    await deleteAttachment(attachmentId);
+
+    return NextResponse.json({ success: true, meta: { timestamp: new Date().toISOString() } });
+  } catch (error) {
+    logger.error('Failed to delete attachment', { error });
+    return NextResponse.json(
+      { success: false, error: { code: 'DELETE_ERROR', message: error instanceof Error ? error.message : 'Failed' } },
       { status: 500 }
     );
   }

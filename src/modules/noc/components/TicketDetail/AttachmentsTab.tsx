@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Upload, Image, FileText, Film, Paperclip, X } from 'lucide-react';
+import { Upload, Image, FileText, Film, Paperclip, X, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Attachment {
@@ -106,6 +106,19 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [uploadFile]);
+
+  const handleDelete = async (attachmentId: string, filename: string) => {
+    if (!confirm(`Delete "${filename}"?`)) return;
+    try {
+      const res = await fetch(
+        `/api/noc/tickets/${ticketId}/attachments?attachment_id=${attachmentId}`,
+        { method: 'DELETE', credentials: 'include' }
+      );
+      if (res.ok) fetchAttachments();
+    } catch {
+      // Silent fail
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -242,17 +255,27 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
                     {new Date(att.uploaded_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}
                   </span>
                 </div>
-                {att.storage_url && (
-                  <a
-                    href={att.storage_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-blue-400 hover:underline mt-1 block"
-                    onClick={(e) => e.stopPropagation()}
+                <div className="flex items-center justify-between mt-1">
+                  {att.storage_url && (
+                    <a
+                      href={att.storage_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-blue-400 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Open
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(att.id, att.filename); }}
+                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete attachment"
                   >
-                    Open original
-                  </a>
-                )}
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
