@@ -147,40 +147,64 @@ export function DailyLogPanel({ projectId, ponStageId, ponLabel, onClose }: Dail
           <p className="text-xs font-medium text-[var(--ff-text-secondary)] mb-2 uppercase tracking-wide">New Entry</p>
           <div className="space-y-2">
             <div className="flex gap-2">
-              <input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
-              />
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as ProgressCategory)}
-                className="w-32 px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-                ))}
-              </select>
+              <div className="flex-1">
+                <label htmlFor="log-date" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Entry Date
+                </label>
+                <input
+                  id="log-date"
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
+                />
+              </div>
+              <div className="w-32">
+                <label htmlFor="log-category" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Category
+                </label>
+                <select
+                  id="log-category"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value as ProgressCategory)}
+                  className="w-full px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <textarea
-              value={newActivity}
-              onChange={(e) => setNewActivity(e.target.value)}
-              placeholder="What happened? (e.g. Prep and splice, Submit, Live...)"
-              rows={2}
-              className="w-full px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-secondary)] resize-none"
-            />
+            <div>
+              <label htmlFor="log-activity" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                Activity
+              </label>
+              <textarea
+                id="log-activity"
+                value={newActivity}
+                onChange={(e) => setNewActivity(e.target.value)}
+                placeholder="What happened? (e.g. Prep and splice, Submit, Live...)"
+                rows={2}
+                className="w-full px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)] placeholder:text-[var(--ff-text-secondary)] resize-none"
+              />
+            </div>
             <div className="flex gap-2">
-              <select
-                value={newDelay}
-                onChange={(e) => setNewDelay(e.target.value as DelayReason | '')}
-                className="flex-1 px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
-              >
-                <option value="">No delay reason</option>
-                {DELAY_REASONS.map((r) => (
-                  <option key={r} value={r}>{DELAY_REASON_LABELS[r]}</option>
-                ))}
-              </select>
+              <div className="flex-1">
+                <label htmlFor="log-delay" className="block text-xs font-medium text-[var(--ff-text-secondary)] mb-1">
+                  Delay Reason
+                </label>
+                <select
+                  id="log-delay"
+                  value={newDelay}
+                  onChange={(e) => setNewDelay(e.target.value as DelayReason | '')}
+                  className="w-full px-3 py-2 text-sm bg-[var(--ff-card-bg)] border border-[var(--ff-border-light)] rounded-md text-[var(--ff-text-primary)]"
+                >
+                  <option value="">No delay reason</option>
+                  {DELAY_REASONS.map((r) => (
+                    <option key={r} value={r}>{DELAY_REASON_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={handleAddEntry}

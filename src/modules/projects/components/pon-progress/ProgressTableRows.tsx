@@ -62,6 +62,7 @@ function CategoryCell({
             onBlur={() => save(dateValue)}
             onKeyDown={(e) => { if (e.key === 'Enter') save(dateValue); if (e.key === 'Escape') setEditing(false); }}
             autoFocus
+            aria-label={`Target date for ${category}`}
             className="w-28 px-1 py-0.5 text-[10px] bg-[var(--ff-bg-secondary)] border border-blue-500 rounded text-[var(--ff-text-primary)]"
           />
         ) : (
@@ -110,6 +111,7 @@ function PonRow({
             onBlur={saveBlockage}
             onKeyDown={(e) => { if (e.key === 'Enter') saveBlockage(); if (e.key === 'Escape') setEditingBlockage(false); }}
             autoFocus placeholder="Blockage reason..."
+            aria-label="Blockage reason"
             className="w-full px-2 py-0.5 text-xs bg-[var(--ff-bg-secondary)] border border-blue-500 rounded text-[var(--ff-text-primary)]"
           />
         ) : (
@@ -155,6 +157,7 @@ export function ZoneSection({
       <tr className="bg-[var(--ff-bg-secondary)] cursor-pointer hover:bg-[var(--ff-bg-tertiary)] transition-colors">
         <td className="px-3 py-2 font-medium text-[var(--ff-text-primary)]" colSpan={2}>
           <button type="button" onClick={onToggle}
+            aria-expanded={isExpanded}
             className="flex items-center gap-2 w-full text-left focus:outline-none focus:ring-2 focus:ring-[var(--ff-accent)] rounded"
           >
             <svg className={`w-3 h-3 text-[var(--ff-text-secondary)] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
