@@ -95,9 +95,9 @@ export class VFStorageService {
       const actualFilename = result.filename || fileName;
       const actualPath = result.path || `${type}/${category}/${actualFilename}`;
 
-      // Return public HTTPS URL for browser access via /storage/ proxy
-      // The /storage/ prefix routes through nginx proxy to the VF storage server
-      const actualUrl = `https://vf.fibreflow.app/storage/${actualPath}`;
+      // Return relative /storage/ URL for browser access via nginx proxy
+      // Each environment (dev/production) has its own /storage/ proxy to port 8091
+      const actualUrl = `/storage/${actualPath}`;
 
       return {
         success: true,
@@ -170,7 +170,7 @@ export class VFStorageService {
    * Get the full URL for a stored file (public HTTPS URL via /storage/ proxy)
    */
   getFileUrl(type: string, category: string, filename: string): string {
-    return `https://vf.fibreflow.app/storage/${type}/${category}/${filename}`;
+    return `/storage/${type}/${category}/${filename}`;
   }
 }
 
