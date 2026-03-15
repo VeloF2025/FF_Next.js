@@ -158,7 +158,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
 
   // 🟢 WORKING: Set defaults
   const priority = payload.priority || TicketPriority.NORMAL;
-  const status = payload.status || TicketStatus.OPEN;
+  let status = payload.status || TicketStatus.OPEN;
   const ticketUID = await generateTicketUID(undefined, payload.uid_prefix || 'VF');
 
   logger.info('Creating ticket', {
@@ -200,6 +200,20 @@ export async function createTicket(payload: CreateTicketPayload): Promise<Ticket
       )
       RETURNING *
     `;
+
+    // Auto-assign dev_ops tickets to the DevOps team if not already assigned
+    if (payload.ticket_type === TicketType.DEV_OPS && !payload.assigned_team_id) {
+      const devOpsTeam = await queryOne<{ id: string; name: string }>(
+        `SELECT id, name FROM teams WHERE name = 'DevOps' AND is_active = true LIMIT 1`,
+        []
+      );
+      if (devOpsTeam) {
+        payload.assigned_team_id = devOpsTeam.id;
+        payload.assigned_team = devOpsTeam.id;
+        status = 'assigned';
+        logger.info('Auto-assigned DevOps ticket to DevOps team', { teamId: devOpsTeam.id });
+      }
+    }
 
     const values = [
       ticketUID,
