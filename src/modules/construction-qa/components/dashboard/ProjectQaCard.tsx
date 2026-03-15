@@ -9,7 +9,7 @@
 'use client';
 
 import { useRouter } from 'next/router';
-import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable, ClipboardCheck } from 'lucide-react';
+import { MapPin, Layers, Radio, Camera, Milestone, CircleDot, Cable, ClipboardCheck, Bot, User } from 'lucide-react';
 import type { ProjectDashboardRow, InfraStats } from '../../types/dashboard.types';
 
 function InfraStat({ label, icon: Icon, stats, showAssignment }: {
@@ -101,8 +101,20 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
             </>
           )}
         </div>
-        <div className="flex items-center gap-3 mt-1.5">
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
           <span className="text-xs text-green-400">{approved} approved</span>
+          {project.ai_approved > 0 && (
+            <span className="flex items-center gap-0.5 text-xs text-emerald-400">
+              <Bot className="w-3 h-3" />
+              {project.ai_approved}
+            </span>
+          )}
+          {project.human_approved > 0 && (
+            <span className="flex items-center gap-0.5 text-xs text-teal-400">
+              <User className="w-3 h-3" />
+              {project.human_approved}
+            </span>
+          )}
           <span className="text-xs text-yellow-400">{pending} pending</span>
           {rejected > 0 && <span className="text-xs text-red-400">{rejected} rejected</span>}
         </div>

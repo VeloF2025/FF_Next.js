@@ -725,7 +725,8 @@ def run_classification(project_name, db_url, limit=100, dry_run=False, disciplin
         print(f"  [Post-classify] Auto-approving eligible reviews...")
         cur.execute("""
             UPDATE construction_qa_reviews
-            SET workflow_status = 'approved', qa_decision = 'PASS', updated_at = NOW()
+            SET workflow_status = 'approved', qa_decision = 'PASS',
+                qa_decision_by = 'VLM Auto-Approve', updated_at = NOW()
             WHERE discipline = 'civil'
               AND workflow_status IN ('pending', 'retake_required', 'unidentified')
               AND photo_count >= 7
