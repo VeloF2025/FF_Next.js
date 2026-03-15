@@ -161,6 +161,11 @@ export async function createTeam(payload: CreateTeamPayload): Promise<Team> {
       throw new Error('Failed to create team');
     }
 
+    // Auto-add lead as team member so they appear in useMyTeams()
+    if (payload.lead_user_id) {
+      await ensureLeadIsTeamMember(team.id, payload.lead_user_id);
+    }
+
     logger.info('Team created successfully', { id: team.id, name: team.name });
     return team;
   } catch (error) {
@@ -221,6 +226,11 @@ export async function updateTeam(id: string, payload: UpdateTeamPayload): Promis
       throw new Error(`Team with ID ${id} not found`);
     }
 
+    // Auto-add new lead as team member so they appear in useMyTeams()
+    if (payload.lead_user_id) {
+      await ensureLeadIsTeamMember(id, payload.lead_user_id);
+    }
+
     logger.info('Team updated successfully', { id, name: team.name });
     return team;
   } catch (error) {
@@ -258,6 +268,44 @@ export async function deleteTeam(id: string): Promise<Team> {
   } catch (error) {
     logger.error('Failed to delete team', { error, id });
     throw error;
+  }
+}
+
+/**
+ * Ensure the team lead exists in team_members table.
+ * Without this, useMyTeams() won't find the team for the lead user.
+ */
+async function ensureLeadIsTeamMember(teamId: string, leadUserId: string): Promise<void> {
+  try {
+    // Check if lead is already a member
+    const existing = await queryOne<{ id: string }>(
+      `SELECT id FROM team_members WHERE team_id = $1 AND user_id = $2 AND is_active = true`,
+      [teamId, leadUserId]
+    );
+
+    if (existing) return;
+
+    // Get user details for the member record
+    const user = await queryOne<{ first_name: string; last_name: string; email: string }>(
+      `SELECT first_name, last_name, email FROM users WHERE id = $1`,
+      [leadUserId]
+    );
+
+    if (!user) {
+      logger.warn('Lead user not found in users table', { leadUserId });
+      return;
+    }
+
+    await query(
+      `INSERT INTO team_members (team_id, user_id, first_name, last_name, email, is_team_lead, is_active)
+       VALUES ($1, $2, $3, $4, $5, true, true)
+       ON CONFLICT DO NOTHING`,
+      [teamId, leadUserId, user.first_name, user.last_name || '', user.email]
+    );
+
+    logger.info('Auto-added lead as team member', { teamId, leadUserId });
+  } catch (error) {
+    logger.error('Failed to auto-add lead as team member', { error, teamId, leadUserId });
   }
 }
 
