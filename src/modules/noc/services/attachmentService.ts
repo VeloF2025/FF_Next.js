@@ -161,14 +161,16 @@ export async function uploadAttachment(
     const buffer = Buffer.from(arrayBuffer);
 
     // Upload to VF Storage API (Velo server port 8091)
-    // Path convention: maintenance/attachments/{ticketId}/{filename}
+    // Path convention: maintenance/ticket-attachments/{ticketId}_{filename}
+    // Uses flat category (not nested) because storage API serves /:type/:category/:filename
+    const prefixedFilename = `${request.ticket_id}_${uniqueFilename}`;
     let uploadResult;
     try {
       uploadResult = await vfStorage.uploadFile(
         buffer,
         'maintenance',
-        `attachments/${request.ticket_id}`,
-        uniqueFilename
+        'ticket-attachments',
+        prefixedFilename
       );
     } catch (error) {
       logger.error('VF Storage upload failed', {
