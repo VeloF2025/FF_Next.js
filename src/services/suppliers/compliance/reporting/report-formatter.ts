@@ -245,7 +245,7 @@ export class ComplianceReportFormatter {
       { 
         name: 'Partial', 
         value: report.complianceBreakdown.partial,
-        color: '#F59E0B' // yellow
+        color: '#D97706' // yellow
       },
       { 
         name: 'Non-Compliant', 

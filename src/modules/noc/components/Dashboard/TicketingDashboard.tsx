@@ -217,7 +217,7 @@ export function TicketingDashboard({
               title: 'Open',
               value: summaryData.by_status?.open || 0,
               icon: Activity,
-              color: '#F59E0B',
+              color: '#D97706',
               subtitle: 'Awaiting action',
               description: 'Tickets currently open and active',
               variant: 'detailed',

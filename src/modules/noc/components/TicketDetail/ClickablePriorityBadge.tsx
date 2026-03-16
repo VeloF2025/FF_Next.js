@@ -77,7 +77,7 @@ const PRIORITY_OPTIONS: PriorityOption[] = [
   {
     code: 'high',
     name: 'High',
-    color: '#F97316',
+    color: '#C2410C',
     bgColor: 'rgba(249, 115, 22, 0.2)',
     borderColor: 'rgba(249, 115, 22, 0.3)',
     icon: AlertTriangle,

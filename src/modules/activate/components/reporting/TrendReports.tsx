@@ -60,13 +60,13 @@ const projectColors: Record<string, string> = {
   Lawley: '#3B82F6',     // blue
   Mohadin: '#8B5CF6',    // purple
   Mamelodi: '#10B981',   // green
-  'Velo Test': '#F59E0B', // amber
+  'Velo Test': '#D97706', // amber
 };
 
 const defaultProjectColors = [
   '#06B6D4', // cyan
   '#EC4899', // pink
-  '#F97316', // orange
+  '#C2410C', // orange
   '#84CC16', // lime
   '#14B8A6', // teal
   '#A855F7', // violet

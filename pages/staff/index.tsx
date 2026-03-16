@@ -322,7 +322,7 @@ export default function StaffDirectoryPage() {
                 title: 'On Leave',
                 value: staff.filter((s) => s.status === 'on_leave').length,
                 icon: UserMinus,
-                color: '#F59E0B',
+                color: '#D97706',
                 subtitle: 'Away',
                 description: 'Staff currently on leave',
                 variant: 'detailed',

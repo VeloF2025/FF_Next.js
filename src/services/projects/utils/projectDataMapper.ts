@@ -139,7 +139,7 @@ export class ProjectDataMapper {
     const statusColors: Record<string, string> = {
       'PLANNING': '#6B7280',
       'ACTIVE': '#10B981',
-      'IN_PROGRESS': '#F59E0B',
+      'IN_PROGRESS': '#D97706',
       'ON_HOLD': '#EF4444',
       'COMPLETED': '#8B5CF6',
       'CANCELLED': '#9CA3AF'
@@ -154,12 +154,12 @@ export class ProjectDataMapper {
   static getPriorityColor(priority: string): string {
     const priorityColors: Record<string, string> = {
       'LOW': '#10B981',
-      'MEDIUM': '#F59E0B',
+      'MEDIUM': '#D97706',
       'HIGH': '#EF4444',
       'URGENT': '#DC2626'
     };
     
-    return priorityColors[priority] || '#F59E0B';
+    return priorityColors[priority] || '#D97706';
   }
 
   /**

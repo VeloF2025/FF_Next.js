@@ -399,7 +399,7 @@ export function PerformanceTab({ staffId }: PerformanceTabProps) {
             series={[
               { dataKey: 'Submissions', name: 'Submissions', color: '#3B82F6' },
               { dataKey: 'First Pass', name: 'First Pass', color: '#10B981' },
-              { dataKey: 'Resubmissions', name: 'Resubmissions', color: '#F59E0B' },
+              { dataKey: 'Resubmissions', name: 'Resubmissions', color: '#D97706' },
             ]}
             type="bar"
             xAxisKey="date"

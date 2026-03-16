@@ -223,7 +223,7 @@ export function PipelineDashboard() {
                   title: 'Awaiting PO',
                   value: stats.projects_awaiting_po,
                   icon: FileText,
-                  color: '#F59E0B',
+                  color: '#D97706',
                   subtitle: 'Approvals complete, waiting for PO',
                 },
                 {

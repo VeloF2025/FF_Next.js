@@ -79,7 +79,7 @@ function ScoreGauge({ score, label, icon: Icon, description, trend, trendValue }
             cy="64"
             r="45"
             fill="none"
-            stroke={score === null ? 'var(--ff-text-tertiary)' : score >= 70 ? '#10B981' : score >= 50 ? '#F59E0B' : '#EF4444'}
+            stroke={score === null ? 'var(--ff-text-tertiary)' : score >= 70 ? '#10B981' : score >= 50 ? '#D97706' : '#EF4444'}
             strokeWidth="10"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
@@ -427,7 +427,7 @@ export function ScorecardTab({ staffId, drivers, onSelectDriver }: ScorecardTabP
                 <Legend />
                 <Line type="monotone" dataKey="Composite" stroke="#8B5CF6" strokeWidth={3} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="Check-in" stroke="#10B981" strokeWidth={1} strokeDasharray="3 3" />
-                <Line type="monotone" dataKey="Fuel" stroke="#F59E0B" strokeWidth={1} strokeDasharray="3 3" />
+                <Line type="monotone" dataKey="Fuel" stroke="#D97706" strokeWidth={1} strokeDasharray="3 3" />
                 <Line type="monotone" dataKey="Authorization" stroke="#3B82F6" strokeWidth={1} strokeDasharray="3 3" />
                 <Line type="monotone" dataKey="Vehicle Care" stroke="#EC4899" strokeWidth={1} strokeDasharray="3 3" />
               </LineChart>

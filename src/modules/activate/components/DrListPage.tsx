@@ -381,7 +381,7 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
                   title: 'Not Reviewed',
                   value: dashboardStats.notReviewed,
                   icon: Eye,
-                  color: '#F59E0B',
+                  color: '#D97706',
                   subtitle: 'Pending QA',
                   description: 'DRs awaiting QA feedback',
                   variant: 'detailed',

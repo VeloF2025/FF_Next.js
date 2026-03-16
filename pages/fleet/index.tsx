@@ -222,7 +222,7 @@ export default function FleetDashboardPage() {
                 title: 'Unassigned',
                 value: stats?.unassignedVehicles || 0,
                 icon: AlertTriangle,
-                color: '#F59E0B',
+                color: '#D97706',
                 subtitle: 'Available',
                 description: 'Vehicles without assigned drivers',
                 route: '/fleet/vehicles?assigned=false',

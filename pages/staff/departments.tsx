@@ -185,7 +185,7 @@ export default function DepartmentsPage() {
                   title: 'On Leave',
                   value: onLeave,
                   icon: UserMinus,
-                  color: '#F59E0B',
+                  color: '#D97706',
                   subtitle: 'Away',
                   description: 'Staff currently on leave',
                   variant: 'detailed',

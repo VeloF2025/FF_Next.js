@@ -33,7 +33,7 @@ const COLORS = {
   primary: '#8B5CF6',
   secondary: '#06B6D4',
   success: '#10B981',
-  warning: '#F59E0B',
+  warning: '#D97706',
   error: '#EF4444',
   info: '#3B82F6',
   neutral: '#6B7280'
@@ -46,7 +46,7 @@ const PIE_COLORS = [
   COLORS.warning,
   COLORS.info,
   '#EC4899',
-  '#F97316',
+  '#C2410C',
   '#84CC16'
 ];
 

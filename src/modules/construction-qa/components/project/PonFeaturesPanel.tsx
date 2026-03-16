@@ -197,9 +197,9 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
                         {f.qa_decision_by && (
                           <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
                             {f.qa_decision_by === 'VLM Auto-Approve' ? (
-                              <><Bot className="w-2.5 h-2.5" /> VLM</>
+                              <><Bot className="w-2.5 h-2.5" aria-hidden="true" />VLM</>
                             ) : (
-                              <><User className="w-2.5 h-2.5" /> {f.qa_decision_by}</>
+                              <><User className="w-2.5 h-2.5" aria-hidden="true" /> {f.qa_decision_by}</>
                             )}
                           </span>
                         )}

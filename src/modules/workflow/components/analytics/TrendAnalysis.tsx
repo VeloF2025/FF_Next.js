@@ -246,7 +246,7 @@ export function TrendAnalysis({ analytics, dateRange: _dateRange }: TrendAnalysi
       case 'success_rate':
         return { key: 'successRate', name: 'Success Rate', unit: '%', color: '#8B5CF6' };
       case 'template_usage':
-        return { key: 'projectCount', name: 'Project Count', unit: '', color: '#F59E0B' };
+        return { key: 'projectCount', name: 'Project Count', unit: '', color: '#D97706' };
     }
   };
 

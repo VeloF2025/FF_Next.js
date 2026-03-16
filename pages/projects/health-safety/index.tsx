@@ -100,7 +100,7 @@ function HealthSafetyContent() {
                 title: 'Overdue Audits',
                 value: dashboard?.audits?.overdue_count || 0,
                 icon: Calendar,
-                color: '#F97316',
+                color: '#C2410C',
                 subtitle: `${dashboard?.audits?.upcoming?.length || 0} due soon`,
                 description: 'Safety audits past their scheduled date',
                 route: '/projects/health-safety/checklists',

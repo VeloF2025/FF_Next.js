@@ -88,11 +88,11 @@ const defaultColors = [
   '#3B82F6', // blue
   '#8B5CF6', // purple
   '#10B981', // green
-  '#F59E0B', // yellow
+  '#D97706', // yellow
   '#EF4444', // red
   '#06B6D4', // cyan
   '#EC4899', // pink
-  '#F97316', // orange
+  '#C2410C', // orange
 ];
 
 export function TrendChart({
@@ -507,7 +507,7 @@ export function GaugeChart({
   // Determine color based on value vs target
   const getColor = () => {
     if (value >= target) return '#10B981'; // green
-    if (value >= target * 0.8) return '#F59E0B'; // yellow
+    if (value >= target * 0.8) return '#D97706'; // yellow
     return '#EF4444'; // red
   };
 

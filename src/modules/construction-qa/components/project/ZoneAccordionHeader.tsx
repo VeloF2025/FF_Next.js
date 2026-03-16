@@ -24,9 +24,9 @@ export function ZoneAccordionHeader({ zone, expanded, onToggle }: ZoneAccordionH
       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--hover-bg)] transition-colors text-left"
     >
       {expanded ? (
-        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
+        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
       ) : (
-        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+        <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
       )}
 
       <span className={`text-sm font-semibold min-w-[80px] ${zone.zone_no === -1 ? 'text-yellow-400' : 'text-white'}`}>

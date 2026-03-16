@@ -30,11 +30,11 @@ export type OverallStage = BuildStage | 'not_started' | 'complete';
 export const BUILD_STAGE_META: Record<BuildStage, { label: string; order: number; color: string }> = {
   permissions: { label: 'Permissions', order: 1, color: '#8B5CF6' },
   poles:       { label: 'Poles Planted', order: 2, color: '#3B82F6' },
-  cwc:        { label: 'CWC', order: 3, color: '#F59E0B' },
+  cwc:        { label: 'CWC', order: 3, color: '#D97706' },
   optical:    { label: 'Optical', order: 4, color: '#10B981' },
   atp:        { label: 'ATP', order: 5, color: '#6366F1' },
   activation:  { label: 'Activation', order: 6, color: '#EF4444' },
-  maintenance: { label: 'Maintenance', order: 7, color: '#F97316' },
+  maintenance: { label: 'Maintenance', order: 7, color: '#C2410C' },
 };
 
 /** Ordered list of build stages */

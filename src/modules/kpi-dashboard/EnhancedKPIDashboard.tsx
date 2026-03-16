@@ -252,7 +252,7 @@ export function EnhancedKPIDashboard() {
     name: f.stage,
     value: f.count,
     percentage: f.percentage,
-    color: ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'][idx % 4],
+    color: ['#3B82F6', '#8B5CF6', '#10B981', '#D97706'][idx % 4],
   })) || [];
 
   return (
