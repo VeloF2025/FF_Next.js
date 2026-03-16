@@ -24,9 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint -- --max-warnings 3000
-        continue-on-error: true
+      - name: Lint (Accessibility Gate - jsx-a11y)
+        run: npx eslint src --ext ts,tsx --rule "jsx-a11y/*" --max-warnings 487
+        continue-on-error: false
 
       - name: Run TypeScript type check
         run: npm run type-check
