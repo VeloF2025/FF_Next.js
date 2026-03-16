@@ -16,12 +16,101 @@ import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
 import { createOneMapClient } from '@/services/onemap';
 import { extractWaPhotoSerials } from '@/modules/activate/services/serialVerificationService';
+import { logTicketActivity } from '@/modules/noc/services/ticketService';
 
 const logger = createLogger('PPDataResolve');
 
 export const config = {
   maxDuration: 300, // 5 minutes for 1Map serial lookups
 };
+
+/** Status label map for human-readable activity descriptions */
+const STATUS_LABELS: Record<string, string> = {
+  located_oes: 'Found (OES)',
+  located_unified: 'Found (Unified)',
+  located_onemap: 'Found (OneMap)',
+  located_1map: 'Found (1Map)',
+  located_local: 'Found (Local)',
+  activated: 'Activated',
+  not_found: 'Not Found',
+};
+
+/**
+ * After a bulk resolution step, find PP records that were just resolved
+ * AND have a linked NOC ticket. Log an activity on each linked ticket.
+ *
+ * Uses resolved_at >= cutoff to find recently-resolved records.
+ */
+async function syncTicketActivities(cutoffTime: Date): Promise<number> {
+  try {
+    const result = await pool.query(`
+      SELECT pp.serial_number, pp.resolution_status, pp.resolved_source,
+             pp.resolved_drop_number, pp.maintenance_ticket_id
+      FROM oes_pp_data pp
+      WHERE pp.maintenance_ticket_id IS NOT NULL
+        AND pp.resolved_at >= $1
+    `, [cutoffTime.toISOString()]);
+
+    if (result.rows.length === 0) return 0;
+
+    let logged = 0;
+    for (const row of result.rows) {
+      const statusLabel = STATUS_LABELS[row.resolution_status] || row.resolution_status;
+      try {
+        await logTicketActivity({
+          ticketId: row.maintenance_ticket_id,
+          activityType: 'update',
+          description: `PP Data: Serial ${row.serial_number} status changed to ${statusLabel} (source: ${row.resolved_source || 'unknown'}${row.resolved_drop_number ? `, DR: ${row.resolved_drop_number}` : ''})`,
+          fieldChanges: {
+            pp_resolution_status: { from: 'not_found', to: row.resolution_status },
+            ...(row.resolved_drop_number ? { pp_resolved_dr: { from: null, to: row.resolved_drop_number } } : {}),
+          },
+          userName: 'System',
+          userEmail: 'system@fibreflow.app',
+        });
+        logged++;
+      } catch (err) {
+        logger.warn('Failed to log PP status change to ticket', {
+          ticketId: row.maintenance_ticket_id,
+          serial: row.serial_number,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    if (logged > 0) {
+      logger.info('Synced PP status changes to NOC tickets', { logged, total: result.rows.length });
+    }
+    return logged;
+  } catch (err) {
+    logger.warn('syncTicketActivities failed', { error: err instanceof Error ? err.message : String(err) });
+    return 0;
+  }
+}
+
+/**
+ * Log a single PP status change to its linked NOC ticket (used by per-serial 1Map lookup).
+ */
+async function logPPStatusChangeToTicket(
+  ticketId: string,
+  serial: string,
+  newStatus: string,
+  source: string,
+  drNumber: string | null,
+): Promise<void> {
+  const statusLabel = STATUS_LABELS[newStatus] || newStatus;
+  await logTicketActivity({
+    ticketId,
+    activityType: 'update',
+    description: `PP Data: Serial ${serial} status changed to ${statusLabel} (source: ${source}${drNumber ? `, DR: ${drNumber}` : ''})`,
+    fieldChanges: {
+      pp_resolution_status: { from: 'not_found', to: newStatus },
+      ...(drNumber ? { pp_resolved_dr: { from: null, to: drNumber } } : {}),
+    },
+    userName: 'System',
+    userEmail: 'system@fibreflow.app',
+  });
+}
 
 /**
  * Run local resolution against ALL DB tables that might contain ONT serial data.
@@ -302,9 +391,9 @@ async function run1MapLookup(): Promise<{
   const startTime = Date.now();
   const results = { total_resolved: 0, total_searched: 0, total_not_found: 0, total_errors: 0 };
 
-  // Get all unresolved serials
+  // Get all unresolved serials (include ticket link for activity logging)
   const unresolvedResult = await pool.query(`
-    SELECT id, serial_number, project
+    SELECT id, serial_number, project, maintenance_ticket_id
     FROM oes_pp_data
     WHERE resolution_status = 'not_found'
     ORDER BY project, serial_number
@@ -360,6 +449,7 @@ async function run1MapLookup(): Promise<{
     const serial = row.serial_number as string;
     const project = row.project as string;
     const ppId = row.id as number;
+    const ticketId = row.maintenance_ticket_id as string | null;
     results.total_searched++;
 
     try {
@@ -402,6 +492,15 @@ async function run1MapLookup(): Promise<{
             ppId,
           ]);
           results.total_resolved++;
+
+          // Log activity to linked NOC ticket if one exists
+          if (ticketId) {
+            try {
+              await logPPStatusChangeToTicket(ticketId, serial, 'located_1map', '1map_search', (match.drp as string) || null);
+            } catch (actErr) {
+              logger.warn('Failed to log 1Map match to ticket', { ticketId, serial, error: actErr instanceof Error ? actErr.message : String(actErr) });
+            }
+          }
 
           logger.debug('Serial matched via 1Map search', {
             serial, project, dr: match.drp as string, pole: match.pole as string,
@@ -780,8 +879,10 @@ async function handler(
 
   try {
     if (action === 'local-scan') {
+      const cutoff = new Date();
       const result = await runLocalResolution();
-      return res.status(200).json({ success: true, data: result });
+      const ticketsUpdated = await syncTicketActivities(cutoff);
+      return res.status(200).json({ success: true, data: { ...result, tickets_updated: ticketsUpdated } });
     }
 
     if (action === '1map-lookup') {
@@ -799,11 +900,16 @@ async function handler(
 
     if (action === 'resolve-all') {
       // Pipeline: local-scan → WA cross-ref → WA photo VLM → 1Map (background)
+      const cutoff = new Date();
       const localResult = await runLocalResolution();
       const crossRefResult = await runWACrossReference();
       const vlmResult = await runWAPhotoVLMScan();
 
+      // Sync ticket activities for all records resolved in steps 1-3
+      const ticketsUpdated = await syncTicketActivities(cutoff);
+
       // Fire-and-forget 1Map lookup for remaining unresolved serials (has its own progress tracker)
+      // 1Map lookup logs ticket activities per-serial inline
       run1MapLookup().catch(err => {
         logger.error('Background 1Map lookup failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -815,6 +921,7 @@ async function handler(
         data: {
           total_resolved: localResult.total_resolved + crossRefResult.total_resolved + vlmResult.total_pp_matched,
           onemap_started: true,
+          tickets_updated: ticketsUpdated,
           steps: {
             local_scan: { resolved: localResult.total_resolved, sources: localResult.sources },
             wa_cross_ref: { resolved: crossRefResult.total_resolved, drs_checked: crossRefResult.total_drs_checked, backfilled: crossRefResult.total_backfilled },
