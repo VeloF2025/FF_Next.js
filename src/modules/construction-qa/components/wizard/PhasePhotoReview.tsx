@@ -174,21 +174,29 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                   >
                     {/* Step Header */}
                     <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => !isDragging && setExpandedStep(expandedStep === step.step ? null : step.step)}
-                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors ${
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!isDragging) setExpandedStep(expandedStep === step.step ? null : step.step); } }}
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} step ${step.step}: ${step.label}`}
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[var(--hover-bg)] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
                         snapshot.isDraggingOver ? 'bg-blue-500/10' : ''
                       }`}
                     >
                       {/* Checkbox */}
                       <button
                         onClick={e => { e.stopPropagation(); onStepChange(col, !isChecked); }}
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        aria-label={`Mark step ${step.step} (${step.label}) as ${isChecked ? 'incomplete' : 'complete'}`}
                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                           isChecked
                             ? 'bg-green-600 border-green-600'
                             : 'border-gray-600 hover:border-gray-400'
                         }`}
                       >
-                        {isChecked && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                        {isChecked && <CheckCircle className="w-3.5 h-3.5 text-white" aria-hidden="true" />}
                       </button>
 
                       {/* Step Info */}
@@ -207,21 +215,26 @@ export function PhasePhotoReview({ review, photos, checklist, checkedSteps, onSt
                       {/* Photo count + VLM score */}
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <Image className="w-3 h-3" />
+                          <Image className="w-3 h-3" aria-hidden="true" />
                           {stepPhotos.length}
                         </div>
                         {avgConfidence !== null && (
-                          <span className={`text-xs font-mono ${
-                            avgConfidence >= 0.8 ? 'text-green-400' :
-                            avgConfidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'
-                          }`}>
+                          <span
+                            className={`text-xs font-mono ${
+                              avgConfidence >= 0.8 ? 'text-green-400' :
+                              avgConfidence >= 0.6 ? 'text-yellow-400' : 'text-red-400'
+                            }`}
+                            aria-label={`VLM confidence: ${Math.round(avgConfidence * 100)}% — ${
+                              avgConfidence >= 0.8 ? 'high' : avgConfidence >= 0.6 ? 'medium' : 'low'
+                            } quality`}
+                          >
                             {Math.round(avgConfidence * 100)}%
                           </span>
                         )}
                         {!isDragging && (
                           expandedStep === step.step
-                            ? <ChevronDown className="w-4 h-4 text-gray-500" />
-                            : <ChevronRight className="w-4 h-4 text-gray-500" />
+                            ? <ChevronDown className="w-4 h-4 text-gray-500" aria-hidden="true" />
+                            : <ChevronRight className="w-4 h-4 text-gray-500" aria-hidden="true" />
                         )}
                       </div>
                     </div>
@@ -522,7 +535,9 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             </div>
           )}
 
-          <div
+          <button
+            type="button"
+            aria-label={`View full size: ${photo.filename || 'photo'}`}
             className={`relative rounded-lg overflow-hidden border cursor-pointer transition-all group ${
               snapshot.isDragging
                 ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 z-50'
@@ -532,6 +547,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             }`}
             style={swiping ? { transform: `translateX(${swipeX}px)`, transition: swipeX <= -200 ? 'transform 0.15s ease-out' : 'none' } : undefined}
             onClick={() => { if (!snapshot.isDragging && !swiping) onClickPhoto(photo.id); }}
+            onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !snapshot.isDragging && !swiping) { e.preventDefault(); onClickPhoto(photo.id); } if (e.key === 'Delete' && onUnassign) { e.preventDefault(); onUnassign(); } }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -544,9 +560,10 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             {dndEnabled ? (
               <div
                 {...provided.dragHandleProps}
+                aria-label="Drag to reassign photo to different step"
                 className="absolute top-1 left-1 z-10 p-0.5 rounded bg-black/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab"
               >
-                <GripVertical className="w-3 h-3" />
+                <GripVertical className="w-3 h-3" aria-hidden="true" />
               </div>
             ) : (
               <span {...provided.dragHandleProps} />
@@ -556,10 +573,10 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             {onUnassign && !snapshot.isDragging && !swiping && (
               <button
                 onClick={e => { e.stopPropagation(); onUnassign(); }}
+                aria-label="Remove photo from step"
                 className="absolute top-1 right-1 z-10 p-0.5 rounded-full bg-red-600/80 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                title="Remove from step"
               >
-                <XIcon className="w-3 h-3" />
+                <XIcon className="w-3 h-3" aria-hidden="true" />
               </button>
             )}
 
@@ -577,7 +594,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
             {/* Enlarge indicator on hover */}
             {!snapshot.isDragging && !swiping && (
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center pointer-events-none">
-                <Maximize2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white opacity-0 group-hover:opacity-100 transition-opacity`} />
+                <Maximize2 className={`${compact ? 'w-5 h-5' : 'w-6 h-6'} text-white opacity-0 group-hover:opacity-100 transition-opacity`} aria-hidden="true" />
               </div>
             )}
 
@@ -594,8 +611,8 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
 
             {/* Retake warning */}
             {!compact && photo.needs_retake && (
-              <div className="absolute top-1 left-1">
-                <AlertTriangle className="w-4 h-4 text-orange-400" />
+              <div className="absolute top-1 left-1" aria-label="Photo needs retake">
+                <AlertTriangle className="w-4 h-4 text-orange-400" aria-hidden="true" />
               </div>
             )}
 
@@ -605,7 +622,7 @@ function PhotoThumbnail({ photo, index, dndEnabled, onClickPhoto, compact, onUna
                 <div className="text-[10px] text-gray-300 truncate">{photo.filename}</div>
               </div>
             )}
-          </div>
+          </button>
         </div>
       )}
     </Draggable>
@@ -632,17 +649,18 @@ function QaPhoto({ storageKey, source, alt, className, draggable }: {
 
   if (failed) {
     return (
-      <div
+      <button
+        type="button"
         className="w-full h-full flex flex-col items-center justify-center bg-gray-800/60 text-gray-500 gap-1 p-1 cursor-pointer hover:bg-gray-700/60 transition-colors"
         onClick={handleRetry}
-        title="Click to retry loading"
+        aria-label={`Retry loading ${source === 'qfield' ? 'QField' : ''} photo`}
       >
-        <ImageOff className="w-5 h-5 text-gray-600" />
+        <ImageOff className="w-5 h-5 text-gray-600" aria-hidden="true" />
         <span className="text-[9px] text-center leading-tight text-yellow-500/80">
           {source === 'qfield' ? 'Awaiting QField sync' : 'Load failed'}
         </span>
         <span className="text-[8px] text-blue-400 hover:text-blue-300">tap to retry</span>
-      </div>
+      </button>
     );
   }
 
