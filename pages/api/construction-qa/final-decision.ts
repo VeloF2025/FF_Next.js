@@ -143,9 +143,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // Push QA notes back to QField GPKG (async, non-blocking)
+    // Push QA status back to QField GPKG (async, non-blocking)
     let qfieldPushed = false;
-    if (decision === 'FAIL' || decision === 'REWORK_NEEDED') {
+    if (decision === 'PASS' || decision === 'FAIL' || decision === 'REWORK_NEEDED') {
       try {
         const pushUrl = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}/api/construction-qa/push-qfield-comment`;
         fetch(pushUrl, {
