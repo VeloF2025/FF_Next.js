@@ -200,7 +200,7 @@ export function OcrResultsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div role="dialog" aria-modal="true" aria-label="OCR Results" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden mx-4 sm:mx-auto flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--ff-border-light)] flex-shrink-0">

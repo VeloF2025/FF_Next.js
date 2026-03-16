@@ -179,7 +179,7 @@ export function DocumentVerificationModal({
     : [];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div role="dialog" aria-modal="true" aria-label="Document Verification" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-[var(--ff-bg-primary)] rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-[var(--ff-border-light)] flex items-center justify-between shrink-0">

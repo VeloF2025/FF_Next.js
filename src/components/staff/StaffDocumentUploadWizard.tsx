@@ -1425,7 +1425,7 @@ export function StaffDocumentUploadWizard({
   // =========================================================================
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div role="dialog" aria-modal="true" aria-label="Upload Document" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-[var(--ff-bg-secondary)] rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[var(--ff-border-light)]">

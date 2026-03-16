@@ -1549,7 +1549,7 @@ export function AccessControlTab() {
 
       {/* Create Role Modal */}
       {showCreateRoleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div role="dialog" aria-modal="true" aria-label="Access Control" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-md p-6">
             <h3 className="text-lg font-semibold text-[var(--ff-text-primary)] mb-4">Create New Role</h3>
 
