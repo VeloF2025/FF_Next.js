@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { CompleteMaintenanceSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
+import { requireAuth } from '@/lib/auth/app-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,10 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
     const { id } = await params;
     const body = await req.json();
 
@@ -61,8 +66,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TODO: Get actual user from auth
-    const completedBy = req.headers.get('x-user-id') || 'system';
+    const completedBy = user.id;
 
     const result = await maintenanceService.complete(validation.data, completedBy);
 
@@ -87,12 +91,15 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const reason = searchParams.get('reason') || 'Cancelled';
 
-    // TODO: Get actual user from auth
-    const cancelledBy = req.headers.get('x-user-id') || 'system';
+    const cancelledBy = user.id;
 
     const result = await maintenanceService.cancel(id, reason, cancelledBy);
 

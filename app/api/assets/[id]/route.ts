@@ -56,8 +56,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TODO: Get actual user from auth
-    const updatedBy = req.headers.get('x-user-id') || 'system';
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    const updatedBy = user.id;
 
     const result = await assetService.update(id, validation.data, updatedBy);
 

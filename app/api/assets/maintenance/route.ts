@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { maintenanceService } from '@/modules/assets/services';
 import { ScheduleMaintenanceSchema } from '@/modules/assets/utils/schemas';
 import { log } from '@/lib/logger';
+import { requireAuth } from '@/lib/auth/app-router';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
     const body = await req.json();
 
     // Validate request body
@@ -61,8 +66,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TODO: Get actual user from auth
-    const createdBy = req.headers.get('x-user-id') || 'system';
+    const createdBy = user.id;
 
     const result = await maintenanceService.schedule(validation.data, createdBy);
 

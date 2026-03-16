@@ -97,7 +97,10 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     }
 
     const id = uuidv4();
-    const uploadedBy = req.headers.get('x-user-id') || 'system';
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    const uploadedBy = user.id;
 
     const [document] = await sql`
       INSERT INTO asset_documents (

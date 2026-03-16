@@ -32,7 +32,7 @@ export {
   extendSession,
 } from './session';
 
-// Middleware
+// Middleware (Pages Router)
 export {
   withAuth,
   withRole,
@@ -44,6 +44,9 @@ export {
   AUTH_COOKIE_NAME,
   type AuthenticatedNextApiRequest,
 } from './middleware';
+
+// App Router utilities (NextRequest)
+export { getUserFromRequest, requireAuth } from './app-router';
 
 import type { NextApiRequest } from 'next';
 import type { AuthenticatedNextApiRequest } from './middleware';

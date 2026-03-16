@@ -39,8 +39,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       maintenanceRequired: body.maintenanceRequired || false,
     };
 
-    // TODO: Get actual user from auth
-    const checkedInBy = req.headers.get('x-user-id') || 'system';
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    const checkedInBy = user.id;
 
     const result = await assignmentService.checkin(checkinData, checkedInBy);
 

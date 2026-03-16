@@ -31,8 +31,11 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // TODO: Get actual user from auth
-    const createdBy = req.headers.get('x-user-id') || 'system';
+    // Authenticate request (user identity from JWT, never from client headers)
+    const [user, unauth] = await requireAuth(req);
+    if (unauth) return unauth;
+
+    const createdBy = user.id;
 
     const result = await assignmentService.checkout(validation.data, createdBy);
 
