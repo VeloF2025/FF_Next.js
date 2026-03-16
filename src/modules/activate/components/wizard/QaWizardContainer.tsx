@@ -325,19 +325,27 @@ export function QaWizardContainer({
           }
         }
       }
-      // Check for auto-QA results
+      // Check for auto-QA results — if processed, skip straight to HITL feedback
       try {
         const autoQaResponse = await fetch(`/api/activate/${encodeURIComponent(dropNumber)}`);
         if (autoQaResponse.ok) {
           const autoQaData = await autoQaResponse.json();
           if (autoQaData.success && autoQaData.data?.auto_qa_processed && autoQaData.data?.auto_qa_results) {
             setAutoQaResults(autoQaData.data.auto_qa_results);
+            // Jump directly to feedback phase — no Start QA / manual phases needed
             setState((prev) => ({ ...prev, phase: 'feedback' }));
-            log.info('QaWizard', `Auto-QA results loaded for ${dropNumber}`);
+            log.info(`Auto-QA results loaded for ${dropNumber} — skipping to HITL feedback`, undefined, 'QaWizard');
+            // Skip the sync animation since we're going straight to review
+            setSyncPhase('complete');
+            await new Promise(resolve => setTimeout(resolve, 400));
+            setLoading(false);
+            setSyncPhase(null);
+            setDataStatus(null);
+            return; // Exit early — don't run remaining init
           }
         }
       } catch {
-        log.warn('QaWizard', `Could not check auto-QA status for ${dropNumber}`);
+        log.warn(`Could not check auto-QA status for ${dropNumber}`, undefined, 'QaWizard');
       }
 
     // Brief complete animation

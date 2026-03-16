@@ -8,7 +8,8 @@
 import { useState, useCallback } from 'react';
 import { log } from '@/lib/logger';
 import { STEP_LABELS } from '../../utils/stepMapper';
-import type { AutoQaResults } from '../../services/autoQaCommentGenerator';
+import type { AutoQaResults, AutoQaPhotoResult } from '../../services/autoQaCommentGenerator';
+import { generateFeedbackMessage } from '../../services/autoQaCommentGenerator';
 import type { QaDecision } from '../../types/unified.types';
 import { PhotoCard, type EditablePhoto } from './PhotoCard';
 
@@ -37,9 +38,11 @@ export function AutoQaFeedbackPhase({
   );
   const [feedbackMessage, setFeedbackMessage] = useState(autoQaResults.feedbackMessage);
   const [decision, setDecision] = useState<QaDecision>(autoQaResults.summary.decision);
+  const [sendDestination, setSendDestination] = useState<'private' | 'group' | 'both'>('both');
   const [isSending, setIsSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackStale, setFeedbackStale] = useState(false);
 
   const passedCount = photos.filter((p) => p.decision === 'PASS').length;
   const failedCount = photos.filter((p) => p.decision === 'FAIL').length + missingSteps.length;
@@ -53,6 +56,7 @@ export function AutoQaFeedbackPhase({
         edited: true,
       };
     }));
+    setFeedbackStale(true);
   }, []);
 
   const updatePhotoComment = useCallback((index: number, comment: string) => {
@@ -60,7 +64,31 @@ export function AutoQaFeedbackPhase({
       if (i !== index) return p;
       return { ...p, comment, edited: true };
     }));
+    setFeedbackStale(true);
   }, []);
+
+  const regenerateFeedback = useCallback(() => {
+    const allPhotos: AutoQaPhotoResult[] = [
+      ...photos.map((p) => ({
+        filename: p.filename,
+        step: p.step,
+        stepLabel: p.stepLabel,
+        tier: p.tier,
+        decision: p.decision,
+        comment: p.comment,
+        confidence: p.confidence,
+      })),
+      ...missingSteps,
+    ];
+    const newMessage = generateFeedbackMessage(
+      dropNumber,
+      decision,
+      allPhotos,
+      autoQaResults.validations
+    );
+    setFeedbackMessage(newMessage);
+    setFeedbackStale(false);
+  }, [photos, missingSteps, dropNumber, decision, autoQaResults.validations]);
 
   const handleSendFeedback = async () => {
     setIsSending(true);
@@ -75,7 +103,7 @@ export function AutoQaFeedbackPhase({
           project,
           decision,
           message: feedbackMessage,
-          destination: 'group',
+          destination: sendDestination,
           qaFindings: {
             photoCoverage: {
               covered: 10 - missingSteps.length,
@@ -99,7 +127,7 @@ export function AutoQaFeedbackPhase({
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to send feedback';
       setError(msg);
-      log.error('AutoQaFeedback', `Error: ${msg}`);
+      log.error(`AutoQaFeedback: ${msg}`, undefined, 'AutoQaFeedback');
     } finally {
       setIsSending(false);
     }
@@ -113,7 +141,7 @@ export function AutoQaFeedbackPhase({
       });
       onBack();
     } catch (err) {
-      log.error('AutoQaFeedback', 'Failed to reset auto-QA', err instanceof Error ? err : undefined);
+      log.error('Failed to reset auto-QA', { error: err }, 'AutoQaFeedback');
     }
   };
 
@@ -155,7 +183,7 @@ export function AutoQaFeedbackPhase({
           {(['PASS', 'FAIL', 'REWORK_NEEDED'] as QaDecision[]).map((d) => (
             <button
               key={d}
-              onClick={() => setDecision(d)}
+              onClick={() => { setDecision(d); setFeedbackStale(true); }}
               className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 decision === d
                   ? d === 'PASS'
@@ -233,13 +261,50 @@ export function AutoQaFeedbackPhase({
           <h4 className="font-semibold text-foreground flex items-center gap-2">
             <span className="text-green-500">💬</span> WhatsApp Feedback
           </h4>
+          {feedbackStale && (
+            <button
+              onClick={regenerateFeedback}
+              className="px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+            >
+              🔄 Regenerate Message
+            </button>
+          )}
         </div>
+        {feedbackStale && (
+          <p className="text-xs text-amber-500 mb-2">
+            Decisions changed — message may be out of date. Regenerate or edit manually.
+          </p>
+        )}
         <textarea
           value={feedbackMessage}
           onChange={(e) => setFeedbackMessage(e.target.value)}
           rows={10}
           className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg dark:bg-gray-900 font-mono text-sm resize-none"
         />
+      </div>
+
+      {/* Send Destination */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h4 className="font-semibold text-foreground mb-3">Send To</h4>
+        <div className="flex gap-3">
+          {([
+            { value: 'private' as const, label: '👤 Private (Tech only)' },
+            { value: 'group' as const, label: '👥 Group Chat' },
+            { value: 'both' as const, label: '📤 Both' },
+          ]).map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setSendDestination(value)}
+              className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                sendDestination === value
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'border-border text-muted-foreground hover:bg-accent'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Error */}
