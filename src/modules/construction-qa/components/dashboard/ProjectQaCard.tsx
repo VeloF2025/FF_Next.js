@@ -105,13 +105,13 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
           <span className="text-xs text-green-400">{approved} approved</span>
           {project.ai_approved > 0 && (
             <span className="flex items-center gap-0.5 text-xs text-emerald-400">
-              <Bot className="w-3 h-3" />
+              <Bot className="w-3 h-3" aria-hidden="true" />
               {project.ai_approved}
             </span>
           )}
           {project.human_approved > 0 && (
             <span className="flex items-center gap-0.5 text-xs text-teal-400">
-              <User className="w-3 h-3" />
+              <User className="w-3 h-3" aria-hidden="true" />
               {project.human_approved}
             </span>
           )}
@@ -144,7 +144,7 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-xs text-gray-400">
-              <ClipboardCheck className="w-3.5 h-3.5" />
+              <ClipboardCheck className="w-3.5 h-3.5" aria-hidden="true" />
               Photo Steps (7-step)
             </span>
             <span className={`text-xs font-medium ${
@@ -195,19 +195,19 @@ export function ProjectQaCard({ project }: ProjectQaCardProps) {
       {/* Meta row — matches table: Zones, PONs, Photos, OTDR */}
       <div className="flex items-center gap-4 text-xs text-gray-500">
         <span className="flex items-center gap-1">
-          <MapPin className="w-3.5 h-3.5" />
+          <MapPin className="w-3.5 h-3.5" aria-hidden="true" />
           {project.zone_count} zones
         </span>
         <span className="flex items-center gap-1">
-          <Layers className="w-3.5 h-3.5" />
+          <Layers className="w-3.5 h-3.5" aria-hidden="true" />
           {project.pon_count} PONs
         </span>
         <span className="flex items-center gap-1">
-          <Camera className="w-3.5 h-3.5" />
+          <Camera className="w-3.5 h-3.5" aria-hidden="true" />
           {project.photo_count > 0 ? project.photo_count.toLocaleString() : '-'}
         </span>
         <span className="flex items-center gap-1">
-          <Radio className="w-3.5 h-3.5" />
+          <Radio className="w-3.5 h-3.5" aria-hidden="true" />
           {project.otdr_count > 0 ? `${project.otdr_count.toLocaleString()} OTDR` : '-'}
         </span>
       </div>
