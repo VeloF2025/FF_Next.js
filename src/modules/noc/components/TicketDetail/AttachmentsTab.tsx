@@ -157,10 +157,14 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
       {/* Upload Zone */}
       <div
         ref={dropZoneRef}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload files — drop here or click to browse"
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`bg-[var(--ff-bg-secondary)] border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+        onKeyDown={(e) => { if(e.key==='Enter' || e.key===' ') fileInputRef.current?.click(); }}
+        className={`bg-[var(--ff-bg-secondary)] border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none ${
           dragOver ? 'border-blue-500 bg-blue-500/10' : 'border-[var(--ff-border-light)] hover:border-blue-500/50'
         }`}
         onClick={() => fileInputRef.current?.click()}
@@ -294,6 +298,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
         >
           <button
             type="button"
+            aria-label="Close preview"
             onClick={() => setPreviewUrl(null)}
             className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70"
           >
@@ -303,6 +308,7 @@ export function AttachmentsTab({ ticketId }: AttachmentsTabProps) {
             <video
               src={previewUrl}
               controls
+              aria-label={`Video preview: ${previewUrl.split('/').pop()}`}
               className="max-w-full max-h-[90vh] rounded-lg"
               onClick={(e) => e.stopPropagation()}
             />
