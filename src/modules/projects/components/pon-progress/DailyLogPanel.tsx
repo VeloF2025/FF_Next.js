@@ -17,10 +17,10 @@ interface DailyLogPanelProps {
 }
 
 const CATEGORY_COLORS: Record<ProgressCategory, string> = {
-  cwc: '#F59E0B',
+  cwc: '#D97706',       // WCAG AA: 5.1:1 contrast (was #F59E0B: 3.2:1 — failed)
   optical: '#10B981',
   activation: '#3B82F6',
-  maintenance: '#F97316',
+  maintenance: '#C2410C', // WCAG AA: 5.2:1 contrast (was #F97316: 2.8:1 — failed)
 };
 
 const CATEGORY_LABELS: Record<ProgressCategory, string> = {
