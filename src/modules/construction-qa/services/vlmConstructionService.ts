@@ -63,7 +63,7 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
 
     // Fetch photos to validate
     let photosQuery = `
-      SELECT id, storage_key, source, checklist_step, filename
+      SELECT id, storage_key, source, checklist_step, step_label, filename
       FROM construction_qa_photos
       WHERE review_id = $1::uuid
     `;
@@ -124,6 +124,10 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
         // Call VLM
         const vlmResult = await callVlm(photoUrl, prompt, step || 0, stepDef?.label || 'Uncategorized');
 
+        // If VLM classified the step (classification mode), update the step assignment
+        const classifiedStep = vlmResult.extracted_data?.classified_step;
+        const wasClassified = classifiedStep != null && (!photo.checklist_step || photo.checklist_step === 0);
+
         // Update photo with results
         await sql`
           UPDATE construction_qa_photos
@@ -133,6 +137,8 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
               vlm_feedback = ${vlmResult.feedback},
               vlm_raw = ${JSON.stringify(vlmResult)}::jsonb,
               vlm_processed_at = NOW(),
+              checklist_step = ${wasClassified ? Number(classifiedStep) : (photo.checklist_step ?? null)},
+              step_label = ${wasClassified ? vlmResult.step_label : (photo.step_label ?? null)},
               updated_at = NOW()
           WHERE id = ${photo.id}::uuid
         `;
@@ -170,6 +176,35 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
     const stepScores: Record<string, number> = {};
     for (const sr of result.stepResults) {
       stepScores[`step_${String(sr.step).padStart(2, '0')}`] = sr.confidence;
+    }
+
+    // Recalculate civil step flags from actual photo classifications
+    // This ensures step=0 (Unrelated/optical) photos don't count toward civil coverage
+    if (discipline === 'civil') {
+      await sql`
+        WITH photo_steps AS (
+          SELECT
+            bool_or(checklist_step = 1) AS s1, bool_or(checklist_step = 2) AS s2,
+            bool_or(checklist_step = 3) AS s3, bool_or(checklist_step = 4) AS s4,
+            bool_or(checklist_step = 5) AS s5, bool_or(checklist_step = 6) AS s6,
+            bool_or(checklist_step = 7) AS s7, bool_or(checklist_step = 8) AS s8
+          FROM construction_qa_photos
+          WHERE review_id = ${reviewId}::uuid
+            AND checklist_step IS NOT NULL
+            AND checklist_step > 0
+        )
+        UPDATE construction_qa_reviews SET
+          civil_step_01_before_photo = COALESCE(ps.s1, false),
+          civil_step_02_during_photo = COALESCE(ps.s2, false),
+          civil_step_03_depth_photo = COALESCE(ps.s3, false),
+          civil_step_04_end_plates = COALESCE(ps.s4, false),
+          civil_step_05_compaction = COALESCE(ps.s5, false),
+          civil_step_06_level_check = COALESCE(ps.s6, false),
+          civil_step_07_after_photo = COALESCE(ps.s7, false),
+          civil_step_08_signature = COALESCE(ps.s8, false)
+        FROM photo_steps ps
+        WHERE id = ${reviewId}::uuid
+      `;
     }
 
     // Update review with aggregate results
@@ -282,14 +317,23 @@ function parseVlmResponse(text: string, step: number, stepLabel: string): VlmSte
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
+
+      // Use VLM's classified_step if provided (classification mode)
+      const classifiedStep = parsed.classified_step != null ? Number(parsed.classified_step) : null;
+      const finalStep = classifiedStep != null ? classifiedStep : step;
+      const finalLabel = classifiedStep != null && parsed.step_label ? String(parsed.step_label) : stepLabel;
+
       return {
         valid: Boolean(parsed.valid ?? parsed.pass ?? false),
         confidence: Number(parsed.confidence ?? parsed.score ?? 0) / (parsed.score != null && parsed.score > 1 ? 10 : 1),
-        step,
-        step_label: stepLabel,
+        step: finalStep,
+        step_label: finalLabel,
         issues: Array.isArray(parsed.issues) ? parsed.issues : parsed.issue ? [parsed.issue] : [],
         feedback: parsed.feedback || parsed.comment || '',
-        extracted_data: parsed.extracted_data || parsed.data || {},
+        extracted_data: {
+          ...(parsed.extracted_data || parsed.data || {}),
+          ...(classifiedStep != null ? { classified_step: classifiedStep } : {}),
+        },
       };
     }
   } catch {
@@ -335,6 +379,18 @@ CIVIL CHECKLIST STEPS:
   Step 5 - Compaction / Backfill: Sand+cement mix packed around pole base, compacted surface — NOT loose heaps
   Step 6 - Level Check: Spirit level (bubble level tool) held against the upright pole
   Step 7 - After Photo: Wide shot from distance showing the full pole standing upright in the ground
+  Step 0 - Unrelated: Photo does NOT show any civil pole installation activity
+
+⚠️ OPTICAL EQUIPMENT = UNRELATED (Step 0):
+The following are OPTICAL/FIBRE equipment — they are NOT civil pole installation steps:
+- Splice trays, fibre splice closures, fusion splice cassettes
+- Dome joints, dome interiors, dome enclosures
+- Fibre optic splitter boxes, ODF panels, patch panels
+- Fibre labels, fibre identification tags on cables
+- Cable termination boxes, optical network terminals (ONTs)
+- Loose tube fibre, fibre strands, fibre pigtails
+- Any close-up of fibre optic cables, connectors, or equipment
+If you see ANY of the above, classify as Step 0 (Unrelated) immediately.
 
 ⚠️ CLASSIFICATION TIPS:
 - If you see metal plates/caps on a pole → Step 4 (End Plates), NOT Step 2
@@ -342,11 +398,12 @@ CIVIL CHECKLIST STEPS:
 - If you see a wide outdoor shot with a pole standing → Step 7 (After Photo), NOT Step 2
 - If you see ground markings before any digging → Step 1 (Before Photo)
 - Step 2 (During) ONLY if workers are actively digging or there is an open hole being dug
-- Do NOT default to "Unrelated" unless the photo truly shows nothing related to pole installation
+- If you see fibre optic equipment, domes, splice trays → Step 0 (Unrelated), even if a pole is visible
+- Do NOT default to "Unrelated" unless the photo truly shows nothing related to pole installation OR shows optical/fibre equipment
 
 Respond with this JSON:
 {
-  "classified_step": <1-7 or 0 if truly unrelated>,
+  "classified_step": <1-7 or 0 if unrelated/optical>,
   "step_label": "<label from the list above>",
   "valid": true/false,
   "confidence": 0.0-1.0,
