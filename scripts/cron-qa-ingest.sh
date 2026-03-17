@@ -53,4 +53,23 @@ for proj in "${SP_PROJECTS[@]}"; do
   fi
 done
 
+# ── 3. VLM Validation ──────────────────────────────────────────────────────
+# Process pending reviews through VLM (up to 20 per run)
+echo "$LOG_PREFIX [VLM] Processing pending reviews..."
+PENDING_IDS=$(psql "$DATABASE_URL" -t -A -c \
+  "SELECT id || '|' || discipline FROM construction_qa_reviews WHERE vlm_status = 'pending' ORDER BY updated_at DESC LIMIT 20" 2>/dev/null)
+
+VLM_COUNT=0
+for entry in $PENDING_IDS; do
+  RID=$(echo "$entry" | cut -d'|' -f1)
+  DISC=$(echo "$entry" | cut -d'|' -f2)
+  VLM_RESULT=$(curl -s -X POST "$PROD_URL/api/construction-qa/vlm-validate" \
+    -H "Content-Type: application/json" \
+    -H "x-cron-secret: $CRON_SECRET" \
+    -d "{\"reviewId\": \"$RID\", \"discipline\": \"$DISC\", \"forceRerun\": true}" \
+    --max-time 60 2>/dev/null) || true
+  VLM_COUNT=$((VLM_COUNT + 1))
+done
+echo "$LOG_PREFIX [VLM] Processed $VLM_COUNT reviews"
+
 echo "$LOG_PREFIX === QA Ingest Cron Done ==="
