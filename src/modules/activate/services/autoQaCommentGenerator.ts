@@ -197,7 +197,12 @@ export function generateFeedbackMessage(
   if (failedPhotos.length > 0) {
     lines.push('*Photo Issues:*');
     failedPhotos.forEach((p) => {
-      lines.push(`- ${p.comment}`);
+      // Always prefix with step label so the technician knows which photo is affected,
+      // even if the human editor wrote a custom comment without the step name.
+      const label = STEP_LABELS[p.step] || `Step ${p.step}`;
+      const alreadyPrefixed = p.comment.startsWith(`${label}:`);
+      const line = alreadyPrefixed ? p.comment : `${label}: ${p.comment}`;
+      lines.push(`- ${line}`);
     });
     lines.push('');
   }
