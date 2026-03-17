@@ -18,6 +18,7 @@ import { log } from '@/lib/logger';
 
 const MAX_RETRY_ATTEMPTS = 5;
 const API_BASE = process.env.NEXTAUTH_URL || 'http://localhost:3005';
+const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 
 interface RetryResult {
   dropNumber: string;
@@ -124,8 +125,11 @@ export default async function handler(
         // Re-trigger categorization via process-new-dr
         const response = await fetch(`${API_BASE}/api/activate/process-new-dr`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dropNumber: dr.drop_number }),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bridge-secret': BRIDGE_SECRET || '',
+          },
+          body: JSON.stringify({ dropNumber: dr.drop_number, secret: BRIDGE_SECRET }),
         });
 
         const data = await response.json();
