@@ -387,5 +387,5 @@ function buildPhotoUrl(storageKey: string, source: string): string {
   // VLM runs on Velocity, so we use the local API to proxy the photo
   const port = process.env.PORT || '3000';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:${port}`;
-  return `${baseUrl}/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}`;
+  return `${baseUrl}/api/construction-qa/photo-proxy?key=${encodeURIComponent(storageKey)}&source=${source}&vlm=true`;
 }

@@ -76,12 +76,15 @@ export function PhotoCard({
                   value={photo.step}
                   onChange={(e) => onChangeStep(parseInt(e.target.value, 10))}
                   className={`text-sm font-medium border rounded px-2 py-0.5 ${
-                    photo.step === 0
+                    photo.step === -1
+                      ? 'border-purple-400 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                      : photo.step === 0
                       ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300'
                       : 'border-border bg-card text-foreground'
                   }`}
                   title="Change photo step assignment"
                 >
+                  <option value="-1">Duplicate Photo</option>
                   <option value="0">Discard (Step 0)</option>
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((step) => (
                     <option key={step} value={step}>

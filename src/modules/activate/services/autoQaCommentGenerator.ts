@@ -71,6 +71,11 @@ export function generatePhotoComment(
 ): string {
   const stepLabel = STEP_LABELS[step] || `Step ${step}`;
 
+  // Duplicate photo — always FAIL
+  if (step === -1) {
+    return 'Duplicate Photo: This photo is a duplicate of another photo in this submission';
+  }
+
   if (decision === 'PASS') {
     if (tier === 'auto_approved') {
       return `${stepLabel}: Verified (${Math.round(confidence * 100)}% confidence)`;
@@ -180,8 +185,15 @@ export function generateFeedbackMessage(
     lines.push('');
   }
 
-  // Failed photos detail
-  const failedPhotos = photoResults.filter((p) => p.decision === 'FAIL' && p.step > 0);
+  // Duplicate photos
+  const duplicatePhotos = photoResults.filter((p) => p.step === -1);
+  if (duplicatePhotos.length > 0) {
+    lines.push(`*Duplicate Photos:* ${duplicatePhotos.length} photo(s) flagged as duplicates`);
+    lines.push('');
+  }
+
+  // Failed photos detail (include duplicates and discards in issues list)
+  const failedPhotos = photoResults.filter((p) => p.decision === 'FAIL' && (p.step > 0 || p.step === -1));
   if (failedPhotos.length > 0) {
     lines.push('*Photo Issues:*');
     failedPhotos.forEach((p) => {
