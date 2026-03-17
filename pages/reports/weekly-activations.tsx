@@ -161,9 +161,10 @@ export default function ActivationsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/dashboard')}
+              aria-label="Back to dashboard"
               className="p-2 rounded-lg hover:bg-[var(--ff-bg-tertiary)] transition-colors text-[var(--ff-text-secondary)]"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </button>
             <div>
               <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Activations</h1>
@@ -179,9 +180,10 @@ export default function ActivationsPage() {
             <button
               onClick={fetchData}
               disabled={loading}
+              aria-label="Refresh activations data"
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)] transition-colors text-sm text-[var(--ff-text-primary)] disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
               Refresh
             </button>
           </div>
@@ -200,7 +202,7 @@ export default function ActivationsPage() {
             <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">WTD</div>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-emerald-500/20">
-                <Zap className="w-5 h-5 text-emerald-400" />
+                <Zap className="w-5 h-5 text-emerald-400" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">This Week</p>
@@ -218,7 +220,7 @@ export default function ActivationsPage() {
             <div className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">WTD</div>
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/20">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
+                <TrendingUp className="w-5 h-5 text-blue-400" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">This Week Revenue</p>
@@ -232,7 +234,7 @@ export default function ActivationsPage() {
           <div className="p-4 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-emerald-500/10">
-                <Zap className="w-5 h-5 text-[var(--ff-text-tertiary)]" />
+                <Zap className="w-5 h-5 text-[var(--ff-text-tertiary)]" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-sm text-[var(--ff-text-secondary)]">All-time Activations</p>
@@ -261,7 +263,7 @@ export default function ActivationsPage() {
         {/* Filter bar */}
         <div className="mb-4 flex flex-wrap items-center gap-3 p-3 rounded-lg bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]">
           <div className="flex items-center gap-2 text-xs font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
-            <Filter className="w-3.5 h-3.5" />
+            <Filter className="w-3.5 h-3.5" aria-hidden="true" />
             Filters
           </div>
           <div className="flex items-center gap-2">
@@ -277,7 +279,7 @@ export default function ActivationsPage() {
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--ff-text-tertiary)] pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--ff-text-tertiary)] pointer-events-none" aria-hidden="true" />
             </div>
             {projectFilter && (
               <button
@@ -297,7 +299,7 @@ export default function ActivationsPage() {
 
         {/* Loading skeleton */}
         {loading && (
-          <div className="rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
+          <div role="status" aria-live="polite" aria-label="Loading activations data" className="rounded-lg border border-[var(--ff-border-light)] overflow-hidden">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="flex items-center gap-4 px-4 py-4 border-b border-[var(--ff-border-light)] last:border-b-0">
                 <div className="w-4 h-4 bg-[var(--ff-bg-tertiary)] rounded animate-pulse" />
@@ -338,12 +340,14 @@ export default function ActivationsPage() {
                   {/* ── Year row ── */}
                   <button
                     onClick={() => setExpandedYears(toggle(expandedYears, yearGroup.year))}
+                    aria-expanded={yearExpanded}
+                    aria-label={`${yearGroup.year} activations`}
                     className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-3 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors bg-[var(--ff-bg-secondary)]"
                   >
                     <div className="flex items-center">
                       {yearExpanded
-                        ? <ChevronDown className="w-4 h-4 text-emerald-400" />
-                        : <ChevronRight className="w-4 h-4 text-emerald-400" />}
+                        ? <ChevronDown className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                        : <ChevronRight className="w-4 h-4 text-emerald-400" aria-hidden="true" />}
                     </div>
                     <span className="text-sm font-bold text-[var(--ff-text-primary)]">{yearGroup.year}</span>
                     <span className="text-sm font-bold text-emerald-400 text-right">{yearGroup.total.toLocaleString()}</span>
@@ -358,12 +362,14 @@ export default function ActivationsPage() {
                         {/* ── Month row ── */}
                         <button
                           onClick={() => setExpandedMonths(toggle(expandedMonths, monthGroup.key))}
+                          aria-expanded={monthExpanded}
+                          aria-label={`${monthGroup.label} activations`}
                           className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-2.5 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
                         >
                           <div className="flex items-center pl-4">
                             {monthExpanded
-                              ? <ChevronDown className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" />
-                              : <ChevronRight className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" />}
+                              ? <ChevronDown className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" aria-hidden="true" />
+                              : <ChevronRight className="w-3.5 h-3.5 text-[var(--ff-text-secondary)]" aria-hidden="true" />}
                           </div>
                           <span className="text-sm font-semibold text-[var(--ff-text-primary)] pl-1">{monthGroup.label}</span>
                           <span className="text-sm font-semibold text-emerald-400 text-right">{monthGroup.total.toLocaleString()}</span>
@@ -378,12 +384,14 @@ export default function ActivationsPage() {
                               {/* ── Week row ── */}
                               <button
                                 onClick={() => setExpandedWeeks(toggle(expandedWeeks, week.week_start))}
+                                aria-expanded={weekExpanded}
+                                aria-label={`${week.week_label} activations`}
                                 className="w-full grid grid-cols-[2rem_1fr_9rem_13rem] gap-2 px-4 py-2 text-left hover:bg-[var(--ff-bg-tertiary)] transition-colors"
                               >
                                 <div className="flex items-center pl-8">
                                   {weekExpanded
-                                    ? <ChevronDown className="w-3 h-3 text-[var(--ff-text-tertiary)]" />
-                                    : <ChevronRight className="w-3 h-3 text-[var(--ff-text-tertiary)]" />}
+                                    ? <ChevronDown className="w-3 h-3 text-[var(--ff-text-tertiary)]" aria-hidden="true" />
+                                    : <ChevronRight className="w-3 h-3 text-[var(--ff-text-tertiary)]" aria-hidden="true" />}
                                 </div>
                                 <span className="text-sm text-[var(--ff-text-primary)] pl-1">{week.week_label}</span>
                                 <span className="text-sm text-emerald-400 text-right">{week.total.toLocaleString()}</span>
