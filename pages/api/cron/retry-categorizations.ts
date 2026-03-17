@@ -52,11 +52,11 @@ export default async function handler(
   log.info('RetryCategorizations', `Starting retry scan (limit: ${limit})`);
 
   try {
-    // 1. Find DRs with status='failed' eligible for retry
+    // 1. Find DRs with status='failed' or stuck 'processing' eligible for retry
     const failedResult = await pool.query(
       `SELECT drop_number
        FROM dr_photo_unified_reviews
-       WHERE vlm_categorization_status = 'failed'
+       WHERE vlm_categorization_status IN ('failed', 'processing')
          AND (vlm_retry_count IS NULL OR vlm_retry_count < $1)
          AND (vlm_next_retry_at IS NULL OR vlm_next_retry_at <= NOW())
        ORDER BY vlm_retry_count ASC NULLS FIRST, updated_at ASC
@@ -146,20 +146,45 @@ export default async function handler(
             message: 'Re-categorization successful',
           });
         } else {
+          // Restore to 'failed' so it gets retried next cycle
+          const errorMsg = data.data?.categorizationStatus || data.error?.message || 'Unknown failure';
+          await pool.query(
+            `UPDATE dr_photo_unified_reviews
+             SET vlm_categorization_status = 'failed',
+                 vlm_last_error = $1,
+                 vlm_next_retry_at = NOW() + INTERVAL '5 minutes',
+                 updated_at = NOW()
+             WHERE drop_number = $2`,
+            [errorMsg, dr.drop_number]
+          );
+
           results.push({
             dropNumber: dr.drop_number,
             source: dr.source,
             success: false,
-            message: data.data?.categorizationStatus || 'Failed',
+            message: errorMsg,
           });
         }
       } catch (error) {
         log.error('RetryCategorizations', `Error retrying ${dr.drop_number}`, error);
+
+        // Restore to 'failed' so it gets retried next cycle
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET vlm_categorization_status = 'failed',
+               vlm_last_error = $1,
+               vlm_next_retry_at = NOW() + INTERVAL '5 minutes',
+               updated_at = NOW()
+           WHERE drop_number = $2`,
+          [errorMsg, dr.drop_number]
+        ).catch(() => { /* best effort */ });
+
         results.push({
           dropNumber: dr.drop_number,
           source: dr.source,
           success: false,
-          message: error instanceof Error ? error.message : 'Unknown error',
+          message: errorMsg,
         });
       }
 
