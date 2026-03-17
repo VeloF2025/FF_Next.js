@@ -22,6 +22,15 @@ if ! curl -sf "$PROD_URL/api/health" > /dev/null 2>&1; then
   fi
 fi
 
+# Step 1: Retry failed/bad categorizations (re-trigger VLM for DRs that got Error results)
+RETRY_RESPONSE=$(curl -sf -X POST "${URL}/api/cron/retry-categorizations?limit=10" \
+  -H "Authorization: Bearer ${CRON_SECRET}" \
+  -H "Content-Type: application/json" 2>&1) || true
+
+RETRY_SUMMARY=$(echo "$RETRY_RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(f\"retried={d['processed']} succeeded={d['succeeded']}\")" 2>/dev/null || echo "no retries")
+echo "$LOG_PREFIX RETRY: ${URL} — ${RETRY_SUMMARY}"
+
+# Step 2: Run auto-QA pipeline on eligible DRs
 RESPONSE=$(curl -sf -X POST "${URL}/api/cron/auto-qa?limit=${LIMIT}" \
   -H "Authorization: Bearer ${CRON_SECRET}" \
   -H "Content-Type: application/json" 2>&1) || {

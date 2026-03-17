@@ -935,20 +935,45 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     try {
       const categorizations = await categorizePhotos(dropNumber, photos);
 
-      // Store categorization results
-      await pool.query(
-        `UPDATE dr_photo_unified_reviews
-         SET
-           vlm_categorization_status = 'categorized',
-           vlm_categorization_results = $1,
-           vlm_categorized_at = NOW(),
-           updated_at = NOW()
-         WHERE drop_number = $2`,
-        [JSON.stringify(categorizations), dropNumber]
-      );
+      // Detect all-error categorizations (VLM was down or images unreachable)
+      const errorCount = categorizations.filter(
+        (c) => c.vlm_predicted_step === 0 || c.vlm_predicted_category === 'Error'
+      ).length;
+      const allErrors = categorizations.length > 0 && errorCount === categorizations.length;
+
+      if (allErrors) {
+        // All photos failed — mark as 'failed' so retry-categorizations picks them up
+        log.warn('ProcessNewDr', `All ${categorizations.length} categorizations are errors for ${dropNumber} — marking as failed`);
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET
+             vlm_categorization_status = 'failed',
+             vlm_categorization_results = $1,
+             vlm_retry_count = COALESCE(vlm_retry_count, 0) + 1,
+             vlm_last_error = 'All photos returned Error/step=0 — VLM likely unavailable',
+             vlm_next_retry_at = NOW() + INTERVAL '5 minutes',
+             updated_at = NOW()
+           WHERE drop_number = $2`,
+          [JSON.stringify(categorizations), dropNumber]
+        );
+      } else {
+        // Normal case — store categorization results
+        await pool.query(
+          `UPDATE dr_photo_unified_reviews
+           SET
+             vlm_categorization_status = 'categorized',
+             vlm_categorization_results = $1,
+             vlm_categorized_at = NOW(),
+             updated_at = NOW()
+           WHERE drop_number = $2`,
+          [JSON.stringify(categorizations), dropNumber]
+        );
+      }
 
       log.info('ProcessNewDr', `Categorization complete for ${dropNumber}`, {
         photoCount: categorizations.length,
+        errorCount,
+        allErrors,
         processingTimeMs: Date.now() - startTime,
       });
 
@@ -960,7 +985,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.success(res, {
         dropNumber,
         photosDownloaded: photos.length,
-        categorizationStatus: 'categorized',
+        categorizationStatus: allErrors ? 'failed' : 'categorized',
         processingTimeMs: Date.now() - startTime,
         isResubmission,
         submissionCount,
