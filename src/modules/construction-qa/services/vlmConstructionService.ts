@@ -129,7 +129,7 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
           UPDATE construction_qa_photos
           SET vlm_valid = ${vlmResult.valid},
               vlm_confidence = ${vlmResult.confidence},
-              vlm_issues = ${JSON.stringify(vlmResult.issues)}::jsonb,
+              vlm_issues = ${vlmResult.issues || []}::text[],
               vlm_feedback = ${vlmResult.feedback},
               vlm_raw = ${JSON.stringify(vlmResult)}::jsonb,
               vlm_processed_at = NOW(),
@@ -179,7 +179,7 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
       SET vlm_status = 'completed',
           vlm_confidence = ${result.overallConfidence},
           vlm_step_scores = ${JSON.stringify(stepScores)}::jsonb,
-          vlm_issues = ${JSON.stringify(overallResult.cross_step_issues)}::jsonb,
+          vlm_issues = ${overallResult.cross_step_issues || []}::text[],
           vlm_raw_response = ${JSON.stringify(overallResult)}::jsonb,
           vlm_processed_at = NOW(),
           vlm_model_version = ${VLM_MODEL},
