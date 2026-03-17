@@ -23,6 +23,7 @@ interface PonFeaturesPanelProps {
   dateFrom?: string;
   dateTo?: string;
   parentDiscipline?: string;
+  approvalFilter?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,7 +36,7 @@ const STATUS_COLORS: Record<string, string> = {
   unidentified: 'bg-gray-500/20 text-gray-400',
 };
 
-export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFrom, dateTo, parentDiscipline }: PonFeaturesPanelProps) {
+export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFrom, dateTo, parentDiscipline, approvalFilter }: PonFeaturesPanelProps) {
   const router = useRouter();
   const [features, setFeatures] = useState<PonFeatureRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,6 +60,7 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
       if (status) params.set('status', status);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
+      if (approvalFilter) params.set('approval', approvalFilter);
 
       const res = await fetch(`/api/construction-qa/pon-features?${params}`, {
         credentials: 'include',
@@ -74,7 +76,7 @@ export function PonFeaturesPanel({ projectId, zoneNo, ponNo, highlightId, dateFr
     } finally {
       setLoading(false);
     }
-  }, [projectId, zoneNo, ponNo, page, discipline, status, dateFrom, dateTo]);
+  }, [projectId, zoneNo, ponNo, page, discipline, status, dateFrom, dateTo, approvalFilter]);
 
   useEffect(() => {
     fetchFeatures();

@@ -27,6 +27,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const discipline = req.query.discipline as string || '';
   const dateFrom = req.query.dateFrom as string || '';
   const dateTo = req.query.dateTo as string || '';
+  const approval = req.query.approval as string || '';
 
   try {
     // QA stats grouped by zone/pon
@@ -50,6 +51,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       conditions.push(`COALESCE(r.last_photo_at, r.created_at) < $${paramIdx}::timestamptz`);
       params.push(dateTo);
       paramIdx++;
+    }
+
+    // Approval filter: approved = workflow_status approved + all civil steps covered
+    if (approval === 'approved') {
+      conditions.push(`r.workflow_status = 'approved'`);
+    } else if (approval === 'unapproved') {
+      conditions.push(`r.workflow_status != 'approved'`);
     }
 
     const whereClause = conditions.join(' AND ');

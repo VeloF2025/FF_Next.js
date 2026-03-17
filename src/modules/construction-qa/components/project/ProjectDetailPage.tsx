@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, RefreshCw, Download } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Download, CheckCircle, XCircle } from 'lucide-react';
 import { log } from '@/lib/logger';
 import type { DateFilter } from '@/modules/data-sync/types';
 import { getDateRange } from '@/modules/data-sync/types';
@@ -26,11 +26,18 @@ interface ProjectDetailPageProps {
 }
 
 type DisciplineFilter = '' | 'civil' | 'optical';
+type ApprovalFilter = '' | 'approved' | 'unapproved';
 
 const DISCIPLINE_TABS: { key: DisciplineFilter; label: string }[] = [
   { key: '', label: 'All' },
   { key: 'civil', label: 'Civil' },
   { key: 'optical', label: 'Optical' },
+];
+
+const APPROVAL_TABS: { key: ApprovalFilter; label: string; icon?: typeof CheckCircle }[] = [
+  { key: '', label: 'All' },
+  { key: 'approved', label: 'Approved (7/7)', icon: CheckCircle },
+  { key: 'unapproved', label: 'Not Approved', icon: XCircle },
 ];
 
 export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageProps) {
@@ -46,6 +53,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('');
 
   // Compute date range from filter preset or custom inputs
   const { dateFrom, dateTo } = useMemo(() => {
@@ -80,6 +88,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
       if (discipline) params.set('discipline', discipline);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
+      if (approvalFilter) params.set('approval', approvalFilter);
 
       const res = await fetch(`/api/construction-qa/zone-hierarchy?${params}`, {
         credentials: 'include',
@@ -93,7 +102,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
     } finally {
       setLoading(false);
     }
-  }, [projectId, discipline, dateFrom, dateTo]);
+  }, [projectId, discipline, dateFrom, dateTo, approvalFilter]);
 
   // Fetch project name if not provided
   useEffect(() => {
@@ -137,6 +146,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
       if (discipline) params.set('discipline', discipline);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
+      if (approvalFilter) params.set('approval', approvalFilter);
       window.location.href = `/api/construction-qa/export?${params}`;
     } finally {
       // Small delay so the browser starts the download
@@ -194,6 +204,31 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Approval filter toggle */}
+      <div className="flex gap-1 bg-[var(--card-bg)] p-1 rounded-lg border border-[var(--border-color)]">
+        {APPROVAL_TABS.map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setApprovalFilter(tab.key)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                approvalFilter === tab.key
+                  ? tab.key === 'approved'
+                    ? 'bg-green-600 text-white'
+                    : tab.key === 'unapproved'
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-[var(--hover-bg)]'
+              }`}
+            >
+              {Icon && <Icon className="w-3.5 h-3.5" />}
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Date filter bar + export */}
@@ -305,6 +340,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
           dateFrom={dateFrom}
           dateTo={dateTo}
           parentDiscipline={discipline}
+          approvalFilter={approvalFilter}
         />
       )}
     </div>

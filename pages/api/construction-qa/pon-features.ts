@@ -81,6 +81,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIdx++;
     }
 
+    const approval = req.query.approval as string || '';
+    if (approval === 'approved') {
+      conditions.push(`r.workflow_status = 'approved'`);
+    } else if (approval === 'unapproved') {
+      conditions.push(`r.workflow_status != 'approved'`);
+    }
+
     const whereClause = conditions.join(' AND ');
 
     const featuresQuery = `

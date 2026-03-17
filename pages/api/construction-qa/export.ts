@@ -15,7 +15,19 @@ import * as XLSX from 'xlsx';
 
 const sql = neon(process.env.DATABASE_URL!);
 
-function toExcel(rows: Record<string, unknown>[], projectName: string): Buffer {
+const CIVIL_STEPS = [
+  { col: 'civil_step_01_before_photo', label: 'Before Photo' },
+  { col: 'civil_step_02_during_photo', label: 'During Photo' },
+  { col: 'civil_step_03_depth_photo', label: 'Depth Photo' },
+  { col: 'civil_step_04_end_plates', label: 'End Plates' },
+  { col: 'civil_step_05_compaction', label: 'Compaction' },
+  { col: 'civil_step_06_level_check', label: 'Level Check' },
+  { col: 'civil_step_07_after_photo', label: 'After Photo' },
+];
+
+function toExcel(rows: Record<string, unknown>[], projectName: string, approval: string): Buffer {
+  const isUnapproved = approval === 'unapproved';
+
   const headers = [
     'Feature ID',
     'Type',
@@ -23,54 +35,66 @@ function toExcel(rows: Record<string, unknown>[], projectName: string): Buffer {
     'Zone',
     'PON',
     'Photos',
+    'Steps Covered',
     'AI Confidence',
     'VLM Status',
     'Workflow Status',
     'QA Decision',
     'Priority',
+    ...(isUnapproved ? ['Steps Outstanding', 'Missing Steps'] : []),
+    ...CIVIL_STEPS.map(s => s.label),
     'Captured',
     'Created',
     'Updated',
   ];
 
-  const data = rows.map((r) => [
-    r.feature_id,
-    r.feature_type || '',
-    r.discipline || '',
-    r.zone_no != null ? r.zone_no : 'Unassigned',
-    r.pon_no != null ? r.pon_no : 'Unassigned',
-    Number(r.photo_count) || 0,
-    r.vlm_confidence != null ? `${Math.round(Number(r.vlm_confidence) * 100)}%` : '',
-    r.vlm_status || '',
-    r.workflow_status || '',
-    r.qa_decision || '',
-    r.priority || '',
-    r.last_photo_at ? new Date(r.last_photo_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
-    r.created_at ? new Date(r.created_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
-    r.updated_at ? new Date(r.updated_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
-  ]);
+  const data = rows.map((r) => {
+    const stepsDone = CIVIL_STEPS.filter(s => Boolean(r[s.col])).length;
+    const missingSteps = CIVIL_STEPS.filter(s => !r[s.col]).map(s => s.label);
+
+    const base = [
+      r.feature_id,
+      r.feature_type || '',
+      r.discipline || '',
+      r.zone_no != null ? r.zone_no : 'Unassigned',
+      r.pon_no != null ? r.pon_no : 'Unassigned',
+      Number(r.photo_count) || 0,
+      `${stepsDone}/7`,
+      r.vlm_confidence != null ? `${Math.round(Number(r.vlm_confidence) * 100)}%` : '',
+      r.vlm_status || '',
+      r.workflow_status || '',
+      r.qa_decision || '',
+      r.priority || '',
+    ];
+
+    if (isUnapproved) {
+      base.push(
+        String(7 - stepsDone),
+        missingSteps.join(', '),
+      );
+    }
+
+    base.push(
+      ...CIVIL_STEPS.map(s => r[s.col] ? 'Yes' : 'No'),
+      r.last_photo_at ? new Date(r.last_photo_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
+      r.created_at ? new Date(r.created_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
+      r.updated_at ? new Date(r.updated_at as string).toISOString().slice(0, 16).replace('T', ' ') : '',
+    );
+
+    return base;
+  });
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
-  ws['!cols'] = [
-    { wch: 18 }, // Feature ID
-    { wch: 14 }, // Type
-    { wch: 10 }, // Discipline
-    { wch: 6 },  // Zone
-    { wch: 6 },  // PON
-    { wch: 7 },  // Photos
-    { wch: 12 }, // AI Confidence
-    { wch: 12 }, // VLM Status
-    { wch: 14 }, // Workflow Status
-    { wch: 10 }, // QA Decision
-    { wch: 8 },  // Priority
-    { wch: 16 }, // Captured
-    { wch: 16 }, // Created
-    { wch: 16 }, // Updated
-  ];
+  // Auto-size columns
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 10) }));
+
+  const sheetName = approval === 'approved' ? 'Approved'
+    : approval === 'unapproved' ? 'Not Approved'
+    : projectName.slice(0, 31);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, projectName.slice(0, 31) || 'Export');
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Export');
 
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
@@ -88,6 +112,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const discipline = req.query.discipline as string || '';
   const dateFrom = req.query.dateFrom as string || '';
   const dateTo = req.query.dateTo as string || '';
+  const approval = req.query.approval as string || '';
 
   try {
     const conditions: string[] = ['r.project_id = $1::uuid'];
@@ -112,6 +137,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       paramIdx++;
     }
 
+    if (approval === 'approved') {
+      conditions.push(`r.workflow_status = 'approved'`);
+    } else if (approval === 'unapproved') {
+      conditions.push(`r.workflow_status != 'approved'`);
+    }
+
     const whereClause = conditions.join(' AND ');
 
     // Get project name for filename
@@ -134,6 +165,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         r.workflow_status,
         r.qa_decision,
         r.priority,
+        r.civil_step_01_before_photo,
+        r.civil_step_02_during_photo,
+        r.civil_step_03_depth_photo,
+        r.civil_step_04_end_plates,
+        r.civil_step_05_compaction,
+        r.civil_step_06_level_check,
+        r.civil_step_07_after_photo,
         r.last_photo_at,
         r.created_at,
         r.updated_at
@@ -150,13 +188,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       discipline,
       dateFrom,
       dateTo,
+      approval,
     });
 
-    const excel = toExcel(rows, projectName);
+    const excel = toExcel(rows, projectName, approval);
 
     const datePart = new Date().toISOString().slice(0, 10);
     const safeName = projectName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
-    const filename = `field-ops-${safeName}-${datePart}.xlsx`;
+    const approvalSuffix = approval ? `-${approval}` : '';
+    const filename = `field-ops-${safeName}${approvalSuffix}-${datePart}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
