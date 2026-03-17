@@ -340,6 +340,7 @@ export function ProjectDetailPage({ projectId, projectName }: ProjectDetailPageP
           dateFrom={dateFrom}
           dateTo={dateTo}
           parentDiscipline={discipline}
+          approvalFilter={approvalFilter}
         />
       )}
     </div>
