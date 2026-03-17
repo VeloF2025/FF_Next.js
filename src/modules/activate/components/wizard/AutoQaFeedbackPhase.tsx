@@ -98,9 +98,11 @@ export function AutoQaFeedbackPhase({
     setPhotos((prev) => {
       const updated = prev.map((p, i) => {
         if (i !== index) return p;
+        const isDuplicate = newStep === -1;
         const newLabel = STEP_LABELS[newStep] || `Step ${newStep}`;
         const newComment = generatePhotoComment(
-          newStep, p.tier, p.confidence, p.decision,
+          newStep, p.tier, p.confidence,
+          isDuplicate ? 'FAIL' : p.decision, // Duplicates are always FAIL
           '' // No VLM reasoning for human override
         );
         return {
@@ -108,11 +110,13 @@ export function AutoQaFeedbackPhase({
           step: newStep,
           stepLabel: newLabel,
           comment: newComment,
+          decision: isDuplicate ? 'FAIL' as const : p.decision, // Auto-FAIL duplicates
           edited: true,
         };
       });
 
       // Recalculate missing steps based on current photo assignments
+      // Duplicates (step -1) and discards (step 0) don't count as coverage
       const coveredSteps = new Set(updated.map((p) => p.step).filter((s) => s > 0));
       const newMissing: AutoQaPhotoResult[] = [];
       for (let s = 1; s <= 10; s++) {
@@ -137,6 +141,7 @@ export function AutoQaFeedbackPhase({
     if (currentPhoto) {
       const originalStep = currentPhoto.originalStep ?? currentPhoto.step;
       if (originalStep !== newStep) {
+        const isDuplicate = newStep === -1;
         fetch('/api/activate/record-correction', {
           method: 'POST',
           credentials: 'include',
@@ -147,8 +152,9 @@ export function AutoQaFeedbackPhase({
             vlmPredictedStep: originalStep,
             vlmPredictedCategory: STEP_LABELS[originalStep] || `Step ${originalStep}`,
             vlmConfidence: currentPhoto.confidence,
-            correctStep: newStep,
-            correctCategory: STEP_LABELS[newStep] || `Step ${newStep}`,
+            correctStep: isDuplicate ? 0 : newStep, // Store duplicates as step 0 in corrections table
+            correctCategory: isDuplicate ? 'Duplicate Photo' : (STEP_LABELS[newStep] || `Step ${newStep}`),
+            correctionReason: isDuplicate ? 'Photo is a duplicate of another photo in this DR' : undefined,
           }),
         }).catch((err) => {
           log.warn('Failed to record HITL correction', { error: err }, 'AutoQaFeedback');
