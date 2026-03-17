@@ -3,15 +3,23 @@
  *
  * HITL stopping point for auto-QA'd DRs. Shows AI decisions
  * with editable overrides before sending WhatsApp feedback.
+ *
+ * Features:
+ * - Click-to-enlarge photo lightbox
+ * - Step reassignment dropdown (HITL learning)
+ * - Pass/Fail toggle per photo
+ * - Editable comments
+ * - Auto-regenerating WhatsApp feedback message
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { log } from '@/lib/logger';
 import { STEP_LABELS } from '../../utils/stepMapper';
 import type { AutoQaResults, AutoQaPhotoResult } from '../../services/autoQaCommentGenerator';
-import { generateFeedbackMessage } from '../../services/autoQaCommentGenerator';
+import { generateFeedbackMessage, generatePhotoComment } from '../../services/autoQaCommentGenerator';
 import type { QaDecision } from '../../types/unified.types';
 import { PhotoCard, type EditablePhoto } from './PhotoCard';
+import { PhotoLightbox, type LightboxPhoto } from '@/components/PhotoLightbox';
 
 interface AutoQaFeedbackPhaseProps {
   dropNumber: string;
@@ -31,9 +39,9 @@ export function AutoQaFeedbackPhase({
   const [photos, setPhotos] = useState<EditablePhoto[]>(() =>
     autoQaResults.photos
       .filter((p) => !p.filename.startsWith('missing_step_'))
-      .map((p) => ({ ...p, edited: false }))
+      .map((p) => ({ ...p, edited: false, originalStep: p.step }))
   );
-  const [missingSteps] = useState(() =>
+  const [missingSteps, setMissingSteps] = useState<AutoQaPhotoResult[]>(() =>
     autoQaResults.photos.filter((p) => p.filename.startsWith('missing_step_'))
   );
   const [feedbackMessage, setFeedbackMessage] = useState(autoQaResults.feedbackMessage);
@@ -43,9 +51,20 @@ export function AutoQaFeedbackPhase({
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedbackStale, setFeedbackStale] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const passedCount = photos.filter((p) => p.decision === 'PASS').length;
   const failedCount = photos.filter((p) => p.decision === 'FAIL').length + missingSteps.length;
+
+  // Build lightbox photos array for the viewer
+  const lightboxPhotos: LightboxPhoto[] = useMemo(() =>
+    photos.map((p) => ({
+      url: `/api/activate/photo/${dropNumber}/${p.filename}`,
+      label: p.filename,
+      metadata: `${STEP_LABELS[p.step] || `Step ${p.step}`} | ${p.decision} | ${Math.round(p.confidence * 100)}% confidence`,
+    })),
+    [photos, dropNumber]
+  );
 
   const togglePhotoDecision = useCallback((index: number) => {
     setPhotos((prev) => prev.map((p, i) => {
@@ -66,6 +85,79 @@ export function AutoQaFeedbackPhase({
     }));
     setFeedbackStale(true);
   }, []);
+
+  /**
+   * Handle step reassignment from the dropdown.
+   * Updates step, label, comment, and recalculates missing steps.
+   * Records correction for HITL learning (fire-and-forget).
+   */
+  const changePhotoStep = useCallback((index: number, newStep: number) => {
+    // Capture current photo state before setState for the HITL correction call
+    const currentPhoto = photos[index];
+
+    setPhotos((prev) => {
+      const updated = prev.map((p, i) => {
+        if (i !== index) return p;
+        const newLabel = STEP_LABELS[newStep] || `Step ${newStep}`;
+        const newComment = generatePhotoComment(
+          newStep, p.tier, p.confidence, p.decision,
+          '' // No VLM reasoning for human override
+        );
+        return {
+          ...p,
+          step: newStep,
+          stepLabel: newLabel,
+          comment: newComment,
+          edited: true,
+        };
+      });
+
+      // Recalculate missing steps based on current photo assignments
+      const coveredSteps = new Set(updated.map((p) => p.step).filter((s) => s > 0));
+      const newMissing: AutoQaPhotoResult[] = [];
+      for (let s = 1; s <= 10; s++) {
+        if (!coveredSteps.has(s)) {
+          newMissing.push({
+            filename: `missing_step_${s}`,
+            step: s,
+            stepLabel: STEP_LABELS[s] || `Step ${s}`,
+            tier: 'human_required',
+            decision: 'FAIL',
+            comment: `${STEP_LABELS[s] || `Step ${s}`}: Photo missing - please upload this step`,
+            confidence: 0,
+          });
+        }
+      }
+      setMissingSteps(newMissing);
+
+      return updated;
+    });
+
+    // Record HITL correction for VLM learning (fire-and-forget, outside setState)
+    if (currentPhoto) {
+      const originalStep = currentPhoto.originalStep ?? currentPhoto.step;
+      if (originalStep !== newStep) {
+        fetch('/api/activate/record-correction', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            photoFilename: currentPhoto.filename,
+            dropNumber,
+            vlmPredictedStep: originalStep,
+            vlmPredictedCategory: STEP_LABELS[originalStep] || `Step ${originalStep}`,
+            vlmConfidence: currentPhoto.confidence,
+            correctStep: newStep,
+            correctCategory: STEP_LABELS[newStep] || `Step ${newStep}`,
+          }),
+        }).catch((err) => {
+          log.warn('Failed to record HITL correction', { error: err }, 'AutoQaFeedback');
+        });
+      }
+    }
+
+    setFeedbackStale(true);
+  }, [dropNumber, photos]);
 
   const regenerateFeedback = useCallback(() => {
     const allPhotos: AutoQaPhotoResult[] = [
@@ -91,9 +183,25 @@ export function AutoQaFeedbackPhase({
   }, [photos, missingSteps, dropNumber, decision, autoQaResults.validations]);
 
   const handleSendFeedback = async () => {
+    // Auto-regenerate if stale to ensure message matches current state
+    if (feedbackStale) {
+      regenerateFeedback();
+    }
+
     setIsSending(true);
     setError(null);
     try {
+      // Collect edits to persist alongside feedback
+      const editedPhotos = photos
+        .filter((p) => p.edited)
+        .map((p) => ({
+          filename: p.filename,
+          originalStep: p.originalStep ?? p.step,
+          newStep: p.step,
+          decision: p.decision,
+          comment: p.comment,
+        }));
+
       const response = await fetch('/api/activate/send-feedback', {
         method: 'POST',
         credentials: 'include',
@@ -102,7 +210,14 @@ export function AutoQaFeedbackPhase({
           dropNumber,
           project,
           decision,
-          message: feedbackMessage,
+          message: feedbackStale ? generateFeedbackMessage(
+            dropNumber, decision,
+            [...photos.map((p) => ({
+              filename: p.filename, step: p.step, stepLabel: p.stepLabel,
+              tier: p.tier, decision: p.decision, comment: p.comment, confidence: p.confidence,
+            })), ...missingSteps],
+            autoQaResults.validations
+          ) : feedbackMessage,
           destination: sendDestination,
           qaFindings: {
             photoCoverage: {
@@ -114,6 +229,7 @@ export function AutoQaFeedbackPhase({
             serialValidation: autoQaResults.validations.serialValidation,
             reasons: autoQaResults.validations.autoFail.reasons,
           },
+          humanEdits: editedPhotos.length > 0 ? editedPhotos : undefined,
         }),
       });
 
@@ -160,6 +276,15 @@ export function AutoQaFeedbackPhase({
 
   return (
     <div className="space-y-6">
+      {/* Photo Lightbox */}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
+
       {/* Auto-QA Banner */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-center gap-3">
@@ -211,8 +336,8 @@ export function AutoQaFeedbackPhase({
           />
           <SummaryCard
             label="Coverage"
-            icon={autoQaResults.validations.stepCoverage.complete ? '✅' : '⚠️'}
-            detail={`${autoQaResults.validations.stepCoverage.covered.length}/10`}
+            icon={missingSteps.length === 0 ? '✅' : '⚠️'}
+            detail={`${10 - missingSteps.length}/10`}
           />
           <SummaryCard
             label="Power"
@@ -227,7 +352,7 @@ export function AutoQaFeedbackPhase({
         </div>
       </div>
 
-      {/* Missing Steps */}
+      {/* Missing Steps — dynamically recalculated */}
       {missingSteps.length > 0 && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <h4 className="font-semibold text-red-700 dark:text-red-300 mb-2">Missing Steps</h4>
@@ -243,7 +368,12 @@ export function AutoQaFeedbackPhase({
 
       {/* Photo Cards */}
       <div className="space-y-4">
-        <h4 className="font-semibold text-foreground">Photo Decisions ({photos.length})</h4>
+        <h4 className="font-semibold text-foreground">
+          Photo Decisions ({photos.length})
+          <span className="text-xs font-normal text-muted-foreground ml-2">
+            Click photo to enlarge · Use dropdown to reassign step
+          </span>
+        </h4>
         {photos.map((photo, idx) => (
           <PhotoCard
             key={photo.filename}
@@ -251,6 +381,8 @@ export function AutoQaFeedbackPhase({
             dropNumber={dropNumber}
             onToggleDecision={() => togglePhotoDecision(idx)}
             onUpdateComment={(c) => updatePhotoComment(idx, c)}
+            onChangeStep={(newStep) => changePhotoStep(idx, newStep)}
+            onClickPhoto={() => setLightboxIndex(idx)}
           />
         ))}
       </div>
@@ -266,13 +398,13 @@ export function AutoQaFeedbackPhase({
               onClick={regenerateFeedback}
               className="px-3 py-1 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
             >
-              🔄 Regenerate Message
+              Regenerate Message
             </button>
           )}
         </div>
         {feedbackStale && (
           <p className="text-xs text-amber-500 mb-2">
-            Decisions changed — message may be out of date. Regenerate or edit manually.
+            Decisions changed — click Regenerate or edit manually below.
           </p>
         )}
         <textarea
@@ -333,7 +465,7 @@ export function AutoQaFeedbackPhase({
               Sending...
             </>
           ) : (
-            <>📤 Send Feedback</>
+            <>Send Feedback</>
           )}
         </button>
       </div>

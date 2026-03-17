@@ -41,7 +41,8 @@ export type ActivityEventType =
   | 'STATUS_UPDATE'
   | 'ONT_SWAP_REPORTED'
   | 'AUTO_QA_COMPLETED'
-  | 'AUTO_QA_RESET';
+  | 'AUTO_QA_RESET'
+  | 'HITL_STEP_CORRECTION';
 
 /**
  * Serial change source types
@@ -263,6 +264,11 @@ export const EVENT_METADATA: Record<ActivityEventType, { title: string; icon: st
     title: 'Auto-QA Reset',
     icon: '↩',
     iconColor: 'text-yellow-500',
+  },
+  HITL_STEP_CORRECTION: {
+    title: 'Step Correction (HITL)',
+    icon: '✏️',
+    iconColor: 'text-purple-500',
   },
 };
 
