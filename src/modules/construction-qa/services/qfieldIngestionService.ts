@@ -180,8 +180,9 @@ export async function ingestQFieldPhotos(opts: IngestOptions): Promise<IngestRes
         AND qpv.work_type IN (${wtPlaceholders})
         AND NOT EXISTS (
           SELECT 1 FROM construction_qa_photos cqp
-          WHERE cqp.storage_key = qpv.photo_key
-            AND cqp.source = 'qfield'
+          JOIN construction_qa_reviews cqr ON cqr.id = cqp.review_id
+          WHERE cqr.feature_id = qpv.feature_id
+            AND cqp.filename = regexp_replace(qpv.photo_key, '^.*/', '')
         )
     `;
 
@@ -476,6 +477,7 @@ async function insertPhoto(
       ${checklistStep},
       ${stepLabel}
     )
+    ON CONFLICT (review_id, filename) DO NOTHING
   `;
 
   return capturedAt;

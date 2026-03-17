@@ -5,7 +5,8 @@
  * then parks them at phase 5 (feedback) for human review.
  *
  * Eligible DRs: received 30+ min ago, photos categorized, data extracted,
- * not yet QA'd, and no human_required tier photos.
+ * not yet QA'd. DRs with low-confidence photos are still processed —
+ * uncertain photos are flagged for HITL review in phase 5.
  */
 
 import pool from '@/lib/db';
@@ -157,15 +158,9 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
     const tiers = assignTiers(categorizations, stepAccuracy);
     const tierSummary = buildSummary(tiers, stepAccuracy);
 
-    // Skip if any photo requires human review
-    if (tierSummary.humanRequired > 0) {
-      return makeResult(dropNumber, startTime, {
-        skipped: true,
-        skipReason: `${tierSummary.humanRequired} photo(s) require human review`,
-      });
-    }
-
-    // Build per-photo results
+    // Build per-photo results — process ALL photos including human_required
+    // Low-confidence photos are flagged as FAIL for HITL review in phase 5
+    const hasHumanRequired = tierSummary.humanRequired > 0;
     const tierMap = new Map(tiers.map((t) => [t.photo_filename, t]));
     const photoResults: AutoQaPhotoResult[] = categorizations.map((cat) => {
       const tier = tierMap.get(cat.photo_filename);
@@ -173,8 +168,15 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       const tierValue = tier?.tier || 'review_recommended';
       const confidence = cat.vlm_confidence;
 
-      // Auto-approved photos pass; review_recommended photos pass if confidence >= 0.70
-      const decision: 'PASS' | 'FAIL' = step === 0 ? 'FAIL' : 'PASS';
+      // human_required photos FAIL and get flagged for HITL step reassignment
+      // step=0 or Error always FAIL
+      // Otherwise PASS
+      let decision: 'PASS' | 'FAIL';
+      if (step === 0 || tierValue === 'human_required') {
+        decision = 'FAIL';
+      } else {
+        decision = 'PASS';
+      }
 
       return {
         filename: cat.photo_filename,
@@ -236,7 +238,9 @@ export async function processOneDR(dropNumber: string): Promise<AutoQaProcessRes
       tierSummary: {
         autoApproved: tierSummary.autoApproved,
         reviewRecommended: tierSummary.reviewRecommended,
+        humanRequired: tierSummary.humanRequired,
       },
+      hasHumanRequired,
     }, 'system:auto-qa');
 
     log.info('AutoQA', `Completed ${dropNumber}: ${decision}`, {
