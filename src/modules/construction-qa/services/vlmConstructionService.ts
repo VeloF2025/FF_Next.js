@@ -125,7 +125,9 @@ export async function validateReviewPhotos(opts: ValidateOptions): Promise<Valid
         const vlmResult = await callVlm(photoUrl, prompt, step || 0, stepDef?.label || 'Uncategorized');
 
         // If VLM classified the step (classification mode), update the step assignment
-        const classifiedStep = vlmResult.extracted_data?.classified_step;
+        // Use extracted_data.classified_step if available, otherwise use vlmResult.step
+        // (the VLM model doesn't always include classified_step in JSON but parseVlmResponse sets step)
+        const classifiedStep = vlmResult.extracted_data?.classified_step ?? vlmResult.step;
         const wasClassified = classifiedStep != null && (!photo.checklist_step || photo.checklist_step === 0);
 
         // Update photo with results
