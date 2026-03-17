@@ -12,16 +12,9 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neonConfig, Pool } from '@neondatabase/serverless';
-import ws from 'ws';
+import pool from '@/lib/db';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-
-neonConfig.webSocketConstructor = ws;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 const MAX_RETRY_ATTEMPTS = 5;
 const API_BASE = process.env.NEXTAUTH_URL || 'http://localhost:3005';
