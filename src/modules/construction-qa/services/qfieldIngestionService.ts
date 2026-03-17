@@ -343,6 +343,7 @@ async function upsertReview(
             WHERE review_id = ${existingRow.id}::uuid
           ),
           last_photo_at = NOW(),
+          vlm_status = 'pending',
           updated_at = NOW()
       WHERE id = ${existingRow.id}::uuid
     `;
