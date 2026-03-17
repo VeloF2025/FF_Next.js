@@ -62,7 +62,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(withPermission('construction-qa.qa-centre')(handler));
+// Allow cron secret OR localhost (VLM server) OR session auth
+function authWrapper(req: NextApiRequest, res: NextApiResponse) {
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  const CRON_SECRET = process.env.CRON_SECRET || '';
+  if (cronSecret === CRON_SECRET && CRON_SECRET) {
+    return handler(req, res);
+  }
+
+  // Allow localhost requests (VLM server fetching photos on same machine)
+  const remoteAddr = req.socket?.remoteAddress || '';
+  const isLocalhost = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+  if (isLocalhost && req.query.vlm === 'true') {
+    return handler(req, res);
+  }
+
+  return withAuth(withPermission('construction-qa.qa-centre')(handler))(req, res);
+}
+
+export default authWrapper;
 
 async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void> {
   const objectPath = key.startsWith('/') ? key.slice(1) : key;
