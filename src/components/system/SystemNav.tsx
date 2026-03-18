@@ -7,5 +7,5 @@ import { ModuleNav } from '../layout/ModuleNav';
 import { TABS, getActiveTabId } from './systemNavConfig';
 
 export function SystemNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="slate" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="slate" navLabel="System navigation" />;
 }

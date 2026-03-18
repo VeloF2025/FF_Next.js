@@ -8,5 +8,5 @@ import { TABS, getActiveTabId } from './sowNavConfig';
 
 // 🟢 WORKING: Thin wrapper — all rendering logic lives in ModuleNav.
 export function SOWNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="teal" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="teal" navLabel="SOW navigation" />;
 }

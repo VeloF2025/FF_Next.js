@@ -7,5 +7,5 @@ import { ModuleNav } from '../layout/ModuleNav';
 import { TABS, getActiveTabId } from './analyticsNavConfig';
 
 export function AnalyticsNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="violet" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="violet" navLabel="Analytics navigation" />;
 }
