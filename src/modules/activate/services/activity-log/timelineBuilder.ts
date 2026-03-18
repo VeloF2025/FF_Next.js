@@ -208,6 +208,7 @@ export async function getActivityTimeline(
         human_review_completed_at,
         qa_decision_at,
         qa_decision,
+        qa_decision_by,
         feedback_sent_at,
         serial_swap_detected_at,
         serial_swap_corrected_at,
@@ -334,18 +335,21 @@ export async function getActivityTimeline(
 
       // QA Decision (Final)
       if (dr.qa_decision_at && dr.qa_decision) {
+        const isAutoQa = typeof dr.qa_decision_by === 'string' && dr.qa_decision_by.startsWith('system:');
         const decisionIcon = dr.qa_decision === 'PASS' ? '✅' : dr.qa_decision === 'FAIL' ? '❌' : '🔄';
         const decisionColor = dr.qa_decision === 'PASS' ? 'text-green-500' : dr.qa_decision === 'FAIL' ? 'text-red-500' : 'text-orange-500';
         timeline.push({
           id: `dr-decision-${drNumber}`,
           timestamp: new Date(dr.qa_decision_at),
-          eventType: 'human_review_completed',
-          title: `${decisionIcon} Final Decision: ${dr.qa_decision}`,
-          description: `QA decision recorded`,
+          eventType: isAutoQa ? 'AUTO_QA_COMPLETED' : 'human_review_completed',
+          title: isAutoQa
+            ? `${decisionIcon} Auto-QA Decision: ${dr.qa_decision}`
+            : `${decisionIcon} Final Decision: ${dr.qa_decision}`,
+          description: isAutoQa ? 'Automated QA decision (pending human review)' : 'QA decision recorded',
           icon: decisionIcon,
           iconColor: decisionColor,
-          actor: 'qa_team',
-          metadata: { source: 'dr_record', decision: dr.qa_decision },
+          actor: isAutoQa ? 'system' : 'qa_team',
+          metadata: { source: 'dr_record', decision: dr.qa_decision, decidedBy: dr.qa_decision_by },
         });
       }
 

@@ -111,6 +111,8 @@ export interface DrListItem {
   autoQaProcessed: boolean;
   /** Timestamp of auto-QA processing */
   autoQaProcessedAt: string | null;
+  /** Who made the QA decision (user ID or 'system:auto-qa') */
+  qaDecisionBy: string | null;
 }
 
 export interface DashboardStats {
@@ -325,6 +327,7 @@ export async function fetchDrops(filters: DropsFilters = {}): Promise<DropsApiRe
       // Auto-QA tracking
       autoQaProcessed: drop.auto_qa_processed || false,
       autoQaProcessedAt: drop.auto_qa_processed_at || null,
+      qaDecisionBy: drop.qa_decision_by || null,
     };
   });
 
