@@ -233,7 +233,7 @@ async function getPaginatedDrops(
   } else if (filters?.reviewSource === 'ai_reviewed') {
     conditions.push('u.auto_qa_processed = true');
   } else if (filters?.reviewSource === 'human_reviewed') {
-    conditions.push('u.feedback_sent = true');
+    conditions.push("u.human_review_status = 'completed'");
   } else if (filters?.reviewSource === 'not_reviewed') {
     conditions.push('u.auto_qa_processed = false AND (u.qa_decision IS NULL)');
   }

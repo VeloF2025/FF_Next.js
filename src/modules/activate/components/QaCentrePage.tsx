@@ -813,16 +813,21 @@ function QaCentrePageContent() {
 
                   // Get QA Review Status — differentiate AI vs Human
                   const getQaReviewStatus = () => {
-                    if (drop.feedbackSent) {
-                      return drop.autoQaProcessed
-                        ? { label: 'Human ✓', color: 'bg-green-700 text-green-100' }
-                        : { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
+                    const isAutoQaDecision = drop.qaDecisionBy?.startsWith('system:');
+                    if (drop.feedbackSent && !isAutoQaDecision) {
+                      return { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
+                    }
+                    if (drop.feedbackSent && isAutoQaDecision) {
+                      return { label: 'AI Sent', color: 'bg-purple-600 text-purple-100' };
                     }
                     if (drop.autoQaProcessed) {
                       return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
-                    if (drop.qaDecision) {
+                    if (drop.qaDecision && !isAutoQaDecision) {
                       return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
+                    }
+                    if (drop.qaDecision && isAutoQaDecision) {
+                      return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
                     return { label: 'Pending', color: 'bg-gray-600 text-gray-200' };
                   };
