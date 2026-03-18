@@ -7,5 +7,5 @@ import { ModuleNav } from '../layout/ModuleNav';
 import { TABS, getActiveTabId } from './fleetNavConfig';
 
 export function FleetNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="amber" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="amber" navLabel="Fleet navigation" />;
 }

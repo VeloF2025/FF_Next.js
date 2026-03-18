@@ -7,5 +7,5 @@ import { ModuleNav } from '../layout/ModuleNav';
 import { TABS, getActiveTabId } from './accountingNavConfig';
 
 export function AccountingNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="emerald" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="emerald" navLabel="Accounting navigation" />;
 }
