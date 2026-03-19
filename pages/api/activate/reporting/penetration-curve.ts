@@ -18,9 +18,6 @@
  * - project (required when groupBy='zone' or 'pon'): project UUID or name
  * - zone (required when groupBy='pon'): zone_no integer
  * - granularity (optional): 'daily' | 'weekly' (default: 'daily')
- * - scopeMode (optional): 'full' | 'live_pons' (default: 'full')
- *     full = PO contracted_drops (or total drop count) as denominator
- *     live_pons = only drops in PONs with at least one activation
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -64,7 +61,6 @@ async function handler(
       project,
       zone,
       granularity = 'daily',
-      scopeMode = 'full',
     } = req.query;
 
     if (!dateFrom || !dateTo) {
@@ -75,8 +71,6 @@ async function handler(
     const dateToStr = String(Array.isArray(dateTo) ? dateTo[0] : dateTo);
     const groupByMode = String(Array.isArray(groupBy) ? groupBy[0] : groupBy) as PenetrationGroupBy;
     const granularityMode = String(Array.isArray(granularity) ? granularity[0] : granularity) as PenetrationGranularity;
-    const scopeModeStr = String(Array.isArray(scopeMode) ? scopeMode[0] : scopeMode) as 'full' | 'live_pons';
-    const useLivePons = scopeModeStr === 'live_pons';
 
     const projectFilter = project ? String(Array.isArray(project) ? project[0] : project) : null;
     const zoneFilter = zone ? parseInt(String(Array.isArray(zone) ? zone[0] : zone), 10) : null;
@@ -111,63 +105,35 @@ async function handler(
         : "DATE_TRUNC('week', oes.activation_date)";
 
       if (groupByMode === 'project') {
-        if (useLivePons) {
-          // Live PONs mode: scope = only drops in PONs that have at least one activation
-          scopeQuery = `
-            WITH live_pon_scope AS (
-              SELECT d.project_id, COUNT(DISTINCT d.drop_number) AS live_scope
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND COALESCE(p.project_type, 'installation') != 'internal'
-                AND EXISTS (
-                  SELECT 1 FROM oes_activations oes2
-                  JOIN drops d2 ON d2.drop_number = oes2.drop_number
-                  WHERE d2.project_id = d.project_id AND d2.pon_no = d.pon_no
-                )
-              GROUP BY d.project_id
-            )
-            SELECT
-              p.id::text AS key,
-              p.project_name AS label,
-              COALESCE(ls.live_scope, 0)::text AS total_scope
-            FROM projects p
-            LEFT JOIN live_pon_scope ls ON ls.project_id = p.id
+        // Scope: PO contracted_drops preferred; fall back to drop count if no PO exists
+        scopeQuery = `
+          WITH po_scope AS (
+            SELECT cpo.project_id, SUM(cpo.contracted_drops) AS po_scope
+            FROM client_purchase_orders cpo
+            JOIN projects p ON p.id = cpo.project_id
             WHERE p.status = 'active'
               AND COALESCE(p.project_type, 'installation') != 'internal'
-            ORDER BY p.project_name
-          `;
-        } else {
-          // Full mode: PO contracted_drops preferred; fall back to drop count
-          scopeQuery = `
-            WITH po_scope AS (
-              SELECT cpo.project_id, SUM(cpo.contracted_drops) AS po_scope
-              FROM client_purchase_orders cpo
-              JOIN projects p ON p.id = cpo.project_id
-              WHERE p.status = 'active'
-                AND COALESCE(p.project_type, 'installation') != 'internal'
-              GROUP BY cpo.project_id
-            ),
-            drop_scope AS (
-              SELECT d.project_id, COUNT(DISTINCT d.drop_number) AS drop_scope
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND COALESCE(p.project_type, 'installation') != 'internal'
-              GROUP BY d.project_id
-            )
-            SELECT
-              p.id::text AS key,
-              p.project_name AS label,
-              COALESCE(ps.po_scope, ds.drop_scope, 0)::text AS total_scope
-            FROM projects p
-            LEFT JOIN po_scope ps ON ps.project_id = p.id
-            LEFT JOIN drop_scope ds ON ds.project_id = p.id
+            GROUP BY cpo.project_id
+          ),
+          drop_scope AS (
+            SELECT d.project_id, COUNT(DISTINCT d.drop_number) AS drop_scope
+            FROM drops d
+            JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
               AND COALESCE(p.project_type, 'installation') != 'internal'
-            ORDER BY p.project_name
-          `;
-        }
+            GROUP BY d.project_id
+          )
+          SELECT
+            p.id::text AS key,
+            p.project_name AS label,
+            COALESCE(ps.po_scope, ds.drop_scope, 0)::text AS total_scope
+          FROM projects p
+          LEFT JOIN po_scope ps ON ps.project_id = p.id
+          LEFT JOIN drop_scope ds ON ds.project_id = p.id
+          WHERE p.status = 'active'
+            AND COALESCE(p.project_type, 'installation') != 'internal'
+          ORDER BY p.project_name
+        `;
 
         timeSeriesQuery = `
           SELECT
@@ -186,13 +152,22 @@ async function handler(
         timeSeriesParams.push(dateToStr);
 
       } else if (groupByMode === 'zone') {
-        if (useLivePons) {
-          // Live PONs mode: only drops in PONs with at least one activation per zone
-          scopeQuery = `
-            SELECT
-              'zone-' || d.zone_no::text AS key,
-              'Zone ' || d.zone_no::text AS label,
-              COUNT(DISTINCT d.drop_number)::text AS total_scope
+        // Zone scope: pro-rate project PO contracted_drops by zone's share of total drops.
+        // Falls back to zone drop count if project has no PO.
+        scopeQuery = `
+          WITH project_po AS (
+            SELECT SUM(cpo.contracted_drops) AS po_scope
+            FROM client_purchase_orders cpo
+            JOIN projects p ON p.id = cpo.project_id
+            WHERE p.status = 'active'
+              AND (
+                $1::text IS NULL
+                OR ($2::boolean = true AND cpo.project_id = $1::uuid)
+                OR ($2::boolean = false AND p.project_name = $1::text)
+              )
+          ),
+          project_totals AS (
+            SELECT COUNT(DISTINCT d.drop_number) AS total_drops
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
@@ -201,69 +176,36 @@ async function handler(
                 OR ($2::boolean = true AND d.project_id = $1::uuid)
                 OR ($2::boolean = false AND p.project_name = $1::text)
               )
-              AND EXISTS (
-                SELECT 1 FROM oes_activations oes2
-                JOIN drops d2 ON d2.drop_number = oes2.drop_number
-                WHERE d2.project_id = d.project_id AND d2.pon_no = d.pon_no
+          ),
+          zone_counts AS (
+            SELECT
+              d.zone_no,
+              COUNT(DISTINCT d.drop_number) AS zone_drops
+            FROM drops d
+            JOIN projects p ON p.id = d.project_id
+            WHERE p.status = 'active'
+              AND (
+                $1::text IS NULL
+                OR ($2::boolean = true AND d.project_id = $1::uuid)
+                OR ($2::boolean = false AND p.project_name = $1::text)
               )
             GROUP BY d.zone_no
-            ORDER BY d.zone_no
-          `;
-        } else {
-          // Full mode: pro-rate project PO contracted_drops by zone's share of total drops
-          scopeQuery = `
-            WITH project_po AS (
-              SELECT SUM(cpo.contracted_drops) AS po_scope
-              FROM client_purchase_orders cpo
-              JOIN projects p ON p.id = cpo.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND cpo.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-            ),
-            project_totals AS (
-              SELECT COUNT(DISTINCT d.drop_number) AS total_drops
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND d.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-            ),
-            zone_counts AS (
-              SELECT
-                d.zone_no,
-                COUNT(DISTINCT d.drop_number) AS zone_drops
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND d.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-              GROUP BY d.zone_no
-            )
-            SELECT
-              'zone-' || zc.zone_no::text AS key,
-              'Zone ' || zc.zone_no::text AS label,
-              ROUND(
-                CASE
-                  WHEN pp.po_scope IS NOT NULL AND pt.total_drops > 0
-                    THEN pp.po_scope::numeric * zc.zone_drops::numeric / pt.total_drops
-                  ELSE zc.zone_drops::numeric
-                END
-              )::text AS total_scope
-            FROM zone_counts zc
-            CROSS JOIN project_po pp
-            CROSS JOIN project_totals pt
-            ORDER BY zc.zone_no
-          `;
-        }
+          )
+          SELECT
+            'zone-' || zc.zone_no::text AS key,
+            'Zone ' || zc.zone_no::text AS label,
+            ROUND(
+              CASE
+                WHEN pp.po_scope IS NOT NULL AND pt.total_drops > 0
+                  THEN pp.po_scope::numeric * zc.zone_drops::numeric / pt.total_drops
+                ELSE zc.zone_drops::numeric
+              END
+            )::text AS total_scope
+          FROM zone_counts zc
+          CROSS JOIN project_po pp
+          CROSS JOIN project_totals pt
+          ORDER BY zc.zone_no
+        `;
         scopeParams.push(projectFilter, isUuid);
 
         timeSeriesQuery = `
@@ -287,13 +229,34 @@ async function handler(
         timeSeriesParams.push(dateToStr, projectFilter, isUuid);
 
       } else if (groupByMode === 'pon') {
-        if (useLivePons) {
-          // Live PONs mode: only drops in PONs with at least one activation
-          scopeQuery = `
+        // PON scope: pro-rate project PO contracted_drops by PON's share of total drops.
+        scopeQuery = `
+          WITH project_po AS (
+            SELECT SUM(cpo.contracted_drops) AS po_scope
+            FROM client_purchase_orders cpo
+            JOIN projects p ON p.id = cpo.project_id
+            WHERE p.status = 'active'
+              AND (
+                $1::text IS NULL
+                OR ($2::boolean = true AND cpo.project_id = $1::uuid)
+                OR ($2::boolean = false AND p.project_name = $1::text)
+              )
+          ),
+          project_totals AS (
+            SELECT COUNT(DISTINCT d.drop_number) AS total_drops
+            FROM drops d
+            JOIN projects p ON p.id = d.project_id
+            WHERE p.status = 'active'
+              AND (
+                $1::text IS NULL
+                OR ($2::boolean = true AND d.project_id = $1::uuid)
+                OR ($2::boolean = false AND p.project_name = $1::text)
+              )
+          ),
+          pon_counts AS (
             SELECT
-              'pon-' || d.pon_no::text AS key,
-              'PON ' || d.pon_no::text AS label,
-              COUNT(DISTINCT d.drop_number)::text AS total_scope
+              d.pon_no,
+              COUNT(DISTINCT d.drop_number) AS pon_drops
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
@@ -303,70 +266,23 @@ async function handler(
                 OR ($2::boolean = false AND p.project_name = $1::text)
               )
               AND d.zone_no = $3::int
-              AND EXISTS (
-                SELECT 1 FROM oes_activations oes2
-                JOIN drops d2 ON d2.drop_number = oes2.drop_number
-                WHERE d2.project_id = d.project_id AND d2.pon_no = d.pon_no
-              )
             GROUP BY d.pon_no
-            ORDER BY d.pon_no
-          `;
-        } else {
-          // Full mode: pro-rate project PO contracted_drops by PON's share
-          scopeQuery = `
-            WITH project_po AS (
-              SELECT SUM(cpo.contracted_drops) AS po_scope
-              FROM client_purchase_orders cpo
-              JOIN projects p ON p.id = cpo.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND cpo.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-            ),
-            project_totals AS (
-              SELECT COUNT(DISTINCT d.drop_number) AS total_drops
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND d.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-            ),
-            pon_counts AS (
-              SELECT
-                d.pon_no,
-                COUNT(DISTINCT d.drop_number) AS pon_drops
-              FROM drops d
-              JOIN projects p ON p.id = d.project_id
-              WHERE p.status = 'active'
-                AND (
-                  $1::text IS NULL
-                  OR ($2::boolean = true AND d.project_id = $1::uuid)
-                  OR ($2::boolean = false AND p.project_name = $1::text)
-                )
-                AND d.zone_no = $3::int
-              GROUP BY d.pon_no
-            )
-            SELECT
-              'pon-' || pc.pon_no::text AS key,
-              'PON ' || pc.pon_no::text AS label,
-              ROUND(
-                CASE
-                  WHEN pp.po_scope IS NOT NULL AND pt.total_drops > 0
-                    THEN pp.po_scope::numeric * pc.pon_drops::numeric / pt.total_drops
-                  ELSE pc.pon_drops::numeric
-                END
-              )::text AS total_scope
-            FROM pon_counts pc
-            CROSS JOIN project_po pp
-            CROSS JOIN project_totals pt
-            ORDER BY pc.pon_no
-          `;
-        }
+          )
+          SELECT
+            'pon-' || pc.pon_no::text AS key,
+            'PON ' || pc.pon_no::text AS label,
+            ROUND(
+              CASE
+                WHEN pp.po_scope IS NOT NULL AND pt.total_drops > 0
+                  THEN pp.po_scope::numeric * pc.pon_drops::numeric / pt.total_drops
+                ELSE pc.pon_drops::numeric
+              END
+            )::text AS total_scope
+          FROM pon_counts pc
+          CROSS JOIN project_po pp
+          CROSS JOIN project_totals pt
+          ORDER BY pc.pon_no
+        `;
         scopeParams.push(projectFilter, isUuid, zoneFilter);
 
         timeSeriesQuery = `

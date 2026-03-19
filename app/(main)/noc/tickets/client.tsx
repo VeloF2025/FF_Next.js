@@ -20,7 +20,6 @@ import { useSearchParams } from 'next/navigation';
 import { ModulePage } from '@/components/module-page';
 import { nocConfig } from '@/modules/navigation';
 import { TicketList } from '@/modules/noc/components/TicketList/TicketList';
-import { TicketGridView } from '@/modules/noc/components/TicketList/TicketGridView';
 import { KanbanBoard } from '@/modules/noc/components/KanbanBoard';
 import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,7 +27,7 @@ import Link from 'next/link';
 import { Search, Users, User, Filter, X, Calendar } from 'lucide-react';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
-type ViewMode = 'table' | 'kanban' | 'grid';
+type ViewMode = 'table' | 'kanban';
 type TicketScope = 'all' | 'my_tickets' | 'my_team';
 
 // Icons for view toggle
@@ -41,12 +40,6 @@ const TableIcon = () => (
 const KanbanIcon = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-  </svg>
-);
-
-const GridIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18M3 9h18M3 13h18M3 17h18M8 5v14M16 5v14" />
   </svg>
 );
 
@@ -67,7 +60,7 @@ export default function TicketsListPageClient() {
   // Load saved preferences from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('ticketsViewMode') as ViewMode | null;
-    if (saved && (saved === 'table' || saved === 'kanban' || saved === 'grid')) {
+    if (saved && (saved === 'table' || saved === 'kanban')) {
       setViewMode(saved);
     }
     const savedScope = localStorage.getItem('ticketsScope') as TicketScope | null;
@@ -179,7 +172,7 @@ export default function TicketsListPageClient() {
             </div>
 
             {/* Search Bar */}
-            {(viewMode === 'kanban' || viewMode === 'grid') && (
+            {viewMode === 'kanban' && (
               <div className="relative max-w-md flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
                 <input
@@ -304,20 +297,6 @@ export default function TicketsListPageClient() {
                 <KanbanIcon />
                 <span className="hidden sm:inline">Kanban</span>
               </button>
-              <button
-                onClick={() => handleViewChange('grid')}
-                className={`
-                  flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all
-                  ${viewMode === 'grid'
-                    ? 'bg-[var(--ff-primary-500)] text-white shadow-sm'
-                    : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
-                  }
-                `}
-                title="Grid View"
-              >
-                <GridIcon />
-                <span className="hidden sm:inline">Grid</span>
-              </button>
             </div>
 
             {/* Create Ticket Button */}
@@ -334,8 +313,6 @@ export default function TicketsListPageClient() {
         <div className="flex-1">
           {viewMode === 'table' ? (
             <TicketList initialFilters={filters} />
-          ) : viewMode === 'grid' ? (
-            <TicketGridView initialFilters={filters} />
           ) : (
             <KanbanBoard filters={filters} />
           )}
