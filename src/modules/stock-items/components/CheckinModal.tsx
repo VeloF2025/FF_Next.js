@@ -1,9 +1,12 @@
 /**
  * CheckinModal - Check in a previously checked-out serial unit
+ *
+ * Supports condition photos at check-in to document the returned state.
  */
 
 import { useState } from 'react';
 import { X, Loader2, AlertCircle, Clock, MapPin, User } from 'lucide-react';
+import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
 
 interface CheckoutInfo {
   id: string;
@@ -24,6 +27,7 @@ interface CheckinModalProps {
 
 export function CheckinModal({ checkout, itemName, onClose, onSuccess }: CheckinModalProps) {
   const [conditionNotes, setConditionNotes] = useState('');
+  const [conditionPhotos, setConditionPhotos] = useState<CapturedPhoto[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +37,17 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (conditionPhotos.some(p => p.uploading)) {
+      setError('Please wait for photos to finish uploading');
+      return;
+    }
+
     setIsSubmitting(true);
+
+    const photoUrls = conditionPhotos
+      .map(p => p.storageUrl)
+      .filter((url): url is string => !!url);
 
     try {
       const res = await fetch('/api/stock/checkin', {
@@ -42,6 +56,7 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
         body: JSON.stringify({
           checkoutId: checkout.id,
           conditionNotes: conditionNotes || null,
+          conditionPhotoUrls: photoUrls.length > 0 ? photoUrls : undefined,
         }),
       });
 
@@ -60,7 +75,7 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] w-full max-w-md">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] w-full max-w-md max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ff-border-light)]">
           <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Check In Tool</h3>
@@ -69,7 +84,7 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* Checkout info */}
           <div className="space-y-2 p-3 bg-[var(--ff-bg-tertiary)] rounded-lg">
             <div>
@@ -120,6 +135,16 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
             </div>
           )}
 
+          {/* Condition Photos */}
+          <ConditionPhotoCapture
+            photos={conditionPhotos}
+            onChange={setConditionPhotos}
+            storageCategory="checkin-photos"
+            maxPhotos={4}
+            label="Condition at Return"
+            helperText="Photograph the equipment's condition when returned"
+          />
+
           {/* Condition notes */}
           <div>
             <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
@@ -145,7 +170,7 @@ export function CheckinModal({ checkout, itemName, onClose, onSuccess }: Checkin
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || conditionPhotos.some(p => p.uploading)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
             >
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
