@@ -112,6 +112,7 @@ async function handler(
             FROM client_purchase_orders cpo
             JOIN projects p ON p.id = cpo.project_id
             WHERE p.status = 'active'
+              AND COALESCE(p.project_type, 'installation') != 'internal'
             GROUP BY cpo.project_id
           ),
           drop_scope AS (
@@ -119,6 +120,7 @@ async function handler(
             FROM drops d
             JOIN projects p ON p.id = d.project_id
             WHERE p.status = 'active'
+              AND COALESCE(p.project_type, 'installation') != 'internal'
             GROUP BY d.project_id
           )
           SELECT
@@ -129,6 +131,7 @@ async function handler(
           LEFT JOIN po_scope ps ON ps.project_id = p.id
           LEFT JOIN drop_scope ds ON ds.project_id = p.id
           WHERE p.status = 'active'
+            AND COALESCE(p.project_type, 'installation') != 'internal'
           ORDER BY p.project_name
         `;
 
@@ -141,6 +144,7 @@ async function handler(
           JOIN drops d ON d.drop_number = oes.drop_number
           JOIN projects p ON p.id = d.project_id
           WHERE p.status = 'active'
+            AND COALESCE(p.project_type, 'installation') != 'internal'
             AND oes.activation_date <= $1::date
           GROUP BY p.id, ${groupDateExpr}
           ORDER BY p.id, ${groupDateExpr}

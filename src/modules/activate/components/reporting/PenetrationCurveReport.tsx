@@ -80,6 +80,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   });
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('daily');
   const [hideZero, setHideZero] = useState(true);
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
 
   // Fetch data
   useEffect(() => {
@@ -140,16 +141,19 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   // Transform API date-based data into elapsed-time-based chart data.
   // Each series independently starts at elapsed=0 (its own first activation date).
   // Weekly mode groups into week buckets (elapsed = weeks since first activation).
-  const { chartData, maxElapsed } = useMemo(() => {
-    if (!data || data.series.length === 0) return { chartData: [], maxElapsed: 0 };
+  const { chartData, maxElapsed, maxPenetration } = useMemo(() => {
+    if (!data || data.series.length === 0) return { chartData: [], maxElapsed: 0, maxPenetration: 100 };
 
     // Build per-series elapsed→penetration maps
     const seriesElapsedMaps = new Map<string, Map<number, number>>();
     let globalMax = 0;
+    let globalMaxPct = 0;
 
-    const visibleSeries = hideZero
-      ? data.series.filter(s => s.points.length > 0 && (s.points[s.points.length - 1]?.penetration_pct ?? 0) > 0)
-      : data.series;
+    const visibleSeries = data.series.filter(s => {
+      if (hiddenSeries.has(s.key)) return false;
+      if (hideZero && (s.points.length === 0 || (s.points[s.points.length - 1]?.penetration_pct ?? 0) === 0)) return false;
+      return true;
+    });
 
     for (const series of visibleSeries) {
       if (series.points.length === 0) continue;
@@ -169,6 +173,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         if (point.penetration_pct > existing) {
           elapsedMap.set(elapsed, point.penetration_pct);
         }
+        if (point.penetration_pct > globalMaxPct) globalMaxPct = point.penetration_pct;
         if (elapsed > globalMax) globalMax = elapsed;
       }
 
@@ -195,8 +200,10 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
       return point;
     });
 
-    return { chartData: chartPoints, maxElapsed: globalMax };
-  }, [data, granularity]);
+    // Auto-scale Y ceiling: round up to nearest 10%, min 20%, max 100%
+    const yCeiling = Math.min(100, Math.max(20, Math.ceil((globalMaxPct + 5) / 10) * 10));
+    return { chartData: chartPoints, maxElapsed: globalMax, maxPenetration: yCeiling };
+  }, [data, granularity, hideZero, hiddenSeries]);
 
   // Smart X-axis ticks for elapsed time
   const xAxisTicks = useMemo(() => {
@@ -251,7 +258,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         ))}
         {sorted.length > 0 && (
           <div className="mt-2 pt-2 border-t border-border text-xs text-muted-foreground text-center" aria-live="polite">
-            {groupBy !== 'pon' ? '↓ Click series to drill down' : 'PON level (deepest)'}
+            {groupBy !== 'pon' ? '↓ Click badge below to drill down' : 'PON level (deepest)'}
           </div>
         )}
       </div>
@@ -344,9 +351,9 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         {/* Controls */}
         <div className="flex items-center gap-3 flex-wrap">
           {canDrillDown && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground/70 italic">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground/80 italic">
               <MousePointerClick className="h-3.5 w-3.5" aria-hidden="true" />
-              Click a series to drill down
+              Click legend to toggle · Click badge to drill down
             </span>
           )}
           {groupBy === 'pon' && (
@@ -400,32 +407,34 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         </p>
         <ResponsiveContainer width="100%" height="92%">
           <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
             <XAxis
               dataKey="elapsed"
               type="number"
               domain={[0, maxElapsed]}
               ticks={xAxisTicks}
               tickFormatter={formatXTick}
-              stroke="var(--muted-foreground)"
-              tick={{ fontSize: 11 }}
+              stroke="#9ca3af"
+              tick={{ fontSize: 11, fill: '#9ca3af' }}
               tickLine={false}
               label={{
                 value: xAxisLabel,
                 position: 'insideBottom',
                 offset: -12,
-                style: { fontSize: 11, fill: 'var(--muted-foreground)' },
+                style: { fontSize: 11, fill: '#9ca3af' },
               }}
             />
             <YAxis
-              domain={[0, 100]}
+              domain={[0, maxPenetration]}
               tickFormatter={(v: number) => `${v}%`}
-              stroke="var(--muted-foreground)"
-              tick={{ fontSize: 11 }}
+              stroke="#9ca3af"
+              tick={{ fontSize: 11, fill: '#9ca3af' }}
               tickLine={false}
               width={40}
             />
-            <ReferenceLine y={100} stroke="#10b981" strokeDasharray="4 2" strokeOpacity={0.4} />
+            {maxPenetration === 100 && (
+              <ReferenceLine y={100} stroke="#6b7280" strokeDasharray="4 2" strokeOpacity={0.3} />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend
               verticalAlign="top"
@@ -434,13 +443,26 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               iconSize={8}
               wrapperStyle={{
                 paddingBottom: '8px',
-                cursor: canDrillDown ? 'pointer' : 'default',
+                cursor: 'pointer',
                 fontSize: '12px',
               }}
+              formatter={(value: string, entry: { dataKey?: string }) => {
+                const isHidden = hiddenSeries.has(entry.dataKey ?? '');
+                return (
+                  <span style={{ color: isHidden ? '#6b7280' : '#d1d5db', textDecoration: isHidden ? 'line-through' : 'none' }}>
+                    {value}
+                  </span>
+                );
+              }}
               onClick={(e) => {
-                if (!canDrillDown) return;
-                const series = data.series.find(s => s.key === e.dataKey);
-                if (series) handleDrillDown(series);
+                const key = e.dataKey as string;
+                if (!key) return;
+                setHiddenSeries(prev => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key);
+                  else next.add(key);
+                  return next;
+                });
               }}
             />
             {data.series.map((series, idx) => (
@@ -455,6 +477,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 activeDot={{ r: 4, strokeWidth: 0 }}
                 isAnimationActive={false}
                 connectNulls={true}
+                hide={hiddenSeries.has(series.key)}
               />
             ))}
           </LineChart>
@@ -463,7 +486,11 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
 
       {/* Summary badges — clickable for drill-down */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {(hideZero ? data.series.filter(s => s.points.length > 0 && (s.points[s.points.length - 1]?.penetration_pct ?? 0) > 0) : data.series).map((series, idx) => {
+        {data.series.filter(s => {
+          if (hiddenSeries.has(s.key)) return false;
+          if (hideZero && (s.points.length === 0 || (s.points[s.points.length - 1]?.penetration_pct ?? 0) === 0)) return false;
+          return true;
+        }).map((series, idx) => {
           const lastPoint = series.points[series.points.length - 1];
           const penetration = lastPoint?.penetration_pct ?? 0;
           const color = COLORS[idx % COLORS.length];
@@ -502,7 +529,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 {(lastPoint?.cumulative ?? 0).toLocaleString()} / {series.total_scope.toLocaleString()}
               </p>
               {daysActive > 0 && (
-                <p className="text-xs text-muted-foreground/60 mt-0.5">
+                <p className="text-xs text-muted-foreground/80 mt-0.5">
                   {daysActive}d active
                 </p>
               )}
