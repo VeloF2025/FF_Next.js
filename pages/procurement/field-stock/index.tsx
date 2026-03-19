@@ -10,6 +10,7 @@ import { AppLayout } from '@/components/layout';
 import {
   FieldStockDashboard,
   LocationList,
+  CreateLocationModal,
   SerialScanner,
   PickingList,
   CreatePickingForm,
@@ -106,6 +107,22 @@ const tabs: TabConfig[] = [
     description: 'Stock quantity adjustments'
   },
 ];
+
+/** Locations tab with create modal */
+function LocationsTab() {
+  const [showCreate, setShowCreate] = useState(false);
+  const { createLocation } = useLocations({ autoFetch: false });
+  return (
+    <>
+      <LocationList onCreateClick={() => setShowCreate(true)} />
+      <CreateLocationModal
+        isOpen={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={async (input) => { await createLocation(input); }}
+      />
+    </>
+  );
+}
 
 /** Transfers tab with list/create toggle */
 function PickingsTab() {
@@ -230,7 +247,7 @@ export default function FieldStockPage() {
       case 'dashboard':
         return <FieldStockDashboard onNavigate={(tab) => setActiveTab(tab as TabType)} />;
       case 'locations':
-        return <LocationList />;
+        return <LocationsTab />;
       case 'serials':
         return (
           <div className="space-y-6">

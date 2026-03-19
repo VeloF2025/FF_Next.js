@@ -8,6 +8,7 @@ export { FieldStockDashboard } from './dashboard/FieldStockDashboard';
 
 // Locations
 export { LocationList } from './locations/LocationList';
+export { CreateLocationModal } from './locations/CreateLocationModal';
 
 // Serials
 export { SerialScanner } from './serials/SerialScanner';
