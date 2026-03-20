@@ -16,6 +16,7 @@ import type {
   FiberBudgetCategoryCode,
 } from '@/types/procurement/material-catalog.types';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 const DATABASE_URL = process.env.DATABASE_URL!;
 
@@ -180,6 +181,7 @@ async function handleGet(
 
     return apiResponse.success(res, response);
   } catch (error) {
+    log.error('budget-items', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.databaseError(res, error, 'Failed to fetch budget items');
   }
 }
@@ -299,6 +301,7 @@ async function handlePost(
 
     return apiResponse.created(res, item, 'Budget item created successfully');
   } catch (error) {
+    log.error('budget-items', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.databaseError(res, error, 'Failed to create budget item');
   }
 }

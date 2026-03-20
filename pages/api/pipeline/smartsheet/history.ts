@@ -30,6 +30,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       count: history.length,
     });
   } catch (error) {
+   log.error('smartsheet-history', { error: error instanceof Error ? error.message : String(error) });
+    log.error('smartsheet-history', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

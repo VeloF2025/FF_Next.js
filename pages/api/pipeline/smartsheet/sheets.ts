@@ -21,6 +21,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       count: sheets.length,
     });
   } catch (error) {
+   log.error('smartsheet-sheets', { error: error instanceof Error ? error.message : String(error) });
+    log.error('smartsheet-sheets', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

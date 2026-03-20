@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, withRole } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -104,6 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       records: result.rows,
     });
   } catch (error) {
+    log.error('olt-report-displaced-report', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

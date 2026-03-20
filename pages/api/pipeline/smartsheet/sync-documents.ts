@@ -28,6 +28,8 @@ async function handler(
 
     return apiResponse.success(res, result);
   } catch (error) {
+   log.error('smartsheet-sync-documents', { error: error instanceof Error ? error.message : String(error) });
+    log.error('smartsheet-sync-docs', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

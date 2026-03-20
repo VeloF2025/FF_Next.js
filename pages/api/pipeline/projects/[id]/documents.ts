@@ -10,6 +10,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/neon';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: NextApiRequest,
@@ -103,6 +104,7 @@ async function handleGet(
       total: documents.length,
     });
   } catch (error) {
+    log.error('[id]-documents', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }
@@ -181,6 +183,7 @@ async function handlePost(
 
     return apiResponse.success(res, { id: result[0].id }, 201);
   } catch (error) {
+    log.error('[id]-documents', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }
@@ -217,6 +220,7 @@ async function handlePatch(
 
     return apiResponse.success(res, result[0]);
   } catch (error) {
+    log.error('[id]-documents', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }
@@ -247,6 +251,7 @@ async function handleDelete(
 
     return apiResponse.success(res, { deleted: true });
   } catch (error) {
+    log.error('[id]-documents', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

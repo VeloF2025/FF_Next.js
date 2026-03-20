@@ -48,6 +48,8 @@ async function handler(
       }
     });
   } catch (error) {
+   log.error('qcontact-debug-case', { error: error instanceof Error ? error.message : String(error) });
+    log.error('qcontact-debug', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

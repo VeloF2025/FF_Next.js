@@ -6,6 +6,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 const VLM_URL = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -41,6 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             timestamp: new Date().toISOString(),
         });
     } catch (error) {
+        log.error('dr-dashboard-vlm-status', { error: error instanceof Error ? error.message : String(error) });
         return res.status(200).json({
             status: 'offline',
             message: 'Cannot connect to VLM service',

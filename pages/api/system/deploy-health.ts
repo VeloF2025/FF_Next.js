@@ -22,6 +22,7 @@ interface DeployHealthResponse {
   systemd: SystemdService[]
   logs: string[]
   github: { configured: false; message: string } | { configured: true; runs: unknown[] }
+import { log } from '@/lib/logger';
   generatedAt: string
 }
 
