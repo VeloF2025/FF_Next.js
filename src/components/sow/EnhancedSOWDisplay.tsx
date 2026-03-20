@@ -28,6 +28,8 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
   const totalPoles = summary?.totalPoles ?? poles.length;
   const totalDrops = summary?.totalDrops ?? drops.length;
   const totalFibre = summary?.totalFibre ?? fibre.length;
+  const totalZones = summary?.totalZones ?? 0;
+  const totalPons = summary?.totalPons ?? 0;
 
   const hasData = totalPoles > 0 || totalDrops > 0 || totalFibre > 0;
 
@@ -67,6 +69,8 @@ export function EnhancedSOWDisplay({ projectId }: EnhancedSOWDisplayProps) {
               polesCount={totalPoles}
               dropsCount={totalDrops}
               fibreCount={totalFibre}
+              zonesCount={totalZones}
+              ponsCount={totalPons}
             />
 
             <SOWDataStatus

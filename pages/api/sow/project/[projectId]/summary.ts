@@ -30,10 +30,12 @@ async function handler(
     }
 
     // Get counts from main tables
-    const [poleCount, dropCount, fibreCount] = await Promise.all([
+    const [poleCount, dropCount, fibreCount, zoneCount, ponCount] = await Promise.all([
       sql`SELECT COUNT(*) as count FROM poles WHERE project_id = ${projectId}`,
       sql`SELECT COUNT(*) as count FROM drops WHERE project_id = ${projectId}`,
-      sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`
+      sql`SELECT COUNT(*) as count FROM fibre_segments WHERE project_id = ${projectId}`,
+      sql`SELECT COUNT(DISTINCT zone_no) as count FROM drops WHERE project_id = ${projectId} AND zone_no IS NOT NULL`,
+      sql`SELECT COUNT(DISTINCT pon_no) as count FROM drops WHERE project_id = ${projectId} AND pon_no IS NOT NULL`
     ]);
 
     // Get activation count
@@ -51,6 +53,8 @@ async function handler(
         totalPoles: parseInt(poleCount[0]?.count || '0'),
         totalDrops: parseInt(dropCount[0]?.count || '0'),
         totalFibre: parseInt(fibreCount[0]?.count || '0'),
+        totalZones: parseInt(zoneCount[0]?.count || '0'),
+        totalPons: parseInt(ponCount[0]?.count || '0'),
         totalActivated: parseInt(activationCount[0]?.count || '0'),
         lastUpdated: new Date().toISOString()
       }
