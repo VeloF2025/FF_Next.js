@@ -121,7 +121,7 @@ export default function TicketsListPageClient() {
       ticket_type: (filterType || undefined) as any,
       source: (filterSource || undefined) as any,
       assigned_to: ticketScope === 'my_tickets' && currentUser?.id ? currentUser.id : undefined,
-      assigned_team_id: ticketScope === 'my_team' ? (teamIds.length > 0 ? teamIds[0] : 'NO_TEAM') : undefined,
+      assigned_team_id: ticketScope === 'my_team' ? (teamIds.length > 0 ? teamIds[0] : '00000000-0000-0000-0000-000000000000') : undefined,
     };
     if (dateRange.created_after) f.created_after = dateRange.created_after;
     if (dateRange.created_before) f.created_before = dateRange.created_before;
