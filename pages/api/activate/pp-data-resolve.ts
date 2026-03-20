@@ -441,7 +441,12 @@ async function run1MapLookup(): Promise<{
           method: 'per_serial_search',
         }), trackerId]
       );
-    } catch { /* non-fatal */ }
+    } catch (err) {
+      logger.warn('Failed to update data_sync_operations tracking (non-fatal)', {
+        error: err instanceof Error ? err.message : String(err),
+        trackerId,
+      });
+    }
   };
 
   // Process serials sequentially with rate limiting
