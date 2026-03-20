@@ -137,8 +137,10 @@ class POService {
 
   async getPOItems(poId: string): Promise<POItem[]> {
     const po = await this.getPOById(poId);
-    if (!po || !(po as any).items) return [];
-    return (po as any).items;
+    if (!po) return [];
+    // mapApiToFullPO appends items; cast through internal shape
+    const poWithItems = po as unknown as { items?: POItem[] };
+    return poWithItems.items ?? [];
   }
 
   async createPO(data: CreatePORequest): Promise<PurchaseOrder> {
@@ -158,7 +160,7 @@ class POService {
         paymentTerms: sanitized.paymentTerms,
         deliveryTerms: sanitized.deliveryTerms,
         notes: sanitized.notes,
-        items: sanitized.items?.map((item: any) => ({
+        items: sanitized.items?.map((item: CreatePORequest['items'][number]) => ({
           itemCode: item.itemCode,
           itemDescription: item.description,
           quantity: item.quantity,
@@ -314,13 +316,13 @@ class POService {
       deliveredBy: deliveryData.deliveredBy,
       receivedBy: deliveryData.receivedBy,
       deliveryDate: new Date(),
-      items: deliveryData.items.map((item: any) => ({
+      items: deliveryData.items.map((item) => ({
         poItemId: item.poItemId,
         quantityDelivered: item.quantity,
         quantityAccepted: item.quantity,
         quantityRejected: 0,
-      })) as any,
-      status: 'pending' as any,
+      })),
+      status: 'pending' as PODeliveryNote['status'],
       deliveryNotes: deliveryData.notes,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -356,12 +358,12 @@ class POService {
       invoiceAmount: invoiceData.invoiceAmount,
       taxAmount: invoiceData.taxAmount,
       totalAmount: invoiceData.totalAmount,
-      matchingStatus: 'not_matched' as any,
-      items: invoiceData.items.map((item: any) => ({
+      matchingStatus: 'not_matched' as POInvoice['matchingStatus'],
+      items: invoiceData.items.map((item) => ({
         poItemId: item.poItemId,
         quantityInvoiced: item.quantity,
         amountInvoiced: item.amount,
-      })) as any,
+      })),
       invoiceDate: new Date(invoiceData.invoiceDate),
       dueDate: new Date(invoiceData.dueDate),
       receivedDate: new Date(),
@@ -398,13 +400,13 @@ class POService {
       amendmentNumber: (po.amendmentCount || 0) + 1,
       reason: amendmentData.reason,
       description: amendmentData.description,
-      changeType: amendmentData.changeType as any,
-      changes: amendmentData.changes as any,
+      changeType: amendmentData.changeType as POAmendment['changeType'],
+      changes: amendmentData.changes,
       previousTotal: po.totalAmount,
       newTotal: amendmentData.newTotal,
       changeAmount: amendmentData.newTotal - po.totalAmount,
       approvalStatus: POApprovalStatus.PENDING,
-      status: 'draft' as any,
+      status: 'draft' as POAmendment['status'],
       createdBy: 'current-user',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -488,7 +490,7 @@ class POService {
       quoteId,
       supplierId: quote.data.supplierId,
       title: `PO from Quote ${quote.data.quoteNumber}`,
-      orderType: 'goods' as any,
+      orderType: 'goods' as CreatePORequest['orderType'],
       paymentTerms: quote.data.paymentTerms || 'Net 30',
       deliveryTerms: quote.data.deliveryTerms || 'DDP',
       deliveryAddress: {
@@ -544,14 +546,14 @@ class POService {
     };
   }
 
-  private mapApiToFullPO(api: POApiDetail): PurchaseOrder & { items: any } {
+  private mapApiToFullPO(api: POApiDetail): PurchaseOrder & { items: POItem[] } {
     return {
       id: api.id,
       projectId: api.projectId || '',
       poNumber: api.poNumber,
-      supplierId: String(api.supplierId) as any,
+      supplierId: String(api.supplierId) as PurchaseOrder['supplierId'],
       title: `PO ${api.poNumber}`,
-      orderType: 'goods' as any,
+      orderType: 'goods' as PurchaseOrder['orderType'],
       status: api.status as POStatus,
       approvalStatus: this.deriveApprovalStatus(api.status as POStatus),
       supplier: {
@@ -584,7 +586,7 @@ class POService {
       amendmentCount: 0,
       createdAt: new Date(api.createdAt),
       updatedAt: new Date(api.updatedAt),
-      items: api.items.map((item: any) => ({
+      items: api.items.map((item: POApiItem) => ({
         id: item.id,
         poId: api.id,
         lineNumber: item.lineNumber,

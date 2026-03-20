@@ -13,7 +13,7 @@ import { boqs } from '@/lib/neon/schema';
 import { BOQOperations } from './boqOperations';
 import { RFQOperations } from './rfqOperations';
 import { StockOperations } from './stockOperations';
-import type { ApiContext, HealthStatus } from './types';
+import type { ApiContext, HealthStatus, BOQFilters, RFQFilters, StockFilters, BOQImportData } from './types';
 
 export class ProcurementApiService extends BaseService {
   private boqOps: BOQOperations;
@@ -64,33 +64,33 @@ export class ProcurementApiService extends BaseService {
   // BOQ MANAGEMENT ENDPOINTS
   // ==============================================
 
-  async getBOQList(context: ApiContext, filters?: any) {
+  async getBOQList(context: ApiContext, filters?: BOQFilters) {
     const authCheck = await this.validateContext(context, 'boq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.boqOps.getBOQList(context, filters);
   }
 
   async getBOQById(context: ApiContext, boqId: string) {
     const authCheck = await this.validateContext(context, 'boq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.boqOps.getBOQById(context, boqId);
   }
 
-  async getBOQs(context: ApiContext, filters?: any) {
+  async getBOQs(context: ApiContext, filters?: BOQFilters) {
     const authCheck = await this.validateContext(context, 'boq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.boqOps.getBOQList(context, filters);
   }
 
-  async importBOQ(context: ApiContext, importData: any) {
+  async importBOQ(context: ApiContext, importData: BOQImportData) {
     const authCheck = await this.validateContext(context, 'boq:create');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.boqOps.importBOQ(context, importData);
   }
 
-  async updateBOQ(context: ApiContext, boqId: string, updateData: any) {
+  async updateBOQ(context: ApiContext, boqId: string, updateData: Record<string, unknown>) {
     const authCheck = await this.validateContext(context, 'boq:write');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.boqOps.updateBOQ(context, boqId, updateData);
   }
 
@@ -98,57 +98,57 @@ export class ProcurementApiService extends BaseService {
   // RFQ MANAGEMENT ENDPOINTS
   // ==============================================
 
-  async getRFQList(context: ApiContext, filters?: any) {
+  async getRFQList(context: ApiContext, filters?: RFQFilters) {
     const authCheck = await this.validateContext(context, 'rfq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.getRFQList(context, filters);
   }
 
   async getRFQById(context: ApiContext, rfqId: string) {
     const authCheck = await this.validateContext(context, 'rfq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.getRFQById(context, rfqId);
   }
 
-  async createRFQ(context: ApiContext, rfqData: any) {
+  async createRFQ(context: ApiContext, rfqData: Record<string, unknown>) {
     const authCheck = await this.validateContext(context, 'rfq:create');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.createRFQ(context, rfqData);
   }
 
-  async updateRFQ(context: ApiContext, rfqId: string, updateData: any) {
+  async updateRFQ(context: ApiContext, rfqId: string, updateData: Record<string, unknown>) {
     const authCheck = await this.validateContext(context, 'rfq:write');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.updateRFQ(context, rfqId, updateData);
   }
 
   async deleteRFQ(context: ApiContext, rfqId: string) {
     const authCheck = await this.validateContext(context, 'rfq:delete');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.deleteRFQ(context, rfqId);
   }
 
   async addSuppliersToRFQ(context: ApiContext, rfqId: string, supplierIds: string[]) {
     const authCheck = await this.validateContext(context, 'rfq:write');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.addSuppliersToRFQ(context, rfqId, supplierIds);
   }
 
   async removeSuppliersFromRFQ(context: ApiContext, rfqId: string, supplierIds: string[]) {
     const authCheck = await this.validateContext(context, 'rfq:write');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.removeSuppliersFromRFQ(context, rfqId, supplierIds);
   }
 
   async replaceRFQSuppliers(context: ApiContext, rfqId: string, supplierIds: string[]) {
     const authCheck = await this.validateContext(context, 'rfq:write');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.replaceRFQSuppliers(context, rfqId, supplierIds);
   }
 
-  async getSupplierRFQHistory(context: ApiContext, supplierId: string, filters?: any) {
+  async getSupplierRFQHistory(context: ApiContext, supplierId: string, filters?: RFQFilters) {
     const authCheck = await this.validateContext(context, 'rfq:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.rfqOps.getSupplierRFQHistory(context, supplierId, filters);
   }
 
@@ -156,9 +156,9 @@ export class ProcurementApiService extends BaseService {
   // STOCK MANAGEMENT ENDPOINTS
   // ==============================================
 
-  async getStockPositions(context: ApiContext, filters?: any) {
+  async getStockPositions(context: ApiContext, filters?: StockFilters) {
     const authCheck = await this.validateContext(context, 'stock:read');
-    if (!authCheck.success) return authCheck as any;
+    if (!authCheck.success) return authCheck as ServiceResponse<never>;
     return this.stockOps.getStockPositions(context, filters);
   }
 

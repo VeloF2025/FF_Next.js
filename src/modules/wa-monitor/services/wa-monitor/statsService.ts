@@ -5,6 +5,79 @@
 import { log } from '@/lib/logger';
 import { getDbConnection } from './_shared';
 
+// ─── SQL Row Interfaces ───────────────────────────────────────────────────────
+// PostgreSQL COUNT() aggregates return string in JS (BigInt serialisation).
+// Typing each row shape eliminates `as any` casts on SQL results.
+
+interface DatePeriodRow {
+  today: string;
+  week_start: string;
+  month_start: string;
+}
+
+interface DateRangeRow {
+  today: string;
+  week_ago: string;
+  month_ago: string;
+}
+
+interface StatsRow {
+  total: string;
+  complete: string;
+}
+
+interface ProjectStatsRow {
+  project: string;
+  total: string;
+  complete: string;
+}
+
+interface OutstandingRow {
+  total_incomplete: string;
+  needs_attention: string;
+}
+
+interface ResubmissionRow {
+  total_drops: string;
+  resubmitted_drops: string;
+}
+
+interface FailureStatsRow {
+  step_01_fails: string;
+  step_02_fails: string;
+  step_03_fails: string;
+  step_04_fails: string;
+  step_05_fails: string;
+  step_06_fails: string;
+  step_07_fails: string;
+  step_08_fails: string;
+  step_09_fails: string;
+  step_10_fails: string;
+  step_11_fails: string;
+  step_12_fails: string;
+  total_drops: string;
+}
+
+interface FeedbackStatsRow {
+  sent: string;
+  pending: string;
+}
+
+interface AgentStatsRow {
+  agent: string;
+  drops: string;
+  complete: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Parse SQL COUNT / aggregate values (returned as strings by PostgreSQL driver) */
+function parseCount(v: string | number | null | undefined): number {
+  return parseInt(String(v ?? 0), 10) || 0;
+}
+
+// ─── Service Functions ────────────────────────────────────────────────────────
+
 /**
  * Get project stats by time period (real-time calculation)
  * Returns stats for today, this week, this month, and all-time
@@ -18,15 +91,15 @@ export async function getProjectStats(projectName: string): Promise<{
   const sql = getDbConnection();
   try {
     // Get current date in SAST timezone
-    const [dateInfo] = await sql`
+    const [dateInfo] = (await sql`
       SELECT
         CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' as today,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '7 days')::date as week_start,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '30 days')::date as month_start
-    `;
+    `) as unknown as DatePeriodRow[];
 
     // Today's stats
-    const [todayStats] = await sql`
+    const [todayStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -41,10 +114,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') = ${dateInfo.today}::date
-    `;
+    `) as unknown as StatsRow[];
 
     // This week's stats
-    const [weekStats] = await sql`
+    const [weekStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -59,10 +132,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.week_start}::date
-    `;
+    `) as unknown as StatsRow[];
 
     // This month's stats
-    const [monthStats] = await sql`
+    const [monthStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -77,10 +150,10 @@ export async function getProjectStats(projectName: string): Promise<{
       FROM qa_photo_reviews
       WHERE project = ${projectName}
         AND DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.month_start}::date
-    `;
+    `) as unknown as StatsRow[];
 
     // All-time stats
-    const [allTimeStats] = await sql`
+    const [allTimeStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -94,15 +167,19 @@ export async function getProjectStats(projectName: string): Promise<{
         END) as complete
       FROM qa_photo_reviews
       WHERE project = ${projectName}
-    `;
+    `) as unknown as StatsRow[];
 
     // Helper to calculate stats
-    const calcStats = (total: number, complete: number) => ({
-      total: parseInt(total as any, 10) || 0,
-      complete: parseInt(complete as any, 10) || 0,
-      incomplete: (parseInt(total as any, 10) || 0) - (parseInt(complete as any, 10) || 0),
-      completionRate: total > 0 ? Math.round((complete / total) * 100) : 0,
-    });
+    const calcStats = (total: string, complete: string) => {
+      const t = parseCount(total);
+      const c = parseCount(complete);
+      return {
+        total: t,
+        complete: c,
+        incomplete: t - c,
+        completionRate: t > 0 ? Math.round((c / t) * 100) : 0,
+      };
+    };
 
     return {
       today: calcStats(todayStats.total, todayStats.complete),
@@ -170,19 +247,19 @@ export async function getAllProjectsStatsSummary(
   const sql = getDbConnection();
   try {
     // Get current date in SAST timezone
-    const [dateInfo] = await sql`
+    const [dateInfo] = (await sql`
       SELECT
         CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' as today,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '7 days')::date as week_ago,
         (CURRENT_DATE AT TIME ZONE 'Africa/Johannesburg' - INTERVAL '30 days')::date as month_ago
-    `;
+    `) as unknown as DateRangeRow[];
 
     // Determine date range for main query
     const queryStartDate = startDate || dateInfo.today;
     const queryEndDate = endDate || dateInfo.today;
 
     // 1. Stats by project for the selected date range
-    const projectStats = await sql`
+    const projectStats = (await sql`
       SELECT
         COALESCE(project, 'Unknown') as project,
         COUNT(DISTINCT drop_number) as total,
@@ -201,10 +278,10 @@ export async function getAllProjectsStatsSummary(
         AND project != 'Marketing Activations'
       GROUP BY project
       ORDER BY total DESC
-    `;
+    `) as unknown as ProjectStatsRow[];
 
     // 2. Overall system stats (all-time by project)
-    const overallProjectStats = await sql`
+    const overallProjectStats = (await sql`
       SELECT
         COALESCE(project, 'Unknown') as project,
         COUNT(DISTINCT drop_number) as total,
@@ -220,10 +297,10 @@ export async function getAllProjectsStatsSummary(
       FROM qa_photo_reviews
       WHERE project != 'Marketing Activations'
       GROUP BY project
-    `;
+    `) as unknown as ProjectStatsRow[];
 
     // 3. Weekly trends
-    const [weeklyStats] = await sql`
+    const [weeklyStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -237,10 +314,10 @@ export async function getAllProjectsStatsSummary(
         END) as complete
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.week_ago}::date
-    `;
+    `) as unknown as StatsRow[];
 
     // 4. Monthly trends
-    const [monthlyStats] = await sql`
+    const [monthlyStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total,
         COUNT(DISTINCT CASE
@@ -254,10 +331,10 @@ export async function getAllProjectsStatsSummary(
         END) as complete
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg') >= ${dateInfo.month_ago}::date
-    `;
+    `) as unknown as StatsRow[];
 
     // 5. Outstanding drops
-    const [outstandingStats] = await sql`
+    const [outstandingStats] = (await sql`
       SELECT
         COUNT(DISTINCT CASE
           WHEN NOT (
@@ -283,18 +360,18 @@ export async function getAllProjectsStatsSummary(
           THEN drop_number
         END) as needs_attention
       FROM qa_photo_reviews
-    `;
+    `) as unknown as OutstandingRow[];
 
     // 6. Resubmission stats
-    const [resubmissionStats] = await sql`
+    const [resubmissionStats] = (await sql`
       SELECT
         COUNT(DISTINCT drop_number) as total_drops,
         COUNT(DISTINCT CASE WHEN resubmitted = true THEN drop_number END) as resubmitted_drops
       FROM qa_photo_reviews
-    `;
+    `) as unknown as ResubmissionRow[];
 
     // 7. Common failure points
-    const [failureStats] = await sql`
+    const [failureStats] = (await sql`
       SELECT
         COUNT(CASE WHEN step_01_house_photo = false THEN 1 END) as step_01_fails,
         COUNT(CASE WHEN step_02_cable_from_pole = false THEN 1 END) as step_02_fails,
@@ -312,10 +389,10 @@ export async function getAllProjectsStatsSummary(
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')
         BETWEEN ${queryStartDate}::date AND ${queryEndDate}::date
-    `;
+    `) as unknown as FailureStatsRow[];
 
     // 8. Feedback stats
-    const [feedbackStats] = await sql`
+    const [feedbackStats] = (await sql`
       SELECT
         COUNT(DISTINCT CASE WHEN feedback_sent IS NOT NULL THEN drop_number END) as sent,
         COUNT(DISTINCT CASE
@@ -333,10 +410,10 @@ export async function getAllProjectsStatsSummary(
       FROM qa_photo_reviews
       WHERE DATE(COALESCE(whatsapp_message_date, created_at) AT TIME ZONE 'Africa/Johannesburg')
         BETWEEN ${queryStartDate}::date AND ${queryEndDate}::date
-    `;
+    `) as unknown as FeedbackStatsRow[];
 
     // 9. Agent performance for the selected date range
-    const agentStats = await sql`
+    const agentStats = (await sql`
       SELECT
         COALESCE(assigned_agent, 'Unassigned') as agent,
         COUNT(DISTINCT drop_number) as drops,
@@ -356,17 +433,17 @@ export async function getAllProjectsStatsSummary(
       GROUP BY assigned_agent
       ORDER BY complete DESC, drops DESC
       LIMIT 10
-    `;
+    `) as unknown as AgentStatsRow[];
 
     // Calculate totals
-    const todayTotal = projectStats.reduce((sum, p) => sum + parseInt(p.total as any, 10), 0);
-    const todayComplete = projectStats.reduce((sum, p) => sum + parseInt(p.complete as any, 10), 0);
+    const todayTotal = projectStats.reduce((sum, p) => sum + parseCount(p.total), 0);
+    const todayComplete = projectStats.reduce((sum, p) => sum + parseCount(p.complete), 0);
 
-    const overallTotal = overallProjectStats.reduce((sum, p) => sum + parseInt(p.total as any, 10), 0);
-    const overallComplete = overallProjectStats.reduce((sum, p) => sum + parseInt(p.complete as any, 10), 0);
+    const overallTotal = overallProjectStats.reduce((sum, p) => sum + parseCount(p.total), 0);
+    const overallComplete = overallProjectStats.reduce((sum, p) => sum + parseCount(p.complete), 0);
 
     // Process common failures
-    const stepLabels: { [key: string]: string } = {
+    const stepLabels: Record<keyof Omit<FailureStatsRow, 'total_drops'>, string> = {
       step_01_fails: 'House photo',
       step_02_fails: 'Cable from pole',
       step_03_fails: 'Cable entry outside',
@@ -381,27 +458,38 @@ export async function getAllProjectsStatsSummary(
       step_12_fails: 'Customer signature',
     };
 
-    const failures = Object.entries(stepLabels)
-      .map(([key, label]) => ({
-        step: label,
-        count: parseInt((failureStats as any)[key], 10) || 0,
-        percentage: failureStats.total_drops > 0
-          ? Math.round((parseInt((failureStats as any)[key], 10) / parseInt(failureStats.total_drops, 10)) * 100)
-          : 0,
-      }))
+    const totalDrops = parseCount(failureStats.total_drops);
+    const failures = (Object.entries(stepLabels) as [keyof Omit<FailureStatsRow, 'total_drops'>, string][])
+      .map(([key, label]) => {
+        const count = parseCount(failureStats[key]);
+        return {
+          step: label,
+          count,
+          percentage: totalDrops > 0 ? Math.round((count / totalDrops) * 100) : 0,
+        };
+      })
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
     // Build overall stats map
     const overallMap = new Map(
       overallProjectStats.map(p => [p.project, {
-        total: parseInt(p.total as any, 10),
-        complete: parseInt(p.complete as any, 10),
+        total: parseCount(p.total),
+        complete: parseCount(p.complete),
       }])
     );
 
-    const totalResubmitted = parseInt(resubmissionStats.resubmitted_drops as any, 10) || 0;
-    const totalDropsForResubmission = parseInt(resubmissionStats.total_drops as any, 10) || 0;
+    const totalResubmitted = parseCount(resubmissionStats.resubmitted_drops);
+    const totalDropsForResubmission = parseCount(resubmissionStats.total_drops);
+
+    const feedbackSent = parseCount(feedbackStats.sent);
+    const feedbackPending = parseCount(feedbackStats.pending);
+    const weeklyTotal = parseCount(weeklyStats.total);
+    const weeklyComplete = parseCount(weeklyStats.complete);
+    const monthlyTotal = parseCount(monthlyStats.total);
+    const monthlyComplete = parseCount(monthlyStats.complete);
+    const totalIncomplete = parseCount(outstandingStats.total_incomplete);
+    const needsAttention = parseCount(outstandingStats.needs_attention);
 
     return {
       total: todayTotal,
@@ -409,12 +497,14 @@ export async function getAllProjectsStatsSummary(
       incomplete: todayTotal - todayComplete,
       completionRate: todayTotal > 0 ? Math.round((todayComplete / todayTotal) * 100) : 0,
       byProject: projectStats.map(p => {
-        const overall = overallMap.get(p.project) || { total: 0, complete: 0 };
+        const overall = overallMap.get(p.project) ?? { total: 0, complete: 0 };
+        const t = parseCount(p.total);
+        const c = parseCount(p.complete);
         return {
           project: p.project,
-          total: parseInt(p.total as any, 10),
-          complete: parseInt(p.complete as any, 10),
-          completionRate: p.total > 0 ? Math.round((parseInt(p.complete as any, 10) / parseInt(p.total as any, 10)) * 100) : 0,
+          total: t,
+          complete: c,
+          completionRate: t > 0 ? Math.round((c / t) * 100) : 0,
           overallTotal: overall.total,
           overallComplete: overall.complete,
           overallCompletionRate: overall.total > 0 ? Math.round((overall.complete / overall.total) * 100) : 0,
@@ -427,24 +517,20 @@ export async function getAllProjectsStatsSummary(
       },
       trends: {
         weekly: {
-          total: parseInt(weeklyStats.total as any, 10) || 0,
-          complete: parseInt(weeklyStats.complete as any, 10) || 0,
-          completionRate: weeklyStats.total > 0
-            ? Math.round((parseInt(weeklyStats.complete as any, 10) / parseInt(weeklyStats.total as any, 10)) * 100)
-            : 0,
+          total: weeklyTotal,
+          complete: weeklyComplete,
+          completionRate: weeklyTotal > 0 ? Math.round((weeklyComplete / weeklyTotal) * 100) : 0,
         },
         monthly: {
-          total: parseInt(monthlyStats.total as any, 10) || 0,
-          complete: parseInt(monthlyStats.complete as any, 10) || 0,
-          completionRate: monthlyStats.total > 0
-            ? Math.round((parseInt(monthlyStats.complete as any, 10) / parseInt(monthlyStats.total as any, 10)) * 100)
-            : 0,
+          total: monthlyTotal,
+          complete: monthlyComplete,
+          completionRate: monthlyTotal > 0 ? Math.round((monthlyComplete / monthlyTotal) * 100) : 0,
         },
       },
       outstanding: {
-        totalIncomplete: parseInt(outstandingStats.total_incomplete as any, 10) || 0,
-        needsAttention: parseInt(outstandingStats.needs_attention as any, 10) || 0,
-        recent: (parseInt(outstandingStats.total_incomplete as any, 10) || 0) - (parseInt(outstandingStats.needs_attention as any, 10) || 0),
+        totalIncomplete,
+        needsAttention,
+        recent: totalIncomplete - needsAttention,
       },
       resubmissions: {
         total: totalResubmitted,
@@ -455,17 +541,21 @@ export async function getAllProjectsStatsSummary(
       },
       commonFailures: failures,
       feedbackStats: {
-        sent: parseInt(feedbackStats.sent as any, 10) || 0,
-        pending: parseInt(feedbackStats.pending as any, 10) || 0,
-        sendRate: (parseInt(feedbackStats.sent as any, 10) + parseInt(feedbackStats.pending as any, 10)) > 0
-          ? Math.round((parseInt(feedbackStats.sent as any, 10) / (parseInt(feedbackStats.sent as any, 10) + parseInt(feedbackStats.pending as any, 10))) * 100)
+        sent: feedbackSent,
+        pending: feedbackPending,
+        sendRate: (feedbackSent + feedbackPending) > 0
+          ? Math.round((feedbackSent / (feedbackSent + feedbackPending)) * 100)
           : 0,
       },
-      agentPerformance: agentStats.map(a => ({
-        agent: a.agent,
-        drops: parseInt(a.drops as any, 10),
-        completionRate: a.drops > 0 ? Math.round((parseInt(a.complete as any, 10) / parseInt(a.drops as any, 10)) * 100) : 0,
-      })),
+      agentPerformance: agentStats.map(a => {
+        const drops = parseCount(a.drops);
+        const complete = parseCount(a.complete);
+        return {
+          agent: a.agent,
+          drops,
+          completionRate: drops > 0 ? Math.round((complete / drops) * 100) : 0,
+        };
+      }),
     };
   } catch (error) {
     log.error('Error getting all projects stats summary', { error, startDate, endDate }, 'waMonitorService.getAllProjectsStatsSummary');

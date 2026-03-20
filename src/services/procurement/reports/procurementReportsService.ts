@@ -162,6 +162,31 @@ export interface MonthlyVariance {
   variancePercentage: number;
 }
 
+// ─── Internal data shapes ─────────────────────────────────────────────────────
+// Minimal structural types for boqService / supplierService results.
+// Avoids 'any' casts while remaining independent of schema import.
+
+interface BoqRecord {
+  category?: string;
+  projectId?: string;
+  totalEstimatedValue?: number | string | null;
+  status?: string;
+}
+
+interface SupplierRecord {
+  id: string;
+  name: string;
+  status?: string;
+  rating?: number | { overall: number };
+  certifications?: string[];
+  hasInsurance?: boolean;
+  performance?: {
+    overallScore?: number;
+    qualityScore?: number;
+    metrics?: { onTimeDeliveries?: number; totalOrders?: number };
+  };
+}
+
 export interface ReportFilters {
   dateFrom?: Date;
   dateTo?: Date;
@@ -194,8 +219,8 @@ export class ProcurementReportsService {
       });
       
       // Calculate metrics
-      const totalBudget = boqs.reduce((sum: any, boq: any) => sum + (boq.totalEstimatedValue || 0), 0);
-      const actualSpend = boqs.reduce((sum: any, boq: any) => sum + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0), 0);
+      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue || 0), 0);
+      const actualSpend = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0), 0);
       const savings = totalBudget - actualSpend;
       const savingsPercentage = totalBudget > 0 ? (savings / totalBudget) * 100 : 0;
       
@@ -280,7 +305,7 @@ export class ProcurementReportsService {
       // Get spend data from various sources
       const boqs = await boqService.getAll({ status: 'approved' });
       
-      const totalSpend = boqs.reduce((sum: any, boq: any) => sum + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0), 0);
+      const totalSpend = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue ? Number(boq.totalEstimatedValue) : 0), 0);
       
       // Generate breakdowns
       const categoryBreakdown = this.generateCategoryBreakdown(boqs);
@@ -334,11 +359,11 @@ export class ProcurementReportsService {
     try {
       const boqs = await boqService.getAll({ status: 'approved' });
       
-      const totalBudgetVariance = boqs.reduce((sum: any, _boq: any) => {
+      const totalBudgetVariance = boqs.reduce((sum: number, _boq: BoqRecord) => {
         return sum + (0); // TODO: Implement actual spend tracking vs estimated
       }, 0);
       
-      const totalBudget = boqs.reduce((sum: any, boq: any) => sum + (boq.totalEstimatedValue || 0), 0);
+      const totalBudget = boqs.reduce((sum: number, boq: BoqRecord) => sum + (boq.totalEstimatedValue || 0), 0);
       const variancePercentage = totalBudget > 0 ? (totalBudgetVariance / totalBudget) * 100 : 0;
       
       // Generate variance breakdowns
@@ -360,7 +385,7 @@ export class ProcurementReportsService {
   }
 
   // 🟡 PARTIAL: Helper methods for data processing
-  private generateCategoryBreakdown(boqs: any[]): CategorySpend[] {
+  private generateCategoryBreakdown(boqs: BoqRecord[]): CategorySpend[] {
     const categoryMap = new Map<string, { budgeted: number; actual: number }>();
     
     boqs.forEach(boq => {
@@ -382,7 +407,7 @@ export class ProcurementReportsService {
     }));
   }
 
-  private generateMonthlySavings(_boqs: any[], _dateFrom?: Date, _dateTo?: Date): MonthlySavings[] {
+  private generateMonthlySavings(_boqs: BoqRecord[], _dateFrom?: Date, _dateTo?: Date): MonthlySavings[] {
     // 🔵 MOCK: Generate sample monthly savings data
     const months = [];
     const now = new Date();
@@ -410,7 +435,7 @@ export class ProcurementReportsService {
   // Additional helper methods would continue here...
   // 🔴 INCOMPLETE: Need to implement remaining helper methods
 
-  private generatePerformanceDistribution(suppliers: any[]): PerformanceRange[] {
+  private generatePerformanceDistribution(suppliers: SupplierRecord[]): PerformanceRange[] {
     const ranges = [
       { range: '90-100%', min: 90, max: 100 },
       { range: '80-89%', min: 80, max: 89 },
@@ -433,7 +458,7 @@ export class ProcurementReportsService {
     });
   }
 
-  private generateComplianceStats(suppliers: any[]): ComplianceMetric[] {
+  private generateComplianceStats(suppliers: SupplierRecord[]): ComplianceMetric[] {
     return [
       {
         metric: 'ISO Certification',
@@ -456,7 +481,7 @@ export class ProcurementReportsService {
   }
 
   // 🔵 MOCK: Placeholder implementations for complex operations
-  private generateSupplierBreakdown(_boqs: any[]): SupplierSpend[] {
+  private generateSupplierBreakdown(_boqs: BoqRecord[]): SupplierSpend[] {
     // Mock data - real implementation would aggregate by supplier
     return [
       { supplierId: '1', supplierName: 'Supplier A', totalSpend: 150000, orderCount: 25, averageOrderValue: 6000 },
@@ -465,7 +490,7 @@ export class ProcurementReportsService {
     ];
   }
 
-  private generateProjectBreakdown(boqs: any[]): ProjectSpend[] {
+  private generateProjectBreakdown(boqs: BoqRecord[]): ProjectSpend[] {
     const projectMap = new Map<string, { totalSpend: number; budgetedSpend: number; name: string }>();
     
     boqs.forEach(boq => {
@@ -489,7 +514,7 @@ export class ProcurementReportsService {
     }));
   }
 
-  private generateMonthlySpendTrends(_boqs: any[], _dateFrom?: Date, _dateTo?: Date): MonthlySpend[] {
+  private generateMonthlySpendTrends(_boqs: BoqRecord[], _dateFrom?: Date, _dateTo?: Date): MonthlySpend[] {
     // 🔵 MOCK: Generate sample monthly spend trends
     const months = [];
     const now = new Date();
@@ -510,37 +535,37 @@ export class ProcurementReportsService {
   }
 
   // 🔴 INCOMPLETE: These methods need full implementation
-  private async getRfqCycleData(_filters: ReportFilters): Promise<any[]> {
+  private async getRfqCycleData(_filters: ReportFilters): Promise<unknown[]> {
     // TODO: Implement RFQ cycle data retrieval
     return [];
   }
 
-  private calculateAverageRfqCycleTime(_data: any[]): number {
+  private calculateAverageRfqCycleTime(_data: unknown[]): number {
     // TODO: Calculate average RFQ cycle time
     return 14; // Mock: 14 days
   }
 
-  private calculateAverageProcurementCycleTime(_data: any[]): number {
+  private calculateAverageProcurementCycleTime(_data: unknown[]): number {
     // TODO: Calculate average procurement cycle time
     return 30; // Mock: 30 days
   }
 
-  private generateCycleTimeByCategory(_data: any[]): CategoryCycleTime[] {
+  private generateCycleTimeByCategory(_data: unknown[]): CategoryCycleTime[] {
     // TODO: Generate cycle time by category
     return [];
   }
 
-  private generateTimelineAnalysis(_data: any[]): TimelineMetric[] {
+  private generateTimelineAnalysis(_data: unknown[]): TimelineMetric[] {
     // TODO: Generate timeline analysis
     return [];
   }
 
-  private generateBottleneckAnalysis(_data: any[]): BottleneckMetric[] {
+  private generateBottleneckAnalysis(_data: unknown[]): BottleneckMetric[] {
     // TODO: Generate bottleneck analysis
     return [];
   }
 
-  private generateProjectVariances(boqs: any[]): ProjectVariance[] {
+  private generateProjectVariances(boqs: BoqRecord[]): ProjectVariance[] {
     return this.generateProjectBreakdown(boqs).map(project => ({
       projectId: project.projectId,
       projectName: project.projectName,
@@ -551,7 +576,7 @@ export class ProcurementReportsService {
     }));
   }
 
-  private generateCategoryVariances(boqs: any[]): CategoryVariance[] {
+  private generateCategoryVariances(boqs: BoqRecord[]): CategoryVariance[] {
     return this.generateCategoryBreakdown(boqs).map(category => ({
       category: category.category,
       budgetedAmount: category.budgeted,
@@ -561,7 +586,7 @@ export class ProcurementReportsService {
     }));
   }
 
-  private generateMonthlyVariances(_boqs: any[], dateFrom?: Date, dateTo?: Date): MonthlyVariance[] {
+  private generateMonthlyVariances(_boqs: BoqRecord[], dateFrom?: Date, dateTo?: Date): MonthlyVariance[] {
     const monthlyTrends = this.generateMonthlySavings(_boqs, dateFrom, dateTo);
     return monthlyTrends.map(trend => ({
       month: trend.month,
@@ -573,7 +598,7 @@ export class ProcurementReportsService {
   }
 
   // 🟡 PARTIAL: Export functionality
-  async exportReport(_reportType: string, _data: any, options: ExportOptions): Promise<string> {
+  async exportReport(_reportType: string, _data: unknown, options: ExportOptions): Promise<string> {
     // TODO: Implement actual export functionality
 
     return `mock-report-${Date.now()}.${options.format}`;

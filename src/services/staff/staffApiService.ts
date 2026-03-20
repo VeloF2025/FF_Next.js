@@ -99,6 +99,9 @@ interface DbStaff {
   exitType?: string;
   exitReason?: string;
   isRehireable?: boolean;
+  // Additional API-only fields (camelCase aliases returned by RETURNING clause)
+  saContractType?: string;
+  benefitsPackage?: string;
 }
 
 /**
@@ -344,31 +347,31 @@ function transformStaffMemberToDb(staff: Partial<StaffMember>): Partial<DbStaff>
   if ('bankAccountType' in staff) result.bankAccountType = staff.bankAccountType;
 
   // SA Compliance fields - map to camelCase for API (matches RETURNING aliases)
-  if ('uifStatus' in staff) (result as any).uifStatus = staff.uifStatus;
-  if ('uifNumber' in staff) (result as any).uifNumber = staff.uifNumber;
-  if ('coidaStatus' in staff) (result as any).coidaStatus = staff.coidaStatus;
-  if ('taxStatus' in staff) (result as any).taxStatus = staff.taxStatus;
-  if ('taxNumber' in staff) (result as any).taxNumber = staff.taxNumber;
-  if ('probationStatus' in staff) (result as any).probationStatus = staff.probationStatus;
-  if ('probationEndDate' in staff) (result as any).probationEndDate = toDateStringOrNull(staff.probationEndDate);
-  if ('probationExtended' in staff) (result as any).probationExtended = staff.probationExtended;
-  if ('probationExtensionReason' in staff) (result as any).probationExtensionReason = staff.probationExtensionReason;
-  if ('noticePeriod' in staff) (result as any).noticePeriod = staff.noticePeriod;
-  if ('noticePeriodDays' in staff) (result as any).noticePeriodDays = staff.noticePeriodDays;
-  if ('weeklyHours' in staff) (result as any).weeklyHours = staff.weeklyHours;
-  if ('idNumber' in staff) (result as any).idNumber = staff.idNumber;
-  if ('workPermitNumber' in staff) (result as any).workPermitNumber = staff.workPermitNumber;
-  if ('workPermitExpiry' in staff) (result as any).workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry);
-  if ('salaryGrade' in staff) (result as any).salaryGrade = staff.salaryGrade;
-  if ('benefitsPackage' in staff) (result as any).benefitsPackage = staff.benefitsPackage;
+  if ('uifStatus' in staff) result.uifStatus = staff.uifStatus;
+  if ('uifNumber' in staff) result.uifNumber = staff.uifNumber;
+  if ('coidaStatus' in staff) result.coidaStatus = staff.coidaStatus;
+  if ('taxStatus' in staff) result.taxStatus = staff.taxStatus;
+  if ('taxNumber' in staff) result.taxNumber = staff.taxNumber;
+  if ('probationStatus' in staff) result.probationStatus = staff.probationStatus;
+  if ('probationEndDate' in staff) result.probationEndDate = toDateStringOrNull(staff.probationEndDate);
+  if ('probationExtended' in staff) result.probationExtended = staff.probationExtended;
+  if ('probationExtensionReason' in staff) result.probationExtensionReason = staff.probationExtensionReason;
+  if ('noticePeriod' in staff) result.noticePeriod = staff.noticePeriod;
+  if ('noticePeriodDays' in staff) result.noticePeriodDays = staff.noticePeriodDays;
+  if ('weeklyHours' in staff) result.weeklyHours = staff.weeklyHours;
+  if ('idNumber' in staff) result.idNumber = staff.idNumber;
+  if ('workPermitNumber' in staff) result.workPermitNumber = staff.workPermitNumber;
+  if ('workPermitExpiry' in staff) result.workPermitExpiry = toDateStringOrNull(staff.workPermitExpiry);
+  if ('salaryGrade' in staff) result.salaryGrade = staff.salaryGrade;
+  if ('benefitsPackage' in staff) result.benefitsPackage = staff.benefitsPackage;
   if ('bio' in staff) result.bio = staff.bio;
-  if ('specializations' in staff) (result as any).specializations = staff.specializations;
-  if ('saContractType' in staff) (result as any).saContractType = staff.saContractType;
+  if ('specializations' in staff) result.specializations = staff.specializations;
+  if ('saContractType' in staff) result.saContractType = staff.saContractType;
 
   // Exit fields
-  if ('exitType' in staff) (result as any).exitType = staff.exitType;
-  if ('exitReason' in staff) (result as any).exitReason = staff.exitReason;
-  if ('isRehireable' in staff) (result as any).isRehireable = staff.isRehireable;
+  if ('exitType' in staff) result.exitType = staff.exitType;
+  if ('exitReason' in staff) result.exitReason = staff.exitReason;
+  if ('isRehireable' in staff) result.isRehireable = staff.isRehireable;
 
   return result;
 }
