@@ -145,6 +145,11 @@ export interface UnifiedReview {
   feedback_message: string | null;
   feedback_sent_at: Date | null;
 
+  // Auto-QA
+  auto_qa_processed: boolean;
+  auto_qa_processed_at: Date | null;
+  auto_qa_results: Record<string, unknown> | null;
+
   // Metadata
   reviewed_by: string | null;
   reviewed_at: Date | null;
