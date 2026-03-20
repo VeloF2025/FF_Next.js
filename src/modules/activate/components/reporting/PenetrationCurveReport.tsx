@@ -81,6 +81,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   const [granularity, setGranularity] = useState<'daily' | 'weekly'>('daily');
   const [hideZero, setHideZero] = useState(true);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const [scopeMode, setScopeMode] = useState<'full' | 'live_pons'>('full');
 
   // Fetch data
   useEffect(() => {
@@ -94,6 +95,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         params.set('dateTo', filters.dateTo);
         params.set('groupBy', groupBy);
         params.set('granularity', granularity);
+        params.set('scopeMode', scopeMode);
 
         if (groupBy !== 'project' && drill.projectKey) {
           params.set('project', drill.projectKey);
@@ -114,7 +116,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     };
 
     fetchData();
-  }, [filters, refreshKey, groupBy, drill, granularity]);
+  }, [filters, refreshKey, groupBy, drill, granularity, scopeMode]);
 
   // Drill-down handler — preserves labels for breadcrumb
   const handleDrillDown = (series: PenetrationSeries) => {
@@ -305,7 +307,17 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     );
   }
 
+  // Stable color map: assign colors based on original data.series index (never shifts when filtering)
+  const colorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (data) {
+      data.series.forEach((s, idx) => map.set(s.key, COLORS[idx % COLORS.length]));
+    }
+    return map;
+  }, [data]);
+
   const canDrillDown = groupBy !== 'pon';
+  const scopeLabel = scopeMode === 'live_pons' ? ' (Live PONs)' : '';
   const chartTitle = groupBy === 'project'
     ? 'All Projects'
     : groupBy === 'zone'
@@ -361,6 +373,32 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               PON level — deepest
             </span>
           )}
+          <div className="flex rounded-lg border border-border overflow-hidden" role="group" aria-label="Scope mode">
+            <button
+              onClick={() => setScopeMode('full')}
+              aria-pressed={scopeMode === 'full'}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                scopeMode === 'full'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
+              }`}
+              title="Denominator = full project scope (PO contracted drops)"
+            >
+              Full Project
+            </button>
+            <button
+              onClick={() => setScopeMode('live_pons')}
+              aria-pressed={scopeMode === 'live_pons'}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                scopeMode === 'live_pons'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-card text-muted-foreground hover:bg-accent'
+              }`}
+              title="Denominator = only drops in PONs with at least one activation"
+            >
+              Live PONs
+            </button>
+          </div>
           <button
             onClick={() => setHideZero(h => !h)}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg border border-border transition-colors ${
@@ -403,7 +441,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
       {/* Chart */}
       <div className="bg-card border border-border rounded-xl p-4" style={{ height: 480 }}>
         <p className="text-xs font-medium text-muted-foreground mb-1 ml-1">
-          {chartTitle} — Penetration % · {xAxisLabel}
+          {chartTitle} — Penetration %{scopeLabel} · {xAxisLabel}
         </p>
         <ResponsiveContainer width="100%" height="92%">
           <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
@@ -446,14 +484,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 cursor: 'pointer',
                 fontSize: '12px',
               }}
-              formatter={(value: string, entry: { dataKey?: string }) => {
-                const isHidden = hiddenSeries.has(entry.dataKey ?? '');
-                return (
-                  <span style={{ color: isHidden ? '#6b7280' : '#d1d5db', textDecoration: isHidden ? 'line-through' : 'none' }}>
-                    {value}
-                  </span>
-                );
-              }}
+              formatter={(value: string) => value}
               onClick={(e) => {
                 const key = e.dataKey as string;
                 if (!key) return;
@@ -465,13 +496,13 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 });
               }}
             />
-            {data.series.map((series, idx) => (
+            {data.series.map((series) => (
               <Line
                 key={series.key}
                 type="monotone"
                 dataKey={series.key}
                 name={series.label}
-                stroke={COLORS[idx % COLORS.length]}
+                stroke={colorMap.get(series.key) ?? '#6b7280'}
                 dot={false}
                 strokeWidth={2}
                 activeDot={{ r: 4, strokeWidth: 0 }}
@@ -490,10 +521,10 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           if (hiddenSeries.has(s.key)) return false;
           if (hideZero && (s.points.length === 0 || (s.points[s.points.length - 1]?.penetration_pct ?? 0) === 0)) return false;
           return true;
-        }).map((series, idx) => {
+        }).map((series) => {
           const lastPoint = series.points[series.points.length - 1];
           const penetration = lastPoint?.penetration_pct ?? 0;
-          const color = COLORS[idx % COLORS.length];
+          const color = colorMap.get(series.key) ?? '#6b7280';
           const pctFill = Math.min(penetration, 100);
           const daysActive = series.points.length > 0
             ? Math.round(
