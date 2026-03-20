@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const MC_BASE = 'http://127.0.0.1:3847/api';
 

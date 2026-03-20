@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { FieldTask } from '../../../../src/modules/field-app/types/field-app.types';
+import { log } from '@/lib/logger';import type { FieldTask } from '../../../../src/modules/field-app/types/field-app.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate, logDelete } from '@/lib/db-logger';

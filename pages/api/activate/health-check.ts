@@ -70,6 +70,7 @@ async function checkDatabase(): Promise<ServiceStatus> {
       lastCheck: new Date().toISOString(),
     };
   } catch (error) {
+    log.error('health-check: Database error', { error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       latencyMs: Date.now() - start,
@@ -109,6 +110,7 @@ async function checkOneMap(): Promise<ServiceStatus> {
       };
     }
   } catch (error) {
+    log.error('health-check: OneMap check failed', { error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       latencyMs: Date.now() - start,
@@ -151,6 +153,7 @@ async function checkVLM(): Promise<ServiceStatus> {
       };
     }
   } catch (error) {
+    log.error('health-check: VLM check failed', { error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       latencyMs: Date.now() - start,

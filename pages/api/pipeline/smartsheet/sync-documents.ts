@@ -6,7 +6,7 @@
  */
 
 import type { NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';import { apiResponse } from '@/lib/apiResponse';
 import { syncDocumentsFromSmartsheet } from '@/modules/pipeline/services';
 import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 

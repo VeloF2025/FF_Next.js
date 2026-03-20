@@ -4,7 +4,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';import { apiResponse } from '@/lib/apiResponse';
 import { pipelineSmartsheetService } from '@/modules/pipeline/services';
 import { withAuth } from '@/lib/auth';
 

@@ -1,5 +1,6 @@
 import { sql } from '@/lib/neon';
 import { NextApiRequest, NextApiResponse } from 'next';
+import { log } from '@/lib/logger';
 
 interface HealthCheck {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -94,6 +95,7 @@ export default async function handler(
         health.details.database = { error: 'Invalid response from database' };
       }
     } catch (dbError) {
+      log.error('health-check: database error', { error: dbError instanceof Error ? dbError.message : String(dbError) });
       health.checks.database = 'error';
       health.details.database = {
         error: dbError instanceof Error ? dbError.message : 'Unknown database error',
@@ -161,6 +163,7 @@ export default async function handler(
       checks: health.checks,
     } as HealthCheck);
   } catch (error) {
+    log.error('health-check: critical failure', { error: error instanceof Error ? error.message : String(error) });
     // Critical failure
     health.status = 'unhealthy';
     health.checks = {
