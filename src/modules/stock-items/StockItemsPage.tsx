@@ -18,7 +18,7 @@ import { useStockItems } from './hooks/useStockItems';
 import { useActiveCheckouts } from './hooks/useToolCheckouts';
 import { StockItemRow } from './components/StockItemRow';
 import { StockItemModal } from './components/StockItemModal';
-import { CheckOutModal, CheckInModal } from './components/CheckOutModal';
+import { CheckOutModal, CheckInModal } from './components/ToolCheckoutModals';
 import { Pagination } from '@/components/ui/StandardDataTable';
 import { ExportCSVButton } from '@/components/shared/ExportCSVButton';
 import { useAuth } from '@/contexts/AuthContext';
