@@ -228,6 +228,15 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     return `D${val}`;
   };
 
+  // Stable color map: assign colors based on original data.series index (never shifts when filtering)
+  const colorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (data) {
+      data.series.forEach((s, idx) => map.set(s.key, COLORS[idx % COLORS.length]));
+    }
+    return map;
+  }, [data]);
+
   // Custom tooltip — shows elapsed label + series values ranked desc
   const CustomTooltip = ({ active, payload, label }: {
     active?: boolean;
@@ -306,15 +315,6 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
       </div>
     );
   }
-
-  // Stable color map: assign colors based on original data.series index (never shifts when filtering)
-  const colorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (data) {
-      data.series.forEach((s, idx) => map.set(s.key, COLORS[idx % COLORS.length]));
-    }
-    return map;
-  }, [data]);
 
   const canDrillDown = groupBy !== 'pon';
   const scopeLabel = scopeMode === 'live_pons' ? ' (Live PONs)' : '';
