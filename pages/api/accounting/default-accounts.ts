@@ -61,6 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       log.info('Default accounts saved', { keys: Object.keys(mappings), module: 'accounting' });
       return apiResponse.success(res, { saved: true });
     } catch (err) {
+      log.error('accounting-default-accounts', { error: err instanceof Error ? err.message : String(err) });
       // If app_settings doesn't exist, create it
       if (String(err).includes('app_settings')) {
         try {

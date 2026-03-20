@@ -242,6 +242,7 @@ async function handler(
           });
           updated++;
         } catch (updateError) {
+          log.error('drops-sync-serials', { error: updateError instanceof Error ? updateError.message : String(updateError) });
           results.push({
             drop_number: drNumber,
             ont_serial: ontSerial,

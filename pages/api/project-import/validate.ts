@@ -78,6 +78,7 @@ async function handler(
       sheetName = workbook.SheetNames[0] || '';
       parsedData = parseExcelFile(buffer);
     } catch (parseError) {
+      log.error('project-import-validate', { error: parseError instanceof Error ? parseError.message : String(parseError) });
       const error = parseError as Error;
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, `Failed to parse Excel file: ${error.message}`);
     }

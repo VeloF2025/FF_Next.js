@@ -125,6 +125,7 @@ async function handleGet(
       total,
     });
   } catch (error) {
+    log.error('materials-catalog', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.databaseError(res, error, 'Failed to fetch materials');
   }
 }

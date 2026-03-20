@@ -117,6 +117,7 @@ async function sendWhatsAppReminder(
     const data = await response.json();
     return { success: true, messageId: data.id };
   } catch (error) {
+    log.error('cron-fleet-check-reminders', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

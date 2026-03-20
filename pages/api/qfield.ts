@@ -139,6 +139,7 @@ async function getHealthStatus(): Promise<HealthStatus> {
         lastError: parsed.last_error || null,
       };
     } catch (e) {
+      log.error('qfield', { error: e instanceof Error ? e.message : String(e) });
       log.debug('QField sync API JSON parse failed', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield');
     }
   }

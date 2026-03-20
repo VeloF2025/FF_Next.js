@@ -157,6 +157,7 @@ async function retryWithBackoff<T>(
     try {
       return await fn();
     } catch (error: any) {
+      log.error('wa-monitor-sync-sharepoint-test', { error: error instanceof Error ? error.message : String(error) });
       lastError = error;
 
       if (attempt === maxRetries) {

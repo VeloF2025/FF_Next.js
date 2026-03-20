@@ -35,6 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (error) {
+    log.error('mission-control-[...path]', { error: error instanceof Error ? error.message : String(error) });
     return res.status(502).json({ error: 'Mission Control server unavailable' });
   }
 }

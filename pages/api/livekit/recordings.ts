@@ -51,6 +51,7 @@ async function handler(
                                 duration = Math.round(manifest.file_results[0].duration / 1e9); // Convert nanoseconds to seconds
                             }
                         } catch (e) {
+                          log.error('livekit-recordings', { error: e instanceof Error ? e.message : String(e) });
                             // Ignore manifest parsing errors
                         }
                     }

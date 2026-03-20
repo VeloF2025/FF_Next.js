@@ -1070,6 +1070,7 @@ async function handler(
               ]
             );
           } catch (logErr) {
+            log.error('activate-import-oes', { error: logErr instanceof Error ? logErr.message : String(logErr) });
             log.warn('OESImport', 'Failed to log QField sync to data_sync_operations', logErr);
           }
         })

@@ -394,6 +394,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
           res.status(201).json({ success: true, data: newStaffRows[0] });
         } catch (error: any) {
+          log.error('staff-index', { error: error instanceof Error ? error.message : String(error) });
           // Handle database constraint violations with user-friendly messages
           if (error.message?.includes('staff_email_unique')) {
             return res.status(409).json({

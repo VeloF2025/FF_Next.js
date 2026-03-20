@@ -117,6 +117,7 @@ async function handler(
               evaluationMethod = 'python-fallback';
               log.debug('fotoApi', { action: 'evaluatePythonSuccess', drNumber: sanitizedDr });
             } catch (pythonError) {
+              log.error('foto-evaluate', { error: pythonError instanceof Error ? pythonError.message : String(pythonError) });
               // Both failed - return VLM error (primary method)
               return res.status(500).json({
                 error: 'VLM evaluation failed',

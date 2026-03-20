@@ -183,6 +183,7 @@ export default withAuth(withErrorHandler(async (
         { stats }
       );
     } catch (error) {
+      log.error('tasks-index', { error: error instanceof Error ? error.message : String(error) });
       return apiResponse.databaseError(res, error, 'Failed to fetch tasks');
     }
   } else if (req.method === 'POST') {

@@ -133,6 +133,7 @@ async function proxyMinioPhoto(key: string, res: NextApiResponse): Promise<void>
       res.send(stdout);
       return;
     } catch (execError) {
+      log.error('construction-qa-photo-proxy', { error: execError instanceof Error ? execError.message : String(execError) });
       const err = execError as { stderr?: string; message?: string };
       const errorMsg = err.stderr || err.message || '';
 

@@ -106,6 +106,7 @@ async function handler(
       // Send image
       res.send(stdout);
     } catch (execError) {
+      log.error('qfield-photo-proxy', { error: execError instanceof Error ? execError.message : String(execError) });
       const error = execError as { stderr?: string; message?: string; code?: number };
       const errorMsg = error.stderr || error.message || '';
 

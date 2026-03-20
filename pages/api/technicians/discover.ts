@@ -114,6 +114,7 @@ async function handleImport(req: AuthenticatedNextApiRequest, res: NextApiRespon
         imported.push(result.rows[0]);
       }
     } catch (err) {
+      log.error('technicians-discover', { error: err instanceof Error ? err.message : String(err) });
       errors.push({ identifier: tech.identifier, error: (err as Error).message });
     }
   }
