@@ -54,14 +54,16 @@ export async function fetchOnlineMeetingInfo(
   joinUrl: string
 ): Promise<OnlineMeetingInfo | null> {
   const encodedUrl = encodeURIComponent(joinUrl);
-  const url = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings?$filter=joinWebUrl eq '${encodedUrl}'&$select=id,subject`;
+  // Note: $select is NOT supported on the onlineMeetings endpoint — omit it
+  const url = `${GRAPH_BASE}/users/${organizerUserId}/onlineMeetings?$filter=joinWebUrl eq '${encodedUrl}'`;
 
   const response = await graphFetch(url);
 
   if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
     log.warn(
       'Failed to fetch online meeting',
-      { organizerUserId, status: response.status },
+      { organizerUserId, status: response.status, error: errorBody.substring(0, 200) },
       'GraphTranscripts'
     );
     return null;
