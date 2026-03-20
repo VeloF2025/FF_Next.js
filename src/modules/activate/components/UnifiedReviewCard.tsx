@@ -44,6 +44,7 @@ type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maint
 export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
+  const [autoQaSkipDone, setAutoQaSkipDone] = useState(false);
   const {
     review,
     isLoading,
@@ -54,6 +55,14 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
     sendFeedback,
     refresh,
   } = useUnifiedReview({ dropNumber });
+
+  // Auto-skip to QA Wizard for auto-QA processed DRs (wizard will jump to feedback phase)
+  useEffect(() => {
+    if (review && !autoQaSkipDone && review.auto_qa_processed) {
+      setActiveTab('wizard');
+      setAutoQaSkipDone(true);
+    }
+  }, [review, autoQaSkipDone]);
 
   if (isLoading) {
     return (
