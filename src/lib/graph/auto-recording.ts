@@ -96,11 +96,13 @@ async function getUpcomingTeamsMeetings(
   hoursAhead: number
 ): Promise<CalendarEvent[] | null> {
   const now = new Date();
+  // Look back 1 hour to catch meetings that just started (cron runs every 30min)
+  const start = new Date(now.getTime() - 60 * 60 * 1000);
   const end = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
 
   // Note: isOnlineMeeting does not support $filter — filter client-side
   const url = `${GRAPH_BASE}/users/${userId}/calendarView` +
-    `?startDateTime=${now.toISOString()}` +
+    `?startDateTime=${start.toISOString()}` +
     `&endDateTime=${end.toISOString()}` +
     `&$select=id,subject,start,end,isOnlineMeeting,isCancelled,onlineMeeting,organizer` +
     `&$top=50`;
