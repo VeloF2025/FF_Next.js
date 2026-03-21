@@ -52,4 +52,5 @@ export {
   staffConfig,
   projectsConfig,
   constructionQaConfig,
+  analyticsConfig,
 } from './config';

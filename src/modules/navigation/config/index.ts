@@ -43,3 +43,4 @@ export { activateConfig };
 export { staffConfig };
 export { projectsConfig };
 export { constructionQaConfig };
+export { analyticsConfig } from './modules/analytics.config';
