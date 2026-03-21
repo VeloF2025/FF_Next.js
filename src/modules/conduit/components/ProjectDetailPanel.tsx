@@ -122,12 +122,6 @@ function ForecastTable({
 
 // ─── Input field ─────────────────────────────────────────────────────────────
 
-// Format a number with thousand separators (en-ZA style, space separator)
-function fmtInput(v: number): string {
-  if (v === 0) return '0';
-  return Math.round(v).toLocaleString('en-ZA').replace(/,/g, '\u00a0');
-}
-
 function InputField({
   label,
   value,
@@ -141,55 +135,35 @@ function InputField({
   prefix?: string;
   hint?: string;
 }) {
-  const [focused, setFocused] = useState(false);
-  // When focused: raw number string for easy editing
-  // When blurred: formatted with thousand separators
-  const [raw, setRaw] = useState(String(value));
+  const [draft, setDraft] = useState(String(value));
 
-  // Sync raw when value changes externally (e.g. parent state update)
+  // Sync when value changes externally
   useEffect(() => {
-    if (!focused) setRaw(String(value));
-  }, [value, focused]);
-
-  const commit = () => {
-    // Strip any thousand separators the user may have typed, parse
-    const cleaned = raw.replace(/[\s\u00a0,]/g, '');
-    const n = Number(cleaned);
-    if (!isNaN(n) && n >= 0) {
-      onChange(n);
-      setRaw(String(n));
-    } else {
-      setRaw(String(value)); // revert
-    }
-    setFocused(false);
-  };
+    setDraft(String(value));
+  }, [value]);
 
   return (
     <div className="flex flex-col gap-0.5">
       <label className="text-xs text-gray-400 font-medium">{label}</label>
-      <div className={`flex items-center gap-1 bg-gray-900 border rounded px-2 py-1.5 transition-colors ${focused ? 'border-teal-500' : 'border-gray-600'}`}>
+      <div className="flex items-center gap-1 bg-gray-900 border border-gray-600 rounded px-2 py-1.5 focus-within:border-teal-500 transition-colors">
         {prefix && <span className="text-xs text-gray-500 select-none">{prefix}</span>}
         <input
-          type="text"
-          inputMode="numeric"
-          value={focused ? raw : fmtInput(value)}
-          onChange={e => setRaw(e.target.value)}
-          onFocus={e => {
-            setFocused(true);
-            setRaw(String(value));
-            // Select all for easy overtype
-            setTimeout(() => e.target.select(), 0);
+          type="number"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => {
+            const n = Number(draft);
+            if (!isNaN(n)) onChange(n);
+            else setDraft(String(value));
           }}
-          onBlur={commit}
           onKeyDown={e => {
-            if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') {
-              setRaw(String(value));
-              setFocused(false);
-              (e.target as HTMLInputElement).blur();
+            if (e.key === 'Enter') {
+              const n = Number(draft);
+              if (!isNaN(n)) onChange(n);
             }
           }}
           className="bg-transparent outline-none text-sm text-white w-full tabular-nums"
+          min={0}
         />
       </div>
       {hint && <span className="text-xs text-gray-600">{hint}</span>}
