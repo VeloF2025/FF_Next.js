@@ -62,37 +62,57 @@ function findColContains(headers: unknown[], include: string): number {
  * Groups rows by project, sums Debit Excl VAT per project.
  * Returns a single CostCentreRevenueItem with children sorted by revenue desc.
  */
-function parseFibertimeSheet(values: unknown[][]): CostCentreRevenueItem | null {
-  if (values.length < 2) return null;
+function parseFibertimeSheet(values: unknown[][]): CostCentreRevenueItem {
+  // Always returns something — never throws. Logs headers for diagnostics.
+  const headers = (values[0] ?? []) as unknown[];
 
-  const headers = values[0] as unknown[];
+  logger.info('FibertimeRevenue headers', { headers: headers.slice(0, 20) });
 
-  // "Debit Excl VAT" — exact match first, then contains "debit excl"
+  // "Debit Excl VAT" — try multiple patterns before giving up
   let debitCol = findColExact(headers, 'debit excl vat');
   if (debitCol < 0) debitCol = findColContains(headers, 'debit excl');
   if (debitCol < 0) debitCol = findColContains(headers, 'debit');
-  if (debitCol < 0) return null;
+  if (debitCol < 0) debitCol = findColContains(headers, 'amount');
+  if (debitCol < 0) debitCol = findColContains(headers, 'revenue');
+  // Hard fallback: last numeric-looking column in first data row
+  if (debitCol < 0 && values.length > 1) {
+    const firstRow = values[1] as unknown[];
+    for (let c = firstRow.length - 1; c >= 0; c--) {
+      if (typeof firstRow[c] === 'number') { debitCol = c; break; }
+    }
+  }
 
-  // Project column — contains "project" (case-insensitive), fallback col 0
+  // Project column — "project" in header, fallback col 0
   let projectCol = findColContains(headers, 'project');
   if (projectCol < 0) projectCol = 0;
+
+  logger.info('FibertimeRevenue column detection', { debitCol, projectCol });
+
+  // If debitCol still not found, return Fibertime with revenue=0 and no children
+  if (debitCol < 0) {
+    logger.warn('FibertimeRevenue: could not detect revenue column');
+    return { tier1: 'Fibertime', revenue: 0, children: [] };
+  }
 
   const grouped = new Map<string, number>();
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i] as unknown[];
     const project = String(row[projectCol] ?? '').trim();
-    if (!project) continue;
-    grouped.set(project, (grouped.get(project) ?? 0) + toNumber(row[debitCol]));
+    const amount = toNumber(row[debitCol]);
+    if (!project && amount === 0) continue;
+    // Use "(Unassigned)" if project name is empty but there's a value
+    const key = project || '(Unassigned)';
+    grouped.set(key, (grouped.get(key) ?? 0) + amount);
   }
-
-  if (grouped.size === 0) return null;
 
   const children: ProjectRevenueChild[] = Array.from(grouped.entries())
     .map(([project, revenue]) => ({ project, revenue }))
     .sort((a, b) => b.revenue - a.revenue);
 
   const total = children.reduce((s, c) => s + c.revenue, 0);
+
+  logger.info('FibertimeRevenue parsed', { projects: children.length, total });
 
   return { tier1: 'Fibertime', revenue: total, children };
 }
@@ -135,16 +155,23 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   logger.info('Cost centre revenue requested', { userId });
 
   try {
-    const { values } = await getWorksheetRange('FibertimeRevenue');
-
-    if (!values || values.length < 2) {
-      throw new Error('FibertimeRevenue sheet returned insufficient rows');
+    // Try both tab name variants (with and without space)
+    let sheetValues: unknown[][] | null = null;
+    try {
+      const res = await getWorksheetRange('FibertimeRevenue');
+      sheetValues = res.values ?? null;
+    } catch {
+      logger.warn('FibertimeRevenue (no space) failed — trying "Fibertime Revenue"');
+    }
+    if (!sheetValues || sheetValues.length < 2) {
+      const res2 = await getWorksheetRange('Fibertime Revenue');
+      sheetValues = res2.values ?? null;
+    }
+    if (!sheetValues || sheetValues.length < 2) {
+      throw new Error('FibertimeRevenue sheet not found under either tab name variant');
     }
 
-    const ft = parseFibertimeSheet(values);
-    if (!ft) {
-      throw new Error('FibertimeRevenue sheet: no usable data found');
-    }
+    const ft = parseFibertimeSheet(sheetValues);
 
     const response: ApiResponse = {
       success: true,
