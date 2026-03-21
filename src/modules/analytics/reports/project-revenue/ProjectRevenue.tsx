@@ -1,6 +1,6 @@
 /**
  * ProjectRevenue — Cost Centre Revenue report.
- * Table tab: tiered data grid (Cost Centre T1 | Cost Centre | Revenue)
+ * Table tab: T1-only data grid (Cost Centre T1 | Revenue)
  * Charts tab: placeholder — awaiting spec from Lew
  */
 
