@@ -192,16 +192,19 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
   const b = c.breakdown;
   const dur = project.build_duration_months;
 
+  // % of COS Total for each cost bucket (null = not a cost bucket)
+  const cosPct = (v: number) => c.cos_total > 0 ? `${((v / c.cos_total) * 100).toFixed(1)}%` : null;
+
   const summary = [
-    { label: 'Revenue',      value: c.revenue,      color: 'text-teal-400' },
-    { label: 'COS Services', value: c.cos_services, color: 'text-gray-300' },
-    { label: 'COS Material', value: c.cos_material, color: 'text-gray-300' },
-    { label: 'COS OPEX',     value: c.cos_opex,     color: 'text-gray-300' },
-    { label: 'COS Lump',     value: c.cos_lump,     color: 'text-gray-300' },
-    { label: 'COS Total',    value: c.cos_total,    color: 'text-amber-400' },
-    { label: 'Profit',       value: c.profit,       color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
-    { label: 'GP%',          gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400' },
-    { label: 'Cost/Home',    value: c.cost_per_home, color: 'text-gray-300' },
+    { label: 'Revenue',      value: c.revenue,      color: 'text-teal-400',                                                                   pct: null },
+    { label: 'COS Services', value: c.cos_services, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_services) },
+    { label: 'COS Material', value: c.cos_material, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_material) },
+    { label: 'COS OPEX',     value: c.cos_opex,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_opex) },
+    { label: 'COS Lump',     value: c.cos_lump,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_lump) },
+    { label: 'COS Total',    value: c.cos_total,    color: 'text-amber-400',                                                                  pct: null },
+    { label: 'Profit',       value: c.profit,       color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400',                              pct: null },
+    { label: 'GP%',          gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400', pct: null },
+    { label: 'Cost/Home',    value: c.cost_per_home, color: 'text-gray-300',                                                                  pct: null },
   ];
 
   const serviceLines = [
@@ -232,13 +235,16 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
       {/* Summary row */}
       <div className="flex flex-wrap gap-3 p-3 bg-gray-900">
         {summary.map(item => (
-          <div key={item.label} className="flex flex-col min-w-[90px]">
+          <div key={item.label} className="flex flex-col min-w-[100px]">
             <span className="text-xs text-gray-500">{item.label}</span>
             <span className={`text-sm font-bold tabular-nums ${item.color}`}>
               {'gp' in item
                 ? `${((item.gp ?? 0) * 100).toFixed(1)}%`
-                : fZARShort(item.value ?? 0)}
+                : fZAR('value' in item ? (item.value ?? 0) : 0)}
             </span>
+            {item.pct && (
+              <span className="text-[10px] text-gray-500 tabular-nums">{item.pct} of COS</span>
+            )}
           </div>
         ))}
       </div>
@@ -292,7 +298,7 @@ function BreakdownGroup({
     <div className="bg-gray-900 p-3 space-y-1.5">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">{title}</span>
-        <span className="text-xs font-bold text-amber-400 tabular-nums">{fZARShort(total)}</span>
+        <span className="text-xs font-bold text-amber-400 tabular-nums">{fZAR(total)}</span>
       </div>
       {lines.map(line => (
         <div key={line.label} className="flex items-center justify-between gap-2">
@@ -301,7 +307,7 @@ function BreakdownGroup({
             <span className="text-[10px] text-gray-600 truncate">{line.hint}</span>
           </div>
           <span className={`text-xs font-mono tabular-nums shrink-0 ${line.value > 0 ? 'text-gray-200' : 'text-gray-600'}`}>
-            {fZARShort(line.value)}
+            {fZAR(line.value)}
           </span>
         </div>
       ))}
