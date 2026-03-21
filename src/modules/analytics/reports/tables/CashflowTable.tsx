@@ -41,7 +41,7 @@ interface Props {
 }
 
 export function CashflowTable({ rows }: Props) {
-  const [forecastExpanded, setForecastExpanded] = useState(true);
+  const [forecastExpanded, setForecastExpanded] = useState(false);
 
   const cutoff = lastActualDate();
 
