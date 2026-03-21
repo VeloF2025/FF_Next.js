@@ -324,7 +324,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         <InputSection title="Scope — Quantities to Build">
           <InputField label="Poles" value={inp.scope.poles}       onChange={v => setScope('poles', v)}       hint="count" />
           <InputField label="Stringing (m)" value={inp.scope.stringing_m} onChange={v => setScope('stringing_m', v)} hint="total meters" />
-          <InputField label="PON Splitters" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
+          <InputField label="PON Count" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
         </InputSection>
 
         {/* Unit costs */}
