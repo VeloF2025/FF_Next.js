@@ -4257,3 +4257,41 @@ Any UI that needs to reflect client-side edits MUST live inside the client compo
 - [ ] Summary tiles/cards update ✓
 - [ ] Page-level KPIs update ✓
 - [ ] Any other pages/components that derive from the same data ✓
+
+---
+
+## 2026-03-21: Conduit Data Architecture — Excel/PBI Model (Lew directive)
+
+**Directive:** "Think like Excel and Power BI will do. All visuals are connected to the underlying data."
+
+**The mental model:**
+In Excel and Power BI there is ONE data model. Every cell, chart, tile, and total is a live view of that model. Change a cell — everything that depends on it updates instantly, automatically, without exception. No stale views. No partial updates.
+
+**How to apply this in Next.js / React:**
+
+```
+WRONG mental model (the bug we just fixed):
+  Server fetch → server renders tiles (static snapshot)
+                + client renders table (live state)
+  = TWO disconnected views of the same data
+
+CORRECT mental model (Excel/PBI):
+  Server fetch → passes raw data to ONE client component
+  Client component owns the single source of truth (projects state)
+  ALL visuals — tiles, rows, totals, detail panels — are pure functions of that state
+  Change state once → everything updates everywhere, instantly
+```
+
+**Implementation rule for Conduit:**
+```
+projects[] state (PortfolioTable)
+    │
+    ├── calcConduit(p) per project  →  row Revenue, COS, Profit, GP%, Cost/Home
+    ├── Σ calcConduit(p) all projects  →  KPI tiles (Total Homes, FC Act, Revenue, COS, Profit, GP%)
+    ├── Σ calcConduit(p) all projects  →  footer totals row
+    └── project.inputs_json  →  ProjectDetailPanel COS summary bar + input form
+```
+
+Every number on the page is a deterministic derivation from `projects[]`. No number is stored in its own separate state. No UI fetches its own copy of the data. Change `projects[i].inputs_json.uptake` and EVERY number that depends on it — in the row, in the footer, in the tiles — updates in the same render cycle.
+
+**The test:** Can you change one input and trust that every visual on the page that depends on it has updated? If yes, you've built it the Excel/PBI way. If no, find and fix the stale view.
