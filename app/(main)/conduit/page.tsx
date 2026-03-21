@@ -70,12 +70,13 @@ export default async function ConduitPage() {
       const c = calcConduit(p);
       return {
         po_count: acc.po_count + p.po_count,
+        fc_activation: acc.fc_activation + c.fc_activation,
         revenue: acc.revenue + c.revenue,
         cos_total: acc.cos_total + c.cos_total,
         profit: acc.profit + c.profit,
       };
     },
-    { po_count: 0, revenue: 0, cos_total: 0, profit: 0 }
+    { po_count: 0, fc_activation: 0, revenue: 0, cos_total: 0, profit: 0 }
   );
   const portfolioGP = totals.revenue > 0 ? totals.profit / totals.revenue : 0;
 
@@ -108,6 +109,11 @@ export default async function ConduitPage() {
             label="Total Homes"
             value={fNum(totals.po_count)}
             sub={`${projects.length} projects`}
+          />
+          <KpiCard
+            label="FC Activations"
+            value={fNum(totals.fc_activation)}
+            sub="forecasted connected homes"
           />
           <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} />
           <KpiCard label="Total COS" value={fZAR(totals.cos_total)} />
