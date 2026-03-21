@@ -64,12 +64,12 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
   // ── COS — Activation ─────────────────────────────────────────────────────
   const cos_activation = fc_activation * (sr.activation_each + mr.activation);
 
-  // ── COS — Monthly opex × build duration ──────────────────────────────────
+  // ── COS — Monthly opex × build duration (ad_hoc now monthly, not lump) ───
   const cos_monthly =
-    (mo.casuals + mo.fuel + mo.overheads + mo.sales) * build_duration_months;
+    (mo.casuals + mo.fuel + mo.overheads + mo.sales + mo.ad_hoc) * build_duration_months;
 
   // ── COS — Lump sums ───────────────────────────────────────────────────────
-  const cos_lump = lc.ad_hoc + lc.sub_contractor;
+  const cos_lump = lc.sub_contractor;
 
   // ── Totals ────────────────────────────────────────────────────────────────
   const cos_total = cos_civil + cos_activation + cos_monthly + cos_lump;

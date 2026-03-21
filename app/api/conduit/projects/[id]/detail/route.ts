@@ -106,7 +106,7 @@ function buildForecast(project: ConduitProject) {
     const monthRev = cumAct * rate;
 
     // COS this month
-    const adhoc    = m === 0 ? lc.ad_hoc : 0; // lump in month 1
+    const adhoc    = mo.ad_hoc;   // monthly (× build duration like all opex)
     const casuals  = mo.casuals;
     const fuel     = mo.fuel;
     const overhead = mo.overheads;

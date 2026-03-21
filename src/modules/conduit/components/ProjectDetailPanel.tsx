@@ -357,11 +357,11 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="Fuel / mo"      value={inp.monthly_opex.fuel}      onChange={v => setMonthlyOpex('fuel', v)}      prefix="R" />
           <InputField label="Overheads / mo" value={inp.monthly_opex.overheads} onChange={v => setMonthlyOpex('overheads', v)} prefix="R" />
           <InputField label="Sales / mo"     value={inp.monthly_opex.sales}     onChange={v => setMonthlyOpex('sales', v)}     prefix="R" />
+          <InputField label="Ad Hoc / mo"    value={inp.monthly_opex.ad_hoc}    onChange={v => setMonthlyOpex('ad_hoc', v)}    prefix="R" hint="contingency / variable" />
         </InputSection>
 
         {/* Lump costs */}
         <InputSection title="Lump Costs — Project Totals">
-          <InputField label="Ad Hoc (total)"       value={inp.lump_costs.ad_hoc}         onChange={v => setLumpCost('ad_hoc', v)}         prefix="R" hint="contingency / variable" />
           <InputField label="Sub-Contractor (total)" value={inp.lump_costs.sub_contractor} onChange={v => setLumpCost('sub_contractor', v)} prefix="R" />
         </InputSection>
 

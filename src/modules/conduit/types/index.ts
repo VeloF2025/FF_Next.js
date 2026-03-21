@@ -41,11 +41,11 @@ export interface MonthlyOpex {
   fuel: number;       // vehicle / generator fuel per month
   overheads: number;  // site overheads per month
   sales: number;      // sales / customer acquisition per month
+  ad_hoc: number;     // contingency / variable per month
 }
 
 /** Lump-sum costs entered as totals (not per-month). */
 export interface LumpCosts {
-  ad_hoc: number;          // variable/contingency costs (project total)
   sub_contractor: number;  // sub-contractor fees (project total)
 }
 
