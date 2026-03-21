@@ -1,6 +1,7 @@
 /**
- * PortfolioTable — v3 Portfolio with expandable drill-down.
+ * PortfolioTable — v3 Portfolio with KPI tiles + expandable drill-down.
  *
+ * KPI tiles live here (client component) so they react to inline edits instantly.
  * Editable inline: Rate, Uptake %, Build Duration
  * Full COS inputs editable via expanded detail panel
  * Read-only summary: PO Count, FC Activations, Revenue, COS Total, Profit, GP%, Cost/Home
@@ -11,11 +12,30 @@
 
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import type { ConduitProject, ConduitProjectInputs } from '../types';
+import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
 import { EditableCell, ReadCell, fZAR, fPct, fNum } from './conduit-cells';
 import { log } from '@/lib/logger';
+
+// ─── KPI Card ────────────────────────────────────────────────────────────────
+
+interface KpiCardProps {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}
+
+function KpiCard({ label, value, sub, valueClass = 'text-white' }: KpiCardProps) {
+  return (
+    <div className="rounded-lg border border-gray-700 bg-gray-800 px-5 py-4 min-w-[160px]">
+      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">{label}</p>
+      <p className={`text-xl font-bold tabular-nums ${valueClass}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -106,7 +126,52 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
   const totalGP = totals.revenue > 0 ? totals.profit / totals.revenue : 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+
+      {/* ── Forecasted section divider ──────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-bold text-white uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
+          Forecasted
+        </span>
+        <div className="flex-1 border-t border-gray-700" />
+      </div>
+
+      {/* ── KPI Tiles — driven by live projects state ───────────────── */}
+      <div className="flex flex-wrap gap-3">
+        <KpiCard
+          label="Total Homes"
+          value={fNum(totals.po_count)}
+          sub={`${projects.length} projects`}
+        />
+        <KpiCard
+          label="FC Activations"
+          value={fNum(totals.fc_activation)}
+          sub="forecasted connected homes"
+        />
+        <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
+        <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
+        <KpiCard
+          label="Total Profit"
+          value={fZAR(totals.profit)}
+          sub="forecasted profit"
+          valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}
+        />
+        <KpiCard
+          label="Portfolio GP%"
+          value={fPct(totalGP)}
+          sub="forecasted gross profit"
+          valueClass={
+            totalGP >= 0.30
+              ? 'text-emerald-400'
+              : totalGP >= 0.10
+              ? 'text-amber-400'
+              : 'text-red-400'
+          }
+        />
+      </div>
+
+      {/* ── Error banner ────────────────────────────────────────────── */}
+      <div className="space-y-3">
       {error && (
         <div className="flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2 text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -273,6 +338,20 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       <p className="text-xs text-gray-500">
         Click Rate, Uptake %, or Build Duration to edit. Click a row or chevron to drill down.
       </p>
+      </div>{/* end table section */}
+
+      {/* ── Actual section divider ──────────────────────────────────── */}
+      <div className="flex items-center gap-3 pt-2">
+        <span className="text-sm font-bold text-white uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
+          Actual
+        </span>
+        <div className="flex-1 border-t border-gray-700" />
+      </div>
+
+      <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
+        <p className="text-sm">Actual to date — coming soon</p>
+      </div>
+
     </div>
   );
 }
