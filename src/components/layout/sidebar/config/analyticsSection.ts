@@ -2,7 +2,7 @@
  * Analytics & Reporting section configuration
  */
 
-import { Activity, TrendingUp, BarChart3, FileText } from 'lucide-react';
+import { Activity, TrendingUp, BarChart3, FileText, LineChart } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const analyticsSection: NavSection = {
@@ -41,6 +41,14 @@ export const analyticsSection: NavSection = {
       shortLabel: 'KPI Dash',
       permissions: [],
       rbacKey: 'analytics',
+    },
+    {
+      to: '/conduit',
+      icon: LineChart,
+      label: 'Conduit',
+      shortLabel: 'Conduit',
+      permissions: [],
+      rbacKey: 'conduit',
     },
   ]
 };
