@@ -12,6 +12,7 @@ import { activateConfig } from './modules/activate.config';
 import { staffConfig } from './modules/staff.config';
 import { projectsConfig } from './modules/projects.config';
 import { constructionQaConfig } from './modules/construction-qa.config';
+import { analyticsConfig } from './modules/analytics.config';
 
 // Register all module configs
 registerModuleConfig(nocConfig);
@@ -22,6 +23,7 @@ registerModuleConfig(activateConfig);
 registerModuleConfig(staffConfig);
 registerModuleConfig(projectsConfig);
 registerModuleConfig(constructionQaConfig);
+registerModuleConfig(analyticsConfig);
 
 // Re-export everything
 export {
