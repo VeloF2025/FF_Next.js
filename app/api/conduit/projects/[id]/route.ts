@@ -71,7 +71,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         ${params.id},
         ${label},
         ${JSON.stringify(existing.inputs_json)}::jsonb,
-        ${auth.userId}
+        NULL
       )
     `;
 
