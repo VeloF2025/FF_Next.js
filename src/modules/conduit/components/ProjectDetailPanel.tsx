@@ -122,6 +122,12 @@ function ForecastTable({
 
 // ─── Input field ─────────────────────────────────────────────────────────────
 
+/** Format with thousand separators (non-breaking space) for display when not editing */
+function fmtThousands(v: number): string {
+  if (v === 0) return '0';
+  return Math.round(v).toLocaleString('en-ZA').replace(/,/g, '\u00a0');
+}
+
 function InputField({
   label,
   value,
@@ -135,35 +141,51 @@ function InputField({
   prefix?: string;
   hint?: string;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(String(value));
 
-  // Sync when value changes externally
+  // Sync raw when parent value changes and we're not actively editing
   useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
+    if (!focused) setRaw(String(value));
+  }, [value, focused]);
+
+  const commit = (inputVal: string) => {
+    const cleaned = inputVal.replace(/[\s\u00a0,]/g, '');
+    const n = Number(cleaned);
+    if (!isNaN(n) && n >= 0) {
+      onChange(n);
+      setRaw(String(n));
+    } else {
+      setRaw(String(value)); // revert to last valid
+    }
+    setFocused(false);
+  };
 
   return (
     <div className="flex flex-col gap-0.5">
       <label className="text-xs text-gray-400 font-medium">{label}</label>
-      <div className="flex items-center gap-1 bg-gray-900 border border-gray-600 rounded px-2 py-1.5 focus-within:border-teal-500 transition-colors">
+      <div className={`flex items-center gap-1 bg-gray-900 border rounded px-2 py-1.5 transition-colors ${focused ? 'border-teal-500' : 'border-gray-600'}`}>
         {prefix && <span className="text-xs text-gray-500 select-none">{prefix}</span>}
         <input
-          type="number"
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onBlur={() => {
-            const n = Number(draft);
-            if (!isNaN(n)) onChange(n);
-            else setDraft(String(value));
+          type="text"
+          inputMode="numeric"
+          value={focused ? raw : fmtThousands(value)}
+          onChange={e => setRaw(e.target.value)}
+          onFocus={e => {
+            setFocused(true);
+            setRaw(String(value));
+            setTimeout(() => e.target.select(), 0);
           }}
+          onBlur={e => commit(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter') {
-              const n = Number(draft);
-              if (!isNaN(n)) onChange(n);
+            if (e.key === 'Enter') commit(raw);
+            if (e.key === 'Escape') {
+              setRaw(String(value));
+              setFocused(false);
+              (e.target as HTMLInputElement).blur();
             }
           }}
           className="bg-transparent outline-none text-sm text-white w-full tabular-nums"
-          min={0}
         />
       </div>
       {hint && <span className="text-xs text-gray-600">{hint}</span>}
@@ -331,7 +353,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [forecastData, setForecastData] = useState<ProjectDetailData | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastOpen, setForecastOpen] = useState(false);
-  const [inputsOpen, setInputsOpen] = useState(true);
+  const [inputsOpen, setInputsOpen] = useState(false);
 
   // Keep in sync if parent re-renders
   useEffect(() => {
