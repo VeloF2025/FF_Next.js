@@ -49,7 +49,7 @@ function buildForecast(project: ConduitProject) {
     inputs_json: inp,
   } = project;
 
-  const { rate, uptake, scope, unit_costs: uc, monthly_opex: mo, lump_costs: lc } = inp;
+  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
 
   const fc_total = po_count * uptake; // unrounded
   const start = start_date ? new Date(start_date) : new Date();
@@ -58,11 +58,17 @@ function buildForecast(project: ConduitProject) {
   const months: string[] = Array.from({ length: dur }, (_, i) => monthLabel(start, i));
 
   // ── Civil cost — spread evenly over build duration ────────────────────────
+  const total_per_pole = sr.pole_plant_each + sr.permissions_per_pole + sr.wayleave_incentive + sr.wayleave_cost + mr.pole;
+  const total_per_m    = sr.stringing_per_m + mr.cable_per_m;
+  const total_per_pon  = sr.optical_per_pon + mr.optical;
   const civil_total =
-    scope.poles * (uc.per_pole + uc.wayleave_per_pole) +
-    scope.stringing_m * uc.per_stringing_m +
-    scope.pon * uc.per_pon;
+    scope.poles * total_per_pole +
+    scope.stringing_m * total_per_m +
+    scope.pon * total_per_pon;
   const civil_pm = dur > 0 ? civil_total / dur : 0;
+
+  // ── Per-activation cost ───────────────────────────────────────────────────
+  const per_activation_cost = sr.activation_each + mr.activation;
 
   // ── Sub-contractor — spread evenly ────────────────────────────────────────
   const sub_pm = dur > 0 ? lc.sub_contractor / dur : 0;
@@ -106,7 +112,7 @@ function buildForecast(project: ConduitProject) {
     const overhead = mo.overheads;
     const sales    = mo.sales;
     const stock    = civil_pm;               // civil materials/labour
-    const act_cost = newAct * uc.per_activation;
+    const act_cost = newAct * per_activation_cost;
     const sub      = sub_pm;
 
     const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + sub;

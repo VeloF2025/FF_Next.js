@@ -246,8 +246,13 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
     setSaved(false);
   }, []);
 
-  const setUnitCost = useCallback((field: keyof typeof inp.unit_costs, v: number) => {
-    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, unit_costs: { ...p.inputs_json.unit_costs, [field]: v } } }));
+  const setServiceRate = useCallback((field: keyof typeof inp.service_rates, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, service_rates: { ...p.inputs_json.service_rates, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const setMaterialRate = useCallback((field: keyof typeof inp.material_rates, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, material_rates: { ...p.inputs_json.material_rates, [field]: v } } }));
     setSaved(false);
   }, []);
 
@@ -327,13 +332,23 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="PON Count" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
         </InputSection>
 
-        {/* Unit costs */}
-        <InputSection title="Unit Costs — All-in per Unit (supply + install)">
-          <InputField label="Per Pole"       value={inp.unit_costs.per_pole}          onChange={v => setUnitCost('per_pole', v)}          prefix="R" hint="supply + erect" />
-          <InputField label="Per Meter Stringing" value={inp.unit_costs.per_stringing_m}   onChange={v => setUnitCost('per_stringing_m', v)}   prefix="R" hint="cable + aerial" />
-          <InputField label="Per PON"        value={inp.unit_costs.per_pon}           onChange={v => setUnitCost('per_pon', v)}           prefix="R" hint="supply + install" />
-          <InputField label="Per Activation" value={inp.unit_costs.per_activation}    onChange={v => setUnitCost('per_activation', v)}    prefix="R" hint="ONT + install" />
-          <InputField label="Wayleave / Pole" value={inp.unit_costs.wayleave_per_pole} onChange={v => setUnitCost('wayleave_per_pole', v)} prefix="R" hint="permission per pole" />
+        {/* Service Rates */}
+        <InputSection title="COS — Service Rates (labour / installation per unit)">
+          <InputField label="Permissions / Pole"  value={inp.service_rates.permissions_per_pole} onChange={v => setServiceRate('permissions_per_pole', v)} prefix="R" />
+          <InputField label="Pole Plant / Each"   value={inp.service_rates.pole_plant_each}      onChange={v => setServiceRate('pole_plant_each', v)}      prefix="R" />
+          <InputField label="Stringing / Meter"   value={inp.service_rates.stringing_per_m}      onChange={v => setServiceRate('stringing_per_m', v)}      prefix="R" />
+          <InputField label="Optical / PON"       value={inp.service_rates.optical_per_pon}      onChange={v => setServiceRate('optical_per_pon', v)}      prefix="R" />
+          <InputField label="Activation / Each"   value={inp.service_rates.activation_each}      onChange={v => setServiceRate('activation_each', v)}      prefix="R" />
+          <InputField label="Wayleave Incentive"  value={inp.service_rates.wayleave_incentive}   onChange={v => setServiceRate('wayleave_incentive', v)}   prefix="R" hint="per pole" />
+          <InputField label="Wayleave Cost"       value={inp.service_rates.wayleave_cost}        onChange={v => setServiceRate('wayleave_cost', v)}        prefix="R" hint="per pole" />
+        </InputSection>
+
+        {/* Material Rates */}
+        <InputSection title="COS — Materials Rate (supply / stock per unit)">
+          <InputField label="Pole"        value={inp.material_rates.pole}       onChange={v => setMaterialRate('pole', v)}       prefix="R" hint="per pole" />
+          <InputField label="Cable"       value={inp.material_rates.cable_per_m} onChange={v => setMaterialRate('cable_per_m', v)} prefix="R" hint="per meter" />
+          <InputField label="Optical"     value={inp.material_rates.optical}    onChange={v => setMaterialRate('optical', v)}    prefix="R" hint="per PON" />
+          <InputField label="Activations" value={inp.material_rates.activation} onChange={v => setMaterialRate('activation', v)} prefix="R" hint="ONT per home" />
         </InputSection>
 
         {/* Monthly opex */}

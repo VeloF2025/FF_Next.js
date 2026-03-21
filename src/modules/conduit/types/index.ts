@@ -16,16 +16,23 @@ export interface ScopeInputs {
 
 // ─── COS Rates ───────────────────────────────────────────────────────────────
 
-/**
- * All-in unit costs — material + labour bundled per unit.
- * PMs enter ONE number per category, not split service/stock.
- */
-export interface UnitCosts {
-  per_pole: number;           // supply + erect per pole (excl. wayleave)
-  per_stringing_m: number;    // cable supply + aerial install per meter
-  per_pon: number;            // PON splitter supply + install per unit
-  per_activation: number;     // ONT supply + installation per connected home
-  wayleave_per_pole: number;  // wayleave / permission fee per pole
+/** COS — Service Rates (labour / installation per unit) */
+export interface ServiceRates {
+  permissions_per_pole: number;  // Permissions / Pole
+  pole_plant_each: number;       // Pole Plant / Each
+  stringing_per_m: number;       // Stringing / Meter
+  optical_per_pon: number;       // Optical / PON
+  activation_each: number;       // Activation / Each
+  wayleave_incentive: number;    // Wayleave Incentive
+  wayleave_cost: number;         // Wayleave Cost
+}
+
+/** COS — Materials Rate (supply / stock per unit) */
+export interface MaterialRates {
+  pole: number;        // Pole (material)
+  cable_per_m: number; // Cable (per meter)
+  optical: number;     // Optical / PON (material)
+  activation: number;  // Activations (ONT + connectors)
 }
 
 /** Monthly operational costs during the build phase (multiplied by build_duration_months). */
@@ -52,8 +59,11 @@ export interface ConduitProjectInputs {
   // Scope of work
   scope: ScopeInputs;
 
-  // COS — unit rates
-  unit_costs: UnitCosts;
+  // COS — service rates (labour / installation per unit)
+  service_rates: ServiceRates;
+
+  // COS — material rates (supply / stock per unit)
+  material_rates: MaterialRates;
 
   // COS — monthly opex × build_duration_months
   monthly_opex: MonthlyOpex;
@@ -82,8 +92,10 @@ export interface ConduitProject {
  * Calculated (derived) fields — never stored, always re-derived from inputs.
  *
  * COS breakdown:
- *   cos_civil      = poles×(per_pole + wayleave) + stringing×per_m + pon×per_pon
- *   cos_activation = fc_activation × per_activation
+ *   cos_civil      = poles × (service.pole_plant + service.permissions + service.wayleave_incentive + service.wayleave_cost + material.pole)
+ *                  + stringing × (service.stringing_per_m + material.cable_per_m)
+ *                  + pon × (service.optical_per_pon + material.optical)
+ *   cos_activation = fc_activation × (service.activation_each + material.activation)
  *   cos_monthly    = (casuals+fuel+overheads+sales) × build_duration_months
  *   cos_lump       = ad_hoc + sub_contractor
  *   cos_total      = sum of all above
