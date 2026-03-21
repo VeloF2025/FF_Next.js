@@ -124,10 +124,13 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       throw new Error('Could not locate Cash In / Cash Out rows in Financial Summary');
     }
 
+    // cashOut: normalise to positive magnitude regardless of sign in Excel.
+    // Some cells are stored negative (correct), some positive (data inconsistency).
+    // Math.abs ensures the total always reflects true outflow — not a net of mixed signs.
     const data: CashflowDataPoint[] = monthColumns.map(({ col, label }) => ({
       label,
       cashIn: toNumber(cashInRow?.[col]),
-      cashOut: toNumber(cashOutRow?.[col]),
+      cashOut: Math.abs(toNumber(cashOutRow?.[col])),
       net: toNumber(cashMovementRow?.[col]),
     }));
 
