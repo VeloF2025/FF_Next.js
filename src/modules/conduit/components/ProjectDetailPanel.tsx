@@ -353,7 +353,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
 
   const [forecastOpen, setForecastOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Keep in sync if parent re-renders
   useEffect(() => {
