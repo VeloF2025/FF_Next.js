@@ -131,7 +131,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       {/* ── Forecasted section divider ──────────────────────────────── */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-bold text-white uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
-          Forecasted
+          Forecasted — Executable
         </span>
         <div className="flex-1 border-t border-gray-700" />
       </div>
