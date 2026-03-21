@@ -185,7 +185,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
             <tr style={{ backgroundColor: '#1a3a4a' }}>
               <th className={th} style={{ width: 32 }}></th>
               <th className={`${th} text-left`} style={{ minWidth: 200 }}>
-                Project Scope \u2014 Executable
+                Project Scope — Executable
               </th>
               <th className={`${th} text-right`} style={{ minWidth: 90 }}>PO Count</th>
               <th className={`${th} text-right`} style={{ minWidth: 80 }}>Rate</th>
