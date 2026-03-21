@@ -115,7 +115,7 @@ export default async function ConduitPage() {
             value={fNum(totals.fc_activation)}
             sub="forecasted connected homes"
           />
-          <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} />
+          <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
           <KpiCard label="Total COS" value={fZAR(totals.cos_total)} />
           <KpiCard
             label="Total Profit"
