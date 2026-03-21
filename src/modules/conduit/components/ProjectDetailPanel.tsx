@@ -18,8 +18,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { log } from '@/lib/logger';
-import type { ConduitProject, ConduitProjectInputs } from '../types';
+import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
+import { MonthlyForecastGrid } from './MonthlyForecastGrid';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -350,10 +351,9 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [forecastData, setForecastData] = useState<ProjectDetailData | null>(null);
-  const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastOpen, setForecastOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   // Keep in sync if parent re-renders
   useEffect(() => {
@@ -388,6 +388,32 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
     setSaved(false);
   }, []);
 
+  const handlePlanChange = useCallback((plan: MonthlyPlanEntry[]) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, monthly_plan: plan } }));
+    setSaved(false);
+  }, []);
+
+  const setStartDate = useCallback((v: string) => {
+    setProject(p => ({ ...p, start_date: v }));
+    setSaved(false);
+  }, []);
+
+  const setBuildDuration = useCallback((v: number) => {
+    setProject(p => {
+      // Resize monthly_plan to match new duration
+      const current = p.inputs_json.monthly_plan ?? [];
+      const blank = () => ({ poles: 0, stringing_m: 0, pon: 0, activations: 0,
+                              opex_casuals: null, opex_fuel: null, opex_overheads: null,
+                              opex_sales: null, opex_ad_hoc: null });
+      const resized = v > current.length
+        ? [...current, ...Array.from({ length: v - current.length }, blank)]
+        : current.slice(0, v);
+      return { ...p, build_duration_months: v,
+               inputs_json: { ...p.inputs_json, monthly_plan: resized } };
+    });
+    setSaved(false);
+  }, []);
+
 
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -413,29 +439,13 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       onProjectUpdate?.(data);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-      // Refresh forecast after save
-      if (forecastOpen) loadForecast();
+
     } catch (err) {
       log.error('ProjectDetailPanel save failed', { id: project.id, err: String(err) });
       setSaveError(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
     }
-  };
-
-  // ── Forecast ─────────────────────────────────────────────────────────────
-  const loadForecast = useCallback(() => {
-    setForecastLoading(true);
-    fetch(`/api/conduit/projects/${project.id}/detail`)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(({ data: d }: { data: ProjectDetailData }) => setForecastData(d))
-      .catch((err: unknown) => log.error('forecast fetch failed', { err: String(err) }))
-      .finally(() => setForecastLoading(false));
-  }, [project.id]);
-
-  const toggleForecast = () => {
-    if (!forecastOpen && !forecastData) loadForecast();
-    setForecastOpen(v => !v);
   };
 
   const dur = project.build_duration_months;
@@ -445,6 +455,40 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
 
       {/* ── COS Summary bar ────────────────────────────────────────────── */}
       <CosSummaryBar project={project} />
+
+      {/* ── Project Details (collapsible) ──────────────────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setDetailsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+        >
+          <span>Project Details</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {detailsOpen && (
+          <div className="p-3 flex flex-wrap gap-4">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-gray-400 font-medium">Build Start Date</label>
+              <input
+                type="date"
+                value={project.start_date?.slice(0, 10) ?? ''}
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-teal-500 transition-colors"
+              />
+              <span className="text-xs text-gray-600">drives month column headers</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-gray-400 font-medium">Build Duration (months)</label>
+              <InputField
+                label=""
+                value={project.build_duration_months}
+                onChange={setBuildDuration}
+                hint="resizes forecast grid"
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Input sections (collapsible) ───────────────────────────────── */}
       <div className="rounded-lg border border-gray-700 overflow-hidden">
@@ -529,21 +573,20 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       <div className="rounded-lg border border-gray-700 overflow-hidden">
         <button
           className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-semibold text-white"
-          onClick={toggleForecast}
+          onClick={() => setForecastOpen(v => !v)}
         >
           <span>Monthly Forecast</span>
-          {forecastLoading
-            ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-            : forecastOpen
+          {forecastOpen
             ? <ChevronDown className="w-4 h-4 text-gray-400" />
             : <ChevronRight className="w-4 h-4 text-gray-400" />}
         </button>
 
-        {forecastOpen && forecastData && (
-          <div className="space-y-4 p-4 bg-gray-900">
-            <ForecastTable title="Rollout Plan" months={forecastData.months} rows={forecastData.rolloutPlan} format="int" />
-            <ForecastTable title="COS Category — Forecast" months={forecastData.months} rows={forecastData.cosCategories} format="zar" />
-            <ForecastTable title="Revenue — Forecast" months={forecastData.months} rows={forecastData.revenueForecast} format="zar" />
+        {forecastOpen && (
+          <div className="p-3 bg-gray-900">
+            <MonthlyForecastGrid
+              project={project}
+              onPlanChange={handlePlanChange}
+            />
           </div>
         )}
       </div>

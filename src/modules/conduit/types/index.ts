@@ -48,6 +48,28 @@ export interface LumpCosts {
   wayleave_cost: number;  // Wayleave Cost (project total)
 }
 
+// ─── Monthly Plan ────────────────────────────────────────────────────────────
+
+/**
+ * PM-entered rollout quantities per calendar month.
+ * OPEX overrides: null = use default from monthly_opex inputs.
+ * Stored in inputs_json.monthly_plan[].
+ */
+export interface MonthlyPlanEntry {
+  // Rollout quantities (physical work this month)
+  poles: number;
+  stringing_m: number;
+  pon: number;
+  activations: number;
+
+  // OPEX overrides — null means "use default from MonthlyOpex inputs"
+  opex_casuals:   number | null;
+  opex_fuel:      number | null;
+  opex_overheads: number | null;
+  opex_sales:     number | null;
+  opex_ad_hoc:    number | null;
+}
+
 // ─── Project Inputs ──────────────────────────────────────────────────────────
 
 export interface ConduitProjectInputs {
@@ -58,6 +80,7 @@ export interface ConduitProjectInputs {
   material_rates: MaterialRates;
   monthly_opex: MonthlyOpex;
   lump_costs: LumpCosts;
+  monthly_plan: MonthlyPlanEntry[];  // PM-entered per-month rollout plan
 }
 
 // ─── Project Record ──────────────────────────────────────────────────────────
