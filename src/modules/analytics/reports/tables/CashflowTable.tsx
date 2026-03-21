@@ -4,10 +4,11 @@
  * Closing Balance = cumulative running sum of Net column.
  *
  * Actual / Forecast separator: dynamic — end of previous calendar month.
- * Today = Mar 21 2026 → last actual = Feb 2026, first forecast = Mar 2026.
+ * Forecast section is collapsible via +/− toggle on the separator row.
  */
 'use client';
 
+import { useState } from 'react';
 import type { CashflowDataPoint } from '../revenue-overview/useRevenueData';
 
 function fZAR(v: number) {
@@ -17,10 +18,6 @@ function fZAR(v: number) {
   return `${v < 0 ? '-' : ''}R\u00a0${s}`;
 }
 
-/**
- * Parse a month label like "Mar 2025" or "Sep 2025" into a comparable Date
- * (always set to the 1st of that month).
- */
 function parseMonthLabel(label: string): Date | null {
   const MONTHS: Record<string, number> = {
     Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
@@ -34,10 +31,8 @@ function parseMonthLabel(label: string): Date | null {
   return new Date(yr, mon, 1);
 }
 
-/** Last day of the previous calendar month relative to today */
 function lastActualDate(): Date {
   const now = new Date();
-  // first day of current month, minus 1 day = last day of previous month
   return new Date(now.getFullYear(), now.getMonth(), 0);
 }
 
@@ -46,25 +41,25 @@ interface Props {
 }
 
 export function CashflowTable({ rows }: Props) {
-  const cutoff = lastActualDate(); // e.g. 28 Feb 2026
+  const [forecastExpanded, setForecastExpanded] = useState(true);
+
+  const cutoff = lastActualDate();
 
   const totals = rows.reduce(
     (acc, r) => ({ cashIn: acc.cashIn + r.cashIn, cashOut: acc.cashOut + r.cashOut, net: acc.net + r.net }),
     { cashIn: 0, cashOut: 0, net: 0 }
   );
 
-  // Compute closing balance per row (cumulative running net)
   let running = 0;
   const rowsWithBalance = rows.map((r) => {
     running += r.net;
     const rowDate = parseMonthLabel(r.label);
-    // A row is "actual" if its month-start is on or before the cutoff
     const isActual = rowDate !== null && rowDate <= cutoff;
-    return { ...r, closingBalance: running, isActual, rowDate };
+    return { ...r, closingBalance: running, isActual };
   });
 
-  // Index of the first forecast row (used to insert the separator)
   const firstForecastIdx = rowsWithBalance.findIndex((r) => !r.isActual);
+  const forecastCount = firstForecastIdx === -1 ? 0 : rowsWithBalance.length - firstForecastIdx;
 
   const th = 'px-4 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
   const thR = `${th} text-right`;
@@ -84,44 +79,73 @@ export function CashflowTable({ rows }: Props) {
         <tbody>
           {rowsWithBalance.map((r, i) => {
             const isSeparatorRow = firstForecastIdx !== -1 && i === firstForecastIdx;
+            const isForecast = !r.isActual;
+
+            // Hide forecast rows when collapsed (but still render separator)
+            if (isForecast && !isSeparatorRow && !forecastExpanded) return null;
 
             return (
               <>
-                {/* Actual / Forecast separator — inserted before first forecast row */}
+                {/* Separator row with +/− toggle */}
                 {isSeparatorRow && (
                   <tr key={`separator-${i}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
                     <td
                       colSpan={5}
-                      className="px-4 py-1 text-xs font-semibold tracking-widest uppercase"
+                      className="py-1 text-xs font-semibold tracking-widest uppercase"
                       style={{
                         borderTop: '2px solid #1a3a4a',
                         borderBottom: '1px solid rgba(255,255,255,0.08)',
                         color: '#9CA3AF',
-                        letterSpacing: '0.12em',
+                        letterSpacing: '0.10em',
+                        paddingLeft: 0,
                       }}
                     >
-                      <span className="opacity-60">← ACTUAL</span>
-                      <span className="mx-3 opacity-30">|</span>
-                      <span className="opacity-60">FORECAST →</span>
+                      <button
+                        onClick={() => setForecastExpanded((v) => !v)}
+                        className="flex items-center gap-2 w-full px-4 py-0.5 hover:opacity-80 transition-opacity text-left"
+                        title={forecastExpanded ? 'Collapse forecast' : 'Expand forecast'}
+                      >
+                        {/* +/− badge */}
+                        <span
+                          className="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold flex-shrink-0"
+                          style={{
+                            backgroundColor: '#1a3a4a',
+                            color: '#9CA3AF',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                          }}
+                        >
+                          {forecastExpanded ? '−' : '+'}
+                        </span>
+                        <span className="opacity-60">← ACTUAL</span>
+                        <span className="opacity-30 mx-1">|</span>
+                        <span className="opacity-60">FORECAST →</span>
+                        {!forecastExpanded && (
+                          <span className="ml-2 opacity-40 text-xs normal-case tracking-normal">
+                            ({forecastCount} months hidden)
+                          </span>
+                        )}
+                      </button>
                     </td>
                   </tr>
                 )}
 
-                <tr
-                  key={r.label}
-                  className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}
-                  style={isSeparatorRow ? { borderTop: '2px solid #1a3a4a' } : undefined}
-                >
-                  <td className="px-4 py-2 text-gray-200 font-medium">{r.label}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-gray-300">{fZAR(r.cashIn)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-gray-300">{fZAR(r.cashOut)}</td>
-                  <td className={`px-4 py-2 text-right tabular-nums font-semibold ${r.net < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {fZAR(r.net)}
-                  </td>
-                  <td className={`px-4 py-2 text-right tabular-nums font-bold ${r.closingBalance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {fZAR(r.closingBalance)}
-                  </td>
-                </tr>
+                {/* Skip forecast data rows when collapsed */}
+                {(!isForecast || forecastExpanded) && (
+                  <tr
+                    key={r.label}
+                    className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}
+                  >
+                    <td className="px-4 py-2 text-gray-200 font-medium">{r.label}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-gray-300">{fZAR(r.cashIn)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-gray-300">{fZAR(r.cashOut)}</td>
+                    <td className={`px-4 py-2 text-right tabular-nums font-semibold ${r.net < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {fZAR(r.net)}
+                    </td>
+                    <td className={`px-4 py-2 text-right tabular-nums font-bold ${r.closingBalance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {fZAR(r.closingBalance)}
+                    </td>
+                  </tr>
+                )}
               </>
             );
           })}
