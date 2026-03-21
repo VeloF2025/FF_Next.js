@@ -6,10 +6,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-// 🟢 WORKING: Cost Centre Revenue types
+// 🟢 WORKING: Cost Centre Revenue types (T1 only — T2 pending spec)
 export interface CostCentreRevenueItem {
   tier1: string;
-  tier2: string;
   revenue: number;
 }
 
