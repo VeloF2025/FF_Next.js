@@ -193,6 +193,7 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
     { label: 'COS Civil',  value: c.cos_civil,       color: 'text-gray-300' },
     { label: 'COS Act.',   value: c.cos_activation,  color: 'text-gray-300' },
     { label: 'COS Monthly',value: c.cos_monthly,     color: 'text-gray-300' },
+    { label: 'COS Lump',   value: c.cos_lump,        color: 'text-gray-300' },
 
     { label: 'COS Total',  value: c.cos_total,       color: 'text-amber-400' },
     { label: 'Profit',     value: c.profit,          color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
@@ -248,6 +249,11 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
 
   const setServiceRate = useCallback((field: keyof typeof inp.service_rates, v: number) => {
     setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, service_rates: { ...p.inputs_json.service_rates, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const setLumpCost = useCallback((field: keyof typeof inp.lump_costs, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, lump_costs: { ...p.inputs_json.lump_costs, [field]: v } } }));
     setSaved(false);
   }, []);
 
@@ -337,7 +343,6 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="Optical / PON"       value={inp.service_rates.optical_per_pon}      onChange={v => setServiceRate('optical_per_pon', v)}      prefix="R" />
           <InputField label="Activation / Each"   value={inp.service_rates.activation_each}      onChange={v => setServiceRate('activation_each', v)}      prefix="R" />
           <InputField label="Wayleave Incentive"  value={inp.service_rates.wayleave_incentive}   onChange={v => setServiceRate('wayleave_incentive', v)}   prefix="R" hint="per pole" />
-          <InputField label="Wayleave Cost"       value={inp.service_rates.wayleave_cost}        onChange={v => setServiceRate('wayleave_cost', v)}        prefix="R" hint="per pole" />
         </InputSection>
 
         {/* Material Rates */}
@@ -346,6 +351,11 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="Cable"       value={inp.material_rates.cable_per_m} onChange={v => setMaterialRate('cable_per_m', v)} prefix="R" hint="per meter" />
           <InputField label="Optical"     value={inp.material_rates.optical}    onChange={v => setMaterialRate('optical', v)}    prefix="R" hint="per PON" />
           <InputField label="Activations" value={inp.material_rates.activation} onChange={v => setMaterialRate('activation', v)} prefix="R" hint="ONT per home" />
+        </InputSection>
+
+        {/* Lump Costs */}
+        <InputSection title="Lump Costs — Project Totals">
+          <InputField label="Wayleave Cost" value={inp.lump_costs.wayleave_cost} onChange={v => setLumpCost('wayleave_cost', v)} prefix="R" hint="project total" />
         </InputSection>
 
         {/* Monthly opex */}

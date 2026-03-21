@@ -49,7 +49,7 @@ function buildForecast(project: ConduitProject) {
     inputs_json: inp,
   } = project;
 
-  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo } = inp;
+  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
 
   const fc_total = po_count * uptake; // unrounded
   const start = start_date ? new Date(start_date) : new Date();
@@ -58,7 +58,8 @@ function buildForecast(project: ConduitProject) {
   const months: string[] = Array.from({ length: dur }, (_, i) => monthLabel(start, i));
 
   // ── Civil cost — spread evenly over build duration ────────────────────────
-  const total_per_pole = sr.pole_plant_each + sr.permissions_per_pole + sr.wayleave_incentive + sr.wayleave_cost + mr.pole;
+  const total_per_pole = sr.pole_plant_each + sr.permissions_per_pole + sr.wayleave_incentive + mr.pole;
+  const wayleave_lump_pm = dur > 0 ? lc.wayleave_cost / dur : 0;
   const total_per_m    = sr.stringing_per_m + mr.cable_per_m;
   const total_per_pon  = sr.optical_per_pon + mr.optical;
   const civil_total =
@@ -112,7 +113,7 @@ function buildForecast(project: ConduitProject) {
     const stock    = civil_pm;               // civil materials/labour
     const act_cost = newAct * per_activation_cost;
 
-    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost;
+    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + wayleave_lump_pm;
 
     const gross = monthRev - monthCos;
     cumulativeNet += gross;

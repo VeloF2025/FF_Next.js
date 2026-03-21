@@ -38,7 +38,7 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
     inputs_json: inp,
   } = project;
 
-  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo } = inp;
+  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
 
   // ── Revenue ──────────────────────────────────────────────────────────────
   const fc_activation = po_count * uptake;
@@ -49,7 +49,6 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
     sr.pole_plant_each +
     sr.permissions_per_pole +
     sr.wayleave_incentive +
-    sr.wayleave_cost +
     mr.pole;
 
   const total_per_m = sr.stringing_per_m + mr.cable_per_m;
@@ -67,8 +66,11 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
   const cos_monthly =
     (mo.casuals + mo.fuel + mo.overheads + mo.sales + mo.ad_hoc) * build_duration_months;
 
+  // ── COS — Lump sums ───────────────────────────────────────────────────────
+  const cos_lump = lc.wayleave_cost;
+
   // ── Totals ────────────────────────────────────────────────────────────────
-  const cos_total = cos_civil + cos_activation + cos_monthly;
+  const cos_total = cos_civil + cos_activation + cos_monthly + cos_lump;
   const profit = revenue - cos_total;
   const gross_profit_pct = revenue > 0 ? profit / revenue : 0;
   const cost_per_home = fc_activation > 0 ? cos_total / fc_activation : 0;
@@ -79,6 +81,7 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
     cos_civil,
     cos_activation,
     cos_monthly,
+    cos_lump,
     cos_total,
     profit,
     gross_profit_pct,

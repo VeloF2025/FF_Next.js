@@ -24,7 +24,11 @@ export interface ServiceRates {
   optical_per_pon: number;       // Optical / PON
   activation_each: number;       // Activation / Each
   wayleave_incentive: number;    // Wayleave Incentive
-  wayleave_cost: number;         // Wayleave Cost
+}
+
+/** Lump-sum costs entered as project totals (not per-unit or per-month). */
+export interface LumpCosts {
+  wayleave_cost: number;  // Wayleave Cost (project total)
 }
 
 /** COS — Materials Rate (supply / stock per unit) */
@@ -65,6 +69,9 @@ export interface ConduitProjectInputs {
   // COS — monthly opex × build_duration_months
   monthly_opex: MonthlyOpex;
 
+  // COS — lump sums (project totals)
+  lump_costs: LumpCosts;
+
 
 }
 
@@ -104,6 +111,7 @@ export interface ConduitCalcResult {
   cos_civil: number;       // infrastructure: poles + stringing + PON + wayleaves
   cos_activation: number;  // per-home activation cost × FC activations
   cos_monthly: number;     // monthly opex × build duration
+  cos_lump: number;        // lump-sum costs (wayleave cost)
 
   cos_total: number;       // sum of all COS
 
