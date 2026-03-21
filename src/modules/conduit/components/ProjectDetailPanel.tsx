@@ -325,6 +325,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [forecastData, setForecastData] = useState<ProjectDetailData | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastOpen, setForecastOpen] = useState(false);
+  const [inputsOpen, setInputsOpen] = useState(true);
 
   // Keep in sync if parent re-renders
   useEffect(() => {
@@ -417,8 +418,17 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       {/* ── COS Summary bar ────────────────────────────────────────────── */}
       <CosSummaryBar project={project} />
 
-      {/* ── Input sections ─────────────────────────────────────────────── */}
-      <div className="space-y-3">
+      {/* ── Input sections (collapsible) ───────────────────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setInputsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+        >
+          <span>Project Inputs</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${inputsOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {inputsOpen && <div className="space-y-3 p-3">
 
         {/* Scope */}
         <InputSection title="Scope — Quantities to Build">
@@ -459,8 +469,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="Ad Hoc / mo"    value={inp.monthly_opex.ad_hoc}    onChange={v => setMonthlyOpex('ad_hoc', v)}    prefix="R" hint="contingency / variable" />
         </InputSection>
 
-
-
+        </div>}
       </div>
 
       {/* ── Save bar ───────────────────────────────────────────────────── */}
