@@ -1,21 +1,25 @@
 /**
- * useProjectRevenueData — React Query hook for the Project Revenue report.
- * Fetches projected FC Activation values per project from SharePoint via the API.
+ * useProjectRevenueData — React Query hook for the Cost Centre Revenue report.
+ * Fetches contract revenue grouped by Cost Centre T1 and Cost Centre
+ * from the Shareholder Model via the API.
  */
 
 import { useQuery } from '@tanstack/react-query';
 
-export interface ProjectRevenuePoint {
-  project: string;
-  fcActivation: number;
+// 🟢 WORKING: Cost Centre Revenue types
+export interface CostCentreRevenueItem {
+  tier1: string;
+  tier2: string;
+  revenue: number;
 }
 
-export interface ProjectRevenueResponse {
+export interface CostCentreRevenueResponse {
   success: boolean;
-  data: ProjectRevenuePoint[];
+  data: CostCentreRevenueItem[];
   meta: {
     generatedAt: string;
-    projectCount: number;
+    itemCount: number;
+    sources: string[];
   };
 }
 
@@ -25,20 +29,20 @@ interface ApiErrorBody {
   };
 }
 
-async function fetchProjectRevenue(): Promise<ProjectRevenueResponse> {
+async function fetchCostCentreRevenue(): Promise<CostCentreRevenueResponse> {
   const res = await fetch('/api/analytics/reports/project-revenue');
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
-    throw new Error(body.error?.message ?? 'Failed to load project revenue data');
+    throw new Error(body.error?.message ?? 'Failed to load cost centre revenue data');
   }
-  return res.json() as Promise<ProjectRevenueResponse>;
+  return res.json() as Promise<CostCentreRevenueResponse>;
 }
 
 // 🟢 WORKING: React Query hook with 5-minute cache
 export function useProjectRevenueData() {
-  return useQuery<ProjectRevenueResponse, Error>({
-    queryKey: ['analytics', 'project-revenue'],
-    queryFn: fetchProjectRevenue,
+  return useQuery<CostCentreRevenueResponse, Error>({
+    queryKey: ['analytics', 'cost-centre-revenue'],
+    queryFn: fetchCostCentreRevenue,
     staleTime: 5 * 60 * 1000,
   });
 }
