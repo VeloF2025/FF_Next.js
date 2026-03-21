@@ -349,7 +349,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         </InputSection>
 
         {/* Monthly opex */}
-        <InputSection title={`Monthly Opex — per month × ${dur} months build`}>
+        <InputSection title={`Capitalized OPEX — per month × ${dur} months build`}>
           <InputField label="Casuals / mo"   value={inp.monthly_opex.casuals}   onChange={v => setMonthlyOpex('casuals', v)}   prefix="R" />
           <InputField label="Fuel / mo"      value={inp.monthly_opex.fuel}      onChange={v => setMonthlyOpex('fuel', v)}      prefix="R" />
           <InputField label="Overheads / mo" value={inp.monthly_opex.overheads} onChange={v => setMonthlyOpex('overheads', v)} prefix="R" />
