@@ -1,24 +1,20 @@
 /**
- * ProjectRevenue — Bar chart showing projected FC Activation count per project,
- * sourced from the Shareholder Model "Project_Detail" worksheet via SharePoint.
+ * ProjectRevenue — FC Activation per project.
+ * Table tab: data grid (Project | FC Activations)
+ * Charts tab: horizontal bar chart
  */
 
 'use client';
 
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useProjectRevenueData } from './useProjectRevenueData';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
+import { ProjectRevenueTable } from '../tables/ProjectRevenueTable';
 
-// 🟢 WORKING: Project Revenue bar chart — FC Activation per project
+// 🟢 WORKING: Project Revenue — table grid + bar chart
 export default function ProjectRevenue() {
   const { data, isLoading, error } = useProjectRevenueData();
 
@@ -45,9 +41,9 @@ export default function ProjectRevenue() {
 
   return (
     <ReportTabLayout
-      tableContent={
+      tableContent={<ProjectRevenueTable rows={chartData} />}
+      chartsContent={
         <div className="space-y-4">
-          {/* Stats row */}
           <div className="flex items-center gap-6">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wider">Projects</p>
@@ -58,37 +54,14 @@ export default function ProjectRevenue() {
               <p className="text-sm font-medium text-blue-400">Shareholder Model (live)</p>
             </div>
           </div>
-
-          {/* Bar chart */}
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ top: 4, right: 24, bottom: 4, left: 140 }}
-              >
+              <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 140 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  axisLine={{ stroke: '#4B5563' }}
-                  tickLine={false}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="project"
-                  tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={135}
-                />
+                <XAxis type="number" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={{ stroke: '#4B5563' }} tickLine={false} />
+                <YAxis type="category" dataKey="project" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={135} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1F2937',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    color: '#F9FAFB',
-                  }}
+                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '6px', color: '#F9FAFB' }}
                   formatter={(value: number) => [value.toLocaleString(), 'FC Activation']}
                 />
                 <Bar dataKey="fcActivation" fill="#8B5CF6" radius={[0, 4, 4, 0]} />
