@@ -77,10 +77,11 @@ function clientSort(tickets: Ticket[], field: SortField, dir: SortDir): Ticket[]
 }
 
 function SortIcon({ field, sortField, sortDir }: { field: string; sortField: string; sortDir: SortDir }) {
-  if (field !== sortField) return <ChevronsUpDown className="w-3 h-3 opacity-30 shrink-0" />;
+  if (field !== sortField) return <ChevronsUpDown className="w-3 h-3 opacity-30 shrink-0" aria-hidden="true" />;
+  const ariaLabel = sortDir === 'asc' ? `${field} sorted ascending` : `${field} sorted descending`;
   return sortDir === 'asc'
-    ? <ChevronUp className="w-3 h-3 text-blue-400 shrink-0" />
-    : <ChevronDown className="w-3 h-3 text-blue-400 shrink-0" />;
+    ? <ChevronUp className="w-3 h-3 text-blue-400 shrink-0" aria-label={ariaLabel} />
+    : <ChevronDown className="w-3 h-3 text-blue-400 shrink-0" aria-label={ariaLabel} />;
 }
 
 function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEven: boolean; onTicketClick?: (t: Ticket) => void }) {
@@ -129,14 +130,15 @@ function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEv
       </td>
       <td className="px-2 py-1.5 text-center">
         <span className={cn('inline-block w-2 h-2 rounded-full', ticket.assigned_to ? 'bg-green-400' : 'bg-gray-600')}
+          aria-label={ticket.assigned_to ? `Assigned to ${ticket.assigned_to}` : 'Unassigned'}
           title={ticket.assigned_to ? 'Assigned' : 'Unassigned'} />
       </td>
       <td className="px-2 py-1.5 text-center">
         {ticket.sla_breached
-          ? <AlertTriangle className="w-3.5 h-3.5 text-red-400 mx-auto" title="SLA Breached" />
+          ? <AlertTriangle className="w-3.5 h-3.5 text-red-400 mx-auto" aria-label="SLA Breached" title="SLA Breached" />
           : ticket.qa_ready
-            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mx-auto" title="QA Ready" />
-            : <span className="text-[var(--ff-text-tertiary)]">{'\u2014'}</span>
+            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mx-auto" aria-label="QA Ready" title="QA Ready" />
+            : <span className="text-[var(--ff-text-tertiary)]" aria-label="No status">{'\u2014'}</span>
         }
       </td>
       <td className="px-2 py-1.5 text-[var(--ff-text-tertiary)] whitespace-nowrap">
@@ -216,6 +218,8 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
                   ? 'bg-[var(--ff-primary-500)] text-white border-transparent'
                   : 'bg-[var(--ff-bg-secondary)] text-[var(--ff-text-secondary)] border-[var(--ff-border-light)] hover:bg-[var(--ff-bg-tertiary)]'
               )}
+              aria-label={`Show ${n} rows per page`}
+              aria-pressed={pageSize === n}
             >{n}</button>
           ))}
           <button
@@ -223,8 +227,9 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
             disabled={isLoading}
             className="ml-1 p-1.5 rounded text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-40"
             title="Refresh"
+            aria-label="Refresh tickets"
           >
-            <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
+            <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -238,19 +243,32 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
                 <th
                   key={col.key}
                   className={cn(
-                    'px-2 py-2 font-semibold text-[var(--ff-text-secondary)] whitespace-nowrap select-none',
+                    'px-2 py-2 font-semibold text-[var(--ff-text-secondary)] whitespace-nowrap select-none text-left',
                     col.width,
                     col.align === 'center' && 'text-center',
                     col.align === 'right' && 'text-right',
-                    !col.align && 'text-left',
-                    col.sortable && 'cursor-pointer hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)]'
                   )}
-                  onClick={() => col.sortable && handleSort(col.key as SortField)}
+                  scope="col"
                 >
-                  <div className={cn('flex items-center gap-1', col.align === 'center' && 'justify-center', col.align === 'right' && 'justify-end')}>
-                    {col.label}
-                    {col.sortable && <SortIcon field={col.key} sortField={sortField} sortDir={sortDir} />}
-                  </div>
+                  {col.sortable ? (
+                    <button
+                      onClick={() => handleSort(col.key as SortField)}
+                      className={cn(
+                        'flex items-center gap-1 w-full p-0 font-semibold text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] rounded px-1 py-0.5 transition-colors',
+                        col.align === 'center' && 'justify-center',
+                        col.align === 'right' && 'justify-end'
+                      )}
+                      aria-label={`Sort by ${col.label}, currently ${sortField === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'unsorted'}`}
+                      aria-pressed={sortField === col.key}
+                    >
+                      {col.label}
+                      <SortIcon field={col.key} sortField={sortField} sortDir={sortDir} />
+                    </button>
+                  ) : (
+                    <div className={cn('flex items-center gap-1', col.align === 'center' && 'justify-center', col.align === 'right' && 'justify-end')}>
+                      {col.label}
+                    </div>
+                  )}
                 </th>
               ))}
             </tr>
@@ -274,16 +292,18 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={pagination.page === 1 || isLoading}
               className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30"
+              aria-label="Previous page"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <span className="text-xs text-[var(--ff-text-secondary)] px-2">{pagination.page} / {pagination.totalPages}</span>
+            <span className="text-xs text-[var(--ff-text-secondary)] px-2" aria-label={`Page ${pagination.page} of ${pagination.totalPages}`}>{pagination.page} / {pagination.totalPages}</span>
             <button
               onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
               disabled={pagination.page === pagination.totalPages || isLoading}
               className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30"
+              aria-label="Next page"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
