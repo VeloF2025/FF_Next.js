@@ -139,6 +139,7 @@ async function qfieldApiRequest(
           try {
             resolve(JSON.parse(body));
           } catch (e) {
+            log.error('activate-sync-oes-to-qfield', { error: e instanceof Error ? e.message : String(e) });
             resolve(body);
           }
         } else {

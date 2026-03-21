@@ -5,6 +5,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { apiResponse } from '@/lib/apiResponse';
 import { neon } from '@neondatabase/serverless';
 import { parseVttSpeakers } from '@/lib/graph/transcripts';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 

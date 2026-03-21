@@ -168,6 +168,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, result[0]);
   } catch (error: unknown) {
+    log.error('[pickingId]-process', { error: error instanceof Error ? error.message : String(error) });
     // Rollback status on error
     await sql`
       UPDATE stock_pickings

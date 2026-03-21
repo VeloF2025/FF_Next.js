@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { execSync } from 'child_process'
+import { log } from '@/lib/logger'
 
 interface ServiceHealth {
   name: string
@@ -123,6 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       generatedAt: new Date().toISOString(),
     })
   } catch (e) {
+    log.error('deploy-health check', { error: e instanceof Error ? e.message : String(e) })
     return res.status(500).json({ error: 'Internal server error' })
   }
 }

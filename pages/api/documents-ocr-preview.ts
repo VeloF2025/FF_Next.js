@@ -422,6 +422,7 @@ Return ONLY the number, nothing else.`;
       log.warn('Orientation detection request failed', { status: response.status });
     }
   } catch (error) {
+    log.error('documents-ocr-preview', { error: error instanceof Error ? error.message : String(error) });
     log.warn('Orientation detection failed, assuming upright', { error: String(error) });
   }
   return 0;

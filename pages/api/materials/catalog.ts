@@ -7,7 +7,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';import { neon } from '@neondatabase/serverless';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import type {
@@ -125,6 +125,7 @@ async function handleGet(
       total,
     });
   } catch (error) {
+    log.error('materials-catalog', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.databaseError(res, error, 'Failed to fetch materials');
   }
 }

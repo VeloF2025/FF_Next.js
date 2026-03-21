@@ -146,6 +146,7 @@ async function checkServiceHealth(
     return baseStatus;
 
   } catch (error) {
+    log.error('services-status', { error: error instanceof Error ? error.message : String(error) });
     baseStatus.status = 'disconnected';
     baseStatus.error_message = error instanceof Error && error.name === 'AbortError'
       ? 'Connection timeout'

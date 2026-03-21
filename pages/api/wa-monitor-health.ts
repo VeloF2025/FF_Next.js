@@ -190,6 +190,7 @@ async function checkProcess(name: string, command: string): Promise<HealthCheck>
       latency_ms: latency,
     };
   } catch (error) {
+    log.error('wa-monitor-health', { error: error instanceof Error ? error.message : String(error) });
     return {
       status: 'down',
       details: { name },

@@ -14,6 +14,7 @@ import type {
   LicenseStatus,
   DriverStatus,
 } from '@/modules/fleet/types/driver.types';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -234,6 +235,7 @@ async function handler(
 
     return apiResponse.success(res, response);
   } catch (error) {
+    log.error('drivers-index', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

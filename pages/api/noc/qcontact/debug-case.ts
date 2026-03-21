@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';import { apiResponse } from '@/lib/apiResponse';
 import { createFiberTimeQContactClient } from '@/modules/noc/services/fibertimeQContactClient';
 import { withAuth } from '@/lib/auth';
 
@@ -48,6 +48,8 @@ async function handler(
       }
     });
   } catch (error) {
+   log.error('qcontact-debug-case', { error: error instanceof Error ? error.message : String(error) });
+    log.error('qcontact-debug', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

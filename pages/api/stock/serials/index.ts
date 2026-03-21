@@ -84,6 +84,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       return res.status(201).json({ data: serial });
     } catch (error: unknown) {
+      log.error('serials-index', { error: error instanceof Error ? error.message : String(error) });
       if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
         return res.status(409).json({ error: 'Serial number already exists for this item' });
       }

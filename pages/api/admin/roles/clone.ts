@@ -120,6 +120,7 @@ async function handler(
       clonedFrom: sourceRole,
     });
   } catch (error) {
+    log.error('roles-clone', { error: error instanceof Error ? error.message : String(error) });
     // Handle specific PostgreSQL errors from the clone_role function
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     if (errorMessage.includes('does not exist')) {

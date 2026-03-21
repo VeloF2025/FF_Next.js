@@ -359,6 +359,7 @@ async function processOneValidation(
       feedback: vlmResult.feedback,
     };
   } catch (error) {
+    log.error('qfield-qa-validate', { error: error instanceof Error ? error.message : String(error) });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     // Update record with error

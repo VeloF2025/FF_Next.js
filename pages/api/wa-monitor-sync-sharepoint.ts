@@ -92,6 +92,7 @@ async function getAccessToken(config: SharePointConfig): Promise<string> {
     const data = await response.json();
     return data.access_token;
   } catch (error: any) {
+    log.error('wa-monitor-sync-sharepoint', { error: error instanceof Error ? error.message : String(error) });
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
       throw new Error('OAuth token request timed out after 30 seconds');

@@ -7,7 +7,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth/middleware';
 
@@ -36,6 +36,7 @@ async function handleGet(_req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { configs });
   } catch (err) {
+    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, err);
   }
 }
@@ -67,6 +68,7 @@ async function handleUpsert(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, rows[0]);
   } catch (err) {
+    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, err);
   }
 }
@@ -81,6 +83,7 @@ async function handleDelete(req: NextApiRequest, res: NextApiResponse) {
     await sql`DELETE FROM exfo_sync_config WHERE id = ${id}::UUID`;
     return apiResponse.success(res, { deleted: true });
   } catch (err) {
+    log.error('exfo-config', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, err);
   }
 }

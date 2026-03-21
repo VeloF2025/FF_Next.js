@@ -6,6 +6,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { checkStaffAccess } from '@/services/staff/staffAccessService';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -25,6 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       isSelfView: access.isSelfView,
     });
   } catch (error) {
+    log.error('staff-access-level GET', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

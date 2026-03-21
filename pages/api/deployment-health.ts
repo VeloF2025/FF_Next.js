@@ -8,6 +8,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
+import { log } from '@/lib/logger';
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 20_000; // 20 seconds

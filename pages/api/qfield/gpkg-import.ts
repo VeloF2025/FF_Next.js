@@ -148,6 +148,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           allErrors.push(...result.errors.map(e => `${layer}: ${e}`));
         }
       } catch (layerError) {
+        log.error('qfield-gpkg-import', { error: layerError instanceof Error ? layerError.message : String(layerError) });
         const errMsg = layerError instanceof Error ? layerError.message : 'Unknown error';
         results[layer] = { created: 0, updated: 0, errors: [errMsg] };
         allErrors.push(`${layer}: ${errMsg}`);

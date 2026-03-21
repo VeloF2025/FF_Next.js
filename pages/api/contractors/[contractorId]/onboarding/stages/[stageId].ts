@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { contractorOnboardingService, UpdateStageRequest } from '@/services/contractor/contractorOnboardingService';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL || '');
 

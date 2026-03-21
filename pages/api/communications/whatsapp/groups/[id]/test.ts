@@ -89,6 +89,7 @@ If you received this message, the connection is working! ✅`;
         ]
       );
     } catch (logError) {
+      log.error('[id]-test', { error: logError instanceof Error ? logError.message : String(logError) });
       log.warn('[WA Test] Failed to log message', { logError });
     }
 

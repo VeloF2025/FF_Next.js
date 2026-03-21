@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
 
 const MC_BASE = 'http://127.0.0.1:3847/api';
 
@@ -35,6 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const data = await response.json();
     return res.status(response.status).json(data);
   } catch (error) {
+    log.error('mission-control-[...path]', { error: error instanceof Error ? error.message : String(error) });
     return res.status(502).json({ error: 'Mission Control server unavailable' });
   }
 }

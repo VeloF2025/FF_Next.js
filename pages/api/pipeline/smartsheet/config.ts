@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse } from '@/lib/apiResponse';
+import { log } from '@/lib/logger';import { apiResponse } from '@/lib/apiResponse';
 import { pipelineSmartsheetService } from '@/modules/pipeline/services';
 import { withAuth } from '@/lib/auth';
 
@@ -39,6 +39,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return apiResponse.methodNotAllowed(res, ['GET', 'POST', 'PUT']);
     }
   } catch (error) {
+   log.error('smartsheet-config', { error: error instanceof Error ? error.message : String(error) });
+    log.error('smartsheet-config', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

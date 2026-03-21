@@ -9,6 +9,7 @@ import type { NextApiResponse } from 'next';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
+import { log } from '@/lib/logger';
 
 async function handler(
   req: AuthenticatedNextApiRequest,
@@ -28,6 +29,7 @@ async function handler(
     const result = await pool.query(sql);
     return apiResponse.success(res, result.rows);
   } catch (err) {
+    log.error('contractors-teams GET', { error: err instanceof Error ? err.message : String(err) });
     return apiResponse.internalError(res, err);
   }
 }

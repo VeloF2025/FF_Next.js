@@ -81,6 +81,7 @@ async function fetchSerialDataFromApi(dropNumber: string): Promise<DrPhotoApiRes
       data,
     };
   } catch (error) {
+    log.error('onemap-sync-serials', { error: error instanceof Error ? error.message : String(error) });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch from dr-photo-api',

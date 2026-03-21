@@ -186,6 +186,7 @@ async function sendMessage(
     };
 
   } catch (error) {
+    log.error('whatsapp-send-message', { error: error instanceof Error ? error.message : String(error) });
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,

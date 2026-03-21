@@ -219,6 +219,7 @@ async function processBatch(
 
       succeeded++;
     } catch (error: unknown) {
+      log.error('activate-sharepoint-sync-batch', { error: error instanceof Error ? error.message : String(error) });
       const errorMessage = error instanceof Error ? error.message : String(error);
       errors.push({ dropNumber, error: errorMessage });
       failed++;

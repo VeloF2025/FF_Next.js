@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { log } from '@/lib/logger';
 import {
   DEFAULT_CHANNEL_PREFERENCES,
   EVENT_LABELS,
@@ -84,6 +85,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     const payload: CommunicationsSettingsResponse = { preferences, globalSettings };
     return apiResponse.success(res, payload);
   } catch (error) {
+    log.error('communications-settings GET', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }
@@ -166,6 +168,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse) {
 
     return apiResponse.success(res, { updated: updatedCount });
   } catch (error) {
+    log.error('communications-settings PUT', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }

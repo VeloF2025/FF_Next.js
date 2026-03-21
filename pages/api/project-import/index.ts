@@ -79,6 +79,7 @@ async function handler(
 
         log.info(`Auto-detected data type: ${resolvedDataType}`, {}, 'project-import-api');
       } catch (parseError) {
+        log.error('project-import-index', { error: parseError instanceof Error ? parseError.message : String(parseError) });
         const error = parseError as Error;
         return apiResponse.error(res, ErrorCode.BAD_REQUEST, `Failed to parse Excel file: ${error.message}`);
       }

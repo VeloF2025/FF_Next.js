@@ -11,7 +11,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth/middleware';
 
@@ -31,6 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     return handleList(req, res);
   } catch (err) {
+    log.error('exfo-results', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, err);
   }
 }

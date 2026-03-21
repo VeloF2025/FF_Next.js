@@ -11,6 +11,7 @@ import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import {
   verifyPortalSession,
 } from '@/modules/fleet/portal/portalSessionUtils';
+import { log } from '@/lib/logger';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -175,6 +176,7 @@ export default async function handler(
         : null,
     });
   } catch (error) {
+    log.error('portal-session', { error: error instanceof Error ? error.message : String(error) });
     return apiResponse.internalError(res, error);
   }
 }
