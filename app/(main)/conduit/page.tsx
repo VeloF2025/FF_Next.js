@@ -116,15 +116,17 @@ export default async function ConduitPage() {
             sub="forecasted connected homes"
           />
           <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
-          <KpiCard label="Total COS" value={fZAR(totals.cos_total)} />
+          <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
           <KpiCard
             label="Total Profit"
             value={fZAR(totals.profit)}
+            sub="forecasted profit"
             valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}
           />
           <KpiCard
             label="Portfolio GP%"
             value={fPct(portfolioGP)}
+            sub="forecasted gross profit"
             valueClass={
               portfolioGP >= 0.30
                 ? 'text-emerald-400'
