@@ -13,6 +13,24 @@ import {
 } from '@/types/staff.types';
 
 /**
+ * Type for Firestore document snapshot data
+ */
+interface FirestoreStaffDoc {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Converts Firestore document to StaffMember type
+ */
+function docToStaffMember(doc: FirestoreStaffDoc): StaffMember {
+  return {
+    ...doc,
+    id: doc.id,
+  } as StaffMember;
+}
+
+/**
  * Specialized query operations for staff
  */
 export const staffQueryService = {
@@ -29,9 +47,9 @@ export const staffQueryService = {
       const snapshot = await getDocs(q);
       
       return snapshot.docs
-        .map((doc: any) => ({ id: doc.id, ...doc.data() } as StaffMember))
-        .filter((staff: any) => staff.status === StaffStatus.ACTIVE)
-        .map((staff: any) => ({
+        .map((doc) => docToStaffMember({ id: doc.id, ...doc.data() }))
+        .filter((staff: StaffMember) => staff.status === StaffStatus.ACTIVE)
+        .map((staff: StaffMember) => ({
           id: staff.id!,
           name: staff.name,
           email: staff.email,
@@ -71,13 +89,13 @@ export const staffQueryService = {
       ];
       
       return snapshot.docs
-        .map((doc: any) => ({ id: doc.id, ...doc.data() } as StaffMember))
-        .filter((staff: any) => {
+        .map((doc) => docToStaffMember({ id: doc.id, ...doc.data() }))
+        .filter((staff: StaffMember) => {
           // Check if active
           if (staff.status !== StaffStatus.ACTIVE) return false;
           
           // Check if position matches any manager position
-          const position = staff.position?.toLowerCase() || '';
+          const position = staff.position?.toString().toLowerCase() || '';
           return managerPositions.some(mp => 
             position.includes(mp.toLowerCase()) || 
             position.includes('manager') ||
@@ -85,7 +103,7 @@ export const staffQueryService = {
             position.includes('supervisor')
           );
         })
-        .map((staff: any) => ({
+        .map((staff: StaffMember) => ({
           id: staff.id!,
           name: staff.name,
           email: staff.email,
@@ -172,7 +190,7 @@ export const staffQueryService = {
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       } as ProjectAssignment));
@@ -195,7 +213,7 @@ export const staffQueryService = {
       );
       const snapshot = await getDocs(q);
       
-      return snapshot.docs.map((doc: any) => ({
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       } as ProjectAssignment));
@@ -210,9 +228,9 @@ export const staffQueryService = {
    */
   async getAllStaff(): Promise<StaffMember[]> {
     const snapshot = await getDocs(collection(db, 'staff'));
-    return snapshot.docs.map((doc: any) => ({
+    return snapshot.docs.map((doc) => docToStaffMember({
       id: doc.id,
       ...doc.data()
-    } as StaffMember));
+    }));
   }
 };
