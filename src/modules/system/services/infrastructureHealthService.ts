@@ -4,6 +4,7 @@
  */
 
 import { neon } from '@/lib/db-neon';
+import { sql as poolSql } from '@/lib/db-pool';
 import { log } from '@/lib/logger';
 import type {
   ServiceStatus,
@@ -297,8 +298,7 @@ async function getRecentRecoveryActions(limit: number = 10): Promise<RecoveryAct
   if (!DATABASE_URL) return [];
 
   try {
-    const sql = neon(DATABASE_URL);
-    const results = await sql`
+    const results = await poolSql`
       SELECT
         id,
         timestamp,
@@ -340,8 +340,7 @@ async function saveHealthSnapshot(health: SystemHealthResponse): Promise<void> {
   if (!DATABASE_URL) return;
 
   try {
-    const sql = neon(DATABASE_URL);
-    await sql`
+    await poolSql`
       INSERT INTO system_health_logs (
         timestamp,
         overall_status,
@@ -576,8 +575,7 @@ export async function getHealthHistory(
   }
 
   try {
-    const sql = neon(DATABASE_URL);
-    const results = await sql`
+    const results = await poolSql`
       SELECT
         timestamp,
         overall_status,
@@ -586,7 +584,7 @@ export async function getHealthHistory(
         degraded_count,
         down_count
       FROM system_health_logs
-      WHERE timestamp > NOW() - INTERVAL '${hours} hours'
+      WHERE timestamp > NOW() - (${hours} * INTERVAL '1 hour')
       ORDER BY timestamp DESC
       LIMIT ${limit}
     `;

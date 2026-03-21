@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import {
@@ -7,8 +7,7 @@ import {
   findAssigneeEmail,
 } from '@/services/action-items/actionItemsParser';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql } from '@/lib/db-pool';
 
 /**
  * Extract action items from a meeting's summary

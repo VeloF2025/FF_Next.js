@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { neon } from '@neondatabase/serverless';
+
 import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
@@ -7,8 +7,7 @@ import {
   parseFirefliesActionItems,
   findAssigneeEmail,
 } from '@/services/action-items/actionItemsParser';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql } from '@/lib/db-pool';
 
 /**
  * Extract action items from ALL meetings that have them
