@@ -88,6 +88,10 @@ function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEv
   const href = `/noc/tickets/${ticket.id}`;
   const linkable = !onTicketClick;
 
+  const handleKeyDown = onTicketClick
+    ? (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTicketClick(ticket); } }
+    : undefined;
+
   return (
     <tr
       className={cn(
@@ -97,6 +101,10 @@ function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEv
         onTicketClick && ticket.sla_breached && 'ring-inset ring-1 ring-red-500/30',
       )}
       onClick={onTicketClick ? () => onTicketClick(ticket) : undefined}
+      onKeyDown={handleKeyDown}
+      tabIndex={onTicketClick ? 0 : undefined}
+      role={onTicketClick ? 'button' : undefined}
+      aria-label={onTicketClick ? `Open ticket ${ticket.ticket_uid}: ${ticket.title}` : undefined}
     >
       <td className="px-2 py-1.5 font-mono text-blue-400 whitespace-nowrap">
         {linkable ? <Link href={href} className="block hover:underline">{ticket.ticket_uid}</Link> : ticket.ticket_uid}
@@ -237,6 +245,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
       {/* Table */}
       <div className="flex-1 overflow-auto rounded-lg border border-[var(--ff-border-light)] min-h-0">
         <table className="w-full text-xs border-collapse min-w-[900px]">
+          <caption className="sr-only">NOC tickets list with sortable columns for ticket ID, priority, type, status, title, DR number, assignment, SLA status, and age</caption>
           <thead className="sticky top-0 z-10">
             <tr className="bg-[var(--ff-bg-tertiary)] border-b border-[var(--ff-border-light)]">
               {COLUMNS.map(col => (
