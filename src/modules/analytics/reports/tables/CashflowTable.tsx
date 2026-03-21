@@ -61,6 +61,14 @@ export function CashflowTable({ rows }: Props) {
   const firstForecastIdx = rowsWithBalance.findIndex((r) => !r.isActual);
   const forecastCount = firstForecastIdx === -1 ? 0 : rowsWithBalance.length - firstForecastIdx;
 
+  // Actuals subtotal (rows before separator)
+  const actualRows = firstForecastIdx === -1 ? rowsWithBalance : rowsWithBalance.slice(0, firstForecastIdx);
+  const actualTotals = actualRows.reduce(
+    (acc, r) => ({ cashIn: acc.cashIn + r.cashIn, cashOut: acc.cashOut + r.cashOut, net: acc.net + r.net }),
+    { cashIn: 0, cashOut: 0, net: 0 }
+  );
+  const actualClosing = actualRows.length > 0 ? actualRows[actualRows.length - 1].closingBalance : 0;
+
   const th = 'px-4 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
   const thR = `${th} text-right`;
 
@@ -86,6 +94,21 @@ export function CashflowTable({ rows }: Props) {
 
             return (
               <>
+                {/* Actuals subtotal row — inserted just before separator */}
+                {isSeparatorRow && firstForecastIdx > 0 && (
+                  <tr key="actual-total" style={{ backgroundColor: '#1a3a4a' }} className="border-t border-gray-600">
+                    <td className="px-4 py-2.5 text-white font-bold text-sm">Total Actual</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">{fZAR(actualTotals.cashIn)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">{fZAR(actualTotals.cashOut)}</td>
+                    <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${actualTotals.net < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {fZAR(actualTotals.net)}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${actualClosing < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {fZAR(actualClosing)}
+                    </td>
+                  </tr>
+                )}
+
                 {/* Separator row with +/− toggle */}
                 {isSeparatorRow && (
                   <tr key={`separator-${i}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
