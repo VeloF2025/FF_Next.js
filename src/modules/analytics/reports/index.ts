@@ -29,8 +29,8 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
   },
   {
     id: 'project-revenue',
-    name: 'Project Revenue',
-    description: 'Projected FC Activation count per project from the Shareholder Model',
+    name: 'Cost Centre Revenue',
+    description: 'Contract revenue grouped by Cost Centre T1 and Cost Centre from the Shareholder Model',
     category: 'financial',
   },
   {
