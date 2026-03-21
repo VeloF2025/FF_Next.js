@@ -89,20 +89,20 @@ export function CashflowTable({ rows }: Props) {
               <>
                 {/* Actual / Forecast separator — inserted before first forecast row */}
                 {isSeparatorRow && (
-                  <tr key={`separator-${i}`} style={{ backgroundColor: 'rgba(220,38,38,0.08)' }}>
+                  <tr key={`separator-${i}`} style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
                     <td
                       colSpan={5}
-                      className="px-4 py-1 text-xs font-bold tracking-widest uppercase"
+                      className="px-4 py-1 text-xs font-semibold tracking-widest uppercase"
                       style={{
-                        borderTop: '2px solid #ef4444',
-                        borderBottom: '1px solid rgba(239,68,68,0.3)',
-                        color: '#ef4444',
+                        borderTop: '2px solid #1a3a4a',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        color: '#9CA3AF',
                         letterSpacing: '0.12em',
                       }}
                     >
-                      <span className="opacity-70">← ACTUAL</span>
-                      <span className="mx-3 opacity-40">|</span>
-                      <span className="opacity-70">FORECAST →</span>
+                      <span className="opacity-60">← ACTUAL</span>
+                      <span className="mx-3 opacity-30">|</span>
+                      <span className="opacity-60">FORECAST →</span>
                     </td>
                   </tr>
                 )}
@@ -110,7 +110,7 @@ export function CashflowTable({ rows }: Props) {
                 <tr
                   key={r.label}
                   className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}
-                  style={isSeparatorRow ? { borderTop: '2px solid #ef4444' } : undefined}
+                  style={isSeparatorRow ? { borderTop: '2px solid #1a3a4a' } : undefined}
                 >
                   <td className="px-4 py-2 text-gray-200 font-medium">{r.label}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-gray-300">{fZAR(r.cashIn)}</td>
