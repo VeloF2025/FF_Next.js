@@ -212,14 +212,16 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
                   </td>
                 </tr>,
 
-                // Expansion row
+                // Expansion row — passes full project so detail panel can edit all COS inputs
                 isExpanded
                   ? (
                     <tr key={`${project.id}-detail`}>
                       <td colSpan={TOTAL_COLS} className="p-0 border border-gray-600">
                         <ProjectDetailPanel
-                          projectId={project.id}
-                          projectName={project.name}
+                          project={project}
+                          onProjectUpdate={updated => {
+                            setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+                          }}
                         />
                       </td>
                     </tr>
