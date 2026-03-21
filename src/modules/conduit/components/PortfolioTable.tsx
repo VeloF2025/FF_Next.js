@@ -128,15 +128,57 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
   return (
     <div className="space-y-6">
 
-      {/* ── Forecasted section divider ──────────────────────────────── */}
+      {/* ── Prospective section divider ─────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <span className="text-sm font-bold text-white uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
+        <span className="text-sm font-bold uppercase tracking-widest border border-purple-500 text-purple-400 px-3 py-1 rounded">
+          Prospective
+        </span>
+        <div className="flex-1 border-t border-gray-700" />
+      </div>
+
+      {/* ── KPI Tiles — Prospective ─────────────────────────────────── */}
+      <div className="flex flex-wrap gap-3">
+        <KpiCard
+          label="Total Homes"
+          value={fNum(totals.po_count)}
+          sub={`${projects.length} projects`}
+        />
+        <KpiCard
+          label="FC Activations"
+          value={fNum(totals.fc_activation)}
+          sub="forecasted connected homes"
+        />
+        <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
+        <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
+        <KpiCard
+          label="Total Profit"
+          value={fZAR(totals.profit)}
+          sub="forecasted profit"
+          valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}
+        />
+        <KpiCard
+          label="Portfolio GP%"
+          value={fPct(totalGP)}
+          sub="forecasted gross profit"
+          valueClass={
+            totalGP >= 0.30
+              ? 'text-emerald-400'
+              : totalGP >= 0.10
+              ? 'text-amber-400'
+              : 'text-red-400'
+          }
+        />
+      </div>
+
+      {/* ── Forecasted — Executable section divider ──────────────────── */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-bold uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
           Forecasted — Executable
         </span>
         <div className="flex-1 border-t border-gray-700" />
       </div>
 
-      {/* ── KPI Tiles — driven by live projects state ───────────────── */}
+      {/* ── KPI Tiles — Forecasted Executable ──────────────────────── */}
       <div className="flex flex-wrap gap-3">
         <KpiCard
           label="Total Homes"
