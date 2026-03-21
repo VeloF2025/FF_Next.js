@@ -259,6 +259,9 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
         />
       </div>
 
+      {/* ── Prospective table ───────────────────────────────────────── */}
+      <ProjectsGrid label="Project Scope — Prospective" />
+
       {/* ── Forecasted — Executable section divider ──────────────────── */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-bold uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
@@ -300,11 +303,6 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
           }
         />
       </div>
-
-      {/* ── Prospective table ───────────────────────────────────────── */}
-      <ProjectsGrid label="Project Scope — Prospective" />
-
-      
 
       {/* ── Executable table ────────────────────────────────────────── */}
       <ProjectsGrid label="Project Scope — Executable" />
