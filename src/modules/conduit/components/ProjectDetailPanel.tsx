@@ -582,7 +582,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         </button>
 
         {forecastOpen && (
-          <div className="p-3 bg-gray-900">
+          <div className="p-3 bg-gray-900 min-w-0 overflow-hidden">
             <MonthlyForecastGrid
               project={project}
               onPlanChange={handlePlanChange}

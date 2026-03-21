@@ -328,8 +328,8 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const tdTotal = 'px-2 py-0.5 text-right text-xs tabular-nums whitespace-nowrap border-l border-gray-700';
 
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded border border-gray-700">
+    <div className="space-y-2 min-w-0 w-full">
+      <div className="overflow-x-auto rounded border border-gray-700" style={{ maxWidth: '100%' }}>
         <table className="text-xs border-collapse" style={{ minWidth: `${Math.max(700, dur * 72 + 200)}px` }}>
           <thead>
             <tr>
