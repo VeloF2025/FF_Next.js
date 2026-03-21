@@ -281,7 +281,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
                 isExpanded
                   ? (
                     <tr key={`${project.id}-detail`}>
-                      <td colSpan={TOTAL_COLS} className="p-0 border border-gray-600">
+                      <td colSpan={TOTAL_COLS} className="p-0 border border-gray-600 max-w-0 overflow-hidden">
                         <ProjectDetailPanel
                           project={project}
                           onProjectUpdate={updated => {
