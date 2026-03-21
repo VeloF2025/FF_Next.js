@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { ChevronDown, Loader2, AlertCircle } from 'lucide-react';
 import { useProjectDetailData, type MonthlyValues } from './useProjectDetailData';
+import { ReportTabLayout } from '../ReportTabLayout';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -246,7 +247,8 @@ export default function ProjectDetail() {
   ];
 
   return (
-    <div className="space-y-3">
+    <ReportTabLayout
+      tableContent={<div className="space-y-3">
       {/* Yellow top bar with project name + slicer */}
       <div className="bg-yellow-400 rounded-lg px-4 py-3 flex items-center justify-between">
         <span className="font-bold text-slate-900 text-xl tracking-wide">{project}</span>
@@ -280,6 +282,7 @@ export default function ProjectDetail() {
       <div className="px-3 py-1.5 bg-slate-800 rounded border border-slate-700 text-xs text-gray-500">
         Source: Data tab (COS actuals) + FT_Invoice tab (revenue) &middot; {months.length} months
       </div>
-    </div>
+    </div>}
+    />
   );
 }

@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useExpensePivotData, type PivotType } from './useExpensePivotData';
+import { ReportTabLayout } from '../ReportTabLayout';
 
 /** Formats a ZAR value: 0 → "—", otherwise "R 1 234" */
 function formatZAR(val: number): string {
@@ -52,7 +53,8 @@ export default function ExpensePivot() {
   const years = Object.keys(yearGroups).sort();
 
   return (
-    <div className="space-y-4">
+    <ReportTabLayout
+      tableContent={<div className="space-y-4">
       {/* Filter buttons */}
       <div className="flex items-center gap-2">
         {FILTER_OPTIONS.map((opt) => (
@@ -198,6 +200,7 @@ export default function ExpensePivot() {
           </tfoot>
         </table>
       </div>
-    </div>
+    </div>}
+    />
   );
 }

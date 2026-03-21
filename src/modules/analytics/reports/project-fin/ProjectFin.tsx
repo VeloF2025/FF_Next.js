@@ -15,6 +15,7 @@
 
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useProjectFinData, SectionData, SectionTotals } from './useProjectFinData';
+import { ReportTabLayout } from '../ReportTabLayout';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -194,52 +195,56 @@ export default function ProjectFin() {
   const { months, projects, cos, revenue, net, totals } = fin;
 
   return (
-    <div className="bg-slate-900 rounded-lg overflow-hidden border border-slate-700 text-sm">
-      {/* Yellow banner */}
-      <div className="bg-yellow-400 px-4 py-2">
-        <span className="font-bold text-slate-900 text-sm tracking-wide">
-          Project COS/Rev &mdash; Forecast
-        </span>
-      </div>
+    <ReportTabLayout
+      tableContent={
+        <div className="bg-slate-900 rounded-lg overflow-hidden border border-slate-700 text-sm">
+          {/* Yellow banner */}
+          <div className="bg-yellow-400 px-4 py-2">
+            <span className="font-bold text-slate-900 text-sm tracking-wide">
+              Project COS/Rev &mdash; Forecast
+            </span>
+          </div>
 
-      <div className="space-y-0 divide-y divide-slate-700">
-        {/* Section 1: Project COS */}
-        <SectionTable
-          title="Project COS"
-          projects={projects}
-          months={months}
-          data={cos}
-          totals={totals.cos}
-          headerBg="bg-slate-800"
-        />
+          <div className="space-y-0 divide-y divide-slate-700">
+            {/* Section 1: Project COS */}
+            <SectionTable
+              title="Project COS"
+              projects={projects}
+              months={months}
+              data={cos}
+              totals={totals.cos}
+              headerBg="bg-slate-800"
+            />
 
-        {/* Section 2: Project Revenue */}
-        <SectionTable
-          title="Project Revenue"
-          projects={projects}
-          months={months}
-          data={revenue}
-          totals={totals.revenue}
-          headerBg="bg-slate-800"
-        />
+            {/* Section 2: Project Revenue */}
+            <SectionTable
+              title="Project Revenue"
+              projects={projects}
+              months={months}
+              data={revenue}
+              totals={totals.revenue}
+              headerBg="bg-slate-800"
+            />
 
-        {/* Section 3: Project Net — colour-coded */}
-        <SectionTable
-          title="Project Net"
-          projects={projects}
-          months={months}
-          data={net}
-          totals={totals.net}
-          colourCodeValues
-          headerBg="bg-emerald-900"
-        />
-      </div>
+            {/* Section 3: Project Net — colour-coded */}
+            <SectionTable
+              title="Project Net"
+              projects={projects}
+              months={months}
+              data={net}
+              totals={totals.net}
+              colourCodeValues
+              headerBg="bg-emerald-900"
+            />
+          </div>
 
-      {/* Footer metadata */}
-      <div className="px-4 py-2 bg-slate-800 border-t border-slate-700 text-xs text-gray-500 flex items-center justify-between">
-        <span>Source: Shareholder Model &mdash; Project_Fin worksheet (live)</span>
-        <span>{projects.length} projects &middot; {months.length} months</span>
-      </div>
-    </div>
+          {/* Footer metadata */}
+          <div className="px-4 py-2 bg-slate-800 border-t border-slate-700 text-xs text-gray-500 flex items-center justify-between">
+            <span>Source: Shareholder Model &mdash; Project_Fin worksheet (live)</span>
+            <span>{projects.length} projects &middot; {months.length} months</span>
+          </div>
+        </div>
+      }
+    />
   );
 }
