@@ -11,6 +11,14 @@ export const analyticsSection: NavSection = {
   isCollapsible: true,
   items: [
     {
+      to: '/analytics/reports',
+      icon: FileText,
+      label: 'Reports',
+      shortLabel: 'Reports',
+      permissions: [],
+      rbacKey: 'analytics.reports',
+    },
+    {
       to: '/analytics',
       icon: Activity,
       label: 'Analytics Dashboard',
@@ -33,14 +41,6 @@ export const analyticsSection: NavSection = {
       shortLabel: 'KPI Dash',
       permissions: [],
       rbacKey: 'analytics',
-    },
-    {
-      to: '/reports',
-      icon: FileText,
-      label: 'Reports',
-      shortLabel: 'Reports',
-      permissions: [],
-      rbacKey: 'analytics.reports',
     },
   ]
 };
