@@ -108,9 +108,6 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
     }
   };
 
-  const TOTAL_COLS = 13; // chevron + name + PO + rate + uptake + 5 calc + duration + save
-  const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
-
   const TOTAL_COLS = 13;
   const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
 
