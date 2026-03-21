@@ -1,8 +1,10 @@
 /**
- * PortfolioTable — v2 Portfolio with expandable drill-down.
+ * PortfolioTable — v3 Portfolio with expandable drill-down.
  *
- * Editable: Rate, Uptake %, Build Duration
- * Read-only: PO Count, FC Activations, Revenue, COS Total, Profit, GP%, Cost/Home
+ * Editable inline: Rate, Uptake %, Build Duration
+ * Full COS inputs editable via expanded detail panel
+ * Read-only summary: PO Count, FC Activations, Revenue, COS Total, Profit, GP%, Cost/Home
+ * Cost/Home = COS Total ÷ FC Activations (connected homes, not passed)
  * Expand: click row or chevron => ProjectDetailPanel inline
  */
 'use client';
@@ -44,7 +46,8 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
     []
   );
 
-  const updateInputs = (id: string, field: keyof ConduitProjectInputs, raw: string) => {
+  // Update a top-level scalar field in inputs_json (rate or uptake)
+  const updateInputs = (id: string, field: 'rate' | 'uptake', raw: string) => {
     updateProject(id, p => ({
       ...p,
       inputs_json: { ...p.inputs_json, [field]: Number(raw) },

@@ -1,13 +1,28 @@
 /**
  * GET /api/conduit/projects/[id]/detail
- * Returns Rollout Plan, COS Categories, and Revenue Forecast for a project.
  *
- * Currently returns Lawley seed data for all projects (SharePoint integration pending).
- * TODO: fetch per-project Excel data from SharePoint once integration is in place.
+ * Returns month-by-month forecast for a project, computed from its inputs_json.
+ * No hardcoded data — all rows derived from the project record.
+ *
+ * Revenue model: recurring subscription.
+ *   Each month N:  monthly_revenue = cumulative_activations_to_date × rate
+ *
+ * COS spread:
+ *   Civil costs      → evenly over build duration (front-loaded option in v3)
+ *   Activation costs → proportional to new activations that month
+ *   Monthly opex     → constant each month
+ *   Sub-contractor   → evenly over build duration
+ *   Ad Hoc           → month 1 only (lump, variable by nature)
+ *
+ * Activations spread linearly; last month absorbs any rounding remainder.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
+import { neon } from '@neondatabase/serverless';
+import type { ConduitProject } from '@/modules/conduit/types';
+
+const sql = neon(process.env.DATABASE_URL!);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -17,48 +32,170 @@ interface ForecastRow {
   isTotal?: boolean;
 }
 
-// ─── Lawley hardcoded seed data ──────────────────────────────────────────────
+// ─── Month label ─────────────────────────────────────────────────────────────
 
-const MONTHS: string[] = [
-  'Sept-25', 'Oct-25', 'Nov-25', 'Dec-25', 'Jan-26', 'Feb-26',
-  'Mar-26', 'Apr-26', 'May-26', 'Jun-26', 'Jul-26', 'Aug-26',
-];
+function monthLabel(base: Date, offset: number): string {
+  const d = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+  return d.toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' });
+}
 
-const ROLLOUT_PLAN: ForecastRow[] = [
-  { label: 'Permissions', values: Array<null>(12).fill(null) },
-  { label: 'Poles', values: Array<null>(12).fill(null) },
-  { label: 'Stringing', values: Array<null>(12).fill(null) },
-  { label: "Optical - PON's", values: [null, null, null, null, null, null, 15, 20, 20, 17, null, null] },
-  { label: 'Activations', values: [1026, 113, 785, 648, 982, 979, 800, 1000, 1200, 844, null, null] },
-  { label: 'Wayleave Incentive', values: Array<null>(12).fill(null) },
-];
+// ─── Forecast builder ─────────────────────────────────────────────────────────
 
-const COS_CATEGORIES: ForecastRow[] = [
-  { label: 'COS - Ad Hoc', values: [10434.78, 30700.87, 12000, null, null, 600, 10000, 10000, null, 10000, null, null] },
-  { label: 'COS - Casuals', values: [19140, 29040, 31380, 25740, 26840, 51040, 30000, 30000, 30000, 30000, 20000, 20000] },
-  { label: 'COS - Fuel', values: [1564.39, null, null, 25665.70, 32946.74, 13100.70, 15000, 15000, 15000, 15000, 10000, 10000] },
-  { label: 'COS - Overheads', values: [173233.61, 168167.12, 212753.22, 194025.11, 149168.17, 150013.95, 150000, 150000, 150000, 150000, 75000, 75000] },
-  { label: 'COS - Sales', values: [null, null, null, null, null, 5217.39, null, null, null, null, null, null] },
-  { label: 'COS - Stock', values: [156800.54, 279572.91, 1368667.68, 824581.70, 339799.03, 235476.80, 60000, 60000, 279680.53, 340128.93, 318464.28, 236959.53] },
-  { label: 'COS - Sub-Contractor', values: [301339.75, 281639.80, 146288.50, 377646.75, 349644.55, 379634.20, 259000, 335000, 366000, 283820, null, null] },
-  { label: 'COS - Wayleaves', values: [null, null, null, null, null, 31232.78, null, null, null, null, null, null] },
-  {
-    label: 'Total',
-    values: [662513.07, 789120.70, 1771089.40, 1447659.26, 898398.49, 866315.81, 524000, 600000, 850680.53, 828948.93, 423464.28, 341959.53],
-    isTotal: true,
-  },
-];
+function buildForecast(project: ConduitProject) {
+  const {
+    po_count,
+    build_duration_months: dur,
+    start_date,
+    inputs_json: inp,
+  } = project;
 
-const REVENUE_FORECAST: ForecastRow[] = [
-  { label: 'Activations', values: [770200, 305100, 2119500, 1749600, 2651400, 2642298.10, 2160000, 2700000, 3240000, 2278800, null, null] },
-  { label: 'Gross', values: [892313.07, -484020.70, 348410.60, 301940.74, 1753001.51, 1775982.29, 1636000, 2100000, 2389319.47, 1449851.07, -423464.28, -341959.53] },
-  { label: 'Running Net', values: [-9087409.22, -10571429.93, -10223019.33, -9921078.59, -8168077.08, -6392094.79, -4756094.79, -2656094.79, -266775.32, 1183075.75, 759611.47, 417651.95] },
-];
+  const { rate, uptake, scope, unit_costs: uc, monthly_opex: mo, lump_costs: lc } = inp;
+
+  const fc_total = po_count * uptake; // unrounded
+  const start = start_date ? new Date(start_date) : new Date();
+
+  // ── Month labels ──────────────────────────────────────────────────────────
+  const months: string[] = Array.from({ length: dur }, (_, i) => monthLabel(start, i));
+
+  // ── Civil cost — spread evenly over build duration ────────────────────────
+  const civil_total =
+    scope.poles * (uc.per_pole + uc.wayleave_per_pole) +
+    scope.stringing_m * uc.per_stringing_m +
+    scope.pon * uc.per_pon;
+  const civil_pm = dur > 0 ? civil_total / dur : 0;
+
+  // ── Sub-contractor — spread evenly ────────────────────────────────────────
+  const sub_pm = dur > 0 ? lc.sub_contractor / dur : 0;
+
+  // ── Monthly opex ──────────────────────────────────────────────────────────
+  const monthly_opex = mo.casuals + mo.fuel + mo.overheads + mo.sales;
+
+  // ── Per-month arrays ──────────────────────────────────────────────────────
+  const newActs: number[]     = [];
+  const cumActs: number[]     = [];
+  const revMonthly: number[]  = [];
+  const cosAdHoc: number[]    = [];
+  const cosCasuals: number[]  = [];
+  const cosFuel: number[]     = [];
+  const cosOverheads: number[]= [];
+  const cosSales: number[]    = [];
+  const cosStock: number[]    = [];   // civil per month
+  const cosActivation: number[]= [];
+  const cosSub: number[]      = [];
+  const cosTotal: number[]    = [];
+  const grossMonthly: number[]= [];
+  const runningNet: number[]  = [];
+
+  let cumAct = 0;
+  let cumulativeNet = 0;
+  const baseNewAct = fc_total / dur;
+
+  for (let m = 0; m < dur; m++) {
+    // Activations: linear spread, last month absorbs remainder
+    const isLast = m === dur - 1;
+    const newAct = isLast ? fc_total - cumAct : baseNewAct;
+    cumAct += newAct;
+
+    // Revenue: all cumulative subscribers pay monthly subscription
+    const monthRev = cumAct * rate;
+
+    // COS this month
+    const adhoc    = m === 0 ? lc.ad_hoc : 0; // lump in month 1
+    const casuals  = mo.casuals;
+    const fuel     = mo.fuel;
+    const overhead = mo.overheads;
+    const sales    = mo.sales;
+    const stock    = civil_pm;               // civil materials/labour
+    const act_cost = newAct * uc.per_activation;
+    const sub      = sub_pm;
+
+    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + sub;
+
+    const gross = monthRev - monthCos;
+    cumulativeNet += gross;
+
+    newActs.push(newAct);
+    cumActs.push(cumAct);
+    revMonthly.push(monthRev);
+    cosAdHoc.push(adhoc);
+    cosCasuals.push(casuals);
+    cosFuel.push(fuel);
+    cosOverheads.push(overhead);
+    cosSales.push(sales);
+    cosStock.push(stock);
+    cosActivation.push(act_cost);
+    cosSub.push(sub);
+    cosTotal.push(monthCos);
+    grossMonthly.push(gross);
+    runningNet.push(cumulativeNet);
+  }
+
+  // ── Helper: null out zero values for cleaner display ──────────────────────
+  const sparse = (arr: number[]): (number | null)[] =>
+    arr.map(v => (Math.abs(v) < 0.005 ? null : Math.round(v * 100) / 100));
+
+  const round = (arr: number[]): number[] => arr.map(v => Math.round(v));
+
+  // ── Rollout plan ─────────────────────────────────────────────────────────
+  const rolloutPlan: ForecastRow[] = [
+    {
+      label: 'Poles',
+      values: sparse(Array.from({ length: dur }, () => scope.poles > 0 ? scope.poles / dur : 0)),
+    },
+    {
+      label: 'Stringing (m)',
+      values: sparse(Array.from({ length: dur }, () => scope.stringing_m > 0 ? scope.stringing_m / dur : 0)),
+    },
+    {
+      label: "Optical — PON's",
+      values: sparse(Array.from({ length: dur }, () => scope.pon > 0 ? scope.pon / dur : 0)),
+    },
+    {
+      label: 'Activations (new)',
+      values: round(newActs),
+    },
+    {
+      label: 'Activations (cumulative)',
+      values: round(cumActs),
+    },
+  ];
+
+  // ── COS categories ────────────────────────────────────────────────────────
+  const cosTotals = cosTotal.map((_, i) =>
+    (cosAdHoc[i] ?? 0) + cosCasuals[i] + cosFuel[i] + cosOverheads[i] +
+    cosSales[i] + cosStock[i] + cosActivation[i] + cosSub[i]
+  );
+
+  const cosCategories: ForecastRow[] = [
+    { label: 'COS — Ad Hoc',          values: sparse(cosAdHoc) },
+    { label: 'COS — Casuals',          values: sparse(cosCasuals) },
+    { label: 'COS — Fuel',             values: sparse(cosFuel) },
+    { label: 'COS — Overheads',        values: sparse(cosOverheads) },
+    { label: 'COS — Sales',            values: sparse(cosSales) },
+    { label: 'COS — Stock / Civil',    values: sparse(cosStock) },
+    { label: 'COS — Activation',       values: sparse(cosActivation) },
+    { label: 'COS — Sub-Contractor',   values: sparse(cosSub) },
+    {
+      label: 'Total',
+      values: sparse(cosTotals),
+      isTotal: true,
+    },
+  ];
+
+  // ── Revenue forecast ──────────────────────────────────────────────────────
+  const revenueForecast: ForecastRow[] = [
+    { label: 'Subscription Revenue',  values: sparse(revMonthly) },
+    { label: 'Monthly Gross (Rev−COS)', values: sparse(grossMonthly) },
+    { label: 'Running Net (Cumulative)', values: sparse(runningNet), isTotal: true },
+  ];
+
+  return { months, rolloutPlan, cosCategories, revenueForecast };
+}
 
 // ─── Route context ────────────────────────────────────────────────────────────
 
 interface RouteContext {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -69,18 +206,37 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { id } = params;
+  const { id } = await params;
   if (!id) {
     return NextResponse.json({ error: 'Missing project id' }, { status: 400 });
   }
 
-  const payload = {
-    projectId: id,
-    months: MONTHS,
-    rolloutPlan: ROLLOUT_PLAN,
-    cosCategories: COS_CATEGORIES,
-    revenueForecast: REVENUE_FORECAST,
-  };
+  try {
+    const rows = await sql`
+      SELECT id, name, po_count, start_date, build_duration_months,
+             inputs_json, is_baseline_locked, created_at, updated_at
+      FROM conduit_projects
+      WHERE id = ${id}::uuid
+      LIMIT 1
+    `;
 
-  return NextResponse.json({ success: true, data: payload });
+    if (rows.length === 0) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    const project = rows[0] as ConduitProject;
+    const forecast = buildForecast(project);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        projectId: id,
+        projectName: project.name,
+        ...forecast,
+      },
+    });
+  } catch (err) {
+    console.error('[conduit/detail GET]', err);
+    return NextResponse.json({ error: 'Failed to build forecast' }, { status: 500 });
+  }
 }

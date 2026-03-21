@@ -2,55 +2,75 @@
  * useConduitCalc — Pure formula engine for Conduit project calculations.
  * No side effects, no API calls. Input → derived output.
  *
- * COS Formula:
- *   Services = (Poles × PermPerPole) + (Poles × PolesEach) + (Stringing × StringPerM)
- *              + (PON × OptPerPON) + (FCActivations × ActEach)
- *   Stock    = (Poles × PoleStock) + (Stringing × CablePerM)
- *              + (PON × OptStock) + (FCActivations × ActStock)
- *   Expenses = (AdHoc + Casuals + Fuel + Overheads + Sales) × BuildDuration
- *   COS Total = Services + Stock + Expenses
+ * ─── Revenue ──────────────────────────────────────────────────────────────
+ *   FC Activation  = PO Count × Uptake          (unrounded — display rounds)
+ *   Revenue        = FC Activation × Rate        (peak monthly subscription revenue)
+ *
+ * ─── COS ──────────────────────────────────────────────────────────────────
+ *   Civil          = Poles × (PerPole + WayleavePerPole)
+ *                  + Stringing × PerStringM
+ *                  + PON × PerPON
+ *
+ *   Activation     = FC Activation × PerActivation
+ *
+ *   Monthly Opex   = (Casuals + Fuel + Overheads + Sales) × BuildDuration
+ *
+ *   Lump           = AdHoc + SubContractor
+ *
+ *   COS Total      = Civil + Activation + Monthly Opex + Lump
+ *
+ * ─── Derived ──────────────────────────────────────────────────────────────
+ *   Profit         = Revenue − COS Total
+ *   GP%            = Profit ÷ Revenue
+ *   Cost/Home      = COS Total ÷ FC Activation    (cost per CONNECTED home)
  */
 
 import type { ConduitProject, ConduitCalcResult } from '../types';
 
 export function calcConduit(project: ConduitProject): ConduitCalcResult {
-  const { po_count, build_duration_months, inputs_json: inp } = project;
-  const { rate, uptake, scope, service_rates: sr, stock_rates: st, expenses_per_month: ex } = inp;
+  const {
+    po_count,
+    build_duration_months,
+    inputs_json: inp,
+  } = project;
 
-  // Core derivations
-  const fc_activation = po_count * uptake;
-  const revenue = fc_activation * rate * 12;
+  const { rate, uptake, scope, unit_costs: uc, monthly_opex: mo, lump_costs: lc } = inp;
 
-  // COS — Services
-  const cos_services =
-    scope.poles * sr.permissions_per_pole +
-    scope.poles * sr.poles_each +
-    scope.stringing_m * sr.stringing_per_m +
-    scope.pon * sr.optical_per_pon +
-    fc_activation * sr.activation_each;
+  // ── Revenue ──────────────────────────────────────────────────────────────
+  const fc_activation = po_count * uptake; // keep unrounded for downstream calcs
+  const revenue = fc_activation * rate;
 
-  // COS — Stock
-  const cos_stock =
-    scope.poles * st.pole +
-    scope.stringing_m * st.cable_per_m +
-    scope.pon * st.optical +
-    fc_activation * st.activation;
+  // ── COS — Civil (infrastructure, scope-driven) ────────────────────────────
+  const cos_civil =
+    scope.poles * (uc.per_pole + uc.wayleave_per_pole) +
+    scope.stringing_m * uc.per_stringing_m +
+    scope.pon * uc.per_pon;
 
-  // COS — Expenses (monthly total × build duration)
-  const monthly_expenses = ex.ad_hoc + ex.casuals + ex.fuel + ex.overheads + ex.sales;
-  const cos_expenses = monthly_expenses * build_duration_months;
+  // ── COS — Activation (variable with uptake) ───────────────────────────────
+  const cos_activation = fc_activation * uc.per_activation;
 
-  const cos_total = cos_services + cos_stock + cos_expenses;
+  // ── COS — Monthly opex × build duration ──────────────────────────────────
+  const cos_monthly =
+    (mo.casuals + mo.fuel + mo.overheads + mo.sales) * build_duration_months;
+
+  // ── COS — Lump sums ───────────────────────────────────────────────────────
+  const cos_lump = lc.ad_hoc + lc.sub_contractor;
+
+  // ── Totals ────────────────────────────────────────────────────────────────
+  const cos_total = cos_civil + cos_activation + cos_monthly + cos_lump;
   const profit = revenue - cos_total;
   const gross_profit_pct = revenue > 0 ? profit / revenue : 0;
-  const cost_per_home = po_count > 0 ? cos_total / po_count : 0;
+
+  // Cost per CONNECTED home (COS ÷ FC Activations, not ÷ PO Count)
+  const cost_per_home = fc_activation > 0 ? cos_total / fc_activation : 0;
 
   return {
     fc_activation,
     revenue,
-    cos_services,
-    cos_stock,
-    cos_expenses,
+    cos_civil,
+    cos_activation,
+    cos_monthly,
+    cos_lump,
     cos_total,
     profit,
     gross_profit_pct,
