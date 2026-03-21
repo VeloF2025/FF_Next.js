@@ -37,13 +37,14 @@ function KpiCard({ label, value, sub, valueClass = 'text-white' }: KpiCardProps)
   );
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
+// ─── Projects grid (fully self-contained — own state, own KPI tiles) ──────────
 
-interface PortfolioTableProps {
+interface ProjectsGridProps {
   initialProjects: ConduitProject[];
+  tableLabel: string;
 }
 
-export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
+function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
   const [projects, setProjects] = useState<ConduitProject[]>(initialProjects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Record<string, boolean>>({});
@@ -110,21 +111,49 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
   const TOTAL_COLS = 13; // chevron + name + PO + rate + uptake + 5 calc + duration + save
   const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
 
-  // ── Inner table component (shared by Prospective + Executable) ────────────
-  const ProjectsGrid = ({ label }: { label: string }) => (
-    <div className="space-y-3">
+  const TOTAL_COLS = 13;
+  const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
+
+  const totals = projects.reduce(
+    (acc, p) => {
+      const c = calcConduit(p);
+      return {
+        po_count: acc.po_count + p.po_count,
+        fc_activation: acc.fc_activation + c.fc_activation,
+        revenue: acc.revenue + c.revenue,
+        cos_total: acc.cos_total + c.cos_total,
+        profit: acc.profit + c.profit,
+      };
+    },
+    { po_count: 0, fc_activation: 0, revenue: 0, cos_total: 0, profit: 0 }
+  );
+  const totalGP = totals.revenue > 0 ? totals.profit / totals.revenue : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* KPI tiles */}
       {error && (
         <div className="flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2 text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          {error}
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
         </div>
       )}
+      <div className="flex flex-wrap gap-3">
+        <KpiCard label="Total Homes" value={fNum(totals.po_count)} sub={`${projects.length} projects`} />
+        <KpiCard label="FC Activations" value={fNum(totals.fc_activation)} sub="forecasted connected homes" />
+        <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
+        <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
+        <KpiCard label="Total Profit" value={fZAR(totals.profit)} sub="forecasted profit" valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'} />
+        <KpiCard label="Portfolio GP%" value={fPct(totalGP)} sub="forecasted gross profit"
+          valueClass={totalGP >= 0.30 ? 'text-emerald-400' : totalGP >= 0.10 ? 'text-amber-400' : 'text-red-400'} />
+      </div>
+
+      {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-gray-700 shadow-sm">
         <table className="min-w-max w-full border-collapse text-sm">
           <thead>
             <tr style={{ backgroundColor: '#1a3a4a' }}>
               <th className={th} style={{ width: 32 }}></th>
-              <th className={`${th} text-left`} style={{ minWidth: 200 }}>{label}</th>
+              <th className={`${th} text-left`} style={{ minWidth: 200 }}>{tableLabel}</th>
               <th className={`${th} text-right`} style={{ minWidth: 90 }}>PO Count</th>
               <th className={`${th} text-right`} style={{ minWidth: 80 }}>Rate</th>
               <th className={`${th} text-right`} style={{ minWidth: 80 }}>Uptake</th>
@@ -150,9 +179,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
                   <td className="px-2 py-2 text-center cursor-pointer text-gray-400 hover:text-white border border-gray-700" onClick={() => toggleExpand(project.id)}>
                     {isExpanded ? <ChevronDown className="w-4 h-4 inline" /> : <ChevronRight className="w-4 h-4 inline" />}
                   </td>
-                  <td className="px-3 py-2 text-sm font-medium text-gray-200 border border-gray-700 cursor-pointer hover:text-white" onClick={() => toggleExpand(project.id)}>
-                    {project.name}
-                  </td>
+                  <td className="px-3 py-2 text-sm font-medium text-gray-200 border border-gray-700 cursor-pointer hover:text-white" onClick={() => toggleExpand(project.id)}>{project.name}</td>
                   <td className="px-3 py-2 text-sm text-right bg-gray-800/40 border border-gray-700 text-gray-300 tabular-nums">{fNum(project.po_count)}</td>
                   <EditableCell value={project.inputs_json.rate} onCommit={v => updateInputs(project.id, 'rate', v)} />
                   <EditableCell value={project.inputs_json.uptake} type="percent" onCommit={v => updateInputs(project.id, 'uptake', v)} />
@@ -198,125 +225,51 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       <p className="text-xs text-gray-500">Click Rate or Uptake % to edit. Click a row or chevron to drill down.</p>
     </div>
   );
+}
 
-  const totals = projects.reduce(
-    (acc, p) => {
-      const c = calcConduit(p);
-      return {
-        po_count: acc.po_count + p.po_count,
-        fc_activation: acc.fc_activation + c.fc_activation,
-        revenue: acc.revenue + c.revenue,
-        cos_total: acc.cos_total + c.cos_total,
-        profit: acc.profit + c.profit,
-      };
-    },
-    { po_count: 0, fc_activation: 0, revenue: 0, cos_total: 0, profit: 0 }
-  );
-  const totalGP = totals.revenue > 0 ? totals.profit / totals.revenue : 0;
+// ─── Main wrapper ─────────────────────────────────────────────────────────────
 
+interface PortfolioTableProps {
+  initialProjects: ConduitProject[];
+}
+
+export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
 
-      {/* ── Prospective section divider ─────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-bold uppercase tracking-widest border border-purple-500 text-purple-400 px-3 py-1 rounded">
-          Prospective
-        </span>
-        <div className="flex-1 border-t border-gray-700" />
+      {/* ── Prospective ──────────────────────────────────────────────── */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold uppercase tracking-widest border border-purple-500 text-purple-400 px-3 py-1 rounded">
+            Prospective
+          </span>
+          <div className="flex-1 border-t border-gray-700" />
+        </div>
+        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Prospective" />
       </div>
 
-      {/* ── KPI Tiles — Prospective ─────────────────────────────────── */}
-      <div className="flex flex-wrap gap-3">
-        <KpiCard
-          label="Total Homes"
-          value={fNum(totals.po_count)}
-          sub={`${projects.length} projects`}
-        />
-        <KpiCard
-          label="FC Activations"
-          value={fNum(totals.fc_activation)}
-          sub="forecasted connected homes"
-        />
-        <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
-        <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
-        <KpiCard
-          label="Total Profit"
-          value={fZAR(totals.profit)}
-          sub="forecasted profit"
-          valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}
-        />
-        <KpiCard
-          label="Portfolio GP%"
-          value={fPct(totalGP)}
-          sub="forecasted gross profit"
-          valueClass={
-            totalGP >= 0.30
-              ? 'text-emerald-400'
-              : totalGP >= 0.10
-              ? 'text-amber-400'
-              : 'text-red-400'
-          }
-        />
+      {/* ── Forecasted — Executable ───────────────────────────────────── */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
+            Forecasted — Executable
+          </span>
+          <div className="flex-1 border-t border-gray-700" />
+        </div>
+        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Executable" />
       </div>
 
-      {/* ── Prospective table ───────────────────────────────────────── */}
-      <ProjectsGrid label="Project Scope — Prospective" />
-
-      {/* ── Forecasted — Executable section divider ──────────────────── */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-bold uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
-          Forecasted — Executable
-        </span>
-        <div className="flex-1 border-t border-gray-700" />
-      </div>
-
-      {/* ── KPI Tiles — Forecasted Executable ──────────────────────── */}
-      <div className="flex flex-wrap gap-3">
-        <KpiCard
-          label="Total Homes"
-          value={fNum(totals.po_count)}
-          sub={`${projects.length} projects`}
-        />
-        <KpiCard
-          label="FC Activations"
-          value={fNum(totals.fc_activation)}
-          sub="forecasted connected homes"
-        />
-        <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
-        <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
-        <KpiCard
-          label="Total Profit"
-          value={fZAR(totals.profit)}
-          sub="forecasted profit"
-          valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}
-        />
-        <KpiCard
-          label="Portfolio GP%"
-          value={fPct(totalGP)}
-          sub="forecasted gross profit"
-          valueClass={
-            totalGP >= 0.30
-              ? 'text-emerald-400'
-              : totalGP >= 0.10
-              ? 'text-amber-400'
-              : 'text-red-400'
-          }
-        />
-      </div>
-
-      {/* ── Executable table ────────────────────────────────────────── */}
-      <ProjectsGrid label="Project Scope — Executable" />
-
-      {/* ── Actual section divider ──────────────────────────────────── */}
-      <div className="flex items-center gap-3 pt-2">
-        <span className="text-sm font-bold text-white uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
-          Actual
-        </span>
-        <div className="flex-1 border-t border-gray-700" />
-      </div>
-
-      <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
-        <p className="text-sm">Actual to date — coming soon</p>
+      {/* ── Actual ───────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pt-2">
+          <span className="text-sm font-bold uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
+            Actual
+          </span>
+          <div className="flex-1 border-t border-gray-700" />
+        </div>
+        <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
+          <p className="text-sm">Actual to date — coming soon</p>
+        </div>
       </div>
 
     </div>
