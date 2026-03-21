@@ -254,11 +254,10 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
                   <ReadCell value={calc.profit} />
                   <ReadCell value={calc.gross_profit_pct} format="pct" />
                   <ReadCell value={calc.cost_per_home} />
-                  {/* Build Duration — editable */}
-                  <EditableCell
-                    value={project.build_duration_months}
-                    onCommit={v => updateDuration(project.id, v)}
-                  />
+                  {/* Build Duration — read-only, edit via Project Details */}
+                  <td className="px-2 py-2 text-right text-sm tabular-nums text-gray-300 border border-gray-700 bg-gray-900">
+                    {project.build_duration_months}
+                  </td>
                   {/* Save */}
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
                     <button
