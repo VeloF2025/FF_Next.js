@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X } from 'lucide-react';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -50,6 +50,50 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+
+  // ── Add project form ───────────────────────────────────────────────────────
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', po_count: '', rate: '2700', uptake: '60' });
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const submitAdd = async () => {
+    const poCount = Number(addForm.po_count.replace(/[\s,]/g, ''));
+    const rate    = Number(addForm.rate.replace(/[\s,]/g, ''));
+    const uptake  = Number(addForm.uptake.replace(/[\s,]/g, '')) / 100;
+
+    if (!addForm.name.trim()) { setAddError('Project name is required'); return; }
+    if (!poCount || poCount <= 0) { setAddError('PO Count must be greater than 0'); return; }
+
+    setAdding(true);
+    setAddError(null);
+    try {
+      const defaultInputs = {
+        rate, uptake,
+        scope:         { poles: 0, stringing_m: 0, pon: 0 },
+        service_rates: { pole_plant_each: 0, permissions_per_pole: 0, stringing_per_m: 0, optical_per_pon: 0, activation_each: 0, wayleave_incentive: 0 },
+        material_rates:{ pole: 0, cable_per_m: 0, optical: 0, activation: 0 },
+        monthly_opex:  { casuals: 0, fuel: 0, overheads: 0, sales: 0, ad_hoc: 0 },
+        lump_costs:    { wayleave_cost: 0 },
+        monthly_plan:  [],
+      };
+
+      const res = await fetch('/api/conduit/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: addForm.name.trim(), po_count: poCount, build_duration_months: 12, inputs_json: defaultInputs }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { data } = await res.json() as { data: ConduitProject };
+      setProjects(prev => [...prev, data]);
+      setAddForm({ name: '', po_count: '', rate: '2700', uptake: '60' });
+      setShowAddForm(false);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Failed to create project');
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -143,6 +187,100 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
         <KpiCard label="Portfolio GP%" value={fPct(totalGP)} sub="forecasted gross profit"
           valueClass={totalGP >= 0.30 ? 'text-emerald-400' : totalGP >= 0.10 ? 'text-amber-400' : 'text-red-400'} />
       </div>
+
+      {/* Add Project button + inline form */}
+      {!showAddForm ? (
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Add Project
+        </button>
+      ) : (
+        <div className="rounded-lg border border-gray-600 bg-gray-800 p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white">New Project</h3>
+            <button onClick={() => { setShowAddForm(false); setAddError(null); }} className="text-gray-500 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="sm:col-span-2 flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-medium">Project Name</label>
+              <input
+                type="text"
+                value={addForm.name}
+                onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && submitAdd()}
+                placeholder="e.g. Mamelodi POP 2"
+                autoFocus
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-medium">PO Count</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={addForm.po_count}
+                onChange={e => setAddForm(f => ({ ...f, po_count: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && submitAdd()}
+                placeholder="e.g. 12000"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-medium">Rate (R)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={addForm.rate}
+                onChange={e => setAddForm(f => ({ ...f, rate: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && submitAdd()}
+                placeholder="2700"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400 font-medium">Uptake %</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={addForm.uptake}
+                onChange={e => setAddForm(f => ({ ...f, uptake: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && submitAdd()}
+                placeholder="60"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          {addError && (
+            <p className="text-xs text-red-400 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />{addError}
+            </p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={submitAdd}
+              disabled={adding}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
+            >
+              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {adding ? 'Adding…' : 'Add Project'}
+            </button>
+            <button
+              onClick={() => { setShowAddForm(false); setAddError(null); }}
+              className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-gray-700 shadow-sm">
