@@ -193,7 +193,7 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
     { label: 'COS Civil',  value: c.cos_civil,       color: 'text-gray-300' },
     { label: 'COS Act.',   value: c.cos_activation,  color: 'text-gray-300' },
     { label: 'COS Monthly',value: c.cos_monthly,     color: 'text-gray-300' },
-    { label: 'COS Lump',   value: c.cos_lump,        color: 'text-gray-300' },
+
     { label: 'COS Total',  value: c.cos_total,       color: 'text-amber-400' },
     { label: 'Profit',     value: c.profit,          color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
     { label: 'GP%',        value: null,  gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400' },
@@ -261,10 +261,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
     setSaved(false);
   }, []);
 
-  const setLumpCost = useCallback((field: keyof typeof inp.lump_costs, v: number) => {
-    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, lump_costs: { ...p.inputs_json.lump_costs, [field]: v } } }));
-    setSaved(false);
-  }, []);
+
 
   // ── Save ─────────────────────────────────────────────────────────────────
   const save = async () => {
@@ -360,10 +357,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           <InputField label="Ad Hoc / mo"    value={inp.monthly_opex.ad_hoc}    onChange={v => setMonthlyOpex('ad_hoc', v)}    prefix="R" hint="contingency / variable" />
         </InputSection>
 
-        {/* Lump costs */}
-        <InputSection title="Lump Costs — Project Totals">
-          <InputField label="Sub-Contractor (total)" value={inp.lump_costs.sub_contractor} onChange={v => setLumpCost('sub_contractor', v)} prefix="R" />
-        </InputSection>
+
 
       </div>
 

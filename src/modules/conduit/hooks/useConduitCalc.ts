@@ -22,7 +22,6 @@
  *   cos_monthly    = (casuals + fuel + overheads + sales) × build_duration_months
  *
  * ─── COS Lump sums ────────────────────────────────────────────────────────
- *   cos_lump       = ad_hoc + sub_contractor
  *
  * ─── Derived ──────────────────────────────────────────────────────────────
  *   Profit         = Revenue − COS Total
@@ -39,7 +38,7 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
     inputs_json: inp,
   } = project;
 
-  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
+  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo } = inp;
 
   // ── Revenue ──────────────────────────────────────────────────────────────
   const fc_activation = po_count * uptake;
@@ -68,11 +67,8 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
   const cos_monthly =
     (mo.casuals + mo.fuel + mo.overheads + mo.sales + mo.ad_hoc) * build_duration_months;
 
-  // ── COS — Lump sums ───────────────────────────────────────────────────────
-  const cos_lump = lc.sub_contractor;
-
   // ── Totals ────────────────────────────────────────────────────────────────
-  const cos_total = cos_civil + cos_activation + cos_monthly + cos_lump;
+  const cos_total = cos_civil + cos_activation + cos_monthly;
   const profit = revenue - cos_total;
   const gross_profit_pct = revenue > 0 ? profit / revenue : 0;
   const cost_per_home = fc_activation > 0 ? cos_total / fc_activation : 0;
@@ -83,7 +79,6 @@ export function calcConduit(project: ConduitProject): ConduitCalcResult {
     cos_civil,
     cos_activation,
     cos_monthly,
-    cos_lump,
     cos_total,
     profit,
     gross_profit_pct,

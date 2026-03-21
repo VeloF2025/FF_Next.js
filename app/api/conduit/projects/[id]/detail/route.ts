@@ -49,7 +49,7 @@ function buildForecast(project: ConduitProject) {
     inputs_json: inp,
   } = project;
 
-  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
+  const { rate, uptake, scope, service_rates: sr, material_rates: mr, monthly_opex: mo } = inp;
 
   const fc_total = po_count * uptake; // unrounded
   const start = start_date ? new Date(start_date) : new Date();
@@ -70,8 +70,7 @@ function buildForecast(project: ConduitProject) {
   // ── Per-activation cost ───────────────────────────────────────────────────
   const per_activation_cost = sr.activation_each + mr.activation;
 
-  // ── Sub-contractor — spread evenly ────────────────────────────────────────
-  const sub_pm = dur > 0 ? lc.sub_contractor / dur : 0;
+
 
   // ── Monthly opex ──────────────────────────────────────────────────────────
   const monthly_opex = mo.casuals + mo.fuel + mo.overheads + mo.sales;
@@ -87,7 +86,6 @@ function buildForecast(project: ConduitProject) {
   const cosSales: number[]    = [];
   const cosStock: number[]    = [];   // civil per month
   const cosActivation: number[]= [];
-  const cosSub: number[]      = [];
   const cosTotal: number[]    = [];
   const grossMonthly: number[]= [];
   const runningNet: number[]  = [];
@@ -113,9 +111,8 @@ function buildForecast(project: ConduitProject) {
     const sales    = mo.sales;
     const stock    = civil_pm;               // civil materials/labour
     const act_cost = newAct * per_activation_cost;
-    const sub      = sub_pm;
 
-    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + sub;
+    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost;
 
     const gross = monthRev - monthCos;
     cumulativeNet += gross;
@@ -130,7 +127,6 @@ function buildForecast(project: ConduitProject) {
     cosSales.push(sales);
     cosStock.push(stock);
     cosActivation.push(act_cost);
-    cosSub.push(sub);
     cosTotal.push(monthCos);
     grossMonthly.push(gross);
     runningNet.push(cumulativeNet);
@@ -169,7 +165,7 @@ function buildForecast(project: ConduitProject) {
   // ── COS categories ────────────────────────────────────────────────────────
   const cosTotals = cosTotal.map((_, i) =>
     (cosAdHoc[i] ?? 0) + cosCasuals[i] + cosFuel[i] + cosOverheads[i] +
-    cosSales[i] + cosStock[i] + cosActivation[i] + cosSub[i]
+    cosSales[i] + cosStock[i] + cosActivation[i]
   );
 
   const cosCategories: ForecastRow[] = [
@@ -180,7 +176,7 @@ function buildForecast(project: ConduitProject) {
     { label: 'COS — Sales',            values: sparse(cosSales) },
     { label: 'COS — Stock / Civil',    values: sparse(cosStock) },
     { label: 'COS — Activation',       values: sparse(cosActivation) },
-    { label: 'COS — Sub-Contractor',   values: sparse(cosSub) },
+
     {
       label: 'Total',
       values: sparse(cosTotals),

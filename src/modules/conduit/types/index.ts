@@ -44,10 +44,7 @@ export interface MonthlyOpex {
   ad_hoc: number;     // contingency / variable per month
 }
 
-/** Lump-sum costs entered as totals (not per-month). */
-export interface LumpCosts {
-  sub_contractor: number;  // sub-contractor fees (project total)
-}
+
 
 // ─── Project Inputs ──────────────────────────────────────────────────────────
 
@@ -68,8 +65,7 @@ export interface ConduitProjectInputs {
   // COS — monthly opex × build_duration_months
   monthly_opex: MonthlyOpex;
 
-  // COS — lump sums (project totals)
-  lump_costs: LumpCosts;
+
 }
 
 // ─── Project record ──────────────────────────────────────────────────────────
@@ -97,7 +93,6 @@ export interface ConduitProject {
  *                  + pon × (service.optical_per_pon + material.optical)
  *   cos_activation = fc_activation × (service.activation_each + material.activation)
  *   cos_monthly    = (casuals+fuel+overheads+sales) × build_duration_months
- *   cos_lump       = ad_hoc + sub_contractor
  *   cos_total      = sum of all above
  *
  * cost_per_home = cos_total ÷ fc_activation  (cost per CONNECTED home, not passed)
@@ -109,7 +104,7 @@ export interface ConduitCalcResult {
   cos_civil: number;       // infrastructure: poles + stringing + PON + wayleaves
   cos_activation: number;  // per-home activation cost × FC activations
   cos_monthly: number;     // monthly opex × build duration
-  cos_lump: number;        // ad hoc + sub-contractor (lump sums)
+
   cos_total: number;       // sum of all COS
 
   profit: number;          // revenue − cos_total
