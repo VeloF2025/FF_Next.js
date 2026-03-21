@@ -57,24 +57,21 @@ function buildForecast(project: ConduitProject) {
   // ── Month labels ──────────────────────────────────────────────────────────
   const months: string[] = Array.from({ length: dur }, (_, i) => monthLabel(start, i));
 
-  // ── Civil cost — spread evenly over build duration ────────────────────────
-  const total_per_pole = sr.pole_plant_each + sr.permissions_per_pole + sr.wayleave_incentive + mr.pole;
-  const wayleave_lump_pm = dur > 0 ? lc.wayleave_cost / dur : 0;
-  const total_per_m    = sr.stringing_per_m + mr.cable_per_m;
-  const total_per_pon  = sr.optical_per_pon + mr.optical;
-  const civil_total =
-    scope.poles * total_per_pole +
-    scope.stringing_m * total_per_m +
-    scope.pon * total_per_pon;
-  const civil_pm = dur > 0 ? civil_total / dur : 0;
+  // ── Civil infra cost — spread evenly over build duration ─────────────────
+  // Services: poles + stringing + optical (wayleave_incentive is per-activation, handled below)
+  const svc_civil_total = scope.poles * (sr.pole_plant_each + sr.permissions_per_pole)
+    + scope.stringing_m * sr.stringing_per_m
+    + scope.pon * sr.optical_per_pon;
+  const svc_civil_pm = dur > 0 ? svc_civil_total / dur : 0;
 
-  // ── Per-activation cost ───────────────────────────────────────────────────
-  const per_activation_cost = sr.activation_each + mr.activation;
+  // Materials: poles + cable + optical
+  const mat_civil_total = scope.poles * mr.pole
+    + scope.stringing_m * mr.cable_per_m
+    + scope.pon * mr.optical;
+  const mat_civil_pm = dur > 0 ? mat_civil_total / dur : 0;
 
-
-
-  // ── Monthly opex ──────────────────────────────────────────────────────────
-  const monthly_opex = mo.casuals + mo.fuel + mo.overheads + mo.sales;
+  // Lump: wayleave_cost spread over build duration
+  const lump_pm = dur > 0 ? lc.wayleave_cost / dur : 0;
 
   // ── Per-month arrays ──────────────────────────────────────────────────────
   const newActs: number[]     = [];
@@ -105,15 +102,19 @@ function buildForecast(project: ConduitProject) {
     const monthRev = cumAct * rate;
 
     // COS this month
-    const adhoc    = mo.ad_hoc;   // monthly (× build duration like all opex)
+    const adhoc    = mo.ad_hoc;
     const casuals  = mo.casuals;
     const fuel     = mo.fuel;
     const overhead = mo.overheads;
     const sales    = mo.sales;
-    const stock    = civil_pm;               // civil materials/labour
-    const act_cost = newAct * per_activation_cost;
+    // Civil infra (services + material) spread evenly
+    const stock    = svc_civil_pm + mat_civil_pm;
+    // Per-activation: service + material + wayleave incentive (per FC activation)
+    const act_cost = newAct * (sr.activation_each + mr.activation + sr.wayleave_incentive);
+    // Lump spread
+    const lump     = lump_pm;
 
-    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + wayleave_lump_pm;
+    const monthCos = adhoc + casuals + fuel + overhead + sales + stock + act_cost + lump;
 
     const gross = monthRev - monthCos;
     cumulativeNet += gross;
@@ -126,8 +127,9 @@ function buildForecast(project: ConduitProject) {
     cosFuel.push(fuel);
     cosOverheads.push(overhead);
     cosSales.push(sales);
-    cosStock.push(stock);
+    cosStock.push(stock + lump);
     cosActivation.push(act_cost);
+    // lump tracked in cosStock (civil+lump combined for chart row)
     cosTotal.push(monthCos);
     grossMonthly.push(gross);
     runningNet.push(cumulativeNet);

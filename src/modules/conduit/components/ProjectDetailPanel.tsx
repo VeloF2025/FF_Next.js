@@ -184,32 +184,124 @@ function InputSection({ title, children }: { title: string; children: React.Reac
   );
 }
 
-// ─── COS Summary bar ─────────────────────────────────────────────────────────
+// ─── COS Summary bar + expandable breakdown ──────────────────────────────────
 
 function CosSummaryBar({ project }: { project: ConduitProject }) {
+  const [open, setOpen] = useState(false);
   const c = calcConduit(project);
-  const items = [
-    { label: 'Revenue',    value: c.revenue,        color: 'text-teal-400' },
-    { label: 'COS Civil',  value: c.cos_civil,       color: 'text-gray-300' },
-    { label: 'COS Act.',   value: c.cos_activation,  color: 'text-gray-300' },
-    { label: 'COS Monthly',value: c.cos_monthly,     color: 'text-gray-300' },
-    { label: 'COS Lump',   value: c.cos_lump,        color: 'text-gray-300' },
+  const b = c.breakdown;
+  const dur = project.build_duration_months;
 
-    { label: 'COS Total',  value: c.cos_total,       color: 'text-amber-400' },
-    { label: 'Profit',     value: c.profit,          color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
-    { label: 'GP%',        value: null,  gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400' },
-    { label: 'Cost/Home',  value: c.cost_per_home,   color: 'text-gray-300' },
+  const summary = [
+    { label: 'Revenue',      value: c.revenue,      color: 'text-teal-400' },
+    { label: 'COS Services', value: c.cos_services, color: 'text-gray-300' },
+    { label: 'COS Material', value: c.cos_material, color: 'text-gray-300' },
+    { label: 'COS OPEX',     value: c.cos_opex,     color: 'text-gray-300' },
+    { label: 'COS Lump',     value: c.cos_lump,     color: 'text-gray-300' },
+    { label: 'COS Total',    value: c.cos_total,    color: 'text-amber-400' },
+    { label: 'Profit',       value: c.profit,       color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
+    { label: 'GP%',          gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400' },
+    { label: 'Cost/Home',    value: c.cost_per_home, color: 'text-gray-300' },
+  ];
+
+  const serviceLines = [
+    { label: 'Poles',             value: b.svc_poles,      hint: 'poles × (pole plant + permissions)' },
+    { label: 'Stringing',         value: b.svc_stringing,  hint: 'stringing m × rate/m' },
+    { label: 'Optical',           value: b.svc_optical,    hint: 'PON count × optical rate' },
+    { label: 'Activations',       value: b.svc_activation, hint: 'FC activations × activation rate' },
+    { label: 'Wayleave Incentive',value: b.svc_wayleave,   hint: 'FC activations × wayleave incentive rate' },
+  ];
+
+  const materialLines = [
+    { label: 'Poles',       value: b.mat_poles,      hint: 'poles × pole material cost' },
+    { label: 'Cable',       value: b.mat_cable,      hint: 'stringing m × cable cost/m' },
+    { label: 'Optical',     value: b.mat_optical,    hint: 'PON count × optical material' },
+    { label: 'Activations', value: b.mat_activation, hint: 'FC activations × ONT cost' },
+  ];
+
+  const opexLines = [
+    { label: 'Casuals',   value: b.opex_casuals,   hint: `casuals/mo × ${dur} months` },
+    { label: 'Fuel',      value: b.opex_fuel,      hint: `fuel/mo × ${dur} months` },
+    { label: 'Overheads', value: b.opex_overheads, hint: `overheads/mo × ${dur} months` },
+    { label: 'Sales',     value: b.opex_sales,     hint: `sales/mo × ${dur} months` },
+    { label: 'Ad Hoc',    value: b.opex_ad_hoc,    hint: `ad hoc/mo × ${dur} months` },
   ];
 
   return (
-    <div className="flex flex-wrap gap-3 p-3 bg-gray-900 rounded-lg border border-gray-700">
-      {items.map(item => (
-        <div key={item.label} className="flex flex-col min-w-[90px]">
-          <span className="text-xs text-gray-500">{item.label}</span>
-          <span className={`text-sm font-bold tabular-nums ${item.color}`}>
-            {item.gp !== undefined
-              ? `${(item.gp * 100).toFixed(1)}%`
-              : fZARShort(item.value ?? 0)}
+    <div className="rounded-lg border border-gray-700 overflow-hidden">
+      {/* Summary row */}
+      <div className="flex flex-wrap gap-3 p-3 bg-gray-900">
+        {summary.map(item => (
+          <div key={item.label} className="flex flex-col min-w-[90px]">
+            <span className="text-xs text-gray-500">{item.label}</span>
+            <span className={`text-sm font-bold tabular-nums ${item.color}`}>
+              {'gp' in item
+                ? `${((item.gp ?? 0) * 100).toFixed(1)}%`
+                : fZARShort(item.value ?? 0)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Toggle */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-1.5 bg-gray-800 hover:bg-gray-750 text-xs text-gray-400 hover:text-gray-200 transition-colors border-t border-gray-700"
+      >
+        <span>COS breakdown by line item</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Expandable breakdown */}
+      {open && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-700 border-t border-gray-700">
+          {/* Services */}
+          <BreakdownGroup
+            title="Cost of Sale — Services"
+            total={c.cos_services}
+            lines={serviceLines}
+          />
+          {/* Material */}
+          <BreakdownGroup
+            title="Cost of Sale — Material"
+            total={c.cos_material}
+            lines={materialLines}
+          />
+          {/* OPEX */}
+          <BreakdownGroup
+            title="Cost of Sale — OPEX"
+            total={c.cos_opex}
+            lines={opexLines}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BreakdownGroup({
+  title,
+  total,
+  lines,
+}: {
+  title: string;
+  total: number;
+  lines: { label: string; value: number; hint: string }[];
+}) {
+  return (
+    <div className="bg-gray-900 p-3 space-y-1.5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">{title}</span>
+        <span className="text-xs font-bold text-amber-400 tabular-nums">{fZARShort(total)}</span>
+      </div>
+      {lines.map(line => (
+        <div key={line.label} className="flex items-center justify-between gap-2">
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-gray-300">{line.label}</span>
+            <span className="text-[10px] text-gray-600 truncate">{line.hint}</span>
+          </div>
+          <span className={`text-xs font-mono tabular-nums shrink-0 ${line.value > 0 ? 'text-gray-200' : 'text-gray-600'}`}>
+            {fZARShort(line.value)}
           </span>
         </div>
       ))}

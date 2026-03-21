@@ -1,45 +1,40 @@
 /**
  * Conduit module types — project scenario modelling.
  *
- * Schema v2 — PM-centric inputs, clean COS breakdown.
+ * Schema v3 — COS split into Services / Material / OPEX / Lump.
  * Cost/Home = COS Total ÷ FC Activations (not PO Count).
+ * Wayleave Incentive = FC Activations × rate (not Poles × rate).
  */
 
 // ─── Scope ───────────────────────────────────────────────────────────────────
 
-/** Physical quantities to be built (scope of work). */
 export interface ScopeInputs {
   poles: number;        // number of poles to erect
   stringing_m: number;  // aerial cable run (meters)
   pon: number;          // PON splitters to install
 }
 
-// ─── COS Rates ───────────────────────────────────────────────────────────────
+// ─── COS Input Rates ─────────────────────────────────────────────────────────
 
-/** COS — Service Rates (labour / installation per unit) */
+/** Service Rates — labour / installation per unit */
 export interface ServiceRates {
   permissions_per_pole: number;  // Permissions / Pole
   pole_plant_each: number;       // Pole Plant / Each
   stringing_per_m: number;       // Stringing / Meter
   optical_per_pon: number;       // Optical / PON
   activation_each: number;       // Activation / Each
-  wayleave_incentive: number;    // Wayleave Incentive
+  wayleave_incentive: number;    // Wayleave Incentive — per FC Activation (not per pole)
 }
 
-/** Lump-sum costs entered as project totals (not per-unit or per-month). */
-export interface LumpCosts {
-  wayleave_cost: number;  // Wayleave Cost (project total)
-}
-
-/** COS — Materials Rate (supply / stock per unit) */
+/** Material Rates — supply / stock per unit */
 export interface MaterialRates {
-  pole: number;        // Pole (material)
+  pole: number;        // Pole material (each)
   cable_per_m: number; // Cable (per meter)
-  optical: number;     // Optical / PON (material)
-  activation: number;  // Activations (ONT + connectors)
+  optical: number;     // Optical / PON material (each)
+  activation: number;  // Activations — ONT + connectors (per home)
 }
 
-/** Monthly operational costs during the build phase (multiplied by build_duration_months). */
+/** Monthly OPEX — multiplied × build_duration_months */
 export interface MonthlyOpex {
   casuals: number;    // temporary labour per month
   fuel: number;       // vehicle / generator fuel per month
@@ -48,39 +43,29 @@ export interface MonthlyOpex {
   ad_hoc: number;     // contingency / variable per month
 }
 
-
+/** Lump Costs — project totals (not per-unit or per-month) */
+export interface LumpCosts {
+  wayleave_cost: number;  // Wayleave Cost (project total)
+}
 
 // ─── Project Inputs ──────────────────────────────────────────────────────────
 
 export interface ConduitProjectInputs {
-  // Revenue drivers
   rate: number;    // monthly ARPU per connected home (R)
   uptake: number;  // expected take-up rate, fraction 0–1
-
-  // Scope of work
   scope: ScopeInputs;
-
-  // COS — service rates (labour / installation per unit)
   service_rates: ServiceRates;
-
-  // COS — material rates (supply / stock per unit)
   material_rates: MaterialRates;
-
-  // COS — monthly opex × build_duration_months
   monthly_opex: MonthlyOpex;
-
-  // COS — lump sums (project totals)
   lump_costs: LumpCosts;
-
-
 }
 
-// ─── Project record ──────────────────────────────────────────────────────────
+// ─── Project Record ──────────────────────────────────────────────────────────
 
 export interface ConduitProject {
   id: string;
   name: string;
-  po_count: number;              // homes passed
+  po_count: number;
   start_date: string | null;
   build_duration_months: number;
   inputs_json: ConduitProjectInputs;
@@ -89,33 +74,62 @@ export interface ConduitProject {
   updated_at: string;
 }
 
-// ─── Calc result ─────────────────────────────────────────────────────────────
+// ─── COS Breakdown (line-item detail) ────────────────────────────────────────
+
+/**
+ * Per-line breakdown — used by the expandable COS detail panel.
+ * All derived; never stored.
+ */
+export interface ConduitCosBreakdown {
+  // Services
+  svc_poles: number;       // poles × (pole_plant_each + permissions_per_pole)
+  svc_stringing: number;   // stringing_m × stringing_per_m
+  svc_optical: number;     // pon × optical_per_pon
+  svc_activation: number;  // fc_activation × activation_each
+  svc_wayleave: number;    // fc_activation × wayleave_incentive
+
+  // Materials
+  mat_poles: number;       // poles × mr.pole
+  mat_cable: number;       // stringing_m × mr.cable_per_m
+  mat_optical: number;     // pon × mr.optical
+  mat_activation: number;  // fc_activation × mr.activation
+
+  // OPEX (each × build_duration_months)
+  opex_casuals: number;
+  opex_fuel: number;
+  opex_overheads: number;
+  opex_sales: number;
+  opex_ad_hoc: number;
+}
+
+// ─── Calc Result ─────────────────────────────────────────────────────────────
 
 /**
  * Calculated (derived) fields — never stored, always re-derived from inputs.
  *
- * COS breakdown:
- *   cos_civil      = poles × (service.pole_plant + service.permissions + service.wayleave_incentive + service.wayleave_cost + material.pole)
- *                  + stringing × (service.stringing_per_m + material.cable_per_m)
- *                  + pon × (service.optical_per_pon + material.optical)
- *   cos_activation = fc_activation × (service.activation_each + material.activation)
- *   cos_monthly    = (casuals+fuel+overheads+sales) × build_duration_months
- *   cos_total      = sum of all above
+ * COS formula:
+ *   cos_services = poles×(pole_plant+permissions) + stringing×stringing_pm
+ *                + pon×optical_per_pon + fc_activation×(activation_each + wayleave_incentive)
+ *   cos_material = poles×mr.pole + stringing×mr.cable + pon×mr.optical + fc_activation×mr.activation
+ *   cos_opex     = (casuals+fuel+overheads+sales+ad_hoc) × build_duration_months
+ *   cos_lump     = lc.wayleave_cost
+ *   cos_total    = cos_services + cos_material + cos_opex + cos_lump
  *
- * cost_per_home = cos_total ÷ fc_activation  (cost per CONNECTED home, not passed)
+ *   cost_per_home = cos_total ÷ fc_activation
  */
 export interface ConduitCalcResult {
   fc_activation: number;   // PO Count × Uptake (unrounded)
   revenue: number;         // fc_activation × rate
 
-  cos_civil: number;       // infrastructure: poles + stringing + PON + wayleaves
-  cos_activation: number;  // per-home activation cost × FC activations
-  cos_monthly: number;     // monthly opex × build duration
-  cos_lump: number;        // lump-sum costs (wayleave cost)
-
+  cos_services: number;    // labour / installation costs
+  cos_material: number;    // supply / stock costs
+  cos_opex: number;        // monthly OPEX × build duration
+  cos_lump: number;        // lump-sum costs (wayleave_cost)
   cos_total: number;       // sum of all COS
 
-  profit: number;          // revenue − cos_total
-  gross_profit_pct: number; // profit ÷ revenue
-  cost_per_home: number;   // cos_total ÷ fc_activation
+  profit: number;
+  gross_profit_pct: number;
+  cost_per_home: number;
+
+  breakdown: ConduitCosBreakdown;
 }
