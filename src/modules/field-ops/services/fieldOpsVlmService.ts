@@ -12,6 +12,7 @@
 
 import { neon } from '@/lib/db-neon';
 import { createLogger } from '@/lib/logger';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 
 const logger = createLogger('fieldOpsVlmService');
 const VLM_URL = process.env.VLM_SERVICE_URL || 'http://100.96.203.105:8100';
@@ -100,13 +101,35 @@ function parseVlmResponse(text: string): VlmResult {
 
 /**
  * Call Qwen3-VL to analyse a construction photo and extract QA results.
+ * Injects HITL few-shot correction examples from past reviews to improve accuracy.
  */
 async function runVlmAnalysis(photoPath: string, discipline: string): Promise<VlmResult> {
-  const prompt = discipline === 'civil' ? CIVIL_PROMPT : OPTICAL_PROMPT;
+  const basePrompt = discipline === 'civil' ? CIVIL_PROMPT : OPTICAL_PROMPT;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3004';
   const imageUrl = photoPath.startsWith('http')
     ? photoPath
     : `${baseUrl}/api/field-ops/photo-proxy?path=${encodeURIComponent(photoPath)}`;
+
+  // Inject HITL few-shot examples from past corrections (non-blocking on failure)
+  let prompt = basePrompt;
+  try {
+    const examples = await getVlmFewShotExamples({
+      module: 'construction_qa',
+      analysisType: 'construction_photo_qa',
+      context: { discipline },
+      maxExamples: 3,
+      prioritizeCanonical: true,
+    });
+    const fewShotSection = buildVlmFewShotPrompt(examples);
+    if (fewShotSection) {
+      prompt = `${fewShotSection}\n\n${basePrompt}`;
+      logger.info('Few-shot injection applied', { discipline, count: examples.length });
+    }
+  } catch (fewShotError) {
+    logger.warn('Few-shot retrieval failed (continuing without)', {
+      error: fewShotError instanceof Error ? fewShotError.message : 'Unknown',
+    });
+  }
 
   try {
     const response = await fetch(`${VLM_URL}/v1/chat/completions`, {
