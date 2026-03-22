@@ -60,8 +60,16 @@ export async function POST(req: NextRequest) {
 
       if (!project || !dateM) continue;
 
-      // Parse month
-      const monthDate = dateM instanceof Date ? dateM : new Date(String(dateM));
+      // Parse month — Graph API returns Excel serial numbers (days since 1899-12-30)
+      let monthDate: Date;
+      if (typeof dateM === 'number') {
+        // Excel serial date: days since Dec 30 1899
+        monthDate = new Date(Date.UTC(1899, 11, 30) + dateM * 86400000);
+      } else if (dateM instanceof Date) {
+        monthDate = dateM;
+      } else {
+        monthDate = new Date(String(dateM));
+      }
       if (isNaN(monthDate.getTime())) continue;
 
       // Enforce cutoff — skip current month and future
