@@ -351,7 +351,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [forecastOpen, setForecastOpen] = useState(false);
+  const [forecastOpen, setForecastOpen] = useState(initialProject.status === 'wip');
   const [inputsOpen, setInputsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
