@@ -19,7 +19,7 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
         return (
           <Link
             key={card.title}
-            to={card.link}
+            href={card.link}
             className="bg-card overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
           >
             <div className="p-5">

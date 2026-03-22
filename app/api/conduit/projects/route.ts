@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     const rows = await sql`
-      SELECT id, name, po_count, start_date, build_duration_months,
+      SELECT id, name, status, po_count, start_date, build_duration_months,
              inputs_json, is_baseline_locked, created_at, updated_at
       FROM conduit_projects
       ORDER BY created_at ASC

@@ -385,6 +385,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       const res = await fetch(`/api/conduit/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'executable' }),
       });
       if (!res.ok) throw new Error('Failed to promote project');
@@ -473,13 +474,13 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       {/* ── Actual ───────────────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center gap-3 pt-2">
-          <span className="text-sm font-bold uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
-            Actual
+          <span className="text-sm font-bold uppercase tracking-widest border border-orange-500 text-orange-400 px-3 py-1 rounded">
+            Work in Progress
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
         <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
-          <p className="text-sm">Actual to date — coming soon</p>
+          <p className="text-sm">Work in Progress — coming soon</p>
         </div>
       </div>
 

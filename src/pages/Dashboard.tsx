@@ -12,7 +12,6 @@ import {
   BarChart3,
   Settings
 } from 'lucide-react';
-import { useRouter } from 'next/router';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { QuickActionCard } from '@/components/dashboard/QuickActionCard';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
