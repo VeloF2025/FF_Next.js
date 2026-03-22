@@ -18,6 +18,9 @@ The Analytics & Reporting module provides **comprehensive business intelligence 
 - Export to Excel/PDF
 - Scheduled report generation
 - Role-based dashboard access
+- **Reports Sandbox** with multi-report financial analysis (Cashflow, Revenue, Expense, Project Financial)
+- SharePoint Excel integration for report distribution
+- RBAC-controlled analytics access
 
 ## Database Schema
 
@@ -296,6 +299,163 @@ export async function compareProjects(projectIds) {
     JOIN project_analytics pa ON p.id = pa.project_id
     WHERE p.id = ANY(${projectIds})
   `;
+}
+```
+
+## Reports Sandbox
+
+The **Reports Sandbox** is a comprehensive financial reporting feature enabling multi-dimensional analysis of project finances, cashflow, and revenue projections. Introduced in commit `ca95b24af9c418e02b45b9d43d92d106fdc23f81` (2026-03-21), the Reports Sandbox provides seven specialized report types with Excel export and SharePoint integration.
+
+### Supported Report Types
+
+#### 1. Cashflow Overview Report
+- **Purpose**: Tracks inflow and outflow of funds across projects and time periods
+- **Metrics**: Opening balance, cash receipts, cash disbursements, closing balance
+- **Scope**: Period-based view (daily, weekly, monthly, quarterly)
+- **Access**: Role-based (Admin, Manager; restricted for Technician/Viewer by RBAC)
+
+#### 2. Revenue Overview Report
+- **Purpose**: Aggregated revenue analysis across all projects and clients
+- **Metrics**: Gross revenue, net revenue, revenue by project, revenue trend
+- **Scope**: Client-level and project-level granularity
+- **Access**: Admin, Manager, Finance roles
+
+#### 3. Project Revenue Projections Report
+- **Purpose**: Forecast revenue completion and trend analysis for individual projects
+- **Metrics**: Projected completion revenue, burn-down/burn-up curves, variance analysis
+- **Calculation**: Based on historical burn rate and project progress
+- **Access**: Project Manager, Admin
+
+#### 4. Expense Pivot Report
+- **Purpose**: Multi-dimensional expense analysis by category, supplier, and time period
+- **Metrics**: Total expenses, expense ratio (%), trend analysis, cost drivers
+- **Pivot Dimensions**: Category, supplier, cost center, project, time period
+- **Access**: Finance, Admin roles
+
+#### 5. Project Financial Detail Report
+- **Purpose**: Deep-dive financial metrics for a single project
+- **Metrics**: Budget vs. Actual (full variance), item-level costs, profitability, forecast-to-complete
+- **Format**: Tabular with drill-down to purchase orders and invoices
+- **Access**: Project Manager, Finance, Admin
+
+#### 6. Project Detail Report
+- **Purpose**: Comprehensive project metadata and status with linked financial snapshot
+- **Includes**: Project dates, scope, status, resources, KPIs, attached financials
+- **Format**: Single-page summary with drill-down capability
+- **Access**: All roles with project assignment (filtered by RBAC)
+
+#### 7. Legacy Expense Summary (Archive)
+- **Purpose**: Backward-compatible expense roll-up report
+- **Deprecated**: Superseded by Expense Pivot in new workflows
+
+### API Endpoints (`/api/analytics/reports/*`)
+
+```javascript
+// GET /api/analytics/reports/cashflow - Cashflow Overview
+export async function getCashflowReport(filters = {}) {
+  const { projectId, dateRange, granularity } = filters;
+  // Returns: { openingBalance, receipts, disbursements, closingBalance, periods }
+}
+
+// GET /api/analytics/reports/revenue-overview - Revenue aggregation
+export async function getRevenueOverviewReport(filters = {}) {
+  const { clientId, projectIds, dateRange } = filters;
+  // Returns: { totalRevenue, byProject, byClient, trends }
+}
+
+// GET /api/analytics/reports/project-revenue-projection - Revenue forecast
+export async function getProjectRevenueProjectionReport(projectId, filters = {}) {
+  const { includeHistorical, forecastMethod } = filters;
+  // Returns: { projectedCompletion, burnDown, variance, confidence }
+}
+
+// GET /api/analytics/reports/expense-pivot - Multi-dimensional expenses
+export async function getExpensePivotReport(filters = {}) {
+  const { dimensions, categories, dateRange } = filters;
+  // Returns: pivoted data by selected dimensions
+}
+
+// GET /api/analytics/reports/project-financial-detail - Deep-dive financials
+export async function getProjectFinancialDetailReport(projectId) {
+  // Returns: { budget, actualCost, variance, forecast, line_items[] }
+}
+
+// GET /api/analytics/reports/project-detail - Project summary
+export async function getProjectDetailReport(projectId) {
+  // Returns: { project metadata, status, financials, resources, kpis }
+}
+
+// POST /api/analytics/reports/export - Export to Excel/PDF
+export async function exportReport(reportType, filters, format = 'xlsx') {
+  // Returns: { downloadUrl, expiresAt, format }
+}
+```
+
+### Excel Export & SharePoint Integration
+
+All Reports Sandbox reports support **direct export to Excel** with:
+- Formatted headers and styling
+- Column width auto-fitting
+- Pivot table structures (where applicable)
+- Shareable links via SharePoint OneDrive
+
+**SharePoint Integration Details:**
+- Reports export to `/sites/FibreFlow/Shared Documents/Reports/` structure
+- Excel workbooks include metadata tabs (timestamp, filters applied, prepared by)
+- Power BI read-enabled for dashboard integration
+- Synchronization cadence: 8 PM UTC daily (configurable)
+
+See [`docs/integrations/sharepoint-excel.md`](../integrations/sharepoint-excel.md) for detailed setup.
+
+### RBAC Permission Mapping (SQL Migration 248)
+
+| Report Type | Admin | Manager | Finance | ProjectMgr | Technician | Viewer |
+|---|---|---|---|---|---|---|
+| Cashflow Overview | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Revenue Overview | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Project Revenue Projection | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Expense Pivot | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Project Financial Detail | ✓ | ✓ | ✓ | ✓* | ✗ | ✗ |
+| Project Detail | ✓ | ✓ | ✓ | ✓* | ✓* | ✓* |
+
+*ProjectMgr, Technician, Viewer: own projects only (scoped by projectId)
+
+**Permission Keys (database):**
+- `analytics:reports:cashflow:view`
+- `analytics:reports:revenue:view`
+- `analytics:reports:projection:view`
+- `analytics:reports:expense:view`
+- `analytics:reports:financial-detail:view`
+- `analytics:reports:project-detail:view`
+- `analytics:reports:export:excel`
+- `analytics:reports:export:pdf`
+
+### Usage Example
+
+```typescript
+// React hook for Reports Sandbox
+const useReportSandbox = (reportType: string, filters: ReportFilters) => {
+  return useQuery(
+    ['analytics', 'report', reportType],
+    () => fetch(`/api/analytics/reports/${reportType}?${new URLSearchParams(filters)}`).then(r => r.json()),
+    { staleTime: 15 * 60 * 1000 } // 15 min cache
+  );
+};
+
+// Component example
+export function CashflowReportPage() {
+  const [filters, setFilters] = useState({ dateRange: 'current-month' });
+  const { data, isLoading } = useReportSandbox('cashflow', filters);
+  
+  return (
+    <div>
+      <ReportFilters value={filters} onChange={setFilters} />
+      <CashflowTable data={data} />
+      <button onClick={() => exportReport('cashflow', filters, 'xlsx')}>
+        Export to Excel
+      </button>
+    </div>
+  );
 }
 ```
 

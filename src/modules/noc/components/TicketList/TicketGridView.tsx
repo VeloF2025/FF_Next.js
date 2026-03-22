@@ -137,9 +137,15 @@ function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEv
         {ticket.dr_number ?? '\u2014'}
       </td>
       <td className="px-2 py-1.5 text-center">
-        <span className={cn('inline-block w-2 h-2 rounded-full', ticket.assigned_to ? 'bg-green-400' : 'bg-gray-600')}
+        <span 
+          className={cn(
+            'inline-flex items-center justify-center w-2 h-2 rounded-full',
+            ticket.assigned_to ? 'bg-green-400' : 'bg-gray-600'
+          )}
+          role="img"
           aria-label={ticket.assigned_to ? `Assigned to ${ticket.assigned_to}` : 'Unassigned'}
-          title={ticket.assigned_to ? 'Assigned' : 'Unassigned'} />
+          title={ticket.assigned_to ? 'Assigned' : 'Unassigned'} 
+        />
       </td>
       <td className="px-2 py-1.5 text-center">
         {ticket.sla_breached
@@ -233,7 +239,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
           <button
             onClick={() => refetch()}
             disabled={isLoading}
-            className="ml-1 p-1.5 rounded text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-40"
+            className="ml-1 p-1.5 rounded text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ff-primary-500)]"
             title="Refresh"
             aria-label="Refresh tickets"
           >
@@ -264,6 +270,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
                       onClick={() => handleSort(col.key as SortField)}
                       className={cn(
                         'flex items-center gap-1 w-full p-0 font-semibold text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] rounded px-1 py-0.5 transition-colors',
+                        'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ff-primary-500)]',
                         col.align === 'center' && 'justify-center',
                         col.align === 'right' && 'justify-end'
                       )}
@@ -300,7 +307,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={pagination.page === 1 || isLoading}
-              className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30"
+              className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ff-primary-500)]"
               aria-label="Previous page"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
@@ -309,7 +316,7 @@ export function TicketGridView({ initialFilters = {}, onTicketClick }: TicketGri
             <button
               onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
               disabled={pagination.page === pagination.totalPages || isLoading}
-              className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30"
+              className="p-1 rounded text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-secondary)] disabled:opacity-30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--ff-primary-500)]"
               aria-label="Next page"
             >
               <ChevronRight className="w-4 h-4" aria-hidden="true" />

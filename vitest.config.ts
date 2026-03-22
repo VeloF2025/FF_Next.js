@@ -17,6 +17,8 @@ export default defineConfig({
     // the '@/lib' → './lib' alias gets a chance to apply.
     alias: [
       { find: '@/lib/utils', replacement: path.resolve(__dirname, './src/lib/utils') },
+      { find: '@/lib/db-neon', replacement: path.resolve(__dirname, './src/lib/db-neon') },
+      { find: '@/lib/neon', replacement: path.resolve(__dirname, './src/lib/neon') },
       { find: '@/lib', replacement: path.resolve(__dirname, './lib') },
       { find: '@/components', replacement: path.resolve(__dirname, './src/components') },
       { find: '@/hooks', replacement: path.resolve(__dirname, './src/hooks') },
