@@ -299,7 +299,7 @@ function ProjectsGrid({
       </div>
 
       {/* Add Project button + inline form */}
-      {showAddButton && !showAddForm ? (
+      {showAddButton && !showAddForm && (
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-colors"
@@ -307,7 +307,8 @@ function ProjectsGrid({
           <Plus className="w-4 h-4" />
           Add Project
         </button>
-      ) : (
+      )}
+      {showAddButton && showAddForm && (
         <div className="rounded-lg border border-gray-600 bg-gray-800 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-white">New Project</h3>
