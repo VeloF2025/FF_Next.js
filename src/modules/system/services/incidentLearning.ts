@@ -312,6 +312,7 @@ export async function resetConsecutiveCounters(
   actionId: string,
   type: 'success' | 'failure'
 ): Promise<{ consecutiveSuccess: number; consecutiveFailure: number }> {
+  const db = await getDb();
   if (type === 'success') {
     await db.query(
       `
