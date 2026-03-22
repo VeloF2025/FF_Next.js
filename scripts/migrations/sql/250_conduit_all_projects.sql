@@ -8,7 +8,7 @@ VALUES
     'Mohadin',
     22434,
     12,
-    '{"rate":2700,"uptake":0.60,"scope":{"poles":0,"stringing_m":0,"pon":0},"service_rates":{"permissions_per_pole":0,"poles_each":0,"stringing_per_m":0,"optical_per_pon":0,"activation_each":155},"stock_rates":{"pole":0,"cable_per_m":0,"optical":0,"activation":191.68},"expenses_per_month":{"ad_hoc":0,"casuals":0,"fuel":0,"overheads":0,"sales":0}}'::jsonb
+    '{"rate":2700,"uptake":0.52,"scope":{"poles":0,"stringing_m":0,"pon":0},"service_rates":{"permissions_per_pole":0,"poles_each":0,"stringing_per_m":0,"optical_per_pon":0,"activation_each":155},"stock_rates":{"pole":0,"cable_per_m":0,"optical":0,"activation":191.68},"expenses_per_month":{"ad_hoc":0,"casuals":0,"fuel":0,"overheads":0,"sales":0}}'::jsonb
   ),
   (
     'c3d4e5f6-0000-4000-8000-000000000003',
@@ -50,7 +50,7 @@ VALUES
     'Themb''elihle',
     10403,
     10,
-    '{"rate":2700,"uptake":0.60,"scope":{"poles":0,"stringing_m":0,"pon":0},"service_rates":{"permissions_per_pole":0,"poles_each":0,"stringing_per_m":0,"optical_per_pon":0,"activation_each":155},"stock_rates":{"pole":0,"cable_per_m":0,"optical":0,"activation":191.68},"expenses_per_month":{"ad_hoc":0,"casuals":0,"fuel":0,"overheads":0,"sales":0}}'::jsonb
+    '{"rate":2700,"uptake":0.50,"scope":{"poles":0,"stringing_m":0,"pon":0},"service_rates":{"permissions_per_pole":0,"poles_each":0,"stringing_per_m":0,"optical_per_pon":0,"activation_each":155},"stock_rates":{"pole":0,"cable_per_m":0,"optical":0,"activation":191.68},"expenses_per_month":{"ad_hoc":0,"casuals":0,"fuel":0,"overheads":0,"sales":0}}'::jsonb
   ),
   (
     'c9d0e1f2-0000-4000-8000-000000000009',

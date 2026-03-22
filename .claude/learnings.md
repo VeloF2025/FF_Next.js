@@ -4219,3 +4219,79 @@ claude --model opus  # Start with Opus as team lead
 
 **Rollback:** `cp ~/.claude/.settings.backup.json ~/.claude/settings.json`
 
+
+---
+
+## 2026-03-21: Always Trace All Connected Logic Before Shipping (Lew directive)
+
+**Directive:** Before shipping any change, trace the full dependency chain of every value you touch. Do not ship until all connected UI, state, and computed values are verified to update correctly.
+
+**The incident that prompted this:**
+Editing `Uptake %` inline in the Conduit portfolio table updated the row Revenue and the table TOTAL footer, but the KPI tiles at the top stayed stale. The tiles were a server component rendering totals at load time — they had no connection to the client-side `projects` state in `PortfolioTable`.
+
+**Why it was missed:** The fix to make tiles reactive was only applied after Lew spotted the bug. It should have been caught during development by tracing: `Uptake % edit → fc_activation → revenue → cos_total → profit → GP% → tiles`.
+
+**The rule:**
+When you modify a value, ask: *"Who else reads this?"* Trace the full downstream chain:
+1. Which state variables change?
+2. Which computed/derived values depend on that state?
+3. Which UI elements render those derived values?
+4. Are those UI elements in the same React tree / client component, or are they server-rendered?
+5. If server-rendered, they CANNOT react to client-side state — they must be moved into a client component or receive updates via props/callbacks.
+
+**Applied pattern — Server vs Client split in Next.js:**
+```
+page.tsx (Server Component)
+  └── fetches data once at load
+  └── passes initialProjects → PortfolioTable (Client Component)
+                                  ├── owns projects state
+                                  ├── KPI tiles  ← MUST live here to be reactive
+                                  ├── table rows ← already reactive
+                                  └── totals footer ← already reactive
+```
+Any UI that needs to reflect client-side edits MUST live inside the client component that owns the state.
+
+**Checklist before shipping a data change:**
+- [ ] Row-level displays update ✓
+- [ ] Aggregate/total rows update ✓  
+- [ ] Summary tiles/cards update ✓
+- [ ] Page-level KPIs update ✓
+- [ ] Any other pages/components that derive from the same data ✓
+
+---
+
+## 2026-03-21: Conduit Data Architecture — Excel/PBI Model (Lew directive)
+
+**Directive:** "Think like Excel and Power BI will do. All visuals are connected to the underlying data."
+
+**The mental model:**
+In Excel and Power BI there is ONE data model. Every cell, chart, tile, and total is a live view of that model. Change a cell — everything that depends on it updates instantly, automatically, without exception. No stale views. No partial updates.
+
+**How to apply this in Next.js / React:**
+
+```
+WRONG mental model (the bug we just fixed):
+  Server fetch → server renders tiles (static snapshot)
+                + client renders table (live state)
+  = TWO disconnected views of the same data
+
+CORRECT mental model (Excel/PBI):
+  Server fetch → passes raw data to ONE client component
+  Client component owns the single source of truth (projects state)
+  ALL visuals — tiles, rows, totals, detail panels — are pure functions of that state
+  Change state once → everything updates everywhere, instantly
+```
+
+**Implementation rule for Conduit:**
+```
+projects[] state (PortfolioTable)
+    │
+    ├── calcConduit(p) per project  →  row Revenue, COS, Profit, GP%, Cost/Home
+    ├── Σ calcConduit(p) all projects  →  KPI tiles (Total Homes, FC Act, Revenue, COS, Profit, GP%)
+    ├── Σ calcConduit(p) all projects  →  footer totals row
+    └── project.inputs_json  →  ProjectDetailPanel COS summary bar + input form
+```
+
+Every number on the page is a deterministic derivation from `projects[]`. No number is stored in its own separate state. No UI fetches its own copy of the data. Change `projects[i].inputs_json.uptake` and EVERY number that depends on it — in the row, in the footer, in the tiles — updates in the same render cycle.
+
+**The test:** Can you change one input and trust that every visual on the page that depends on it has updated? If yes, you've built it the Excel/PBI way. If no, find and fix the stale view.

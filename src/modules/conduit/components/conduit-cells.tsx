@@ -53,7 +53,7 @@ export function EditableCell({ value, onCommit, type = 'number' }: EditableCellP
 
   if (editing) {
     return (
-      <td className="px-3 py-2 text-sm text-right bg-white border border-blue-300" style={{ minWidth: 80 }}>
+      <td className="px-3 py-2 text-sm text-right bg-gray-700 border border-teal-600" style={{ minWidth: 80 }}>
         <input
           ref={inputRef}
           type="number"
@@ -64,7 +64,7 @@ export function EditableCell({ value, onCommit, type = 'number' }: EditableCellP
             if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setEditing(false);
           }}
-          className="w-full bg-transparent outline-none text-sm text-right font-medium text-gray-900"
+          className="w-full bg-transparent outline-none text-sm text-right font-medium text-gray-100 tabular-nums"
         />
       </td>
     );
@@ -72,11 +72,11 @@ export function EditableCell({ value, onCommit, type = 'number' }: EditableCellP
 
   return (
     <td
-      className="px-3 py-2 text-sm text-right bg-white border border-gray-200 cursor-text hover:bg-blue-50 transition-colors"
+      className="px-3 py-2 text-sm text-right bg-gray-800/60 border border-gray-700 cursor-text hover:bg-gray-700/60 hover:border-gray-600 transition-colors"
       style={{ minWidth: 80 }}
       onClick={startEdit}
     >
-      <span className="font-medium text-gray-900 tabular-nums">{display}</span>
+      <span className="font-medium text-gray-300 tabular-nums">{display}</span>
     </td>
   );
 }

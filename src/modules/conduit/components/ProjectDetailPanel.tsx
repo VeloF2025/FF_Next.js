@@ -1,12 +1,26 @@
 /**
- * ProjectDetailPanel — Drill-down detail for a Conduit project.
- * Renders 3 forecast tables: Rollout Plan, COS Categories, Revenue.
+ * ProjectDetailPanel — Per-project inputs + monthly forecast.
+ *
+ * Section 1: COS Input Editor
+ *   - Scope quantities (poles, stringing, PON)
+ *   - Unit costs (all-in per unit)
+ *   - Monthly opex (× build duration)
+ *   - Lump costs (ad hoc, sub-contractor)
+ *   - Live COS summary as you type
+ *
+ * Section 2: Monthly Forecast (computed from saved inputs)
+ *   - Rollout plan
+ *   - COS categories
+ *   - Revenue forecast
  */
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { log } from '@/lib/logger';
+import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry } from '../types';
+import { calcConduit } from '../hooks/useConduitCalc';
+import { MonthlyForecastGrid } from './MonthlyForecastGrid';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +31,6 @@ interface ForecastRow {
 }
 
 interface ProjectDetailData {
-  projectName: string;
   months: string[];
   rolloutPlan: ForecastRow[];
   cosCategories: ForecastRow[];
@@ -27,87 +40,300 @@ interface ProjectDetailData {
 // ─── Formatters ─────────────────────────────────────────────────────────────
 
 function fZAR(v: number | null): string {
-  if (v === null || v === 0) return '\u2014';
+  if (v === null || v === 0) return '—';
   const abs = Math.abs(Math.round(v));
   const s = abs.toLocaleString('en-ZA').replace(/,/g, '\u00a0');
   return `${v < 0 ? '-' : ''}R\u00a0${s}`;
 }
 
 function fInt(v: number | null): string {
-  if (v === null || v === 0) return '\u2014';
+  if (v === null || v === 0) return '—';
   return Math.round(v).toLocaleString('en-ZA').replace(/,/g, '\u00a0');
 }
 
-// ─── Sub-table ───────────────────────────────────────────────────────────────
+function fZARShort(v: number): string {
+  if (!isFinite(v) || v === 0) return '—';
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return `R ${(v / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `R ${(v / 1_000).toFixed(0)}K`;
+  return `R ${Math.round(v).toLocaleString()}`;
+}
 
-interface ForecastTableProps {
+// ─── Forecast sub-table ─────────────────────────────────────────────────────
+
+function ForecastTable({
+  title,
+  months,
+  rows,
+  format,
+}: {
   title: string;
   months: string[];
   rows: ForecastRow[];
   format: 'int' | 'zar';
-}
-
-function ForecastTable({ title, months, rows, format }: ForecastTableProps) {
-  const fmt = (v: number | null) => format === 'zar' ? fZAR(v) : fInt(v);
+}) {
+  const fmt = (v: number | null) => (format === 'zar' ? fZAR(v) : fInt(v));
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs border-collapse min-w-max">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
-            <th
-              className="px-3 py-2 text-left text-white font-bold whitespace-nowrap"
-              style={{ minWidth: 180 }}
-            >
+            <th className="px-3 py-2 text-left text-white font-bold whitespace-nowrap" style={{ minWidth: 180 }}>
               {title}
             </th>
             {months.map(m => (
-              <th
-                key={m}
-                className="px-2 py-2 text-right text-white font-semibold whitespace-nowrap"
-                style={{ minWidth: 90 }}
-              >
+              <th key={m} className="px-2 py-2 text-right text-white font-semibold whitespace-nowrap" style={{ minWidth: 90 }}>
                 {m}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => {
-            const isTotal = Boolean(row.isTotal);
-            return (
-              <tr
-                key={row.label}
-                style={isTotal ? { backgroundColor: '#1a3a4a' } : undefined}
-                className={!isTotal ? (i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60') : ''}
-              >
+          {rows.map((row, i) => (
+            <tr
+              key={row.label}
+              style={row.isTotal ? { backgroundColor: '#1a3a4a' } : undefined}
+              className={!row.isTotal ? (i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60') : ''}
+            >
+              <td className={`px-3 py-1.5 whitespace-nowrap ${row.isTotal ? 'font-bold text-white' : 'text-gray-300'}`}>
+                {row.label}
+              </td>
+              {row.values.map((v, j) => (
                 <td
-                  className={`px-3 py-1.5 whitespace-nowrap ${isTotal ? 'font-bold text-white' : 'text-gray-300'}`}
+                  key={j}
+                  className={`px-2 py-1.5 text-right tabular-nums ${
+                    row.isTotal
+                      ? 'font-bold text-white'
+                      : typeof v === 'number' && v < 0
+                      ? 'text-red-400'
+                      : 'text-gray-300'
+                  }`}
                 >
-                  {row.label}
+                  {fmt(v)}
                 </td>
-                {row.values.map((v, j) => {
-                  const isNeg = typeof v === 'number' && v < 0;
-                  return (
-                    <td
-                      key={j}
-                      className={`px-2 py-1.5 text-right tabular-nums ${
-                        isTotal
-                          ? 'font-bold text-white'
-                          : isNeg
-                          ? 'text-red-400'
-                          : 'text-gray-300'
-                      }`}
-                    >
-                      {fmt(v)}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Input field ─────────────────────────────────────────────────────────────
+
+/** Format with thousand separators (non-breaking space) for display when not editing */
+function fmtThousands(v: number): string {
+  if (v === 0) return '0';
+  return Math.round(v).toLocaleString('en-ZA').replace(/,/g, '\u00a0');
+}
+
+function InputField({
+  label,
+  value,
+  onChange,
+  prefix,
+  hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  prefix?: string;
+  hint?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(String(value));
+
+  // Sync raw when parent value changes and we're not actively editing
+  useEffect(() => {
+    if (!focused) setRaw(String(value));
+  }, [value, focused]);
+
+  const commit = (inputVal: string) => {
+    const cleaned = inputVal.replace(/[\s\u00a0,]/g, '');
+    const n = Number(cleaned);
+    if (!isNaN(n) && n >= 0) {
+      onChange(n);
+      setRaw(String(n));
+    } else {
+      setRaw(String(value)); // revert to last valid
+    }
+    setFocused(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <label className="text-xs text-gray-400 font-medium">{label}</label>
+      <div className={`flex items-center gap-1 bg-gray-900 border rounded px-2 py-1.5 transition-colors ${focused ? 'border-teal-500' : 'border-gray-600'}`}>
+        {prefix && <span className="text-xs text-gray-500 select-none">{prefix}</span>}
+        <input
+          type="text"
+          inputMode="numeric"
+          value={focused ? raw : fmtThousands(value)}
+          onChange={e => setRaw(e.target.value)}
+          onFocus={e => {
+            setFocused(true);
+            setRaw(String(value));
+            setTimeout(() => e.target.select(), 0);
+          }}
+          onBlur={e => commit(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit(raw);
+            if (e.key === 'Escape') {
+              setRaw(String(value));
+              setFocused(false);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          className="bg-transparent outline-none text-sm text-white w-full tabular-nums"
+        />
+      </div>
+      {hint && <span className="text-xs text-gray-600">{hint}</span>}
+    </div>
+  );
+}
+
+// ─── Input section ───────────────────────────────────────────────────────────
+
+function InputSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 space-y-3">
+      <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wide">{title}</h4>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── COS Summary bar + expandable breakdown ──────────────────────────────────
+
+function CosSummaryBar({ project }: { project: ConduitProject }) {
+  const [open, setOpen] = useState(false);
+  const c = calcConduit(project);
+  const b = c.breakdown;
+  const dur = project.build_duration_months;
+
+  // % of COS Total for each cost bucket (null = not a cost bucket)
+  const cosPct = (v: number) => c.cos_total > 0 ? `${((v / c.cos_total) * 100).toFixed(1)}%` : null;
+
+  const summary = [
+    { label: 'Revenue',      value: c.revenue,      color: 'text-teal-400',                                                                   pct: null },
+    { label: 'COS Services', value: c.cos_services, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_services) },
+    { label: 'COS Material', value: c.cos_material, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_material) },
+    { label: 'COS OPEX',     value: c.cos_opex,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_opex) },
+    { label: 'COS Lump',     value: c.cos_lump,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_lump) },
+    { label: 'COS Total',    value: c.cos_total,    color: 'text-amber-400',                                                                  pct: null },
+    { label: 'Profit',       value: c.profit,       color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400',                              pct: null },
+    { label: 'GP%',          gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400', pct: null },
+    { label: 'Cost/Home',    value: c.cost_per_home, color: 'text-gray-300',                                                                  pct: null },
+  ];
+
+  const serviceLines = [
+    { label: 'Poles',             value: b.svc_poles,      hint: 'poles × (pole plant + permissions)' },
+    { label: 'Stringing',         value: b.svc_stringing,  hint: 'stringing m × rate/m' },
+    { label: 'Optical',           value: b.svc_optical,    hint: 'PON count × optical rate' },
+    { label: 'Activations',       value: b.svc_activation, hint: 'FC activations × activation rate' },
+    { label: 'Wayleave Incentive',value: b.svc_wayleave,   hint: 'FC activations × wayleave incentive rate' },
+  ];
+
+  const materialLines = [
+    { label: 'Poles',       value: b.mat_poles,      hint: 'poles × pole material cost' },
+    { label: 'Cable',       value: b.mat_cable,      hint: 'stringing m × cable cost/m' },
+    { label: 'Optical',     value: b.mat_optical,    hint: 'PON count × optical material' },
+    { label: 'Activations', value: b.mat_activation, hint: 'FC activations × ONT cost' },
+  ];
+
+  const opexLines = [
+    { label: 'Casuals',   value: b.opex_casuals,   hint: `casuals/mo × ${dur} months` },
+    { label: 'Fuel',      value: b.opex_fuel,      hint: `fuel/mo × ${dur} months` },
+    { label: 'Overheads', value: b.opex_overheads, hint: `overheads/mo × ${dur} months` },
+    { label: 'Sales',     value: b.opex_sales,     hint: `sales/mo × ${dur} months` },
+    { label: 'Ad Hoc',    value: b.opex_ad_hoc,    hint: `ad hoc/mo × ${dur} months` },
+  ];
+
+  return (
+    <div className="rounded-lg border border-gray-700 overflow-hidden">
+      {/* Summary row */}
+      <div className="flex flex-wrap gap-3 p-3 bg-gray-900">
+        {summary.map(item => (
+          <div key={item.label} className="flex flex-col min-w-[100px]">
+            <span className="text-xs text-gray-500">{item.label}</span>
+            <span className={`text-sm font-bold tabular-nums ${item.color}`}>
+              {'gp' in item
+                ? `${((item.gp ?? 0) * 100).toFixed(1)}%`
+                : fZAR('value' in item ? (item.value ?? 0) : 0)}
+            </span>
+            {item.pct && (
+              <span className="text-[10px] text-gray-500 tabular-nums">{item.pct} of COS</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Toggle */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-1.5 bg-gray-800 hover:bg-gray-750 text-xs text-gray-400 hover:text-gray-200 transition-colors border-t border-gray-700"
+      >
+        <span>COS breakdown by line item</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Expandable breakdown */}
+      {open && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-700 border-t border-gray-700">
+          {/* Services */}
+          <BreakdownGroup
+            title="Cost of Sale — Services"
+            total={c.cos_services}
+            lines={serviceLines}
+          />
+          {/* Material */}
+          <BreakdownGroup
+            title="Cost of Sale — Material"
+            total={c.cos_material}
+            lines={materialLines}
+          />
+          {/* OPEX */}
+          <BreakdownGroup
+            title="Cost of Sale — OPEX"
+            total={c.cos_opex}
+            lines={opexLines}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BreakdownGroup({
+  title,
+  total,
+  lines,
+}: {
+  title: string;
+  total: number;
+  lines: { label: string; value: number; hint: string }[];
+}) {
+  return (
+    <div className="bg-gray-900 p-3 space-y-1.5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wide">{title}</span>
+        <span className="text-xs font-bold text-amber-400 tabular-nums">{fZAR(total)}</span>
+      </div>
+      {lines.map(line => (
+        <div key={line.label} className="flex items-center justify-between gap-2">
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs text-gray-300">{line.label}</span>
+            <span className="text-[10px] text-gray-600 truncate">{line.hint}</span>
+          </div>
+          <span className={`text-xs font-mono tabular-nums shrink-0 ${line.value > 0 ? 'text-gray-200' : 'text-gray-600'}`}>
+            {fZAR(line.value)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -115,62 +341,256 @@ function ForecastTable({ title, months, rows, format }: ForecastTableProps) {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
-  projectId: string;
-  projectName: string;
+  project: ConduitProject;
+  onProjectUpdate?: (updated: ConduitProject) => void;
 }
 
-export function ProjectDetailPanel({ projectId, projectName }: Props) {
-  const [data, setData] = useState<ProjectDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }: Props) {
+  const [project, setProject] = useState<ConduitProject>(initialProject);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [forecastOpen, setForecastOpen] = useState(false);
+  const [inputsOpen, setInputsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Keep in sync if parent re-renders
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    setProject(initialProject);
+  }, [initialProject.id]);
 
-    fetch(`/api/conduit/projects/${projectId}/detail`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then(({ data: d }: { data: ProjectDetailData }) => setData(d))
-      .catch((err: unknown) => {
-        log.error('ProjectDetailPanel fetch failed', { projectId, err: String(err) });
-        setError('Failed to load detail data');
-      })
-      .finally(() => setLoading(false));
-  }, [projectId]);
+  const inp = project.inputs_json;
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 p-6 text-gray-400">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span className="text-sm">Loading {projectName} detail\u2026</span>
-      </div>
-    );
-  }
+  // ── Input updaters ──────────────────────────────────────────────────────
+  const setScope = useCallback((field: keyof typeof inp.scope, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, scope: { ...p.inputs_json.scope, [field]: v } } }));
+    setSaved(false);
+  }, []);
 
-  if (error || !data) {
-    return <p className="p-6 text-sm text-red-400">{error ?? 'No data'}</p>;
-  }
+  const setServiceRate = useCallback((field: keyof typeof inp.service_rates, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, service_rates: { ...p.inputs_json.service_rates, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const setLumpCost = useCallback((field: keyof typeof inp.lump_costs, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, lump_costs: { ...p.inputs_json.lump_costs, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const setMaterialRate = useCallback((field: keyof typeof inp.material_rates, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, material_rates: { ...p.inputs_json.material_rates, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const setMonthlyOpex = useCallback((field: keyof typeof inp.monthly_opex, v: number) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, monthly_opex: { ...p.inputs_json.monthly_opex, [field]: v } } }));
+    setSaved(false);
+  }, []);
+
+  const handlePlanChange = useCallback((plan: MonthlyPlanEntry[]) => {
+    setProject(p => ({ ...p, inputs_json: { ...p.inputs_json, monthly_plan: plan } }));
+    setSaved(false);
+  }, []);
+
+  const setStartDate = useCallback((v: string) => {
+    setProject(p => ({ ...p, start_date: v }));
+    setSaved(false);
+  }, []);
+
+  const setBuildDuration = useCallback((v: number) => {
+    setProject(p => {
+      // Resize monthly_plan to match new duration
+      const current = p.inputs_json.monthly_plan ?? [];
+      const blank = () => ({ poles: 0, stringing_m: 0, pon: 0, activations: 0,
+                              opex_casuals: null, opex_fuel: null, opex_overheads: null,
+                              opex_sales: null, opex_ad_hoc: null });
+      const resized = v > current.length
+        ? [...current, ...Array.from({ length: v - current.length }, blank)]
+        : current.slice(0, v);
+      return { ...p, build_duration_months: v,
+               inputs_json: { ...p.inputs_json, monthly_plan: resized } };
+    });
+    setSaved(false);
+  }, []);
+
+
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  const save = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/conduit/projects/${project.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: project.name,
+          po_count: project.po_count,
+          start_date: project.start_date,
+          build_duration_months: project.build_duration_months,
+          inputs_json: project.inputs_json,
+          version_label: `Save ${new Date().toLocaleString('en-ZA')}`,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { data } = (await res.json()) as { data: ConduitProject };
+      setProject(data);
+      onProjectUpdate?.(data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+
+    } catch (err) {
+      log.error('ProjectDetailPanel save failed', { id: project.id, err: String(err) });
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dur = project.build_duration_months;
 
   return (
-    <div className="space-y-4 p-4 bg-gray-900 border-t border-gray-700">
-      <ForecastTable
-        title="Rollout Plan \u2014 Forecast"
-        months={data.months}
-        rows={data.rolloutPlan}
-        format="int"
-      />
-      <ForecastTable
-        title="COS Category \u2014 Forecast"
-        months={data.months}
-        rows={data.cosCategories}
-        format="zar"
-      />
-      <ForecastTable
-        title="Revenue \u2014 Forecast"
-        months={data.months}
-        rows={data.revenueForecast}
-        format="zar"
-      />
+    <div className="space-y-4 p-4 bg-gray-900/80 border-t border-gray-700">
+
+      {/* ── COS Summary bar ────────────────────────────────────────────── */}
+      <CosSummaryBar project={project} />
+
+      {/* ── Project Details (collapsible) ──────────────────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setDetailsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+        >
+          <span>Project Details</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {detailsOpen && (
+          <div className="p-3 flex flex-wrap gap-4">
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-gray-400 font-medium">Build Start Date</label>
+              <input
+                type="date"
+                value={project.start_date?.slice(0, 10) ?? ''}
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-teal-500 transition-colors"
+              />
+              <span className="text-xs text-gray-600">drives month column headers</span>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-gray-400 font-medium">Build Duration (months)</label>
+              <InputField
+                label=""
+                value={project.build_duration_months}
+                onChange={setBuildDuration}
+                hint="resizes forecast grid"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Input sections (collapsible) ───────────────────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setInputsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
+        >
+          <span>Project Inputs</span>
+          <ChevronDown className={`w-3 h-3 transition-transform ${inputsOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {inputsOpen && <div className="space-y-3 p-3">
+
+        {/* Scope */}
+        <InputSection title="Scope — Quantities to Build">
+          <InputField label="Poles" value={inp.scope.poles}       onChange={v => setScope('poles', v)}       hint="count" />
+          <InputField label="Stringing (m)" value={inp.scope.stringing_m} onChange={v => setScope('stringing_m', v)} hint="total meters" />
+          <InputField label="PON Count" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
+        </InputSection>
+
+        {/* Service Rates */}
+        <InputSection title="COS — Service Rates (labour / installation per unit)">
+          <InputField label="Permissions / Pole"  value={inp.service_rates.permissions_per_pole} onChange={v => setServiceRate('permissions_per_pole', v)} prefix="R" />
+          <InputField label="Pole Plant / Each"   value={inp.service_rates.pole_plant_each}      onChange={v => setServiceRate('pole_plant_each', v)}      prefix="R" />
+          <InputField label="Stringing / Meter"   value={inp.service_rates.stringing_per_m}      onChange={v => setServiceRate('stringing_per_m', v)}      prefix="R" />
+          <InputField label="Optical / PON"       value={inp.service_rates.optical_per_pon}      onChange={v => setServiceRate('optical_per_pon', v)}      prefix="R" />
+          <InputField label="Activation / Each"   value={inp.service_rates.activation_each}      onChange={v => setServiceRate('activation_each', v)}      prefix="R" />
+          <InputField label="Wayleave Incentive"  value={inp.service_rates.wayleave_incentive}   onChange={v => setServiceRate('wayleave_incentive', v)}   prefix="R" hint="per pole" />
+        </InputSection>
+
+        {/* Material Rates */}
+        <InputSection title="COS — Materials Rate (supply / stock per unit)">
+          <InputField label="Pole"        value={inp.material_rates.pole}       onChange={v => setMaterialRate('pole', v)}       prefix="R" hint="per pole" />
+          <InputField label="Cable"       value={inp.material_rates.cable_per_m} onChange={v => setMaterialRate('cable_per_m', v)} prefix="R" hint="per meter" />
+          <InputField label="Optical"     value={inp.material_rates.optical}    onChange={v => setMaterialRate('optical', v)}    prefix="R" hint="per PON" />
+          <InputField label="Activations" value={inp.material_rates.activation} onChange={v => setMaterialRate('activation', v)} prefix="R" hint="ONT per home" />
+        </InputSection>
+
+        {/* Lump Costs */}
+        <InputSection title="Lump Costs — Project Totals">
+          <InputField label="Wayleave Cost" value={inp.lump_costs.wayleave_cost} onChange={v => setLumpCost('wayleave_cost', v)} prefix="R" hint="project total" />
+        </InputSection>
+
+        {/* Monthly opex */}
+        <InputSection title={`Capitalized OPEX — per month × ${dur} months build`}>
+          <InputField label="Casuals / mo"   value={inp.monthly_opex.casuals}   onChange={v => setMonthlyOpex('casuals', v)}   prefix="R" />
+          <InputField label="Fuel / mo"      value={inp.monthly_opex.fuel}      onChange={v => setMonthlyOpex('fuel', v)}      prefix="R" />
+          <InputField label="Overheads / mo" value={inp.monthly_opex.overheads} onChange={v => setMonthlyOpex('overheads', v)} prefix="R" />
+          <InputField label="Sales / mo"     value={inp.monthly_opex.sales}     onChange={v => setMonthlyOpex('sales', v)}     prefix="R" />
+          <InputField label="Ad Hoc / mo"    value={inp.monthly_opex.ad_hoc}    onChange={v => setMonthlyOpex('ad_hoc', v)}    prefix="R" hint="contingency / variable" />
+        </InputSection>
+
+        </div>}
+      </div>
+
+      {/* ── Save bar ───────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
+        >
+          {saving ? (
+            <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
+          ) : saved ? (
+            <><CheckCircle2 className="w-4 h-4 text-emerald-300" />Saved</>
+          ) : (
+            <><Save className="w-4 h-4" />Save {project.name}</>
+          )}
+        </button>
+        {saveError && (
+          <span className="flex items-center gap-1 text-sm text-red-400">
+            <AlertCircle className="w-4 h-4" />{saveError}
+          </span>
+        )}
+        <span className="text-xs text-gray-500">
+          Changes are live in the summary table immediately. Save to persist.
+        </span>
+      </div>
+
+      {/* ── Monthly Forecast (collapsible) ────────────────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-semibold text-white"
+          onClick={() => setForecastOpen(v => !v)}
+        >
+          <span>Monthly Forecast</span>
+          {forecastOpen
+            ? <ChevronDown className="w-4 h-4 text-gray-400" />
+            : <ChevronRight className="w-4 h-4 text-gray-400" />}
+        </button>
+
+        {forecastOpen && (
+          <div className="p-3 bg-gray-900 min-w-0 overflow-hidden">
+            <MonthlyForecastGrid
+              project={project}
+              onPlanChange={handlePlanChange}
+            />
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
