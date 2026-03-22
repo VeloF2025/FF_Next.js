@@ -8,11 +8,10 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
-import { neon } from '@neondatabase/serverless';
+
 import type { ContractorProject, ContractorProjectWithDetails } from '@/types/contractor-project.types';
 import { log } from '@/lib/logger';
-
-const sql = neon(process.env.DATABASE_URL || '');
+import { sql } from '@/lib/db-pool';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {

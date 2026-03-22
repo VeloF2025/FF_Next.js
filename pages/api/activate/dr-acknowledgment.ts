@@ -15,8 +15,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 // Webhook auth: verified via shared bridge secret (not withAuth - called by Go WhatsApp Bridge)
 import pool from '@/lib/db';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 
+const logger = createLogger('api/activate/dr-acknowledgment');
 const BRIDGE_SECRET = process.env.WA_BRIDGE_SECRET;
 import { detectSwappedSerials, looksLikeOntSerial, looksLikeGizzuSerial } from '@/modules/activate/services/qaAutoFailService';
 import { extractWaPhotoSerials, waitForWaPhotos } from '@/modules/activate/services/serialVerificationService';
@@ -110,7 +111,7 @@ async function checkWAPhotos(dropNumber: string): Promise<WAPhotoCheck> {
     const count = parseInt(result.rows[0]?.count || '0', 10);
     return { hasPhoto: count > 0, photoCount: count };
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to check WA photos for ${dropNumber}`, { error });
+    logger.warn(`Failed to check WA photos for ${dropNumber}`, { error });
     return { hasPhoto: false, photoCount: 0 };
   }
 }
@@ -128,7 +129,7 @@ async function checkExistingSubmission(dropNumber: string): Promise<ExistingSubm
     );
     return result.rows[0] || null;
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to check existing submission for ${dropNumber}`, { error });
+    logger.warn(`Failed to check existing submission for ${dropNumber}`, { error });
     return null;
   }
 }
@@ -149,7 +150,7 @@ async function checkDropsTable(dropNumber: string): Promise<DropsTableRecord | n
     );
     return result.rows[0] || null;
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to check drops table for ${dropNumber}`, { error });
+    logger.warn(`Failed to check drops table for ${dropNumber}`, { error });
     return null;
   }
 }
@@ -201,7 +202,7 @@ async function checkDuplicateSerials(
     const results = await Promise.all(queries);
     return { ontDuplicates: results[0] || [], upsDuplicates: results[1] || [] };
   } catch (error) {
-    log.warn('DrAcknowledgment', `Duplicate serial check failed for ${dropNumber}`, { error });
+    logger.warn(`Duplicate serial check failed for ${dropNumber}`, { error });
     return empty;
   }
 }
@@ -311,12 +312,12 @@ async function updateOneMapStatus(
          updated_at = NOW()`,
       [dropNumber, status, ontSerial || null, upsSerial || null]
     );
-    log.info('DrAcknowledgment', `Set onemap_status=${status} for ${dropNumber}`, {
+    logger.info(`Set onemap_status=${status} for ${dropNumber}`, {
       ontSerial: ontSerial || null,
       upsSerial: upsSerial || null,
     });
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to update onemap_status for ${dropNumber}`, { error });
+    logger.warn(`Failed to update onemap_status for ${dropNumber}`, { error });
   }
 }
 
@@ -410,11 +411,11 @@ async function markForRework(dropNumber: string, newPhotoCount: number): Promise
        WHERE drop_number = $1`,
       [dropNumber, newPhotoCount]
     );
-    log.info('DrAcknowledgment', `Reset ${dropNumber} for QA re-review (resubmission)`, {
+    logger.info(`Reset ${dropNumber} for QA re-review (resubmission)`, {
       newPhotoCount,
     });
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to mark ${dropNumber} for rework`, { error });
+    logger.warn(`Failed to mark ${dropNumber} for rework`, { error });
   }
 }
 
@@ -454,9 +455,9 @@ async function saveSwapDetection(
          updated_at = NOW()`,
       [dropNumber, ontSerial, upsSerial, swapDetails]
     );
-    log.info('DrAcknowledgment', `Saved swap detection for ${dropNumber}`, { swapDetails });
+    logger.info(`Saved swap detection for ${dropNumber}`, { swapDetails });
   } catch (error) {
-    log.warn('DrAcknowledgment', `Failed to save swap detection for ${dropNumber}`, { error });
+    logger.warn(`Failed to save swap detection for ${dropNumber}`, { error });
   }
 }
 
@@ -638,7 +639,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
     }
 
-    log.info('DrAcknowledgment', `Getting acknowledgment data for ${dropNumber}`, { project });
+    logger.info(`Getting acknowledgment data for ${dropNumber}`, { project });
 
     // Check if this is a resubmission
     // IMPORTANT: A bare record created by updateOneMapStatus, process-new-dr, or OES import
@@ -657,13 +658,13 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     if (isResubmission) {
       submissionNumber = (existingSubmission.submission_count || 1) + 1;
       previousPhotoCount = existingSubmission.photo_count || 0;
-      log.info('DrAcknowledgment', `RESUBMISSION detected for ${dropNumber}`, {
+      logger.info(`RESUBMISSION detected for ${dropNumber}`, {
         previousSubmissions: existingSubmission.submission_count,
         previousPhotoCount,
         qaDecision: existingSubmission.qa_decision,
       });
     } else if (existingSubmission !== null) {
-      log.info('DrAcknowledgment', `Record exists for ${dropNumber} but no QA decision yet - treating as first submission`, {
+      logger.info(`Record exists for ${dropNumber} but no QA decision yet - treating as first submission`, {
         submissionCount: existingSubmission.submission_count,
         qaDecision: existingSubmission.qa_decision,
         feedbackMessage: existingSubmission.feedback_message ? 'yes' : 'no',
@@ -693,21 +694,21 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         ontSerial = extractOntSerial(data.ont_barcode ?? null);
         upsSerial = data.ups_serial || null;
 
-        log.info('DrAcknowledgment', `OneMap data for ${dropNumber}`, {
+        logger.info(`OneMap data for ${dropNumber}`, {
           photoCount,
           hasOnt: !!ontSerial,
           hasUps: !!upsSerial,
         });
       } else if (response.status === 404 || response.status === 422) {
-        log.info('DrAcknowledgment', `DR ${dropNumber} not found in OneMap`);
+        logger.info(`DR ${dropNumber} not found in OneMap`);
       } else {
-        log.warn('DrAcknowledgment', `OneMap returned ${response.status} for ${dropNumber}`);
+        logger.warn(`OneMap returned ${response.status} for ${dropNumber}`);
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        log.warn('DrAcknowledgment', `OneMap timeout for ${dropNumber}`);
+        logger.warn(`OneMap timeout for ${dropNumber}`);
       } else {
-        log.warn('DrAcknowledgment', `OneMap query failed for ${dropNumber}`, { error });
+        logger.warn(`OneMap query failed for ${dropNumber}`, { error });
       }
       // Continue with found=false - don't fail the request
     }
@@ -728,7 +729,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
 
       if (photosReady) {
         waPhotoCheck = await checkWAPhotos(dropNumber);
-        log.info('DrAcknowledgment', `WA photos found for ${dropNumber}, running VLM extraction`, {
+        logger.info(`WA photos found for ${dropNumber}, running VLM extraction`, {
           waPhotoCount: waPhotoCheck.photoCount,
         });
 
@@ -748,23 +749,23 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             ontConfidence: ontConf,
             upsConfidence: upsConf,
           };
-          log.info('DrAcknowledgment', `VLM serial extraction completed for ${dropNumber}`, {
+          logger.info(`VLM serial extraction completed for ${dropNumber}`, {
             ontExtracted: vlmResult.ontSerial,
             upsExtracted: vlmResult.upsSerial,
             confidence: vlmResult.confidence,
             photosProcessed: extraction.photosProcessed,
           });
         } else {
-          log.info('DrAcknowledgment', `VLM found no serials in ${extraction.photosProcessed} photos for ${dropNumber}`);
+          logger.info(`VLM found no serials in ${extraction.photosProcessed} photos for ${dropNumber}`);
         }
       } else {
         // No photos appeared within timeout
         waPhotoCheck = await checkWAPhotos(dropNumber);
-        log.info('DrAcknowledgment', `No WA photos appeared for ${dropNumber} within timeout`);
+        logger.info(`No WA photos appeared for ${dropNumber} within timeout`);
       }
     } catch (vlmError) {
       // VLM failure is non-critical - fall back to 1Map serials only
-      log.warn('DrAcknowledgment', `VLM extraction failed for ${dropNumber} - using 1Map only`, {
+      logger.warn(`VLM extraction failed for ${dropNumber} - using 1Map only`, {
         error: vlmError instanceof Error ? vlmError.message : String(vlmError),
       });
       waPhotoCheck = await checkWAPhotos(dropNumber);
@@ -773,7 +774,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     // Await duplicate check (was running in parallel with WA photo polling)
     const duplicates = await duplicateCheckPromise;
     if (duplicates.ontDuplicates.length > 0 || duplicates.upsDuplicates.length > 0) {
-      log.warn('DrAcknowledgment', `Duplicate serials found for ${dropNumber}`, {
+      logger.warn(`Duplicate serials found for ${dropNumber}`, {
         ontDuplicates: duplicates.ontDuplicates.map(d => d.drop_number),
         upsDuplicates: duplicates.upsDuplicates.map(d => d.drop_number),
       });
@@ -808,7 +809,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         // Send warning ack about home sign-up not complete
         notOnOneMap = true;
         ackResult = generateNotOnOneMapMessage(dropNumber, dropsRecord, waPhotoCheck);
-        log.warn('DrAcknowledgment', `DR ${dropNumber} found in drops but NOT in 1Map`, {
+        logger.warn(`DR ${dropNumber} found in drops but NOT in 1Map`, {
           project: dropsRecord.project_name,
           pole: dropsRecord.pole_number,
         });
@@ -832,7 +833,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
           swapped: false,
           swapDetails: null,
         };
-        log.warn('DrAcknowledgment', `DR ${dropNumber} not found in 1Map or drops - notifying tech`);
+        logger.warn(`DR ${dropNumber} not found in 1Map or drops - notifying tech`);
       }
     } else {
       // Normal first submission found in 1Map
@@ -844,18 +845,18 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     const duration = Date.now() - startTime;
 
     if (!found && !notOnOneMap) {
-      log.info('DrAcknowledgment', `DR ${dropNumber} not found anywhere - sending "not found" notification`);
+      logger.info(`DR ${dropNumber} not found anywhere - sending "not found" notification`);
     } else if (notOnOneMap) {
-      log.info('DrAcknowledgment', `DR ${dropNumber} NOT ON 1MAP - warning ack sent in ${duration}ms`);
+      logger.info(`DR ${dropNumber} NOT ON 1MAP - warning ack sent in ${duration}ms`);
     } else if (isResubmission) {
-      log.info('DrAcknowledgment', `Resubmission acknowledgment ready for ${dropNumber}`, {
+      logger.info(`Resubmission acknowledgment ready for ${dropNumber}`, {
         submissionNumber,
         photoCount,
         previousPhotoCount,
         duration: `${duration}ms`,
       });
     } else if (ackResult.swapped) {
-      log.warn('DrAcknowledgment', `SWAPPED SERIALS detected for ${dropNumber}`, {
+      logger.warn(`SWAPPED SERIALS detected for ${dropNumber}`, {
         ontSerial,
         upsSerial,
         details: ackResult.swapDetails,
@@ -863,7 +864,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       // Save swap detection to database for tracking
       await saveSwapDetection(dropNumber, ontSerial, upsSerial, ackResult.swapDetails);
     } else {
-      log.info('DrAcknowledgment', `Acknowledgment ready for ${dropNumber} in ${duration}ms`);
+      logger.info(`Acknowledgment ready for ${dropNumber} in ${duration}ms`);
     }
 
     return apiResponse.success(res, {
@@ -904,7 +905,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       } : null,
     });
   } catch (error) {
-    log.error('DrAcknowledgment', 'Error generating acknowledgment', { error });
+    logger.error('Error generating acknowledgment', { error });
     return apiResponse.internalError(res, error);
   }
 }

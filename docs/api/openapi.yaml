@@ -1,0 +1,772 @@
+openapi: 3.0.0
+
+info:
+  title: FibreFlow API
+  version: 1.0.0
+  description: WA field operations and asset management platform
+  contact:
+    name: FibreFlow Team
+    url: https://fibreflow.app
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://fibreflow.app/api
+    description: Production API
+    variables: {}
+  - url: http://localhost:3000/api
+    description: Local development
+
+tags:
+  - name: Assets
+    description: Asset inventory and maintenance
+  - name: Analytics
+    description: Reporting and analytics
+  - name: Projects
+    description: Project management
+  - name: Procurement
+    description: PO and budget management
+  - name: Teams
+    description: Team and member management
+  - name: Tickets
+    description: Ticket tracking system
+  - name: NOC
+    description: Network operations center
+  - name: WhatsApp
+    description: WhatsApp integration
+  - name: Users
+    description: User management and authentication
+
+paths:
+  /assets:
+    get:
+      tags: [Assets]
+      summary: List all assets
+      operationId: listAssets
+      parameters:
+        - name: skip
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Number of records to skip
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum records to return
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category ID
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, maintenance]
+          description: Filter by asset status
+      responses:
+        '200':
+          description: Asset list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Asset'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Assets]
+      summary: Create new asset
+      operationId: createAsset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetInput'
+      responses:
+        '201':
+          description: Asset created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/{id}:
+    get:
+      tags: [Assets]
+      summary: Get asset by ID
+      operationId: getAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Asset ID
+      responses:
+        '200':
+          description: Asset retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Assets]
+      summary: Update asset
+      operationId: updateAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetInput'
+      responses:
+        '200':
+          description: Asset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/{id}/checkin:
+    post:
+      tags: [Assets]
+      summary: Check in asset (field operations)
+      operationId: checkinAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location, notes]
+              properties:
+                location:
+                  type: string
+                  description: Check-in location
+                notes:
+                  type: string
+                  description: Optional notes
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Asset checked in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/{id}/checkout:
+    post:
+      tags: [Assets]
+      summary: Check out asset (field operations)
+      operationId: checkoutAsset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [location, technician]
+              properties:
+                location:
+                  type: string
+                technician:
+                  type: string
+                  description: Technician ID/name
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Asset checked out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /assets/dashboard:
+    get:
+      tags: [Assets]
+      summary: Asset overview dashboard
+      operationId: assetDashboard
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  active:
+                    type: integer
+                  maintenance:
+                    type: integer
+                  calibrationDue:
+                    type: integer
+                  byCategory:
+                    type: object
+                  recentActivity:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List projects
+      operationId: listProjects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, completed, on-hold]
+      responses:
+        '200':
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      summary: Create project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /procurement:
+    get:
+      tags: [Procurement]
+      summary: List purchase orders
+      operationId: listPOs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, pending-approval, approved, rejected]
+      responses:
+        '200':
+          description: PO list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PurchaseOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Procurement]
+      summary: Create purchase order
+      operationId: createPO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseOrderInput'
+      responses:
+        '201':
+          description: PO created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PurchaseOrder'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /noc/dashboard/summary:
+    get:
+      tags: [NOC]
+      summary: NOC dashboard overview
+      operationId: nocDashboard
+      responses:
+        '200':
+          description: NOC overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  activeTickets:
+                    type: integer
+                  slaCompliance:
+                    type: number
+                    format: float
+                  mttr:
+                    type: number
+                    description: Mean Time To Repair (hours)
+                  recentIncidents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ticket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /whatsapp/send:
+    post:
+      tags: [WhatsApp]
+      summary: Send WhatsApp message
+      operationId: sendWAMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to, message]
+              properties:
+                to:
+                  type: string
+                  description: Recipient phone number (with country code)
+                message:
+                  type: string
+                  description: Message body
+                template:
+                  type: string
+                  description: Optional template ID
+                media:
+                  type: object
+                  description: Optional media (image/document)
+                  properties:
+                    type:
+                      type: string
+                      enum: [image, document, audio, video]
+                    url:
+                      type: string
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [queued, sent, delivered, failed]
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{id}/permissions:
+    get:
+      tags: [Users]
+      summary: Get user permissions and roles
+      operationId: getUserPermissions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                  roles:
+                    type: array
+                    items:
+                      type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    Asset:
+      type: object
+      required: [id, name, category, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, maintenance, retired]
+        location:
+          type: string
+        serialNumber:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        purchasePrice:
+          type: number
+          format: float
+        lastMaintenance:
+          type: string
+          format: date-time
+        nextMaintenance:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AssetInput:
+      type: object
+      required: [name, category, location]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        serialNumber:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        purchasePrice:
+          type: number
+        notes:
+          type: string
+
+    Project:
+      type: object
+      required: [id, name, status, budget]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, completed, on-hold, cancelled]
+        budget:
+          type: number
+          format: float
+        spent:
+          type: number
+          format: float
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        manager:
+          type: string
+        team:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ProjectInput:
+      type: object
+      required: [name, status, budget, manager]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        budget:
+          type: number
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        manager:
+          type: string
+        team:
+          type: array
+          items:
+            type: string
+
+    PurchaseOrder:
+      type: object
+      required: [id, poNumber, vendor, items, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        poNumber:
+          type: string
+        vendor:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/POItem'
+        status:
+          type: string
+          enum: [draft, pending-approval, approved, rejected, fulfilled]
+        totalAmount:
+          type: number
+          format: float
+        approvedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+
+    PurchaseOrderInput:
+      type: object
+      required: [poNumber, vendor, items]
+      properties:
+        poNumber:
+          type: string
+        vendor:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/POItem'
+        notes:
+          type: string
+
+    POItem:
+      type: object
+      required: [description, quantity, unitPrice]
+      properties:
+        description:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+          format: float
+        category:
+          type: string
+
+    Ticket:
+      type: object
+      required: [id, title, status, priority]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, in-progress, resolved, closed]
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        assignee:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        userId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        changes:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: boolean
+              message:
+                type: string
+              code:
+                type: string
+                enum: [VALIDATION_ERROR, BAD_REQUEST]
+              statusCode:
+                type: integer
+                example: 400
+
+    Unauthorized:
+      description: Unauthorized - missing or invalid token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: boolean
+              message:
+                type: string
+                example: Invalid or missing Authorization header
+              code:
+                type: string
+                enum: [UNAUTHORIZED, TOKEN_EXPIRED]
+              statusCode:
+                type: integer
+                example: 401
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: boolean
+              message:
+                type: string
+              code:
+                type: string
+                enum: [NOT_FOUND]
+              statusCode:
+                type: integer
+                example: 404
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: boolean
+              message:
+                type: string
+              code:
+                type: string
+                enum: [INTERNAL_ERROR]
+              statusCode:
+                type: integer
+                example: 500
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from user login or service account credentials.
+        Format: `Authorization: Bearer <token>`
+
+security:
+  - BearerAuth: []

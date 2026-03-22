@@ -3,8 +3,26 @@
 import { collection, doc, addDoc, updateDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 // @ts-ignore — firebase config not available
 import { db } from '@/config/firebase';
-import { ProjectAssignment } from '@/types/staff.types';
+import { ProjectAssignment, StaffMember } from '@/types/staff.types';
 import { log } from '@/lib/logger';
+
+/**
+ * Type for Firestore document snapshot data
+ */
+interface FirestoreStaffDoc {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Converts Firestore document to StaffMember type
+ */
+function docToStaffMember(doc: FirestoreStaffDoc): StaffMember {
+  return {
+    ...doc,
+    id: doc.id,
+  } as StaffMember;
+}
 
 /**
  * Project assignment operations for staff
@@ -96,7 +114,7 @@ export const staffAssignmentService = {
   /**
    * Get available staff for a project
    */
-  async getAvailableStaff(projectRequirements?: { skills?: string[], department?: string }): Promise<any[]> {
+  async getAvailableStaff(projectRequirements?: { skills?: string[], department?: string }): Promise<StaffMember[]> {
     try {
       const staffQuery = query(
         collection(db, 'staff'),
@@ -104,19 +122,19 @@ export const staffAssignmentService = {
       );
       
       const snapshot = await getDocs(staffQuery);
-      let availableStaff = snapshot.docs.map((doc: any) => ({
+      let availableStaff: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
         id: doc.id,
         ...doc.data()
-      } as any));
+      }));
       
       // Filter by availability (not at max capacity)
-      availableStaff = availableStaff.filter((staff: any) =>
+      availableStaff = availableStaff.filter((staff: StaffMember) =>
         (staff.currentProjectCount || 0) < (staff.maxProjectCount || 5)
       );
 
       // Filter by requirements if provided
       if (projectRequirements?.skills?.length) {
-        availableStaff = availableStaff.filter((staff: any) =>
+        availableStaff = availableStaff.filter((staff: StaffMember) =>
           projectRequirements.skills!.some(skill =>
             (staff.skills || []).includes(skill)
           )
@@ -124,7 +142,7 @@ export const staffAssignmentService = {
       }
 
       if (projectRequirements?.department) {
-        availableStaff = availableStaff.filter((staff: any) =>
+        availableStaff = availableStaff.filter((staff: StaffMember) =>
           staff.department === projectRequirements.department
         );
       }

@@ -11,6 +11,25 @@ import {
 } from '@/types/staff.types';
 
 /**
+ * Type for Firestore document snapshot data
+ * Represents the raw data structure returned from Firestore
+ */
+interface FirestoreStaffDoc {
+  id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Converts Firestore document to StaffMember type
+ */
+function docToStaffMember(doc: FirestoreStaffDoc): StaffMember {
+  return {
+    ...doc,
+    id: doc.id,
+  } as StaffMember;
+}
+
+/**
  * Core CRUD operations for staff management
  */
 export const staffCrudService = {
@@ -23,32 +42,32 @@ export const staffCrudService = {
       const q = query(collection(db, 'staff'), orderBy('name', 'asc'));
       const snapshot = await getDocs(q);
       
-      let staffMembers = snapshot.docs.map((doc: any) => ({
+      let staffMembers: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
         id: doc.id,
-        ...doc.data()
-      } as StaffMember));
+        ...doc.data(),
+      }));
       
       // Apply all filters client-side
       if (filter?.status?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           filter.status!.includes(staff.status)
         );
       }
       
       if (filter?.department?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           filter.department!.includes(staff.department)
         );
       }
       
       if (filter?.level?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           staff.level && filter.level!.includes(staff.level)
         );
       }
       
       if (filter?.managerId) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           staff.managerId === filter.managerId
         );
       }
@@ -56,12 +75,12 @@ export const staffCrudService = {
       // Apply search term filter
       if (filter?.searchTerm) {
         const searchTerm = filter.searchTerm.toLowerCase();
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           staff.name.toLowerCase().includes(searchTerm) ||
           staff.email.toLowerCase().includes(searchTerm) ||
           staff.phone.includes(searchTerm) ||
           staff.employeeId.toLowerCase().includes(searchTerm) ||
-          staff.position.toLowerCase().includes(searchTerm)
+          staff.position.toString().toLowerCase().includes(searchTerm)
         );
       }
       
@@ -102,7 +121,7 @@ export const staffCrudService = {
       const now = Timestamp.now();
       
       // Build staff data without undefined values
-      const staffData: any = {
+      const staffData: Record<string, unknown> = {
         ...data,
         
         // Convert dates
@@ -166,7 +185,7 @@ export const staffCrudService = {
   async update(id: string, data: Partial<StaffFormData>): Promise<void> {
     try {
       const docRef = doc(db, 'staff', id);
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         ...data,
         updatedAt: Timestamp.now(),
         lastModifiedBy: 'current-user', // TODO: Get from auth context
@@ -221,39 +240,39 @@ export const staffCrudService = {
     // Get all staff to avoid index requirements
     const q = query(collection(db, 'staff'), orderBy('name', 'asc'));
     
-    return onSnapshot(q, (snapshot: any) => {
-      let staffMembers = snapshot.docs.map((doc: any) => ({
+    return onSnapshot(q, (snapshot) => {
+      let staffMembers: StaffMember[] = snapshot.docs.map((doc) => docToStaffMember({
         id: doc.id,
-        ...doc.data()
-      } as StaffMember));
+        ...doc.data(),
+      }));
       
       // Apply filters client-side
       if (filter?.status?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           filter.status!.includes(staff.status)
         );
       }
       
       if (filter?.department?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           filter.department!.includes(staff.department)
         );
       }
       
       if (filter?.level?.length) {
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           staff.level && filter.level!.includes(staff.level)
         );
       }
       
       if (filter?.searchTerm) {
         const searchTerm = filter.searchTerm.toLowerCase();
-        staffMembers = staffMembers.filter((staff: any) =>
+        staffMembers = staffMembers.filter((staff: StaffMember) =>
           staff.name.toLowerCase().includes(searchTerm) ||
           staff.email.toLowerCase().includes(searchTerm) ||
           staff.phone.includes(searchTerm) ||
           staff.employeeId.toLowerCase().includes(searchTerm) ||
-          staff.position.toLowerCase().includes(searchTerm)
+          staff.position.toString().toLowerCase().includes(searchTerm)
         );
       }
       
@@ -270,12 +289,12 @@ export const staffCrudService = {
   ): Unsubscribe {
     const docRef = doc(db, 'staff', staffId);
     
-    return onSnapshot(docRef, (snapshot: any) => {
+    return onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
-        const staff = {
+        const staff = docToStaffMember({
           id: snapshot.id,
-          ...snapshot.data()
-        } as StaffMember;
+          ...snapshot.data(),
+        });
         callback(staff);
       } else {
         callback(null);

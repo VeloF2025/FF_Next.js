@@ -14,8 +14,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { IncomingForm, Fields, Files } from 'formidable';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
-import { log } from '@/lib/logger';
+import { createLogger } from '@/lib/logger';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+
+const logger = createLogger('api/activate/import-oes');
 import pool from '@/lib/db';
 import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
 import { recordVlmCorrection, recordExtractionMetric } from '@/services/vlmLearningService';
@@ -343,9 +345,9 @@ async function recordVlmCorrectionsFromOes(dropNumbers: string[]): Promise<void>
             },
             correctedByName: 'OES Import (automated)',
           }).catch(err => {
-            log.warn(`VLM correction failed for ${row.drop_number} step6`, {
+            logger.warn(`VLM correction failed for ${row.drop_number} step6`, {
               error: err instanceof Error ? err.message : String(err),
-            }, 'OESImport');
+            });
           });
         } else {
           totalSkipped++;
@@ -379,9 +381,9 @@ async function recordVlmCorrectionsFromOes(dropNumbers: string[]): Promise<void>
             },
             correctedByName: 'OES Import (automated)',
           }).catch(err => {
-            log.warn(`VLM correction failed for ${row.drop_number} step9`, {
+            logger.warn(`VLM correction failed for ${row.drop_number} step9`, {
               error: err instanceof Error ? err.message : String(err),
-            }, 'OESImport');
+            });
           });
         } else {
           totalSkipped++;
@@ -390,7 +392,7 @@ async function recordVlmCorrectionsFromOes(dropNumbers: string[]): Promise<void>
     }
   }
 
-  log.info('OESImport', `VLM learning: ${totalCorrections} corrections, ${totalCorrect} correct, ${totalSkipped} skipped`);
+  logger.info(`VLM learning: ${totalCorrections} corrections, ${totalCorrect} correct, ${totalSkipped} skipped`);
 }
 
 /**
@@ -398,7 +400,7 @@ async function recordVlmCorrectionsFromOes(dropNumbers: string[]): Promise<void>
  */
 async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
   try {
-    log.info('OESImport', 'Importing PP DATA sheet', { rows: ppRows.length });
+    logger.info('Importing PP DATA sheet', { rows: ppRows.length });
 
     // Create import batch
     const batchResult = await pool.query(
@@ -462,7 +464,12 @@ async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
         FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'not_found'
       `);
       onemapMatches = onemapMatch.rowCount || 0;
-    } catch { /* onemap_properties may not have ont_barcode */ }
+    } catch (err) {
+      logger.warn('PP DATA resolution: onemap_properties query failed (may not have ont_barcode column)', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      onemapMatches = 0;
+    }
 
     const totalResolved = (oesMatch.rowCount || 0) + (unifiedMatch.rowCount || 0) + onemapMatches;
 
@@ -472,7 +479,7 @@ async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
       [totalResolved, ppRows.length - totalResolved, batchId]
     );
 
-    log.info('OESImport', 'PP DATA import complete', {
+    logger.info('PP DATA import complete', {
       total: ppRows.length,
       resolved: totalResolved,
       oes: oesMatch.rowCount || 0,
@@ -480,7 +487,7 @@ async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
       onemap: onemapMatches,
     });
   } catch (err) {
-    log.error('OESImport', 'PP DATA import failed (non-blocking)', err);
+    logger.error('PP DATA import failed (non-blocking)', err);
   }
 }
 
@@ -493,7 +500,7 @@ function parseOESExcel(filePath: string): ParseResult & { ppRows: PPRow[] | null
   // Also parse PP DATA sheet if present
   const ppRows = parsePPDataSheet(workbook);
   if (ppRows) {
-    log.info('OESImport', `Found PP DATA sheet with ${ppRows.length} rows`);
+    logger.info(`Found PP DATA sheet with ${ppRows.length} rows`);
   }
 
   const sheetName = workbook.SheetNames[0]; // Use first sheet (OLT DATA)
@@ -605,13 +612,13 @@ async function handler(
     const action = Array.isArray(fields.action) ? fields.action[0] : fields.action;
 
     // Parse the Excel file with validation
-    log.info('OESImport', `Parsing file: ${uploadedFile.originalFilename}`);
+    logger.info(`Parsing file: ${uploadedFile.originalFilename}`);
     const parseResult = parseOESExcel(filePath);
     const { rows: oesRows, warnings, headerMismatch, ppRows } = parseResult;
 
     // Log warnings if any
     if (warnings.length > 0) {
-      log.warn('OESImport', 'Format validation warnings detected', { warnings, headerMismatch });
+      logger.warn('Format validation warnings detected', { warnings, headerMismatch });
     }
 
     // Clean up temp file
@@ -631,7 +638,7 @@ async function handler(
     if (action === 'import') {
       const reportDate = Array.isArray(fields.reportDate) ? fields.reportDate[0] : fields.reportDate;
 
-      log.info('OESImport', `Importing ${oesRows.length} rows (batch mode)`, { reportDate, warningCount: warnings.length });
+      logger.info(`Importing ${oesRows.length} rows (batch mode)`, { reportDate, warningCount: warnings.length });
 
       // Create import batch
       const batchResult = await pool.query(
@@ -649,14 +656,14 @@ async function handler(
         [dropNumbers]
       );
       const dropsMap = new Map(dropsResult.rows.map(d => [d.drop_number, d.id]));
-      log.info('OESImport', `Found ${dropsMap.size} matching drops`);
+      logger.info(`Found ${dropsMap.size} matching drops`);
 
       // Step 2: Count existing records before import
       const countBefore = await pool.query(
         `SELECT COUNT(*) as count FROM oes_activations`
       );
       const existingCount = parseInt(countBefore.rows[0].count, 10);
-      log.info('OESImport', `Existing OES records: ${existingCount}`);
+      logger.info(`Existing OES records: ${existingCount}`);
 
       // Step 3: Batch upsert OES activations (in chunks of 500)
       const BATCH_SIZE = 500;
@@ -722,10 +729,10 @@ async function handler(
         } catch (chunkError) {
           const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
           errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
-          log.error('OESImport', `Batch error at row ${i}`, chunkError);
+          logger.error(`Batch error at row ${i}`, chunkError);
         }
 
-        log.info('OESImport', `Processed ${Math.min(i + BATCH_SIZE, oesRows.length)}/${oesRows.length}`);
+        logger.info(`Processed ${Math.min(i + BATCH_SIZE, oesRows.length)}/${oesRows.length}`);
       }
 
       // Step 4: Count records after import to calculate inserted vs updated
@@ -735,7 +742,7 @@ async function handler(
       const newCount = parseInt(countAfter.rows[0].count, 10);
       const inserted = newCount - existingCount;
       const updated = Math.max(0, oesRows.length - inserted); // Rows not inserted were updated
-      log.info('OESImport', `After import: ${newCount} records (${inserted} new, ${updated} updated)`);
+      logger.info(`After import: ${newCount} records (${inserted} new, ${updated} updated)`);
 
       // Step 5: Bulk update drops table to mark OES confirmed
       const matchedDropNumbers = oesRows
@@ -774,7 +781,7 @@ async function handler(
       const oesOnlyDRs = oesRows.filter(row => !existingUnifiedSet.has(row.drop_number));
 
       if (oesOnlyDRs.length > 0) {
-        log.info('OESImport', `Creating ${oesOnlyDRs.length} unified records for OES-only DRs`);
+        logger.info(`Creating ${oesOnlyDRs.length} unified records for OES-only DRs`);
 
         // Lookup project for each DR from drops table (source of truth)
         const oesOnlyDropNumbers = oesOnlyDRs.map(r => r.drop_number);
@@ -789,7 +796,7 @@ async function handler(
         projectLookupResult.rows.forEach(r => {
           drToProject.set(r.drop_number, r.project_name);
         });
-        log.info('OESImport', `Found project mapping for ${drToProject.size}/${oesOnlyDRs.length} DRs`);
+        logger.info(`Found project mapping for ${drToProject.size}/${oesOnlyDRs.length} DRs`);
 
         // Batch insert OES-only DRs into unified table
         // Photos will be fetched via ensure-data when user opens for QA review
@@ -828,14 +835,14 @@ async function handler(
             );
             oesOnlyCreated += chunk.length;
           } catch (oesErr) {
-            log.error('OESImport', `Error creating OES-only unified records at batch ${i}`, oesErr);
+            logger.error(`Error creating OES-only unified records at batch ${i}`, oesErr);
           }
         }
 
-        log.info('OESImport', `Created ${oesOnlyCreated} OES-only unified records`);
+        logger.info(`Created ${oesOnlyCreated} OES-only unified records`);
 
         // Add activity log entries for OES activations
-        log.info('OESImport', 'Adding activity log entries for OES activations');
+        logger.info('Adding activity log entries for OES activations');
         const activityChunks = [];
         for (let i = 0; i < oesOnlyDRs.length; i += OES_BATCH_SIZE) {
           activityChunks.push(oesOnlyDRs.slice(i, i + OES_BATCH_SIZE));
@@ -870,7 +877,7 @@ async function handler(
               actValues
             );
           } catch (actErr) {
-            log.error('OESImport', 'Error adding activity log entries', actErr);
+            logger.error('Error adding activity log entries', actErr);
           }
         }
       }
@@ -883,7 +890,7 @@ async function handler(
       let oesSerialUpdated = 0;
 
       if (existingToUpdate.length > 0) {
-        log.info('OESImport', `Updating ${existingToUpdate.length} existing unified records with OES activation data`);
+        logger.info(`Updating ${existingToUpdate.length} existing unified records with OES activation data`);
 
         const UPDATE_BATCH_SIZE = 100;
         for (let i = 0; i < existingToUpdate.length; i += UPDATE_BATCH_SIZE) {
@@ -903,7 +910,7 @@ async function handler(
               existingSerials.set(r.drop_number, { oes_serial: r.oes_serial, ont_serial_scanned: r.ont_serial_scanned });
             });
           } catch (fetchErr) {
-            log.error('OESImport', `Error fetching existing serials at batch ${i}`, fetchErr);
+            logger.error(`Error fetching existing serials at batch ${i}`, fetchErr);
           }
 
           // Detect serial changes and swaps
@@ -995,7 +1002,7 @@ async function handler(
             );
             oesSerialUpdated += chunk.length;
           } catch (updateErr) {
-            log.error('OESImport', `Error updating existing unified records at batch ${i}`, updateErr);
+            logger.error(`Error updating existing unified records at batch ${i}`, updateErr);
           }
 
           // Log swap/mismatch activity entries
@@ -1014,14 +1021,14 @@ async function handler(
                 actParams
               );
             } catch (actErr) {
-              log.error('OESImport', 'Error logging serial swap activities', actErr);
+              logger.error('Error logging serial swap activities', actErr);
             }
           }
         }
-        log.info('OESImport', `Updated ${oesSerialUpdated} existing unified records, detected ${serialSwapsDetected} serial swaps`);
+        logger.info(`Updated ${oesSerialUpdated} existing unified records, detected ${serialSwapsDetected} serial swaps`);
       }
 
-      log.info('OESImport', 'Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, existingUpdated: existingToUpdate.length, serialSwapsDetected, errors: errors.length });
+      logger.info('Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, existingUpdated: existingToUpdate.length, serialSwapsDetected, errors: errors.length });
 
       // === QField Sync (fire-and-forget) ===
       // Trigger QField sync but DON'T wait for completion - prevents Cloudflare 524 timeout
@@ -1038,7 +1045,7 @@ async function handler(
           reportDate: reportDate || new Date().toISOString().split('T')[0]
         };
 
-        log.info('OESImport', 'Triggering QField sync webhook (fire-and-forget)', syncPayload);
+        logger.info('Triggering QField sync webhook (fire-and-forget)', syncPayload);
 
         // Fire-and-forget with short timeout - just confirm webhook received
         const controller = new AbortController();
@@ -1054,9 +1061,9 @@ async function handler(
           clearTimeout(timeoutId);
           if (response.ok) {
             const result = await response.json();
-            log.info('OESImport', 'QField sync webhook accepted', result);
+            logger.info('QField sync webhook accepted', result);
           } else {
-            log.warn('OESImport', `QField sync webhook returned ${response.status}`);
+            logger.warn(`QField sync webhook returned ${response.status}`);
           }
 
           // Log to data_sync_operations
@@ -1071,18 +1078,18 @@ async function handler(
             );
           } catch (logErr) {
             log.error('activate-import-oes', { error: logErr instanceof Error ? logErr.message : String(logErr) });
-            log.warn('OESImport', 'Failed to log QField sync to data_sync_operations', logErr);
+            logger.warn('Failed to log QField sync to data_sync_operations', logErr);
           }
         })
         .catch((fetchError: unknown) => {
           clearTimeout(timeoutId);
           const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-          log.warn('OESImport', 'QField sync webhook failed (non-blocking)', errorMessage);
+          logger.warn('QField sync webhook failed (non-blocking)', errorMessage);
         });
 
         qfieldSyncTriggered = true;
       } catch (error) {
-        log.error('OESImport', 'Failed to trigger QField sync webhook', error);
+        logger.error('Failed to trigger QField sync webhook', error);
       }
 
       // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
@@ -1093,7 +1100,7 @@ async function handler(
             .map(row => row.drop_number);
 
           if (matchedDrNumbers.length > 0) {
-            log.info('OESImport', `Triggering SharePoint folder verification for ${matchedDrNumbers.length} DRs`);
+            logger.info(`Triggering SharePoint folder verification for ${matchedDrNumbers.length} DRs`);
 
             const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
             fetch(`${baseUrl}/api/activate/sharepoint-sync-batch`, {
@@ -1107,21 +1114,21 @@ async function handler(
             .then(async (response) => {
               if (response.ok) {
                 const result = await response.json();
-                log.info('OESImport', 'SharePoint folder verification triggered', {
+                logger.info('SharePoint folder verification triggered', {
                   processed: result.data?.processed,
                   succeeded: result.data?.succeeded,
                   failed: result.data?.failed,
                 });
               } else {
-                log.warn('OESImport', `SharePoint sync returned ${response.status}`);
+                logger.warn(`SharePoint sync returned ${response.status}`);
               }
             })
             .catch((error) => {
-              log.warn('OESImport', 'SharePoint sync failed (non-blocking)', error.message);
+              logger.warn('SharePoint sync failed (non-blocking)', error.message);
             });
           }
         } catch (error) {
-          log.error('OESImport', 'Failed to trigger SharePoint folder verification', error);
+          logger.error('Failed to trigger SharePoint folder verification', error);
         }
       }
 
@@ -1133,18 +1140,18 @@ async function handler(
         const { processLookupQueue } = await import('@/modules/data-sync/services/oltQueueProcessorService');
         runAutoDetect(batchId)
           .then(async (result) => {
-            log.info('OESImport', 'OLT auto-detect completed', result);
+            logger.info('OLT auto-detect completed', result);
             if (result.apiLookupsQueued > 0) {
               await processLookupQueue(result.runId);
             }
           })
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : 'Unknown error';
-            log.error('OESImport', 'OLT auto-detect failed (non-blocking)', msg);
+            logger.error('OLT auto-detect failed (non-blocking)', msg);
           });
         oltAutoDetectTriggered = true;
       } catch (error) {
-        log.error('OESImport', 'Failed to trigger OLT auto-detect', error);
+        logger.error('Failed to trigger OLT auto-detect', error);
       }
 
       // === SERIAL VERIFICATION RECOMPUTATION (Fire-and-forget) ===
@@ -1152,7 +1159,7 @@ async function handler(
       // recompute 4-way verification badges for all affected DRs.
       const affectedDRs = [...new Set(oesRows.map(row => row.drop_number))];
       if (affectedDRs.length > 0) {
-        log.info('OESImport', `Recomputing serial verification for ${affectedDRs.length} DRs`);
+        logger.info(`Recomputing serial verification for ${affectedDRs.length} DRs`);
         const BATCH_SIZE = 50;
         (async () => {
           let recomputed = 0;
@@ -1163,9 +1170,9 @@ async function handler(
             );
             recomputed += results.filter(r => r.status === 'fulfilled').length;
           }
-          log.info('OESImport', `Serial verification recomputed for ${recomputed}/${affectedDRs.length} DRs`);
+          logger.info(`Serial verification recomputed for ${recomputed}/${affectedDRs.length} DRs`);
         })().catch(err => {
-          log.error('OESImport', 'Serial verification batch recomputation failed', err);
+          logger.error('Serial verification batch recomputation failed', err);
         });
       }
 
@@ -1174,7 +1181,7 @@ async function handler(
       // and auto-record corrections into vlm_corrections for learning.
       if (affectedDRs.length > 0) {
         recordVlmCorrectionsFromOes(affectedDRs).catch(err => {
-          log.error('OESImport', 'VLM learning from OES failed', err);
+          logger.error('VLM learning from OES failed', err);
         });
       }
 
@@ -1184,7 +1191,7 @@ async function handler(
       if (ppRows && ppRows.length > 0) {
         ppDataStatus = { total: ppRows.length, message: 'Importing in background...' };
         importPPData(ppRows, uploadedFile.originalFilename || 'unknown').catch(err => {
-          log.error('OESImport', 'PP DATA import failed', err);
+          logger.error('PP DATA import failed', err);
         });
       }
 
@@ -1209,10 +1216,10 @@ async function handler(
               AND pp.resolution_status != 'activated'
           `);
           if ((activatedResult.rowCount || 0) > 0) {
-            log.info('OESImport', `PP activation check: ${activatedResult.rowCount} serials now activated`);
+            logger.info(`PP activation check: ${activatedResult.rowCount} serials now activated`);
           }
         } catch (err) {
-          log.error('OESImport', 'PP activation check failed', err);
+          logger.error('PP activation check failed', err);
         }
       })();
 
@@ -1233,7 +1240,7 @@ async function handler(
             RETURNING osr.drop_number, osr.new_serial
           `);
           if ((swapResult.rowCount || 0) > 0) {
-            log.info('OESImport', `ONT swap confirmation: ${swapResult.rowCount} swaps confirmed via OES`);
+            logger.info(`ONT swap confirmation: ${swapResult.rowCount} swaps confirmed via OES`);
             // Update unified reviews with the new serial so it shows as current
             for (const row of swapResult.rows) {
               await pool.query(
@@ -1245,7 +1252,7 @@ async function handler(
             }
           }
         } catch (err) {
-          log.error('OESImport', 'ONT swap confirmation check failed', err);
+          logger.error('ONT swap confirmation check failed', err);
         }
       })();
 
@@ -1274,7 +1281,7 @@ async function handler(
 
     return res.status(400).json({ error: 'Invalid action. Use "preview" or "import".' });
   } catch (error) {
-    log.error('OESImport', 'Import failed', error);
+    logger.error('Import failed', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Import failed',
     });

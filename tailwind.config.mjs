@@ -271,5 +271,24 @@ export default {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Accessible button component class (WCAG 2.5.5: 44x44px minimum touch target)
+    function({ addComponents }) {
+      addComponents({
+        '.btn-a11y': {
+          '@apply min-h-[44px] min-w-[44px] px-4 py-3 inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed': {}
+        },
+        '.btn-a11y-primary': {
+          '@apply btn-a11y bg-blue-600 hover:bg-blue-700 text-white focus-visible:outline-blue-500': {}
+        },
+        '.btn-a11y-secondary': {
+          '@apply btn-a11y bg-slate-600 hover:bg-slate-700 text-white focus-visible:outline-slate-500': {}
+        },
+        '.btn-a11y-ghost': {
+          '@apply btn-a11y text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-400 dark:text-slate-300 dark:hover:bg-slate-800': {}
+        }
+      })
+    }
+  ],
 }
