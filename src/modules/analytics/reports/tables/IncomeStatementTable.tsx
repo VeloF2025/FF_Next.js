@@ -50,7 +50,7 @@ function RowEl({ row, months }: { row: IncomeStatementRow; months: string[] }) {
 
   return (
     <tr className="border-b border-gray-800 hover:bg-gray-750">
-      <td className={`px-3 py-1.5 text-xs text-gray-200 ${labelClass}`}>{row.label}</td>
+      <td className={`px-3 py-1.5 text-xs text-gray-200 whitespace-nowrap ${labelClass}`} style={{ minWidth: 220 }}>{row.label}</td>
       <Cell value={row.fy26} />
       <Cell value={row.fy27} />
       <Cell value={row.fy28} />
@@ -69,7 +69,7 @@ export function IncomeStatementTable({ data }: Props) {
       <table className="min-w-full text-xs">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
-            <th className="px-3 py-2 text-left text-xs font-bold text-white whitespace-nowrap sticky left-0 bg-inherit z-10">
+            <th className="px-3 py-2 text-left text-xs font-bold text-white whitespace-nowrap sticky left-0 bg-inherit z-10" style={{ minWidth: 220 }}>
               Label
             </th>
             <th className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">FY26</th>
