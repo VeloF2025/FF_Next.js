@@ -1,5 +1,10 @@
+import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-import WorkflowPortalPage from '@/modules/workflow/WorkflowPortalPage';
+
+const WorkflowPortalPage = dynamic(
+  () => import('@/modules/workflow/WorkflowPortalPage'),
+  { loading: () => <div className="p-8 text-center text-gray-400">Loading portal...</div>, ssr: false }
+);
 
 export default function WorkflowPortal() {
   return (
