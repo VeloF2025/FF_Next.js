@@ -1,5 +1,6 @@
 /**
  * GET    /api/conduit/projects/[id] — fetch single project
+ * PATCH  /api/conduit/projects/[id] — partial update (e.g. status promotion)
  * PUT    /api/conduit/projects/[id] — update project + snapshot version history
  */
 
@@ -36,6 +37,40 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   } catch (error) {
     console.error('[conduit/projects/[id] GET]', error);
     return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteContext) {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json() as { status?: string };
+    const { status } = body;
+
+    const validStatuses = ['prospective', 'executable', 'actual'];
+    if (!status || !validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid status — must be prospective, executable, or actual' }, { status: 400 });
+    }
+
+    const [updated] = await sql`
+      UPDATE conduit_projects
+      SET status = ${status}
+      WHERE id = ${params.id}
+      RETURNING id, name, status, po_count, start_date, build_duration_months,
+                inputs_json, is_baseline_locked, created_at, updated_at
+    `;
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: updated as ConduitProject });
+  } catch (error) {
+    console.error('[conduit/projects/[id] PATCH]', error);
+    return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 });
   }
 }
 
