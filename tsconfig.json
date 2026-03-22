@@ -78,6 +78,7 @@
     "node_modules",
     "archived/**/*",
     "archive/**/*",
+    "tools/pdfcraft/**",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",
