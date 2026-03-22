@@ -10,17 +10,25 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-
-import { IncomingForm, Fields, Files } from 'formidable';
-import * as XLSX from 'xlsx';
+import { IncomingForm, type Fields, type Files } from 'formidable';
 import fs from 'fs';
 import { createLogger } from '@/lib/logger';
-import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth';
+
+import { parseOESExcel } from '@/modules/activate/services/oes/oesExcelParser';
+import { createImportBatch, upsertActivations, importPPData } from '@/modules/activate/services/oes/oesImportService';
+import { loadExistingUnifiedSet, processUnifiedRecords } from '@/modules/activate/services/oes/oesUnifiedRecordsService';
+import {
+  triggerQFieldSync,
+  triggerSharePointSync,
+  triggerOltAutoDetect,
+  triggerSerialVerificationRecompute,
+  triggerVlmLearning,
+  triggerPpActivationCheck,
+  triggerOntSwapConfirmation,
+} from '@/modules/activate/services/oes/oesPostImportService';
 
 const logger = createLogger('api/activate/import-oes');
-import pool from '@/lib/db';
-import { computeAndPersistVerification } from '@/modules/activate/services/serialVerificationService';
-import { recordVlmCorrection, recordExtractionMetric } from '@/services/vlmLearningService';
 
 // Disable body parser for file uploads + extend timeout for large files
 export const config = {
@@ -30,564 +38,26 @@ export const config = {
   maxDuration: 120, // 2 minutes for large OES imports (7000+ rows)
 };
 
-interface OESRow {
-  drop_number: string;
-  serial_number: string;
-  activation_date: string;
-  activation_datetime: string | null; // Full timestamp if available
-  olt_address: string;
-  ont_rx_sig_dbm: number | null;
-  link_budget_ont_olt_db: number | null;
-  olt_rx_sig_dbm: number | null;
-  link_budget_olt_ont_db: number | null;
-  status: string;
-  latitude: number | null;
-  longitude: number | null;
-  current_ont_rx: number | null;
-  team: string;
-}
-
-/**
- * Parse Excel serial date to ISO date string (date only)
- * Excel serial date is days since 1900-01-01 (with a bug for 1900 leap year)
- */
-function excelDateToISO(serial: number): string {
-  // Excel's epoch is 1900-01-01, but Excel incorrectly treats 1900 as a leap year
-  // Days are counted from 1, not 0
-  const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
-  const date = new Date(excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000);
-  return date.toISOString().split('T')[0];
-}
-
-/**
- * Parse Excel serial date to full ISO timestamp
- * Excel stores datetime as fractional days since 1900-01-01
- * The fractional part represents the time of day
- */
-function excelDateTimeToISO(serial: number): string {
-  // Excel's epoch is 1900-01-01, but Excel incorrectly treats 1900 as a leap year
-  const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
-  const date = new Date(excelEpoch.getTime() + serial * 24 * 60 * 60 * 1000);
-  return date.toISOString();
-}
-
-// Expected headers for validation (Jan 2027 format - 13 columns, Stack Ref removed)
-const EXPECTED_HEADERS = [
-  'Drop Number',
-  'Serial Number',
-  'Timestamp',
-  'OLT Address',
-  'ONT Rx SIG (dBm)',
-  'Link Budget ONT->OLT (dB)',
-  'OLT Rx SIG (dBm)',
-  'Link Budget OLT->ONT (dB)',
-  'Status',
-  'Latitude',
-  'Longitude',
-  'Current ONT RX',
-  'Team',
-];
-
-interface ParseResult {
-  rows: OESRow[];
-  warnings: string[];
-  headerMismatch: boolean;
-}
-
-/**
- * Validate Excel headers match expected format
- */
-function validateHeaders(headers: any[]): { valid: boolean; warnings: string[] } {
-  const warnings: string[] = [];
-
-  // Check column count
-  if (headers.length < 13) {
-    warnings.push(`Column count mismatch: expected 13, got ${headers.length}. Format may have changed.`);
-  } else if (headers.length > 13) {
-    warnings.push(`Extra columns detected: expected 13, got ${headers.length}. New columns may have been added.`);
-  }
-
-  // Check key headers are in expected positions (Jan 2027 format - no Stack Ref)
-  const headerChecks = [
-    { index: 0, expected: 'Drop Number', actual: headers[0] },
-    { index: 4, expected: 'ONT Rx SIG (dBm)', actual: headers[4] },
-    { index: 8, expected: 'Status', actual: headers[8] },
-    { index: 12, expected: 'Team', actual: headers[12] },
-  ];
-
-  for (const check of headerChecks) {
-    const actualStr = String(check.actual || '').trim();
-    if (!actualStr.toLowerCase().includes(check.expected.toLowerCase().split(' ')[0])) {
-      warnings.push(`Header mismatch at column ${check.index + 1}: expected "${check.expected}", got "${actualStr}"`);
-    }
-  }
-
-  return { valid: warnings.length === 0, warnings };
-}
-
-/**
- * Validate data values look correct (detect column misalignment)
- */
-function validateDataSample(rows: OESRow[]): string[] {
-  const warnings: string[] = [];
-  const sampleSize = Math.min(10, rows.length);
-
-  let statusNumericCount = 0;
-  let teamNumericCount = 0;
-  let invalidStatusCount = 0;
-
-  for (let i = 0; i < sampleSize; i++) {
-    const row = rows[i];
-
-    // Status should be text like "Active" or "Inactive", not numbers
-    if (row.status && !isNaN(parseFloat(row.status))) {
-      statusNumericCount++;
-    }
-
-    // Status should be "Active" or "Inactive" typically
-    if (row.status && !['active', 'inactive', ''].includes(row.status.toLowerCase())) {
-      invalidStatusCount++;
-    }
-
-    // Team should be alphanumeric like "law6", "moa1", not coordinates like "-21.307682"
-    if (row.team && /^-?\d+\.\d+$/.test(row.team)) {
-      teamNumericCount++;
-    }
-  }
-
-  if (statusNumericCount > sampleSize / 2) {
-    warnings.push(`⚠️ Status column contains numeric values (${statusNumericCount}/${sampleSize} rows). Columns may be misaligned!`);
-  }
-
-  if (teamNumericCount > sampleSize / 2) {
-    warnings.push(`⚠️ Team column contains coordinate-like values (${teamNumericCount}/${sampleSize} rows). Columns may be misaligned!`);
-  }
-
-  if (invalidStatusCount > sampleSize / 2 && statusNumericCount === 0) {
-    warnings.push(`⚠️ Status values unexpected: ${rows.slice(0, 3).map(r => r.status).join(', ')}. Expected "Active" or "Inactive".`);
-  }
-
-  return warnings;
-}
-
-// PP DATA types and project mapping
-interface PPRow {
-  project: string;
-  serial_number: string;
-  date_registered: string | null;
-}
-
-const PP_PROJECT_CODE_MAP: Record<string, string> = {
-  'LAW': 'Lawley',
-  'MOA': 'Mohadin',
-  'MAM': 'Mamelodi',
-};
-
-/**
- * Parse PP DATA sheet from an already-loaded workbook
- * Returns null if no PP sheet found (non-fatal)
- */
-function parsePPDataSheet(workbook: XLSX.WorkBook): PPRow[] | null {
-  const ppSheetName = workbook.SheetNames.find(name =>
-    name.toUpperCase().includes('PP')
-  );
-
-  if (!ppSheetName) return null;
-
-  const sheet = workbook.Sheets[ppSheetName];
-  if (!sheet) return null;
-
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as unknown[][];
-  if (data.length < 2) return null;
-
-  const rows: PPRow[] = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row || !row[0] || !row[1]) continue;
-
-    const rawProject = String(row[0]).trim().toUpperCase();
-    const serialNumber = String(row[1]).trim();
-    if (!serialNumber) continue;
-
-    let dateRegistered: string | null = null;
-    if (row[2] !== undefined && row[2] !== null && row[2] !== '') {
-      if (typeof row[2] === 'number') {
-        dateRegistered = excelDateToISO(row[2]);
-      } else {
-        dateRegistered = String(row[2]).trim();
-      }
-    }
-
-    rows.push({
-      project: PP_PROJECT_CODE_MAP[rawProject] || rawProject,
-      serial_number: serialNumber,
-      date_registered: dateRegistered,
-    });
-  }
-
-  return rows.length > 0 ? rows : null;
-}
-
 // ============================================================================
-// VLM LEARNING FROM OES GROUND TRUTH
+// FORM PARSING
 // ============================================================================
 
-/**
- * Classify serial OCR error pattern by comparing VLM output to OES truth.
- * Returns an error pattern string for the vlm_corrections table.
- */
-function classifySerialError(vlm: string, oes: string): string {
-  if (vlm.length !== oes.length) return 'length_mismatch';
-
-  let diffCount = 0;
-  const diffs: string[] = [];
-  for (let i = 0; i < vlm.length; i++) {
-    if (vlm[i] !== oes[i]) {
-      diffCount++;
-      diffs.push(`${vlm[i]}->${oes[i]}`);
-    }
-  }
-
-  if (diffCount === 1) {
-    const pair = diffs[0];
-    // Known digit confusion patterns
-    if (pair === '1->7' || pair === '7->1') return 'digit_1_7';
-    if (pair === '1->6' || pair === '6->1') return 'digit_1_6';
-    if (pair === '6->8' || pair === '8->6') return 'digit_6_8';
-    if (pair === '8->0' || pair === '0->8') return 'digit_8_0';
-    if (pair === '9->4' || pair === '4->9') return 'digit_9_4';
-    if (pair === '2->3' || pair === '3->2') return 'digit_2_3';
-    return `single_char_${diffCount}`;
-  }
-
-  if (diffCount <= 3) return `multi_char_${diffCount}`;
-  return 'totally_wrong';
-}
-
-/**
- * Determine correction reason from error pattern
- */
-function errorPatternToReason(pattern: string): 'digit_confusion' | 'partial_extraction' | 'other' {
-  if (pattern.startsWith('digit_')) return 'digit_confusion';
-  if (pattern === 'length_mismatch') return 'partial_extraction';
-  return 'other';
-}
-
-/**
- * Compare VLM-extracted serials against OES ground truth
- * and record corrections + metrics into vlm_corrections / vlm_metrics.
- *
- * Runs fire-and-forget after OES import.
- */
-async function recordVlmCorrectionsFromOes(dropNumbers: string[]): Promise<void> {
-  const BATCH_SIZE = 200;
-  let totalCorrections = 0;
-  let totalCorrect = 0;
-  let totalSkipped = 0;
-
-  for (let i = 0; i < dropNumbers.length; i += BATCH_SIZE) {
-    const batch = dropNumbers.slice(i, i + BATCH_SIZE);
-
-    // Fetch VLM extractions and OES serials for this batch
-    const result = await pool.query(
-      `SELECT id, drop_number, oes_serial,
-              vlm_ont_serial_step6, vlm_ont_serial_step9,
-              serial_extraction_method_step6, serial_extraction_method_step9
-       FROM dr_photo_unified_reviews
-       WHERE drop_number = ANY($1::text[])
-         AND oes_serial IS NOT NULL AND oes_serial != ''`,
-      [batch]
-    );
-
-    // Get UUIDs for dedup check
-    const reviewIds = result.rows.map((r: { id: string }) => r.id);
-    // Get existing corrections to avoid duplicates on re-import
-    const existingResult = reviewIds.length > 0 ? await pool.query(
-      `SELECT source_id, analysis_type FROM vlm_corrections
-       WHERE module = 'activate'
-         AND analysis_type IN ('ont_serial_back', 'ont_serial_front')
-         AND source_id = ANY($1::uuid[])`,
-      [reviewIds]
-    ) : { rows: [] };
-    const existingKeys = new Set(
-      existingResult.rows.map((r: { source_id: string; analysis_type: string }) =>
-        `${r.source_id}:${r.analysis_type}`)
-    );
-
-    for (const row of result.rows) {
-      const oesSerial = row.oes_serial.trim().toUpperCase();
-
-      // Check Step 6 (ONT back)
-      if (row.vlm_ont_serial_step6) {
-        const vlmS6 = row.vlm_ont_serial_step6.trim().toUpperCase();
-
-        if (vlmS6 === oesSerial) {
-          totalCorrect++;
-        } else if (!existingKeys.has(`${row.id}:ont_serial_back`)) {
-          const errorPattern = classifySerialError(vlmS6, oesSerial);
-          totalCorrections++;
-
-          // recordVlmCorrection also records the metric internally
-          recordVlmCorrection({
-            module: 'activate',
-            analysisType: 'ont_serial_back',
-            sourceId: row.id,
-            sourceTable: 'dr_photo_unified_reviews',
-            vlmExtractedValue: row.vlm_ont_serial_step6,
-            correctedValue: row.oes_serial,
-            correctionReason: errorPatternToReason(errorPattern),
-            correctionNotes: `Auto-corrected from OES. Pattern: ${errorPattern}`,
-            context: {
-              drop_number: row.drop_number,
-              error_pattern: errorPattern,
-              extraction_method: row.serial_extraction_method_step6 || 'vlm',
-              source: 'oes_import',
-            },
-            correctedByName: 'OES Import (automated)',
-          }).catch(err => {
-            logger.warn(`VLM correction failed for ${row.drop_number} step6`, {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-        } else {
-          totalSkipped++;
-        }
-      }
-
-      // Check Step 9 (ONT front)
-      if (row.vlm_ont_serial_step9) {
-        const vlmS9 = row.vlm_ont_serial_step9.trim().toUpperCase();
-
-        if (vlmS9 === oesSerial) {
-          totalCorrect++;
-        } else if (!existingKeys.has(`${row.id}:ont_serial_front`)) {
-          const errorPattern = classifySerialError(vlmS9, oesSerial);
-          totalCorrections++;
-
-          recordVlmCorrection({
-            module: 'activate',
-            analysisType: 'ont_serial_front',
-            sourceId: row.id,
-            sourceTable: 'dr_photo_unified_reviews',
-            vlmExtractedValue: row.vlm_ont_serial_step9,
-            correctedValue: row.oes_serial,
-            correctionReason: errorPatternToReason(errorPattern),
-            correctionNotes: `Auto-corrected from OES. Pattern: ${errorPattern}`,
-            context: {
-              drop_number: row.drop_number,
-              error_pattern: errorPattern,
-              extraction_method: row.serial_extraction_method_step9 || 'vlm',
-              source: 'oes_import',
-            },
-            correctedByName: 'OES Import (automated)',
-          }).catch(err => {
-            logger.warn(`VLM correction failed for ${row.drop_number} step9`, {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-        } else {
-          totalSkipped++;
-        }
-      }
-    }
-  }
-
-  logger.info(`VLM learning: ${totalCorrections} corrections, ${totalCorrect} correct, ${totalSkipped} skipped`);
-}
-
-/**
- * Import PP DATA rows into oes_pp_data with local resolution
- */
-async function importPPData(ppRows: PPRow[], filename: string): Promise<void> {
-  try {
-    logger.info('Importing PP DATA sheet', { rows: ppRows.length });
-
-    // Create import batch
-    const batchResult = await pool.query(
-      `INSERT INTO oes_pp_import_batches (filename, total_rows, imported_by)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [filename, ppRows.length, 'oes_import_auto']
-    );
-    const batchId = batchResult.rows[0].id;
-
-    // Batch upsert in chunks of 500
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < ppRows.length; i += BATCH_SIZE) {
-      const chunk = ppRows.slice(i, i + BATCH_SIZE);
-      const values: (string | number | null)[] = [];
-      const placeholders: string[] = [];
-
-      chunk.forEach((row, idx) => {
-        const offset = idx * 4;
-        placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::date, $${offset + 4})`);
-        values.push(row.serial_number, row.project, row.date_registered, batchId);
-      });
-
-      await pool.query(
-        `INSERT INTO oes_pp_data (serial_number, project, date_registered, import_batch_id)
-         VALUES ${placeholders.join(', ')}
-         ON CONFLICT (serial_number, project) DO UPDATE SET
-           date_registered = COALESCE(EXCLUDED.date_registered, oes_pp_data.date_registered),
-           import_batch_id = EXCLUDED.import_batch_id,
-           updated_at = NOW()
-         WHERE oes_pp_data.resolution_status = 'not_found'`,
-        values
-      );
-    }
-
-    // Run local resolution (3 sequential UPDATE queries)
-    const oesMatch = await pool.query(`
-      UPDATE oes_pp_data pp SET resolution_status = 'located_oes',
-        resolved_drop_number = oa.drop_number, resolved_source = 'oes_activations',
-        resolved_details = jsonb_build_object('activation_date', oa.activation_date::text, 'status', oa.status, 'team', oa.team),
-        resolved_at = NOW(), updated_at = NOW()
-      FROM oes_activations oa WHERE pp.serial_number = oa.serial_number AND pp.resolution_status = 'not_found'
-    `);
-
-    const unifiedMatch = await pool.query(`
-      UPDATE oes_pp_data pp SET resolution_status = 'located_unified',
-        resolved_drop_number = ur.drop_number, resolved_source = 'dr_photo_unified_reviews',
-        resolved_details = jsonb_build_object('matched_field',
-          CASE WHEN ur.oes_serial = pp.serial_number THEN 'oes_serial' ELSE 'ont_serial_scanned' END, 'project', ur.project),
-        resolved_at = NOW(), updated_at = NOW()
-      FROM dr_photo_unified_reviews ur
-      WHERE (ur.oes_serial = pp.serial_number OR ur.ont_serial_scanned = pp.serial_number) AND pp.resolution_status = 'not_found'
-    `);
-
-    let onemapMatches = 0;
-    try {
-      const onemapMatch = await pool.query(`
-        UPDATE oes_pp_data pp SET resolution_status = 'located_onemap',
-          resolved_drop_number = op.drop_number, resolved_source = 'onemap_properties',
-          resolved_details = jsonb_build_object('site', op.site, 'pole', op.pole),
-          resolved_at = NOW(), updated_at = NOW()
-        FROM onemap_properties op WHERE op.ont_barcode = pp.serial_number AND pp.resolution_status = 'not_found'
-      `);
-      onemapMatches = onemapMatch.rowCount || 0;
-    } catch (err) {
-      logger.warn('PP DATA resolution: onemap_properties query failed (may not have ont_barcode column)', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      onemapMatches = 0;
-    }
-
-    const totalResolved = (oesMatch.rowCount || 0) + (unifiedMatch.rowCount || 0) + onemapMatches;
-
-    // Update batch stats
-    await pool.query(
-      `UPDATE oes_pp_import_batches SET located_count = $1, unlocated_count = $2 WHERE id = $3`,
-      [totalResolved, ppRows.length - totalResolved, batchId]
-    );
-
-    logger.info('PP DATA import complete', {
-      total: ppRows.length,
-      resolved: totalResolved,
-      oes: oesMatch.rowCount || 0,
-      unified: unifiedMatch.rowCount || 0,
-      onemap: onemapMatches,
-    });
-  } catch (err) {
-    logger.error('PP DATA import failed (non-blocking)', err);
-  }
-}
-
-/**
- * Parse Excel file and extract OES data with validation
- */
-function parseOESExcel(filePath: string): ParseResult & { ppRows: PPRow[] | null } {
-  const workbook = XLSX.readFile(filePath);
-
-  // Also parse PP DATA sheet if present
-  const ppRows = parsePPDataSheet(workbook);
-  if (ppRows) {
-    logger.info(`Found PP DATA sheet with ${ppRows.length} rows`);
-  }
-
-  const sheetName = workbook.SheetNames[0]; // Use first sheet (OLT DATA)
-  const sheet = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-
-  const warnings: string[] = [];
-  let headerMismatch = false;
-
-  // Validate headers
-  if (data.length > 0) {
-    const headerValidation = validateHeaders(data[0]);
-    if (!headerValidation.valid) {
-      headerMismatch = true;
-      warnings.push(...headerValidation.warnings);
-    }
-  }
-
-  // Skip header row
-  const rows: OESRow[] = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row || !row[0]) continue; // Skip empty rows
-
-    const dropNumber = String(row[0] || '').trim();
-    if (!dropNumber.startsWith('DR')) continue; // Skip invalid rows
-
-    // Parse activation date/datetime
-    let activationDate: string;
-    let activationDatetime: string | null = null;
-    if (typeof row[2] === 'number') {
-      activationDate = excelDateToISO(row[2]);
-      // If there's a fractional part, it contains time info
-      if (row[2] % 1 !== 0) {
-        activationDatetime = excelDateTimeToISO(row[2]);
-      }
-    } else {
-      activationDate = String(row[2] || '');
-    }
-
-    // Column mapping updated Jan 2027 - "Stack Ref." removed
-    // A=0:Drop, B=1:Serial, C=2:Timestamp, D=3:OLT Address,
-    // E=4:ONT Rx, F=5:Link ONT->OLT, G=6:OLT Rx, H=7:Link OLT->ONT,
-    // I=8:Status, J=9:Lat, K=10:Lon, L=11:Current ONT RX, M=12:Team
-    rows.push({
-      drop_number: dropNumber,
-      serial_number: String(row[1] || '').trim(),
-      activation_date: activationDate,
-      activation_datetime: activationDatetime,
-      olt_address: String(row[3] || '').trim(),
-      ont_rx_sig_dbm: row[4] !== undefined ? parseFloat(row[4]) : null,
-      link_budget_ont_olt_db: row[5] !== undefined ? parseFloat(row[5]) : null,
-      olt_rx_sig_dbm: row[6] !== undefined ? parseFloat(row[6]) : null,
-      link_budget_olt_ont_db: row[7] !== undefined ? parseFloat(row[7]) : null,
-      status: String(row[8] || '').trim(),
-      latitude: row[9] !== undefined ? parseFloat(row[9]) : null,
-      longitude: row[10] !== undefined ? parseFloat(row[10]) : null,
-      current_ont_rx: row[11] !== undefined ? parseFloat(row[11]) : null,
-      team: String(row[12] || '').trim(),
-    });
-  }
-
-  // Validate data sample for column alignment issues
-  if (rows.length > 0) {
-    const dataWarnings = validateDataSample(rows);
-    warnings.push(...dataWarnings);
-  }
-
-  return { rows, warnings, headerMismatch, ppRows };
-}
-
-/**
- * Parse form data from request
- */
 function parseForm(req: NextApiRequest): Promise<{ fields: Fields; files: Files }> {
   return new Promise((resolve, reject) => {
     const form = new IncomingForm({
       keepExtensions: true,
       maxFileSize: 50 * 1024 * 1024, // 50MB limit
     });
-
     form.parse(req, (err, fields, files) => {
       if (err) reject(err);
       else resolve({ fields, files });
     });
   });
 }
+
+// ============================================================================
+// HANDLER
+// ============================================================================
 
 async function handler(
   req: AuthenticatedNextApiRequest,
@@ -600,7 +70,6 @@ async function handler(
   try {
     const { fields, files } = await parseForm(req);
 
-    // Get the uploaded file
     const fileField = files.file;
     const uploadedFile = Array.isArray(fileField) ? fileField[0] : fileField;
 
@@ -611,21 +80,20 @@ async function handler(
     const filePath = uploadedFile.filepath;
     const action = Array.isArray(fields.action) ? fields.action[0] : fields.action;
 
-    // Parse the Excel file with validation
     logger.info(`Parsing file: ${uploadedFile.originalFilename}`);
-    const parseResult = parseOESExcel(filePath);
-    const { rows: oesRows, warnings, headerMismatch, ppRows } = parseResult;
+    const { rows: oesRows, warnings, headerMismatch, ppRows } = parseOESExcel(filePath);
 
-    // Log warnings if any
     if (warnings.length > 0) {
       logger.warn('Format validation warnings detected', { warnings, headerMismatch });
     }
 
-    // Clean up temp file
+    // Temp file is no longer needed after parsing
     fs.unlinkSync(filePath);
 
+    // -------------------------------------------------------------------------
+    // PREVIEW
+    // -------------------------------------------------------------------------
     if (action === 'preview') {
-      // Return preview data with warnings
       return res.status(200).json({
         success: true,
         preview: oesRows,
@@ -635,626 +103,70 @@ async function handler(
       });
     }
 
+    // -------------------------------------------------------------------------
+    // IMPORT
+    // -------------------------------------------------------------------------
     if (action === 'import') {
       const reportDate = Array.isArray(fields.reportDate) ? fields.reportDate[0] : fields.reportDate;
-
       logger.info(`Importing ${oesRows.length} rows (batch mode)`, { reportDate, warningCount: warnings.length });
 
-      // Create import batch
-      const batchResult = await pool.query(
-        `INSERT INTO oes_import_batches (filename, report_date, total_rows)
-         VALUES ($1, $2, $3)
-         RETURNING id`,
-        [uploadedFile.originalFilename, reportDate || new Date().toISOString().split('T')[0], oesRows.length]
-      );
-      const batchId = batchResult.rows[0].id;
-
-      // Step 1: Fetch all drops in one query for matching
       const dropNumbers = oesRows.map(r => r.drop_number);
-      const dropsResult = await pool.query(
-        `SELECT id, drop_number FROM drops WHERE drop_number = ANY($1)`,
-        [dropNumbers]
+
+      // Step 1 — Create batch + load drops map
+      const { batchId, dropsMap, existingCount } = await createImportBatch(
+        uploadedFile.originalFilename ?? null,
+        reportDate ?? null,
+        oesRows.length,
+        dropNumbers
       );
-      const dropsMap = new Map(dropsResult.rows.map(d => [d.drop_number, d.id]));
-      logger.info(`Found ${dropsMap.size} matching drops`);
 
-      // Step 2: Count existing records before import
-      const countBefore = await pool.query(
-        `SELECT COUNT(*) as count FROM oes_activations`
+      // Step 2 — Upsert activations + update drops.oes_confirmed
+      const { inserted, updated, matched, unmatched, errors } = await upsertActivations(
+        oesRows, batchId, dropsMap, existingCount
       );
-      const existingCount = parseInt(countBefore.rows[0].count, 10);
-      logger.info(`Existing OES records: ${existingCount}`);
 
-      // Step 3: Batch upsert OES activations (in chunks of 500)
-      const BATCH_SIZE = 500;
-      const errors: string[] = [];
-
-      for (let i = 0; i < oesRows.length; i += BATCH_SIZE) {
-        const chunk = oesRows.slice(i, i + BATCH_SIZE);
-
-        // Build VALUES clause for batch insert
-        const values: any[] = [];
-        const placeholders: string[] = [];
-
-        chunk.forEach((row, idx) => {
-          const dropId = dropsMap.get(row.drop_number) || null;
-          const offset = idx * 16; // 16 columns (stack_ref removed Jan 2027)
-          placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16})`);
-          values.push(
-            row.drop_number,
-            dropId,
-            row.serial_number,
-            row.activation_date,
-            row.activation_datetime, // Full timestamp if available
-            row.olt_address,
-            row.ont_rx_sig_dbm,
-            row.link_budget_ont_olt_db,
-            row.olt_rx_sig_dbm,
-            row.link_budget_olt_ont_db,
-            row.status,
-            row.latitude,
-            row.longitude,
-            row.current_ont_rx,
-            row.team,
-            batchId
-          );
-        });
-
-        try {
-          await pool.query(
-            `INSERT INTO oes_activations (
-               drop_number, drop_id, serial_number, activation_date, activation_datetime, olt_address,
-               ont_rx_sig_dbm, link_budget_ont_olt_db, olt_rx_sig_dbm, link_budget_olt_ont_db,
-               status, latitude, longitude, current_ont_rx, team, import_batch_id
-             ) VALUES ${placeholders.join(', ')}
-             ON CONFLICT (drop_number) DO UPDATE SET
-               drop_id = COALESCE(EXCLUDED.drop_id, oes_activations.drop_id),
-               serial_number = EXCLUDED.serial_number,
-               activation_date = EXCLUDED.activation_date,
-               activation_datetime = COALESCE(EXCLUDED.activation_datetime, oes_activations.activation_datetime),
-               olt_address = EXCLUDED.olt_address,
-               ont_rx_sig_dbm = EXCLUDED.ont_rx_sig_dbm,
-               link_budget_ont_olt_db = EXCLUDED.link_budget_ont_olt_db,
-               olt_rx_sig_dbm = EXCLUDED.olt_rx_sig_dbm,
-               link_budget_olt_ont_db = EXCLUDED.link_budget_olt_ont_db,
-               status = EXCLUDED.status,
-               latitude = EXCLUDED.latitude,
-               longitude = EXCLUDED.longitude,
-               current_ont_rx = EXCLUDED.current_ont_rx,
-               team = EXCLUDED.team,
-               import_batch_id = EXCLUDED.import_batch_id,
-               updated_at = NOW()`,
-            values
-          );
-        } catch (chunkError) {
-          const errMsg = chunkError instanceof Error ? chunkError.message : 'Unknown error';
-          errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${errMsg}`);
-          logger.error(`Batch error at row ${i}`, chunkError);
-        }
-
-        logger.info(`Processed ${Math.min(i + BATCH_SIZE, oesRows.length)}/${oesRows.length}`);
-      }
-
-      // Step 4: Count records after import to calculate inserted vs updated
-      const countAfter = await pool.query(
-        `SELECT COUNT(*) as count FROM oes_activations`
+      // Step 3 — Create / update unified review records
+      const existingUnifiedSet = await loadExistingUnifiedSet(dropNumbers);
+      const { oesOnlyCreated, serialSwapsDetected, oesOnlyDRs } = await processUnifiedRecords(
+        oesRows, existingUnifiedSet
       );
-      const newCount = parseInt(countAfter.rows[0].count, 10);
-      const inserted = newCount - existingCount;
-      const updated = Math.max(0, oesRows.length - inserted); // Rows not inserted were updated
-      logger.info(`After import: ${newCount} records (${inserted} new, ${updated} updated)`);
 
-      // Step 5: Bulk update drops table to mark OES confirmed
+      logger.info('Import complete', {
+        inserted, updated, matched, unmatched,
+        oesOnly: oesOnlyDRs.length, serialSwapsDetected, errors: errors.length,
+      });
+
+      // -----------------------------------------------------------------------
+      // Fire-and-forget side effects
+      // -----------------------------------------------------------------------
+      const affectedDRs = [...new Set(dropNumbers)];
+
+      const qfieldSyncTriggered = triggerQFieldSync({
+        batchId,
+        totalRows: oesRows.length,
+        imported: inserted + updated,
+        matched,
+        timestamp: new Date().toISOString(),
+        reportDate: reportDate ?? (new Date().toISOString().split('T')[0] as string),
+      });
+
       const matchedDropNumbers = oesRows
-        .filter(r => dropsMap.has(r.drop_number))
-        .map(r => r.drop_number);
+        .filter(row => dropsMap.has(row.drop_number))
+        .map(row => row.drop_number);
+      triggerSharePointSync(matchedDropNumbers);
 
-      if (matchedDropNumbers.length > 0) {
-        await pool.query(
-          `UPDATE drops
-           SET oes_confirmed = true, oes_confirmed_at = NOW()
-           WHERE drop_number = ANY($1)`,
-          [matchedDropNumbers]
-        );
-      }
+      const oltAutoDetectTriggered = await triggerOltAutoDetect(batchId);
 
-      const matched = dropsMap.size;
-      const unmatched = oesRows.length - matched;
+      triggerSerialVerificationRecompute(affectedDRs);
+      triggerVlmLearning(affectedDRs);
+      triggerPpActivationCheck();
+      triggerOntSwapConfirmation();
 
-      // Update batch stats
-      await pool.query(
-        `UPDATE oes_import_batches
-         SET matched_drops = $1, unmatched_drops = $2
-         WHERE id = $3`,
-        [matched, unmatched, batchId]
-      );
-
-      // Step 6: Create unified records for OES-only DRs (not submitted via WhatsApp)
-      // These will appear in QA centre for review, photos will be fetched when opened
-      const existingUnifiedResult = await pool.query(
-        `SELECT drop_number FROM dr_photo_unified_reviews WHERE drop_number = ANY($1)`,
-        [dropNumbers]
-      );
-      const existingUnifiedSet = new Set(existingUnifiedResult.rows.map(r => r.drop_number));
-
-      // Find DRs that are in OES but NOT in unified table
-      const oesOnlyDRs = oesRows.filter(row => !existingUnifiedSet.has(row.drop_number));
-
-      if (oesOnlyDRs.length > 0) {
-        logger.info(`Creating ${oesOnlyDRs.length} unified records for OES-only DRs`);
-
-        // Lookup project for each DR from drops table (source of truth)
-        const oesOnlyDropNumbers = oesOnlyDRs.map(r => r.drop_number);
-        const projectLookupResult = await pool.query(
-          `SELECT d.drop_number, p.project_name
-           FROM drops d
-           JOIN projects p ON d.project_id = p.id
-           WHERE d.drop_number = ANY($1)`,
-          [oesOnlyDropNumbers]
-        );
-        const drToProject = new Map<string, string>();
-        projectLookupResult.rows.forEach(r => {
-          drToProject.set(r.drop_number, r.project_name);
-        });
-        logger.info(`Found project mapping for ${drToProject.size}/${oesOnlyDRs.length} DRs`);
-
-        // Batch insert OES-only DRs into unified table
-        // Photos will be fetched via ensure-data when user opens for QA review
-        // NOTE: submitted_date is NOT set - these DRs were not "submitted" via WhatsApp
-        const OES_BATCH_SIZE = 100;
-        let oesOnlyCreated = 0;
-
-        for (let i = 0; i < oesOnlyDRs.length; i += OES_BATCH_SIZE) {
-          const chunk = oesOnlyDRs.slice(i, i + OES_BATCH_SIZE);
-
-          const values: any[] = [];
-          const placeholders: string[] = [];
-
-          chunk.forEach((row, idx) => {
-            const offset = idx * 6;
-            // is_oes_only is always TRUE for these records
-            // project is looked up from drops table (source of truth)
-            // oes_activated_at is set to activation_datetime or activation_date
-            placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, TRUE, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
-            values.push(
-              row.drop_number,
-              'OES Import', // Mark source as OES import
-              drToProject.get(row.drop_number) || null, // Project from drops table
-              row.activation_datetime || row.activation_date, // oes_activated_at
-              row.serial_number, // oes_serial
-              row.team // oes_team
-            );
-          });
-
-          try {
-            await pool.query(
-              `INSERT INTO dr_photo_unified_reviews (drop_number, photo_source, project, is_oes_only, oes_activated_at, oes_serial, oes_team)
-               VALUES ${placeholders.join(', ')}
-               ON CONFLICT (drop_number) DO NOTHING`,
-              values
-            );
-            oesOnlyCreated += chunk.length;
-          } catch (oesErr) {
-            logger.error(`Error creating OES-only unified records at batch ${i}`, oesErr);
-          }
-        }
-
-        logger.info(`Created ${oesOnlyCreated} OES-only unified records`);
-
-        // Add activity log entries for OES activations
-        logger.info('Adding activity log entries for OES activations');
-        const activityChunks = [];
-        for (let i = 0; i < oesOnlyDRs.length; i += OES_BATCH_SIZE) {
-          activityChunks.push(oesOnlyDRs.slice(i, i + OES_BATCH_SIZE));
-        }
-
-        for (const chunk of activityChunks) {
-          const actValues: any[] = [];
-          const actPlaceholders: string[] = [];
-
-          chunk.forEach((row, idx) => {
-            const offset = idx * 4;
-            actPlaceholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::jsonb, $${offset + 4})`);
-            actValues.push(
-              row.drop_number,
-              'oes_activated',
-              JSON.stringify({
-                activation_date: row.activation_date,
-                activation_datetime: row.activation_datetime,
-                serial_number: row.serial_number,
-                team: row.team,
-                olt_address: row.olt_address,
-                source: 'OES Import'
-              }),
-              'system'
-            );
-          });
-
-          try {
-            await pool.query(
-              `INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor)
-               VALUES ${actPlaceholders.join(', ')}`,
-              actValues
-            );
-          } catch (actErr) {
-            logger.error('Error adding activity log entries', actErr);
-          }
-        }
-      }
-
-      // Step 7: Update EXISTING unified records with OES activation data
-      // OES is source of truth for the currently active ONT on the network.
-      // If OES serial differs from ont_serial_scanned (1Map/WA scan), that's a potential serial swap.
-      const existingToUpdate = oesRows.filter(row => existingUnifiedSet.has(row.drop_number));
-      let serialSwapsDetected = 0;
-      let oesSerialUpdated = 0;
-
-      if (existingToUpdate.length > 0) {
-        logger.info(`Updating ${existingToUpdate.length} existing unified records with OES activation data`);
-
-        const UPDATE_BATCH_SIZE = 100;
-        for (let i = 0; i < existingToUpdate.length; i += UPDATE_BATCH_SIZE) {
-          const chunk = existingToUpdate.slice(i, i + UPDATE_BATCH_SIZE);
-          const dropNumbersChunk = chunk.map(r => r.drop_number);
-
-          // Pre-fetch existing serials for swap detection
-          const existingSerials: Map<string, { oes_serial: string | null; ont_serial_scanned: string | null }> = new Map();
-          try {
-            const existingResult = await pool.query(
-              `SELECT drop_number, oes_serial, ont_serial_scanned
-               FROM dr_photo_unified_reviews
-               WHERE drop_number = ANY($1::text[])`,
-              [dropNumbersChunk]
-            );
-            existingResult.rows.forEach((r: { drop_number: string; oes_serial: string | null; ont_serial_scanned: string | null }) => {
-              existingSerials.set(r.drop_number, { oes_serial: r.oes_serial, ont_serial_scanned: r.ont_serial_scanned });
-            });
-          } catch (fetchErr) {
-            logger.error(`Error fetching existing serials at batch ${i}`, fetchErr);
-          }
-
-          // Detect serial changes and swaps
-          const swapActivityEntries: { drop_number: string; event_data: string }[] = [];
-
-          for (const row of chunk) {
-            const existing = existingSerials.get(row.drop_number);
-            if (!existing) continue;
-
-            const newOesSerial = row.serial_number?.trim() || '';
-            const oldOesSerial = existing.oes_serial?.trim() || '';
-            const scannedSerial = existing.ont_serial_scanned?.trim() || '';
-
-            // Detect OES serial change (different from previous OES import)
-            if (oldOesSerial && newOesSerial && oldOesSerial.toUpperCase() !== newOesSerial.toUpperCase()) {
-              swapActivityEntries.push({
-                drop_number: row.drop_number,
-                event_data: JSON.stringify({
-                  event: 'OES_SERIAL_CHANGED',
-                  old_oes_serial: oldOesSerial,
-                  new_oes_serial: newOesSerial,
-                  ont_serial_scanned: scannedSerial || null,
-                  source: 'OES Import',
-                  note: 'OES serial changed between imports - possible ONT replacement on network',
-                }),
-              });
-              serialSwapsDetected++;
-            }
-
-            // Detect mismatch between OES (network truth) and scanned serial (installation scan)
-            if (newOesSerial && scannedSerial && newOesSerial.toUpperCase() !== scannedSerial.toUpperCase()) {
-              // Only log if this is a NEW mismatch (not already flagged)
-              swapActivityEntries.push({
-                drop_number: row.drop_number,
-                event_data: JSON.stringify({
-                  event: 'SERIAL_MISMATCH_DETECTED',
-                  oes_serial: newOesSerial,
-                  ont_serial_scanned: scannedSerial,
-                  source: 'OES Import',
-                  note: 'OES serial differs from 1Map/WA scanned serial - possible swap or scan error',
-                }),
-              });
-            }
-          }
-
-          // Build arrays for the bulk update - ALWAYS update oes_serial (source of truth)
-          const activationTimes = chunk.map(r => r.activation_datetime || r.activation_date);
-          const serials = chunk.map(r => r.serial_number);
-          const teams = chunk.map(r => r.team);
-
-          try {
-            await pool.query(
-              `UPDATE dr_photo_unified_reviews u
-               SET
-                 oes_activated_at = data.activation_time::timestamp,
-                 oes_serial = data.serial,
-                 oes_team = data.team,
-                 serial_swap_detected = CASE
-                   WHEN u.ont_serial_scanned IS NOT NULL AND u.ont_serial_scanned != ''
-                        AND data.serial IS NOT NULL AND data.serial != ''
-                        AND UPPER(TRIM(u.ont_serial_scanned)) != UPPER(TRIM(data.serial))
-                   THEN TRUE ELSE u.serial_swap_detected END,
-                 serial_swap_detected_at = CASE
-                   WHEN u.ont_serial_scanned IS NOT NULL AND u.ont_serial_scanned != ''
-                        AND data.serial IS NOT NULL AND data.serial != ''
-                        AND UPPER(TRIM(u.ont_serial_scanned)) != UPPER(TRIM(data.serial))
-                        AND (u.serial_swap_detected IS NULL OR u.serial_swap_detected = FALSE)
-                   THEN NOW() ELSE u.serial_swap_detected_at END,
-                 serial_swap_details = CASE
-                   WHEN u.ont_serial_scanned IS NOT NULL AND u.ont_serial_scanned != ''
-                        AND data.serial IS NOT NULL AND data.serial != ''
-                        AND UPPER(TRIM(u.ont_serial_scanned)) != UPPER(TRIM(data.serial))
-                   THEN jsonb_build_object(
-                     'oes_serial', data.serial,
-                     'scanned_serial', u.ont_serial_scanned,
-                     'detected_at', NOW()::text,
-                     'source', 'OES Import'
-                   )::text ELSE u.serial_swap_details END,
-                 updated_at = NOW()
-               FROM (
-                 SELECT
-                   unnest($1::text[]) as drop_number,
-                   unnest($2::text[]) as activation_time,
-                   unnest($3::text[]) as serial,
-                   unnest($4::text[]) as team
-               ) data
-               WHERE u.drop_number = data.drop_number`,
-              [dropNumbersChunk, activationTimes, serials, teams]
-            );
-            oesSerialUpdated += chunk.length;
-          } catch (updateErr) {
-            logger.error(`Error updating existing unified records at batch ${i}`, updateErr);
-          }
-
-          // Log swap/mismatch activity entries
-          if (swapActivityEntries.length > 0) {
-            try {
-              const actValues: string[] = [];
-              const actParams: (string | null)[] = [];
-              swapActivityEntries.forEach((entry, idx) => {
-                const offset = idx * 3;
-                actValues.push(`($${offset + 1}, 'SERIAL_SWAP', $${offset + 2}::jsonb, $${offset + 3})`);
-                actParams.push(entry.drop_number, entry.event_data, 'system:oes-import');
-              });
-              await pool.query(
-                `INSERT INTO dr_activity_log (drop_number, event_type, event_data, actor)
-                 VALUES ${actValues.join(', ')}`,
-                actParams
-              );
-            } catch (actErr) {
-              logger.error('Error logging serial swap activities', actErr);
-            }
-          }
-        }
-        logger.info(`Updated ${oesSerialUpdated} existing unified records, detected ${serialSwapsDetected} serial swaps`);
-      }
-
-      logger.info('Import complete', { inserted, updated, matched, unmatched, oesOnly: oesOnlyDRs.length, existingUpdated: existingToUpdate.length, serialSwapsDetected, errors: errors.length });
-
-      // === QField Sync (fire-and-forget) ===
-      // Trigger QField sync but DON'T wait for completion - prevents Cloudflare 524 timeout
-      // QField sync takes ~90s and can be monitored via /system/data-sync
-      let qfieldSyncTriggered = false;
-
-      try {
-        const syncPayload = {
-          batchId,
-          totalRows: oesRows.length,
-          imported: inserted + updated,
-          matched: matched,
-          timestamp: new Date().toISOString(),
-          reportDate: reportDate || new Date().toISOString().split('T')[0]
-        };
-
-        logger.info('Triggering QField sync webhook (fire-and-forget)', syncPayload);
-
-        // Fire-and-forget with short timeout - just confirm webhook received
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s to confirm receipt
-
-        fetch('http://100.96.203.105:8095/sync/oes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncPayload),
-          signal: controller.signal
-        })
-        .then(async (response) => {
-          clearTimeout(timeoutId);
-          if (response.ok) {
-            const result = await response.json();
-            logger.info('QField sync webhook accepted', result);
-          } else {
-            logger.warn(`QField sync webhook returned ${response.status}`);
-          }
-
-          // Log to data_sync_operations
-          try {
-            await pool.query(
-              `INSERT INTO data_sync_operations (operation_type, status, started_at, details, triggered_by, source_batch_id)
-               VALUES ('qfield_sync', 'running', NOW(), $1, 'oes_import_webhook', $2)`,
-              [
-                JSON.stringify({ message: 'Sync triggered, running in background', total_records: String(oesRows.length) }),
-                batchId,
-              ]
-            );
-          } catch (logErr) {
-            log.error('activate-import-oes', { error: logErr instanceof Error ? logErr.message : String(logErr) });
-            logger.warn('Failed to log QField sync to data_sync_operations', logErr);
-          }
-        })
-        .catch((fetchError: unknown) => {
-          clearTimeout(timeoutId);
-          const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-          logger.warn('QField sync webhook failed (non-blocking)', errorMessage);
-        });
-
-        qfieldSyncTriggered = true;
-      } catch (error) {
-        logger.error('Failed to trigger QField sync webhook', error);
-      }
-
-      // === SHAREPOINT FOLDER VERIFICATION (Fire-and-forget) ===
-      if (process.env.SHAREPOINT_DR_SYNC_ENABLED === 'true' && matched > 0) {
-        try {
-          const matchedDrNumbers = oesRows
-            .filter(row => dropsMap.has(row.drop_number))
-            .map(row => row.drop_number);
-
-          if (matchedDrNumbers.length > 0) {
-            logger.info(`Triggering SharePoint folder verification for ${matchedDrNumbers.length} DRs`);
-
-            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
-            fetch(`${baseUrl}/api/activate/sharepoint-sync-batch`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'verify_folders',
-                dropNumbers: matchedDrNumbers.slice(0, 100)
-              })
-            })
-            .then(async (response) => {
-              if (response.ok) {
-                const result = await response.json();
-                logger.info('SharePoint folder verification triggered', {
-                  processed: result.data?.processed,
-                  succeeded: result.data?.succeeded,
-                  failed: result.data?.failed,
-                });
-              } else {
-                logger.warn(`SharePoint sync returned ${response.status}`);
-              }
-            })
-            .catch((error) => {
-              logger.warn('SharePoint sync failed (non-blocking)', error.message);
-            });
-          }
-        } catch (error) {
-          logger.error('Failed to trigger SharePoint folder verification', error);
-        }
-      }
-
-      // === OLT AUTO-DETECT (Fire-and-forget) ===
-      // Compare OES serials against 1Map cache, then queue API lookups
-      let oltAutoDetectTriggered = false;
-      try {
-        const { runAutoDetect } = await import('@/modules/data-sync/services/oltAutoDetectService');
-        const { processLookupQueue } = await import('@/modules/data-sync/services/oltQueueProcessorService');
-        runAutoDetect(batchId)
-          .then(async (result) => {
-            logger.info('OLT auto-detect completed', result);
-            if (result.apiLookupsQueued > 0) {
-              await processLookupQueue(result.runId);
-            }
-          })
-          .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : 'Unknown error';
-            logger.error('OLT auto-detect failed (non-blocking)', msg);
-          });
-        oltAutoDetectTriggered = true;
-      } catch (error) {
-        logger.error('Failed to trigger OLT auto-detect', error);
-      }
-
-      // === SERIAL VERIFICATION RECOMPUTATION (Fire-and-forget) ===
-      // OES is the source of truth for serial numbers. When OES data changes,
-      // recompute 4-way verification badges for all affected DRs.
-      const affectedDRs = [...new Set(oesRows.map(row => row.drop_number))];
-      if (affectedDRs.length > 0) {
-        logger.info(`Recomputing serial verification for ${affectedDRs.length} DRs`);
-        const BATCH_SIZE = 50;
-        (async () => {
-          let recomputed = 0;
-          for (let i = 0; i < affectedDRs.length; i += BATCH_SIZE) {
-            const batch = affectedDRs.slice(i, i + BATCH_SIZE);
-            const results = await Promise.allSettled(
-              batch.map(dr => computeAndPersistVerification(dr))
-            );
-            recomputed += results.filter(r => r.status === 'fulfilled').length;
-          }
-          logger.info(`Serial verification recomputed for ${recomputed}/${affectedDRs.length} DRs`);
-        })().catch(err => {
-          logger.error('Serial verification batch recomputation failed', err);
-        });
-      }
-
-      // === VLM LEARNING FROM OES (Fire-and-forget) ===
-      // OES serial is ground truth. Compare against VLM-extracted serials
-      // and auto-record corrections into vlm_corrections for learning.
-      if (affectedDRs.length > 0) {
-        recordVlmCorrectionsFromOes(affectedDRs).catch(err => {
-          logger.error('VLM learning from OES failed', err);
-        });
-      }
-
-      // === PP DATA IMPORT (Fire-and-forget) ===
-      // Automatically import pre-provision data from the PP DATA sheet
-      let ppDataStatus: { total: number; message: string } | null = null;
       if (ppRows && ppRows.length > 0) {
-        ppDataStatus = { total: ppRows.length, message: 'Importing in background...' };
-        importPPData(ppRows, uploadedFile.originalFilename || 'unknown').catch(err => {
-          logger.error('PP DATA import failed', err);
+        importPPData(ppRows, uploadedFile.originalFilename ?? 'unknown').catch(err => {
+          logger.error('PP DATA import failed', { error: err instanceof Error ? err.message : String(err) });
         });
       }
-
-      // === PP ACTIVATION CHECK (Fire-and-forget) ===
-      // When OES data is imported, check if any PP serials now appear in OES activations
-      // and mark them as 'activated' (truly resolved)
-      (async () => {
-        try {
-          const activatedResult = await pool.query(`
-            UPDATE oes_pp_data pp
-            SET resolution_status = 'activated',
-                resolved_drop_number = COALESCE(pp.resolved_drop_number, oa.drop_number),
-                resolved_source = COALESCE(pp.resolved_source, 'oes_activations'),
-                resolved_details = COALESCE(pp.resolved_details, '{}'::jsonb) || jsonb_build_object(
-                  'activated_date', oa.activation_date::text,
-                  'activated_status', oa.status
-                ),
-                resolved_at = COALESCE(pp.resolved_at, NOW()),
-                updated_at = NOW()
-            FROM oes_activations oa
-            WHERE pp.serial_number = oa.serial_number
-              AND pp.resolution_status != 'activated'
-          `);
-          if ((activatedResult.rowCount || 0) > 0) {
-            logger.info(`PP activation check: ${activatedResult.rowCount} serials now activated`);
-          }
-        } catch (err) {
-          logger.error('PP activation check failed', err);
-        }
-      })();
-
-      // === ONT SWAP CONFIRMATION (Fire-and-forget) ===
-      // Auto-confirm swap records when OES shows the new serial as active,
-      // and update the unified review's oes_serial to the new serial
-      (async () => {
-        try {
-          const swapResult = await pool.query(`
-            UPDATE ont_swap_records osr
-            SET status = 'confirmed_oes',
-                oes_status = oa.status,
-                updated_at = NOW()
-            FROM oes_activations oa
-            WHERE osr.new_serial = oa.serial_number
-              AND osr.drop_number = oa.drop_number
-              AND osr.status = 'pending_review'
-            RETURNING osr.drop_number, osr.new_serial
-          `);
-          if ((swapResult.rowCount || 0) > 0) {
-            logger.info(`ONT swap confirmation: ${swapResult.rowCount} swaps confirmed via OES`);
-            // Update unified reviews with the new serial so it shows as current
-            for (const row of swapResult.rows) {
-              await pool.query(
-                `UPDATE dr_photo_unified_reviews
-                 SET oes_serial = $2, updated_at = NOW()
-                 WHERE drop_number = $1`,
-                [row.drop_number, row.new_serial]
-              );
-            }
-          }
-        } catch (err) {
-          logger.error('ONT swap confirmation check failed', err);
-        }
-      })();
 
       return res.status(200).json({
         success: true,
@@ -1263,7 +175,7 @@ async function handler(
         updated,
         matched,
         unmatched,
-        oesOnlyCreated: oesOnlyDRs.length,
+        oesOnlyCreated,
         serialSwapsDetected,
         errors,
         batchId,
@@ -1275,17 +187,20 @@ async function handler(
             : 'QField sync not triggered',
         },
         oltAutoDetectTriggered,
-        ppDataImport: ppDataStatus,
+        ppDataImport: ppRows && ppRows.length > 0
+          ? { total: ppRows.length, message: 'Importing in background...' }
+          : null,
       });
     }
 
     return res.status(400).json({ error: 'Invalid action. Use "preview" or "import".' });
   } catch (error) {
-    logger.error('Import failed', error);
+    logger.error('Import failed', { error: error instanceof Error ? error.message : String(error) });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Import failed',
     });
   }
 }
 
-export default withAuth(withRole('manager')(handler));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default withAuth(withRole('manager')(handler as any));
