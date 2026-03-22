@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       UPDATE conduit_projects
       SET status = ${status}
       WHERE id = ${params.id}
-      RETURNING id, name, status, po_count, start_date, build_duration_months,
+      RETURNING id, name, status, ft_project_name, po_count, start_date, build_duration_months,
                 inputs_json, is_baseline_locked, created_at, updated_at
     `;
 
@@ -120,7 +120,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         build_duration_months = ${build_duration_months ?? existing.build_duration_months},
         inputs_json           = ${JSON.stringify(inputs_json ?? existing.inputs_json)}::jsonb
       WHERE id = ${params.id}
-      RETURNING id, name, status, po_count, start_date, build_duration_months,
+      RETURNING id, name, status, ft_project_name, po_count, start_date, build_duration_months,
                 inputs_json, is_baseline_locked, created_at, updated_at
     `;
 

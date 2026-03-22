@@ -9,8 +9,8 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
-import type { ConduitProject, MonthlyPlanEntry } from '../types';
+import { AlertTriangle, CheckCircle2, RotateCcw, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import type { ConduitProject, MonthlyPlanEntry, ConduitActual } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -234,6 +234,8 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const { build_duration_months: dur, start_date, inputs_json: inp } = project;
   const { service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
   const fc_activation = project.po_count * inp.uptake;
+  const isWip = project.status === 'wip';
+  const ftName = project.ft_project_name;
 
   const [plan, setPlan] = useState<MonthlyPlanEntry[]>(() =>
     normPlan(inp.monthly_plan, dur)
@@ -243,6 +245,57 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   useEffect(() => {
     setPlan(normPlan(inp.monthly_plan, dur));
   }, [project.id, dur]);
+
+  // ── Actuals (WIP only) ────────────────────────────────────────────────────
+  const [actuals, setActuals] = useState<ConduitActual[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [breakdownOpen, setBreakdownOpen] = useState<Record<number, boolean>>({});
+
+  // Fetch actuals on mount for WIP projects with a mapping
+  useEffect(() => {
+    if (!isWip || !ftName) return;
+    fetch(`/api/conduit/actuals?project=${encodeURIComponent(ftName)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(({ data }) => setActuals(data ?? []))
+      .catch(() => {/* silent — actuals are optional */});
+  }, [project.id, ftName, isWip]);
+
+  // Map actuals by month ISO string for O(1) lookup
+  const actualsMap = useMemo(() => {
+    const m = new Map<string, ConduitActual>();
+    actuals.forEach(a => m.set(a.month.slice(0, 7), a));
+    return m;
+  }, [actuals]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    setSyncError(null);
+    try {
+      const res = await fetch('/api/conduit/actuals/sync', { method: 'POST' });
+      const body = await res.json() as { success?: boolean; upserted?: number; error?: string; projects?: string[] };
+      if (!res.ok) throw new Error(body.error ?? 'Sync failed');
+      setSyncResult(`Synced ${body.upserted} month entries for: ${(body.projects ?? []).join(', ')}`);
+      // Re-fetch actuals for this project
+      if (ftName) {
+        const r2 = await fetch(`/api/conduit/actuals?project=${encodeURIComponent(ftName)}`);
+        if (r2.ok) { const { data } = await r2.json(); setActuals(data ?? []); }
+      }
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Get month key from start_date + index
+  const getMonthKey = (i: number): string => {
+    const base = start_date ? new Date(start_date) : new Date();
+    const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
 
   const months = useMemo(() =>
     Array.from({ length: dur }, (_, i) => mkLabel(start_date, i)),
@@ -329,6 +382,32 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
 
   return (
     <div className="space-y-2 min-w-0 w-full">
+
+      {/* ── WIP Actuals sync bar ─────────────────────────────────────────── */}
+      {isWip && (
+        <div className="flex items-center gap-3 px-1">
+          {ftName ? (
+            <>
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold bg-indigo-800 hover:bg-indigo-700 text-indigo-200 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing…' : 'Sync Actuals from SharePoint'}
+              </button>
+              {syncResult && <span className="text-xs text-emerald-400">{syncResult}</span>}
+              {syncError && <span className="text-xs text-red-400">{syncError}</span>}
+              {actuals.length > 0 && !syncResult && (
+                <span className="text-xs text-gray-500">{actuals.length} months of actuals loaded</span>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-amber-500">⚠️ No FT project mapping — set ft_project_name to enable actuals sync</span>
+          )}
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded border border-gray-700" style={{ maxWidth: '100%' }}>
         <table className="text-xs border-collapse" style={{ minWidth: `${Math.max(700, dur * 72 + 200)}px` }}>
           <thead>
@@ -446,6 +525,83 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                 {fR(derived.at(-1)?.cumNet ?? 0)}
               </td>
             </tr>
+
+            {/* ── ACTUALS (WIP only) ───────────────────────────────────── */}
+            {isWip && actuals.length > 0 && (<>
+              <SectionHeader title="Actuals to Date — From FibreTime" cols={dur} color="text-purple-400 bg-gray-850" />
+
+              {/* Activations: Forecast vs Actual vs Variance */}
+              <tr className="border-b border-gray-800">
+                <td className={`${tdLabel} text-gray-400`}>
+                  <div>Activations</div>
+                  <div className="text-[9px] text-gray-600">Forecast / Actual / Var</div>
+                </td>
+                {plan.map((e, m) => {
+                  const key = getMonthKey(m);
+                  const act = actualsMap.get(key);
+                  const variance = act ? act.activations - e.activations : null;
+                  return (
+                    <td key={m} className="px-1 py-0.5 text-center text-[10px] tabular-nums border-r border-gray-800">
+                      <div className="text-gray-400">{e.activations || '—'}</div>
+                      {act && <div className="text-teal-300 font-medium">{act.activations}</div>}
+                      {variance !== null && <div className={variance >= 0 ? 'text-emerald-400' : 'text-red-400'}>{variance > 0 ? '+' : ''}{variance}</div>}
+                    </td>
+                  );
+                })}
+                <td className={tdTotal}></td>
+              </tr>
+
+              {/* COS Actual — total with expandable breakdown */}
+              <tr className="border-b border-gray-800">
+                <td className={`${tdLabel}`}>
+                  <div className="text-purple-300">COS Actual</div>
+                  <div className="text-[9px] text-gray-600">Forecast / Actual / Var</div>
+                </td>
+                {derived.map((d, m) => {
+                  const key = getMonthKey(m);
+                  const act = actualsMap.get(key);
+                  const variance = act ? act.cos_actual - d.cos_total : null;
+                  return (
+                    <td key={m} className="px-1 py-0.5 text-center text-[10px] tabular-nums border-r border-gray-800">
+                      <div className="text-gray-400">{fR(d.cos_total)}</div>
+                      {act && <div className="text-purple-300 font-medium">{fR(act.cos_actual)}</div>}
+                      {variance !== null && <div className={variance <= 0 ? 'text-emerald-400' : 'text-red-400'}>{variance > 0 ? '+' : ''}{fR(variance)}</div>}
+                    </td>
+                  );
+                })}
+                <td className={tdTotal}></td>
+              </tr>
+
+              {/* COS Breakdown — expandable */}
+              <tr className="border-b border-gray-700">
+                <td className={`${tdLabel}`}>
+                  <button
+                    onClick={() => setBreakdownOpen(v => ({ ...v, 0: !v[0] }))}
+                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300"
+                  >
+                    {breakdownOpen[0] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    Breakdown by category
+                  </button>
+                </td>
+                {plan.map((_, m) => <td key={m} className="border-r border-gray-800" />)}
+                <td />
+              </tr>
+
+              {breakdownOpen[0] && actuals.some(a => Object.keys(a.cos_breakdown).length > 0) && (
+                [...new Set(actuals.flatMap(a => Object.keys(a.cos_breakdown)))].map(cat => (
+                  <tr key={cat} className="border-b border-gray-800 bg-gray-950/50">
+                    <td className={`${tdLabel} text-[10px] text-gray-500 pl-6`}>{cat}</td>
+                    {plan.map((_, m) => {
+                      const key = getMonthKey(m);
+                      const act = actualsMap.get(key);
+                      const val = act?.cos_breakdown[cat] ?? 0;
+                      return <td key={m} className="px-1 py-0.5 text-right text-[10px] text-gray-500 tabular-nums border-r border-gray-800">{val ? fR(val) : ''}</td>;
+                    })}
+                    <td className={tdTotal}></td>
+                  </tr>
+                ))
+              )}
+            </>)}
 
           </tbody>
         </table>

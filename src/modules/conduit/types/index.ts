@@ -89,6 +89,7 @@ export interface ConduitProject {
   id: string;
   name: string;
   status: 'prospective' | 'executable' | 'wip';
+  ft_project_name: string | null;
   po_count: number;
   start_date: string | null;
   build_duration_months: number;
@@ -156,6 +157,15 @@ export interface ConduitCalcResult {
   cost_per_home: number;
 
   breakdown: ConduitCosBreakdown;
+}
+
+// ─── Actuals ─────────────────────────────────────────────────────────────────
+
+export interface ConduitActual {
+  month: string;           // ISO date string, first of month
+  cos_actual: number;
+  activations: number;
+  cos_breakdown: Record<string, number>;  // { Activations: R, Backhaul: R, ... }
 }
 
 // ─── Baseline ────────────────────────────────────────────────────────────────
