@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked } from 'lucide-react';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -44,17 +44,25 @@ interface ProjectsGridProps {
   tableLabel: string;
   defaultStatus: 'prospective' | 'executable' | 'wip';
   promoteLabel?: string;        // e.g. "→ Executable"
-  promoteToStatus?: 'executable' | 'wip';
-  onProjectPromoted?: (project: ConduitProject) => void; // called after promote so parent can add to next section
+  promoteToStatus?: 'prospective' | 'executable' | 'wip';
+  onProjectPromoted?: (project: ConduitProject) => void;
+  demoteLabel?: string;
+  demoteToStatus?: 'prospective' | 'executable';
+  onProjectDemoted?: (project: ConduitProject) => void;
   showAddButton?: boolean;
   showDeleteButton?: boolean;
+  showBaselineButton?: boolean;
+  onBaselineSaved?: () => void;
 }
 
 function ProjectsGrid({
   initialProjects, tableLabel, defaultStatus,
   promoteLabel, promoteToStatus, onProjectPromoted,
+  demoteLabel, demoteToStatus, onProjectDemoted,
   showAddButton = true,
   showDeleteButton = false,
+  showBaselineButton = false,
+  onBaselineSaved,
 }: ProjectsGridProps) {
   const [projects, setProjects] = useState<ConduitProject[]>(initialProjects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -80,6 +88,26 @@ function ProjectsGrid({
       onProjectPromoted?.(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Promote failed');
+    } finally {
+      setPromoting(prev => ({ ...prev, [project.id]: false }));
+    }
+  };
+
+  const demoteProject = async (project: ConduitProject) => {
+    if (!demoteToStatus) return;
+    setPromoting(prev => ({ ...prev, [project.id]: true }));
+    try {
+      const res = await fetch(`/api/conduit/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: demoteToStatus }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { data } = await res.json() as { data: ConduitProject };
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      onProjectDemoted?.(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Move back failed');
     } finally {
       setPromoting(prev => ({ ...prev, [project.id]: false }));
     }
@@ -143,6 +171,37 @@ function ProjectsGrid({
       setError(err instanceof Error ? err.message : 'Delete failed');
     } finally {
       setDeleting(prev => ({ ...prev, [project.id]: false }));
+    }
+  };
+
+  const [baselining, setBaselining] = useState<Record<string, boolean>>({});
+  const [baselined, setBaselined] = useState<Record<string, boolean>>({});
+
+  const saveBaseline = async (project: ConduitProject) => {
+    setBaselining(prev => ({ ...prev, [project.id]: true }));
+    try {
+      const calc = calcConduit(project);
+      const dateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
+      const label = `${project.name} — ${dateStr}`;
+      const res = await fetch('/api/conduit/baselines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: project.id,
+          project_name: project.name,
+          label,
+          inputs_snapshot: project.inputs_json,
+          calc_snapshot: calc,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setBaselined(prev => ({ ...prev, [project.id]: true }));
+      setTimeout(() => setBaselined(prev => ({ ...prev, [project.id]: false })), 2500);
+      onBaselineSaved?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Baseline save failed');
+    } finally {
+      setBaselining(prev => ({ ...prev, [project.id]: false }));
     }
   };
 
@@ -377,11 +436,39 @@ function ProjectsGrid({
                   <ReadCell value={calc.cost_per_home} />
                   <td className="px-2 py-2 text-right text-sm tabular-nums text-gray-300 border border-gray-700 bg-gray-900">{project.build_duration_months}</td>
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
-                    <div className="flex items-center gap-1 justify-center">
+                    <div className="flex items-center gap-1 justify-center flex-wrap">
+                      {showBaselineButton && (
+                        <button
+                          onClick={() => saveBaseline(project)}
+                          disabled={baselining[project.id]}
+                          title="Save to Baseline"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-800 hover:bg-indigo-700 text-indigo-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          {baselining[project.id]
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : baselined[project.id]
+                            ? <CheckCircle2 className="w-3 h-3 text-emerald-300" />
+                            : <BookMarked className="w-3 h-3" />}
+                          {baselining[project.id] ? 'Saving…' : baselined[project.id] ? 'Saved!' : 'Baseline'}
+                        </button>
+                      )}
                       <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors">
                         {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />}
                         {isSaving ? 'Saving' : justSaved ? 'Saved' : 'Save'}
                       </button>
+                      {demoteToStatus && demoteLabel && (
+                        <button
+                          onClick={() => demoteProject(project)}
+                          disabled={promoting[project.id]}
+                          title={demoteLabel}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          {promoting[project.id]
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <ArrowRight className="w-3 h-3 rotate-180" />}
+                          {promoting[project.id] ? '…' : demoteLabel}
+                        </button>
+                      )}
                       {promoteToStatus && promoteLabel && (
                         <button
                           onClick={() => promoteProject(project)}
@@ -461,9 +548,10 @@ interface PortfolioTableProps {
   prospectiveProjects: ConduitProject[];
   executableProjects:  ConduitProject[];
   wipProjects:         ConduitProject[];
+  onBaselineSaved?: () => void;
 }
 
-export function PortfolioTable({ prospectiveProjects, executableProjects, wipProjects }: PortfolioTableProps) {
+export function PortfolioTable({ prospectiveProjects, executableProjects, wipProjects, onBaselineSaved }: PortfolioTableProps) {
   const [prospective, setProspective] = useState<ConduitProject[]>(prospectiveProjects);
   const [executable,  setExecutable]  = useState<ConduitProject[]>(executableProjects);
   const [wip,         setWip]         = useState<ConduitProject[]>(wipProjects);
@@ -506,6 +594,11 @@ export function PortfolioTable({ prospectiveProjects, executableProjects, wipPro
           promoteLabel="→ WIP"
           promoteToStatus="wip"
           onProjectPromoted={p => setWip(prev => [...prev, p])}
+          demoteLabel="← Prospective"
+          demoteToStatus="prospective"
+          onProjectDemoted={p => setProspective(prev => [...prev, p])}
+          showBaselineButton
+          onBaselineSaved={onBaselineSaved}
           showAddButton
         />
       </div>

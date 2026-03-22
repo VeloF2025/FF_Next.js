@@ -157,3 +157,15 @@ export interface ConduitCalcResult {
 
   breakdown: ConduitCosBreakdown;
 }
+
+// ─── Baseline ────────────────────────────────────────────────────────────────
+
+export interface ConduitBaseline {
+  id: string;
+  project_id: string;
+  project_name: string;
+  label: string;
+  inputs_snapshot: Record<string, unknown>;
+  calc_snapshot: ConduitCalcResult;
+  created_at: string;
+}

@@ -2,13 +2,16 @@
  * Conduit — Project Scenario Modelling
  * Restricted: internal use only (Hein, Lew, Hanro)
  *
- * KPI tiles live inside PortfolioTable (client component) so they
- * react to inline edits without a page reload.
+ * Two tabs:
+ *  - Current: Prospective / Executable / WIP / Actual (live editing)
+ *  - Baseline: immutable snapshots saved from Executable rows
  */
 
 import { Lock, TrendingUp } from 'lucide-react';
 import { PortfolioTable } from '@/modules/conduit/components/PortfolioTable';
-import type { ConduitProject } from '@/modules/conduit/types';
+import { ConduitTabs } from '@/modules/conduit/components/ConduitTabs';
+import type { ConduitProject, ConduitBaseline } from '@/modules/conduit/types';
+
 import { log } from '@/lib/logger';
 
 // ─── Data fetching ───────────────────────────────────────────────────────────
@@ -26,10 +29,27 @@ async function getProjects(): Promise<ConduitProject[]> {
   }
 }
 
+async function getBaselines(): Promise<ConduitBaseline[]> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3005';
+    const res = await fetch(`${baseUrl}/api/conduit/baselines`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const { data } = (await res.json()) as { data: ConduitBaseline[] };
+    return data ?? [];
+  } catch (err) {
+    log.error('Conduit: failed to fetch baselines', { err: String(err) });
+    return [];
+  }
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function ConduitPage() {
-  const projects = await getProjects();
+  const [projects, baselines] = await Promise.all([getProjects(), getBaselines()]);
+
+  const prospectiveProjects = projects.filter(p => p.status === 'prospective');
+  const executableProjects  = projects.filter(p => p.status === 'executable');
+  const wipProjects         = projects.filter(p => p.status === 'wip');
 
   return (
     <div className="p-6 space-y-6 min-h-screen bg-gray-950">
@@ -40,16 +60,17 @@ export default async function ConduitPage() {
           <h1 className="text-2xl font-bold text-white">Conduit</h1>
           <p className="text-sm text-gray-400 flex items-center gap-1">
             <Lock className="w-3 h-3" />
-            Project scenario modelling \u2014 Internal use only
+            Project scenario modelling — Internal use only
           </p>
         </div>
       </div>
 
-      {/* PortfolioTable owns tiles + table + Actual section */}
-      <PortfolioTable
-        prospectiveProjects={projects.filter(p => p.status === 'prospective')}
-        executableProjects={projects.filter(p => p.status === 'executable')}
-        wipProjects={projects.filter(p => p.status === 'wip')}
+      {/* Tabs — client component handles tab switching */}
+      <ConduitTabs
+        prospectiveProjects={prospectiveProjects}
+        executableProjects={executableProjects}
+        wipProjects={wipProjects}
+        initialBaselines={baselines}
       />
     </div>
   );
