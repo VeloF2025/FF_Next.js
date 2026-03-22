@@ -1,7 +1,8 @@
 /**
  * Financial Reports Client — expandable report cards for all financial reports.
  * 🟢 WORKING: Income Statement, Project Profitability, Revenue by Client,
- *             Cashflow Statement, OPEX, COS Breakdown, Assets Register, OPEX vs CAPEX
+ *             Cashflow Statement, OPEX (OPEX tab only), Income/Expenses (Data tab pivot),
+ *             COS Breakdown, Assets, OPEX vs CAPEX
  */
 
 'use client';
@@ -12,6 +13,7 @@ import { REPORT_REGISTRY } from '@/modules/analytics/reports';
 import RevenueOverview from '@/modules/analytics/reports/revenue-overview/RevenueOverview';
 import ProjectRevenue from '@/modules/analytics/reports/project-revenue/ProjectRevenue';
 import ExpensePivot from '@/modules/analytics/reports/expense-pivot/ExpensePivot';
+import OPEXReport from '@/modules/analytics/reports/opex/OPEXReport';
 import IncomeStatement from '@/modules/analytics/reports/income-statement/IncomeStatement';
 import RevenueByClient from '@/modules/analytics/reports/revenue-by-client/RevenueByClient';
 import CosBreakdown from '@/modules/analytics/reports/cos-breakdown/CosBreakdown';
@@ -24,7 +26,8 @@ const REPORT_COMPONENTS: Record<string, React.ComponentType> = {
   'project-profitability': ProjectRevenue,
   'revenue-by-client': RevenueByClient,
   'cashflow-statement': RevenueOverview,
-  'opex': ExpensePivot,
+  'opex': OPEXReport,                    // OPEX tab only — pure operational expenses
+  'income-expenses': ExpensePivot,       // Data tab pivot — Expense/Income/All toggle
   'cos-breakdown': CosBreakdown,
   'assets-register': AssetsRegister,
   'opex-vs-capex': () => <ComingSoon name="OPEX vs CAPEX" />,
