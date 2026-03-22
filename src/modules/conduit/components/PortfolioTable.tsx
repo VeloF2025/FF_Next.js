@@ -263,7 +263,7 @@ function ProjectsGrid({
   };
 
   const TOTAL_COLS = 13;
-  const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
+  const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide';
 
   const totals = projects.reduce(
     (acc, p) => {
@@ -408,8 +408,8 @@ function ProjectsGrid({
               <th className={`${th} text-right`} style={{ minWidth: 120 }}>Profit</th>
               <th className={`${th} text-right`} style={{ minWidth: 70 }}>GP%</th>
               <th className={`${th} text-right`} style={{ minWidth: 100 }}>Cost/Home</th>
-              <th className={`${th} text-right`} style={{ minWidth: 90 }}>Build Duration</th>
-              <th className={th} style={{ width: 72 }}></th>
+              <th className={`${th} text-right`} style={{ minWidth: 60 }}>Build Duration</th>
+              <th className={th} style={{ minWidth: 200 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -436,7 +436,7 @@ function ProjectsGrid({
                   <ReadCell value={calc.cost_per_home} />
                   <td className="px-2 py-2 text-right text-sm tabular-nums text-gray-300 border border-gray-700 bg-gray-900">{project.build_duration_months}</td>
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
-                    <div className="flex items-center gap-1 justify-center flex-wrap">
+                    <div className="flex items-center gap-1 justify-center whitespace-nowrap">
                       {showBaselineButton && (
                         <button
                           onClick={() => saveBaseline(project)}
