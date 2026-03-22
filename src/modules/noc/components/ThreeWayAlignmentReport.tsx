@@ -30,8 +30,7 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 
-// Excel parsing
-import * as XLSX from 'xlsx';
+// xlsx is loaded dynamically inside the mutationFn to avoid bundle cost at page load
 
 // Types matching API response
 interface ExcelTicketRow {
@@ -134,6 +133,7 @@ export function ThreeWayAlignmentReport() {
   // Mutation for generating report
   const generateMutation = useMutation({
     mutationFn: async (file: File) => {
+      const XLSX = await import('xlsx');
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
 

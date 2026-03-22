@@ -1,7 +1,6 @@
 import { log } from '@/lib/logger';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+// jsPDF, jspdf-autotable, and xlsx are loaded dynamically inside each export
+// function to keep them out of the initial page bundle.
 
 export interface ExportOptions {
   format: 'pdf' | 'excel' | 'csv';
@@ -64,6 +63,11 @@ export async function exportToPDF(data: Record<string, unknown>, filename: strin
       throw new Error('No tabular data found for PDF export');
     }
 
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     // Header
@@ -97,6 +101,8 @@ export async function exportToExcel(data: Record<string, unknown>, filename: str
     if (headers.length === 0) {
       throw new Error('No tabular data found for Excel export');
     }
+
+    const XLSX = await import('xlsx');
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
 

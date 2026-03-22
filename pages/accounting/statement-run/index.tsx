@@ -6,7 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { FileText, Loader2, AlertCircle, Download, CheckSquare, Square, Mail } from 'lucide-react';
-import { generateStatementPdf, type StatementData } from '@/modules/accounting/utils/statementPdf';
+// generateStatementPdf is loaded dynamically inside handleGenerate
+import type { StatementData } from '@/modules/accounting/utils/statementPdf';
 import { log } from '@/lib/logger';
 
 function formatCurrency(amount: number): string {
@@ -70,6 +71,8 @@ export default function StatementRunPage() {
     if (selected.size === 0) return;
     setIsGenerating(true);
     try {
+      // Load jsPDF-dependent generator once, reuse for all statements in the batch
+      const { generateStatementPdf } = await import('@/modules/accounting/utils/statementPdf');
       const pdfs: { name: string; blob: Blob }[] = [];
 
       for (const clientId of selected) {
@@ -92,7 +95,7 @@ export default function StatementRunPage() {
           transactions: detail.transactions || [],
         };
 
-        const blob = generateStatementPdf(stmtData);
+        const blob = await generateStatementPdf(stmtData);
         const safeName = cust.client_name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
         pdfs.push({ name: `statement-${safeName}.pdf`, blob });
       }

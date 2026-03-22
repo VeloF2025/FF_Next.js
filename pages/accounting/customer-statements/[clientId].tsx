@@ -8,7 +8,7 @@ import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Link from 'next/link';
 import { ArrowLeft, ClipboardList, Loader2, AlertCircle, Download, FileText, Search, ExternalLink } from 'lucide-react';
-import { generateStatementPdf } from '@/modules/accounting/utils/statementPdf';
+// generateStatementPdf is loaded dynamically inside handleDownloadPDF
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' }).format(amount);
@@ -137,9 +137,10 @@ export default function CustomerStatementDetailPage() {
     URL.revokeObjectURL(url);
   }
 
-  function handleDownloadPDF() {
+  async function handleDownloadPDF() {
     if (!client || !summary || transactions.length === 0) return;
-    const blob = generateStatementPdf({
+    const { generateStatementPdf } = await import('@/modules/accounting/utils/statementPdf');
+    const blob = await generateStatementPdf({
       clientName: client.name,
       clientEmail: client.email || undefined,
       clientPhone: client.phone || undefined,

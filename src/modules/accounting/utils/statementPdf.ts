@@ -2,10 +2,12 @@
  * Customer Statement PDF Generator
  * Produces a portrait A4 PDF statement for a single customer
  * using jsPDF + jspdf-autotable (same pattern as reconReportPdf.ts)
+ *
+ * jsPDF and jspdf-autotable are loaded dynamically to keep them out of the
+ * initial page bundle — they are only needed when the user clicks "Download PDF".
  */
 
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface StatementTransaction {
   date: string;
@@ -29,6 +31,8 @@ export interface StatementData {
   transactions: StatementTransaction[];
 }
 
+// ─── Private helpers (no jsPDF type reference — avoids static import) ─────────
+
 const fmtZAR = (amount: number): string =>
   new Intl.NumberFormat('en-ZA', {
     style: 'currency',
@@ -44,9 +48,26 @@ const fmtDate = (d: string): string => {
   return d;
 };
 
-function paintHeader(doc: jsPDF, data: StatementData): void {
+// ─── Main Export Function ─────────────────────────────────────────────────────
+
+/**
+ * Generate a portrait A4 PDF customer statement and return it as a Blob.
+ * Call `URL.createObjectURL(blob)` to download in the browser.
+ *
+ * This function is async because it dynamically imports jsPDF and
+ * jspdf-autotable to avoid including them in the initial page bundle.
+ */
+// 🟢 WORKING: generateStatementPdf
+export async function generateStatementPdf(data: StatementData): Promise<Blob> {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const PAGE_W = doc.internal.pageSize.getWidth();
 
+  // ── Header ──────────────────────────────────────────────────────────────────
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 30, 30);
@@ -74,28 +95,26 @@ function paintHeader(doc: jsPDF, data: StatementData): void {
 
   doc.setDrawColor(200, 200, 200);
   doc.line(14, 44, PAGE_W - 14, 44);
-}
 
-function paintSummary(doc: jsPDF, data: StatementData, startY: number): number {
-  const PAGE_W = doc.internal.pageSize.getWidth();
+  // ── Summary box ─────────────────────────────────────────────────────────────
   const BOX_H = 28;
   const COL = (PAGE_W - 28) / 4;
+  let cursor = 48;
 
   doc.setFillColor(245, 247, 250);
   doc.setDrawColor(210, 215, 225);
-  doc.roundedRect(14, startY, PAGE_W - 28, BOX_H, 2, 2, 'FD');
+  doc.roundedRect(14, cursor, PAGE_W - 28, BOX_H, 2, 2, 'FD');
 
-  const labelY = startY + 9;
-  const valueY = startY + 20;
-
-  const cols = [
+  const labelY = cursor + 9;
+  const valueY = cursor + 20;
+  const summaryCols = [
     { label: 'Total Invoiced', value: data.totalInvoiced },
     { label: 'Total Paid', value: data.totalPaid },
     { label: 'Credits Applied', value: data.totalCredits },
     { label: 'Balance Due', value: data.balanceOutstanding },
   ];
 
-  cols.forEach((col, i) => {
+  summaryCols.forEach((col, i) => {
     const x = 14 + COL * i + COL / 2;
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
@@ -115,18 +134,16 @@ function paintSummary(doc: jsPDF, data: StatementData, startY: number): number {
     doc.text(fmtZAR(col.value), x, valueY, { align: 'center' });
   });
 
-  return startY + BOX_H + 6;
-}
+  cursor += BOX_H + 6;
 
-function paintTransactions(doc: jsPDF, txns: StatementTransaction[], startY: number): number {
-  const PAGE_W = doc.internal.pageSize.getWidth();
+  // ── Transactions table ───────────────────────────────────────────────────────
   const typeLabels: Record<string, string> = {
     invoice: 'Invoice',
     payment: 'Payment',
     credit_note: 'Credit Note',
   };
 
-  const rows = txns.map(t => [
+  const rows = data.transactions.map(t => [
     fmtDate(t.date),
     typeLabels[t.type] || t.type,
     t.reference,
@@ -137,7 +154,7 @@ function paintTransactions(doc: jsPDF, txns: StatementTransaction[], startY: num
   ]);
 
   autoTable(doc, {
-    startY,
+    startY: cursor,
     head: [['Date', 'Type', 'Reference', 'Description', 'Debit', 'Credit', 'Balance']],
     body: rows,
     styles: { fontSize: 7.5, cellPadding: 2 },
@@ -152,13 +169,9 @@ function paintTransactions(doc: jsPDF, txns: StatementTransaction[], startY: num
     margin: { left: 14, right: 14 },
   });
 
-  return (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-}
-
-function paintFooters(doc: jsPDF): void {
-  const PAGE_W = doc.internal.pageSize.getWidth();
+  // ── Page footers ─────────────────────────────────────────────────────────────
   const PAGE_H = doc.internal.pageSize.getHeight();
-  const totalPages = (doc as jsPDF & { internal: { getNumberOfPages: () => number } })
+  const totalPages = (doc as typeof doc & { internal: { getNumberOfPages: () => number } })
     .internal.getNumberOfPages();
 
   for (let i = 1; i <= totalPages; i++) {
@@ -170,15 +183,6 @@ function paintFooters(doc: jsPDF): void {
     doc.text(`Page ${i} of ${totalPages}`, PAGE_W - 14, PAGE_H - 5, { align: 'right' });
     doc.text('FibreFlow Customer Statement — Confidential', 14, PAGE_H - 5);
   }
-}
-
-export function generateStatementPdf(data: StatementData): Blob {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  paintHeader(doc, data);
-  let cursor = paintSummary(doc, data, 48);
-  paintTransactions(doc, data.transactions, cursor);
-  paintFooters(doc);
 
   return doc.output('blob');
 }
