@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, AlertCircle, Calendar, MapPin, ScanBarcode } from 'lucide-react';
+import { X, Loader2, AlertCircle, Calendar, MapPin, ScanLine } from 'lucide-react';
 import { BarcodeScannerModal } from '@/modules/barcode-scanner';
 import { ConditionPhotoCapture, type CapturedPhoto } from '@/modules/assets/components/ConditionPhotoCapture';
 import type { Asset } from '@/modules/assets/types/asset';
@@ -198,7 +198,7 @@ export function CheckoutModal({ stockItemId, stockItemName, serials, onClose, on
                     className="px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-colors"
                     title="Scan barcode to select serial"
                   >
-                    <ScanBarcode className="h-4 w-4 text-purple-400" />
+                    <ScanLine className="h-4 w-4 text-purple-400" />
                   </button>
                 </div>
               )}
