@@ -48,7 +48,13 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
   {
     id: 'opex',
     name: 'Operational Expenses',
-    description: 'Monthly OPEX breakdown by category',
+    description: 'Monthly OPEX breakdown by category — from OPEX worksheet',
+    category: 'financial',
+  },
+  {
+    id: 'income-expenses',
+    name: 'Income / Expenses',
+    description: 'Full transaction pivot by category — Expense, Income or All from the Data tab',
     category: 'financial',
   },
   {
