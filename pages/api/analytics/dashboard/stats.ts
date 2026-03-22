@@ -3,9 +3,14 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth, withRole } from '@/lib/auth';
 import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
+import { cachedQuery } from '@/lib/queryCache';
 
 // Initialize Neon client with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
+
+/** Cache TTL: 5 minutes — dashboard stats aggregate across many tables */
+const CACHE_TTL_MS = 300_000;
+const CACHE_KEY = 'analytics-dashboard-stats';
 
 export default withAuth(withRole('manager')(withErrorHandler(async (
   req: NextApiRequest,
@@ -23,7 +28,7 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
   res.setHeader('Surrogate-Control', 'no-store');
 
   try {
-    // Fetch real statistics from database using direct Neon client
+    // Fetch real statistics from database using direct Neon client, cached for 5 minutes
     const [
       projectStats,
       staffStats,
@@ -32,69 +37,77 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
       sowImportStats,
       contractorStats,
       openIssuesStats,
-    ] = await Promise.all([
-      // Projects statistics - using actual columns
-      sql`
-        SELECT 
-          COUNT(*) as total_projects,
-          COUNT(CASE WHEN status = 'active' OR status = 'in_progress' THEN 1 END) as active_projects,
-          COUNT(CASE WHEN status = 'completed' OR status = 'finished' THEN 1 END) as completed_projects,
-          COALESCE(SUM(budget::numeric), 0) as total_budget,
-          COALESCE(AVG(progress), 0) as avg_progress
-        FROM projects
-      `,
-      
-      // Staff statistics - using actual columns
-      sql`
-        SELECT 
-          COUNT(*) as total_staff,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_staff,
-          COUNT(DISTINCT department) as departments
-        FROM staff
-      `,
-      
-      // SOW statistics - using sow_poles table instead of sow_imports
-      sql`
-        SELECT
-          COUNT(DISTINCT project_id) as pole_projects,
-          COUNT(*) as total_poles,
-          0 as drop_imports,
-          0 as fiber_imports,
-          0 as total_processed
-        FROM sow_poles
-      `,
-      
-      // Client statistics - using actual columns
-      sql`
-        SELECT
-          COUNT(*) as total_clients,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_clients
-        FROM clients
-      `,
-      
-      // Get project budgets for revenue calculation (without sow_imports)
-      sql`
-        SELECT
-          COALESCE(SUM(budget::numeric), 0) as total_revenue,
-          0 as total_imports,
-          0 as completed_imports
-        FROM projects
-      `,
+    ] = await cachedQuery(
+      'reporting',
+      CACHE_KEY,
+      async () => {
+        log.debug('Cache miss — querying database', { cacheKey: CACHE_KEY }, 'AnalyticsDashboardStats');
+        return Promise.all([
+          // Projects statistics - using actual columns
+          sql`
+            SELECT
+              COUNT(*) as total_projects,
+              COUNT(CASE WHEN status = 'active' OR status = 'in_progress' THEN 1 END) as active_projects,
+              COUNT(CASE WHEN status = 'completed' OR status = 'finished' THEN 1 END) as completed_projects,
+              COALESCE(SUM(budget::numeric), 0) as total_budget,
+              COALESCE(AVG(progress), 0) as avg_progress
+            FROM projects
+          `,
 
-      // Contractor statistics
-      sql`
-        SELECT
-          COUNT(*) as total_contractors,
-          COUNT(CASE WHEN status = 'approved' THEN 1 END) as active_contractors,
-          COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_contractors,
-          COUNT(CASE WHEN status IN ('under_review', 'documentation_incomplete') THEN 1 END) as review_contractors
-        FROM contractors
-      `,
+          // Staff statistics - using actual columns
+          sql`
+            SELECT
+              COUNT(*) as total_staff,
+              COUNT(CASE WHEN status = 'active' THEN 1 END) as active_staff,
+              COUNT(DISTINCT department) as departments
+            FROM staff
+          `,
 
-      // Open issues — action items not yet completed or cancelled
-      sql`SELECT COUNT(*) as open_issues FROM action_items WHERE status IN ('pending', 'in_progress')`
-        .catch(() => [{ open_issues: 0 }]),
-    ]);
+          // SOW statistics - using sow_poles table instead of sow_imports
+          sql`
+            SELECT
+              COUNT(DISTINCT project_id) as pole_projects,
+              COUNT(*) as total_poles,
+              0 as drop_imports,
+              0 as fiber_imports,
+              0 as total_processed
+            FROM sow_poles
+          `,
+
+          // Client statistics - using actual columns
+          sql`
+            SELECT
+              COUNT(*) as total_clients,
+              COUNT(CASE WHEN status = 'active' THEN 1 END) as active_clients
+            FROM clients
+          `,
+
+          // Get project budgets for revenue calculation (without sow_imports)
+          sql`
+            SELECT
+              COALESCE(SUM(budget::numeric), 0) as total_revenue,
+              0 as total_imports,
+              0 as completed_imports
+            FROM projects
+          `,
+
+          // Contractor statistics
+          sql`
+            SELECT
+              COUNT(*) as total_contractors,
+              COUNT(CASE WHEN status = 'approved' THEN 1 END) as active_contractors,
+              COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_contractors,
+              COUNT(CASE WHEN status IN ('under_review', 'documentation_incomplete') THEN 1 END) as review_contractors
+            FROM contractors
+          `,
+
+          // Open issues — action items not yet completed or cancelled
+          sql`SELECT COUNT(*) as open_issues FROM action_items WHERE status IN ('pending', 'in_progress')`
+            .catch(() => [{ open_issues: 0 }]),
+        ]);
+      },
+      CACHE_TTL_MS
+    );
 
     // Extract results
     const projectData: any = projectStats[0] || {};

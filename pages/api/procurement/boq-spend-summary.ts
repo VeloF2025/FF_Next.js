@@ -8,8 +8,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
+import { cachedQuery } from '@/lib/queryCache';
 
 const sql = neon(process.env.DATABASE_URL!);
+
+/** Cache TTL: 5 minutes — BOQ spend aggregates join multiple large tables */
+const CACHE_TTL_MS = 300_000;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -23,47 +27,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // If projectId provided, return PO transactions for that project
   if (projectId && typeof projectId === 'string') {
     try {
-      let rows;
-      if (from && to) {
-        rows = await sql`
-          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
-            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
-          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
-            AND po.order_date >= ${from}::date AND po.order_date <= ${to}::date
-          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
-          ORDER BY po.order_date DESC NULLS LAST`;
-      } else if (from) {
-        rows = await sql`
-          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
-            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
-          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
-            AND po.order_date >= ${from}::date
-          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
-          ORDER BY po.order_date DESC NULLS LAST`;
-      } else if (to) {
-        rows = await sql`
-          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
-            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
-          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
-            AND po.order_date <= ${to}::date
-          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
-          ORDER BY po.order_date DESC NULLS LAST`;
-      } else {
-        rows = await sql`
-          SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
-            COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
-          FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
-            LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-          WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
-          GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
-          ORDER BY po.order_date DESC NULLS LAST`;
-      }
+      const txCacheKey = `boq-spend-transactions:${projectId}:${from ?? 'null'}:${to ?? 'null'}`;
+      const rows = await cachedQuery(
+        'reporting',
+        txCacheKey,
+        async () => {
+          log.debug('Cache miss — querying project transactions', { txCacheKey }, 'BOQSpendSummary');
+          if (from && to) {
+            return sql`
+              SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+                COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+              FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+                LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+              WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+                AND po.order_date >= ${from}::date AND po.order_date <= ${to}::date
+              GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+              ORDER BY po.order_date DESC NULLS LAST`;
+          } else if (from) {
+            return sql`
+              SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+                COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+              FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+                LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+              WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+                AND po.order_date >= ${from}::date
+              GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+              ORDER BY po.order_date DESC NULLS LAST`;
+          } else if (to) {
+            return sql`
+              SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+                COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+              FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+                LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+              WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+                AND po.order_date <= ${to}::date
+              GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+              ORDER BY po.order_date DESC NULLS LAST`;
+          } else {
+            return sql`
+              SELECT po.id, po.external_po_number, po.status, po.order_date, s.name as supplier_name,
+                COALESCE(SUM(poi.total_price), 0)::numeric as total_amount, COUNT(poi.id) as item_count
+              FROM purchase_orders po LEFT JOIN suppliers s ON s.id = po.supplier_id
+                LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+              WHERE po.project_id::text = ${projectId}::text AND po.status NOT IN ('draft', 'cancelled')
+              GROUP BY po.id, po.external_po_number, po.status, po.order_date, s.name
+              ORDER BY po.order_date DESC NULLS LAST`;
+          }
+        },
+        CACHE_TTL_MS
+      );
 
       const transactions = rows.map((r) => ({
         id: r.id,
@@ -84,37 +96,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const projects = await sql`
-      SELECT
-        p.id as project_id,
-        p.project_name,
-        b.id as boq_id,
-        b.version as boq_version,
-        (SELECT COUNT(*) FROM boq_items WHERE boq_id = b.id) as boq_line_count,
-        (SELECT COALESCE(SUM(unit_price * quantity), 0) FROM boq_items WHERE boq_id = b.id)::numeric as boq_value,
-        (
-          SELECT COALESCE(SUM(poi.total_price), 0)
-          FROM purchase_order_items poi
-          JOIN purchase_orders po ON po.id = poi.purchase_order_id
-          WHERE po.project_id::text = p.id::text
-            AND po.status NOT IN ('draft', 'cancelled')
-        )::numeric as total_ordered,
-        (
-          SELECT COALESCE(SUM(poi.total_price), 0)
-          FROM purchase_order_items poi
-          JOIN purchase_orders po ON po.id = poi.purchase_order_id
-          WHERE po.project_id::text = p.id::text
-            AND po.status IN ('received', 'partially_received', 'closed')
-        )::numeric as confirmed_spend,
-        (
-          SELECT COUNT(DISTINCT po.id)
-          FROM purchase_orders po
-          WHERE po.project_id::text = p.id::text
-        ) as po_count
-      FROM projects p
-      JOIN boqs b ON b.project_id::text = p.id::text AND b.status = 'active'
-      ORDER BY boq_value DESC
-    `;
+    const projects = await cachedQuery(
+      'reporting',
+      'boq-spend-summary:all',
+      async () => {
+        log.debug('Cache miss — querying cross-project summary', {}, 'BOQSpendSummary');
+        return sql`
+          SELECT
+            p.id as project_id,
+            p.project_name,
+            b.id as boq_id,
+            b.version as boq_version,
+            (SELECT COUNT(*) FROM boq_items WHERE boq_id = b.id) as boq_line_count,
+            (SELECT COALESCE(SUM(unit_price * quantity), 0) FROM boq_items WHERE boq_id = b.id)::numeric as boq_value,
+            (
+              SELECT COALESCE(SUM(poi.total_price), 0)
+              FROM purchase_order_items poi
+              JOIN purchase_orders po ON po.id = poi.purchase_order_id
+              WHERE po.project_id::text = p.id::text
+                AND po.status NOT IN ('draft', 'cancelled')
+            )::numeric as total_ordered,
+            (
+              SELECT COALESCE(SUM(poi.total_price), 0)
+              FROM purchase_order_items poi
+              JOIN purchase_orders po ON po.id = poi.purchase_order_id
+              WHERE po.project_id::text = p.id::text
+                AND po.status IN ('received', 'partially_received', 'closed')
+            )::numeric as confirmed_spend,
+            (
+              SELECT COUNT(DISTINCT po.id)
+              FROM purchase_orders po
+              WHERE po.project_id::text = p.id::text
+            ) as po_count
+          FROM projects p
+          JOIN boqs b ON b.project_id::text = p.id::text AND b.status = 'active'
+          ORDER BY boq_value DESC
+        `;
+      },
+      CACHE_TTL_MS
+    );
 
     const summary = projects.map((r) => {
       const boqValue = Number(r.boq_value);
