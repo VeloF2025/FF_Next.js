@@ -42,14 +42,46 @@ function KpiCard({ label, value, sub, valueClass = 'text-white' }: KpiCardProps)
 interface ProjectsGridProps {
   initialProjects: ConduitProject[];
   tableLabel: string;
+  defaultStatus: 'prospective' | 'executable' | 'wip';
+  promoteLabel?: string;        // e.g. "→ Executable"
+  promoteToStatus?: 'executable' | 'wip';
+  onProjectPromoted?: (project: ConduitProject) => void; // called after promote so parent can add to next section
+  showAddButton?: boolean;
 }
 
-function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
+function ProjectsGrid({
+  initialProjects, tableLabel, defaultStatus,
+  promoteLabel, promoteToStatus, onProjectPromoted,
+  showAddButton = true,
+}: ProjectsGridProps) {
   const [projects, setProjects] = useState<ConduitProject[]>(initialProjects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState<Record<string, boolean>>({});
+
+  const promoteProject = async (project: ConduitProject) => {
+    if (!promoteToStatus) return;
+    setPromoting(prev => ({ ...prev, [project.id]: true }));
+    try {
+      const res = await fetch(`/api/conduit/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: promoteToStatus }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { data } = await res.json() as { data: ConduitProject };
+      // Remove from this section
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      // Notify parent to add to next section
+      onProjectPromoted?.(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Promote failed');
+    } finally {
+      setPromoting(prev => ({ ...prev, [project.id]: false }));
+    }
+  };
 
   // ── Add project form ───────────────────────────────────────────────────────
   const [showAddForm, setShowAddForm] = useState(false);
@@ -81,7 +113,7 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
       const res = await fetch('/api/conduit/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: addForm.name.trim(), po_count: poCount, build_duration_months: 12, inputs_json: defaultInputs }),
+        body: JSON.stringify({ name: addForm.name.trim(), po_count: poCount, build_duration_months: 12, inputs_json: defaultInputs, status: defaultStatus }),
       });
       if (!res.ok) throw new Error(await res.text());
       const { data } = await res.json() as { data: ConduitProject };
@@ -189,7 +221,7 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
       </div>
 
       {/* Add Project button + inline form */}
-      {!showAddForm ? (
+      {showAddButton && !showAddForm ? (
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-colors"
@@ -326,10 +358,25 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
                   <ReadCell value={calc.cost_per_home} />
                   <td className="px-2 py-2 text-right text-sm tabular-nums text-gray-300 border border-gray-700 bg-gray-900">{project.build_duration_months}</td>
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
-                    <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors mx-auto">
-                      {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />}
-                      {isSaving ? 'Saving' : justSaved ? 'Saved' : 'Save'}
-                    </button>
+                    <div className="flex items-center gap-1 justify-center">
+                      <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors">
+                        {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />}
+                        {isSaving ? 'Saving' : justSaved ? 'Saved' : 'Save'}
+                      </button>
+                      {promoteToStatus && promoteLabel && (
+                        <button
+                          onClick={() => promoteProject(project)}
+                          disabled={promoting[project.id]}
+                          title={promoteLabel}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-indigo-700 text-gray-300 hover:text-white disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          {promoting[project.id]
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <ArrowRight className="w-3 h-3" />}
+                          {promoting[project.id] ? '…' : promoteLabel}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>,
                 isExpanded ? (
@@ -362,44 +409,22 @@ function ProjectsGrid({ initialProjects, tableLabel }: ProjectsGridProps) {
   );
 }
 
+
 // ─── Main wrapper ─────────────────────────────────────────────────────────────
 
 interface PortfolioTableProps {
-  initialProjects: ConduitProject[];
+  prospectiveProjects: ConduitProject[];
+  executableProjects:  ConduitProject[];
+  wipProjects:         ConduitProject[];
 }
 
-export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
-  const [allProjects, setAllProjects] = useState<ConduitProject[]>(initialProjects);
-  const [showPromoteModal, setShowPromoteModal] = useState(false);
-  const [promoting, setPromoting] = useState(false);
-  const [promoteError, setPromoteError] = useState<string | null>(null);
-
-  const prospective = allProjects.filter(p => (p.status ?? 'prospective') === 'prospective');
-  const executable  = allProjects.filter(p => p.status === 'executable');
-  const actual      = allProjects.filter(p => p.status === 'actual');
-
-  async function handlePromote(projectId: string) {
-    setPromoting(true);
-    setPromoteError(null);
-    try {
-      const res = await fetch(`/api/conduit/projects/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'executable' }),
-      });
-      if (!res.ok) throw new Error('Failed to promote project');
-      setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'executable' as const } : p));
-      setShowPromoteModal(false);
-    } catch (e) {
-      setPromoteError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      setPromoting(false);
-    }
-  }
+export function PortfolioTable({ prospectiveProjects, executableProjects, wipProjects }: PortfolioTableProps) {
+  const [prospective, setProspective] = useState<ConduitProject[]>(prospectiveProjects);
+  const [executable,  setExecutable]  = useState<ConduitProject[]>(executableProjects);
+  const [wip,         setWip]         = useState<ConduitProject[]>(wipProjects);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
 
       {/* ── Prospective ──────────────────────────────────────────────── */}
       <div className="space-y-6">
@@ -409,7 +434,15 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
-        <ProjectsGrid initialProjects={prospective} tableLabel="Project Scope — Prospective" />
+        <ProjectsGrid
+          initialProjects={prospective}
+          tableLabel="Project Scope — Prospective"
+          defaultStatus="prospective"
+          promoteLabel="→ Executable"
+          promoteToStatus="executable"
+          onProjectPromoted={p => setExecutable(prev => [...prev, p])}
+          showAddButton
+        />
       </div>
 
       {/* ── Forecasted — Executable ───────────────────────────────────── */}
@@ -419,68 +452,50 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
             Forecasted — Executable
           </span>
           <div className="flex-1 border-t border-gray-700" />
-          {/* Add Project From Prospective */}
-          {prospective.length > 0 && (
-            <button
-              onClick={() => { setShowPromoteModal(true); setPromoteError(null); }}
-              className="flex items-center gap-1.5 text-xs font-semibold text-teal-400 border border-teal-600 hover:bg-teal-900/30 px-3 py-1.5 rounded transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Project From Prospective
-            </button>
-          )}
         </div>
-
-        {/* Promote modal */}
-        {showPromoteModal && (
-          <div className="rounded-lg border border-teal-700 bg-gray-900 p-4 space-y-3">
-            <p className="text-sm font-semibold text-teal-300">Select a Prospective project to move to Executable:</p>
-            {promoteError && <p className="text-xs text-red-400">{promoteError}</p>}
-            <div className="space-y-2">
-              {prospective.map(p => (
-                <button
-                  key={p.id}
-                  disabled={promoting}
-                  onClick={() => handlePromote(p.id)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 rounded border border-gray-700 hover:border-teal-500 hover:bg-teal-900/20 text-left transition-colors disabled:opacity-50"
-                >
-                  <span className="text-sm text-white font-medium">{p.name}</span>
-                  <span className="flex items-center gap-1 text-xs text-teal-400">
-                    {promoting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                    Move to Executable
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowPromoteModal(false)}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {executable.length > 0
-          ? <ProjectsGrid initialProjects={executable} tableLabel="Project Scope — Executable" />
-          : !showPromoteModal && (
-            <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
-              <p className="text-sm">No executable projects yet — use the button above to add one from Prospective.</p>
-            </div>
-          )
-        }
+        <ProjectsGrid
+          initialProjects={executable}
+          tableLabel="Project Scope — Executable"
+          defaultStatus="executable"
+          promoteLabel="→ WIP"
+          promoteToStatus="wip"
+          onProjectPromoted={p => setWip(prev => [...prev, p])}
+          showAddButton
+        />
       </div>
 
-      {/* ── Actual ───────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pt-2">
+      {/* ── Work in Progress ─────────────────────────────────────────── */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
           <span className="text-sm font-bold uppercase tracking-widest border border-orange-500 text-orange-400 px-3 py-1 rounded">
             Work in Progress
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
+        {wip.length > 0 ? (
+          <ProjectsGrid
+            initialProjects={wip}
+            tableLabel="Project Scope — WIP"
+            defaultStatus="wip"
+            showAddButton={false}
+          />
+        ) : (
+          <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
+            <p className="text-sm">No projects in progress yet — promote from Executable using the → WIP button.</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Actual ───────────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 pt-2">
+          <span className="text-sm font-bold uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
+            Actual
+          </span>
+          <div className="flex-1 border-t border-gray-700" />
+        </div>
         <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
-          <p className="text-sm">Work in Progress — coming soon</p>
+          <p className="text-sm">Actual to date — coming soon</p>
         </div>
       </div>
 

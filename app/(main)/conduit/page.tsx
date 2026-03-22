@@ -46,7 +46,11 @@ export default async function ConduitPage() {
       </div>
 
       {/* PortfolioTable owns tiles + table + Actual section */}
-      <PortfolioTable initialProjects={projects} />
+      <PortfolioTable
+        prospectiveProjects={projects.filter(p => p.status === 'prospective')}
+        executableProjects={projects.filter(p => p.status === 'executable')}
+        wipProjects={projects.filter(p => p.status === 'wip')}
+      />
     </div>
   );
 }

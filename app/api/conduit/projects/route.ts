@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json() as Partial<ConduitProject>;
-    const { name, po_count, start_date, build_duration_months, inputs_json } = body;
+    const { name, po_count, start_date, build_duration_months, inputs_json, status } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -47,15 +47,16 @@ export async function POST(req: NextRequest) {
 
     const [row] = await sql`
       INSERT INTO conduit_projects
-        (name, po_count, start_date, build_duration_months, inputs_json)
+        (name, po_count, start_date, build_duration_months, inputs_json, status)
       VALUES (
         ${name},
         ${po_count ?? 0},
         ${start_date ?? null},
         ${build_duration_months ?? 12},
-        ${JSON.stringify(inputs_json ?? {})}::jsonb
+        ${JSON.stringify(inputs_json ?? {})}::jsonb,
+        ${status ?? 'executable'}
       )
-      RETURNING id, name, po_count, start_date, build_duration_months,
+      RETURNING id, name, status, po_count, start_date, build_duration_months,
                 inputs_json, is_baseline_locked, created_at, updated_at
     `;
 

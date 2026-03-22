@@ -51,9 +51,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const body = await req.json() as { status?: string };
     const { status } = body;
 
-    const validStatuses = ['prospective', 'executable', 'actual'];
+    const validStatuses = ['prospective', 'executable', 'wip'];
     if (!status || !validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status — must be prospective, executable, or actual' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid status — must be prospective, executable, or wip' }, { status: 400 });
     }
 
     const [updated] = await sql`
@@ -120,7 +120,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         build_duration_months = ${build_duration_months ?? existing.build_duration_months},
         inputs_json           = ${JSON.stringify(inputs_json ?? existing.inputs_json)}::jsonb
       WHERE id = ${params.id}
-      RETURNING id, name, po_count, start_date, build_duration_months,
+      RETURNING id, name, status, po_count, start_date, build_duration_months,
                 inputs_json, is_baseline_locked, created_at, updated_at
     `;
 
