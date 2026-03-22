@@ -107,17 +107,6 @@ async function handler(
         GROUP BY cpo.project_id
       `;
 
-      const poScopeResult = await client.query<RawPoScopeRow>(poScopeQuery, [
-        projectFilter,
-        isUuid,
-      ]);
-
-      // Build PO scope lookup: project_id -> contracted drops total
-      const poScopeMap = new Map<string, number>();
-      for (const row of poScopeResult.rows) {
-        poScopeMap.set(row.project_id, parseInt(row.po_total_scope, 10));
-      }
-
       // Query 1: Get scope and activation counts with first/latest dates
       const projectQuery = `
         SELECT
@@ -141,11 +130,6 @@ async function handler(
         GROUP BY p.id, p.project_name, d.zone_no, d.pon_no
         ORDER BY p.project_name, d.zone_no NULLS LAST, d.pon_no NULLS LAST
       `;
-
-      const projectResult = await client.query<RawProjectRow>(projectQuery, [
-        projectFilter,
-        isUuid,
-      ]);
 
       // Query 2: Get cumulative activation counts per day for milestone calculation
       // We need running totals to find when each milestone was reached
@@ -202,11 +186,6 @@ async function handler(
         ORDER BY da.project_id, da.zone_no, da.pon_no, da.activation_date
       `;
 
-      const milestoneResult = await client.query<RawMilestoneRow>(milestoneQuery, [
-        projectFilter,
-        isUuid,
-      ]);
-
       // Query 3: Get weekly activation velocity for the last 12 weeks
       const velocityQuery = `
         SELECT
@@ -227,10 +206,19 @@ async function handler(
         ORDER BY d.project_id, week_start
       `;
 
-      const velocityResult = await client.query<RawVelocityRow>(velocityQuery, [
-        projectFilter,
-        isUuid,
+      // All four queries are independent — run them in parallel
+      const [poScopeResult, projectResult, milestoneResult, velocityResult] = await Promise.all([
+        client.query<RawPoScopeRow>(poScopeQuery, [projectFilter, isUuid]),
+        client.query<RawProjectRow>(projectQuery, [projectFilter, isUuid]),
+        client.query<RawMilestoneRow>(milestoneQuery, [projectFilter, isUuid]),
+        client.query<RawVelocityRow>(velocityQuery, [projectFilter, isUuid]),
       ]);
+
+      // Build PO scope lookup: project_id -> contracted drops total
+      const poScopeMap = new Map<string, number>();
+      for (const row of poScopeResult.rows) {
+        poScopeMap.set(row.project_id, parseInt(row.po_total_scope, 10));
+      }
 
       // Build milestone lookup map
       const milestoneMap = new Map<string, RawMilestoneRow[]>();

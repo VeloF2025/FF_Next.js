@@ -173,35 +173,33 @@ async function handleGet(
   const limitNum = Math.min(parseInt(limit as string, 10), 100);
   const offsetNum = parseInt(offset as string, 10);
 
-  // Get paginated transactions
-  const rows = await sql`
-    SELECT * FROM fleet_fuel_transactions
-    WHERE vehicle_id = ${vehicleId}
-    ORDER BY transaction_date DESC, created_at DESC
-    LIMIT ${limitNum} OFFSET ${offsetNum}
-  ` as FuelTransactionRow[];
-
-  // Get total count
-  const countResult = await sql`
-    SELECT COUNT(*) as total FROM fleet_fuel_transactions
-    WHERE vehicle_id = ${vehicleId}
-  ` as Array<{ total: string }>;
-
-  // Get summary stats
-  const statsResult = await sql`
-    SELECT
-      COALESCE(SUM(amount_rand), 0) as total_spent,
-      COALESCE(SUM(litres), 0) as total_litres,
-      COALESCE(AVG(litres_per_100km), 0) as avg_consumption,
-      COUNT(*) as transaction_count
-    FROM fleet_fuel_transactions
-    WHERE vehicle_id = ${vehicleId}
-  ` as Array<{
-    total_spent: string;
-    total_litres: string;
-    avg_consumption: string;
-    transaction_count: string;
-  }>;
+  // Paginated transactions, total count, and summary stats are all independent — run in parallel
+  const [rows, countResult, statsResult] = await Promise.all([
+    sql`
+      SELECT * FROM fleet_fuel_transactions
+      WHERE vehicle_id = ${vehicleId}
+      ORDER BY transaction_date DESC, created_at DESC
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    ` as Promise<FuelTransactionRow[]>,
+    sql`
+      SELECT COUNT(*) as total FROM fleet_fuel_transactions
+      WHERE vehicle_id = ${vehicleId}
+    ` as Promise<Array<{ total: string }>>,
+    sql`
+      SELECT
+        COALESCE(SUM(amount_rand), 0) as total_spent,
+        COALESCE(SUM(litres), 0) as total_litres,
+        COALESCE(AVG(litres_per_100km), 0) as avg_consumption,
+        COUNT(*) as transaction_count
+      FROM fleet_fuel_transactions
+      WHERE vehicle_id = ${vehicleId}
+    ` as Promise<Array<{
+      total_spent: string;
+      total_litres: string;
+      avg_consumption: string;
+      transaction_count: string;
+    }>>,
+  ]);
 
   const total = parseInt(countResult[0]?.total || '0', 10);
   const transactions = rows.map(rowToTransaction);

@@ -151,77 +151,75 @@ async function getActivatorPerformance(
   const ontScanned = parseInt(summary.ont_scanned) || 0;
   const upsScanned = parseInt(summary.ups_scanned) || 0;
 
-  // Get daily trend
-  const trendResult = await pool.query(
-    `
-    WITH tech_submissions AS (
+  // Trend, project breakdown, and recent DRs are all independent — run in parallel
+  const [trendResult, projectResult, recentDRsResult] = await Promise.all([
+    pool.query(
+      `
+      WITH tech_submissions AS (
+        SELECT
+          COALESCE(upr.submitted_date, upr.created_at::DATE) as date_val,
+          upr.submission_count
+        FROM qa_photo_reviews qpr
+        INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+        WHERE ${matchClause}
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+      )
       SELECT
-        COALESCE(upr.submitted_date, upr.created_at::DATE) as date_val,
-        upr.submission_count
-      FROM qa_photo_reviews qpr
-      INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
-      WHERE ${matchClause}
-        AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
-        AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
-    )
-    SELECT
-      date_val::TEXT as date,
-      COUNT(*) as submissions,
-      COUNT(*) FILTER (WHERE submission_count = 1) as first_pass,
-      COUNT(*) FILTER (WHERE submission_count > 1) as resubmissions
-    FROM tech_submissions
-    GROUP BY date_val
-    ORDER BY date_val
-    `,
-    matchParams
-  );
-
-  // Get project breakdown
-  const projectResult = await pool.query(
-    `
-    WITH tech_submissions AS (
+        date_val::TEXT as date,
+        COUNT(*) as submissions,
+        COUNT(*) FILTER (WHERE submission_count = 1) as first_pass,
+        COUNT(*) FILTER (WHERE submission_count > 1) as resubmissions
+      FROM tech_submissions
+      GROUP BY date_val
+      ORDER BY date_val
+      `,
+      matchParams
+    ),
+    pool.query(
+      `
+      WITH tech_submissions AS (
+        SELECT
+          qpr.project,
+          upr.submission_count,
+          upr.ont_serial_scanned
+        FROM qa_photo_reviews qpr
+        INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
+        WHERE ${matchClause}
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
+          AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
+          AND qpr.project IS NOT NULL
+      )
       SELECT
+        project,
+        COUNT(*) as submissions,
+        ROUND(COUNT(*) FILTER (WHERE submission_count = 1)::NUMERIC / NULLIF(COUNT(*), 0) * 100) as first_pass_rate,
+        ROUND(COUNT(*) FILTER (WHERE ont_serial_scanned IS NOT NULL AND ont_serial_scanned != '')::NUMERIC / NULLIF(COUNT(*), 0) * 100) as serial_compliance_rate
+      FROM tech_submissions
+      GROUP BY project
+      ORDER BY submissions DESC
+      `,
+      matchParams
+    ),
+    pool.query(
+      `
+      SELECT DISTINCT ON (qpr.drop_number)
+        qpr.drop_number,
         qpr.project,
+        COALESCE(upr.submitted_date, upr.created_at::DATE)::TEXT as date,
         upr.submission_count,
-        upr.ont_serial_scanned
+        upr.qa_decision
       FROM qa_photo_reviews qpr
       INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
       WHERE ${matchClause}
         AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
         AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
-        AND qpr.project IS NOT NULL
-    )
-    SELECT
-      project,
-      COUNT(*) as submissions,
-      ROUND(COUNT(*) FILTER (WHERE submission_count = 1)::NUMERIC / NULLIF(COUNT(*), 0) * 100) as first_pass_rate,
-      ROUND(COUNT(*) FILTER (WHERE ont_serial_scanned IS NOT NULL AND ont_serial_scanned != '')::NUMERIC / NULLIF(COUNT(*), 0) * 100) as serial_compliance_rate
-    FROM tech_submissions
-    GROUP BY project
-    ORDER BY submissions DESC
-    `,
-    matchParams
-  );
-
-  // Get recent DRs for this activator
-  const recentDRsResult = await pool.query(
-    `
-    SELECT DISTINCT ON (qpr.drop_number)
-      qpr.drop_number,
-      qpr.project,
-      COALESCE(upr.submitted_date, upr.created_at::DATE)::TEXT as date,
-      upr.submission_count,
-      upr.qa_decision
-    FROM qa_photo_reviews qpr
-    INNER JOIN dr_photo_unified_reviews upr ON qpr.drop_number = upr.drop_number
-    WHERE ${matchClause}
-      AND COALESCE(upr.submitted_date, upr.created_at::DATE) >= $1::DATE
-      AND COALESCE(upr.submitted_date, upr.created_at::DATE) <= $2::DATE
-    ORDER BY qpr.drop_number, COALESCE(upr.submitted_date, upr.created_at::DATE) DESC
-    LIMIT 50
-    `,
-    matchParams
-  );
+      ORDER BY qpr.drop_number, COALESCE(upr.submitted_date, upr.created_at::DATE) DESC
+      LIMIT 50
+      `,
+      matchParams
+    ),
+  ]);
 
   const response: ActivatorPerformance = {
     technicianId: tech.id,
@@ -366,37 +364,96 @@ async function getInstallerPerformance(
   const dbInRangeCount = parseInt(summary.db_in_range) || 0;
   const dbReadingsCount = parseInt(summary.db_readings_count) || 0;
 
-  // Get daily trend
-  const trendResult = await pool.query(
-    `
-    WITH installer_data AS (
+  // Trend, project breakdown, common failures, and recent DRs are all independent — run in parallel
+  const [trendResult, projectResult, failuresResult, recentDRsResult] = await Promise.all([
+    pool.query(
+      `
+      WITH installer_data AS (
+        SELECT
+          d.created_at::DATE as date_val,
+          upr.qa_decision
+        FROM drops d
+        LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+        WHERE d.installed_by_name = $3
+          AND d.created_at >= $1::DATE
+          AND d.created_at <= $2::DATE
+      )
       SELECT
-        d.created_at::DATE as date_val,
-        upr.qa_decision
-      FROM drops d
-      LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
-      WHERE d.installed_by_name = $3
-        AND d.created_at >= $1::DATE
-        AND d.created_at <= $2::DATE
-    )
-    SELECT
-      date_val::TEXT as date,
-      COUNT(*) as installations,
-      COUNT(*) FILTER (WHERE qa_decision = 'PASS') as passed,
-      COUNT(*) FILTER (WHERE qa_decision IN ('FAIL', 'REWORK_NEEDED')) as failed
-    FROM installer_data
-    GROUP BY date_val
-    ORDER BY date_val
-    `,
-    matchParams
-  );
-
-  // Get project breakdown
-  const projectResult = await pool.query(
-    `
-    WITH installer_data AS (
+        date_val::TEXT as date,
+        COUNT(*) as installations,
+        COUNT(*) FILTER (WHERE qa_decision = 'PASS') as passed,
+        COUNT(*) FILTER (WHERE qa_decision IN ('FAIL', 'REWORK_NEEDED')) as failed
+      FROM installer_data
+      GROUP BY date_val
+      ORDER BY date_val
+      `,
+      matchParams
+    ),
+    pool.query(
+      `
+      WITH installer_data AS (
+        SELECT
+          p.project_name,
+          upr.qa_decision
+        FROM drops d
+        LEFT JOIN projects p ON d.project_id = p.id
+        LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+        WHERE d.installed_by_name = $3
+          AND d.created_at >= $1::DATE
+          AND d.created_at <= $2::DATE
+          AND p.project_name IS NOT NULL
+      )
       SELECT
-        p.project_name,
+        project_name as project,
+        COUNT(*) as installations,
+        ROUND(COUNT(*) FILTER (WHERE qa_decision = 'PASS')::NUMERIC / NULLIF(COUNT(*), 0) * 100) as qa_pass_rate
+      FROM installer_data
+      GROUP BY project_name
+      ORDER BY installations DESC
+      `,
+      matchParams
+    ),
+    pool.query(
+      `
+      WITH step_failures AS (
+        SELECT
+          CASE WHEN NOT COALESCE(upr.step_01_house_photo, false) THEN 'House Photo' END as step_01,
+          CASE WHEN NOT COALESCE(upr.step_02_cable_from_pole, false) THEN 'Cable from Pole' END as step_02,
+          CASE WHEN NOT COALESCE(upr.step_03_entry_outside, false) THEN 'Entry Outside' END as step_03,
+          CASE WHEN NOT COALESCE(upr.step_04_entry_inside, false) THEN 'Entry Inside' END as step_04,
+          CASE WHEN NOT COALESCE(upr.step_05_wall, false) THEN 'Wall Installation' END as step_05,
+          CASE WHEN NOT COALESCE(upr.step_06_ont_back, false) THEN 'ONT Back' END as step_06,
+          CASE WHEN NOT COALESCE(upr.step_07_power_meter, false) THEN 'Power Meter' END as step_07,
+          CASE WHEN NOT COALESCE(upr.step_08_final_installation, false) THEN 'Final Installation' END as step_08,
+          CASE WHEN NOT COALESCE(upr.step_09_green_lights, false) THEN 'Green Lights' END as step_09,
+          CASE WHEN NOT COALESCE(upr.step_10_signature, false) THEN 'Signature' END as step_10
+        FROM drops d
+        INNER JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
+        WHERE d.installed_by_name = $3
+          AND d.created_at >= $1::DATE
+          AND d.created_at <= $2::DATE
+      ),
+      unpivoted AS (
+        SELECT step FROM step_failures, LATERAL (
+          VALUES (step_01), (step_02), (step_03), (step_04), (step_05),
+                 (step_06), (step_07), (step_08), (step_09), (step_10)
+        ) AS t(step)
+        WHERE step IS NOT NULL
+      )
+      SELECT step, COUNT(*) as fail_count
+      FROM unpivoted
+      GROUP BY step
+      ORDER BY fail_count DESC
+      LIMIT 5
+      `,
+      matchParams
+    ),
+    pool.query(
+      `
+      SELECT DISTINCT ON (d.drop_number)
+        d.drop_number,
+        p.project_name as project,
+        d.created_at::DATE::TEXT as date,
         upr.qa_decision
       FROM drops d
       LEFT JOIN projects p ON d.project_id = p.id
@@ -404,75 +461,12 @@ async function getInstallerPerformance(
       WHERE d.installed_by_name = $3
         AND d.created_at >= $1::DATE
         AND d.created_at <= $2::DATE
-        AND p.project_name IS NOT NULL
-    )
-    SELECT
-      project_name as project,
-      COUNT(*) as installations,
-      ROUND(COUNT(*) FILTER (WHERE qa_decision = 'PASS')::NUMERIC / NULLIF(COUNT(*), 0) * 100) as qa_pass_rate
-    FROM installer_data
-    GROUP BY project_name
-    ORDER BY installations DESC
-    `,
-    matchParams
-  );
-
-  // Get common failures (which steps fail most often)
-  const failuresResult = await pool.query(
-    `
-    WITH step_failures AS (
-      SELECT
-        CASE WHEN NOT COALESCE(upr.step_01_house_photo, false) THEN 'House Photo' END as step_01,
-        CASE WHEN NOT COALESCE(upr.step_02_cable_from_pole, false) THEN 'Cable from Pole' END as step_02,
-        CASE WHEN NOT COALESCE(upr.step_03_entry_outside, false) THEN 'Entry Outside' END as step_03,
-        CASE WHEN NOT COALESCE(upr.step_04_entry_inside, false) THEN 'Entry Inside' END as step_04,
-        CASE WHEN NOT COALESCE(upr.step_05_wall, false) THEN 'Wall Installation' END as step_05,
-        CASE WHEN NOT COALESCE(upr.step_06_ont_back, false) THEN 'ONT Back' END as step_06,
-        CASE WHEN NOT COALESCE(upr.step_07_power_meter, false) THEN 'Power Meter' END as step_07,
-        CASE WHEN NOT COALESCE(upr.step_08_final_installation, false) THEN 'Final Installation' END as step_08,
-        CASE WHEN NOT COALESCE(upr.step_09_green_lights, false) THEN 'Green Lights' END as step_09,
-        CASE WHEN NOT COALESCE(upr.step_10_signature, false) THEN 'Signature' END as step_10
-      FROM drops d
-      INNER JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
-      WHERE d.installed_by_name = $3
-        AND d.created_at >= $1::DATE
-        AND d.created_at <= $2::DATE
+      ORDER BY d.drop_number, d.created_at DESC
+      LIMIT 50
+      `,
+      matchParams
     ),
-    unpivoted AS (
-      SELECT step FROM step_failures, LATERAL (
-        VALUES (step_01), (step_02), (step_03), (step_04), (step_05),
-               (step_06), (step_07), (step_08), (step_09), (step_10)
-      ) AS t(step)
-      WHERE step IS NOT NULL
-    )
-    SELECT step, COUNT(*) as fail_count
-    FROM unpivoted
-    GROUP BY step
-    ORDER BY fail_count DESC
-    LIMIT 5
-    `,
-    matchParams
-  );
-
-  // Get recent DRs for this installer
-  const recentDRsResult = await pool.query(
-    `
-    SELECT DISTINCT ON (d.drop_number)
-      d.drop_number,
-      p.project_name as project,
-      d.created_at::DATE::TEXT as date,
-      upr.qa_decision
-    FROM drops d
-    LEFT JOIN projects p ON d.project_id = p.id
-    LEFT JOIN dr_photo_unified_reviews upr ON d.drop_number = upr.drop_number
-    WHERE d.installed_by_name = $3
-      AND d.created_at >= $1::DATE
-      AND d.created_at <= $2::DATE
-    ORDER BY d.drop_number, d.created_at DESC
-    LIMIT 50
-    `,
-    matchParams
-  );
+  ]);
 
   const response: InstallerPerformance = {
     technicianId: tech.id,
