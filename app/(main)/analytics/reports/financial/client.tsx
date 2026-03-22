@@ -1,7 +1,7 @@
 /**
  * Financial Reports Client — expandable report cards for all financial reports.
- * 🟢 WORKING: Cashflow Overview, Cost Centre Revenue, Expense Pivot,
- *             Project COS/Rev Forecast, Project Detail
+ * 🟢 WORKING: Income Statement, Project Profitability, Revenue by Client,
+ *             Cashflow Statement, OPEX, COS Breakdown, Assets Register, OPEX vs CAPEX
  */
 
 'use client';
@@ -12,16 +12,22 @@ import { REPORT_REGISTRY } from '@/modules/analytics/reports';
 import RevenueOverview from '@/modules/analytics/reports/revenue-overview/RevenueOverview';
 import ProjectRevenue from '@/modules/analytics/reports/project-revenue/ProjectRevenue';
 import ExpensePivot from '@/modules/analytics/reports/expense-pivot/ExpensePivot';
-import ProjectFin from '@/modules/analytics/reports/project-fin/ProjectFin';
-import ProjectDetail from '@/modules/analytics/reports/project-detail/ProjectDetail';
+import IncomeStatement from '@/modules/analytics/reports/income-statement/IncomeStatement';
+import RevenueByClient from '@/modules/analytics/reports/revenue-by-client/RevenueByClient';
+import CosBreakdown from '@/modules/analytics/reports/cos-breakdown/CosBreakdown';
+import AssetsRegister from '@/modules/analytics/reports/assets-register/AssetsRegister';
+import ComingSoon from '@/modules/analytics/reports/ComingSoon';
 
 // 🟢 WORKING: Map of report IDs to their React components
 const REPORT_COMPONENTS: Record<string, React.ComponentType> = {
-  'revenue-overview': RevenueOverview,
-  'project-revenue': ProjectRevenue,
-  'expense-pivot': ExpensePivot,
-  'project-fin': ProjectFin,
-  'project-detail': ProjectDetail,
+  'income-statement': IncomeStatement,
+  'project-profitability': ProjectRevenue,
+  'revenue-by-client': RevenueByClient,
+  'cashflow-statement': RevenueOverview,
+  'opex': ExpensePivot,
+  'cos-breakdown': CosBreakdown,
+  'assets-register': AssetsRegister,
+  'opex-vs-capex': () => <ComingSoon name="OPEX vs CAPEX" />,
 };
 
 export default function FinancialReportsClient() {
