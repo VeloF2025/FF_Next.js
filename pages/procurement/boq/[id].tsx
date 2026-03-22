@@ -20,7 +20,7 @@ import { BOQItemLinksPopover } from '@/components/procurement/boq/BOQItemLinksPo
 import type { BOQLifecycleResponse, BOQLifecycleLine, LifecycleStatus } from '@/types/procurement/boq-lifecycle.types';
 import { notificationService } from '@/services/core/NotificationService';
 import { log } from '@/lib/logger';
-import * as XLSX from 'xlsx';
+// xlsx is loaded dynamically inside handleExcelDownload to avoid bundle cost at page load
 
 interface BOQItem {
   id: string;
@@ -404,10 +404,12 @@ export default function BOQDetailPage() {
   // NEW: Check if any filters are active
   const hasActiveFilters = searchTerm.length > 0 || selectedCategories.size > 0;
 
-  const handleExcelDownload = useCallback(() => {
+  const handleExcelDownload = useCallback(async () => {
     if (!boq || displayItems.length === 0) return;
 
-    // NEW: Use filtered items instead of all items
+    const XLSX = await import('xlsx');
+
+    // Use filtered items instead of all items
     const wsData = displayItems.map((item, idx) => ({
       '#': item.lineNumber || idx + 1,
       'Code': item.itemCode || '',

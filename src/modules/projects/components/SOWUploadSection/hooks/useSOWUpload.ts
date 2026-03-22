@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx is loaded dynamically inside downloadTemplate to avoid bundle cost at page load
 import { useSOWService } from '@/hooks/useSOW';
 import { sowDataProcessor } from '@/services/sowDataProcessor';
 import { neonSOWService } from '@/services/neonSOWService';
@@ -145,7 +145,8 @@ export function useSOWUpload(
     setFiles(prev => prev.filter(f => f.type !== type));
   };
 
-  const downloadTemplate = (fileType: FileTypeConfig) => {
+  const downloadTemplate = async (fileType: FileTypeConfig) => {
+    const XLSX = await import('xlsx');
     // Create workbook with sample data
     const ws = XLSX.utils.json_to_sheet(fileType.sampleData);
     const wb = XLSX.utils.book_new();
