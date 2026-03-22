@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { projectsService } from '@/services/projectsService';
 import { log } from '@/lib/logger';
 
@@ -31,7 +31,8 @@ interface UseProjectResult {
 }
 
 export function useProject(): UseProjectResult {
-  const { projectId } = useParams<{ projectId: string }>();
+  const router = useRouter();
+  const { projectId } = router.query as Record<string, string>;
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

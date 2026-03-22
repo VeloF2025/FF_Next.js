@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { useProjectForm } from '@/hooks/useProjects';
 import { useClientSelection } from '@/hooks/useClients';
@@ -16,8 +16,8 @@ import { ProjectScheduleBudget } from './forms/ProjectScheduleBudget';
 import { log } from '@/lib/logger';
 
 export function ProjectForm() {
-  const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { id } = router.query as Record<string, string>;
   const isEditing = !!id;
 
   const { project, isLoading, save, error } = useProjectForm(id);
@@ -84,7 +84,7 @@ export function ProjectForm() {
         setShowSOWWizard(true);
       } else {
         // Updated existing project, navigate back to list
-        navigate('/app/projects');
+        router.push('/app/projects');
       }
     } catch (error) {
       log.error('Failed to save project:', { data: error }, 'ProjectForm');
@@ -96,9 +96,9 @@ export function ProjectForm() {
     setShowSOWWizard(false);
     // Navigate to the project detail page
     if (createdProjectId) {
-      navigate(`/app/projects/${createdProjectId}`);
+      router.push(`/app/projects/${createdProjectId}`);
     } else {
-      navigate('/app/projects');
+      router.push('/app/projects');
     }
   };
 
@@ -106,9 +106,9 @@ export function ProjectForm() {
     setShowSOWWizard(false);
     // Still navigate to project detail, just skip SOW upload
     if (createdProjectId) {
-      navigate(`/app/projects/${createdProjectId}`);
+      router.push(`/app/projects/${createdProjectId}`);
     } else {
-      navigate('/app/projects');
+      router.push('/app/projects');
     }
   };
 
@@ -125,7 +125,7 @@ export function ProjectForm() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/app/projects')}
+          onClick={() => router.push('/app/projects')}
           className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -189,7 +189,7 @@ export function ProjectForm() {
             <div className="flex items-center justify-end gap-4">
               <button
                 type="button"
-                onClick={() => navigate('/app/projects')}
+                onClick={() => router.push('/app/projects')}
                 className="px-6 py-2 text-muted-foreground border border-border rounded-lg hover:bg-background transition-colors font-medium"
               >
                 Cancel

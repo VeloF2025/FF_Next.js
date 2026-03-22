@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Save } from 'lucide-react';
 import { ClientFormData } from '@/types/client.types';
 import { useClient, useCreateClient, useUpdateClient } from '@/hooks/useClients';
@@ -11,8 +11,8 @@ import { ServiceBillingFields } from './ServiceBillingFields';
 import { log } from '@/lib/logger';
 
 export function ClientForm() {
-  const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { id } = router.query as Record<string, string>;
   const isEditing = !!id;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,7 +125,7 @@ export function ClientForm() {
       } else {
         await createMutation.mutateAsync(formData);
       }
-      navigate('/clients');
+      router.push('/clients');
     } catch (error) {
       log.error('Error saving client:', { data: error }, 'index');
     }
@@ -148,7 +148,7 @@ export function ClientForm() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/clients')}
+          onClick={() => router.push('/clients')}
           className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -191,7 +191,7 @@ export function ClientForm() {
           <div className="flex justify-end gap-3 pt-6 border-t border-neutral-200">
             <button
               type="button"
-              onClick={() => navigate('/clients')}
+              onClick={() => router.push('/clients')}
               className="px-4 py-2 text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
             >
               Cancel

@@ -3,7 +3,7 @@
  * Grid of procurement metric cards with navigation links
  */
 
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { DashboardCard } from '../types/dashboard.types';
 
 interface DashboardCardsProps {

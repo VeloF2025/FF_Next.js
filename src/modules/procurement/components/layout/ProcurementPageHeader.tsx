@@ -1,5 +1,5 @@
 // import React from 'react'; // Not used in this component
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { ChevronRight, HelpCircle, Settings, Plus } from 'lucide-react';
 import type { ProcurementPermissions } from '@/types/procurement/portal.types';
 import type { ProcurementBreadcrumb } from '../../types';
@@ -30,8 +30,7 @@ export function ProcurementPageHeader({
     
     if (currentPath.includes('/boq') && !currentPath.includes('/create')) {
       return permissions.canEditBOQ ? (
-        <Link
-          to="/app/procurement/boq/create"
+        <Link href="/app/procurement/boq/create"
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -42,8 +41,7 @@ export function ProcurementPageHeader({
     
     if (currentPath.includes('/rfq') && !currentPath.includes('/create')) {
       return permissions.canCreateRFQ ? (
-        <Link
-          to="/app/procurement/rfq/create"
+        <Link href="/app/procurement/rfq/create"
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -54,8 +52,7 @@ export function ProcurementPageHeader({
     
     if (currentPath.includes('/orders') && !currentPath.includes('/create')) {
       return permissions.canApproveOrders ? (
-        <Link
-          to="/app/procurement/orders/create"
+        <Link href="/app/procurement/orders/create"
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -83,8 +80,7 @@ export function ProcurementPageHeader({
                     {breadcrumb.label}
                   </span>
                 ) : (
-                  <Link
-                    to={breadcrumb.path || '#'}
+                  <Link href={breadcrumb.path || '#'}
                     className="text-sm font-medium text-muted-foreground hover:text-muted-foreground"
                   >
                     {breadcrumb.label}
@@ -125,8 +121,7 @@ export function ProcurementPageHeader({
             
             {/* Settings (if permissions allow) */}
             {permissions.canAccessReports && (
-              <Link
-                to="/app/procurement/reports"
+              <Link href="/app/procurement/reports"
                 className="inline-flex items-center px-3 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-background focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <Settings className="h-4 w-4" />

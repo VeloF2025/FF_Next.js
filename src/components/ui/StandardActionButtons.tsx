@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { Eye, Edit, Trash2, Download, Archive, MoreVertical } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -40,7 +40,7 @@ export function StandardActionButtons({
   showMore = false,
   moreActions = []
 }: StandardActionButtonsProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +59,7 @@ export function StandardActionButtons({
     if (onView) {
       onView();
     } else {
-      navigate(`/app/${module}/${id}`);
+      router.push(`/app/${module}/${id}`);
     }
   };
 
@@ -67,7 +67,7 @@ export function StandardActionButtons({
     if (onEdit) {
       onEdit();
     } else {
-      navigate(`/app/${module}/${id}/edit`);
+      router.push(`/app/${module}/${id}/edit`);
     }
   };
 

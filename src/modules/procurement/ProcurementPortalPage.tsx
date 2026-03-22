@@ -1,6 +1,6 @@
 // 🟢 WORKING: Main Procurement Portal with comprehensive tabbed navigation
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import type { Project } from '@/types/project.types';
 import { ProjectType, ProjectStatus, Priority } from '@/types/project.types';
 import { AlertCircle } from 'lucide-react';
@@ -22,7 +22,8 @@ interface ProcurementPortalPageProps {
 }
 
 export function ProcurementPortalPage({ children }: ProcurementPortalPageProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const router = useRouter();
+  const searchParams = new URLSearchParams(router.query as Record<string, string>);
   
   // State management
   const [selectedProject, setSelectedProject] = useState<Project | undefined>(() => {
