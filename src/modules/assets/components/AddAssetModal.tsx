@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  X, Loader2, ScanLine, ScanBarcode, PenLine,
+  X, Loader2, ScanLine, ScanLine, PenLine,
   PackagePlus, Camera,
 } from 'lucide-react';
 import { LabelScanner } from './LabelScanner';
@@ -221,7 +221,7 @@ export function AddAssetModal({ isOpen, onClose, onCreated }: AddAssetModalProps
                     className="flex flex-col items-center gap-2 p-4 bg-[var(--ff-bg-tertiary)] hover:bg-purple-500/10 border border-[var(--ff-border-light)] hover:border-purple-500/50 rounded-xl transition-all"
                   >
                     <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                      <ScanBarcode className="w-5 h-5 text-purple-400" />
+                      <ScanLine className="w-5 h-5 text-purple-400" />
                     </div>
                     <span className="text-xs font-medium text-[var(--ff-text-primary)]">Scan Barcode</span>
                     <span className="text-[10px] text-[var(--ff-text-tertiary)] text-center leading-tight">
@@ -266,7 +266,7 @@ export function AddAssetModal({ isOpen, onClose, onCreated }: AddAssetModalProps
                       onClick={() => setBarcodeScannerOpen(true)}
                       className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-lg hover:bg-purple-500/15 transition-colors"
                     >
-                      <ScanBarcode className="h-3.5 w-3.5" />
+                      <ScanLine className="h-3.5 w-3.5" />
                       Scan Barcode
                     </button>
                   </div>
