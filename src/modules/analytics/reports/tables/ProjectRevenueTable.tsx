@@ -19,6 +19,12 @@ function fPct(v: number): string {
   return `${(v * 100).toFixed(1)}%`;
 }
 
+function marginColor(margin: number): string {
+  if (margin > 0.2) return 'text-green-400';
+  if (margin >= 0.1) return 'text-yellow-400';
+  return 'text-red-400';
+}
+
 interface Props {
   rows: CostCentreRevenueItem[];
 }
@@ -65,7 +71,7 @@ export function CostCentreRevenueTable({ rows }: Props) {
               Gross Profit
             </th>
             <th className={TH_RIGHT} style={{ minWidth: 100 }}>
-              Margin %
+              Margin
             </th>
           </tr>
         </thead>
@@ -97,17 +103,11 @@ export function CostCentreRevenueTable({ rows }: Props) {
                   <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
                     {fZAR(row.cos)}
                   </td>
-                  <td
-                    className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                      row.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}
-                  >
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">
                     {fZAR(row.grossProfit)}
                   </td>
                   <td
-                    className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                      row.margin >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}
+                    className={`px-4 py-2.5 text-right tabular-nums font-bold ${marginColor(row.margin)}`}
                   >
                     {fPct(row.margin)}
                   </td>
@@ -129,17 +129,11 @@ export function CostCentreRevenueTable({ rows }: Props) {
                       <td className="px-4 py-2 text-right tabular-nums text-gray-300">
                         {fZAR(child.cos)}
                       </td>
-                      <td
-                        className={`px-4 py-2 text-right tabular-nums ${
-                          child.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}
-                      >
+                      <td className="px-4 py-2 text-right tabular-nums text-gray-300">
                         {fZAR(child.grossProfit)}
                       </td>
                       <td
-                        className={`px-4 py-2 text-right tabular-nums ${
-                          child.margin >= 0 ? 'text-green-400' : 'text-red-400'
-                        }`}
+                        className={`px-4 py-2 text-right tabular-nums ${marginColor(child.margin)}`}
                       >
                         {fPct(child.margin)}
                       </td>
@@ -162,17 +156,11 @@ export function CostCentreRevenueTable({ rows }: Props) {
                     <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
                       {fZAR(row.cos)}
                     </td>
-                    <td
-                      className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                        row.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}
-                    >
+                    <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">
                       {fZAR(row.grossProfit)}
                     </td>
                     <td
-                      className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                        row.margin >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}
+                      className={`px-4 py-2.5 text-right tabular-nums font-bold ${marginColor(row.margin)}`}
                     >
                       {fPct(row.margin)}
                     </td>
@@ -191,17 +179,11 @@ export function CostCentreRevenueTable({ rows }: Props) {
             <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
               {fZAR(grandCos)}
             </td>
-            <td
-              className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                grandGP >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}
-            >
+            <td className="px-4 py-2.5 text-right tabular-nums font-bold text-white">
               {fZAR(grandGP)}
             </td>
             <td
-              className={`px-4 py-2.5 text-right tabular-nums font-bold ${
-                grandMargin >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}
+              className={`px-4 py-2.5 text-right tabular-nums font-bold ${marginColor(grandMargin)}`}
             >
               {fPct(grandMargin)}
             </td>
