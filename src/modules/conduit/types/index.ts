@@ -165,7 +165,8 @@ export interface ConduitActual {
   month: string;           // ISO date string, first of month
   cos_actual: number;
   activations: number;
-  cos_breakdown: Record<string, number>;  // { Activations: R, Backhaul: R, ... }
+  revenue_actual: number;
+  cos_breakdown: Record<string, number>;  // { COS - Ad Hoc: R, COS - Stock: R, ... }
 }
 
 // ─── Baseline ────────────────────────────────────────────────────────────────

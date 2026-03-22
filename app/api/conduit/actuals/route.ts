@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
         to_char(month, 'YYYY-MM-DD') as month,
         cos_actual::float,
         activations::int,
+        revenue_actual::float,
         cos_breakdown
       FROM conduit_actuals
       WHERE project_name = ${project}
