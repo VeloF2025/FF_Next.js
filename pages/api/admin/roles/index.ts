@@ -7,7 +7,7 @@
 import type { NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
-import { getRolePermissions } from '@/lib/permissions';
+import type { RolePermissionWithLabel } from '@/lib/permissions';
 import { apiResponse } from '@/lib/apiResponse';
 import log from '@/lib/logger';
 
@@ -52,28 +52,50 @@ async function handleGet(
       ORDER BY sort_order
     `;
 
-    // Get permissions for each role
-    const rolesWithPermissions = await Promise.all(
-      rolesData.map(async (role) => {
-        const permissions = await getRolePermissions(role.name);
+    // Batch fetch all permissions for all roles in a single query
+    const roleNames = rolesData.map((r) => r.name as string);
+    const allPermissions = roleNames.length > 0
+      ? await sql`
+          SELECT rp.role, rp.permission_key, rp.actions, ap.label, ap.type
+          FROM role_permissions rp
+          JOIN access_permissions ap ON rp.permission_key = ap.key
+          WHERE rp.role = ANY(${roleNames}::text[]) AND ap.is_active = true
+          ORDER BY ap.sort_order
+        `
+      : [];
 
-        return {
-          id: role.id,
-          name: role.name,
-          displayName: role.display_name,
-          description: role.description,
-          color: role.color,
-          isSystem: role.is_system,
-          isActive: role.is_active,
-          sortOrder: role.sort_order,
-          permissions,
-          permissionCount: parseInt(role.permission_count) || 0,
-          userCount: parseInt(role.user_count) || 0,
-          createdAt: role.created_at,
-          updatedAt: role.updated_at,
-        };
-      })
-    );
+    // Group permissions by role name
+    const permissionsByRole = new Map<string, RolePermissionWithLabel[]>();
+    for (const row of allPermissions) {
+      const roleName = row.role as string;
+      if (!permissionsByRole.has(roleName)) {
+        permissionsByRole.set(roleName, []);
+      }
+      permissionsByRole.get(roleName)!.push({
+        role: row.role,
+        permissionKey: row.permission_key,
+        key: row.permission_key,
+        label: (row.label || row.permission_key) as string,
+        type: row.type as string | undefined,
+        actions: row.actions as RolePermissionWithLabel['actions'],
+      });
+    }
+
+    const rolesWithPermissions = rolesData.map((role) => ({
+      id: role.id,
+      name: role.name,
+      displayName: role.display_name,
+      description: role.description,
+      color: role.color,
+      isSystem: role.is_system,
+      isActive: role.is_active,
+      sortOrder: role.sort_order,
+      permissions: permissionsByRole.get(role.name as string) ?? [],
+      permissionCount: parseInt(role.permission_count as string) || 0,
+      userCount: parseInt(role.user_count as string) || 0,
+      createdAt: role.created_at,
+      updatedAt: role.updated_at,
+    }));
 
     return apiResponse.success(res, {
       roles: rolesWithPermissions,

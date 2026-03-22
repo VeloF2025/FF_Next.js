@@ -15,6 +15,10 @@ import { getTeamPerformanceReport } from '@/modules/activate/services/reportingS
 import { log } from '@/lib/logger';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { withAuth, withRole, AuthenticatedNextApiRequest } from '@/lib/auth';
+import { cachedQuery } from '@/lib/queryCache';
+
+/** Cache TTL: 5 minutes — team performance data is aggregated and expensive to compute */
+const CACHE_TTL_MS = 300_000;
 
 async function handler(
   req: NextApiRequest,
@@ -40,16 +44,27 @@ async function handler(
         : project
       : undefined;
 
+    const cacheKey = `team-performance:${dateFromStr}:${dateToStr}:${projectStr ?? 'all'}`;
+
     log.info('TeamPerformanceAPI', 'Fetching team performance report', {
       dateFrom: dateFromStr,
       dateTo: dateToStr,
       project: projectStr,
+      cacheKey,
     });
 
-    const data = await getTeamPerformanceReport(
-      dateFromStr as string,
-      dateToStr as string,
-      projectStr
+    const data = await cachedQuery(
+      'reporting',
+      cacheKey,
+      async () => {
+        log.debug('Cache miss — querying database', { cacheKey }, 'TeamPerformanceAPI');
+        return getTeamPerformanceReport(
+          dateFromStr as string,
+          dateToStr as string,
+          projectStr
+        );
+      },
+      CACHE_TTL_MS
     );
 
     return res.status(200).json(data);

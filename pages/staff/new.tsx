@@ -1,6 +1,11 @@
 import type { NextPage } from 'next';
+import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { StaffForm } from '../../src/modules/staff/components/StaffForm';
+
+const StaffForm = dynamic(
+  () => import('../../src/modules/staff/components/StaffForm').then(m => m.StaffForm),
+  { loading: () => <div className="p-8 text-center text-gray-400">Loading form...</div>, ssr: false }
+);
 
 const StaffCreatePage: NextPage = () => {
   return (

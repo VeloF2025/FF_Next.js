@@ -42,7 +42,7 @@ function parseMarkdownBlocks(md: string): Block[] {
   let i = 0;
 
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i]!;
 
     // Horizontal rule
     if (/^---+$/.test(line.trim()) || /^\*\*\*+$/.test(line.trim())) {
@@ -54,7 +54,7 @@ function parseMarkdownBlocks(md: string): Block[] {
     // Heading
     const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
     if (headingMatch) {
-      blocks.push({ type: 'heading', content: headingMatch[2], level: headingMatch[1].length });
+      blocks.push({ type: 'heading', content: headingMatch[2]!, level: headingMatch[1]!.length });
       i++;
       continue;
     }
@@ -64,8 +64,8 @@ function parseMarkdownBlocks(md: string): Block[] {
       const lang = line.trim().replace('```', '').trim();
       const codeLines: string[] = [];
       i++;
-      while (i < lines.length && !lines[i].trim().startsWith('```')) {
-        codeLines.push(lines[i]);
+      while (i < lines.length && !lines[i]!.trim().startsWith('```')) {
+        codeLines.push(lines[i]!);
         i++;
       }
       blocks.push({ type: 'code', content: codeLines.join('\n'), language: lang || undefined });
@@ -74,14 +74,14 @@ function parseMarkdownBlocks(md: string): Block[] {
     }
 
     // Table
-    if (line.includes('|') && i + 1 < lines.length && /^\|[\s-:|]+\|$/.test(lines[i + 1]?.trim())) {
+    if (line.includes('|') && i + 1 < lines.length && /^\|[\s-:|]+\|$/.test(lines[i + 1]!.trim())) {
       const rows: string[][] = [];
       // Header row
       rows.push(parseTRow(line));
       i++; // skip separator
       i++;
-      while (i < lines.length && lines[i].includes('|') && lines[i].trim().startsWith('|')) {
-        rows.push(parseTRow(lines[i]));
+      while (i < lines.length && lines[i]!.includes('|') && lines[i]!.trim().startsWith('|')) {
+        rows.push(parseTRow(lines[i]!));
         i++;
       }
       blocks.push({ type: 'table', content: '', rows });
@@ -91,8 +91,8 @@ function parseMarkdownBlocks(md: string): Block[] {
     // Blockquote
     if (line.trim().startsWith('>')) {
       const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].trim().startsWith('>')) {
-        quoteLines.push(lines[i].replace(/^>\s?/, ''));
+      while (i < lines.length && lines[i]!.trim().startsWith('>')) {
+        quoteLines.push(lines[i]!.replace(/^>\s?/, ''));
         i++;
       }
       blocks.push({ type: 'blockquote', content: quoteLines.join('\n') });
@@ -103,8 +103,8 @@ function parseMarkdownBlocks(md: string): Block[] {
     if (/^[\s]*[-*+]\s/.test(line) || /^[\s]*\d+\.\s/.test(line)) {
       const items: string[] = [];
       const ordered = /^\s*\d+\./.test(line);
-      while (i < lines.length && (/^[\s]*[-*+]\s/.test(lines[i]) || /^[\s]*\d+\.\s/.test(lines[i]))) {
-        items.push(lines[i].replace(/^[\s]*[-*+]\s/, '').replace(/^[\s]*\d+\.\s/, ''));
+      while (i < lines.length && (/^[\s]*[-*+]\s/.test(lines[i]!) || /^[\s]*\d+\.\s/.test(lines[i]!))) {
+        items.push(lines[i]!.replace(/^[\s]*[-*+]\s/, '').replace(/^[\s]*\d+\.\s/, ''));
         i++;
       }
       blocks.push({ type: 'list', content: '', items, ordered });
@@ -119,8 +119,8 @@ function parseMarkdownBlocks(md: string): Block[] {
 
     // Paragraph — collect consecutive non-empty lines
     const paraLines: string[] = [];
-    while (i < lines.length && lines[i].trim() && !lines[i].match(/^#{1,6}\s/) && !lines[i].trim().startsWith('```') && !lines[i].trim().startsWith('>') && !/^[\s]*[-*+]\s/.test(lines[i]) && !/^[\s]*\d+\.\s/.test(lines[i]) && !/^---+$/.test(lines[i].trim())) {
-      paraLines.push(lines[i]);
+    while (i < lines.length && lines[i]!.trim() && !lines[i]!.match(/^#{1,6}\s/) && !lines[i]!.trim().startsWith('```') && !lines[i]!.trim().startsWith('>') && !/^[\s]*[-*+]\s/.test(lines[i]!) && !/^[\s]*\d+\.\s/.test(lines[i]!) && !/^---+$/.test(lines[i]!.trim())) {
+      paraLines.push(lines[i]!);
       i++;
     }
     if (paraLines.length > 0) {

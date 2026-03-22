@@ -41,24 +41,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         ORDER BY d.incident_date DESC, d.created_at DESC
       `;
 
-      // Fetch witnesses for each incident
-      const incidentsWithWitnesses = await Promise.all(
-        incidents.map(async (incident) => {
-          let witnesses: Array<{ id: string; name: string }> = [];
-          if (incident.witness_ids && incident.witness_ids.length > 0) {
-            const witnessData = await sql`
-              SELECT id, CONCAT(first_name, ' ', last_name) as name
-              FROM staff
-              WHERE id = ANY(${incident.witness_ids})
-            `;
-            witnesses = witnessData.map((w) => ({
-              id: w.id as string,
-              name: w.name as string,
-            }));
+      // Collect all unique witness IDs across all incidents in one pass
+      const allWitnessIds: string[] = [];
+      for (const incident of incidents) {
+        if (Array.isArray(incident.witness_ids)) {
+          for (const wid of incident.witness_ids as string[]) {
+            if (!allWitnessIds.includes(wid)) {
+              allWitnessIds.push(wid);
+            }
           }
-          return mapDbToIncident(incident, witnesses);
-        })
-      );
+        }
+      }
+
+      // Batch fetch all witnesses in a single query
+      const witnessMap = new Map<string, { id: string; name: string }>();
+      if (allWitnessIds.length > 0) {
+        const witnessRows = await sql`
+          SELECT id, CONCAT(first_name, ' ', last_name) as name
+          FROM staff
+          WHERE id = ANY(${allWitnessIds}::uuid[])
+        `;
+        for (const w of witnessRows) {
+          witnessMap.set(w.id as string, { id: w.id as string, name: w.name as string });
+        }
+      }
+
+      // Map each incident, resolving witnesses from the pre-fetched map
+      const incidentsWithWitnesses = incidents.map((incident) => {
+        const witnesses: Array<{ id: string; name: string }> = Array.isArray(incident.witness_ids)
+          ? (incident.witness_ids as string[])
+              .map((wid) => witnessMap.get(wid))
+              .filter((w): w is { id: string; name: string } => w !== undefined)
+          : [];
+        return mapDbToIncident(incident, witnesses);
+      });
 
       return res.status(200).json({
         success: true,

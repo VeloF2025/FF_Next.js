@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Dashboard } from '@/modules/dashboard/Dashboard';
+
+const Dashboard = dynamic(
+  () => import('@/modules/dashboard/Dashboard').then(m => m.Dashboard),
+  { loading: () => <DashboardSkeleton />, ssr: false }
+);
 import { RefreshCw } from 'lucide-react';
 
 function DashboardSkeleton() {

@@ -13,6 +13,7 @@ import {
   FuelGaugeExtractionResult,
   FuelReceiptExtractionResult,
 } from '../types/check-in.types';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 import { callVlmApi, parseVlmJson, getVehicleCalibration } from './fleetVlmClient';
 
 // ============================================================================
@@ -123,6 +124,24 @@ export async function extractFuelLevel(
 ): Promise<FuelGaugeExtractionResult> {
   const MAX_RETRIES = 2;
 
+  // Fetch HITL few-shot examples once before the retry loop (non-blocking on failure)
+  let fuelGaugePrompt = FUEL_GAUGE_PROMPT;
+  try {
+    const examples = await getVlmFewShotExamples({
+      module: 'fleet',
+      analysisType: 'fuel_gauge',
+      maxExamples: 3,
+      prioritizeCanonical: true,
+    });
+    const fewShotSection = buildVlmFewShotPrompt(examples);
+    if (fewShotSection) {
+      fuelGaugePrompt = `${fewShotSection}\n\n${FUEL_GAUGE_PROMPT}`;
+      log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for fuel_gauge`);
+    }
+  } catch (fewShotError) {
+    log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+  }
+
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       log.info(
@@ -132,7 +151,7 @@ export async function extractFuelLevel(
 
       const content = await callVlmApi(
         base64Image,
-        FUEL_GAUGE_PROMPT,
+        fuelGaugePrompt,
         'fuel_gauge'
       );
       const result = parseVlmJson<{
@@ -294,9 +313,27 @@ export async function extractFuelReceipt(
   try {
     log.info('FleetVlmService', 'Extracting fuel receipt data...');
 
+    // Inject HITL few-shot examples from past corrections (non-blocking on failure)
+    let prompt = FUEL_RECEIPT_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'fleet',
+        analysisType: 'fuel_receipt',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        prompt = `${fewShotSection}\n\n${FUEL_RECEIPT_PROMPT}`;
+        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for fuel_receipt`);
+      }
+    } catch (fewShotError) {
+      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    }
+
     const content = await callVlmApi(
       base64Image,
-      FUEL_RECEIPT_PROMPT,
+      prompt,
       'fuel_receipt'
     );
     const result = parseVlmJson<{

@@ -19,6 +19,7 @@ import {
   FuelReceiptExtractionResult,
   VlmAnalysisType,
 } from '../types/check-in.types';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 import { callVlmApi, parseVlmJson } from './fleetVlmClient';
 import { extractOdometerReading } from './odometerExtractor';
 import { extractFuelLevel, extractFuelReceipt } from './fuelExtractor';
@@ -132,9 +133,27 @@ export async function verifyLicensePlate(
       `Verifying license plate (expected: ${expectedPlate})...`
     );
 
+    // Inject HITL few-shot examples from past corrections (non-blocking on failure)
+    let prompt = LICENSE_PLATE_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'fleet',
+        analysisType: 'license_plate',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        prompt = `${fewShotSection}\n\n${LICENSE_PLATE_PROMPT}`;
+        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for license_plate`);
+      }
+    } catch (fewShotError) {
+      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    }
+
     const content = await callVlmApi(
       base64Image,
-      LICENSE_PLATE_PROMPT,
+      prompt,
       'license_plate'
     );
     const result = parseVlmJson<{
@@ -190,9 +209,27 @@ export async function extractLicenseDiskDetails(
   try {
     log.info('FleetVlmService', 'Extracting licence disk details...');
 
+    // Inject HITL few-shot examples from past corrections (non-blocking on failure)
+    let prompt = LICENSE_DISK_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'fleet',
+        analysisType: 'license_disk',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        prompt = `${fewShotSection}\n\n${LICENSE_DISK_PROMPT}`;
+        log.info('FleetVlmService', `Injecting ${examples.length} few-shot examples for license_disk`);
+      }
+    } catch (fewShotError) {
+      log.warn('FleetVlmService', `Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    }
+
     const content = await callVlmApi(
       base64Image,
-      LICENSE_DISK_PROMPT,
+      prompt,
       'license_plate'
     );
     const result = parseVlmJson<{

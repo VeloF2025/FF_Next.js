@@ -463,21 +463,24 @@ export async function batchUpdateRolePermissions(
   // Delete all existing permissions for this role
   await sql`DELETE FROM role_permissions WHERE role = ${role}`;
 
-  // Insert new permissions
-  let inserted = 0;
-  for (const perm of permissions) {
-    // Only insert if at least one action is true
-    const hasAnyAction = perm.actions.view || perm.actions.create || perm.actions.edit || perm.actions.delete;
-    if (hasAnyAction) {
-      await sql`
-        INSERT INTO role_permissions (role, permission_key, actions)
-        VALUES (${role}, ${perm.key}, ${JSON.stringify(perm.actions)}::jsonb)
-      `;
-      inserted++;
-    }
+  // Filter to permissions that have at least one action enabled
+  const activePerms = permissions.filter(
+    (p) => p.actions.view || p.actions.create || p.actions.edit || p.actions.delete
+  );
+
+  // Batch insert using UNNEST — single query instead of N inserts
+  if (activePerms.length > 0) {
+    const keys = activePerms.map((p) => p.key);
+    const actions = activePerms.map((p) => JSON.stringify(p.actions));
+    const roles = activePerms.map(() => role);
+    await sql`
+      INSERT INTO role_permissions (role, permission_key, actions)
+      SELECT r, k, a::jsonb
+      FROM UNNEST(${roles}::text[], ${keys}::text[], ${actions}::text[]) AS t(r, k, a)
+    `;
   }
 
-  return inserted;
+  return activePerms.length;
 }
 
 /**
@@ -512,39 +515,39 @@ export async function batchSetUserPermissions(
   // Delete all existing overrides for this user
   await sql`DELETE FROM user_permission_overrides WHERE user_id = ${userId}`;
 
-  let overridesCreated = 0;
-
-  for (const desired of desiredPermissions) {
-    const roleDefault = rolePermMap.get(desired.key) || {
+  // Collect only permissions that differ from the role default
+  const overridePerms = desiredPermissions.filter((desired) => {
+    const roleDefault = rolePermMap.get(desired.key) ?? {
       view: false, create: false, edit: false, delete: false,
     };
-
-    // Check if desired differs from role default
-    const differs = (
+    return (
       desired.actions.view !== roleDefault.view ||
       desired.actions.create !== roleDefault.create ||
       desired.actions.edit !== roleDefault.edit ||
       desired.actions.delete !== roleDefault.delete
     );
+  });
 
-    if (differs) {
-      // Grant type with full desired actions replaces role defaults entirely
-      // in the getUserEffectivePermissions SQL resolution
-      await sql`
-        INSERT INTO user_permission_overrides
-          (user_id, permission_key, override_type, actions, granted_by, reason)
-        VALUES (
-          ${userId}, ${desired.key}, 'grant',
-          ${JSON.stringify(desired.actions)}::jsonb,
-          ${grantedBy}, 'Batch permission update'
-        )
-      `;
-      overridesCreated++;
-    }
-    // No override needed if desired === role default
+  // Batch insert overrides using UNNEST — single query instead of N inserts
+  if (overridePerms.length > 0) {
+    const userIds = overridePerms.map(() => userId);
+    const keys = overridePerms.map((p) => p.key);
+    const actionsArr = overridePerms.map((p) => JSON.stringify(p.actions));
+    const grantedBys = overridePerms.map(() => grantedBy);
+    await sql`
+      INSERT INTO user_permission_overrides
+        (user_id, permission_key, override_type, actions, granted_by, reason)
+      SELECT u, k, 'grant', a::jsonb, g, 'Batch permission update'
+      FROM UNNEST(
+        ${userIds}::uuid[],
+        ${keys}::text[],
+        ${actionsArr}::text[],
+        ${grantedBys}::uuid[]
+      ) AS t(u, k, a, g)
+    `;
   }
 
-  return { overridesCreated, overridesRemoved: removedCount };
+  return { overridesCreated: overridePerms.length, overridesRemoved: removedCount };
 }
 
 /**
@@ -569,26 +572,26 @@ export async function createRoleFromUserPermissions(
 
   const roleId = newRole[0].id;
 
-  // Insert permissions that have at least one action enabled
-  let count = 0;
-  for (const perm of effectivePerms) {
-    const hasAny = perm.canView || perm.canCreate || perm.canEdit || perm.canDelete;
-    if (hasAny) {
-      const actions = {
-        view: perm.canView,
-        create: perm.canCreate,
-        edit: perm.canEdit,
-        delete: perm.canDelete,
-      };
-      await sql`
-        INSERT INTO role_permissions (role, permission_key, actions)
-        VALUES (${roleName}, ${perm.permissionKey}, ${JSON.stringify(actions)}::jsonb)
-      `;
-      count++;
-    }
+  // Filter to permissions that have at least one action enabled
+  const activePermsForRole = effectivePerms.filter(
+    (p) => p.canView || p.canCreate || p.canEdit || p.canDelete
+  );
+
+  // Batch insert using UNNEST — single query instead of N inserts
+  if (activePermsForRole.length > 0) {
+    const roleNames = activePermsForRole.map(() => roleName);
+    const keys = activePermsForRole.map((p) => p.permissionKey);
+    const actionsArr = activePermsForRole.map((p) =>
+      JSON.stringify({ view: p.canView, create: p.canCreate, edit: p.canEdit, delete: p.canDelete })
+    );
+    await sql`
+      INSERT INTO role_permissions (role, permission_key, actions)
+      SELECT r, k, a::jsonb
+      FROM UNNEST(${roleNames}::text[], ${keys}::text[], ${actionsArr}::text[]) AS t(r, k, a)
+    `;
   }
 
-  return { roleId, permissionCount: count };
+  return { roleId, permissionCount: activePermsForRole.length };
 }
 
 /**
@@ -604,26 +607,26 @@ export async function updateRoleFromUserPermissions(
   // Delete existing permissions for this role
   await sql`DELETE FROM role_permissions WHERE role = ${targetRole}`;
 
-  // Insert new permissions
-  let count = 0;
-  for (const perm of effectivePerms) {
-    const hasAny = perm.canView || perm.canCreate || perm.canEdit || perm.canDelete;
-    if (hasAny) {
-      const actions = {
-        view: perm.canView,
-        create: perm.canCreate,
-        edit: perm.canEdit,
-        delete: perm.canDelete,
-      };
-      await sql`
-        INSERT INTO role_permissions (role, permission_key, actions)
-        VALUES (${targetRole}, ${perm.permissionKey}, ${JSON.stringify(actions)}::jsonb)
-      `;
-      count++;
-    }
+  // Filter to permissions that have at least one action enabled
+  const activePermsForTarget = effectivePerms.filter(
+    (p) => p.canView || p.canCreate || p.canEdit || p.canDelete
+  );
+
+  // Batch insert using UNNEST — single query instead of N inserts
+  if (activePermsForTarget.length > 0) {
+    const targetRoles = activePermsForTarget.map(() => targetRole);
+    const keys = activePermsForTarget.map((p) => p.permissionKey);
+    const actionsArr = activePermsForTarget.map((p) =>
+      JSON.stringify({ view: p.canView, create: p.canCreate, edit: p.canEdit, delete: p.canDelete })
+    );
+    await sql`
+      INSERT INTO role_permissions (role, permission_key, actions)
+      SELECT r, k, a::jsonb
+      FROM UNNEST(${targetRoles}::text[], ${keys}::text[], ${actionsArr}::text[]) AS t(r, k, a)
+    `;
   }
 
-  return { permissionCount: count };
+  return { permissionCount: activePermsForTarget.length };
 }
 
 // =====================================================
