@@ -48,22 +48,54 @@ async function handleGet(contractorId: string, req: NextApiRequest, res: NextApi
     return apiResponse.notFound(res, 'Contractor', contractorId);
   }
 
-  // Get documents
-  const documents = await sql`
-    SELECT
-      d.*,
-      CASE
-        WHEN d.expiry_date IS NULL THEN 'no_expiry'
-        WHEN d.expiry_date < NOW() THEN 'expired'
-        WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
-        ELSE 'valid'
-      END as expiry_status
-    FROM hs_contractor_documents d
-    WHERE d.contractor_id = ${contractorId}
-    ${status ? sql`AND d.status = ${status}` : sql``}
-    ${type ? sql`AND d.document_type = ${type}` : sql``}
-    ORDER BY d.document_type, d.created_at DESC
-  `;
+  // Get documents — explicit branches to avoid conditional SQL fragments (Neon rule)
+  let documents;
+  if (status && type) {
+    documents = await sql`
+      SELECT d.*,
+        CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
+             WHEN d.expiry_date < NOW() THEN 'expired'
+             WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
+             ELSE 'valid' END as expiry_status
+      FROM hs_contractor_documents d
+      WHERE d.contractor_id = ${contractorId}
+        AND d.status = ${status} AND d.document_type = ${type}
+      ORDER BY d.document_type, d.created_at DESC
+    `;
+  } else if (status) {
+    documents = await sql`
+      SELECT d.*,
+        CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
+             WHEN d.expiry_date < NOW() THEN 'expired'
+             WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
+             ELSE 'valid' END as expiry_status
+      FROM hs_contractor_documents d
+      WHERE d.contractor_id = ${contractorId} AND d.status = ${status}
+      ORDER BY d.document_type, d.created_at DESC
+    `;
+  } else if (type) {
+    documents = await sql`
+      SELECT d.*,
+        CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
+             WHEN d.expiry_date < NOW() THEN 'expired'
+             WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
+             ELSE 'valid' END as expiry_status
+      FROM hs_contractor_documents d
+      WHERE d.contractor_id = ${contractorId} AND d.document_type = ${type}
+      ORDER BY d.document_type, d.created_at DESC
+    `;
+  } else {
+    documents = await sql`
+      SELECT d.*,
+        CASE WHEN d.expiry_date IS NULL THEN 'no_expiry'
+             WHEN d.expiry_date < NOW() THEN 'expired'
+             WHEN d.expiry_date < NOW() + INTERVAL '30 days' THEN 'expiring_soon'
+             ELSE 'valid' END as expiry_status
+      FROM hs_contractor_documents d
+      WHERE d.contractor_id = ${contractorId}
+      ORDER BY d.document_type, d.created_at DESC
+    `;
+  }
 
   // Group by type for easy display
   const byType: Record<string, any[]> = {};

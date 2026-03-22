@@ -73,77 +73,95 @@ async function handler(
       project: projectStr,
     });
 
-    // Get time buckets (in hours for precision)
-    const bucketsResult = await sql`
-      WITH matched AS (
-        SELECT
-          q.drop_number,
-          q.created_at as wa_time,
-          oes.activation_date as oes_time,
-          EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
-        FROM qa_photo_reviews q
-        INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
-        WHERE q.created_at::date >= ${dateFromStr}::date
-        AND q.created_at::date <= ${dateToStr}::date
-        ${projectStr ? sql`AND q.project = ${projectStr}` : sql``}
-      )
-      SELECT
-        CASE
-          WHEN hours_diff <= 0 THEN 'Same day (pre-submitted)'
-          WHEN hours_diff <= 4 THEN 'Within 4 hours'
-          WHEN hours_diff <= 24 THEN '4-24 hours'
-          WHEN hours_diff <= 72 THEN '1-3 days'
-          WHEN hours_diff <= 168 THEN '3-7 days'
-          ELSE '7+ days'
-        END as bucket,
-        COUNT(DISTINCT drop_number) as count,
-        AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
-      FROM matched
-      GROUP BY 1
-      ORDER BY MIN(hours_diff)
-    `;
+    // Explicit branches to avoid conditional SQL fragments inside CTEs (Neon rule)
+    const bucketsResult = projectStr
+      ? await sql`
+          WITH matched AS (
+            SELECT q.drop_number, q.created_at as wa_time, oes.activation_date as oes_time,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+              AND q.project = ${projectStr}
+          )
+          SELECT
+            CASE WHEN hours_diff <= 0 THEN 'Same day (pre-submitted)' WHEN hours_diff <= 4 THEN 'Within 4 hours'
+                 WHEN hours_diff <= 24 THEN '4-24 hours' WHEN hours_diff <= 72 THEN '1-3 days'
+                 WHEN hours_diff <= 168 THEN '3-7 days' ELSE '7+ days' END as bucket,
+            COUNT(DISTINCT drop_number) as count,
+            AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
+          FROM matched GROUP BY 1 ORDER BY MIN(hours_diff)
+        `
+      : await sql`
+          WITH matched AS (
+            SELECT q.drop_number, q.created_at as wa_time, oes.activation_date as oes_time,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+          )
+          SELECT
+            CASE WHEN hours_diff <= 0 THEN 'Same day (pre-submitted)' WHEN hours_diff <= 4 THEN 'Within 4 hours'
+                 WHEN hours_diff <= 24 THEN '4-24 hours' WHEN hours_diff <= 72 THEN '1-3 days'
+                 WHEN hours_diff <= 168 THEN '3-7 days' ELSE '7+ days' END as bucket,
+            COUNT(DISTINCT drop_number) as count,
+            AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
+          FROM matched GROUP BY 1 ORDER BY MIN(hours_diff)
+        `;
 
     // Get overall stats
-    const statsResult = await sql`
-      WITH matched AS (
-        SELECT
-          q.drop_number,
-          EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
-        FROM qa_photo_reviews q
-        INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
-        WHERE q.created_at::date >= ${dateFromStr}::date
-        AND q.created_at::date <= ${dateToStr}::date
-        ${projectStr ? sql`AND q.project = ${projectStr}` : sql``}
-      )
-      SELECT
-        COUNT(DISTINCT drop_number) as total_matched,
-        AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY GREATEST(hours_diff, 0))::numeric(10,1) as median_hours,
-        (COUNT(DISTINCT CASE WHEN hours_diff <= 0 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as same_day_percent,
-        (COUNT(DISTINCT CASE WHEN hours_diff <= 24 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as within_24h_percent
-      FROM matched
-    `;
+    const statsResult = projectStr
+      ? await sql`
+          WITH matched AS (
+            SELECT q.drop_number,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+              AND q.project = ${projectStr}
+          )
+          SELECT COUNT(DISTINCT drop_number) as total_matched,
+            AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY GREATEST(hours_diff, 0))::numeric(10,1) as median_hours,
+            (COUNT(DISTINCT CASE WHEN hours_diff <= 0 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as same_day_percent,
+            (COUNT(DISTINCT CASE WHEN hours_diff <= 24 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as within_24h_percent
+          FROM matched
+        `
+      : await sql`
+          WITH matched AS (
+            SELECT q.drop_number,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+          )
+          SELECT COUNT(DISTINCT drop_number) as total_matched,
+            AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY GREATEST(hours_diff, 0))::numeric(10,1) as median_hours,
+            (COUNT(DISTINCT CASE WHEN hours_diff <= 0 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as same_day_percent,
+            (COUNT(DISTINCT CASE WHEN hours_diff <= 24 THEN drop_number END) * 100.0 / NULLIF(COUNT(DISTINCT drop_number), 0))::numeric(10,1) as within_24h_percent
+          FROM matched
+        `;
 
     // Get daily averages for trend chart
-    const dailyResult = await sql`
-      WITH matched AS (
-        SELECT
-          q.created_at::date as wa_date,
-          EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
-        FROM qa_photo_reviews q
-        INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
-        WHERE q.created_at::date >= ${dateFromStr}::date
-        AND q.created_at::date <= ${dateToStr}::date
-        ${projectStr ? sql`AND q.project = ${projectStr}` : sql``}
-      )
-      SELECT
-        wa_date as date,
-        COUNT(*) as count,
-        AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
-      FROM matched
-      GROUP BY wa_date
-      ORDER BY wa_date
-    `;
+    const dailyResult = projectStr
+      ? await sql`
+          WITH matched AS (
+            SELECT q.created_at::date as wa_date,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+              AND q.project = ${projectStr}
+          )
+          SELECT wa_date as date, COUNT(*) as count, AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
+          FROM matched GROUP BY wa_date ORDER BY wa_date
+        `
+      : await sql`
+          WITH matched AS (
+            SELECT q.created_at::date as wa_date,
+                   EXTRACT(EPOCH FROM (oes.activation_date - q.created_at)) / 3600 as hours_diff
+            FROM qa_photo_reviews q INNER JOIN oes_activations oes ON oes.drop_number = q.drop_number
+            WHERE q.created_at::date >= ${dateFromStr}::date AND q.created_at::date <= ${dateToStr}::date
+          )
+          SELECT wa_date as date, COUNT(*) as count, AVG(GREATEST(hours_diff, 0))::numeric(10,1) as avg_hours
+          FROM matched GROUP BY wa_date ORDER BY wa_date
+        `;
 
     const stats = statsResult[0] as {
       total_matched: number;

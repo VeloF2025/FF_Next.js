@@ -24,95 +24,162 @@ async function handler(
     const { projectId } = req.query;
 
     // Get overall counts by workflow status
-    const statusCounts = await sql`
-      SELECT
-        workflow_status,
-        COUNT(*) as count
-      FROM qfield_photo_validations
-      WHERE 1=1 ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-      GROUP BY workflow_status
-    `;
+    const statusCounts = projectId
+      ? await sql`
+          SELECT workflow_status, COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE project_id = ${projectId}::uuid
+          GROUP BY workflow_status
+        `
+      : await sql`
+          SELECT workflow_status, COUNT(*) as count
+          FROM qfield_photo_validations
+          GROUP BY workflow_status
+        `;
 
     // Get counts by AI result
-    const aiCounts = await sql`
-      SELECT
-        CASE
-          WHEN vlm_confidence IS NULL THEN 'not_validated'
-          WHEN vlm_confidence >= 0.8 THEN 'high_confidence'
-          WHEN vlm_confidence >= 0.6 THEN 'medium_confidence'
-          ELSE 'low_confidence'
-        END as confidence_level,
-        COUNT(*) as count
-      FROM qfield_photo_validations
-      WHERE 1=1 ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-      GROUP BY confidence_level
-    `;
+    const aiCounts = projectId
+      ? await sql`
+          SELECT
+            CASE
+              WHEN vlm_confidence IS NULL THEN 'not_validated'
+              WHEN vlm_confidence >= 0.8 THEN 'high_confidence'
+              WHEN vlm_confidence >= 0.6 THEN 'medium_confidence'
+              ELSE 'low_confidence'
+            END as confidence_level,
+            COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE project_id = ${projectId}::uuid
+          GROUP BY confidence_level
+        `
+      : await sql`
+          SELECT
+            CASE
+              WHEN vlm_confidence IS NULL THEN 'not_validated'
+              WHEN vlm_confidence >= 0.8 THEN 'high_confidence'
+              WHEN vlm_confidence >= 0.6 THEN 'medium_confidence'
+              ELSE 'low_confidence'
+            END as confidence_level,
+            COUNT(*) as count
+          FROM qfield_photo_validations
+          GROUP BY confidence_level
+        `;
 
     // Get needs retake count
-    const retakeCounts = await sql`
-      SELECT
-        COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NULL) as needs_retake,
-        COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NOT NULL) as retaken
-      FROM qfield_photo_validations
-      WHERE 1=1 ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-    `;
+    const retakeCounts = projectId
+      ? await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NULL) as needs_retake,
+            COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NOT NULL) as retaken
+          FROM qfield_photo_validations
+          WHERE project_id = ${projectId}::uuid
+        `
+      : await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NULL) as needs_retake,
+            COUNT(*) FILTER (WHERE needs_retake = TRUE AND retake_completed_at IS NOT NULL) as retaken
+          FROM qfield_photo_validations
+        `;
 
     // Get escalated count
-    const escalatedCount = await sql`
-      SELECT COUNT(*) as count
-      FROM qfield_photo_validations
-      WHERE escalation_level > 0
-        AND workflow_status = 'escalated'
-        ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-    `;
+    const escalatedCount = projectId
+      ? await sql`
+          SELECT COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE escalation_level > 0
+            AND workflow_status = 'escalated'
+            AND project_id = ${projectId}::uuid
+        `
+      : await sql`
+          SELECT COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE escalation_level > 0
+            AND workflow_status = 'escalated'
+        `;
 
     // Get overdue count (past due date, not completed)
-    const overdueCount = await sql`
-      SELECT COUNT(*) as count
-      FROM qfield_photo_validations
-      WHERE due_date < NOW()
-        AND workflow_status IN ('pending', 'in_review')
-        ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-    `;
+    const overdueCount = projectId
+      ? await sql`
+          SELECT COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE due_date < NOW()
+            AND workflow_status IN ('pending', 'in_review')
+            AND project_id = ${projectId}::uuid
+        `
+      : await sql`
+          SELECT COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE due_date < NOW()
+            AND workflow_status IN ('pending', 'in_review')
+        `;
 
     // Get my queue count if user is logged in
     let myQueueCount = 0;
     if (currentUser) {
-      const myQueue = await sql`
-        SELECT COUNT(*) as count
-        FROM qfield_photo_validations
-        WHERE assigned_to = ${currentUser}
-          AND workflow_status IN ('pending', 'in_review')
-          ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-      `;
+      const myQueue = projectId
+        ? await sql`
+            SELECT COUNT(*) as count
+            FROM qfield_photo_validations
+            WHERE assigned_to = ${currentUser}
+              AND workflow_status IN ('pending', 'in_review')
+              AND project_id = ${projectId}::uuid
+          `
+        : await sql`
+            SELECT COUNT(*) as count
+            FROM qfield_photo_validations
+            WHERE assigned_to = ${currentUser}
+              AND workflow_status IN ('pending', 'in_review')
+          `;
       myQueueCount = parseInt(myQueue[0]?.count || '0', 10);
     }
 
     // Get counts by work type
-    const workTypeCounts = await sql`
-      SELECT
-        COALESCE(work_type, 'unknown') as work_type,
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE workflow_status = 'approved') as approved,
-        COUNT(*) FILTER (WHERE workflow_status = 'rejected') as rejected,
-        COUNT(*) FILTER (WHERE workflow_status = 'pending') as pending,
-        AVG(vlm_confidence) FILTER (WHERE vlm_confidence IS NOT NULL) as avg_confidence
-      FROM qfield_photo_validations
-      WHERE 1=1 ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-      GROUP BY work_type
-      ORDER BY total DESC
-    `;
+    const workTypeCounts = projectId
+      ? await sql`
+          SELECT
+            COALESCE(work_type, 'unknown') as work_type,
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE workflow_status = 'approved') as approved,
+            COUNT(*) FILTER (WHERE workflow_status = 'rejected') as rejected,
+            COUNT(*) FILTER (WHERE workflow_status = 'pending') as pending,
+            AVG(vlm_confidence) FILTER (WHERE vlm_confidence IS NOT NULL) as avg_confidence
+          FROM qfield_photo_validations
+          WHERE project_id = ${projectId}::uuid
+          GROUP BY work_type
+          ORDER BY total DESC
+        `
+      : await sql`
+          SELECT
+            COALESCE(work_type, 'unknown') as work_type,
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE workflow_status = 'approved') as approved,
+            COUNT(*) FILTER (WHERE workflow_status = 'rejected') as rejected,
+            COUNT(*) FILTER (WHERE workflow_status = 'pending') as pending,
+            AVG(vlm_confidence) FILTER (WHERE vlm_confidence IS NOT NULL) as avg_confidence
+          FROM qfield_photo_validations
+          GROUP BY work_type
+          ORDER BY total DESC
+        `;
 
     // Get counts by priority
-    const priorityCounts = await sql`
-      SELECT
-        COALESCE(priority, 'normal') as priority,
-        COUNT(*) as count
-      FROM qfield_photo_validations
-      WHERE workflow_status IN ('pending', 'in_review')
-        ${projectId ? sql`AND project_id = ${projectId}::uuid` : sql``}
-      GROUP BY priority
-    `;
+    const priorityCounts = projectId
+      ? await sql`
+          SELECT
+            COALESCE(priority, 'normal') as priority,
+            COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE workflow_status IN ('pending', 'in_review')
+            AND project_id = ${projectId}::uuid
+          GROUP BY priority
+        `
+      : await sql`
+          SELECT
+            COALESCE(priority, 'normal') as priority,
+            COUNT(*) as count
+          FROM qfield_photo_validations
+          WHERE workflow_status IN ('pending', 'in_review')
+          GROUP BY priority
+        `;
 
     // Get recent activity
     const recentActivity = await sql`

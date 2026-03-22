@@ -33,20 +33,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Build query with optional filters
     let documents;
 
-    if (!documentType && !status) {
-      // Simple query - no filters
+    if (documentType && status) {
       documents = await sql`
         SELECT * FROM contractor_documents
         WHERE contractor_id = ${contractorId}
+          AND document_type = ${documentType}
+          AND status = ${status}
+        ORDER BY created_at DESC
+      `;
+    } else if (documentType) {
+      documents = await sql`
+        SELECT * FROM contractor_documents
+        WHERE contractor_id = ${contractorId}
+          AND document_type = ${documentType}
+        ORDER BY created_at DESC
+      `;
+    } else if (status) {
+      documents = await sql`
+        SELECT * FROM contractor_documents
+        WHERE contractor_id = ${contractorId}
+          AND status = ${status}
         ORDER BY created_at DESC
       `;
     } else {
-      // Query with filters
       documents = await sql`
         SELECT * FROM contractor_documents
         WHERE contractor_id = ${contractorId}
-        ${documentType ? sql`AND document_type = ${documentType}` : sql``}
-        ${status ? sql`AND status = ${status}` : sql``}
         ORDER BY created_at DESC
       `;
     }

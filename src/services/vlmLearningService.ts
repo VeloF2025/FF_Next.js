@@ -528,19 +528,42 @@ export async function getVlmMetrics(options: GetMetricsOptions): Promise<VlmMetr
   const to = dateTo || new Date();
 
   try {
+    // Explicit branches to avoid conditional SQL fragments (Neon rule)
+    const fromDate = from.toISOString().split('T')[0];
+    const toDate = to.toISOString().split('T')[0];
+
     // Get totals
-    const totalsResult = await sql`
-      SELECT
-        COALESCE(SUM(total_extractions), 0) as total,
-        COALESCE(SUM(correct_extractions), 0) as correct,
-        COALESCE(SUM(corrected_extractions), 0) as corrected,
-        COALESCE(SUM(failed_extractions), 0) as failed
-      FROM vlm_metrics
-      WHERE metric_date >= ${from.toISOString().split('T')[0]}::date
-        AND metric_date <= ${to.toISOString().split('T')[0]}::date
-        ${module ? sql`AND module = ${module}` : sql``}
-        ${analysisType ? sql`AND analysis_type = ${analysisType}` : sql``}
-    `;
+    let totalsResult;
+    if (module && analysisType) {
+      totalsResult = await sql`
+        SELECT COALESCE(SUM(total_extractions), 0) as total, COALESCE(SUM(correct_extractions), 0) as correct,
+               COALESCE(SUM(corrected_extractions), 0) as corrected, COALESCE(SUM(failed_extractions), 0) as failed
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date
+          AND module = ${module} AND analysis_type = ${analysisType}
+      `;
+    } else if (module) {
+      totalsResult = await sql`
+        SELECT COALESCE(SUM(total_extractions), 0) as total, COALESCE(SUM(correct_extractions), 0) as correct,
+               COALESCE(SUM(corrected_extractions), 0) as corrected, COALESCE(SUM(failed_extractions), 0) as failed
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date AND module = ${module}
+      `;
+    } else if (analysisType) {
+      totalsResult = await sql`
+        SELECT COALESCE(SUM(total_extractions), 0) as total, COALESCE(SUM(correct_extractions), 0) as correct,
+               COALESCE(SUM(corrected_extractions), 0) as corrected, COALESCE(SUM(failed_extractions), 0) as failed
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date AND analysis_type = ${analysisType}
+      `;
+    } else {
+      totalsResult = await sql`
+        SELECT COALESCE(SUM(total_extractions), 0) as total, COALESCE(SUM(correct_extractions), 0) as correct,
+               COALESCE(SUM(corrected_extractions), 0) as corrected, COALESCE(SUM(failed_extractions), 0) as failed
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date
+      `;
+    }
 
     const totals = totalsResult[0] || { total: 0, correct: 0, corrected: 0, failed: 0 };
     const totalExtractions = Number(totals.total) || 0;
@@ -550,39 +573,81 @@ export async function getVlmMetrics(options: GetMetricsOptions): Promise<VlmMetr
         : 0;
 
     // Get daily breakdown
-    const dailyResult = await sql`
-      SELECT
-        metric_date::text as date,
-        SUM(total_extractions) as count,
-        CASE
-          WHEN SUM(total_extractions) > 0 THEN
-            (SUM(correct_extractions) + SUM(corrected_extractions))::numeric / SUM(total_extractions)
-          ELSE 0
-        END as rate
-      FROM vlm_metrics
-      WHERE metric_date >= ${from.toISOString().split('T')[0]}::date
-        AND metric_date <= ${to.toISOString().split('T')[0]}::date
-        ${module ? sql`AND module = ${module}` : sql``}
-        ${analysisType ? sql`AND analysis_type = ${analysisType}` : sql``}
-      GROUP BY metric_date
-      ORDER BY metric_date ASC
-    `;
+    let dailyResult;
+    if (module && analysisType) {
+      dailyResult = await sql`
+        SELECT metric_date::text as date, SUM(total_extractions) as count,
+          CASE WHEN SUM(total_extractions) > 0
+               THEN (SUM(correct_extractions) + SUM(corrected_extractions))::numeric / SUM(total_extractions)
+               ELSE 0 END as rate
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date
+          AND module = ${module} AND analysis_type = ${analysisType}
+        GROUP BY metric_date ORDER BY metric_date ASC
+      `;
+    } else if (module) {
+      dailyResult = await sql`
+        SELECT metric_date::text as date, SUM(total_extractions) as count,
+          CASE WHEN SUM(total_extractions) > 0
+               THEN (SUM(correct_extractions) + SUM(corrected_extractions))::numeric / SUM(total_extractions)
+               ELSE 0 END as rate
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date AND module = ${module}
+        GROUP BY metric_date ORDER BY metric_date ASC
+      `;
+    } else if (analysisType) {
+      dailyResult = await sql`
+        SELECT metric_date::text as date, SUM(total_extractions) as count,
+          CASE WHEN SUM(total_extractions) > 0
+               THEN (SUM(correct_extractions) + SUM(corrected_extractions))::numeric / SUM(total_extractions)
+               ELSE 0 END as rate
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date AND analysis_type = ${analysisType}
+        GROUP BY metric_date ORDER BY metric_date ASC
+      `;
+    } else {
+      dailyResult = await sql`
+        SELECT metric_date::text as date, SUM(total_extractions) as count,
+          CASE WHEN SUM(total_extractions) > 0
+               THEN (SUM(correct_extractions) + SUM(corrected_extractions))::numeric / SUM(total_extractions)
+               ELSE 0 END as rate
+        FROM vlm_metrics
+        WHERE metric_date >= ${fromDate}::date AND metric_date <= ${toDate}::date
+        GROUP BY metric_date ORDER BY metric_date ASC
+      `;
+    }
 
     // Get top error patterns
-    const errorResult = await sql`
-      SELECT
-        error_pattern,
-        COUNT(*) as count
-      FROM vlm_corrections
-      WHERE created_at >= ${from.toISOString()}
-        AND created_at <= ${to.toISOString()}
-        AND error_pattern IS NOT NULL
-        ${module ? sql`AND module = ${module}` : sql``}
-        ${analysisType ? sql`AND analysis_type = ${analysisType}` : sql``}
-      GROUP BY error_pattern
-      ORDER BY count DESC
-      LIMIT 5
-    `;
+    let errorResult;
+    if (module && analysisType) {
+      errorResult = await sql`
+        SELECT error_pattern, COUNT(*) as count FROM vlm_corrections
+        WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
+          AND error_pattern IS NOT NULL AND module = ${module} AND analysis_type = ${analysisType}
+        GROUP BY error_pattern ORDER BY count DESC LIMIT 5
+      `;
+    } else if (module) {
+      errorResult = await sql`
+        SELECT error_pattern, COUNT(*) as count FROM vlm_corrections
+        WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
+          AND error_pattern IS NOT NULL AND module = ${module}
+        GROUP BY error_pattern ORDER BY count DESC LIMIT 5
+      `;
+    } else if (analysisType) {
+      errorResult = await sql`
+        SELECT error_pattern, COUNT(*) as count FROM vlm_corrections
+        WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
+          AND error_pattern IS NOT NULL AND analysis_type = ${analysisType}
+        GROUP BY error_pattern ORDER BY count DESC LIMIT 5
+      `;
+    } else {
+      errorResult = await sql`
+        SELECT error_pattern, COUNT(*) as count FROM vlm_corrections
+        WHERE created_at >= ${from.toISOString()} AND created_at <= ${to.toISOString()}
+          AND error_pattern IS NOT NULL
+        GROUP BY error_pattern ORDER BY count DESC LIMIT 5
+      `;
+    }
 
     const totalErrors = errorResult.reduce((sum, row) => sum + Number(row.count), 0);
 
@@ -717,35 +782,48 @@ export async function listCorrections(
   const { module, analysisType, errorPattern, isCanonical, dateFrom, dateTo, limit = 50, offset = 0 } = options;
 
   try {
-    // Get total count
-    const countResult = await sql`
-      SELECT COUNT(*) as count
-      FROM vlm_corrections
-      WHERE 1=1
-        ${module ? sql`AND module = ${module}` : sql``}
-        ${analysisType ? sql`AND analysis_type = ${analysisType}` : sql``}
-        ${errorPattern ? sql`AND error_pattern = ${errorPattern}` : sql``}
-        ${isCanonical !== undefined ? sql`AND is_canonical = ${isCanonical}` : sql``}
-        ${dateFrom ? sql`AND created_at >= ${dateFrom.toISOString()}` : sql``}
-        ${dateTo ? sql`AND created_at <= ${dateTo.toISOString()}` : sql``}
-    `;
+    // Fetch all candidate rows without conditional SQL fragments (Neon rule).
+    // Filters are applied in application code after the query to avoid 2^6 = 64 query branches.
+    // Date range bounds are used to pre-filter at the DB level using fixed parameters.
+    const hasDateFrom = Boolean(dateFrom);
+    const hasDateTo = Boolean(dateTo);
+    const dateFromStr = dateFrom?.toISOString() ?? '';
+    const dateToStr = dateTo?.toISOString() ?? '';
 
-    const total = Number(countResult[0]?.count) || 0;
+    const allRows = hasDateFrom && hasDateTo
+      ? await sql`
+          SELECT * FROM vlm_corrections
+          WHERE created_at >= ${dateFromStr} AND created_at <= ${dateToStr}
+          ORDER BY created_at DESC
+        `
+      : hasDateFrom
+        ? await sql`
+            SELECT * FROM vlm_corrections
+            WHERE created_at >= ${dateFromStr}
+            ORDER BY created_at DESC
+          `
+        : hasDateTo
+          ? await sql`
+              SELECT * FROM vlm_corrections
+              WHERE created_at <= ${dateToStr}
+              ORDER BY created_at DESC
+            `
+          : await sql`
+              SELECT * FROM vlm_corrections
+              ORDER BY created_at DESC
+            `;
 
-    // Get corrections
-    const rows = await sql`
-      SELECT *
-      FROM vlm_corrections
-      WHERE 1=1
-        ${module ? sql`AND module = ${module}` : sql``}
-        ${analysisType ? sql`AND analysis_type = ${analysisType}` : sql``}
-        ${errorPattern ? sql`AND error_pattern = ${errorPattern}` : sql``}
-        ${isCanonical !== undefined ? sql`AND is_canonical = ${isCanonical}` : sql``}
-        ${dateFrom ? sql`AND created_at >= ${dateFrom.toISOString()}` : sql``}
-        ${dateTo ? sql`AND created_at <= ${dateTo.toISOString()}` : sql``}
-      ORDER BY created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    // Apply remaining filters in application code (module, analysisType, errorPattern, isCanonical)
+    const filtered = allRows.filter((row) => {
+      if (module && row.module !== module) return false;
+      if (analysisType && row.analysis_type !== analysisType) return false;
+      if (errorPattern && row.error_pattern !== errorPattern) return false;
+      if (isCanonical !== undefined && row.is_canonical !== isCanonical) return false;
+      return true;
+    });
+
+    const total = filtered.length;
+    const rows = filtered.slice(offset, offset + limit);
 
     return {
       corrections: rows.map(mapCorrectionRow),

@@ -999,22 +999,22 @@ export async function getOrphanedDocuments(
 > {
   const sql = neon(databaseUrl);
 
-  const rows = await sql`
-    SELECT
-      id,
-      odoo_attachment_id,
-      odoo_model,
-      odoo_record_id,
-      file_name,
-      file_path,
-      document_type,
-      created_at
-    FROM odoo_documents
-    WHERE sync_status = 'orphaned'
-    ${options?.model ? sql`AND odoo_model = ${options.model}` : sql``}
-    ORDER BY created_at DESC
-    LIMIT ${options?.limit || 100}
-  `;
+  // Explicit branches to avoid conditional SQL fragments (Neon rule)
+  const rows = options?.model
+    ? await sql`
+        SELECT id, odoo_attachment_id, odoo_model, odoo_record_id, file_name, file_path,
+               document_type, created_at
+        FROM odoo_documents
+        WHERE sync_status = 'orphaned' AND odoo_model = ${options.model}
+        ORDER BY created_at DESC LIMIT ${options?.limit || 100}
+      `
+    : await sql`
+        SELECT id, odoo_attachment_id, odoo_model, odoo_record_id, file_name, file_path,
+               document_type, created_at
+        FROM odoo_documents
+        WHERE sync_status = 'orphaned'
+        ORDER BY created_at DESC LIMIT ${options?.limit || 100}
+      `;
 
   return (rows as any[]).map((row: any) => ({
     id: row.id,

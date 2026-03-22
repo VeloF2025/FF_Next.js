@@ -37,26 +37,97 @@ export default withAuth(withErrorHandler(async (
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
 
-      // Get uninvoiced activated drops
-      const drops = await sql`
-        SELECT
-          d.id as drop_id,
-          d.drop_number,
-          d.lid,
-          d.client_po_id,
-          cpo.po_number as client_po_number,
-          oa.activation_date::DATE as activation_date,
-          COALESCE(cpo.price_per_drop, 0) as price_per_drop
-        FROM drops d
-        INNER JOIN oes_activations oa ON oa.drop_id = d.id
-        LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
-        WHERE d.project_id = ${projectId}
-          AND d.invoiced = false
-          ${clientPoId ? sql`AND d.client_po_id = ${clientPoId}` : sql``}
-          ${startDate ? sql`AND oa.activation_date >= ${startDate}` : sql``}
-          ${endDate ? sql`AND oa.activation_date <= ${endDate}` : sql``}
-        ORDER BY oa.activation_date DESC, d.drop_number
-      `;
+      // Get uninvoiced activated drops — explicit branches to avoid conditional SQL fragments (Neon rule)
+      let drops;
+      if (clientPoId && startDate && endDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND d.client_po_id = ${clientPoId}
+            AND oa.activation_date >= ${startDate} AND oa.activation_date <= ${endDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (clientPoId && startDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND d.client_po_id = ${clientPoId} AND oa.activation_date >= ${startDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (clientPoId && endDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND d.client_po_id = ${clientPoId} AND oa.activation_date <= ${endDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (clientPoId) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND d.client_po_id = ${clientPoId}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (startDate && endDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND oa.activation_date >= ${startDate} AND oa.activation_date <= ${endDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (startDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND oa.activation_date >= ${startDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else if (endDate) {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+            AND oa.activation_date <= ${endDate}
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      } else {
+        drops = await sql`
+          SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                 cpo.po_number as client_po_number, oa.activation_date::DATE as activation_date,
+                 COALESCE(cpo.price_per_drop, 0) as price_per_drop
+          FROM drops d INNER JOIN oes_activations oa ON oa.drop_id = d.id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+          WHERE d.project_id = ${projectId} AND d.invoiced = false
+          ORDER BY oa.activation_date DESC, d.drop_number
+        `;
+      }
 
       // Get Client PO details for tax rate
       let taxRate = 15;
@@ -154,26 +225,34 @@ export default withAuth(withErrorHandler(async (
         defaultPrice = Number(poData.price_per_drop);
       }
 
-      // Get uninvoiced activated drops for the period
-      const drops = await sql`
-        SELECT
-          d.id as drop_id,
-          d.drop_number,
-          d.lid,
-          d.client_po_id,
-          oa.id as oes_activation_id,
-          oa.activation_date::DATE as activation_date,
-          COALESCE(cpo.price_per_drop, ${defaultPrice}) as price_per_drop
-        FROM drops d
-        INNER JOIN oes_activations oa ON oa.drop_id = d.id
-        LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
-        WHERE d.project_id = ${projectId}
-          AND d.invoiced = false
-          ${body.clientPoId ? sql`AND d.client_po_id = ${body.clientPoId}` : sql``}
-          AND oa.activation_date >= ${body.billingPeriodStart}
-          AND oa.activation_date <= ${body.billingPeriodEnd}
-        ORDER BY oa.activation_date, d.drop_number
-      `;
+      // Get uninvoiced activated drops for the period — explicit branches (Neon rule)
+      const dropsForPeriod = body.clientPoId
+        ? await sql`
+            SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                   oa.id as oes_activation_id, oa.activation_date::DATE as activation_date,
+                   COALESCE(cpo.price_per_drop, ${defaultPrice}) as price_per_drop
+            FROM drops d
+            INNER JOIN oes_activations oa ON oa.drop_id = d.id
+            LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+            WHERE d.project_id = ${projectId} AND d.invoiced = false
+              AND d.client_po_id = ${body.clientPoId}
+              AND oa.activation_date >= ${body.billingPeriodStart}
+              AND oa.activation_date <= ${body.billingPeriodEnd}
+            ORDER BY oa.activation_date, d.drop_number
+          `
+        : await sql`
+            SELECT d.id as drop_id, d.drop_number, d.lid, d.client_po_id,
+                   oa.id as oes_activation_id, oa.activation_date::DATE as activation_date,
+                   COALESCE(cpo.price_per_drop, ${defaultPrice}) as price_per_drop
+            FROM drops d
+            INNER JOIN oes_activations oa ON oa.drop_id = d.id
+            LEFT JOIN client_purchase_orders cpo ON cpo.id = d.client_po_id
+            WHERE d.project_id = ${projectId} AND d.invoiced = false
+              AND oa.activation_date >= ${body.billingPeriodStart}
+              AND oa.activation_date <= ${body.billingPeriodEnd}
+            ORDER BY oa.activation_date, d.drop_number
+          `;
+      const drops = dropsForPeriod;
 
       if (drops.length === 0) {
         return apiResponse.badRequest(res, 'No uninvoiced activated drops found for the specified period');

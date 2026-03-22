@@ -117,30 +117,34 @@ export async function getAuditLog(
   const limit = options?.limit || 50;
   const offset = options?.offset || 0;
 
-  // Get entries
-  const entries = await sql`
-    SELECT
-      id,
-      action_type as "actionType",
-      action_description as "actionDescription",
-      details,
-      performed_by_name as "performedByName",
-      created_at as "createdAt"
-    FROM staff_audit_log
-    WHERE staff_id = ${staffId}::uuid
-    ${options?.actionTypes?.length ? sql`AND action_type = ANY(${options.actionTypes})` : sql``}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `;
+  // Explicit branches to avoid conditional SQL fragments (Neon rule)
+  const hasActionFilter = Boolean(options?.actionTypes?.length);
+  const actionTypes = options?.actionTypes ?? [];
 
-  // Get total count
-  const [countResult] = await sql`
-    SELECT COUNT(*) as total
-    FROM staff_audit_log
-    WHERE staff_id = ${staffId}::uuid
-    ${options?.actionTypes?.length ? sql`AND action_type = ANY(${options.actionTypes})` : sql``}
-  `;
+  const entries = hasActionFilter
+    ? await sql`
+        SELECT id, action_type as "actionType", action_description as "actionDescription",
+               details, performed_by_name as "performedByName", created_at as "createdAt"
+        FROM staff_audit_log
+        WHERE staff_id = ${staffId}::uuid AND action_type = ANY(${actionTypes})
+        ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+      `
+    : await sql`
+        SELECT id, action_type as "actionType", action_description as "actionDescription",
+               details, performed_by_name as "performedByName", created_at as "createdAt"
+        FROM staff_audit_log
+        WHERE staff_id = ${staffId}::uuid
+        ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+      `;
+
+  const [countResult] = hasActionFilter
+    ? await sql`
+        SELECT COUNT(*) as total FROM staff_audit_log
+        WHERE staff_id = ${staffId}::uuid AND action_type = ANY(${actionTypes})
+      `
+    : await sql`
+        SELECT COUNT(*) as total FROM staff_audit_log WHERE staff_id = ${staffId}::uuid
+      `;
 
   return {
     entries: entries as Array<{

@@ -64,65 +64,67 @@ async function handler(
 
     log.info('PendingAgingAPI', 'Fetching pending aging report', { project: projectStr });
 
-    // Get aging buckets
-    const bucketsResult = await sql`
-      WITH wa_only AS (
-        SELECT
-          q.drop_number,
-          q.project,
-          q.created_at,
-          CURRENT_DATE - q.created_at::date as days_pending
-        FROM qa_photo_reviews q
-        WHERE NOT EXISTS (
-          SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number
-        )
-        ${projectStr ? sql`AND q.project = ${projectStr}` : sql``}
-      )
-      SELECT
-        CASE
-          WHEN days_pending <= 1 THEN '0-1 days'
-          WHEN days_pending <= 3 THEN '2-3 days'
-          WHEN days_pending <= 7 THEN '4-7 days'
-          WHEN days_pending <= 14 THEN '8-14 days'
-          WHEN days_pending <= 30 THEN '15-30 days'
-          ELSE '30+ days'
-        END as bucket,
-        COUNT(DISTINCT drop_number) as count,
-        MIN(days_pending) as min_days,
-        MAX(days_pending) as max_days
-      FROM wa_only
-      GROUP BY 1
-      ORDER BY MIN(days_pending)
-    `;
+    // Explicit branches to avoid conditional SQL fragments inside CTEs (Neon rule)
+    const bucketsResult = projectStr
+      ? await sql`
+          WITH wa_only AS (
+            SELECT q.drop_number, q.project, q.created_at,
+                   CURRENT_DATE - q.created_at::date as days_pending
+            FROM qa_photo_reviews q
+            WHERE NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number)
+              AND q.project = ${projectStr}
+          )
+          SELECT
+            CASE WHEN days_pending <= 1 THEN '0-1 days' WHEN days_pending <= 3 THEN '2-3 days'
+                 WHEN days_pending <= 7 THEN '4-7 days' WHEN days_pending <= 14 THEN '8-14 days'
+                 WHEN days_pending <= 30 THEN '15-30 days' ELSE '30+ days' END as bucket,
+            COUNT(DISTINCT drop_number) as count,
+            MIN(days_pending) as min_days, MAX(days_pending) as max_days
+          FROM wa_only GROUP BY 1 ORDER BY MIN(days_pending)
+        `
+      : await sql`
+          WITH wa_only AS (
+            SELECT q.drop_number, q.project, q.created_at,
+                   CURRENT_DATE - q.created_at::date as days_pending
+            FROM qa_photo_reviews q
+            WHERE NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number)
+          )
+          SELECT
+            CASE WHEN days_pending <= 1 THEN '0-1 days' WHEN days_pending <= 3 THEN '2-3 days'
+                 WHEN days_pending <= 7 THEN '4-7 days' WHEN days_pending <= 14 THEN '8-14 days'
+                 WHEN days_pending <= 30 THEN '15-30 days' ELSE '30+ days' END as bucket,
+            COUNT(DISTINCT drop_number) as count,
+            MIN(days_pending) as min_days, MAX(days_pending) as max_days
+          FROM wa_only GROUP BY 1 ORDER BY MIN(days_pending)
+        `;
 
     // Get detailed records (top 100 oldest)
-    const recordsResult = await sql`
-      WITH wa_only AS (
-        SELECT
-          q.drop_number,
-          q.project,
-          q.created_at::date as wa_submitted,
-          CURRENT_DATE - q.created_at::date as days_pending,
-          q.submitted_by,
-          q.sender_phone,
-          q.completed_photos
-        FROM qa_photo_reviews q
-        WHERE NOT EXISTS (
-          SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number
-        )
-        ${projectStr ? sql`AND q.project = ${projectStr}` : sql``}
-      )
-      SELECT DISTINCT ON (drop_number)
-        drop_number,
-        project,
-        wa_submitted,
-        days_pending,
-        submitted_by,
-        sender_phone,
-        completed_photos
-      FROM wa_only
-      ORDER BY drop_number, days_pending DESC
-    `;
+    const recordsResult = projectStr
+      ? await sql`
+          WITH wa_only AS (
+            SELECT q.drop_number, q.project, q.created_at::date as wa_submitted,
+                   CURRENT_DATE - q.created_at::date as days_pending,
+                   q.submitted_by, q.sender_phone, q.completed_photos
+            FROM qa_photo_reviews q
+            WHERE NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number)
+              AND q.project = ${projectStr}
+          )
+          SELECT DISTINCT ON (drop_number)
+            drop_number, project, wa_submitted, days_pending, submitted_by, sender_phone, completed_photos
+          FROM wa_only ORDER BY drop_number, days_pending DESC
+        `
+      : await sql`
+          WITH wa_only AS (
+            SELECT q.drop_number, q.project, q.created_at::date as wa_submitted,
+                   CURRENT_DATE - q.created_at::date as days_pending,
+                   q.submitted_by, q.sender_phone, q.completed_photos
+            FROM qa_photo_reviews q
+            WHERE NOT EXISTS (SELECT 1 FROM oes_activations oes WHERE oes.drop_number = q.drop_number)
+          )
+          SELECT DISTINCT ON (drop_number)
+            drop_number, project, wa_submitted, days_pending, submitted_by, sender_phone, completed_photos
+          FROM wa_only ORDER BY drop_number, days_pending DESC
+        `;
 
     // Sort by days_pending descending for display
     const sortedRecords = (recordsResult as PendingRecord[]).sort(

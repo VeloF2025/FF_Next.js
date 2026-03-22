@@ -35,27 +35,138 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    // Build query with optional filters
-    const assignments = await sql`
-      SELECT
-        cp.*,
-        c.company_name,
-        c.contact_person,
-        c.email,
-        c.status as contractor_status,
-        p.project_name,
-        p.project_code,
-        p.status as project_status
-      FROM contractor_projects cp
-      JOIN contractors c ON cp.contractor_id = c.id
-      JOIN projects p ON cp.project_id = p.id
-      WHERE 1=1
-        ${contractorId ? sql`AND cp.contractor_id = ${contractorId}` : sql``}
-        ${projectId ? sql`AND cp.project_id = ${projectId}` : sql``}
-        ${assignmentStatus ? sql`AND cp.assignment_status = ${assignmentStatus}` : sql``}
-        ${isActive !== undefined ? sql`AND cp.is_active = ${isActive === 'true'}` : sql``}
-      ORDER BY cp.created_at DESC
-    `;
+    // Build query with explicit branches to avoid conditional SQL fragments (Neon rule)
+    // At least one of contractorId / projectId is required (validated above)
+    const isActiveVal = isActive !== undefined ? isActive === 'true' : undefined;
+
+    let assignments;
+    if (contractorId && projectId && assignmentStatus && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.project_id = ${projectId}
+          AND cp.assignment_status = ${assignmentStatus} AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && projectId && assignmentStatus) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.project_id = ${projectId}
+          AND cp.assignment_status = ${assignmentStatus}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && projectId && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.project_id = ${projectId}
+          AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && projectId) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.project_id = ${projectId}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && assignmentStatus && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.assignment_status = ${assignmentStatus}
+          AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && assignmentStatus) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.assignment_status = ${assignmentStatus}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId} AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (contractorId) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.contractor_id = ${contractorId}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (projectId && assignmentStatus && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.project_id = ${projectId} AND cp.assignment_status = ${assignmentStatus}
+          AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (projectId && assignmentStatus) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.project_id = ${projectId} AND cp.assignment_status = ${assignmentStatus}
+        ORDER BY cp.created_at DESC
+      `;
+    } else if (projectId && isActiveVal !== undefined) {
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.project_id = ${projectId} AND cp.is_active = ${isActiveVal}
+        ORDER BY cp.created_at DESC
+      `;
+    } else {
+      // projectId only (guaranteed by the validation above)
+      assignments = await sql`
+        SELECT cp.*, c.company_name, c.contact_person, c.email, c.status as contractor_status,
+               p.project_name, p.project_code, p.status as project_status
+        FROM contractor_projects cp
+        JOIN contractors c ON cp.contractor_id = c.id
+        JOIN projects p ON cp.project_id = p.id
+        WHERE cp.project_id = ${projectId}
+        ORDER BY cp.created_at DESC
+      `;
+    }
 
     const mapped = assignments.map(mapDbToAssignment);
 

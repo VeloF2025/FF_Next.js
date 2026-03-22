@@ -34,30 +34,78 @@ export default withAuth(withErrorHandler(async (
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
       const offset = (page - 1) * limit;
 
-      const invoices = await sql`
-        SELECT
-          ci.*,
-          c.company_name as client_name,
-          p.project_name as project_name,
-          cpo.po_number as client_po_number
-        FROM customer_invoices ci
-        LEFT JOIN clients c ON c.id = ci.client_id
-        LEFT JOIN projects p ON p.id = ci.project_id
-        LEFT JOIN client_purchase_orders cpo ON cpo.id = ci.client_po_id
-        WHERE ci.project_id = ${projectId}
-        ${status ? sql`AND ci.status = ${status}` : sql``}
-        ${clientPoId ? sql`AND ci.client_po_id = ${clientPoId}` : sql``}
-        ORDER BY ci.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      // Use explicit branches to avoid conditional SQL fragments (Neon rule)
+      let invoices;
+      if (status && clientPoId) {
+        invoices = await sql`
+          SELECT ci.*, c.company_name as client_name, p.project_name as project_name,
+                 cpo.po_number as client_po_number
+          FROM customer_invoices ci
+          LEFT JOIN clients c ON c.id = ci.client_id
+          LEFT JOIN projects p ON p.id = ci.project_id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = ci.client_po_id
+          WHERE ci.project_id = ${projectId}
+            AND ci.status = ${status} AND ci.client_po_id = ${clientPoId}
+          ORDER BY ci.created_at DESC LIMIT ${limit} OFFSET ${offset}
+        `;
+      } else if (status) {
+        invoices = await sql`
+          SELECT ci.*, c.company_name as client_name, p.project_name as project_name,
+                 cpo.po_number as client_po_number
+          FROM customer_invoices ci
+          LEFT JOIN clients c ON c.id = ci.client_id
+          LEFT JOIN projects p ON p.id = ci.project_id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = ci.client_po_id
+          WHERE ci.project_id = ${projectId} AND ci.status = ${status}
+          ORDER BY ci.created_at DESC LIMIT ${limit} OFFSET ${offset}
+        `;
+      } else if (clientPoId) {
+        invoices = await sql`
+          SELECT ci.*, c.company_name as client_name, p.project_name as project_name,
+                 cpo.po_number as client_po_number
+          FROM customer_invoices ci
+          LEFT JOIN clients c ON c.id = ci.client_id
+          LEFT JOIN projects p ON p.id = ci.project_id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = ci.client_po_id
+          WHERE ci.project_id = ${projectId} AND ci.client_po_id = ${clientPoId}
+          ORDER BY ci.created_at DESC LIMIT ${limit} OFFSET ${offset}
+        `;
+      } else {
+        invoices = await sql`
+          SELECT ci.*, c.company_name as client_name, p.project_name as project_name,
+                 cpo.po_number as client_po_number
+          FROM customer_invoices ci
+          LEFT JOIN clients c ON c.id = ci.client_id
+          LEFT JOIN projects p ON p.id = ci.project_id
+          LEFT JOIN client_purchase_orders cpo ON cpo.id = ci.client_po_id
+          WHERE ci.project_id = ${projectId}
+          ORDER BY ci.created_at DESC LIMIT ${limit} OFFSET ${offset}
+        `;
+      }
 
-      const countResult = await sql`
-        SELECT COUNT(*) as total
-        FROM customer_invoices ci
-        WHERE ci.project_id = ${projectId}
-        ${status ? sql`AND ci.status = ${status}` : sql``}
-        ${clientPoId ? sql`AND ci.client_po_id = ${clientPoId}` : sql``}
-      `;
+      let countResult;
+      if (status && clientPoId) {
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM customer_invoices ci
+          WHERE ci.project_id = ${projectId}
+            AND ci.status = ${status} AND ci.client_po_id = ${clientPoId}
+        `;
+      } else if (status) {
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM customer_invoices ci
+          WHERE ci.project_id = ${projectId} AND ci.status = ${status}
+        `;
+      } else if (clientPoId) {
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM customer_invoices ci
+          WHERE ci.project_id = ${projectId} AND ci.client_po_id = ${clientPoId}
+        `;
+      } else {
+        countResult = await sql`
+          SELECT COUNT(*) as total FROM customer_invoices ci
+          WHERE ci.project_id = ${projectId}
+        `;
+      }
 
       const total = Number(countResult[0]?.total || 0);
 

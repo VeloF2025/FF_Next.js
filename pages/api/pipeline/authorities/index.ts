@@ -53,36 +53,280 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const offset = (pageNum - 1) * limitNum;
   const isActiveFilter = is_active === undefined ? true : is_active === 'true';
 
-  // Count total
-  const countResult = (await sql`
-    SELECT COUNT(*) as count
-    FROM pipeline_service_authorities sa
-    WHERE sa.is_active = ${isActiveFilter}
-      ${approval_type_id ? sql`AND sa.approval_type_id = ${String(approval_type_id)}` : sql``}
-      ${province ? sql`AND sa.province = ${String(province)}` : sql``}
-      ${municipality ? sql`AND sa.municipality = ${String(municipality)}` : sql``}
-      ${search ? sql`AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${String(search)})` : sql``}
-  `) as { count: string }[];
+  // Helper to build full-text search condition as a string for tsvector filter
+  const searchStr = search ? String(search) : null;
+
+  // Count total — explicit branches to avoid conditional SQL fragments (Neon rule)
+  let countResult: { count: string }[];
+  if (approval_type_id && province && municipality && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (approval_type_id && province && municipality) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+    `) as { count: string }[];
+  } else if (approval_type_id && province && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.province = ${String(province)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (approval_type_id && province) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.province = ${String(province)}
+    `) as { count: string }[];
+  } else if (approval_type_id && municipality && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (approval_type_id && municipality) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.municipality = ${String(municipality)}
+    `) as { count: string }[];
+  } else if (approval_type_id && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (approval_type_id) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter} AND sa.approval_type_id = ${String(approval_type_id)}
+    `) as { count: string }[];
+  } else if (province && municipality && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (province && municipality) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+    `) as { count: string }[];
+  } else if (province && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter} AND sa.province = ${String(province)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (province) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter} AND sa.province = ${String(province)}
+    `) as { count: string }[];
+  } else if (municipality && searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else if (municipality) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter} AND sa.municipality = ${String(municipality)}
+    `) as { count: string }[];
+  } else if (searchStr) {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+    `) as { count: string }[];
+  } else {
+    countResult = (await sql`
+      SELECT COUNT(*) as count FROM pipeline_service_authorities sa
+      WHERE sa.is_active = ${isActiveFilter}
+    `) as { count: string }[];
+  }
 
   const total = parseInt(countResult[0]?.count || '0', 10);
 
-  // Get authorities with type info
-  const authorities = (await sql`
-    SELECT
-      sa.*,
-      pat.name as approval_type_name,
-      pat.code as approval_type_code,
-      pat.category as approval_type_category
-    FROM pipeline_service_authorities sa
-    LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
-    WHERE sa.is_active = ${isActiveFilter}
-      ${approval_type_id ? sql`AND sa.approval_type_id = ${String(approval_type_id)}` : sql``}
-      ${province ? sql`AND sa.province = ${String(province)}` : sql``}
-      ${municipality ? sql`AND sa.municipality = ${String(municipality)}` : sql``}
-      ${search ? sql`AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${String(search)})` : sql``}
-    ORDER BY sa.authority_name ASC
-    LIMIT ${limitNum} OFFSET ${offset}
-  `) as ServiceAuthorityWithType[];
+  // Get authorities with type info — same branch logic as count
+  let authorities: ServiceAuthorityWithType[];
+  if (approval_type_id && province && municipality && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && province && municipality) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && province && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.province = ${String(province)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && province) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.province = ${String(province)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && municipality && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && municipality) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)} AND sa.municipality = ${String(municipality)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.approval_type_id = ${String(approval_type_id)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (approval_type_id) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter} AND sa.approval_type_id = ${String(approval_type_id)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (province && municipality && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (province && municipality) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND sa.province = ${String(province)} AND sa.municipality = ${String(municipality)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (province && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter} AND sa.province = ${String(province)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (province) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter} AND sa.province = ${String(province)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (municipality && searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter} AND sa.municipality = ${String(municipality)}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (municipality) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter} AND sa.municipality = ${String(municipality)}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else if (searchStr) {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+        AND to_tsvector('english', sa.authority_name || ' ' || COALESCE(sa.department, '') || ' ' || COALESCE(sa.municipality, '')) @@ plainto_tsquery('english', ${searchStr})
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  } else {
+    authorities = (await sql`
+      SELECT sa.*, pat.name as approval_type_name, pat.code as approval_type_code,
+             pat.category as approval_type_category
+      FROM pipeline_service_authorities sa
+      LEFT JOIN pipeline_approval_types pat ON pat.id = sa.approval_type_id
+      WHERE sa.is_active = ${isActiveFilter}
+      ORDER BY sa.authority_name ASC LIMIT ${limitNum} OFFSET ${offset}
+    `) as ServiceAuthorityWithType[];
+  }
 
   return apiResponse.success(res, {
     authorities,
