@@ -259,8 +259,9 @@ function ProjectsGrid({
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2 flex flex-col gap-1">
-              <label className="text-xs text-gray-400 font-medium">Project Name</label>
+              <label htmlFor="add-project-name" className="text-xs text-gray-400 font-medium">Project Name</label>
               <input
+                id="add-project-name"
                 type="text"
                 value={addForm.name}
                 onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
@@ -271,8 +272,9 @@ function ProjectsGrid({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-400 font-medium">PO Count</label>
+              <label htmlFor="add-project-po-count" className="text-xs text-gray-400 font-medium">PO Count</label>
               <input
+                id="add-project-po-count"
                 type="text"
                 inputMode="numeric"
                 value={addForm.po_count}
@@ -283,8 +285,9 @@ function ProjectsGrid({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-400 font-medium">Rate (R)</label>
+              <label htmlFor="add-project-rate" className="text-xs text-gray-400 font-medium">Rate (R)</label>
               <input
+                id="add-project-rate"
                 type="text"
                 inputMode="numeric"
                 value={addForm.rate}
@@ -295,8 +298,9 @@ function ProjectsGrid({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-400 font-medium">Uptake %</label>
+              <label htmlFor="add-project-uptake" className="text-xs text-gray-400 font-medium">Uptake %</label>
               <input
+                id="add-project-uptake"
                 type="text"
                 inputMode="numeric"
                 value={addForm.uptake}
@@ -362,7 +366,20 @@ function ProjectsGrid({
               const rowBg = i % 2 === 0 ? '#111827' : '#1f2937';
               return [
                 <tr key={project.id} style={{ backgroundColor: rowBg }} className="hover:bg-gray-700/30 transition-colors">
-                  <td className="px-2 py-2 text-center cursor-pointer text-gray-400 hover:text-white border border-gray-700" onClick={() => toggleExpand(project.id)}>
+                  <td
+                    role="button"
+                    tabIndex={0}
+                    className="px-2 py-2 text-center cursor-pointer text-gray-400 hover:text-white border border-gray-700"
+                    onClick={() => toggleExpand(project.id)}
+                    aria-label={isExpanded ? `Collapse ${project.name} details` : `Expand ${project.name} details`}
+                    aria-expanded={isExpanded}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleExpand(project.id);
+                      }
+                    }}
+                  >
                     {isExpanded ? <ChevronDown className="w-4 h-4 inline" /> : <ChevronRight className="w-4 h-4 inline" />}
                   </td>
                   <td className="px-3 py-2 text-sm font-medium text-gray-200 border border-gray-700 cursor-pointer hover:text-white" onClick={() => toggleExpand(project.id)}>{project.name}</td>
