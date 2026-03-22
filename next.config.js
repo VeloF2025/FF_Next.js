@@ -72,6 +72,8 @@ const nextConfig = {
       'zod',
       'react-hot-toast',
       '@heroicons/react',
+      '@mui/material',
+      '@mui/icons-material',
     ],
   },
 
