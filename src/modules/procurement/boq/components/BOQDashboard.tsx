@@ -1,5 +1,5 @@
 // import React from 'react'; // Not used in this component
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Plus, Upload, FileText, Search, Filter } from 'lucide-react';
 import { ProcurementErrorBoundary } from '../../components/error/ProcurementErrorBoundary';
 
@@ -41,15 +41,13 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
             <p className="text-[var(--ff-text-secondary)] mt-1">Upload, map, and manage project BOQs</p>
           </div>
           <div className="flex space-x-3">
-            <Link
-              to="/app/procurement/boq/upload"
+            <Link href="/app/procurement/boq/upload"
               className="inline-flex items-center px-4 py-2 border border-[var(--ff-border-light)] rounded-md shadow-sm text-sm font-medium text-[var(--ff-text-secondary)] bg-[var(--ff-bg-secondary)] hover:bg-[var(--ff-bg-hover)]"
             >
               <Upload className="h-4 w-4 mr-2" />
               Upload BOQ
             </Link>
-            <Link
-              to="/app/procurement/boq/create"
+            <Link href="/app/procurement/boq/create"
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -204,22 +202,19 @@ export function BOQDashboard({ projectId: _projectId, searchTerm: _searchTerm, o
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        <Link
-                          to={`/app/procurement/boq/${boq.id}`}
+                        <Link href={`/app/procurement/boq/${boq.id}`}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           View
                         </Link>
                         {boq.status === 'MAPPING_REVIEW' && (
-                          <Link
-                            to={`/app/procurement/boq/${boq.id}/mapping`}
+                          <Link href={`/app/procurement/boq/${boq.id}/mapping`}
                             className="text-yellow-600 hover:text-yellow-900"
                           >
                             Map
                           </Link>
                         )}
-                        <Link
-                          to={`/app/procurement/boq/${boq.id}/edit`}
+                        <Link href={`/app/procurement/boq/${boq.id}/edit`}
                           className="text-green-600 hover:text-green-900"
                         >
                           Edit

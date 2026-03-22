@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { 
   BarChart3, 
   Building, 
@@ -216,7 +216,8 @@ const mockPermissions: SupplierPermissions = {
 
 // Portal provider component
 export function SuppliersPortalProvider({ children }: SuppliersPortalProviderProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const router = useRouter();
+  const searchParams = new URLSearchParams(router.query as Record<string, string>);
   const [state, dispatch] = useReducer(suppliersPortalReducer, initialState);
   
   const permissions = mockPermissions;

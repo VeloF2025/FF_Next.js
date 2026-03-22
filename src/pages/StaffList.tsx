@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { useQuery } from '@tanstack/react-query';
 import { notificationService } from '@/services/core/NotificationService';
 import {
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui';
 
 export function StaffList() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchTerm] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [filter, setFilter] = useState<StaffFilter>({});
@@ -168,7 +168,7 @@ export function StaffList() {
         title="Staff Management"
         description="Manage your team members and their information"
         itemCount={staff?.length || 0}
-        onAdd={() => navigate('/app/staff/new')}
+        onAdd={() => router.push('/app/staff/new')}
         addButtonText="Add Staff Member"
         onImport={() => setShowImport(true)}
         onExport={handleExport}
@@ -277,7 +277,7 @@ export function StaffList() {
         data={filteredStaff}
         columns={tableColumns as any}
         isLoading={isLoading}
-        onRowClick={(staff: StaffMember) => navigate(`/app/staff/${staff.id}`)}
+        onRowClick={(staff: StaffMember) => router.push(`/app/staff/${staff.id}`)}
         getRowKey={(staff: StaffMember) => staff.id || ''}
       />
     </div>

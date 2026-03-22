@@ -1,5 +1,5 @@
 import { } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
 import { useSuppliersPortal } from '../context/SuppliersPortalContext';
 import { cn } from '@/lib/utils';
@@ -105,7 +105,7 @@ function TabItem({
   }
 
   return (
-    <Link to={path} className="block">
+    <Link href={path} className="block">
       {content}
     </Link>
   );

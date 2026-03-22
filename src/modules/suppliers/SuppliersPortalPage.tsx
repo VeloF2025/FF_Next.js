@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { AlertCircle, Building2, Users, TrendingUp, Clock } from 'lucide-react';
 import { 
   SuppliersPortalProvider, 
@@ -79,7 +79,8 @@ function SuppliersPortalLayout() {
     setActiveTab
   } = useSuppliersPortal();
 
-  const [searchParams] = useSearchParams();
+  const router = useRouter();
+  const searchParams = new URLSearchParams(router.query as Record<string, string>);
 
   // Handle tab changes from URL
   useEffect(() => {

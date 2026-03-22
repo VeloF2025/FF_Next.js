@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Edit, Building } from 'lucide-react';
 import { useClient, useDeleteClient } from '@/hooks/useClients';
 import { notificationService } from '@/services/core/NotificationService';
@@ -12,8 +12,8 @@ import { ClientAddressNotes } from './client/ClientAddressNotes';
 import { getStatusColor, getPriorityColor, getCreditRatingColor, formatCurrency } from './client/ClientHelpers';
 
 export function ClientDetail() {
-  const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { id } = router.query as Record<string, string>;
   const { data: client, isLoading, error } = useClient(id || '');
   const deleteMutation = useDeleteClient();
 
@@ -23,7 +23,7 @@ export function ClientDetail() {
     try {
       await deleteMutation.mutateAsync(id!);
       notificationService.success('Client deleted');
-      navigate('/clients');
+      router.push('/clients');
     } catch (error) {
       notificationService.error('Failed to delete client');
     }
@@ -52,7 +52,7 @@ export function ClientDetail() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <button
-          onClick={() => navigate('/clients')}
+          onClick={() => router.push('/clients')}
           className="inline-flex items-center text-sm text-muted-foreground hover:text-muted-foreground"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
@@ -75,7 +75,7 @@ export function ClientDetail() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate(`/clients/${id}/edit`)}
+                onClick={() => router.push(`/clients/${id}/edit`)}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-muted-foreground bg-card border border-border rounded-lg hover:bg-background"
               >
                 <Edit className="w-4 h-4 mr-1" />

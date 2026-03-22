@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { Calendar, Users, Clock, Send, CheckCircle, XCircle, Award, MoreVertical } from 'lucide-react';
 import { RFQ, RFQStatus } from '@/types/procurement.types';
 import { formatDisplayDate, formatDisplayDateShort } from '@/utils/dateFormat';
@@ -8,10 +8,10 @@ interface RFQCardProps {
 }
 
 export function RFQCard({ rfq }: RFQCardProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleClick = () => {
-    navigate(`/procurement/rfq/${rfq.id}`);
+    router.push(`/procurement/rfq/${rfq.id}`);
   };
 
   const getStatusIcon = () => {

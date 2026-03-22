@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { StandardModuleHeader } from '@/components/ui/StandardModuleHeader';
 import { StandardSummaryCards } from '@/components/ui/StandardSummaryCards';
 import { StandardSearchFilter } from '@/components/ui/StandardSearchFilter';
@@ -15,7 +15,7 @@ import { ProjectCardView } from './components/ProjectCardView';
 import { ProjectsPageProps } from './types';
 
 export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: ProjectsPageProps = {}) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
@@ -55,7 +55,7 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
           title="Projects"
           description="Manage and track all your fiber optic projects"
           itemCount={projects.length}
-          onAdd={() => navigate('/app/projects/new')}
+          onAdd={() => router.push('/app/projects/new')}
           addButtonText="New Project"
           addPermission="projects.list"
         />
@@ -105,7 +105,7 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
         <ProjectTableView
           projects={filteredProjects}
           isLoading={isLoading}
-          onProjectView={(id) => navigate(`/app/projects/${id}`)}
+          onProjectView={(id) => router.push(`/app/projects/${id}`)}
         />
       ) : (
         <ProjectCardView
@@ -113,10 +113,10 @@ export function Projects({ searchTerm: initialSearchTerm = '', initialFilter }: 
           isLoading={isLoading}
           searchTerm={searchTerm}
           hasActiveFilters={hasActiveFilters}
-          onProjectView={(id) => navigate(`/app/projects/${id}`)}
-          onProjectEdit={(id) => navigate(`/app/projects/${id}/edit`)}
+          onProjectView={(id) => router.push(`/app/projects/${id}`)}
+          onProjectEdit={(id) => router.push(`/app/projects/${id}/edit`)}
           onProjectDelete={handleDeleteProject}
-          onCreateProject={() => navigate('/app/projects/new')}
+          onCreateProject={() => router.push('/app/projects/new')}
         />
       )}
     </div>

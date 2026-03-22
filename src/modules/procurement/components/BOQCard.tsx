@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { Calendar, DollarSign, FileText, MoreVertical, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { BOQ, BOQStatus } from '@/types/procurement.types';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -8,10 +8,10 @@ interface BOQCardProps {
 }
 
 export function BOQCard({ boq }: BOQCardProps) {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleClick = () => {
-    navigate(`/procurement/boq/${boq.id}`);
+    router.push(`/procurement/boq/${boq.id}`);
   };
 
   const getStatusIcon = () => {
