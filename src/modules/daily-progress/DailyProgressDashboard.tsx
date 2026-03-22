@@ -1,8 +1,8 @@
 import { TrendingUp, Calendar, FileText, BarChart3, Users, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 export function DailyProgressDashboard() {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const cards = [
     {
@@ -10,42 +10,42 @@ export function DailyProgressDashboard() {
       description: 'Submit today\'s progress data',
       icon: FileText,
       color: 'bg-blue-500',
-      onClick: () => navigate('/app/daily-progress/entry'),
+      onClick: () => router.push('/app/daily-progress/entry'),
     },
     {
       title: 'View Progress',
       description: 'Track daily progress trends',
       icon: TrendingUp,
       color: 'bg-green-500',
-      onClick: () => navigate('/app/daily-progress/view'),
+      onClick: () => router.push('/app/daily-progress/view'),
     },
     {
       title: 'Weekly Summary',
       description: 'Weekly performance overview',
       icon: Calendar,
       color: 'bg-purple-500',
-      onClick: () => navigate('/app/daily-progress/weekly'),
+      onClick: () => router.push('/app/daily-progress/weekly'),
     },
     {
       title: 'Monthly Report',
       description: 'Monthly progress analysis',
       icon: BarChart3,
       color: 'bg-orange-500',
-      onClick: () => navigate('/app/daily-progress/monthly'),
+      onClick: () => router.push('/app/daily-progress/monthly'),
     },
     {
       title: 'Team Performance',
       description: 'Compare team metrics',
       icon: Users,
       color: 'bg-indigo-500',
-      onClick: () => navigate('/app/daily-progress/teams'),
+      onClick: () => router.push('/app/daily-progress/teams'),
     },
     {
       title: 'Export Reports',
       description: 'Download progress reports',
       icon: Download,
       color: 'bg-pink-500',
-      onClick: () => navigate('/app/daily-progress/export'),
+      onClick: () => router.push('/app/daily-progress/export'),
     },
   ];
 

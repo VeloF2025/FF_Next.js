@@ -1,9 +1,9 @@
 import { Clock, Users, Calendar, Plus, TrendingUp, AlertTriangle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 
 export function TasksDashboard() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
 
   const tabs = [
@@ -19,7 +19,7 @@ export function TasksDashboard() {
       description: 'Add a new task',
       icon: Plus,
       color: 'bg-blue-500',
-      onClick: () => navigate('/app/tasks/new'),
+      onClick: () => router.push('/app/tasks/new'),
     },
     {
       title: 'In Progress',
@@ -27,7 +27,7 @@ export function TasksDashboard() {
       icon: Clock,
       color: 'bg-yellow-500',
       count: 8,
-      onClick: () => navigate('/app/tasks/in-progress'),
+      onClick: () => router.push('/app/tasks/in-progress'),
     },
     {
       title: 'Overdue',
@@ -35,28 +35,28 @@ export function TasksDashboard() {
       icon: AlertTriangle,
       color: 'bg-red-500',
       count: 3,
-      onClick: () => navigate('/app/tasks/overdue'),
+      onClick: () => router.push('/app/tasks/overdue'),
     },
     {
       title: 'By Project',
       description: 'Tasks grouped by project',
       icon: TrendingUp,
       color: 'bg-green-500',
-      onClick: () => navigate('/app/tasks/by-project'),
+      onClick: () => router.push('/app/tasks/by-project'),
     },
     {
       title: 'By Assignee',
       description: 'Tasks grouped by person',
       icon: Users,
       color: 'bg-purple-500',
-      onClick: () => navigate('/app/tasks/by-assignee'),
+      onClick: () => router.push('/app/tasks/by-assignee'),
     },
     {
       title: 'Calendar View',
       description: 'View tasks on calendar',
       icon: Calendar,
       color: 'bg-indigo-500',
-      onClick: () => navigate('/app/tasks/calendar'),
+      onClick: () => router.push('/app/tasks/calendar'),
     },
   ];
 

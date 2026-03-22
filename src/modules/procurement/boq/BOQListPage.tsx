@@ -3,7 +3,7 @@ import { Plus, FileText, Clock, CheckCircle, Package } from 'lucide-react';
 import { useBOQs } from '../hooks/useBOQ';
 import { BOQStatus } from '@/types/procurement.types';
 import { BOQCard } from '../components/BOQCard';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { formatDate } from '@/utils/dateFormat';
 import {
   StandardModuleHeader,
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui';
 
 export function BOQListPage() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<BOQStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
@@ -39,7 +39,7 @@ export function BOQListPage() {
   });
 
   const handleCreate = () => {
-    navigate('/procurement/boq/new');
+    router.push('/procurement/boq/new');
   };
 
   const handleImport = () => {
@@ -198,7 +198,7 @@ export function BOQListPage() {
           data={filteredBOQs || []}
           columns={tableColumns}
           isLoading={isLoading}
-          onRowClick={(boq: any) => navigate(`/procurement/boq/${boq.id}`)}
+          onRowClick={(boq: any) => router.push(`/procurement/boq/${boq.id}`)}
           getRowKey={(boq: any) => boq.id}
           emptyMessage="No BOQs found. Create your first BOQ to get started."
         />

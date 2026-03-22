@@ -3,7 +3,7 @@
  * Displays key procurement statistics and metrics
  */
 
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { QuickStat } from '../types/dashboard.types';
 
 interface QuickStatsProps {
@@ -30,8 +30,7 @@ export function QuickStats({ stats }: QuickStatsProps) {
           ))}
         </div>
         <div className="mt-6">
-          <Link
-            to="/app/procurement/reports/cost-analysis"
+          <Link href="/app/procurement/reports/cost-analysis"
             className="text-sm font-medium text-blue-600 hover:text-blue-500"
           >
             View detailed analytics →

@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { ArrowLeft, Save } from 'lucide-react';
 
 // Import split components
@@ -9,7 +9,8 @@ import { StaffEmergencyContact } from './staff/StaffEmergencyContact';
 import { useStaffForm } from './staff/useStaffForm';
 
 export function StaffForm() {
-  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { id } = router.query as Record<string, string>;
   
   const {
     formData,

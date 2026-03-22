@@ -3,7 +3,7 @@
  * Displays recent procurement activities with status indicators
  */
 
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { RecentActivity } from '../types/dashboard.types';
 import { getStatusIcon } from '../utils/dashboardUtils';
 
@@ -35,8 +35,7 @@ export function RecentActivities({ activities }: RecentActivitiesProps) {
           ))}
         </div>
         <div className="mt-6">
-          <Link
-            to="/app/procurement/reports"
+          <Link href="/app/procurement/reports"
             className="text-sm font-medium text-blue-600 hover:text-blue-500"
           >
             View all activities →

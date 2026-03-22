@@ -3,7 +3,7 @@
  */
 
 import { LucideIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { memo, useCallback } from 'react';
 import { cn } from '@/utils/cn';
 
@@ -32,15 +32,15 @@ const StatCardComponent = ({
   style,
   onClick
 }: StatCardProps) => {
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleClick = useCallback(() => {
     if (onClick) {
       onClick();
     } else if (route) {
-      navigate(route);
+      router.push(route);
     }
-  }, [onClick, route, navigate]);
+  }, [onClick, route, router]);
 
   return (
     <div

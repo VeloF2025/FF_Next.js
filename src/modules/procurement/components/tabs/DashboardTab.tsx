@@ -11,13 +11,13 @@ import {
   Building2,
   Globe
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { useProcurementPortal } from '../../context/ProcurementPortalProvider';
 import { ProcurementDashboard } from '../ProcurementDashboard';
 import { AllProjectsOverview } from '../AllProjectsOverview';
 
 export function DashboardTab() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const { 
     selectedProject, 
     viewMode, 

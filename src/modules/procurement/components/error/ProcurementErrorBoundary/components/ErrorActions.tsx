@@ -4,7 +4,7 @@
  */
 
 import { RefreshCw, ArrowLeft, Home } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 interface ErrorActionsProps {
   onReset: () => void;
@@ -34,8 +34,7 @@ export function ErrorActions({ onReset, onReload, isComponentLevel }: ErrorActio
       </button>
       
       {!isComponentLevel && (
-        <Link
-          to="/app/procurement"
+        <Link href="/app/procurement"
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-background transition-colors"
         >
           <Home className="h-4 w-4" />

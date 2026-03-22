@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { BarChart3, FileText, Send, Quote, ShoppingCart, Package, Truck, ClipboardList } from 'lucide-react';
 import type { 
   ProcurementPortalContext as ProcurementPortalContextType,
@@ -130,7 +130,8 @@ interface ProcurementPortalProviderProps {
 
 // Portal provider component
 export function ProcurementPortalProvider({ children }: ProcurementPortalProviderProps) {
-  const [searchParams] = useSearchParams();
+  const router = useRouter();
+  const searchParams = new URLSearchParams(router.query as Record<string, string>);
   const [state, dispatch] = useReducer(portalReducer, initialState);
   
   // Get permissions for selected project

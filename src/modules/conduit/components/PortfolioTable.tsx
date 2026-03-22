@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight } from 'lucide-react';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -369,6 +369,34 @@ interface PortfolioTableProps {
 }
 
 export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
+  const [allProjects, setAllProjects] = useState<ConduitProject[]>(initialProjects);
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+
+  const prospective = allProjects.filter(p => (p.status ?? 'prospective') === 'prospective');
+  const executable  = allProjects.filter(p => p.status === 'executable');
+  const actual      = allProjects.filter(p => p.status === 'actual');
+
+  async function handlePromote(projectId: string) {
+    setPromoting(true);
+    setPromoteError(null);
+    try {
+      const res = await fetch(`/api/conduit/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'executable' }),
+      });
+      if (!res.ok) throw new Error('Failed to promote project');
+      setAllProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: 'executable' as const } : p));
+      setShowPromoteModal(false);
+    } catch (e) {
+      setPromoteError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
 
@@ -380,7 +408,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
-        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Prospective" />
+        <ProjectsGrid initialProjects={prospective} tableLabel="Project Scope — Prospective" />
       </div>
 
       {/* ── Forecasted — Executable ───────────────────────────────────── */}
@@ -390,8 +418,56 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
             Forecasted — Executable
           </span>
           <div className="flex-1 border-t border-gray-700" />
+          {/* Add Project From Prospective */}
+          {prospective.length > 0 && (
+            <button
+              onClick={() => { setShowPromoteModal(true); setPromoteError(null); }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-teal-400 border border-teal-600 hover:bg-teal-900/30 px-3 py-1.5 rounded transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Project From Prospective
+            </button>
+          )}
         </div>
-        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Executable" />
+
+        {/* Promote modal */}
+        {showPromoteModal && (
+          <div className="rounded-lg border border-teal-700 bg-gray-900 p-4 space-y-3">
+            <p className="text-sm font-semibold text-teal-300">Select a Prospective project to move to Executable:</p>
+            {promoteError && <p className="text-xs text-red-400">{promoteError}</p>}
+            <div className="space-y-2">
+              {prospective.map(p => (
+                <button
+                  key={p.id}
+                  disabled={promoting}
+                  onClick={() => handlePromote(p.id)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 rounded border border-gray-700 hover:border-teal-500 hover:bg-teal-900/20 text-left transition-colors disabled:opacity-50"
+                >
+                  <span className="text-sm text-white font-medium">{p.name}</span>
+                  <span className="flex items-center gap-1 text-xs text-teal-400">
+                    {promoting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
+                    Move to Executable
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowPromoteModal(false)}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {executable.length > 0
+          ? <ProjectsGrid initialProjects={executable} tableLabel="Project Scope — Executable" />
+          : !showPromoteModal && (
+            <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
+              <p className="text-sm">No executable projects yet — use the button above to add one from Prospective.</p>
+            </div>
+          )
+        }
       </div>
 
       {/* ── Actual ───────────────────────────────────────────────────── */}

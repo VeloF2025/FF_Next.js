@@ -5,10 +5,10 @@ import { RFQStatus } from '@/types/procurement.types';
 import { RFQCard } from '../components/RFQCard';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 
 export function RFQListPage() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<RFQStatus | 'all'>('all');
   
@@ -31,11 +31,11 @@ export function RFQListPage() {
   });
 
   const handleCreate = () => {
-    navigate('/procurement/rfq/new');
+    router.push('/procurement/rfq/new');
   };
 
   const handleCompare = () => {
-    navigate('/procurement/rfq/compare');
+    router.push('/procurement/rfq/compare');
   };
 
   if (error) {

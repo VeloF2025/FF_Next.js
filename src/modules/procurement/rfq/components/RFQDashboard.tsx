@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { 
   Plus, 
   Upload, 
@@ -251,15 +251,13 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </button>
-            <Link
-              to="/app/procurement/rfq/upload"
+            <Link href="/app/procurement/rfq/upload"
               className="inline-flex items-center px-4 py-2 border border-border rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <Upload className="h-4 w-4 mr-2" />
               Import RFQ
             </Link>
-            <Link
-              to="/app/procurement/rfq/create"
+            <Link href="/app/procurement/rfq/create"
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -513,23 +511,20 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
-                          <Link
-                            to={`/app/procurement/rfq/${rfq.id}`}
+                          <Link href={`/app/procurement/rfq/${rfq.id}`}
                             className="text-blue-600 hover:text-blue-900"
                           >
                             View
                           </Link>
                           {rfq.status === RFQStatus.RESPONSES_RECEIVED && (
-                            <Link
-                              to={`/app/procurement/rfq/${rfq.id}/evaluate`}
+                            <Link href={`/app/procurement/rfq/${rfq.id}/evaluate`}
                               className="text-purple-600 hover:text-purple-900"
                             >
                               Evaluate
                             </Link>
                           )}
                           {rfq.status === RFQStatus.DRAFT && (
-                            <Link
-                              to={`/app/procurement/rfq/${rfq.id}/edit`}
+                            <Link href={`/app/procurement/rfq/${rfq.id}/edit`}
                               className="text-green-600 hover:text-green-900"
                             >
                               Edit
@@ -553,8 +548,7 @@ export function RFQDashboard({ projectId: _projectId, searchTerm, statusFilter, 
                     : 'Get started by creating your first RFQ.'}
                 </p>
                 <div className="mt-6">
-                  <Link
-                    to="/app/procurement/rfq/create"
+                  <Link href="/app/procurement/rfq/create"
                     className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4 mr-2" />

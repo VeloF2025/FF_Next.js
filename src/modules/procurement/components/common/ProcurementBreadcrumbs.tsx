@@ -1,5 +1,5 @@
 // import React from 'react'; // Not used in this component
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import type { ProcurementBreadcrumb } from '../../types';
 
@@ -25,8 +25,7 @@ export function ProcurementBreadcrumbs({ breadcrumbs }: ProcurementBreadcrumbsPr
                 {breadcrumb.label}
               </span>
             ) : (
-              <Link
-                to={breadcrumb.path || '#'}
+              <Link href={breadcrumb.path || '#'}
                 className="text-sm font-medium text-muted-foreground hover:text-muted-foreground"
               >
                 {breadcrumb.label}

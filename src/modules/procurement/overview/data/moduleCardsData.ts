@@ -15,7 +15,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import type { ModuleCard, ProjectStats } from '../types/types';
-import type { NavigateFunction } from 'react-router-dom';
+import type { NextRouter } from 'next/router';
+type NavigateFunction = NextRouter['push'];
 
 export const getModuleCards = (stats: ProjectStats, navigate: NavigateFunction): ModuleCard[] => [
   {

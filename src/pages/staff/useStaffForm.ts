@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/router';
 import { useStaffMember, useCreateStaff, useUpdateStaff } from '@/hooks/useStaff';
 import { safeToDate } from '@/utils/dateHelpers';
 import { log } from '@/lib/logger';
@@ -43,7 +43,7 @@ const getInitialFormData = (): StaffFormData => ({
 });
 
 export function useStaffForm(id?: string) {
-  const navigate = useNavigate();
+  const router = useRouter();
   const isEditing = !!id;
   
   const { data: staff, isLoading } = useStaffMember(id || '');
@@ -105,7 +105,7 @@ export function useStaffForm(id?: string) {
       } else {
         await createMutation.mutateAsync(formData);
       }
-      navigate('/app/staff');
+      router.push('/app/staff');
     } catch (error) {
       log.error('Failed to save staff member:', { data: error }, 'useStaffForm');
     }

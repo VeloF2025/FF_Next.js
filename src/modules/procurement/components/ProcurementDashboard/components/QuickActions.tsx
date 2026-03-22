@@ -3,7 +3,7 @@
  * Action buttons for common procurement tasks
  */
 
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { QuickAction } from '../types/dashboard.types';
 
 interface QuickActionsProps {
