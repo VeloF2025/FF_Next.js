@@ -2,7 +2,7 @@
  * GET /api/analytics/reports/project-revenue
  *
  * Returns Fibertime revenue with per-project breakdown (T1 + children).
- * Source: "FibertimeRevenue" worksheet only — Data tab not used.
+ * Source: "FT_Revenue" worksheet only — Data tab not used.
  *
  * Access restricted to authorised users via RBAC (analytics.reports / view)
  * or direct user-ID allowlist.
@@ -58,7 +58,7 @@ function findColContains(headers: unknown[], include: string): number {
 }
 
 /**
- * Parse "FibertimeRevenue" worksheet.
+ * Parse "FT_Revenue" worksheet.
  * Groups rows by project, sums Debit Excl VAT per project.
  * Returns a single CostCentreRevenueItem with children sorted by revenue desc.
  */
@@ -66,7 +66,7 @@ function parseFibertimeSheet(values: unknown[][]): CostCentreRevenueItem {
   // Always returns something — never throws. Logs headers for diagnostics.
   const headers = (values[0] ?? []) as unknown[];
 
-  logger.info('FibertimeRevenue headers', { headers: headers.slice(0, 20) });
+  logger.info('FT_Revenue headers', { headers: headers.slice(0, 20) });
 
   // "Debit Excl VAT" — try multiple patterns before giving up
   let debitCol = findColExact(headers, 'debit excl vat');
@@ -86,11 +86,11 @@ function parseFibertimeSheet(values: unknown[][]): CostCentreRevenueItem {
   let projectCol = findColContains(headers, 'project');
   if (projectCol < 0) projectCol = 0;
 
-  logger.info('FibertimeRevenue column detection', { debitCol, projectCol });
+  logger.info('FT_Revenue column detection', { debitCol, projectCol });
 
   // If debitCol still not found, return Fibertime with revenue=0 and no children
   if (debitCol < 0) {
-    logger.warn('FibertimeRevenue: could not detect revenue column');
+    logger.warn('FT_Revenue: could not detect revenue column');
     return { tier1: 'Fibertime', revenue: 0, children: [] };
   }
 
@@ -112,12 +112,12 @@ function parseFibertimeSheet(values: unknown[][]): CostCentreRevenueItem {
 
   const total = children.reduce((s, c) => s + c.revenue, 0);
 
-  logger.info('FibertimeRevenue parsed', { projects: children.length, total });
+  logger.info('FT_Revenue parsed', { projects: children.length, total });
 
   return { tier1: 'Fibertime', revenue: total, children };
 }
 
-// 🟢 WORKING: Cost Centre Revenue GET handler — reads live SharePoint FibertimeRevenue tab
+// 🟢 WORKING: Cost Centre Revenue GET handler — reads live SharePoint FT_Revenue tab
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   // --- Authentication ---
   const cookieStore = await cookies();
@@ -158,17 +158,17 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     // Try both tab name variants (with and without space)
     let sheetValues: unknown[][] | null = null;
     try {
-      const res = await getWorksheetRange('FibertimeRevenue');
+      const res = await getWorksheetRange('FT_Revenue');
       sheetValues = res.values ?? null;
     } catch {
-      logger.warn('FibertimeRevenue (no space) failed — trying "Fibertime Revenue"');
+      logger.warn('FT_Revenue (no space) failed — trying "FT_Revenue"');
     }
     if (!sheetValues || sheetValues.length < 2) {
-      const res2 = await getWorksheetRange('Fibertime Revenue');
+      const res2 = await getWorksheetRange('FT_Revenue');
       sheetValues = res2.values ?? null;
     }
     if (!sheetValues || sheetValues.length < 2) {
-      throw new Error('FibertimeRevenue sheet not found under either tab name variant');
+      throw new Error('FT_Revenue sheet not found under either tab name variant');
     }
 
     const ft = parseFibertimeSheet(sheetValues);
@@ -179,7 +179,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       meta: {
         generatedAt: new Date().toISOString(),
         itemCount: 1,
-        sources: ['FibertimeRevenue'],
+        sources: ['FT_Revenue'],
       },
     };
 
