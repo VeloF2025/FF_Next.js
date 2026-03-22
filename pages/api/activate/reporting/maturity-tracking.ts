@@ -18,6 +18,7 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { cachedQuery } from '@/lib/queryCache';
 import type {
   MaturityTrackingResponse,
   MaturityTrackingSummary,
@@ -29,6 +30,9 @@ import type {
   VelocityMetrics,
   ProjectionData,
 } from '@/modules/activate/types/reporting.types';
+
+/** Cache TTL: 5 minutes — maturity data changes only on new activations */
+const CACHE_TTL_MS = 300_000;
 
 // Milestone percentages to track
 const MILESTONES = [25, 50, 75, 90];
@@ -206,13 +210,22 @@ async function handler(
         ORDER BY d.project_id, week_start
       `;
 
-      // All four queries are independent — run them in parallel
-      const [poScopeResult, projectResult, milestoneResult, velocityResult] = await Promise.all([
-        client.query<RawPoScopeRow>(poScopeQuery, [projectFilter, isUuid]),
-        client.query<RawProjectRow>(projectQuery, [projectFilter, isUuid]),
-        client.query<RawMilestoneRow>(milestoneQuery, [projectFilter, isUuid]),
-        client.query<RawVelocityRow>(velocityQuery, [projectFilter, isUuid]),
-      ]);
+      // All four queries are independent — run them in parallel, wrapped in cache
+      const cacheKey = `maturity-tracking:${projectFilter ?? 'all'}:${isUuid}`;
+      const [poScopeResult, projectResult, milestoneResult, velocityResult] = await cachedQuery(
+        'reporting',
+        cacheKey,
+        async () => {
+          log.debug('Cache miss — querying database', { cacheKey }, 'MaturityTracking');
+          return Promise.all([
+            client.query<RawPoScopeRow>(poScopeQuery, [projectFilter, isUuid]),
+            client.query<RawProjectRow>(projectQuery, [projectFilter, isUuid]),
+            client.query<RawMilestoneRow>(milestoneQuery, [projectFilter, isUuid]),
+            client.query<RawVelocityRow>(velocityQuery, [projectFilter, isUuid]),
+          ]);
+        },
+        CACHE_TTL_MS
+      );
 
       // Build PO scope lookup: project_id -> contracted drops total
       const poScopeMap = new Map<string, number>();
