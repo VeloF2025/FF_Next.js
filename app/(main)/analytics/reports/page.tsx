@@ -1,12 +1,9 @@
 /**
- * Analytics Reports Page — Server Component (force-dynamic)
- * Restricted internal use — renders the client-side reports sandbox.
+ * Analytics Reports — redirects to /analytics/reports/financial
  */
 
-export const dynamic = 'force-dynamic';
-
-import ReportsPageClient from './client';
+import { redirect } from 'next/navigation';
 
 export default function ReportsPage() {
-  return <ReportsPageClient />;
+  redirect('/analytics/reports/financial');
 }
