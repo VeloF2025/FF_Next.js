@@ -182,16 +182,7 @@ async function callVLMService(
     return data as VLMBatchResponse;
   } catch (error) {
     log.error('VLM service call failed', { error });
-
-    // Return mock results for development (replace with actual error handling)
-    return {
-      results: photos.map((photo) => ({
-        step: photo.step,
-        score: Math.random() * 10,
-        passed: Math.random() > 0.3,
-        comment: 'Mock evaluation result',
-      })),
-    };
+    throw new Error(`VLM service call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

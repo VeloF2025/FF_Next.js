@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout';
+import { useAuth } from '@/contexts/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 
 import {
   FileInput,
@@ -135,10 +137,12 @@ export default function RequisitionDetailPage() {
   const [convertLoading, setConvertLoading] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
 
-  // TODO: Get from auth context
-  const currentUserId = 'current-user';
+  // Resolve real user identity and procurement approval permission from auth context
+  const { currentUser } = useAuth();
+  const { can } = usePermission();
+  const currentUserId = currentUser?.id || '';
   const isCreator = requisition?.requestedBy === currentUserId;
-  const isApprover = true; // TODO: Check user permissions
+  const isApprover = can('procurement.sourcing', 'edit');
 
   useEffect(() => {
     if (id) {
