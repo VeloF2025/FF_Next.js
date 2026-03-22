@@ -1,4 +1,4 @@
-// 🟢 WORKING: React Query hook for Assets Register report
+// 🟢 WORKING: React Query hook for Assets Register report — Current + Fixed Assets
 import { useQuery } from '@tanstack/react-query';
 
 export interface AssetItem {
@@ -9,12 +9,21 @@ export interface AssetItem {
   runningTotal: number;
 }
 
-interface ApiResponse {
-  success: boolean;
-  data: {
+export interface AssetsRegisterData {
+  currentAssets: {
     items: AssetItem[];
     categorySummary: Record<string, number>;
   };
+  fixedAssets: {
+    total: number;
+    byCategory: Record<string, number>;
+    note: string;
+  };
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: AssetsRegisterData;
   meta: { generatedAt: string; sources: string[] };
   error?: { code: string; message: string };
 }

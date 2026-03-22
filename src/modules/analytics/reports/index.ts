@@ -59,8 +59,8 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
   },
   {
     id: 'assets-register',
-    name: 'Assets Register',
-    description: 'Pre-paid and capitalised costs — wayleave deposits and infrastructure pre-payments',
+    name: 'Assets',
+    description: 'Fixed Assets (by category from Data tab) and Current Assets (pre-paid costs, deposits)',
     category: 'financial',
   },
   {

@@ -34,6 +34,20 @@
         "Grep": 5,
         "Edit": 13
       }
+    },
+    "781feca0-9a4f-470d-8825-6175f413a7c4": {
+      "session_id": "781feca0-9a4f-470d-8825-6175f413a7c4",
+      "started_at": "2026-03-22T19:58:24.699Z",
+      "total_input_tokens": 13698,
+      "total_output_tokens": 0,
+      "total_cost_usd": 0.041094000000000006,
+      "tool_calls": 51,
+      "tools_used": {
+        "Bash": 8,
+        "Read": 26,
+        "Agent": 1,
+        "Write": 16
+      }
     }
   }
 }

@@ -1,8 +1,11 @@
 /**
  * GET /api/analytics/reports/assets-register
  *
- * Reads the "Current Assets" worksheet.
- * Returns pre-paid and capitalised costs with running total.
+ * Returns two asset sections:
+ *   - Current Assets: from "Current Assets" worksheet (pre-paid costs, wayleave deposits)
+ *   - Fixed Assets: from "Data" worksheet, categories = Fixed Assets, Computer Equipment,
+ *                   Optical Equipment, Vehicles, Tools & Equipment — total value only
+ *                   (full register pending dedicated Fixed Assets tab in workbook)
  *
  * Access restricted via RBAC (analytics.reports / view) or user allowlist.
  */
@@ -15,6 +18,15 @@ import { verifyToken } from '@/lib/auth/jwt';
 import { userHasPermission } from '@/lib/permissions';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
 import type { AssetItem } from '@/modules/analytics/reports/assets-register/useAssetsRegisterData';
+
+/** Categories in the Data tab that represent Fixed Assets */
+const FIXED_ASSET_CATEGORIES = new Set([
+  'Fixed Assets',
+  'Computer Equipment',
+  'Optical Equipment',
+  'Vehicles',
+  'Tools & Equipment',
+]);
 
 const logger = createLogger('analytics:api:assets-register');
 
@@ -74,48 +86,76 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   logger.info('Assets register requested', { userId });
 
   try {
-    const { values } = await getWorksheetRange('Current Assets');
+    // Fetch both sheets in parallel — Data failure is non-fatal (fixed assets total becomes 0)
+    const [currentAssetsResult, dataResult] = await Promise.allSettled([
+      getWorksheetRange('Current Assets'),
+      getWorksheetRange('Data'),
+    ]);
 
-    if (!values || values.length < 2) {
-      throw new Error('Current Assets sheet returned insufficient data');
-    }
-
-    // Headers at row 0: Date, Date-M, Type, Type-Loan, Description, Amount, Amount Acc, Category
-    // Col 0 = Date (serial), Col 4 = Description, Col 5 = Amount, Col 6 = Amount Acc (running), Col 7 = Category
-
+    // --- Current Assets ---
     const items: AssetItem[] = [];
     const categorySummary: Record<string, number> = {};
 
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i] as unknown[];
+    if (currentAssetsResult.status === 'fulfilled') {
+      const { values } = currentAssetsResult.value;
+      // Headers row 0: Date, Date-M, Type, Type-Loan, Description, Amount, Amount Acc, Category
+      for (let i = 1; i < (values ?? []).length; i++) {
+        const row = values[i] as unknown[];
+        const dateCell = row[0];
+        if (!dateCell && !row[4]) continue;
 
-      const dateCell = row[0];
-      if (!dateCell && !row[4]) continue; // skip empty rows
+        const dateSerial = typeof dateCell === 'number' ? dateCell : 0;
+        const date = dateSerial > 0 ? excelSerialToDate(dateSerial) : '';
+        const description = toStr(row[4]);
+        const amount = toNumber(row[5]);
+        const runningTotal = toNumber(row[6]);
+        const category = toStr(row[7]) || 'Uncategorised';
 
-      const dateSerial = typeof dateCell === 'number' ? dateCell : 0;
-      const date = dateSerial > 0 ? excelSerialToDate(dateSerial) : '';
-      const description = toStr(row[4]);
-      const amount = toNumber(row[5]);
-      const runningTotal = toNumber(row[6]);
-      const category = toStr(row[7]) || 'Uncategorised';
-
-      if (!description && amount === 0) continue;
-
-      items.push({ date, description, category, amount, runningTotal });
-
-      if (amount !== 0) {
-        categorySummary[category] = (categorySummary[category] ?? 0) + amount;
+        if (!description && amount === 0) continue;
+        items.push({ date, description, category, amount, runningTotal });
+        if (amount !== 0) categorySummary[category] = (categorySummary[category] ?? 0) + amount;
       }
     }
 
-    logger.info('Assets register fetched', { userId, itemCount: items.length });
+    // --- Fixed Assets (from Data tab, specific categories) ---
+    const fixedAssetsByCategory: Record<string, number> = {};
+    let fixedAssetsTotal = 0;
+
+    if (dataResult.status === 'fulfilled') {
+      const { values: dataValues } = dataResult.value;
+      // Data headers row 0: Date(0), Date-M(1), Type(2), ..., Ammount Excl. VAT(5), ..., Category(9)
+      for (let i = 1; i < (dataValues ?? []).length; i++) {
+        const row = dataValues[i] as unknown[];
+        const category = toStr(row[9]);
+        if (!FIXED_ASSET_CATEGORIES.has(category)) continue;
+        const amount = Math.abs(toNumber(row[5])); // store as positive magnitude
+        fixedAssetsByCategory[category] = (fixedAssetsByCategory[category] ?? 0) + amount;
+        fixedAssetsTotal += amount;
+      }
+    } else {
+      logger.warn('Data tab unavailable for fixed assets calc', { error: String(dataResult.reason) });
+    }
+
+    logger.info('Assets register fetched', {
+      userId,
+      currentItemCount: items.length,
+      fixedAssetCategories: Object.keys(fixedAssetsByCategory).length,
+      fixedAssetsTotal,
+    });
 
     return NextResponse.json({
       success: true,
-      data: { items, categorySummary },
+      data: {
+        currentAssets: { items, categorySummary },
+        fixedAssets: {
+          total: fixedAssetsTotal,
+          byCategory: fixedAssetsByCategory,
+          note: 'Totals derived from Data tab. Full fixed assets register pending dedicated worksheet in Shareholder Model.',
+        },
+      },
       meta: {
         generatedAt: new Date().toISOString(),
-        sources: ['Current Assets'],
+        sources: ['Current Assets', 'Data'],
       },
     });
   } catch (error) {
