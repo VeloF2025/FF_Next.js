@@ -376,7 +376,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   }, [onPlanChange]);
 
   // ── Shared cell styles ───────────────────────────────────────────────────
-  const th = 'px-1 py-1 text-[10px] text-gray-500 font-normal whitespace-nowrap text-center border-b border-gray-700 bg-gray-850';
+  const th = 'px-1 py-1 text-[10px] text-gray-500 font-normal whitespace-nowrap text-center border-b border-gray-700 bg-gray-850 border-r border-dashed border-r-gray-700';
   const tdLabel = 'sticky left-0 z-10 bg-gray-900 px-3 py-0.5 text-xs text-gray-300 whitespace-nowrap border-r border-gray-800';
   const tdTotal = 'px-2 py-0.5 text-right text-xs tabular-nums whitespace-nowrap border-l border-gray-700';
 
@@ -527,81 +527,187 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
             </tr>
 
             {/* ── ACTUALS (WIP only) ───────────────────────────────────── */}
-            {isWip && actuals.length > 0 && (<>
-              <SectionHeader title="Actuals to Date — From FibreTime" cols={dur} color="text-purple-400 bg-gray-850" />
+            {isWip && actuals.length > 0 && (() => {
+              // All COS categories present across all actual months
+              const cosCategories = [...new Set(
+                actuals.flatMap(a => Object.keys(a.cos_breakdown))
+              )].sort();
 
-              {/* Activations: Forecast vs Actual vs Variance */}
-              <tr className="border-b border-gray-800">
-                <td className={`${tdLabel} text-gray-400`}>
-                  <div>Activations</div>
-                  <div className="text-[9px] text-gray-600">Forecast / Actual / Var</div>
-                </td>
-                {plan.map((e, m) => {
-                  const key = getMonthKey(m);
-                  const act = actualsMap.get(key);
-                  const variance = act ? act.activations - e.activations : null;
-                  return (
-                    <td key={m} className="px-1 py-0.5 text-center text-[10px] tabular-nums border-r border-gray-800">
-                      <div className="text-gray-400">{e.activations || '—'}</div>
-                      {act && <div className="text-teal-300 font-medium">{act.activations}</div>}
-                      {variance !== null && <div className={variance >= 0 ? 'text-emerald-400' : 'text-red-400'}>{variance > 0 ? '+' : ''}{variance}</div>}
+              // Cumulative activations for revenue actual
+              let cumActsActual = 0;
+              let cumNetActual = 0;
+
+              return (<>
+                {/* ── ROLLOUT PLAN — ACTUAL ──────────────────────── */}
+                <SectionHeader title="Rollout Plan — Actual" cols={dur} color="text-purple-400 bg-gray-850" />
+
+                {/* Placeholder rows for physical rollout */}
+                {(['Poles', 'Stringing (m)', "Optical / PON's"] as string[]).map(label => (
+                  <tr key={label} className="border-b border-gray-800">
+                    <td className={`${tdLabel} text-gray-500`}>
+                      <div>{label}</div>
+                      <div className="text-[9px] text-gray-700">actual — pending data source</div>
                     </td>
-                  );
-                })}
-                <td className={tdTotal}></td>
-              </tr>
+                    {plan.map((_, m) => (
+                      <td key={m} className="px-1 py-0.5 border-r border-dashed border-gray-700 text-center text-[10px] text-gray-700">—</td>
+                    ))}
+                    <td className={tdTotal}></td>
+                  </tr>
+                ))}
 
-              {/* COS Actual — total with expandable breakdown */}
-              <tr className="border-b border-gray-800">
-                <td className={`${tdLabel}`}>
-                  <div className="text-purple-300">COS Actual</div>
-                  <div className="text-[9px] text-gray-600">Forecast / Actual / Var</div>
-                </td>
-                {derived.map((d, m) => {
-                  const key = getMonthKey(m);
-                  const act = actualsMap.get(key);
-                  const variance = act ? act.cos_actual - d.cos_total : null;
-                  return (
-                    <td key={m} className="px-1 py-0.5 text-center text-[10px] tabular-nums border-r border-gray-800">
-                      <div className="text-gray-400">{fR(d.cos_total)}</div>
-                      {act && <div className="text-purple-300 font-medium">{fR(act.cos_actual)}</div>}
-                      {variance !== null && <div className={variance <= 0 ? 'text-emerald-400' : 'text-red-400'}>{variance > 0 ? '+' : ''}{fR(variance)}</div>}
-                    </td>
-                  );
-                })}
-                <td className={tdTotal}></td>
-              </tr>
+                {/* Activations — actual vs forecast */}
+                <tr className="border-b border-gray-700 bg-gray-800/20">
+                  <td className={`${tdLabel} text-purple-300 font-medium`}>
+                    <div>Activations</div>
+                    <div className="text-[9px] text-gray-600">Actual / Forecast / Var</div>
+                  </td>
+                  {plan.map((e, m) => {
+                    const key = getMonthKey(m);
+                    const act = actualsMap.get(key);
+                    const variance = act != null ? act.activations - e.activations : null;
+                    return (
+                      <td key={m} className="px-1 py-1 text-center text-[10px] tabular-nums border-r border-dashed border-gray-700">
+                        {act != null ? <div className="text-purple-300 font-medium">{act.activations || '—'}</div> : <div className="text-gray-700">—</div>}
+                        <div className="text-gray-600">{e.activations || '—'}</div>
+                        {variance !== null && act != null && (
+                          <div className={`text-[9px] ${variance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {variance > 0 ? '+' : ''}{variance}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className={`${tdTotal} text-purple-300`}>
+                    {actuals.reduce((s, a) => s + a.activations, 0) || '—'}
+                  </td>
+                </tr>
 
-              {/* COS Breakdown — expandable */}
-              <tr className="border-b border-gray-700">
-                <td className={`${tdLabel}`}>
-                  <button
-                    onClick={() => setBreakdownOpen(v => ({ ...v, 0: !v[0] }))}
-                    className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-300"
-                  >
-                    {breakdownOpen[0] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    Breakdown by category
-                  </button>
-                </td>
-                {plan.map((_, m) => <td key={m} className="border-r border-gray-800" />)}
-                <td />
-              </tr>
+                {/* ── COS CATEGORY — ACTUAL ──────────────────────── */}
+                <SectionHeader title="COS Category — Actual" cols={dur} color="text-purple-400 bg-gray-850" />
 
-              {breakdownOpen[0] && actuals.some(a => Object.keys(a.cos_breakdown).length > 0) && (
-                [...new Set(actuals.flatMap(a => Object.keys(a.cos_breakdown)))].map(cat => (
-                  <tr key={cat} className="border-b border-gray-800 bg-gray-950/50">
-                    <td className={`${tdLabel} text-[10px] text-gray-500 pl-6`}>{cat}</td>
+                {/* Per-category rows */}
+                {cosCategories.map(cat => (
+                  <tr key={cat} className="border-b border-gray-800 hover:bg-gray-800/30">
+                    <td className={`${tdLabel} text-gray-400 pl-5`}>{cat}</td>
                     {plan.map((_, m) => {
                       const key = getMonthKey(m);
                       const act = actualsMap.get(key);
                       const val = act?.cos_breakdown[cat] ?? 0;
-                      return <td key={m} className="px-1 py-0.5 text-right text-[10px] text-gray-500 tabular-nums border-r border-gray-800">{val ? fR(val) : ''}</td>;
+                      return (
+                        <td key={m} className="px-1 py-0.5 text-right text-[10px] tabular-nums border-r border-dashed border-gray-700">
+                          {val ? <span className="text-gray-300">{fR(val)}</span> : <span className="text-gray-800">—</span>}
+                        </td>
+                      );
                     })}
-                    <td className={tdTotal}></td>
+                    <td className={`${tdTotal} text-gray-400`}>
+                      {fR(actuals.reduce((s, a) => s + (a.cos_breakdown[cat] ?? 0), 0))}
+                    </td>
                   </tr>
-                ))
-              )}
-            </>)}
+                ))}
+
+                {/* Total COS actual vs forecast */}
+                <tr className="border-b border-gray-700 font-semibold bg-gray-800/50">
+                  <td className={`${tdLabel} text-purple-300 font-bold`}>
+                    <div>Total COS</div>
+                    <div className="text-[9px] text-gray-600 font-normal">Actual / Forecast / Var</div>
+                  </td>
+                  {derived.map((d, m) => {
+                    const key = getMonthKey(m);
+                    const act = actualsMap.get(key);
+                    const variance = act != null ? act.cos_actual - d.cos_total : null;
+                    return (
+                      <td key={m} className="px-1 py-1 text-center text-[10px] tabular-nums border-r border-dashed border-gray-700">
+                        {act != null ? <div className="text-purple-300 font-bold">{fR(act.cos_actual)}</div> : <div className="text-gray-700">—</div>}
+                        <div className="text-gray-600">{fR(d.cos_total)}</div>
+                        {variance !== null && act != null && (
+                          <div className={`text-[9px] ${variance <= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {variance > 0 ? '+' : ''}{fR(variance)}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className={`${tdTotal} text-purple-300 font-bold`}>
+                    {fR(actuals.reduce((s, a) => s + a.cos_actual, 0))}
+                  </td>
+                </tr>
+
+                {/* ── REVENUE — ACTUAL ───────────────────────────── */}
+                <SectionHeader title="Revenue — Actual" cols={dur} color="text-purple-400 bg-gray-850" />
+
+                {/* Cumulative activations actual */}
+                <tr className="border-b border-gray-800">
+                  <td className={`${tdLabel} text-gray-400`}>Activations (cumulative)</td>
+                  {plan.map((_, m) => {
+                    const key = getMonthKey(m);
+                    const act = actualsMap.get(key);
+                    if (act) cumActsActual += act.activations;
+                    return (
+                      <td key={m} className="px-1 py-0.5 text-right text-[10px] tabular-nums border-r border-dashed border-gray-700">
+                        {act != null ? <span className="text-gray-300">{fN(cumActsActual)}</span> : <span className="text-gray-700">—</span>}
+                      </td>
+                    );
+                  })}
+                  <td className={tdTotal}></td>
+                </tr>
+
+                {/* Revenue actual vs forecast */}
+                {(() => {
+                  let cumActsA = 0;
+                  return (
+                    <tr className="border-b border-gray-700 bg-gray-800/20">
+                      <td className={`${tdLabel} text-purple-300 font-medium`}>
+                        <div>Revenue</div>
+                        <div className="text-[9px] text-gray-600">Actual / Forecast / Var</div>
+                      </td>
+                      {derived.map((d, m) => {
+                        const key = getMonthKey(m);
+                        const act = actualsMap.get(key);
+                        if (act) cumActsA += act.activations;
+                        const revActual = act != null ? cumActsA * inp.rate : null;
+                        const variance = revActual != null ? revActual - d.revenue : null;
+                        return (
+                          <td key={m} className="px-1 py-1 text-center text-[10px] tabular-nums border-r border-dashed border-gray-700">
+                            {revActual != null ? <div className="text-purple-300 font-medium">{fR(revActual)}</div> : <div className="text-gray-700">—</div>}
+                            <div className="text-gray-600">{fR(d.revenue)}</div>
+                            {variance !== null && (
+                              <div className={`text-[9px] ${variance >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {variance > 0 ? '+' : ''}{fR(variance)}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className={tdTotal}></td>
+                    </tr>
+                  );
+                })()}
+
+                {/* Monthly Gross actual */}
+                {(() => {
+                  let cumActsA = 0;
+                  return (
+                    <tr className="border-b border-gray-700">
+                      <td className={`${tdLabel} text-emerald-400`}>Monthly Gross (Actual)</td>
+                      {derived.map((d, m) => {
+                        const key = getMonthKey(m);
+                        const act = actualsMap.get(key);
+                        if (act) { cumActsA += act.activations; }
+                        const revA = act != null ? cumActsA * inp.rate : null;
+                        const gross = revA != null && act != null ? revA - act.cos_actual : null;
+                        cumNetActual += gross ?? 0;
+                        return (
+                          <td key={m} className={`px-1 py-0.5 text-right text-[10px] tabular-nums border-r border-dashed border-gray-700 ${gross == null ? 'text-gray-700' : gross >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {gross != null ? fR(gross) : '—'}
+                          </td>
+                        );
+                      })}
+                      <td className={tdTotal}></td>
+                    </tr>
+                  );
+                })()}
+              </>);
+            })()}
 
           </tbody>
         </table>
