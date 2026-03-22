@@ -89,7 +89,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   logger.info('Revenue overview requested', { userId });
 
   try {
-    const { values } = await getWorksheetRange('Financial Summary');
+    const { values } = await getWorksheetRange('Fin Summary');
 
     if (!values || values.length < 2) {
       throw new Error('Financial Summary sheet returned insufficient data');
