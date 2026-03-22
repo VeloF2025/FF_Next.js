@@ -626,18 +626,7 @@ export function PortfolioTable({ prospectiveProjects, executableProjects, wipPro
         )}
       </div>
 
-      {/* ── Actual ───────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 pt-2">
-          <span className="text-sm font-bold uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
-            Actual
-          </span>
-          <div className="flex-1 border-t border-gray-700" />
-        </div>
-        <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">
-          <p className="text-sm">Actual to date — coming soon</p>
-        </div>
-      </div>
+
 
     </div>
   );
