@@ -486,6 +486,19 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
                 hint="resizes forecast grid"
               />
             </div>
+            <div className="flex flex-col gap-0.5">
+              <label className="text-xs text-gray-400 font-medium">Build Completion Date</label>
+              <div className="bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-300 min-w-[140px]">
+                {project.start_date && project.build_duration_months
+                  ? (() => {
+                      const d = new Date(project.start_date);
+                      d.setMonth(d.getMonth() + project.build_duration_months);
+                      return d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
+                    })()
+                  : <span className="text-gray-600">— set start date</span>}
+              </div>
+              <span className="text-xs text-gray-600">start date + build duration</span>
+            </div>
           </div>
         )}
       </div>
