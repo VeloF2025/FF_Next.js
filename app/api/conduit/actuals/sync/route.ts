@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
       const amount = parseFloat(String(row[5] ?? '0').replace(/[^0-9.\-]/g, '')) || 0;
       const dateM  = row[1];
 
+      const rowType = String(row[2] ?? '').trim();   // Type col (index 2) — 'Expense' or 'Income'
+      if (rowType !== 'Expense') continue;            // Only expense rows — exclude Income
       if (!catT2.startsWith('COS')) continue;
       if (!ccT2 || ['None', 'OPEX', 'Revenue', 'Loan', 'Tools', 'Fixed Assets'].includes(ccT2)) continue;
       if (amount === 0) continue;
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
 
       if (!agg.has(key)) agg.set(key, { cos_actual: 0, activations: 0, cos_breakdown: {} });
       const entry = agg.get(key)!;
-      entry.cos_actual += amount;
+      // Do NOT accumulate cos_actual here — derive it from breakdown sum at upsert time
       entry.cos_breakdown[catT2] = (entry.cos_breakdown[catT2] ?? 0) + amount;
     }
 
@@ -118,13 +120,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Upsert ────────────────────────────────────────────────────────────
+    // cos_actual = sum of breakdown (single source of truth, avoids double-counting)
     let upserted = 0;
     for (const [key, data] of agg) {
       const [project, month] = key.split('||');
+      const cosTotal = Object.values(data.cos_breakdown).reduce((s, v) => s + v, 0);
       await sql`
         INSERT INTO conduit_actuals (project_name, month, cos_actual, activations, cos_breakdown, synced_at)
         VALUES (
-          ${project}, ${month}::date, ${data.cos_actual},
+          ${project}, ${month}::date, ${cosTotal},
           ${Math.round(data.activations)},
           ${JSON.stringify(data.cos_breakdown)}::jsonb, now()
         )
