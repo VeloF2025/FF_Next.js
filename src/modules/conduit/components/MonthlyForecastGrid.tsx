@@ -304,7 +304,6 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
 
   // ── Per-month derived calculations ────────────────────────────────────────
   const derived = useMemo(() => {
-    let cumActs = 0;
     let cumNet = 0;
     return plan.map(e => {
       const casuals   = e.opex_casuals   ?? mo.casuals;
@@ -327,14 +326,13 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
       const cos_opex     = casuals + fuel + overheads + sales + ad_hoc;
       const cos_total    = cos_material + cos_services + cos_wayleave + cos_opex;
 
-      cumActs += e.activations;
-      const revenue = cumActs * inp.rate;
+      const revenue = e.activations * inp.rate;  // that month's activations × rate (one-time)
       const gross   = revenue - cos_total;
       cumNet += gross;
 
       return { casuals, fuel, overheads, sales, ad_hoc,
                cos_material, cos_services, cos_wayleave, cos_opex, cos_total,
-               revenue, cumActs, gross, cumNet };
+               revenue, gross, cumNet };
     });
   }, [plan, sr, mr, mo, lc, inp.rate, dur]);
 
@@ -501,7 +499,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
             <SectionHeader title="Revenue — Forecast" cols={dur} color="text-teal-400 bg-gray-850" />
 
             <tr className="border-b border-gray-800 hover:bg-gray-800/30">
-              <td className={tdLabel}>Subscription Revenue</td>
+              <td className={tdLabel}>Revenue (Activations × Rate)</td>
               {derived.map((d, m) => <CalcCell key={m} value={d.revenue} />)}
               <td className={`${tdTotal} text-gray-400`}>{fR(T.revenue)}</td>
             </tr>
