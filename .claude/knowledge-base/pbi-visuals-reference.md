@@ -13,7 +13,7 @@
 | PBI Surface | `#252423` | Dark background for card/panel surfaces |
 | PBI Amber | `#F2C811` | Warning, GP% 0–15% |
 
-Implementation in `src/modules/analytics/pbi/pbiTheme.ts`.
+> **Planned:** Colour tokens will live in `src/modules/analytics/pbi/pbiTheme.ts` (not yet implemented).
 
 ## KPI Cards
 
@@ -21,7 +21,8 @@ Implementation in `src/modules/analytics/pbi/pbiTheme.ts`.
 Each report page must open with a row of KPI headline cards above the table.
 
 ```tsx
-import { KpiCard } from '@/modules/analytics/pbi/KpiCard';
+// Planned component — not yet implemented
+// import { KpiCard } from '@/modules/analytics/pbi/KpiCard';
 
 <div className="grid grid-cols-3 gap-4 mb-6">
   <KpiCard label="Net Position" value={netPosition} trend="positive" />
@@ -97,23 +98,23 @@ All tables must comply with WCAG 2.1 AA:
 
 ```
 src/modules/analytics/
-├── pbi/
-│   ├── pbiTheme.ts          # Colour tokens + shared formatters
-│   └── KpiCard.tsx          # Reusable KPI headline card
+├── pbi/                               # PLANNED — not yet created
+│   ├── pbiTheme.ts                    # Planned: colour tokens + shared formatters
+│   └── KpiCard.tsx                    # Planned: reusable KPI headline card
 ├── reports/
 │   └── tables/
-│       ├── CashflowTable.tsx
-│       ├── ProjectRevenueTable.tsx
-│       ├── ExpensePivotTable.tsx
-│       ├── ProjectFinTable.tsx
-│       └── ProjectDetailTable.tsx
+│       ├── CashflowTable.tsx          ✅ exists
+│       ├── ProjectRevenueTable.tsx    ✅ exists
+│       ├── ExpensePivotTable.tsx      ✅ exists
+│       ├── ProjectFinTable.tsx        ✅ exists
+│       └── ProjectDetailTable.tsx     ✅ exists
 ```
 
 ## Usage Notes
 
-- Import colour tokens from `pbiTheme.ts` — never hardcode hex values inline
-- `formatCurrency(value)` helper in `pbiTheme.ts` handles R format + zero display
-- `getGPColor(percent)` helper returns the correct conditional colour for GP%
+- When `pbiTheme.ts` is implemented: import colour tokens from there — never hardcode hex values inline
+- Planned: `formatCurrency(value)` helper will handle R format + zero display
+- Planned: `getGPColor(percent)` helper will return the correct conditional colour for GP%
 - All chart series colours should come from the PBI palette above (series 1 = `#118DFF`, series 2 = `#107C10`, series 3 = `#D13438`, etc.)
 
 ---
