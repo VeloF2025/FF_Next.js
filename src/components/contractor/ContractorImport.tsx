@@ -115,3 +115,80 @@ export function ContractorImport({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Import Contractors" className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Backdrop */}
+      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+        <div
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+          aria-hidden="true"
+          onClick={handleClose}
+        />
+
+        {/* Modal panel */}
+        <div className={`relative inline-block bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full ${className}`}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Import Contractors</h2>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="px-6 py-4">
+            {/* Error banner */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {/* Step: upload */}
+            {step === 'upload' && (
+              <div className="space-y-4">
+                <ContractorImportInstructions />
+                <ContractorFileDropZone
+                  onFileSelect={handleFileSelect}
+                  isProcessing={isProcessing}
+                />
+              </div>
+            )}
+
+            {/* Step: preview */}
+            {step === 'preview' && importData && (
+              <ContractorFilePreview
+                data={importData}
+                options={importOptions}
+                onOptionsChange={setImportOptions}
+                onImport={handleImport}
+                onCancel={handleClose}
+                isProcessing={isProcessing}
+              />
+            )}
+
+            {/* Step: importing */}
+            {step === 'importing' && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4" />
+                <p className="text-sm text-gray-600">Importing contractors, please wait...</p>
+              </div>
+            )}
+
+            {/* Step: results */}
+            {step === 'results' && importResult && (
+              <ContractorImportResults
+                result={importResult}
+                onClose={handleClose}
+                onImportMore={handleReset}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
