@@ -369,6 +369,10 @@ interface PortfolioTableProps {
 }
 
 export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
+  const prospective = initialProjects.filter(p => (p.status ?? 'prospective') === 'prospective');
+  const executable  = initialProjects.filter(p => p.status === 'executable');
+  const actual      = initialProjects.filter(p => p.status === 'actual');
+
   return (
     <div className="space-y-8">
 
@@ -380,10 +384,11 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
-        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Prospective" />
+        <ProjectsGrid initialProjects={prospective} tableLabel="Project Scope — Prospective" />
       </div>
 
       {/* ── Forecasted — Executable ───────────────────────────────────── */}
+      {executable.length > 0 && (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <span className="text-sm font-bold uppercase tracking-widest border border-teal-500 text-teal-400 px-3 py-1 rounded">
@@ -391,8 +396,9 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
           </span>
           <div className="flex-1 border-t border-gray-700" />
         </div>
-        <ProjectsGrid initialProjects={initialProjects} tableLabel="Project Scope — Executable" />
+        <ProjectsGrid initialProjects={executable} tableLabel="Project Scope — Executable" />
       </div>
+      )}
 
       {/* ── Actual ───────────────────────────────────────────────────── */}
       <div className="space-y-4">
