@@ -1,6 +1,7 @@
 /**
- * CostCentreRevenueTable — Fibertime T1 row with expand/collapse project children.
- * T1 row is collapsible; child rows show per-project revenue.
+ * CostCentreRevenueTable — Shareholder-quality COS vs Revenue profitability table.
+ * T1 row (Fibertime) is collapsible; child rows show per-project breakdown.
+ * Columns: Cost Centre | Revenue | COS | Gross Profit | Margin %
  */
 'use client';
 
@@ -8,50 +9,63 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import type { CostCentreRevenueItem } from '../project-revenue/useProjectRevenueData';
 
-function fZAR(v: number) {
+function fZAR(v: number): string {
   const abs = Math.abs(Math.round(v));
   const s = abs.toLocaleString('en-ZA').replace(/,/g, '\u00a0');
   return `R\u00a0${s}`;
+}
+
+function fPct(v: number): string {
+  return `${(v * 100).toFixed(1)}%`;
 }
 
 interface Props {
   rows: CostCentreRevenueItem[];
 }
 
-// 🟢 WORKING: Fibertime expand/collapse table with per-project revenue breakdown
+const TH_BASE = 'px-4 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
+const TH_LEFT = `${TH_BASE} text-left`;
+const TH_RIGHT = `${TH_BASE} text-right`;
+
+// 🟢 WORKING: Cost Centre Profitability table — COS vs Revenue shareholder view
 export function CostCentreRevenueTable({ rows }: Props) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(
-    () => new Set(rows.length > 0 ? [rows[0].tier1] : [])
+    () => new Set(rows.length > 0 && rows[0] ? [rows[0].tier1] : [])
   );
 
   function toggleRow(tier1: string) {
     setExpandedRows((prev) => {
       const next = new Set(prev);
-      if (next.has(tier1)) {
-        next.delete(tier1);
-      } else {
-        next.add(tier1);
-      }
+      if (next.has(tier1)) next.delete(tier1);
+      else next.add(tier1);
       return next;
     });
   }
 
-  const grandTotal = rows.reduce((s, r) => s + r.revenue, 0);
-
-  const th =
-    'px-4 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
-  const thR = `${th} text-right`;
+  const grandRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const grandCos = rows.reduce((s, r) => s + r.cos, 0);
+  const grandGP = grandRevenue - grandCos;
+  const grandMargin = grandRevenue !== 0 ? grandGP / grandRevenue : 0;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-700">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
-            <th className={th} style={{ minWidth: 260 }}>
-              Cost Centre T1
+            <th className={TH_LEFT} style={{ minWidth: 260 }}>
+              Cost Centre
             </th>
-            <th className={thR} style={{ minWidth: 160 }}>
-              Revenue (R)
+            <th className={TH_RIGHT} style={{ minWidth: 160 }}>
+              Revenue
+            </th>
+            <th className={TH_RIGHT} style={{ minWidth: 160 }}>
+              COS
+            </th>
+            <th className={TH_RIGHT} style={{ minWidth: 160 }}>
+              Gross Profit
+            </th>
+            <th className={TH_RIGHT} style={{ minWidth: 100 }}>
+              Margin %
             </th>
           </tr>
         </thead>
@@ -80,6 +94,23 @@ export function CostCentreRevenueTable({ rows }: Props) {
                   <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
                     {fZAR(row.revenue)}
                   </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
+                    {fZAR(row.cos)}
+                  </td>
+                  <td
+                    className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                      row.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {fZAR(row.grossProfit)}
+                  </td>
+                  <td
+                    className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                      row.margin >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {fPct(row.margin)}
+                  </td>
                 </tr>
 
                 {/* Child project rows */}
@@ -95,8 +126,58 @@ export function CostCentreRevenueTable({ rows }: Props) {
                       <td className="px-4 py-2 text-right tabular-nums text-gray-300">
                         {fZAR(child.revenue)}
                       </td>
+                      <td className="px-4 py-2 text-right tabular-nums text-gray-300">
+                        {fZAR(child.cos)}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-right tabular-nums ${
+                          child.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {fZAR(child.grossProfit)}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-right tabular-nums ${
+                          child.margin >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}
+                      >
+                        {fPct(child.margin)}
+                      </td>
                     </tr>
                   ))}
+
+                {/* T1 totals row */}
+                {isExpanded && (
+                  <tr
+                    key={`totals-${row.tier1}`}
+                    className="border-t border-gray-600"
+                    style={{ backgroundColor: '#1a3a4a' }}
+                  >
+                    <td className="px-4 py-2.5 pl-8 text-white font-bold text-xs uppercase tracking-wide">
+                      {row.tier1} Total
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
+                      {fZAR(row.revenue)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
+                      {fZAR(row.cos)}
+                    </td>
+                    <td
+                      className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                        row.grossProfit >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}
+                    >
+                      {fZAR(row.grossProfit)}
+                    </td>
+                    <td
+                      className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                        row.margin >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}
+                    >
+                      {fPct(row.margin)}
+                    </td>
+                  </tr>
+                )}
               </>
             );
           })}
@@ -105,7 +186,24 @@ export function CostCentreRevenueTable({ rows }: Props) {
           <tr className="border-t-2 border-gray-500" style={{ backgroundColor: '#1a3a4a' }}>
             <td className="px-4 py-2.5 text-white font-bold">Grand Total</td>
             <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
-              {fZAR(grandTotal)}
+              {fZAR(grandRevenue)}
+            </td>
+            <td className="px-4 py-2.5 text-right tabular-nums text-white font-bold">
+              {fZAR(grandCos)}
+            </td>
+            <td
+              className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                grandGP >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {fZAR(grandGP)}
+            </td>
+            <td
+              className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                grandMargin >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {fPct(grandMargin)}
             </td>
           </tr>
         </tfoot>

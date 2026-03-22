@@ -29,8 +29,8 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
   },
   {
     id: 'project-revenue',
-    name: 'Cost Centre Revenue',
-    description: 'Contract revenue grouped by Cost Centre T1 and Cost Centre from the Shareholder Model',
+    name: 'Cost Centre Profitability',
+    description: 'Revenue, COS, Gross Profit and Margin per project — Fibertime',
     category: 'financial',
   },
   {
