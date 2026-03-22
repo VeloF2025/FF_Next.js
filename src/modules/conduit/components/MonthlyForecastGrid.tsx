@@ -444,6 +444,25 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
               </tr>
             ))}
 
+            {/* Activations cumulative row */}
+            <tr className="border-b border-gray-800 hover:bg-gray-800/30">
+              <td className={`${tdLabel} text-gray-500`}>
+                <span>Activations (cumulative)</span>
+              </td>
+              {(() => {
+                let cum = 0;
+                return plan.map((e, m) => {
+                  cum += e.activations;
+                  return (
+                    <td key={m} className="px-1 py-0.5 text-right text-xs tabular-nums border-r border-dashed border-gray-700">
+                      <span className="text-gray-500">{cum ? fN(cum) : '—'}</span>
+                    </td>
+                  );
+                });
+              })()}
+              <td className={`${tdTotal} text-gray-500`}>{fN(T.activations) || '—'}</td>
+            </tr>
+
             {/* ── COS CATEGORIES ───────────────────────────────────────── */}
             <SectionHeader title="COS Category — Forecast" cols={dur} color="text-blue-400 bg-gray-850" />
 
@@ -521,6 +540,26 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
               ))}
               <td className={`${tdTotal} ${derived.at(-1)?.cumNet ?? 0 < 0 ? 'text-red-400' : 'text-teal-300'} font-bold`}>
                 {fR(derived.at(-1)?.cumNet ?? 0)}
+              </td>
+            </tr>
+            <tr className="border-b border-gray-700 bg-gray-800/40">
+              <td className={`${tdLabel} font-bold text-white`}>
+                <div>Revenue − COS Total</div>
+                <div className="text-[9px] text-gray-600 font-normal">cumulative</div>
+              </td>
+              {(() => {
+                let cumRevMinusCos = 0;
+                return derived.map((d, m) => {
+                  cumRevMinusCos += d.gross;
+                  return (
+                    <td key={m} className={`px-1 py-0.5 text-right text-xs font-bold tabular-nums ${cumRevMinusCos < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                      {fR(cumRevMinusCos)}
+                    </td>
+                  );
+                });
+              })()}
+              <td className={`${tdTotal} font-bold ${(T.revenue - T.cos_total) < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                {fR(T.revenue - T.cos_total)}
               </td>
             </tr>
 
