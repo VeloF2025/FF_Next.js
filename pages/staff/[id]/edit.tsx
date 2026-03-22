@@ -1,6 +1,11 @@
 import type { NextPage } from 'next';
+import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { StaffEditForm } from '../../../src/modules/staff/components/StaffEditForm';
+
+const StaffEditForm = dynamic(
+  () => import('../../../src/modules/staff/components/StaffEditForm').then(m => m.StaffEditForm),
+  { loading: () => <div className="p-8 text-center text-gray-400">Loading form...</div>, ssr: false }
+);
 
 /**
  * Staff Edit Page - Tabbed edit form matching the view tabs
