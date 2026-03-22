@@ -751,6 +751,28 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                   })}
                   <td className={tdTotal}></td>
                 </tr>
+
+                {/* Running Gross Actual — cumulative */}
+                <tr className="border-b border-gray-700 bg-gray-800/40">
+                  <td className={`${tdLabel} font-bold text-teal-300`}>
+                    <div>Running Gross (Actual)</div>
+                    <div className="text-[9px] text-gray-600 font-normal">cumulative</div>
+                  </td>
+                  {(() => {
+                    let cumGross = 0;
+                    return derived.map((_, m) => {
+                      const key = getMonthKey(m);
+                      const act = actualsMap.get(key);
+                      if (act != null) cumGross += (act.revenue_actual ?? 0) - act.cos_actual;
+                      return (
+                        <td key={m} className={`px-1 py-0.5 text-center text-[10px] font-bold tabular-nums border-r border-dashed border-gray-700 ${act == null ? 'text-gray-700' : cumGross >= 0 ? 'text-teal-300' : 'text-red-400'}`}>
+                          {act != null ? fR(cumGross) : '—'}
+                        </td>
+                      );
+                    });
+                  })()}
+                  <td className={tdTotal}></td>
+                </tr>
               </>);
             })()}
 
