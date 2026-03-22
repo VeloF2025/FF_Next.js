@@ -1,14 +1,27 @@
 /**
  * GET /api/analytics/reports/income-statement
  *
- * Reads the "Income Statememt" section from the Fin Summary worksheet
- * and returns a structured P&L with Revenue, COS sub-lines, Gross Profit,
- * Operational Expenses, and Net Profit by FY and month.
+ * Returns a structured P&L from the "Fin Summary" worksheet.
+ *
+ * Sheet structure (confirmed 2026-03-22):
+ *   Row 2  (idx):  Header row — FY26, FY27, FY28 labels + date serials from col 4
+ *   Row 14: "Income Statememt" (section marker — typo in sheet)
+ *   Row 15: Revenue
+ *   Row 16: Cost Of Sales          ← summary (not sub-lines)
+ *   Row 17: Gross Profit/(Loss)
+ *   Row 19: Operational Expenses
+ *   Row 20: Net Profit/(Loss)
+ *   Row 24: "Cost of Sales"        ← sub-lines section
+ *   Rows 25-32: COS - Ad Hoc … COS - Wayleaves
+ *   Row 33: Total (COS total)
+ *
+ * We build the P&L in order:
+ *   Revenue → [COS header] → [COS sub-lines] → [COS Total] → Gross Profit → Operational Expenses → Net Profit
  *
  * Access restricted via RBAC (analytics.reports / view) or user allowlist.
  */
 
-// 🟢 WORKING: Income Statement GET handler — reads live SharePoint data
+// 🟢 WORKING: Income Statement GET handler — fixed row-based parser
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
@@ -23,6 +36,19 @@ const ALLOWED_USERS = new Set([
   '28ab98c1-df21-48f8-a30a-489cd09a0d39', // Hein
   '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
 ]);
+
+/** Row indices in the Fin Summary sheet (0-based) — confirmed from live workbook */
+const ROW = {
+  HEADER: 2,          // FY labels + date serials
+  REVENUE: 15,
+  COS_SUMMARY: 16,    // "Cost Of Sales" — FY summary line
+  GROSS_PROFIT: 17,
+  OP_EXPENSES: 19,
+  NET_PROFIT: 20,
+  COS_HEADER: 24,     // "Cost of Sales" sub-section header
+  COS_FIRST: 25,      // First COS sub-line
+  COS_TOTAL: 33,      // "Total" COS line
+} as const;
 
 function excelSerialToLabel(serial: number): string {
   const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
@@ -41,56 +67,54 @@ function toStr(cell: unknown): string {
   return String(cell).trim();
 }
 
-/** Parse FY columns (cols 1, 2, 3) from a data row */
-function parseFY(row: unknown[]): { fy26: number; fy27: number; fy28: number } {
+function buildRow(
+  values: unknown[][],
+  rowIdx: number,
+  monthColumns: { col: number; label: string }[],
+  opts: Partial<IncomeStatementRow> = {}
+): IncomeStatementRow {
+  const row = (values[rowIdx] ?? []) as unknown[];
+  const label = toStr(row[0]) || opts.label || '';
+  const monthly: Record<string, number> = {};
+  for (const { col, label: mLabel } of monthColumns) {
+    monthly[mLabel] = toNumber(row[col]);
+  }
   return {
+    label,
     fy26: toNumber(row[1]),
     fy27: toNumber(row[2]),
     fy28: toNumber(row[3]),
+    monthly,
+    ...opts,
   };
 }
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
-  // --- Authentication ---
   const cookieStore = await cookies();
   const token = cookieStore.get('ff_auth_token')?.value;
-
   if (!token) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }, { status: 401 });
   }
-
   const payload = await verifyToken(token);
   if (!payload?.sub) {
-    return NextResponse.json(
-      { success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } },
-      { status: 401 }
-    );
+    return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
   }
-
   const userId = payload.sub;
-
   const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
   if (!hasAccess && !ALLOWED_USERS.has(userId)) {
-    return NextResponse.json(
-      { success: false, error: { code: 'FORBIDDEN', message: 'Access restricted to authorised users' } },
-      { status: 403 }
-    );
+    return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
   }
 
   logger.info('Income statement requested', { userId });
 
   try {
     const { values } = await getWorksheetRange('Fin Summary');
-
-    if (!values || values.length < 2) {
+    if (!values || values.length < ROW.COS_TOTAL + 1) {
       throw new Error('Fin Summary sheet returned insufficient data');
     }
 
-    // Header row (index 1): labels + FY cols + date serials from col 4
-    const headerRow = values[1] as unknown[];
+    // Extract month columns from header row (col 4+ numeric serials)
+    const headerRow = (values[ROW.HEADER] ?? []) as unknown[];
     const monthColumns: { col: number; label: string }[] = [];
     for (let col = 4; col < headerRow.length; col++) {
       const cell = headerRow[col];
@@ -100,129 +124,40 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     }
     const months = monthColumns.map((m) => m.label);
 
-    // Scan all rows to locate "Income Statememt" section (note typo in sheet)
-    // and "Cost of Sales" sub-section
-    const IS_LABELS = new Set([
-      'Revenue',
-      'Cost Of Sales',
-      'Gross Profit/(Loss)',
-      'Operational Expenses',
-      'Net Profit/(Loss)',
-      'Net Profit/(Loss) - Running',
-    ]);
+    // Build rows in P&L order
+    const rows: IncomeStatementRow[] = [
+      // 1. Revenue
+      buildRow(values, ROW.REVENUE, monthColumns, { isBold: true }),
 
-    // Phase 1: find section start indices
-    let incomeStatementStart = -1;
-    let cosStart = -1;
+      // 2. Cost of Sales — section header
+      buildRow(values, ROW.COS_HEADER, monthColumns, { isHeader: true, label: 'Cost of Sales' }),
 
-    for (let i = 0; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const label = toStr(row[0]);
-      if (label === 'Income Statememt' || label === 'Income Statement') {
-        incomeStatementStart = i;
-      }
-      if (label === 'Cost of Sales' && incomeStatementStart > 0 && cosStart < 0) {
-        cosStart = i;
-      }
-    }
+      // 3. COS sub-lines (rows 25–32)
+      ...Array.from({ length: ROW.COS_TOTAL - ROW.COS_FIRST }, (_, i) =>
+        buildRow(values, ROW.COS_FIRST + i, monthColumns, { isIndented: true })
+      ),
 
-    if (incomeStatementStart < 0) {
-      throw new Error('Could not locate "Income Statememt" section in Fin Summary');
-    }
+      // 4. COS Total
+      buildRow(values, ROW.COS_TOTAL, monthColumns, { isTotal: true, label: 'Total COS' }),
 
-    // Phase 2: collect Income Statement rows
-    const incomeStatRows: IncomeStatementRow[] = [];
-    // COS sub-lines between cosStart and next non-COS section
-    const cosSubRows: IncomeStatementRow[] = [];
-    let inCosSection = false;
+      // 5. Gross Profit/(Loss)
+      buildRow(values, ROW.GROSS_PROFIT, monthColumns, { isTotal: true }),
 
-    for (let i = incomeStatementStart + 1; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const label = toStr(row[0]);
+      // 6. Operational Expenses
+      buildRow(values, ROW.OP_EXPENSES, monthColumns, { isBold: true }),
 
-      if (!label) continue; // skip blank rows within section
+      // 7. Net Profit/(Loss)
+      buildRow(values, ROW.NET_PROFIT, monthColumns, { isTotal: true }),
+    ];
 
-      // Detect end of income statement section (next major section header)
-      if (label === 'Cash In/Out' || label === 'Cash In' || label === 'Cash Out') break;
+    logger.info('Income statement built', { rowCount: rows.length, monthCount: months.length });
 
-      const { fy26, fy27, fy28 } = parseFY(row);
-      const monthly: Record<string, number> = {};
-      for (const { col, label: mLabel } of monthColumns) {
-        monthly[mLabel] = toNumber(row[col]);
-      }
+    const result: IncomeStatementData = { rows, months };
+    return NextResponse.json({ success: true, data: result, meta: { generatedAt: new Date().toISOString(), sources: ['Fin Summary'] } });
 
-      if (IS_LABELS.has(label)) {
-        if (label === 'Cost Of Sales') {
-          // Section header for COS — we'll inject COS sub-lines after this
-          incomeStatRows.push({
-            label: 'Cost of Sales',
-            fy26, fy27, fy28, monthly,
-            isHeader: true,
-          });
-          inCosSection = true;
-          continue;
-        }
-        if (label === 'Gross Profit/(Loss)' || label === 'Operational Expenses' || label === 'Net Profit/(Loss)') {
-          inCosSection = false;
-        }
-        incomeStatRows.push({
-          label,
-          fy26, fy27, fy28, monthly,
-          isTotal: label === 'Gross Profit/(Loss)' || label === 'Net Profit/(Loss)',
-          isBold: label === 'Revenue' || label === 'Operational Expenses',
-        });
-      }
-    }
-
-    // Phase 3: collect COS sub-lines
-    if (cosStart > 0) {
-      for (let i = cosStart + 1; i < values.length; i++) {
-        const row = values[i] as unknown[];
-        const label = toStr(row[0]);
-        if (!label) continue;
-        // Stop at next section or known totals
-        if (IS_LABELS.has(label) || label === 'Cash In' || label === 'Cash Out') break;
-
-        const { fy26, fy27, fy28 } = parseFY(row);
-        const monthly: Record<string, number> = {};
-        for (const { col, label: mLabel } of monthColumns) {
-          monthly[mLabel] = toNumber(row[col]);
-        }
-        const isTotal = label.toLowerCase().startsWith('total');
-        cosSubRows.push({
-          label,
-          fy26, fy27, fy28, monthly,
-          isTotal,
-          isIndented: !isTotal,
-        });
-      }
-    }
-
-    // Phase 4: splice COS sub-lines into result after the COS header
-    const finalRows: IncomeStatementRow[] = [];
-    for (const r of incomeStatRows) {
-      finalRows.push(r);
-      if (r.isHeader && r.label === 'Cost of Sales') {
-        finalRows.push(...cosSubRows);
-      }
-    }
-
-    const result: IncomeStatementData = { rows: finalRows, months };
-
-    return NextResponse.json({
-      success: true,
-      data: result,
-      meta: {
-        generatedAt: new Date().toISOString(),
-        sources: ['Fin Summary'],
-      },
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('Income statement fetch failed', { error: message });
-    return NextResponse.json(
-      { success: false, error: { code: 'INTERNAL_ERROR', message } },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: { code: 'INTERNAL_ERROR', message } }, { status: 500 });
   }
 }
