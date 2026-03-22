@@ -590,14 +590,20 @@ export const taskOperations = {
    */
   async updateTaskChecklist(taskId: string, checklistId: string, completed: boolean, userId: string): Promise<void> {
     try {
-      await sql`
-        UPDATE phase_task_checklist
-        SET
-          completed = ${completed},
-          completed_by = ${completed ? userId : null},
-          completed_at = ${completed ? sql`CURRENT_TIMESTAMP` : null}
-        WHERE id = ${checklistId}::uuid AND task_id = ${taskId}::uuid
-      `;
+      // Explicit branches to avoid conditional SQL fragments (Neon rule)
+      if (completed) {
+        await sql`
+          UPDATE phase_task_checklist
+          SET completed = ${completed}, completed_by = ${userId}, completed_at = CURRENT_TIMESTAMP
+          WHERE id = ${checklistId}::uuid AND task_id = ${taskId}::uuid
+        `;
+      } else {
+        await sql`
+          UPDATE phase_task_checklist
+          SET completed = ${completed}, completed_by = NULL, completed_at = NULL
+          WHERE id = ${checklistId}::uuid AND task_id = ${taskId}::uuid
+        `;
+      }
     } catch (error) {
       log.error('Error updating task checklist:', { data: error }, 'neonPhaseService');
       throw new Error('Failed to update task checklist');

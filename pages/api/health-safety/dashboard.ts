@@ -51,86 +51,88 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         WHERE table_name = 'maintenance_tickets'
       ) as exists`,
 
-      // Contractor compliance overview
-      sql`SELECT
-        cc.rag_status,
-        COUNT(*)::int as count
-      FROM hs_contractor_compliance cc
-      JOIN contractors c ON c.id = cc.contractor_id
-      WHERE c.status IN ('approved', 'active', 'pending')
-      ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
-      GROUP BY cc.rag_status`,
+      // Contractor compliance overview — explicit branches to avoid conditional SQL fragments (Neon rule)
+      contractor_id
+        ? sql`SELECT cc.rag_status, COUNT(*)::int as count
+              FROM hs_contractor_compliance cc JOIN contractors c ON c.id = cc.contractor_id
+              WHERE c.status IN ('approved', 'active', 'pending') AND cc.contractor_id = ${contractor_id}
+              GROUP BY cc.rag_status`
+        : sql`SELECT cc.rag_status, COUNT(*)::int as count
+              FROM hs_contractor_compliance cc JOIN contractors c ON c.id = cc.contractor_id
+              WHERE c.status IN ('approved', 'active', 'pending')
+              GROUP BY cc.rag_status`,
 
       // Contractors at risk (red/amber)
-      sql`SELECT
-        c.id,
-        c.company_name,
-        cc.overall_score,
-        cc.rag_status,
-        cc.next_audit_due
-      FROM hs_contractor_compliance cc
-      JOIN contractors c ON c.id = cc.contractor_id
-      WHERE c.status IN ('approved', 'active', 'pending')
-      AND cc.rag_status IN ('red', 'amber')
-      ${contractor_id ? sql`AND cc.contractor_id = ${contractor_id}` : sql``}
-      ORDER BY cc.overall_score ASC
-      LIMIT 10`,
+      contractor_id
+        ? sql`SELECT c.id, c.company_name, cc.overall_score, cc.rag_status, cc.next_audit_due
+              FROM hs_contractor_compliance cc JOIN contractors c ON c.id = cc.contractor_id
+              WHERE c.status IN ('approved', 'active', 'pending')
+                AND cc.rag_status IN ('red', 'amber') AND cc.contractor_id = ${contractor_id}
+              ORDER BY cc.overall_score ASC LIMIT 10`
+        : sql`SELECT c.id, c.company_name, cc.overall_score, cc.rag_status, cc.next_audit_due
+              FROM hs_contractor_compliance cc JOIN contractors c ON c.id = cc.contractor_id
+              WHERE c.status IN ('approved', 'active', 'pending')
+                AND cc.rag_status IN ('red', 'amber')
+              ORDER BY cc.overall_score ASC LIMIT 10`,
 
       // Project audit statistics
-      sql`SELECT
-        COUNT(*)::int as total_audits,
-        COUNT(*) FILTER (WHERE status = 'completed')::int as completed,
-        COUNT(*) FILTER (WHERE status = 'requires_action')::int as requires_action,
-        COUNT(*) FILTER (WHERE status = 'in_progress')::int as in_progress,
-        AVG(overall_score)::int as average_score
-      FROM hs_project_audits
-      WHERE audit_date >= ${fromDate}
-      AND audit_date <= ${toDate}
-      ${project_id ? sql`AND project_id = ${project_id}` : sql``}`,
+      project_id
+        ? sql`SELECT COUNT(*)::int as total_audits,
+                COUNT(*) FILTER (WHERE status = 'completed')::int as completed,
+                COUNT(*) FILTER (WHERE status = 'requires_action')::int as requires_action,
+                COUNT(*) FILTER (WHERE status = 'in_progress')::int as in_progress,
+                AVG(overall_score)::int as average_score
+              FROM hs_project_audits
+              WHERE audit_date >= ${fromDate} AND audit_date <= ${toDate}
+                AND project_id = ${project_id}`
+        : sql`SELECT COUNT(*)::int as total_audits,
+                COUNT(*) FILTER (WHERE status = 'completed')::int as completed,
+                COUNT(*) FILTER (WHERE status = 'requires_action')::int as requires_action,
+                COUNT(*) FILTER (WHERE status = 'in_progress')::int as in_progress,
+                AVG(overall_score)::int as average_score
+              FROM hs_project_audits
+              WHERE audit_date >= ${fromDate} AND audit_date <= ${toDate}`,
 
       // Projects by RAG status
-      sql`SELECT
-        rag_status,
-        COUNT(*)::int as count
-      FROM hs_project_audits
-      WHERE status IN ('completed', 'requires_action')
-      AND audit_date >= ${fromDate}
-      AND audit_date <= ${toDate}
-      ${project_id ? sql`AND project_id = ${project_id}` : sql``}
-      GROUP BY rag_status`,
+      project_id
+        ? sql`SELECT rag_status, COUNT(*)::int as count FROM hs_project_audits
+              WHERE status IN ('completed', 'requires_action')
+                AND audit_date >= ${fromDate} AND audit_date <= ${toDate}
+                AND project_id = ${project_id}
+              GROUP BY rag_status`
+        : sql`SELECT rag_status, COUNT(*)::int as count FROM hs_project_audits
+              WHERE status IN ('completed', 'requires_action')
+                AND audit_date >= ${fromDate} AND audit_date <= ${toDate}
+              GROUP BY rag_status`,
 
       // Upcoming audits
-      sql`SELECT
-        pc.project_id,
-        p.project_name,
-        pc.next_audit_due,
-        pc.audit_frequency,
-        (
-          SELECT overall_score
-          FROM hs_project_audits
-          WHERE project_id = pc.project_id
-          ORDER BY audit_date DESC
-          LIMIT 1
-        ) as last_score
-      FROM hs_project_config pc
-      JOIN projects p ON p.id = pc.project_id
-      WHERE pc.next_audit_due IS NOT NULL
-      AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
-      ${project_id ? sql`AND pc.project_id = ${project_id}` : sql``}
-      ORDER BY pc.next_audit_due ASC
-      LIMIT 10`,
+      project_id
+        ? sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency,
+                (SELECT overall_score FROM hs_project_audits
+                 WHERE project_id = pc.project_id ORDER BY audit_date DESC LIMIT 1) as last_score
+              FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
+              WHERE pc.next_audit_due IS NOT NULL
+                AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
+                AND pc.project_id = ${project_id}
+              ORDER BY pc.next_audit_due ASC LIMIT 10`
+        : sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency,
+                (SELECT overall_score FROM hs_project_audits
+                 WHERE project_id = pc.project_id ORDER BY audit_date DESC LIMIT 1) as last_score
+              FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
+              WHERE pc.next_audit_due IS NOT NULL
+                AND pc.next_audit_due <= NOW() + INTERVAL '14 days'
+              ORDER BY pc.next_audit_due ASC LIMIT 10`,
 
       // Overdue audits
-      sql`SELECT
-        pc.project_id,
-        p.project_name,
-        pc.next_audit_due,
-        pc.audit_frequency
-      FROM hs_project_config pc
-      JOIN projects p ON p.id = pc.project_id
-      WHERE pc.next_audit_due < NOW()
-      ${project_id ? sql`AND pc.project_id = ${project_id}` : sql``}
-      ORDER BY pc.next_audit_due ASC`,
+      project_id
+        ? sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency
+              FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
+              WHERE pc.next_audit_due < NOW() AND pc.project_id = ${project_id}
+              ORDER BY pc.next_audit_due ASC`
+        : sql`SELECT pc.project_id, p.project_name, pc.next_audit_due, pc.audit_frequency
+              FROM hs_project_config pc JOIN projects p ON p.id = pc.project_id
+              WHERE pc.next_audit_due < NOW()
+              ORDER BY pc.next_audit_due ASC`,
 
       // Recent activity
       sql`SELECT *
@@ -169,41 +171,118 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let incidentTrend: any[] = [];
 
     if (hasTickets) {
-      const [statsResult, trendResult] = await Promise.all([
-        sql`SELECT
-          COUNT(*)::int as total_incidents,
-          COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
-          COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
-          COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
-          COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
-          COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
-          COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
-          COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
-          COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
-          COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
-        FROM maintenance_tickets t
-        JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-        AND t.created_at >= ${fromDate}
-        AND t.created_at <= ${toDate}
-        ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-        ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}`,
+      // Explicit branches to avoid conditional SQL fragments in incident queries (Neon rule)
+      let statsQuery;
+      let trendQuery;
+      if (project_id && contractor_id) {
+        statsQuery = sql`
+          SELECT COUNT(*)::int as total_incidents,
+            COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+            COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+            COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+            COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+            COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
+            COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+            COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        `;
+        trendQuery = sql`
+          SELECT DATE_TRUNC('month', t.created_at) as month,
+            COUNT(*)::int as total,
+            COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+          GROUP BY DATE_TRUNC('month', t.created_at) ORDER BY month DESC LIMIT 12
+        `;
+      } else if (project_id) {
+        statsQuery = sql`
+          SELECT COUNT(*)::int as total_incidents,
+            COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+            COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+            COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+            COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+            COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
+            COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+            COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.project_id = ${project_id}
+        `;
+        trendQuery = sql`
+          SELECT DATE_TRUNC('month', t.created_at) as month,
+            COUNT(*)::int as total,
+            COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.project_id = ${project_id}
+          GROUP BY DATE_TRUNC('month', t.created_at) ORDER BY month DESC LIMIT 12
+        `;
+      } else if (contractor_id) {
+        statsQuery = sql`
+          SELECT COUNT(*)::int as total_incidents,
+            COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+            COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+            COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+            COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+            COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
+            COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+            COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.contractor_id = ${contractor_id}
+        `;
+        trendQuery = sql`
+          SELECT DATE_TRUNC('month', t.created_at) as month,
+            COUNT(*)::int as total,
+            COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+            AND t.contractor_id = ${contractor_id}
+          GROUP BY DATE_TRUNC('month', t.created_at) ORDER BY month DESC LIMIT 12
+        `;
+      } else {
+        statsQuery = sql`
+          SELECT COUNT(*)::int as total_incidents,
+            COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+            COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+            COUNT(*) FILTER (WHERE hd.severity = 'moderate')::int as moderate,
+            COUNT(*) FILTER (WHERE hd.severity = 'minor')::int as minor,
+            COUNT(*) FILTER (WHERE t.source_type = 'hse_near_miss')::int as near_misses,
+            COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open_incidents,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+            COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+            COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+        `;
+        trendQuery = sql`
+          SELECT DATE_TRUNC('month', t.created_at) as month,
+            COUNT(*)::int as total,
+            COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
+          FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+          WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+            AND t.created_at >= ${fromDate} AND t.created_at <= ${toDate}
+          GROUP BY DATE_TRUNC('month', t.created_at) ORDER BY month DESC LIMIT 12
+        `;
+      }
 
-        sql`SELECT
-          DATE_TRUNC('month', t.created_at) as month,
-          COUNT(*)::int as total,
-          COUNT(*) FILTER (WHERE hd.severity IN ('critical', 'major'))::int as severe
-        FROM maintenance_tickets t
-        JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-        AND t.created_at >= ${fromDate}
-        AND t.created_at <= ${toDate}
-        ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-        ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
-        GROUP BY DATE_TRUNC('month', t.created_at)
-        ORDER BY month DESC
-        LIMIT 12`,
-      ]);
+      const [statsResult, trendResult] = await Promise.all([statsQuery, trendQuery]);
 
       incidentStats = statsResult[0] || incidentStats;
       incidentTrend = trendResult;

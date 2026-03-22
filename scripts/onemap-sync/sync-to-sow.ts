@@ -30,17 +30,29 @@ interface ProjectMapping {
 }
 
 async function getProjectMappings(projectCode?: string): Promise<ProjectMapping[]> {
-  const projects = await sql`
-    SELECT
-      id as onemap_id,
-      project_code as onemap_code,
-      project_id as prod_id,
-      project_name
-    FROM onemap.projects
-    WHERE project_id IS NOT NULL
-    ${projectCode ? sql`AND project_code = ${projectCode}` : sql``}
-    ORDER BY project_code
-  `;
+  // Explicit branches to avoid conditional SQL fragments (Neon rule)
+  const projects = projectCode
+    ? await sql`
+        SELECT
+          id as onemap_id,
+          project_code as onemap_code,
+          project_id as prod_id,
+          project_name
+        FROM onemap.projects
+        WHERE project_id IS NOT NULL
+          AND project_code = ${projectCode}
+        ORDER BY project_code
+      `
+    : await sql`
+        SELECT
+          id as onemap_id,
+          project_code as onemap_code,
+          project_id as prod_id,
+          project_name
+        FROM onemap.projects
+        WHERE project_id IS NOT NULL
+        ORDER BY project_code
+      `;
 
   return projects.map(p => ({
     onemapId: p.onemap_id,

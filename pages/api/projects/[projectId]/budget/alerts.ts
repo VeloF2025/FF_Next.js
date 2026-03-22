@@ -193,17 +193,42 @@ export default withAuth(withErrorHandler(async (
       const acknowledgedBy = alert.acknowledged_by as string | null;
       const acknowledgedAt = alert.acknowledged_at as string | null;
 
-      const result = await sql`
-        UPDATE budget_alerts
-        SET
-          status = ${newStatus},
-          acknowledged_by = ${alertAction === 'acknowledge' ? userId : acknowledgedBy},
-          acknowledged_at = ${alertAction === 'acknowledge' ? sql`NOW()` : acknowledgedAt ? sql`${acknowledgedAt}::timestamp` : sql`NULL`},
-          resolved_by = ${alertAction === 'resolve' ? userId : null},
-          resolved_at = ${alertAction === 'resolve' ? sql`NOW()` : null}
-        WHERE id = ${alertId}
-        RETURNING *
-      `;
+      // Use explicit branches to avoid conditional SQL fragments in SET clause (Neon rule)
+      let result;
+      if (alertAction === 'acknowledge') {
+        result = await sql`
+          UPDATE budget_alerts
+          SET status = ${newStatus},
+              acknowledged_by = ${userId},
+              acknowledged_at = NOW(),
+              resolved_by = NULL,
+              resolved_at = NULL
+          WHERE id = ${alertId}
+          RETURNING *
+        `;
+      } else if (acknowledgedAt) {
+        result = await sql`
+          UPDATE budget_alerts
+          SET status = ${newStatus},
+              acknowledged_by = ${acknowledgedBy},
+              acknowledged_at = ${acknowledgedAt}::timestamp,
+              resolved_by = ${userId},
+              resolved_at = NOW()
+          WHERE id = ${alertId}
+          RETURNING *
+        `;
+      } else {
+        result = await sql`
+          UPDATE budget_alerts
+          SET status = ${newStatus},
+              acknowledged_by = ${acknowledgedBy},
+              acknowledged_at = NULL,
+              resolved_by = ${userId},
+              resolved_at = NOW()
+          WHERE id = ${alertId}
+          RETURNING *
+        `;
+      }
 
       const updated = result[0];
       log.info(`Alert ${alertAction}d`, {

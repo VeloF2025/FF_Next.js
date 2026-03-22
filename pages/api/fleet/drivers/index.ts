@@ -111,18 +111,13 @@ async function handler(
         LIMIT 1
       ) ds ON true
 
-      -- Filter by status
+      -- Filter by status — base condition always present; extra filters added via explicit branches below
       WHERE (
         ${includeFormerDrivers} = true
         OR UPPER(COALESCE(s.status, 'ACTIVE')) = 'ACTIVE'
       )
-      ${filterStatus ? sql`AND UPPER(COALESCE(s.status, 'ACTIVE')) = ${filterStatus.toUpperCase()}` : sql``}
-      ${filterHasVehicle !== undefined ? sql`AND (fv.id IS NOT NULL) = ${filterHasVehicle}` : sql``}
-      ${searchTerm ? sql`AND (
-        LOWER(s.first_name) LIKE ${`%${searchTerm.toLowerCase()}%`}
-        OR LOWER(s.last_name) LIKE ${`%${searchTerm.toLowerCase()}%`}
-        OR LOWER(CONCAT(s.first_name, ' ', s.last_name)) LIKE ${`%${searchTerm.toLowerCase()}%`}
-      )` : sql``}
+      -- Additional filter conditions are applied via JS branching after the query;
+      -- The rows are post-filtered in application code to avoid conditional SQL fragments (Neon rule)
 
       ORDER BY
         CASE WHEN UPPER(COALESCE(s.status, 'ACTIVE')) = 'ACTIVE' THEN 0 ELSE 1 END,
@@ -130,8 +125,22 @@ async function handler(
         s.last_name
     `;
 
+    // Apply additional filters in application code (avoids conditional SQL fragments — Neon rule)
+    const filteredRows = rows.filter((row) => {
+      if (filterStatus && String(row.status).toUpperCase() !== filterStatus.toUpperCase()) return false;
+      if (filterHasVehicle !== undefined && Boolean(row.has_vehicle) !== filterHasVehicle) return false;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const firstName = String(row.first_name || '').toLowerCase();
+        const lastName = String(row.last_name || '').toLowerCase();
+        const fullName = String(row.name || '').toLowerCase();
+        if (!firstName.includes(term) && !lastName.includes(term) && !fullName.includes(term)) return false;
+      }
+      return true;
+    });
+
     // Map to FleetDriver interface
-    const drivers: FleetDriver[] = rows.map((row) => ({
+    const drivers: FleetDriver[] = filteredRows.map((row) => ({
       staffId: row.staff_id as string,
       name: row.name as string,
       email: row.email as string | null,

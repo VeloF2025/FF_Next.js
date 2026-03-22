@@ -34,25 +34,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       params.push(project);
     }
 
-    const recentChanges = await sql`
-      SELECT
-        sch.id,
-        sch.drop_number,
-        sch.change_type,
-        sch.old_value,
-        sch.new_value,
-        sch.change_source,
-        sch.change_reason,
-        sch.actor,
-        sch.metadata,
-        sch.detected_at,
-        u.project
-      FROM serial_change_history sch
-      LEFT JOIN dr_photo_unified_reviews u ON sch.drop_number = u.drop_number
-      ${project ? sql`WHERE u.project = ${project}` : sql``}
-      ORDER BY sch.detected_at DESC
-      LIMIT ${limitNum}
-    `;
+    // Explicit branches to avoid conditional SQL fragments (Neon rule)
+    const recentChanges = project
+      ? await sql`
+          SELECT sch.id, sch.drop_number, sch.change_type, sch.old_value, sch.new_value,
+                 sch.change_source, sch.change_reason, sch.actor, sch.metadata, sch.detected_at, u.project
+          FROM serial_change_history sch
+          LEFT JOIN dr_photo_unified_reviews u ON sch.drop_number = u.drop_number
+          WHERE u.project = ${project}
+          ORDER BY sch.detected_at DESC LIMIT ${limitNum}
+        `
+      : await sql`
+          SELECT sch.id, sch.drop_number, sch.change_type, sch.old_value, sch.new_value,
+                 sch.change_source, sch.change_reason, sch.actor, sch.metadata, sch.detected_at, u.project
+          FROM serial_change_history sch
+          LEFT JOIN dr_photo_unified_reviews u ON sch.drop_number = u.drop_number
+          ORDER BY sch.detected_at DESC LIMIT ${limitNum}
+        `;
 
     // Summary stats
     const stats = await sql`

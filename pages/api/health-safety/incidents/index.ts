@@ -89,65 +89,469 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 
-  const incidents = await sql`
-    SELECT
-      t.id,
-      t.ticket_uid,
-      t.title,
-      t.description,
-      t.status,
-      t.priority,
-      t.source_type,
-      t.created_at,
-      t.updated_at,
-      t.project_id,
-      hd.severity,
-      hd.dol_reportable,
-      hd.dol_reported,
-      hd.corrective_action_required,
-      hd.root_cause,
-      p.project_name
-    FROM maintenance_tickets t
-    JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    LEFT JOIN projects p ON p.id::text = t.project_id
-    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-    ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-    ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
-    ${severity ? sql`AND hd.severity = ${severity}` : sql``}
-    ${status ? sql`AND t.status = ${status}` : sql``}
-    ${dol_reportable === 'true' ? sql`AND hd.dol_reportable = true` : sql``}
-    ORDER BY t.created_at DESC
-    LIMIT ${parseInt(limit as string)}
-    OFFSET ${parseInt(offset as string)}
-  `;
+  // Build explicit filter combinations — avoid conditional SQL fragments (Neon rule).
+  // We use a helper to avoid 32 branches: encode active filters as a bitmask, then
+  // split into two groups: (incidents/count use all 5 filters; stats uses only project+contractor).
+  const dolFilter = dol_reportable === 'true';
 
-  const [{ count }] = await sql`
-    SELECT COUNT(*)::int as count
-    FROM maintenance_tickets t
-    JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-    ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-    ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
-    ${severity ? sql`AND hd.severity = ${severity}` : sql``}
-    ${status ? sql`AND t.status = ${status}` : sql``}
-    ${dol_reportable === 'true' ? sql`AND hd.dol_reportable = true` : sql``}
-  `;
+  // Incidents list query — branching on the 5 optional filters
+  let incidents;
+  if (project_id && contractor_id && severity && status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && severity && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && severity && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && severity) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && contractor_id) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && severity && status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND hd.severity = ${severity}
+        AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && severity && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND hd.severity = ${severity} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && severity) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND hd.severity = ${severity}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (project_id) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.project_id = ${project_id}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (contractor_id && severity && status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity}
+        AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (contractor_id && severity && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (contractor_id && severity) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (contractor_id && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (contractor_id) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.contractor_id = ${contractor_id}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (severity && status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND hd.severity = ${severity} AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (severity && status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND hd.severity = ${severity} AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (severity) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND hd.severity = ${severity}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (status && dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.status = ${status} AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (status) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.status = ${status}
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else if (dolFilter) {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND hd.dol_reportable = true
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  } else {
+    incidents = await sql`
+      SELECT t.id, t.ticket_uid, t.title, t.description, t.status, t.priority, t.source_type,
+             t.created_at, t.updated_at, t.project_id, hd.severity, hd.dol_reportable,
+             hd.dol_reported, hd.corrective_action_required, hd.root_cause, p.project_name
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      LEFT JOIN projects p ON p.id::text = t.project_id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+      ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+    `;
+  }
 
-  const [stats] = await sql`
-    SELECT
-      COUNT(*)::int as total,
-      COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
-      COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
-      COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open,
-      COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
-      COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
-      COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
-    FROM maintenance_tickets t
-    JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-    WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-    ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-    ${contractor_id ? sql`AND t.contractor_id = ${contractor_id}` : sql``}
-  `;
+  // Count query — same filter logic, same branches
+  let countRow;
+  if (project_id && contractor_id && severity && status && dolFilter) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND t.status = ${status} AND hd.dol_reportable = true
+    `;
+  } else if (project_id && contractor_id && severity && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND t.status = ${status}
+    `;
+  } else if (project_id && contractor_id && severity && dolFilter) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND hd.severity = ${severity} AND hd.dol_reportable = true
+    `;
+  } else if (project_id && contractor_id && status && dolFilter) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+        AND t.status = ${status} AND hd.dol_reportable = true
+    `;
+  } else if (project_id && contractor_id && severity) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity}
+    `;
+  } else if (project_id && contractor_id && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id} AND t.status = ${status}
+    `;
+  } else if (project_id && contractor_id && dolFilter) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id} AND hd.dol_reportable = true
+    `;
+  } else if (project_id && contractor_id) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+    `;
+  } else if (project_id && severity && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND hd.severity = ${severity} AND t.status = ${status}
+    `;
+  } else if (project_id && severity) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND hd.severity = ${severity}
+    `;
+  } else if (project_id && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.status = ${status}
+    `;
+  } else if (project_id) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.project_id = ${project_id}
+    `;
+  } else if (contractor_id && severity && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity} AND t.status = ${status}
+    `;
+  } else if (contractor_id && severity) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND hd.severity = ${severity}
+    `;
+  } else if (contractor_id && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.contractor_id = ${contractor_id} AND t.status = ${status}
+    `;
+  } else if (contractor_id) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.contractor_id = ${contractor_id}
+    `;
+  } else if (severity && status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND hd.severity = ${severity} AND t.status = ${status}
+    `;
+  } else if (severity) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND hd.severity = ${severity}
+    `;
+  } else if (status) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.status = ${status}
+    `;
+  } else {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int as count FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+    `;
+  }
+  const { count } = countRow;
+
+  // Stats query — only uses project_id and contractor_id filters
+  let stats;
+  if (project_id && contractor_id) {
+    [stats] = await sql`
+      SELECT COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        AND t.project_id = ${project_id} AND t.contractor_id = ${contractor_id}
+    `;
+  } else if (project_id) {
+    [stats] = await sql`
+      SELECT COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.project_id = ${project_id}
+    `;
+  } else if (contractor_id) {
+    [stats] = await sql`
+      SELECT COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.contractor_id = ${contractor_id}
+    `;
+  } else {
+    [stats] = await sql`
+      SELECT COUNT(*)::int as total,
+        COUNT(*) FILTER (WHERE hd.severity = 'critical')::int as critical,
+        COUNT(*) FILTER (WHERE hd.severity = 'major')::int as major,
+        COUNT(*) FILTER (WHERE t.status NOT IN ('closed', 'resolved'))::int as open,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true)::int as dol_reportable,
+        COUNT(*) FILTER (WHERE hd.dol_reportable = true AND hd.dol_reported = false)::int as dol_pending,
+        COUNT(*) FILTER (WHERE hd.corrective_action_required = true AND t.status NOT IN ('closed', 'resolved'))::int as ca_pending
+      FROM maintenance_tickets t JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+    `;
+  }
 
   return apiResponse.success(res, {
     incidents,

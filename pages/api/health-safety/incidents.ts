@@ -32,44 +32,133 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return apiResponse.success(res, []);
     }
 
-    // Get incidents from maintenance_tickets joined with hs_ticket_details
-    const incidents = await sql`
-      SELECT
-        t.id,
-        t.ticket_number,
-        t.title,
-        t.description,
-        t.status,
-        t.priority,
-        t.source_type,
-        t.project_id,
-        p.project_name,
-        t.contractor_id,
-        c.company_name as contractor_name,
-        t.created_at,
-        t.updated_at,
-        t.resolved_at,
-        t.assigned_to,
-        t.location,
-        hd.severity,
-        hd.dol_reportable,
-        hd.dol_reported,
-        hd.corrective_action_required,
-        hd.root_cause,
-        hd.investigation_notes,
-        u.first_name || ' ' || u.last_name as reported_by
-      FROM maintenance_tickets t
-      LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
-      LEFT JOIN projects p ON p.id = t.project_id
-      LEFT JOIN contractors c ON c.id = t.contractor_id
-      LEFT JOIN users u ON u.id = t.assigned_to
-      WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
-      ${project_id ? sql`AND t.project_id = ${project_id}` : sql``}
-      ${severity ? sql`AND hd.severity = ${severity}` : sql``}
-      ${status ? sql`AND t.status = ${status}` : sql``}
-      ORDER BY t.created_at DESC
-      LIMIT ${parseInt(limit as string, 10)}
-    `;
+    // Get incidents — explicit branches to avoid conditional SQL fragments (Neon rule)
+    let incidents;
+    if (project_id && severity && status) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+          AND t.project_id = ${project_id} AND hd.severity = ${severity} AND t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (project_id && severity) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+          AND t.project_id = ${project_id} AND hd.severity = ${severity}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (project_id && status) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+          AND t.project_id = ${project_id} AND t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (project_id) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.project_id = ${project_id}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (severity && status) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+          AND hd.severity = ${severity} AND t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (severity) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND hd.severity = ${severity}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else if (status) {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss') AND t.status = ${status}
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    } else {
+      incidents = await sql`
+        SELECT t.id, t.ticket_number, t.title, t.description, t.status, t.priority, t.source_type,
+               t.project_id, p.project_name, t.contractor_id, c.company_name as contractor_name,
+               t.created_at, t.updated_at, t.resolved_at, t.assigned_to, t.location,
+               hd.severity, hd.dol_reportable, hd.dol_reported, hd.corrective_action_required,
+               hd.root_cause, hd.investigation_notes, u.first_name || ' ' || u.last_name as reported_by
+        FROM maintenance_tickets t
+        LEFT JOIN hs_ticket_details hd ON hd.ticket_id = t.id
+        LEFT JOIN projects p ON p.id = t.project_id
+        LEFT JOIN contractors c ON c.id = t.contractor_id
+        LEFT JOIN users u ON u.id = t.assigned_to
+        WHERE t.source_type IN ('hse_incident', 'hse_near_miss')
+        ORDER BY t.created_at DESC LIMIT ${parseInt(limit as string, 10)}
+      `;
+    }
 
     // Map to expected format
     const mapped = incidents.map((i: any) => ({

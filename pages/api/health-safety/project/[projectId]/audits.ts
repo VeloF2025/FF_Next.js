@@ -38,37 +38,48 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 async function handleGet(projectId: string, req: NextApiRequest, res: NextApiResponse) {
   const { status, limit = '20', offset = '0' } = req.query;
 
-  const audits = await sql`
-    SELECT
-      a.*,
-      s.full_name as auditor_name,
-      p.project_name,
-      (
-        SELECT json_build_object(
-          'total', COUNT(*)::int,
-          'passed', COUNT(*) FILTER (WHERE response = 'pass')::int,
-          'failed', COUNT(*) FILTER (WHERE response = 'fail')::int,
-          'na', COUNT(*) FILTER (WHERE response = 'na')::int
-        )
-        FROM hs_audit_responses
-        WHERE audit_id = a.id
-      ) as response_summary
-    FROM hs_project_audits a
-    LEFT JOIN staff s ON s.id = a.auditor_id
-    LEFT JOIN projects p ON p.id = a.project_id
-    WHERE a.project_id = ${projectId}
-    ${status ? sql`AND a.status = ${status}` : sql``}
-    ORDER BY a.audit_date DESC, a.created_at DESC
-    LIMIT ${parseInt(limit as string)}
-    OFFSET ${parseInt(offset as string)}
-  `;
+  // Explicit branches to avoid conditional SQL fragments (Neon rule)
+  const audits = status
+    ? await sql`
+        SELECT a.*, s.full_name as auditor_name, p.project_name,
+          (SELECT json_build_object(
+            'total', COUNT(*)::int,
+            'passed', COUNT(*) FILTER (WHERE response = 'pass')::int,
+            'failed', COUNT(*) FILTER (WHERE response = 'fail')::int,
+            'na', COUNT(*) FILTER (WHERE response = 'na')::int
+          ) FROM hs_audit_responses WHERE audit_id = a.id) as response_summary
+        FROM hs_project_audits a
+        LEFT JOIN staff s ON s.id = a.auditor_id
+        LEFT JOIN projects p ON p.id = a.project_id
+        WHERE a.project_id = ${projectId} AND a.status = ${status}
+        ORDER BY a.audit_date DESC, a.created_at DESC
+        LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+      `
+    : await sql`
+        SELECT a.*, s.full_name as auditor_name, p.project_name,
+          (SELECT json_build_object(
+            'total', COUNT(*)::int,
+            'passed', COUNT(*) FILTER (WHERE response = 'pass')::int,
+            'failed', COUNT(*) FILTER (WHERE response = 'fail')::int,
+            'na', COUNT(*) FILTER (WHERE response = 'na')::int
+          ) FROM hs_audit_responses WHERE audit_id = a.id) as response_summary
+        FROM hs_project_audits a
+        LEFT JOIN staff s ON s.id = a.auditor_id
+        LEFT JOIN projects p ON p.id = a.project_id
+        WHERE a.project_id = ${projectId}
+        ORDER BY a.audit_date DESC, a.created_at DESC
+        LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}
+      `;
 
-  const [{ count }] = await sql`
-    SELECT COUNT(*)::int as count
-    FROM hs_project_audits
-    WHERE project_id = ${projectId}
-    ${status ? sql`AND status = ${status}` : sql``}
-  `;
+  const [{ count }] = status
+    ? await sql`
+        SELECT COUNT(*)::int as count FROM hs_project_audits
+        WHERE project_id = ${projectId} AND status = ${status}
+      `
+    : await sql`
+        SELECT COUNT(*)::int as count FROM hs_project_audits
+        WHERE project_id = ${projectId}
+      `;
 
   return apiResponse.success(res, {
     audits,

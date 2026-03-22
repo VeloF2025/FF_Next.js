@@ -170,42 +170,69 @@ export async function getTCOReport(
   vehicleId?: string
 ): Promise<TCOReport> {
   try {
-    let whereClause = '';
-    if (vehicleId) {
-      whereClause = `WHERE vehicle_id = '${vehicleId}'`;
-    }
-
-    const vehicles = await sql`
-      SELECT
-        vehicle_id,
-        registration,
-        make,
-        model,
-        year,
-        ownership_type,
-        status,
-        vehicle_added_date,
-        fuel_cost_12m,
-        service_cost_12m,
-        lease_cost_12m,
-        insurance_cost_12m,
-        license_cost_12m,
-        tco_12m,
-        fuel_cost_lifetime,
-        service_cost_lifetime,
-        lease_cost_lifetime,
-        tco_lifetime,
-        km_travelled_12m,
-        km_travelled_lifetime,
-        cost_per_km_12m,
-        cost_per_km_lifetime,
-        litres_per_100km,
-        fuel_transactions_12m,
-        service_count_12m
-      FROM v_fleet_tco_summary
-      ${vehicleId ? sql`WHERE vehicle_id = ${vehicleId}` : sql``}
-      ORDER BY tco_12m DESC
-    `;
+    // Explicit branches to avoid conditional SQL fragments (Neon rule)
+    const vehicles = vehicleId
+      ? await sql`
+          SELECT
+            vehicle_id,
+            registration,
+            make,
+            model,
+            year,
+            ownership_type,
+            status,
+            vehicle_added_date,
+            fuel_cost_12m,
+            service_cost_12m,
+            lease_cost_12m,
+            insurance_cost_12m,
+            license_cost_12m,
+            tco_12m,
+            fuel_cost_lifetime,
+            service_cost_lifetime,
+            lease_cost_lifetime,
+            tco_lifetime,
+            km_travelled_12m,
+            km_travelled_lifetime,
+            cost_per_km_12m,
+            cost_per_km_lifetime,
+            litres_per_100km,
+            fuel_transactions_12m,
+            service_count_12m
+          FROM v_fleet_tco_summary
+          WHERE vehicle_id = ${vehicleId}
+          ORDER BY tco_12m DESC
+        `
+      : await sql`
+          SELECT
+            vehicle_id,
+            registration,
+            make,
+            model,
+            year,
+            ownership_type,
+            status,
+            vehicle_added_date,
+            fuel_cost_12m,
+            service_cost_12m,
+            lease_cost_12m,
+            insurance_cost_12m,
+            license_cost_12m,
+            tco_12m,
+            fuel_cost_lifetime,
+            service_cost_lifetime,
+            lease_cost_lifetime,
+            tco_lifetime,
+            km_travelled_12m,
+            km_travelled_lifetime,
+            cost_per_km_12m,
+            cost_per_km_lifetime,
+            litres_per_100km,
+            fuel_transactions_12m,
+            service_count_12m
+          FROM v_fleet_tco_summary
+          ORDER BY tco_12m DESC
+        `;
 
     const vehicleTCOs: VehicleTCO[] = (vehicles as VehicleTCORow[]).map((row) => ({
       vehicleId: row.vehicle_id,
@@ -313,62 +340,94 @@ export async function getCostTrends(
     startDate.setMonth(startDate.getMonth() - months);
 
     let dateFormat: string;
-    let intervalGroup: string;
 
     switch (period) {
       case 'daily':
         dateFormat = 'YYYY-MM-DD';
-        intervalGroup = "DATE_TRUNC('day', transaction_date)";
         break;
       case 'weekly':
         dateFormat = 'YYYY-WW';
-        intervalGroup = "DATE_TRUNC('week', transaction_date)";
         break;
       case 'monthly':
       default:
         dateFormat = 'YYYY-MM';
-        intervalGroup = "DATE_TRUNC('month', transaction_date)";
         break;
     }
 
-    // Get fuel costs by period
-    const fuelTrends = await sql`
-      SELECT
-        DATE_TRUNC(${period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}, transaction_date) as period_date,
-        TO_CHAR(transaction_date, ${dateFormat}) as period_label,
-        COALESCE(SUM(amount_rand), 0) as fuel_cost,
-        COALESCE(SUM(litres), 0) as total_litres
-      FROM fleet_fuel_transactions
-      WHERE transaction_date >= ${startDate.toISOString().split('T')[0]}
-        ${vehicleId ? sql`AND vehicle_id = ${vehicleId}` : sql``}
-      GROUP BY 1, 2
-      ORDER BY 1
-    `;
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const truncPeriod = period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month';
+
+    // Get fuel costs by period — explicit branches to avoid conditional SQL fragments (Neon rule)
+    const fuelTrends = vehicleId
+      ? await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, transaction_date) as period_date,
+            TO_CHAR(transaction_date, ${dateFormat}) as period_label,
+            COALESCE(SUM(amount_rand), 0) as fuel_cost,
+            COALESCE(SUM(litres), 0) as total_litres
+          FROM fleet_fuel_transactions
+          WHERE transaction_date >= ${startDateStr}
+            AND vehicle_id = ${vehicleId}
+          GROUP BY 1, 2
+          ORDER BY 1
+        `
+      : await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, transaction_date) as period_date,
+            TO_CHAR(transaction_date, ${dateFormat}) as period_label,
+            COALESCE(SUM(amount_rand), 0) as fuel_cost,
+            COALESCE(SUM(litres), 0) as total_litres
+          FROM fleet_fuel_transactions
+          WHERE transaction_date >= ${startDateStr}
+          GROUP BY 1, 2
+          ORDER BY 1
+        `;
 
     // Get odometer data for km calculation
-    const kmTrends = await sql`
-      SELECT
-        DATE_TRUNC(${period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}, recorded_at) as period_date,
-        SUM(km_since_last) as km_travelled
-      FROM fleet_odometer_history
-      WHERE recorded_at >= ${startDate.toISOString().split('T')[0]}
-        AND km_since_last IS NOT NULL
-        ${vehicleId ? sql`AND vehicle_id = ${vehicleId}` : sql``}
-      GROUP BY 1
-      ORDER BY 1
-    `;
+    const kmTrends = vehicleId
+      ? await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, recorded_at) as period_date,
+            SUM(km_since_last) as km_travelled
+          FROM fleet_odometer_history
+          WHERE recorded_at >= ${startDateStr}
+            AND km_since_last IS NOT NULL
+            AND vehicle_id = ${vehicleId}
+          GROUP BY 1
+          ORDER BY 1
+        `
+      : await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, recorded_at) as period_date,
+            SUM(km_since_last) as km_travelled
+          FROM fleet_odometer_history
+          WHERE recorded_at >= ${startDateStr}
+            AND km_since_last IS NOT NULL
+          GROUP BY 1
+          ORDER BY 1
+        `;
 
     // Get maintenance costs by period
-    const maintenanceTrends = await sql`
-      SELECT
-        DATE_TRUNC(${period === 'daily' ? 'day' : period === 'weekly' ? 'week' : 'month'}, service_date) as period_date,
-        COALESCE(SUM(total_cost), 0) as maintenance_cost
-      FROM fleet_service_history
-      WHERE service_date >= ${startDate.toISOString().split('T')[0]}
-        ${vehicleId ? sql`AND vehicle_id = ${vehicleId}` : sql``}
-      GROUP BY 1
-      ORDER BY 1
-    `;
+    const maintenanceTrends = vehicleId
+      ? await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, service_date) as period_date,
+            COALESCE(SUM(total_cost), 0) as maintenance_cost
+          FROM fleet_service_history
+          WHERE service_date >= ${startDateStr}
+            AND vehicle_id = ${vehicleId}
+          GROUP BY 1
+          ORDER BY 1
+        `
+      : await sql`
+          SELECT
+            DATE_TRUNC(${truncPeriod}, service_date) as period_date,
+            COALESCE(SUM(total_cost), 0) as maintenance_cost
+          FROM fleet_service_history
+          WHERE service_date >= ${startDateStr}
+          GROUP BY 1
+          ORDER BY 1
+        `;
 
     // Combine into data points
     type FuelRow = { period_date: string; period_label: string; fuel_cost: string; total_litres: string };

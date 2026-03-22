@@ -57,30 +57,75 @@ export async function GET(req: NextRequest) {
         ORDER BY created_at DESC
       `;
     }
-    // Multiple filters (build dynamic query)
+    // Multiple filters — explicit branches to avoid conditional SQL fragments (Neon rule)
     else {
-      const conditions = [];
-      const params: any = {};
+      const hasStatus = filters.status && filters.status.length > 0;
+      const hasCompliance = filters.complianceStatus && filters.complianceStatus.length > 0;
 
       if (filters.searchTerm) {
         const searchTerm = `%${filters.searchTerm}%`;
+        if (hasStatus && hasCompliance) {
+          contractors = await sql`
+            SELECT * FROM contractors
+            WHERE (
+              LOWER(company_name) LIKE LOWER(${searchTerm}) OR
+              LOWER(contact_person) LIKE LOWER(${searchTerm}) OR
+              LOWER(email) LIKE LOWER(${searchTerm})
+            )
+            AND status = ANY(${filters.status!})
+            AND compliance_status = ANY(${filters.complianceStatus!})
+            ORDER BY created_at DESC
+          `;
+        } else if (hasStatus) {
+          contractors = await sql`
+            SELECT * FROM contractors
+            WHERE (
+              LOWER(company_name) LIKE LOWER(${searchTerm}) OR
+              LOWER(contact_person) LIKE LOWER(${searchTerm}) OR
+              LOWER(email) LIKE LOWER(${searchTerm})
+            )
+            AND status = ANY(${filters.status!})
+            ORDER BY created_at DESC
+          `;
+        } else if (hasCompliance) {
+          contractors = await sql`
+            SELECT * FROM contractors
+            WHERE (
+              LOWER(company_name) LIKE LOWER(${searchTerm}) OR
+              LOWER(contact_person) LIKE LOWER(${searchTerm}) OR
+              LOWER(email) LIKE LOWER(${searchTerm})
+            )
+            AND compliance_status = ANY(${filters.complianceStatus!})
+            ORDER BY created_at DESC
+          `;
+        } else {
+          contractors = await sql`
+            SELECT * FROM contractors
+            WHERE (
+              LOWER(company_name) LIKE LOWER(${searchTerm}) OR
+              LOWER(contact_person) LIKE LOWER(${searchTerm}) OR
+              LOWER(email) LIKE LOWER(${searchTerm})
+            )
+            ORDER BY created_at DESC
+          `;
+        }
+      } else if (hasStatus && hasCompliance) {
         contractors = await sql`
           SELECT * FROM contractors
-          WHERE (
-            LOWER(company_name) LIKE LOWER(${searchTerm}) OR
-            LOWER(contact_person) LIKE LOWER(${searchTerm}) OR
-            LOWER(email) LIKE LOWER(${searchTerm})
-          )
-          ${filters.status && filters.status.length > 0 ? sql`AND status = ANY(${filters.status})` : sql``}
-          ${filters.complianceStatus && filters.complianceStatus.length > 0 ? sql`AND compliance_status = ANY(${filters.complianceStatus})` : sql``}
+          WHERE status = ANY(${filters.status!})
+            AND compliance_status = ANY(${filters.complianceStatus!})
+          ORDER BY created_at DESC
+        `;
+      } else if (hasStatus) {
+        contractors = await sql`
+          SELECT * FROM contractors
+          WHERE status = ANY(${filters.status!})
           ORDER BY created_at DESC
         `;
       } else {
         contractors = await sql`
           SELECT * FROM contractors
-          WHERE 1=1
-          ${filters.status && filters.status.length > 0 ? sql`AND status = ANY(${filters.status})` : sql``}
-          ${filters.complianceStatus && filters.complianceStatus.length > 0 ? sql`AND compliance_status = ANY(${filters.complianceStatus})` : sql``}
+          WHERE compliance_status = ANY(${filters.complianceStatus!})
           ORDER BY created_at DESC
         `;
       }
