@@ -2,6 +2,7 @@
  * GET /api/conduit/actuals?project=Lawley
  * Returns all actuals rows for a given ft_project_name.
  */
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
