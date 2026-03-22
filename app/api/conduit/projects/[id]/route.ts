@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
+import { log } from '@/lib/logger';
 import type { ConduitProject } from '@/modules/conduit/types';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: row as ConduitProject });
   } catch (error) {
-    console.error('[conduit/projects/[id] GET]', error);
+    log.error('[conduit/projects/[id] GET]', error);
     return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
   }
 }
@@ -69,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: updated as ConduitProject });
   } catch (error) {
-    console.error('[conduit/projects/[id] PATCH]', error);
+    log.error('[conduit/projects/[id] PATCH]', error);
     return NextResponse.json({ error: 'Failed to update project status' }, { status: 500 });
   }
 }
@@ -125,7 +126,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: updated as ConduitProject });
   } catch (error) {
-    console.error('[conduit/projects/[id] PUT]', error);
+    log.error('[conduit/projects/[id] PUT]', error);
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
 }

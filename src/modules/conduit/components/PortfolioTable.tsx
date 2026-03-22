@@ -376,7 +376,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
 
   const prospective = allProjects.filter(p => (p.status ?? 'prospective') === 'prospective');
   const executable  = allProjects.filter(p => p.status === 'executable');
-  const actual      = allProjects.filter(p => p.status === 'actual' || p.status === 'wip');
+  const actual      = allProjects.filter(p => p.status === 'actual');
 
   async function handlePromote(projectId: string) {
     setPromoting(true);
@@ -385,6 +385,7 @@ export function PortfolioTable({ initialProjects }: PortfolioTableProps) {
       const res = await fetch(`/api/conduit/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: 'executable' }),
       });
       if (!res.ok) throw new Error('Failed to promote project');
