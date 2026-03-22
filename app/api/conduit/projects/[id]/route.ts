@@ -130,3 +130,29 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Safety guard: only allow deleting prospective projects
+    const [existing] = await sql`
+      SELECT id, status FROM conduit_projects WHERE id = ${params.id}
+    `;
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (existing.status !== 'prospective') {
+      return NextResponse.json({ error: 'Only prospective projects can be deleted' }, { status: 403 });
+    }
+
+    await sql`DELETE FROM conduit_projects WHERE id = ${params.id}`;
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    log.error('[conduit/projects/[id] DELETE]', error);
+    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
+  }
+}

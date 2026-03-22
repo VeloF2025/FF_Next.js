@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2 } from 'lucide-react';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -47,12 +47,14 @@ interface ProjectsGridProps {
   promoteToStatus?: 'executable' | 'wip';
   onProjectPromoted?: (project: ConduitProject) => void; // called after promote so parent can add to next section
   showAddButton?: boolean;
+  showDeleteButton?: boolean;
 }
 
 function ProjectsGrid({
   initialProjects, tableLabel, defaultStatus,
   promoteLabel, promoteToStatus, onProjectPromoted,
   showAddButton = true,
+  showDeleteButton = false,
 }: ProjectsGridProps) {
   const [projects, setProjects] = useState<ConduitProject[]>(initialProjects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -124,6 +126,23 @@ function ProjectsGrid({
       setAddError(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
       setAdding(false);
+    }
+  };
+
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null); // project id pending confirm
+  const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+
+  const deleteProject = async (project: ConduitProject) => {
+    setDeleting(prev => ({ ...prev, [project.id]: true }));
+    try {
+      const res = await fetch(`/api/conduit/projects/${project.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(await res.text());
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeleting(prev => ({ ...prev, [project.id]: false }));
     }
   };
 
@@ -376,6 +395,32 @@ function ProjectsGrid({
                           {promoting[project.id] ? '…' : promoteLabel}
                         </button>
                       )}
+                      {showDeleteButton && (
+                        confirmDelete === project.id ? (
+                          <span className="flex items-center gap-1">
+                            <span className="text-xs text-red-400 whitespace-nowrap">Sure?</span>
+                            <button
+                              onClick={() => deleteProject(project)}
+                              disabled={deleting[project.id]}
+                              className="px-2 py-1 rounded text-xs font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors"
+                            >
+                              {deleting[project.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDelete(null)}
+                              className="px-2 py-1 rounded text-xs text-gray-400 hover:text-white transition-colors"
+                            >No</button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDelete(project.id)}
+                            title="Delete project"
+                            className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )
+                      )}
                     </div>
                   </td>
                 </tr>,
@@ -441,6 +486,7 @@ export function PortfolioTable({ prospectiveProjects, executableProjects, wipPro
           promoteLabel="→ Executable"
           promoteToStatus="executable"
           onProjectPromoted={p => setExecutable(prev => [...prev, p])}
+          showDeleteButton
           showAddButton
         />
       </div>
