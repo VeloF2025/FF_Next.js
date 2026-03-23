@@ -17,6 +17,9 @@ const PRESENCE_SUB_LIFETIME_MINUTES = 60;
 /** Max users per presence subscription (Graph limit: 650) */
 const MAX_USERS_PER_SUBSCRIPTION = 650;
 
+/** UUID v4 pattern for OData filter sanitization */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Graph presence statuses that indicate a user is in a call */
 const IN_CALL_ACTIVITIES = ['InACall', 'InAConferenceCall'];
 
@@ -40,9 +43,10 @@ export async function createPresenceSubscription(
     throw new Error('GRAPH_WEBHOOK_SECRET required');
   }
 
-  // Fetch all internal users to monitor
+  // Fetch all internal users to monitor — validate UUIDs before OData interpolation
   const users = await getInternalUsers();
-  const userIds = users.slice(0, MAX_USERS_PER_SUBSCRIPTION).map(u => `'${u.id}'`);
+  const validUsers = users.filter(u => UUID_REGEX.test(u.id));
+  const userIds = validUsers.slice(0, MAX_USERS_PER_SUBSCRIPTION).map(u => `'${u.id}'`);
 
   if (userIds.length === 0) {
     throw new Error('No internal users found to monitor');

@@ -2,6 +2,7 @@
 // Detects when users enter Teams calls and dispatches recording bots
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 import { processPresenceChanges, type PresenceChange } from '@/lib/graph/presence';
 import { dispatchRecordingBot } from '@/lib/recording-bot/dispatcher';
 
@@ -47,7 +48,7 @@ export default async function handler(
   }
 
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
     return;
   }
 

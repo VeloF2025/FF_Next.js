@@ -1,6 +1,7 @@
 // Cron: Manage presence subscriptions — renew every 45 minutes (60-min max lifetime)
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { neon } from '@/lib/db-neon';
 import { graphFetch } from '@/lib/graph/auth';
 import { createPresenceSubscription } from '@/lib/graph/presence';
@@ -9,7 +10,9 @@ const sql = neon(process.env.DATABASE_URL!);
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const LOGGER = 'PresenceSubCron';
 
-const PRESENCE_WEBHOOK_URL = 'https://app.fibreflow.app/api/meetings/presence-webhook';
+const PRESENCE_WEBHOOK_URL = process.env.NEXT_PUBLIC_APP_URL
+  ? `${process.env.NEXT_PUBLIC_APP_URL}/api/meetings/presence-webhook`
+  : 'https://app.fibreflow.app/api/meetings/presence-webhook';
 
 /**
  * POST /api/cron/manage-presence-subscriptions
@@ -28,14 +31,14 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method ?? 'UNKNOWN', ['POST']);
     return;
   }
 
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization;
   if (!cronSecret || !authHeader || authHeader !== `Bearer ${cronSecret}`) {
-    res.status(401).json({ error: 'Unauthorized' });
+    apiResponse.unauthorized(res);
     return;
   }
 
@@ -122,10 +125,10 @@ export default async function handler(
     const result = { active: activeRows.length, renewed, created, failed, cleaned };
     log.info('Presence subscription management complete', result, LOGGER);
 
-    res.status(200).json({ success: true, ...result });
+    apiResponse.success(res, result);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     log.error('Presence subscription cron failed', { error: msg }, LOGGER);
-    res.status(500).json({ success: false, error: msg });
+    apiResponse.error(res, ErrorCode.INTERNAL_ERROR, msg);
   }
 }
