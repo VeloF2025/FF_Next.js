@@ -158,11 +158,13 @@ export function safeGetInitials(name: unknown, fallback: string = '?'): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 0) return fallback
   
+  const first = parts[0]?.charAt(0) ?? ''
   if (parts.length === 1) {
-    return parts[0].charAt(0).toUpperCase() || fallback
+    return first.toUpperCase() || fallback
   }
   
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase() || fallback
+  const last = parts[parts.length - 1]?.charAt(0) ?? ''
+  return (first + last).toUpperCase() || fallback
 }
 
 /**

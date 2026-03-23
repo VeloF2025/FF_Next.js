@@ -103,4 +103,4 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/api-error-handler', async () => {
   const actual = await vi.importActual('@/lib/api-error-handler');
   return actual;
-}, { esmock: true });
+});
