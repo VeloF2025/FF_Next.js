@@ -1,21 +1,46 @@
 /**
- * OPEXReport — Operational Expenses from OPEX worksheet.
- * Category rows × monthly columns — same grid format as Expense Pivot.
- * No type toggle — OPEX tab is pure operational expenses only.
+ * OPEXReport — Operational Expenses from Data tab (col D == OPEX).
+ * Table: Category × FY26/27/28 + monthly columns
+ * Charts: Stacked bar — monthly OPEX by expense category
  */
 
-// 🟢 WORKING: OPEX Report component — reads OPEX tab only
+// 🟢 WORKING: OPEX Report — table + stacked bar chart
 'use client';
 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useOPEXData } from './useOPEXData';
+
+// 20-colour palette — cycles if more categories
+const PALETTE = [
+  '#3b82f6','#f97316','#22c55e','#a855f7','#eab308',
+  '#06b6d4','#ec4899','#84cc16','#f43f5e','#8b5cf6',
+  '#14b8a6','#fb923c','#4ade80','#c084fc','#facc15',
+  '#38bdf8','#f472b6','#a3e635','#fb7185','#818cf8',
+];
 
 function fZAR(v: number): string {
   if (v === 0) return '—';
   const abs = Math.abs(Math.round(v));
   return `R\u00a0${abs.toLocaleString('en-ZA').replace(/,/g, '\u00a0')}`;
 }
+
+function fZARShort(v: number): string {
+  if (v === 0) return '—';
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000) return `R ${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `R ${(abs / 1_000).toFixed(0)}k`;
+  return `R ${Math.round(abs)}`;
+}
+
+const TOOLTIP_STYLE = {
+  contentStyle: { backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 6, color: '#F9FAFB', fontSize: 12 },
+  itemStyle: { color: '#F9FAFB' },
+};
 
 export default function OPEXReport() {
   const { data, isLoading, error } = useOPEXData();
@@ -38,8 +63,23 @@ export default function OPEXReport() {
     );
   }
 
-  const { rows = [], months = [], grandTotals } = data?.data ?? { rows: [], months: [], grandTotals: { fy26: 0, fy27: 0, monthly: {}, total: 0 } };
+  const { rows = [], months = [], grandTotals } = data?.data ?? {
+    rows: [], months: [],
+    grandTotals: { fy26: 0, fy27: 0, fy28: 0, monthly: {}, total: 0 },
+  };
 
+  const categories = rows.filter((r) => !r.isTotal).map((r) => r.category);
+
+  // Build stacked bar chart data — one entry per month
+  const chartData = months.map((m) => {
+    const entry: Record<string, number | string> = { month: m };
+    for (const row of rows.filter((r) => !r.isTotal)) {
+      entry[row.category] = Math.round(row.monthly[m] ?? 0);
+    }
+    return entry;
+  });
+
+  // ── Table ──
   const th = 'px-3 py-2.5 text-left text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
   const thR = 'px-3 py-2.5 text-right text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
 
@@ -52,9 +92,7 @@ export default function OPEXReport() {
             <th className={thR}>FY26</th>
             <th className={thR}>FY27</th>
             <th className={thR}>FY28</th>
-            {months.map((m) => (
-              <th key={m} className={thR}>{m}</th>
-            ))}
+            {months.map((m) => <th key={m} className={thR}>{m}</th>)}
             <th className={thR}>Total</th>
           </tr>
         </thead>
@@ -88,14 +126,51 @@ export default function OPEXReport() {
     </div>
   );
 
-  return (
-    <ReportTabLayout
-      tableContent={tableContent}
-      chartsContent={
-        <div className="flex items-center justify-center h-40 text-gray-500 text-sm">
-          Charts coming soon
-        </div>
-      }
-    />
+  // ── Charts ──
+  const chartsContent = (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-white">Monthly OPEX by Category</h3>
+      <div className="h-96">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 60, left: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+            <XAxis
+              dataKey="month"
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
+              axisLine={{ stroke: '#4B5563' }}
+              tickLine={false}
+              angle={-35}
+              textAnchor="end"
+              interval={0}
+            />
+            <YAxis
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={fZARShort}
+            />
+            <Tooltip
+              {...TOOLTIP_STYLE}
+              formatter={(value: number, name: string) => [fZAR(value), name]}
+            />
+            <Legend
+              wrapperStyle={{ color: '#9CA3AF', fontSize: 11, paddingTop: 8 }}
+              iconType="square"
+            />
+            {categories.map((cat, idx) => (
+              <Bar
+                key={cat}
+                dataKey={cat}
+                stackId="opex"
+                fill={PALETTE[idx % PALETTE.length]}
+                maxBarSize={48}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
+
+  return <ReportTabLayout tableContent={tableContent} chartsContent={chartsContent} />;
 }
