@@ -40,27 +40,43 @@ export function CommunicationsMeetingsTab({
   const [activeFilter, setActiveFilter] = useState<MeetingFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Search filter (client-side)
+  // Search + date filter (client-side)
   const searchedMeetings = useMemo(() => {
-    if (!searchTerm.trim()) return meetings;
-    const term = searchTerm.toLowerCase();
-    return meetings.filter(m => {
-      if (m.title?.toLowerCase().includes(term)) return true;
-      if (m.organizer?.toLowerCase().includes(term)) return true;
-      if (m.participants?.some(p => p.toLowerCase().includes(term))) return true;
-      if (m.rawParticipants?.some(p =>
-        (p.name?.toLowerCase().includes(term)) ||
-        (p.email?.toLowerCase().includes(term)) ||
-        (p.displayName?.toLowerCase().includes(term))
-      )) return true;
-      if (m.summary?.overview?.toLowerCase().includes(term)) return true;
-      if (m.summary?.keywords?.some(k => k.toLowerCase().includes(term))) return true;
-      return false;
-    });
-  }, [meetings, searchTerm]);
+    let filtered = meetings;
+
+    // Date filter
+    if (dateFilter) {
+      filtered = filtered.filter(m => {
+        const meetingDate = m.date instanceof Date ? m.date : new Date(m.date);
+        const meetingDateStr = meetingDate.toISOString().substring(0, 10);
+        return meetingDateStr === dateFilter;
+      });
+    }
+
+    // Text search
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(m => {
+        if (m.title?.toLowerCase().includes(term)) return true;
+        if (m.organizer?.toLowerCase().includes(term)) return true;
+        if (m.participants?.some(p => p.toLowerCase().includes(term))) return true;
+        if (m.rawParticipants?.some(p =>
+          (p.name?.toLowerCase().includes(term)) ||
+          (p.email?.toLowerCase().includes(term)) ||
+          (p.displayName?.toLowerCase().includes(term))
+        )) return true;
+        if (m.summary?.overview?.toLowerCase().includes(term)) return true;
+        if (m.summary?.keywords?.some(k => k.toLowerCase().includes(term))) return true;
+        return false;
+      });
+    }
+
+    return filtered;
+  }, [meetings, searchTerm, dateFilter]);
 
   // Filter meetings based on source + status filters
   const filteredMeetings = searchedMeetings.filter(meeting => {
@@ -123,16 +139,37 @@ export function CommunicationsMeetingsTab({
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          placeholder="Search meetings by title, participants, keywords..."
-          className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]/50"
-        />
+      {/* Search + Date filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)]" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search meetings by title, participants, keywords..."
+            className="w-full pl-10 pr-4 py-2 text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] placeholder-[var(--ff-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]/50"
+          />
+        </div>
+        <div className="relative flex-shrink-0">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--ff-text-tertiary)] pointer-events-none" />
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            className="pl-10 pr-3 py-2 text-sm bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ff-primary)]/50"
+          />
+          {dateFilter && (
+            <button
+              type="button"
+              onClick={() => setDateFilter('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--ff-text-tertiary)] hover:text-[var(--ff-text-primary)] text-xs"
+              title="Clear date filter"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Source filter */}
