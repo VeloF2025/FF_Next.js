@@ -1,21 +1,22 @@
 /**
  * OPEXReport — Operational Expenses from Data tab (col D == OPEX).
  * Table: Category × FY26/27/28 + monthly columns
- * Charts: Stacked bar — monthly OPEX by expense category
+ * Charts: Interactive stacked bar — click legend to cross-filter categories
+ *         + total label on top of each bar
  */
 
-// 🟢 WORKING: OPEX Report — table + stacked bar chart
+// 🟢 WORKING: OPEX Report — table + interactive stacked bar chart
 'use client';
 
+import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
+  Tooltip, ResponsiveContainer, Cell, LabelList,
 } from 'recharts';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
 import { useOPEXData } from './useOPEXData';
 
-// 20-colour palette — cycles if more categories
 const PALETTE = [
   '#3b82f6','#f97316','#22c55e','#a855f7','#eab308',
   '#06b6d4','#ec4899','#84cc16','#f43f5e','#8b5cf6',
@@ -30,7 +31,7 @@ function fZAR(v: number): string {
 }
 
 function fZARShort(v: number): string {
-  if (v === 0) return '—';
+  if (v === 0) return '';
   const abs = Math.abs(v);
   if (abs >= 1_000_000) return `R ${(abs / 1_000_000).toFixed(1)}M`;
   if (abs >= 1_000) return `R ${(abs / 1_000).toFixed(0)}k`;
@@ -42,8 +43,61 @@ const TOOLTIP_STYLE = {
   itemStyle: { color: '#F9FAFB' },
 };
 
+// Custom legend that supports multi-select cross-filter
+interface LegendProps {
+  categories: string[];
+  colors: string[];
+  selected: Set<string>;
+  onToggle: (cat: string) => void;
+}
+
+function InteractiveLegend({ categories, colors, selected, onToggle }: LegendProps) {
+  const anySelected = selected.size > 0;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 px-1">
+      {categories.map((cat, idx) => {
+        const isActive = !anySelected || selected.has(cat);
+        return (
+          <button
+            key={cat}
+            onClick={() => onToggle(cat)}
+            className="flex items-center gap-1.5 text-xs transition-opacity"
+            style={{ opacity: isActive ? 1 : 0.3 }}
+          >
+            <span
+              className="w-3 h-3 rounded-sm flex-shrink-0"
+              style={{ background: colors[idx % colors.length] }}
+            />
+            <span className={`${selected.has(cat) ? 'font-bold text-white' : 'text-gray-400'}`}>
+              {cat}
+            </span>
+          </button>
+        );
+      })}
+      {anySelected && (
+        <button
+          onClick={() => onToggle('__clear__')}
+          className="text-xs text-blue-400 hover:text-blue-300 underline ml-1"
+        >
+          Clear filter
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function OPEXReport() {
   const { data, isLoading, error } = useOPEXData();
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  const toggleCategory = useCallback((cat: string) => {
+    if (cat === '__clear__') { setSelectedCategories(new Set()); return; }
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -68,14 +122,21 @@ export default function OPEXReport() {
     grandTotals: { fy26: 0, fy27: 0, fy28: 0, monthly: {}, total: 0 },
   };
 
-  const categories = rows.filter((r) => !r.isTotal).map((r) => r.category);
+  const activeRows = rows.filter((r) => !r.isTotal);
+  const categories = activeRows.map((r) => r.category);
+  const anySelected = selectedCategories.size > 0;
 
-  // Build stacked bar chart data — one entry per month
+  // Build chart data — include __total__ key for top label
   const chartData = months.map((m) => {
     const entry: Record<string, number | string> = { month: m };
-    for (const row of rows.filter((r) => !r.isTotal)) {
-      entry[row.category] = Math.round(row.monthly[m] ?? 0);
+    let monthTotal = 0;
+    for (const row of activeRows) {
+      const val = Math.round(row.monthly[m] ?? 0);
+      entry[row.category] = val;
+      // If filtering, only count selected in total
+      if (!anySelected || selectedCategories.has(row.category)) monthTotal += val;
     }
+    entry['__total__'] = monthTotal;
     return entry;
   });
 
@@ -97,7 +158,7 @@ export default function OPEXReport() {
           </tr>
         </thead>
         <tbody>
-          {rows.filter((r) => !r.isTotal).map((row, i) => (
+          {activeRows.map((row, i) => (
             <tr key={row.category} className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
               <td className="px-3 py-2 text-gray-200 whitespace-nowrap" style={{ minWidth: 220 }}>{row.category}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy26 ?? 0)}</td>
@@ -128,11 +189,12 @@ export default function OPEXReport() {
 
   // ── Charts ──
   const chartsContent = (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <h3 className="text-sm font-semibold text-white">Monthly OPEX by Category</h3>
+      <p className="text-xs text-gray-500">Click a category in the legend to cross-filter. Click again to deselect.</p>
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 60, left: 16 }}>
+          <BarChart data={chartData} margin={{ top: 24, right: 16, bottom: 60, left: 16 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis
               dataKey="month"
@@ -151,24 +213,49 @@ export default function OPEXReport() {
             />
             <Tooltip
               {...TOOLTIP_STYLE}
-              formatter={(value: number, name: string) => [fZAR(value), name]}
+              formatter={(value: number, name: string) => {
+                if (name === '__total__') return null;
+                return [fZAR(value), name];
+              }}
+              itemSorter={(item) => -(item.value as number)}
             />
-            <Legend
-              wrapperStyle={{ color: '#9CA3AF', fontSize: 11, paddingTop: 8 }}
-              iconType="square"
-            />
-            {categories.map((cat, idx) => (
-              <Bar
-                key={cat}
-                dataKey={cat}
-                stackId="opex"
-                fill={PALETTE[idx % PALETTE.length]}
-                maxBarSize={48}
-              />
-            ))}
+            {categories.map((cat, idx) => {
+              const colour = PALETTE[idx % PALETTE.length];
+              const dimmed = anySelected && !selectedCategories.has(cat);
+              const isLast = idx === categories.length - 1;
+              return (
+                <Bar
+                  key={cat}
+                  dataKey={cat}
+                  stackId="opex"
+                  fill={colour}
+                  fillOpacity={dimmed ? 0.15 : 1}
+                  maxBarSize={48}
+                  isAnimationActive={false}
+                >
+                  {/* Total label on top of last stack segment */}
+                  {isLast && (
+                    <LabelList
+                      dataKey="__total__"
+                      position="top"
+                      formatter={fZARShort}
+                      style={{ fill: '#E5E7EB', fontSize: 10, fontWeight: 600 }}
+                    />
+                  )}
+                </Bar>
+              );
+            })}
+            {/* Invisible bar just to carry the total label when filtering hides the last segment */}
+            <Bar dataKey="__total__" stackId="__label__" fill="transparent" maxBarSize={48} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <InteractiveLegend
+        categories={categories}
+        colors={PALETTE}
+        selected={selectedCategories}
+        onToggle={toggleCategory}
+      />
     </div>
   );
 
