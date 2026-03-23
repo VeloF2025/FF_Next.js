@@ -64,6 +64,7 @@ export function EditableCell({ value, onCommit, type = 'number' }: EditableCellP
             if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setEditing(false);
           }}
+          aria-label={type === 'percent' ? 'Edit percentage value' : 'Edit numeric value'}
           className="w-full bg-transparent outline-none text-sm text-right font-medium text-gray-100 tabular-nums"
         />
       </td>
@@ -72,9 +73,18 @@ export function EditableCell({ value, onCommit, type = 'number' }: EditableCellP
 
   return (
     <td
+      role="button"
+      tabIndex={0}
       className="px-3 py-2 text-sm text-right bg-gray-800/60 border border-gray-700 cursor-text hover:bg-gray-700/60 hover:border-gray-600 transition-colors"
       style={{ minWidth: 80 }}
       onClick={startEdit}
+      aria-label={`Edit ${type === 'percent' ? 'uptake percentage' : 'rate'}. Current value: ${display}. Press Enter to edit.`}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          startEdit();
+        }
+      }}
     >
       <span className="font-medium text-gray-300 tabular-nums">{display}</span>
     </td>
