@@ -65,7 +65,9 @@ export function ProcurementDocumentPanel({
   );
   const [notes, setNotes] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadStatusMessage, setUploadStatusMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadStatusRef = useRef<HTMLDivElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,13 +78,18 @@ export function ProcurementDocumentPanel({
     if (!selectedFile) return;
 
     try {
+      setUploadStatusMessage('Uploading document...');
       await uploadDocument(selectedFile, selectedType, notes || undefined);
+      setUploadStatusMessage(`Document "${selectedFile.name}" uploaded successfully.`);
       setShowUpload(false);
       setSelectedFile(null);
       setNotes('');
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // Clear status message after 2 seconds
+      setTimeout(() => setUploadStatusMessage(''), 2000);
     } catch {
-      // Error is handled by the hook
+      setUploadStatusMessage('Error uploading document. Please try again.');
+      // Error is also handled by the hook and displayed in the error alert
     }
   };
 
@@ -121,17 +128,32 @@ export function ProcurementDocumentPanel({
       {showUpload && (
         <div className="px-5 py-4 border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-tertiary)]">
           <div className="space-y-3">
+            {/* Upload Status Announcement (Screen Reader Only) */}
+            <div
+              ref={uploadStatusRef}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="sr-only"
+            >
+              {uploadStatusMessage}
+            </div>
+
             {/* File Input */}
             <div>
-              <label className="block text-sm text-[var(--ff-text-secondary)] mb-1">File</label>
+              <label htmlFor="procurement-file-input" className="block text-sm text-[var(--ff-text-secondary)] mb-1">
+                File
+              </label>
               <input
+                id="procurement-file-input"
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx"
                 onChange={handleFileSelect}
-                className="block w-full text-sm text-[var(--ff-text-secondary)] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer"
+                className="block w-full text-sm text-[var(--ff-text-secondary)] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                aria-describedby="file-size-hint"
               />
-              <p className="text-xs text-[var(--ff-text-tertiary)] mt-1">
+              <p id="file-size-hint" className="text-xs text-[var(--ff-text-tertiary)] mt-1">
                 PDF, JPEG, PNG, DOCX, XLSX — max 20MB
               </p>
             </div>
@@ -203,8 +225,12 @@ export function ProcurementDocumentPanel({
 
       {/* Error */}
       {error && (
-        <div className="px-5 py-3 bg-red-500/10 border-b border-red-500/30 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="px-5 py-3 bg-red-500/10 border-b border-red-500/30 flex items-center gap-2"
+        >
+          <AlertCircle className="h-4 w-4 text-red-400 shrink-0" aria-hidden="true" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
@@ -258,18 +284,18 @@ export function ProcurementDocumentPanel({
                     href={doc.fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-1.5 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors"
-                    title="Download"
+                    className="p-1.5 hover:bg-[var(--ff-bg-tertiary)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    aria-label={`Download ${doc.documentName}`}
                   >
-                    <Download className="h-4 w-4 text-[var(--ff-text-secondary)]" />
+                    <Download className="h-4 w-4 text-[var(--ff-text-secondary)]" aria-hidden="true" />
                   </a>
                   {!readOnly && (
                     <button
                       onClick={() => handleDelete(doc.id, doc.documentName)}
-                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Delete"
+                      className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      aria-label={`Delete ${doc.documentName}`}
                     >
-                      <Trash2 className="h-4 w-4 text-red-400" />
+                      <Trash2 className="h-4 w-4 text-red-400" aria-hidden="true" />
                     </button>
                   )}
                 </div>

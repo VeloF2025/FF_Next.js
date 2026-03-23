@@ -6,7 +6,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 // 🟢 WORKING: Cost Centre Profitability types — COS vs Revenue per project
-export interface ProjectProfitabilityRow {
+export interface ProjectProfitability {
   project: string;
   revenue: number;
   cos: number;
@@ -20,7 +20,7 @@ export interface CostCentreRevenueItem {
   cos: number;
   grossProfit: number;
   margin: number;
-  children: ProjectProfitabilityRow[];
+  children: ProjectProfitability[];
 }
 
 export interface CostCentreRevenueResponse {
