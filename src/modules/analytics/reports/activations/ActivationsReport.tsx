@@ -1,16 +1,16 @@
 /**
  * ActivationsReport — OES activations by year/month/week.
  * Table: collapsible Year → Month → Week drill-down.
- * Charts: stacked bar by project (monthly/weekly) + breakdown grid below.
+ * Charts: stacked horizontal bar by project (monthly/weekly) + breakdown grid below.
  */
 
 // 🟢 WORKING: Activations Report — collapsible table + stacked bar chart by project + breakdown grid
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, LabelList, Legend,
+  Tooltip, ResponsiveContainer, LabelList,
 } from 'recharts';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
@@ -33,6 +33,42 @@ const TOOLTIP_STYLE = {
   contentStyle: { backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 6, color: '#F9FAFB', fontSize: 12 },
   itemStyle: { color: '#F9FAFB' },
 };
+
+// ── ProjectLegend ─────────────────────────────────────────────────────────────
+
+interface ProjectLegendProps {
+  projects: string[];
+  colors: string[];
+  selected: Set<string>;
+  onToggle: (proj: string) => void;
+}
+
+function ProjectLegend({ projects, colors, selected, onToggle }: ProjectLegendProps) {
+  const anySelected = selected.size > 0;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 px-1">
+      {projects.map((proj, idx) => {
+        const isActive = !anySelected || selected.has(proj);
+        return (
+          <button
+            key={proj}
+            onClick={() => onToggle(proj)}
+            className="flex items-center gap-1.5 text-xs transition-opacity"
+            style={{ opacity: isActive ? 1 : 0.3 }}
+          >
+            <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: colors[idx % colors.length] }} />
+            <span className={`${selected.has(proj) ? 'font-bold text-white' : 'text-gray-400'}`}>{proj}</span>
+          </button>
+        );
+      })}
+      {anySelected && (
+        <button onClick={() => onToggle('__clear__')} className="text-xs text-blue-400 hover:text-blue-300 underline ml-1">
+          Clear filter
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ── Table ────────────────────────────────────────────────────────────────────
 
@@ -144,8 +180,18 @@ interface BreakdownColumn {
   projects: Array<{ projectName: string; count: number }>;
 }
 
-function BreakdownGrid({ columns, allProjects }: { columns: BreakdownColumn[]; allProjects: string[] }) {
+function BreakdownGrid({
+  columns,
+  allProjects,
+  selectedProjects,
+}: {
+  columns: BreakdownColumn[];
+  allProjects: string[];
+  selectedProjects: Set<string>;
+}) {
+  const anySelected = selectedProjects.size > 0;
   const projectRows = allProjects
+    .filter((name) => !anySelected || selectedProjects.has(name))
     .map((name) => ({
       name,
       counts: columns.map((col) => col.projects.find((p) => p.projectName === name)?.count ?? 0),
@@ -187,7 +233,9 @@ function BreakdownGrid({ columns, allProjects }: { columns: BreakdownColumn[]; a
           <tr className="border-t-2 border-gray-500 font-bold" style={{ backgroundColor: '#1a3a4a' }}>
             <td className="px-3 py-2.5 text-white">Total</td>
             {columns.map((col) => {
-              const t = col.projects.reduce((s, p) => s + p.count, 0);
+              const t = col.projects
+                .filter((p) => !anySelected || selectedProjects.has(p.projectName))
+                .reduce((s, p) => s + p.count, 0);
               return (
                 <td key={col.key} className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">
                   {t > 0 ? t.toLocaleString() : '—'}
@@ -210,6 +258,18 @@ type ChartEntry = Record<string, number | string | undefined>;
 
 function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; allProjects: string[] }) {
   const [drillMonth, setDrillMonth] = useState<string | null>(null);
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
+
+  const toggleProject = useCallback((proj: string) => {
+    if (proj === '__clear__') { setSelectedProjects(new Set()); return; }
+    setSelectedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(proj)) next.delete(proj); else next.add(proj);
+      return next;
+    });
+  }, []);
+
+  const anySelected = selectedProjects.size > 0;
 
   // Build flat chronological month list with project data
   const allMonthsData: Array<{
@@ -231,19 +291,34 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
     }
   }
 
-  // Build chart data entries with per-project keys + __total__
+  // Build chart data entries — zero out non-selected projects, recompute __total__
   const chartData: ChartEntry[] = drillMonth && drilledMonth
     ? [...drilledMonth.weeks]
         .sort((a: ActivationWeek, b: ActivationWeek) => a.weekStart.localeCompare(b.weekStart))
         .map((w: ActivationWeek) => {
-          const entry: ChartEntry = { label: w.weekLabel.split(' – ')[0] ?? w.weekStart, __total__: w.activations };
-          for (const p of w.projects) entry[p.projectName] = p.count;
+          const entry: ChartEntry = { label: w.weekLabel.split(' – ')[0] ?? w.weekStart };
+          let total = 0;
+          for (const p of w.projects) {
+            const effective = anySelected && !selectedProjects.has(p.projectName) ? 0 : p.count;
+            entry[p.projectName] = effective;
+            total += effective;
+          }
+          entry.__total__ = total;
           return entry;
         })
     : allMonthsData.map((m) => {
         const [mon, yr] = m.label.split(' ');
-        const entry: ChartEntry = { label: `${mon ?? ''} ${yr ?? ''}`, _key: m.key, __total__: m.activations };
-        for (const p of m.projects) entry[p.projectName] = p.count;
+        const entry: ChartEntry = {
+          label: `${(mon ?? '').substring(0, 3)} ${(yr ?? '').slice(-2)}`,
+          _key: m.key,
+        };
+        let total = 0;
+        for (const p of m.projects) {
+          const effective = anySelected && !selectedProjects.has(p.projectName) ? 0 : p.count;
+          entry[p.projectName] = effective;
+          total += effective;
+        }
+        entry.__total__ = total;
         return entry;
       });
 
@@ -260,12 +335,10 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
         const [mon, yr] = m.label.split(' ');
         return {
           key: m.key,
-          label: `${(mon ?? '').substring(0, 3)} '${(yr ?? '').substring(2)}`,
+          label: `${(mon ?? '').substring(0, 3)} ${(yr ?? '').slice(-2)}`,
           projects: m.projects,
         };
       });
-
-  const lastProject = allProjects[allProjects.length - 1];
 
   return (
     <div className="space-y-3">
@@ -295,54 +368,65 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
         {drillMonth ? 'Weekly activations for selected month' : 'Click a bar to drill into weekly view'}
       </p>
 
-      <div className="h-80">
+      <div className="h-[480px]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 24, right: 16, bottom: 60, left: 16 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 56, bottom: 8, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
             <XAxis
-              dataKey="label"
+              type="number"
               tick={{ fill: '#9CA3AF', fontSize: 11 }}
               axisLine={{ stroke: '#4B5563' }}
               tickLine={false}
-              angle={-35}
-              textAnchor="end"
-              interval={0}
+              allowDecimals={false}
             />
-            <YAxis tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={70}
+              tick={{ fill: '#9CA3AF', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip
               {...TOOLTIP_STYLE}
               formatter={(value: number, name: string) => [value.toLocaleString(), name]}
             />
-            <Legend iconType="square" wrapperStyle={{ paddingTop: 8, fontSize: 11, color: '#9CA3AF' }} />
             {allProjects.map((projectName, idx) => (
               <Bar
                 key={projectName}
                 dataKey={projectName}
                 stackId="acts"
                 fill={PALETTE[idx % PALETTE.length]}
-                maxBarSize={48}
+                maxBarSize={24}
                 isAnimationActive={false}
                 cursor={drillMonth ? 'default' : 'pointer'}
                 onClick={(entry: ChartEntry) => {
                   if (!drillMonth && typeof entry._key === 'string') setDrillMonth(entry._key);
                 }}
-              >
-                {projectName === lastProject && (
-                  <LabelList
-                    dataKey="__total__"
-                    position="top"
-                    style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
-                    formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')}
-                  />
-                )}
-              </Bar>
+              />
             ))}
+            {/* Invisible bar carries total label so it survives project filtering */}
+            <Bar dataKey="__total__" stackId="__label__" fill="transparent" maxBarSize={24} isAnimationActive={false}>
+              <LabelList
+                dataKey="__total__"
+                position="right"
+                style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
+                formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')}
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
+      <ProjectLegend
+        projects={allProjects}
+        colors={PALETTE}
+        selected={selectedProjects}
+        onToggle={toggleProject}
+      />
+
       {/* Breakdown grid — project × period matrix */}
-      <BreakdownGrid columns={gridColumns} allProjects={allProjects} />
+      <BreakdownGrid columns={gridColumns} allProjects={allProjects} selectedProjects={selectedProjects} />
     </div>
   );
 }
