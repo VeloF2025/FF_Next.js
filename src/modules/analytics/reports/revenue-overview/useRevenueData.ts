@@ -1,36 +1,37 @@
 /**
  * useRevenueData — React Query hook for the Revenue Overview (cashflow) report.
- * Fetches monthly Cash In / Cash Out / Net data from SharePoint via the API.
+ * Fetches Cash In / Cash Out / Cash Movement / Closing Balance data from SharePoint via the API.
  */
 
 import { useQuery } from '@tanstack/react-query';
 
-/** A single monthly cashflow data point */
+/** @deprecated Use CashflowRow instead */
 export interface CashflowDataPoint {
-  /** Month label, e.g. "Jan 2026" */
   label: string;
-  /** Cash inflows for the month */
   cashIn: number;
-  /** Cash outflows for the month */
   cashOut: number;
-  /** Net cash movement (Cash In − Cash Out) */
   net: number;
+}
+
+export interface CashflowRow {
+  label: string;
+  fy26: number;
+  fy27: number;
+  fy28: number;
+  monthly: Record<string, number>;
+  isBold?: boolean;
+}
+
+export interface CashflowData {
+  rows: CashflowRow[];
+  months: string[];
+  meta: { generatedAt: string; sources: string[] };
 }
 
 /** Response shape returned by /api/analytics/reports/revenue-overview */
 export interface CashflowResponse {
   success: boolean;
-  data: CashflowDataPoint[];
-  meta: {
-    /** Optional informational note */
-    note?: string;
-    /** ISO timestamp of when this data was generated */
-    generatedAt: string;
-    /** Number of months returned */
-    monthCount: number;
-    /** Currency code, always "ZAR" */
-    currency: string;
-  };
+  data: CashflowData;
 }
 
 /** Error response shape from the API */
