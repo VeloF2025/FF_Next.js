@@ -392,29 +392,32 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
               {...TOOLTIP_STYLE}
               formatter={(value: number, name: string) => [value.toLocaleString(), name]}
             />
-            {allProjects.map((projectName, idx) => (
-              <Bar
-                key={projectName}
-                dataKey={projectName}
-                stackId="acts"
-                fill={PALETTE[idx % PALETTE.length]}
-                maxBarSize={48}
-                isAnimationActive={false}
-                cursor={drillMonth ? 'default' : 'pointer'}
-                onClick={(entry: ChartEntry) => {
-                  if (!drillMonth && typeof entry._key === 'string') setDrillMonth(entry._key);
-                }}
-              />
-            ))}
-            {/* Invisible bar carries total label so it survives project filtering */}
-            <Bar dataKey="__total__" stackId="__label__" fill="transparent" maxBarSize={48} isAnimationActive={false}>
-              <LabelList
-                dataKey="__total__"
-                position="top"
-                style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
-                formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')}
-              />
-            </Bar>
+            {allProjects.map((projectName, idx) => {
+              const isLast = idx === allProjects.length - 1;
+              return (
+                <Bar
+                  key={projectName}
+                  dataKey={projectName}
+                  stackId="acts"
+                  fill={PALETTE[idx % PALETTE.length]}
+                  maxBarSize={48}
+                  isAnimationActive={false}
+                  cursor={drillMonth ? 'default' : 'pointer'}
+                  onClick={(entry: ChartEntry) => {
+                    if (!drillMonth && typeof entry._key === 'string') setDrillMonth(entry._key);
+                  }}
+                >
+                  {isLast && (
+                    <LabelList
+                      dataKey="__total__"
+                      position="top"
+                      style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
+                      formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')}
+                    />
+                  )}
+                </Bar>
+              );
+            })}
           </BarChart>
         </ResponsiveContainer>
       </div>
