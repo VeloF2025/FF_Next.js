@@ -42,10 +42,10 @@ function KpiCard({ label, value, sub, valueClass = 'text-foreground' }: KpiCardP
 
 // ─── Projects grid (fully self-contained — own state, own KPI tiles) ──────────
 
-interface ProjectsGridProps {
+export interface ProjectsGridProps {
   initialProjects: ConduitProject[];
   tableLabel: string;
-  defaultStatus: 'prospective' | 'executable' | 'wip';
+  defaultStatus: 'prospective' | 'executable' | 'wip' | 'scoping';
   promoteLabel?: string;        // e.g. "→ Executable"
   promoteToStatus?: 'prospective' | 'executable' | 'wip';
   onProjectPromoted?: (project: ConduitProject) => void;
@@ -58,7 +58,7 @@ interface ProjectsGridProps {
   onBaselineSaved?: () => void;
 }
 
-function ProjectsGrid({
+export function ProjectsGrid({
   initialProjects, tableLabel, defaultStatus,
   promoteLabel, promoteToStatus, onProjectPromoted,
   demoteLabel, demoteToStatus, onProjectDemoted,

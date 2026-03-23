@@ -50,6 +50,7 @@ export default async function ConduitPage() {
   const prospectiveProjects = projects.filter(p => p.status === 'prospective');
   const executableProjects  = projects.filter(p => p.status === 'executable');
   const wipProjects         = projects.filter(p => p.status === 'wip');
+  const scopingProjects     = projects.filter(p => p.status === 'scoping');
 
   return (
     <div className="p-6 space-y-6 min-h-screen bg-gray-950">
@@ -70,6 +71,7 @@ export default async function ConduitPage() {
         prospectiveProjects={prospectiveProjects}
         executableProjects={executableProjects}
         wipProjects={wipProjects}
+        scopingProjects={scopingProjects}
         initialBaselines={baselines}
       />
     </div>

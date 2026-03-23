@@ -1,13 +1,14 @@
 /**
- * ConduitTabs — client-side tab switcher for Current / Baseline views.
- * Current: live editing (Prospective / Executable / WIP / Actual)
+ * ConduitTabs — client-side tab switcher for Current / Baseline / Scoping views.
+ * Current: live editing (Prospective / Executable / WIP)
  * Baseline: read-only immutable snapshots
+ * Scoping: standalone PM calculator — isolated from Current/Baseline, no actuals
  */
 'use client';
 
 import { useState, useCallback } from 'react';
-import { LayoutGrid, BookMarked } from 'lucide-react';
-import { PortfolioTable } from './PortfolioTable';
+import { LayoutGrid, BookMarked, Calculator } from 'lucide-react';
+import { PortfolioTable, ProjectsGrid } from './PortfolioTable';
 import { BaselineList } from './BaselineList';
 import type { ConduitProject } from '../types';
 import type { ConduitBaseline } from '../types';
@@ -16,16 +17,16 @@ interface Props {
   prospectiveProjects: ConduitProject[];
   executableProjects:  ConduitProject[];
   wipProjects:         ConduitProject[];
+  scopingProjects:     ConduitProject[];
   initialBaselines:    ConduitBaseline[];
 }
 
-type Tab = 'current' | 'baseline';
+type Tab = 'current' | 'baseline' | 'scoping';
 
-export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, initialBaselines }: Props) {
+export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, scopingProjects, initialBaselines }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('current');
   const [baselines, setBaselines] = useState<ConduitBaseline[]>(initialBaselines);
 
-  // Called by PortfolioTable when a new baseline is saved — refetch to update list
   const handleBaselineSaved = useCallback(async () => {
     try {
       const res = await fetch('/api/conduit/baselines');
@@ -33,9 +34,7 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
         const { data } = await res.json() as { data: ConduitBaseline[] };
         setBaselines(data ?? []);
       }
-    } catch {
-      // silent — the save succeeded, list just won't refresh until tab switch
-    }
+    } catch { /* silent */ }
   }, []);
 
   const tabClass = (tab: Tab) =>
@@ -62,6 +61,10 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
             </span>
           )}
         </button>
+        <button className={tabClass('scoping')} onClick={() => setActiveTab('scoping')}>
+          <Calculator className="w-4 h-4" />
+          Scoping
+        </button>
       </div>
 
       {/* Tab content */}
@@ -76,6 +79,25 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
 
       {activeTab === 'baseline' && (
         <BaselineList initialBaselines={baselines} />
+      )}
+
+      {activeTab === 'scoping' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold uppercase tracking-widest border border-cyan-500 text-cyan-400 px-3 py-1 rounded">
+              Scoping
+            </span>
+            <div className="flex-1 border-t border-gray-700" />
+            <span className="text-xs text-gray-500">PM costing calculator — independent from Current &amp; Baseline</span>
+          </div>
+          <ProjectsGrid
+            initialProjects={scopingProjects}
+            tableLabel="Project Scope — Scoping"
+            defaultStatus="scoping"
+            showAddButton
+            showDeleteButton
+          />
+        </div>
       )}
     </div>
   );

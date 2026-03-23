@@ -88,7 +88,7 @@ export interface ConduitProjectInputs {
 export interface ConduitProject {
   id: string;
   name: string;
-  status: 'prospective' | 'executable' | 'wip';
+  status: 'prospective' | 'executable' | 'wip' | 'scoping';
   ft_project_name: string | null;
   po_count: number;
   start_date: string | null;

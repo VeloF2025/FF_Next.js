@@ -51,9 +51,9 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     const body = await req.json() as { status?: string };
     const { status } = body;
 
-    const validStatuses = ['prospective', 'executable', 'wip'];
+    const validStatuses = ['prospective', 'executable', 'wip', 'scoping'];
     if (!status || !validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status — must be prospective, executable, or wip' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid status — must be prospective, executable, wip, or scoping' }, { status: 400 });
     }
 
     const [updated] = await sql`
