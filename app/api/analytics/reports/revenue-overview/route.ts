@@ -1,8 +1,8 @@
 /**
  * GET /api/analytics/reports/revenue-overview
  *
- * Returns monthly cashflow data (Cash In, Cash Out, Net) from the
- * Shareholder Model Excel file via Microsoft Graph / SharePoint.
+ * Returns cashflow data (Cash In, Cash Out, Cash Movement, Closing Balance)
+ * from the Shareholder Model Excel file via Microsoft Graph / SharePoint.
  *
  * Access restricted to authorised users via RBAC (analytics.reports / view)
  * or direct user-ID allowlist.
@@ -23,12 +23,19 @@ const ALLOWED_USERS = new Set([
   '7d84184b-2a2b-4fbb-a52e-9815d0e92237', // Lew
 ]);
 
-/** A single monthly cashflow data point */
-export interface CashflowDataPoint {
+export interface CashflowRow {
   label: string;
-  cashIn: number;
-  cashOut: number;
-  net: number;
+  fy26: number;
+  fy27: number;
+  fy28: number;
+  monthly: Record<string, number>;
+  isBold?: boolean;
+}
+
+export interface CashflowData {
+  rows: CashflowRow[];
+  months: string[];
+  meta: { generatedAt: string; sources: string[] };
 }
 
 /**
@@ -50,6 +57,13 @@ function toNumber(cell: unknown): number {
   if (typeof cell === 'string') return parseFloat(cell) || 0;
   return 0;
 }
+
+const ROW_LABELS: { label: string; isBold: boolean }[] = [
+  { label: 'Cash In', isBold: false },
+  { label: 'Cash Out', isBold: false },
+  { label: 'Cash Movement', isBold: true },
+  { label: 'Closing Balance', isBold: true },
+];
 
 // 🟢 WORKING: Revenue overview GET handler — reads live SharePoint data
 export async function GET(_req: NextRequest): Promise<NextResponse> {
@@ -91,14 +105,14 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   try {
     const { values } = await getWorksheetRange('Fin Summary');
 
-    if (!values || values.length < 2) {
+    if (!values || values.length < 4) {
       throw new Error('Financial Summary sheet returned insufficient data');
     }
 
-    // Header row (index 1): ["Cashflow","FY 26","FY27","FY28", <date serials>...]
-    const headerRow = values[1] as unknown[];
+    // Header row is index 2: ["Cash In/Out","FY 26","FY 27","FY28", <date serials col 4+>]
+    const headerRow = values[2] as unknown[];
 
-    // Collect monthly columns (index 4+) where header cell is a numeric date serial
+    // Collect monthly columns (index 4+) where header cell is a numeric date serial > 40000
     const monthColumns: { col: number; label: string }[] = [];
     for (let col = 4; col < headerRow.length; col++) {
       const cell = headerRow[col];
@@ -107,42 +121,44 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Locate Cash In / Cash Out / Cash Movement rows by scanning column 0
-    let cashInRow: unknown[] | null = null;
-    let cashOutRow: unknown[] | null = null;
-    let cashMovementRow: unknown[] | null = null;
+    const months = monthColumns.map((m) => m.label);
 
+    // Build a map from label → row data by scanning col 0
+    const rowMap = new Map<string, unknown[]>();
     for (const row of values) {
       const typedRow = row as unknown[];
       const rowLabel = String(typedRow[0] ?? '').trim();
-      if (rowLabel === 'Cash In') cashInRow = typedRow;
-      else if (rowLabel === 'Cash Out') cashOutRow = typedRow;
-      else if (rowLabel === 'Cash Movement') cashMovementRow = typedRow;
+      if (ROW_LABELS.some((r) => r.label === rowLabel)) {
+        rowMap.set(rowLabel, typedRow);
+      }
     }
 
-    if (!cashInRow && !cashOutRow) {
-      throw new Error('Could not locate Cash In / Cash Out rows in Financial Summary');
-    }
-
-    // cashOut: normalise to positive magnitude regardless of sign in Excel.
-    // Some cells are stored negative (correct), some positive (data inconsistency).
-    // Math.abs ensures the total always reflects true outflow — not a net of mixed signs.
-    const data: CashflowDataPoint[] = monthColumns.map(({ col, label }) => ({
-      label,
-      cashIn: toNumber(cashInRow?.[col]),
-      cashOut: Math.abs(toNumber(cashOutRow?.[col])),
-      net: toNumber(cashMovementRow?.[col]),
-    }));
-
-    return NextResponse.json({
-      success: true,
-      data,
-      meta: {
-        currency: 'ZAR',
-        generatedAt: new Date().toISOString(),
-        monthCount: data.length,
-      },
+    const rows: CashflowRow[] = ROW_LABELS.map(({ label, isBold }) => {
+      const rowData = rowMap.get(label);
+      const monthly: Record<string, number> = {};
+      for (const { col, label: monthLabel } of monthColumns) {
+        monthly[monthLabel] = toNumber(rowData?.[col]);
+      }
+      return {
+        label,
+        fy26: toNumber(rowData?.[1]),
+        fy27: toNumber(rowData?.[2]),
+        fy28: toNumber(rowData?.[3]),
+        monthly,
+        isBold,
+      };
     });
+
+    const result: CashflowData = {
+      rows,
+      months,
+      meta: {
+        generatedAt: new Date().toISOString(),
+        sources: ['Fin Summary'],
+      },
+    };
+
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('Revenue overview fetch failed', { error: message });

@@ -1,28 +1,92 @@
 /**
- * RevenueOverview — Monthly cashflow report.
- * Table tab: data grid (Month | Cash In | Cash Out | Net)
- * Charts tab: grouped bar chart
+ * RevenueOverview — Cashflow Statement report.
+ * Table: Cash In / Cash Out / Cash Movement / Closing Balance with FY + monthly columns.
+ * Charts: placeholder (charts to be added later).
  */
 
 'use client';
 
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
 import { useRevenueData } from './useRevenueData';
+import type { CashflowRow } from './useRevenueData';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
-import { CashflowTable } from '../tables/CashflowTable';
 
-function formatCurrency(value: number): string {
-  const abs = Math.abs(value);
-  const sign = value < 0 ? '-' : '';
-  if (abs >= 1_000_000) return `${sign}R${(abs / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `${sign}R${(abs / 1_000).toFixed(0)}k`;
-  return `${sign}R${abs.toFixed(0)}`;
+function fZAR(value: number): { text: string; negative: boolean } {
+  if (value === 0) return { text: '—', negative: false };
+  const negative = value < 0;
+  const abs = Math.abs(Math.round(value));
+  const formatted = abs.toLocaleString('en-ZA').replace(/,/g, '\u00a0');
+  return { text: `R\u00a0${formatted}`, negative };
 }
 
-// 🟢 WORKING: Cashflow Overview — table grid + grouped bar chart
+function NumCell({ value }: { value: number }) {
+  const { text, negative } = fZAR(value);
+  return (
+    <td className={`px-3 py-1.5 text-xs text-right whitespace-nowrap ${negative ? 'text-red-400' : 'text-gray-200'}`}>
+      {text}
+    </td>
+  );
+}
+
+function RowEl({ row, months }: { row: CashflowRow; months: string[] }) {
+  const labelClass = row.isBold ? 'font-bold border-t border-gray-600' : '';
+
+  // Compute total across all months
+  const total = months.reduce((sum, m) => sum + (row.monthly[m] ?? 0), 0);
+
+  return (
+    <tr className="border-b border-gray-800 hover:bg-gray-750">
+      <td
+        className={`px-3 py-1.5 text-xs text-gray-200 whitespace-nowrap ${labelClass}`}
+        style={{ minWidth: 200 }}
+      >
+        {row.label}
+      </td>
+      <NumCell value={row.fy26} />
+      <NumCell value={row.fy27} />
+      <NumCell value={row.fy28} />
+      {months.map((m) => (
+        <NumCell key={m} value={row.monthly[m] ?? 0} />
+      ))}
+      <NumCell value={total} />
+    </tr>
+  );
+}
+
+function CashflowStatementTable({ rows, months }: { rows: CashflowRow[]; months: string[] }) {
+  return (
+    <div className="overflow-x-auto rounded border border-gray-700">
+      <table className="min-w-full text-xs">
+        <thead>
+          <tr style={{ backgroundColor: '#1a3a4a' }}>
+            <th
+              className="px-3 py-2 text-left text-xs font-bold text-white whitespace-nowrap sticky left-0 bg-inherit z-10"
+              style={{ minWidth: 200 }}
+            >
+              Label
+            </th>
+            <th className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">FY26</th>
+            <th className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">FY27</th>
+            <th className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">FY28</th>
+            {months.map((m) => (
+              <th key={m} className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">
+                {m}
+              </th>
+            ))}
+            <th className="px-3 py-2 text-right text-xs font-bold text-white whitespace-nowrap">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <RowEl key={`${row.label}-${i}`} row={row} months={months} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// 🟢 WORKING: Cashflow Statement — FY + monthly columns table
 export default function RevenueOverview() {
   const { data, isLoading, error } = useRevenueData();
 
@@ -44,55 +108,20 @@ export default function RevenueOverview() {
     );
   }
 
-  const chartData = data?.data ?? [];
-  const note = data?.meta.note;
+  const cashflowData = data?.data;
+
+  if (!cashflowData) {
+    return null;
+  }
 
   return (
     <ReportTabLayout
       tableContent={
-        <div className="space-y-3">
-          {note && (
-            <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-3 py-1.5">
-              {note}
-            </div>
-          )}
-          <CashflowTable rows={chartData} />
-        </div>
+        <CashflowStatementTable rows={cashflowData.rows} months={cashflowData.months} />
       }
       chartsContent={
-        <div className="space-y-4">
-          <div className="flex items-center gap-6">
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wider">Months</p>
-              <p className="text-2xl font-bold text-white">{chartData.length}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wider">Source</p>
-              <p className="text-sm font-medium text-blue-400">Shareholder Model (live)</p>
-            </div>
-          </div>
-          {note && (
-            <div className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded px-3 py-1.5">
-              {note}
-            </div>
-          )}
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="label" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={{ stroke: '#4B5563' }} tickLine={false} />
-                <YAxis tickFormatter={formatCurrency} tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={70} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '6px', color: '#F9FAFB' }}
-                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'cashIn' ? 'Cash In' : name === 'cashOut' ? 'Cash Out' : 'Net']}
-                />
-                <Legend formatter={(v) => v === 'cashIn' ? 'Cash In' : v === 'cashOut' ? 'Cash Out' : 'Net'} wrapperStyle={{ color: '#9CA3AF', fontSize: 12 }} />
-                <Bar dataKey="cashIn" fill="#22C55E" radius={[3, 3, 0, 0]} name="cashIn" />
-                <Bar dataKey="cashOut" fill="#EF4444" radius={[3, 3, 0, 0]} name="cashOut" />
-                <Bar dataKey="net" fill="#3B82F6" radius={[3, 3, 0, 0]} name="net" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+          Charts coming soon
         </div>
       }
     />
