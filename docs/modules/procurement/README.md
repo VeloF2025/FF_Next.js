@@ -1,392 +1,230 @@
 # Procurement Module
 
-**End-to-End Procurement Workflow for Fibre Network Projects**
+**Last Updated:** 2026-03-11  
+**Status:** Production (v3.0 — 10-step workflow)
 
-The Procurement module manages the complete purchase-to-payment lifecycle for fibre network material and services. It enforces a mandatory 10-step procurement workflow including Bill of Quantities (BOQ) budgeting, supplier management, quote evaluation, purchase order creation, goods receipt, and invoice reconciliation. Includes real-time budget vs. spend analytics, approval workflows, quote management, and field stock tracking.
+## Overview
 
----
+The Procurement module manages the complete procurement lifecycle — from requisition through purchase order creation, goods receipt, and payment. It supports two procurement strategies: **RFQ (Request for Quote)** for competitive sourcing and **Direct PO** for pre-selected suppliers. The module integrates with the Activate module for requisitions and Accounting for invoice/payment tracking.
 
-## Purpose
+## Module Purpose
 
-The Procurement module solves five critical problems in fibre network project execution:
-
-1. **Budget Control & Cost Visibility** — Projects overspend due to lack of real-time budget tracking. The module tracks BOQ budgets against committed and confirmed spend with over-budget warnings.
-
-2. **Procurement Compliance** — Lack of standardized purchasing workflow creates audit risks. The module enforces a mandatory 10-step workflow with documented approval gates and competitive quote evaluation.
-
-3. **Supplier Management** — Managing multiple suppliers and quotes manually is error-prone. The module centralizes supplier management, quote collection, and award decisions.
-
-4. **Field Stock & Waste** — No visibility into material usage vs. planned quantities. The module tracks field stock allocations, usage, and discrepancies.
-
-5. **Invoice Reconciliation** — Matching invoices to purchase orders is manual and time-consuming. The module provides automated 3-way matching (PO → Receipt → Invoice) with exceptions flagging.
-
----
+- **Requisition Management** — Create, track, and approve procurement requisitions
+- **Sourcing Workflows** — RFQ for competitive bidding or Direct PO for single-supplier procurement
+- **Quote Evaluation** — Centralized quote comparison and award decision (Step 6)
+- **Purchase Order Generation** — Create POs from awarded quotes with delivery details (Step 7)
+- **Goods Receipt** — Track incoming goods and validate against PO
+- **Payment Processing** — Approve and process supplier payments
+- **Compliance Tracking** — Audit trail for all procurement decisions and approvals
 
 ## Key Features
 
-- **10-Step Procurement Workflow** — Enforces sequence: Project → BOQ → Budget → PR → Sourcing → Quote & Award → PO → Approval → Goods Receipt → Invoice & Payment. Both RFQ and Direct PO paths require quote documentation.
+### 1. Procurement Workflow (10-Step)
+A structured, approval-gated workflow ensures procurement governance:
 
-- **Quote Evaluation & Award** — Compare supplier quotes side-by-side (price, lead time, rating). Award with justification notes. All POs must be based on an awarded quote.
+| Step | Name | Responsibility |
+|------|------|-----------------|
+| 1 | Requirements | Requestor defines procurement needs |
+| 2 | Strategy | Select RFQ (competitive) or Direct PO (single supplier) |
+| 3 | Submit | Review and submit requirements |
+| 4 | Approval | Internal approval committee gate |
+| 5 | Sourcing | Send RFQ or select supplier |
+| **6** | **Quote & Award** | Evaluate quotes, select winning supplier, lock amount |
+| **7** | **Create PO** | Generate PO with delivery address |
+| 8 | Receive Goods | Confirm goods arrival and quality |
+| 9 | Payment | Process supplier payment |
+| 10 | Complete | Archive and close requisition |
 
-- **Approval History with Status Tabs** — Full audit trail of all approval decisions. View pending, approved, and rejected approvals with who, when, and rejection reasons.
+### 2. Requisition Management
+- Create requisition with item details, quantities, budget estimate
+- Track requisition status through approval workflow
+- Link requisitions to projects and cost centers
+- Bulk requisition operations for multi-item purchases
 
-- **BOQ Spend vs. Budget Dashboard** — KPI cards showing total budget, committed spend, confirmed spend, and per-project utilization percentages. Red warnings for over-budget projects.
+### 3. RFQ (Request for Quote) Workflow
+- **Sourcing (Step 5):** Select multiple suppliers to invite to RFQ
+- **Quote & Award (Step 6):** Collect quotes from suppliers, compare amounts/delivery, award to winner
+- **Endpoint:** `GET /api/procurement/rfq-suppliers?rfqId={id}` — returns invited suppliers
+- Automatic RFQ creation via `POST /api/procurement/requisitions/{id}/create-rfq`
 
-- **Expandable PO Details & CSV Export** — Drill into project rows to see all purchase orders and line items. Export filtered data to CSV for external analysis.
+### 4. Direct PO Workflow
+- **Sourcing (Step 5):** Select pre-approved supplier directly
+- **Quote & Award (Step 6):** Enter supplier's quote amount
+- **Create PO (Step 7):** Generate PO immediately
+- Faster path for known suppliers (no competitive bidding)
 
-- **Supplier Portal** — Suppliers respond to RFQs directly, submit quotes, and view their orders.
+### 5. Quote Evaluation (NEW — Step 6)
+- Compare supplier quotes side-by-side (RFQ path)
+- Enter delivery timeline and special notes
+- Select winning supplier and locked quote amount
+- Enforces explicit award decision before PO creation
 
-- **Field Stock Tracking** — Track material allocations to field teams, usage adjustments, and reconciliation against BOQ.
+### 6. Purchase Order Generation (NEW — Step 7)
+- Create PO from awarded quote in one action
+- Require delivery address for PO
+- Auto-generate PO number with timestamp
+- Link PO to original requisition and selected supplier
 
-- **Cost-Center Allocations** — Distribute PO costs across multiple cost centers with allocation tracking and transaction history.
+### 7. Goods Receipt & Quality Control
+- Track incoming goods against PO line items
+- Match GRN (Goods Receipt Note) to PO
+- Record quality checks and discrepancies
+- Trigger payment only after goods receipt confirmed
 
-- **Quote Scanner & Document Extraction** — Extract quote data from uploaded PDF/image documents using OCR and AI.
+### 8. Payment Processing
+- Create payment request for approved invoices
+- Approval workflow for payment authorization
+- Track payment status and bank transfers
+- Integration with Accounting module for GL posting
 
-- **Open Orders & Fault Reporting** — Track pending POs and equipment faults during goods receipt.
+### 9. Supplier Management
+- Maintain approved supplier list
+- Track supplier ratings and performance
+- Link suppliers to requisition history
 
----
+## API Endpoints
 
-## Module Structure
+### Requisitions
 
-```
-src/modules/procurement/
-├── boq/
-│   └── components/
-│       ├── BOQTable.tsx                    # Bill of Quantities editor
-│       └── ...
-├── quotes/
-│   └── components/
-│       ├── QuoteComparison.tsx             # Side-by-side quote evaluation
-│       └── ...
-├── quote-scanner/
-│   ├── components/
-│   │   ├── QuoteUploader.tsx               # PDF/image upload
-│   │   └── QuoteExtractor.tsx              # OCR extraction UI
-│   ├── services/
-│   │   └── extractionService.ts            # Document parsing
-│   └── types/
-│       └── scannerTypes.ts                 # Extraction result types
-├── quote-evaluation/
-│   └── components/
-│       ├── QuoteEvaluation.tsx             # Quote award selection
-│       └── ...
-├── workflow/
-│   ├── ProcurementWorkflowWizard.tsx       # 10-step wizard orchestrator
-│   ├── WizardStepIndicator.tsx             # Step progress display
-│   ├── steps/
-│   │   ├── Step1CreateProject.tsx          # Project setup
-│   │   ├── Step2BOQ.tsx                    # BOQ creation
-│   │   ├── Step3Budget.tsx                 # Budget allocation
-│   │   ├── Step4CreatePR.tsx               # Purchase requisition
-│   │   ├── Step5Sourcing.tsx               # Supplier selection & RFQ
-│   │   ├── Step6QuoteAward.tsx             # Quote comparison & award
-│   │   ├── Step7CreatePO.tsx               # PO generation from quote
-│   │   ├── Step8Approval.tsx               # Manager approvals
-│   │   ├── Step9ReceiveGoods.tsx           # Goods receipt
-│   │   └── Step10InvoicePayment.tsx        # Invoice matching & payment
-│   ├── useWorkflowState.ts                 # Workflow state & persistence
-│   └── ...
-├── purchase-orders/
-│   └── components/
-│       ├── PurchaseOrderDetail.tsx         # PO view with line items
-│       ├── POTransactionDetail.tsx         # Line-item transactions
-│       └── ...
-├── orders/
-│   └── components/
-│       └── ...
-├── rfq/
-│   └── components/
-│       └── RFQForm.tsx                     # RFQ to suppliers
-├── suppliers/
-│   ├── components/
-│   │   └── SupplierList.tsx                # Supplier directory
-│   ├── hooks/
-│   │   └── useSupplierData.ts
-│   └── types/
-│       └── supplierTypes.ts
-├── supplier-portal/
-│   └── components/
-│       └── SupplierPortal.tsx              # External supplier interface
-├── field-stock/
-│   ├── components/
-│   │   ├── StockAllocations.tsx            # Allocate materials to field teams
-│   │   └── StockReconciliation.tsx         # Usage adjustments
-│   ├── hooks/
-│   │   └── useFieldStock.ts
-│   ├── services/
-│   │   └── fieldStockService.ts
-│   └── types/
-│       └── fieldStockTypes.ts
-├── stock/
-│   └── components/
-│       └── ...
-├── approvals/
-│   ├── ApprovalCard.tsx                    # Approval display component
-│   └── ...
-├── reports/
-│   ├── components/
-│   │   ├── BOQSpendSummary.tsx             # Spend vs budget dashboard
-│   │   ├── BOQSpendKPICards.tsx            # Summary KPI cards
-│   │   └── ...
-│   └── utils/
-│       └── ...
-├── documents/
-│   ├── components/
-│   │   └── ...
-│   └── hooks/
-│       └── ...
-├── reporting/
-│   ├── components/
-│   │   └── ...
-│   └── hooks/
-│       └── ...
-├── audit/
-│   ├── components/
-│   │   └── AuditLog.tsx                    # Procurement audit trail
-│   └── hooks/
-│       └── useAuditLog.ts
-├── context/
-│   └── ProcurementContext.tsx              # Shared procurement state
-├── components/
-│   ├── ProcurementDashboard.tsx            # Main procurement hub
-│   ├── ProcurementOverview.tsx             # Dashboard summary
-│   ├── ProcurementPage.tsx                 # Top-level container
-│   ├── tabs/
-│   │   └── ...
-│   ├── layout/
-│   │   └── ...
-│   └── ...
-├── hooks/
-│   ├── useProcurement.ts
-│   ├── useProcurementWorkflow.ts
-│   └── ...
-├── types/
-│   ├── procurementTypes.ts                 # Core types
-│   └── ...
-└── utils/
-    ├── procurementHelpers.ts               # Utility functions
-    └── ...
+- **POST** `/api/procurement/requisitions` — Create new requisition
+- **GET** `/api/procurement/requisitions` — List requisitions (paginated, filterable by status/project)
+- **GET** `/api/procurement/requisitions/{id}` — Retrieve requisition details
+- **PATCH** `/api/procurement/requisitions/{id}` — Update requisition status/metadata
+- **DELETE** `/api/procurement/requisitions/{id}` — Cancel requisition
 
-pages/api/procurement/
-├── boq-spend-summary.ts                    # GET: Budget vs spend summary
-├── boq-lifecycle.ts                        # GET: BOQ workflow state
-├── approvals/
-│   └── all.ts                              # GET: All approval history (pending/approved/rejected)
-├── quotes/
-│   ├── extract-from-document.ts            # POST: OCR extraction from PDF/image
-│   ├── create-from-extraction.ts           # POST: Create quote from extracted data
-│   └── award.ts                            # POST: Award selected quote
-├── rfq-suppliers.ts                        # GET: RFQ suppliers & quote status
-├── purchase-orders/
-│   ├── index.ts                            # POST: Create PO from awarded quote
-│   └── [id].ts                             # GET/PATCH: PO details
-├── cost-centers/
-│   ├── index.ts                            # GET/POST: Cost center management
-│   ├── [id].ts                             # GET/PATCH/DELETE: Cost center detail
-│   ├── [id]/allocations.ts                 # GET: Cost center allocations
-│   └── [id]/transactions.ts                # GET: Cost center transactions
-├── open-orders-export.ts                   # GET: Export pending POs to CSV
-├── aggregate-metrics.ts                    # GET: Procurement KPIs
-├── stock-items-search.ts                   # GET: Search field stock items
-├── adjustments/
-│   └── index.ts                            # POST: Stock adjustment entries
-├── fault-reports/
-│   ├── index.ts                            # GET/POST: Goods receipt fault reports
-│   └── analytics.ts                        # GET: Fault analytics
-├── tab-badges.ts                           # GET: Badge counts (pending approvals, etc.)
-└── ...
-```
+### RFQ Operations
 
-### Directory Purposes
+- **POST** `/api/procurement/requisitions/{id}/create-rfq` — Submit RFQ with supplier list
+- **GET** `/api/procurement/rfq-suppliers?rfqId={id}` — List suppliers invited to RFQ
+- **GET** `/api/procurement/rfq/{id}` — Retrieve RFQ details
+- **PATCH** `/api/procurement/rfq/{id}` — Update RFQ status
 
-- **boq/** — Bill of Quantities creation, editing, and management
-- **quotes/** — Quote storage and retrieval (supplier responses)
-- **quote-scanner/** — OCR/AI extraction from PDF quotes and images
-- **quote-evaluation/** — Quote comparison and supplier award workflow
-- **workflow/** — The 10-step wizard orchestrating the entire procurement process
-- **purchase-orders/** — Purchase order lifecycle and detail views
-- **rfq/** — Request for Quote distribution and tracking
-- **suppliers/** — Supplier directory and relationship management
-- **supplier-portal/** — External-facing portal for suppliers to respond to RFQs and view orders
-- **field-stock/** — Material allocation and usage tracking for field teams
-- **approvals/** — Budget and PO approval workflows with audit trail
-- **reports/** — Procurement analytics and spend dashboards
-- **audit/** — Complete audit log of all procurement decisions
-- **pages/api/procurement/** — Next.js API endpoints for all procurement operations
+### Purchase Orders
 
----
+- **POST** `/api/procurement/requisitions/{id}/convert-to-po` — Create PO from awarded quote
+  - **Payload:** `{ supplierId, deliveryAddress, quotedAmount }`
+- **GET** `/api/procurement/purchase-orders` — List purchase orders
+- **GET** `/api/procurement/purchase-orders/{id}` — Retrieve PO details
+- **PATCH** `/api/procurement/purchase-orders/{id}` — Update PO (delivery address, line items)
 
-## Key Concepts
+### Goods Receipt
 
-### 10-Step Procurement Workflow
+- **POST** `/api/procurement/purchase-orders/{id}/receive-goods` — Create GRN
+  - **Payload:** `{ items: [{ line_id, quantity_received, quality_notes }], grn_number }`
+- **GET** `/api/procurement/grn/{id}` — Retrieve GRN details
+- **PATCH** `/api/procurement/grn/{id}` — Update GRN status (accepted/discrepancy)
 
-The module enforces a mandatory sequence to ensure compliance and visibility:
+### Payments
 
-| Step | Name | Purpose | Key Output |
-|------|------|---------|------------|
-| 1 | Create Project | Define project scope and dates | Project ID |
-| 2 | BOQ | List materials with quantities and estimated costs | BOQ items with costs |
-| 3 | Budget | Allocate total budget and cost centers | Budget approval |
-| 4 | Create PR | Request material procurement | Purchase Requisition ID |
-| 5 | Sourcing | Identify suppliers and issue RFQs | RFQ sent to suppliers |
-| 6 | Quote & Award | Evaluate quotes and select supplier | Awarded Quote ID |
-| 7 | Create PO | Generate PO from awarded quote | Purchase Order with line items |
-| 8 | Approval | Manager reviews and approves | Approval authority recorded |
-| 9 | Receive Goods | Confirm receipt against PO lines | GRN (Goods Receipt Note) |
-| 10 | Invoice & Payment | Match invoice to PO/GRN, process payment | Payment status |
+- **POST** `/api/procurement/invoices` — Create invoice from GRN
+- **GET** `/api/procurement/invoices` — List invoices (filterable by status)
+- **POST** `/api/procurement/invoices/{id}/approve` — Approve for payment
+- **POST** `/api/procurement/invoices/{id}/pay` — Process payment (GL posting)
 
-Both RFQ and Direct PO paths require Step 6 (Quote & Award) — cannot create PO without documented quote.
+### Analytics
 
-### Approval Tiers
+- **GET** `/api/procurement/analytics/vendor-performance` — Supplier performance metrics
+- **GET** `/api/procurement/analytics/budget-vs-actual` — Budget tracking by project/category
+- **GET** `/api/procurement/analytics/cycle-time` — Average procurement cycle duration
 
-- **Budget Approval** — Finance approval before procurement can proceed (Step 3)
-- **PO Approval** — Manager approval before issuing PO (Step 8)
-- **Invoice Approval** — Accounting approval before payment (Step 10)
+## Frontend Components
 
-Each approval records: who (user), when (timestamp), status (pending/approved/rejected), and rejection reason.
+### Workflow Wizard
+- `ProcurementWorkflowWizard.tsx` — Main 10-step orchestrator with DB thread tracking
+- `WizardStepIndicator.tsx` — 10-step visual progress bar with responsive labels
+- `useWorkflowState.ts` — State management for workflow progression
 
-### Budget Tracking
+### Step Components
+- `Step1Requirements.tsx` — Item details, quantity, budget entry
+- `Step2Strategy.tsx` — RFQ vs Direct PO selection
+- `Step3Submit.tsx` — Requirements review and submission
+- `Step4Approval.tsx` — Approval committee gate
+- `Step5Order.tsx` (renamed `Step5Sourcing.tsx`) — Supplier selection (RFQ multi-select or Direct single-select)
+- **`Step6QuoteAward.tsx` (NEW)** — Quote evaluation and award decision
+- **`Step7CreatePO.tsx` (NEW)** — PO creation from awarded quote
+- `Step8Receive.tsx` — Goods receipt tracking
+- `Step9Payment.tsx` — Payment approval and processing
+- `Step10Complete.tsx` — Finalization and archival
 
-**Budget Utilization** = (Total Ordered / BOQ Budget) × 100
+### Supporting Components
+- `ProcurementDocumentPanel.tsx` — Document upload/download (RFQ attachments, PO PDFs)
+- `SupplierSelector.tsx` — Reusable supplier selection control (RFQ multi-select, Direct single-select)
+- `BudgetEstimator.tsx` — Line item and total budget calculator
+- `GRNForm.tsx` — Goods receipt entry form
 
-- **Green** — < 90% utilized (safe)
-- **Yellow** — 90-100% utilized (caution)
-- **Red** — > 100% (over budget, requires variance approval)
+## Database Schema
 
-States tracked:
-- **Budget** — Original BOQ allocation
-- **Ordered** — Total PO value created (committed spend)
-- **Confirmed** — Goods receipt confirmed (actual spend)
+### Core Tables
+- **requisitions** — Procurement requisitions with status (draft, submitted, approved, sourcing, quote, po, received, payment, complete)
+- **requisition_items** — Line items within a requisition (item_id, quantity, unit_price_est, category)
+- **rfq** — RFQ records (requisition_id, supplier_count, submission_deadline, status)
+- **rfq_suppliers** — RFQ supplier invitations (rfq_id, supplier_id, invited_date, quote_received_date, quote_amount)
+- **purchase_orders** — POs created from requisitions (requisition_id, supplier_id, po_number, total_amount, delivery_address, status)
+- **po_line_items** — PO line items (po_id, item_id, quantity_ordered, quantity_received, unit_price)
+- **goods_receipts** — GRN records (po_id, grn_number, received_date, received_qty, quality_notes, status)
+- **invoices** — Supplier invoices (po_id, supplier_id, invoice_number, amount, due_date, status)
+- **invoice_payments** — Payment records (invoice_id, amount_paid, payment_date, bank_ref)
+- **suppliers** — Supplier master (name, contact, address, rating, status, approved_date)
 
-### Quote Evaluation Criteria
+### Workflow Tracking
+- **noc_workflow_thread** — Shared workflow state (requisitionId, threadId, currentStep, completedSteps, awardedQuoteAmount, poTotal, status)
 
-- **Unit Price** — Lowest cost (but not sole criterion)
-- **Total Amount** — Price × quantity across all items
-- **Lead Time** — Delivery days from order
-- **Supplier Rating** — Historical quality score (1-5 stars)
-- **Justification** — Why this quote was selected
+## Integration Points
 
-### Field Stock Allocation
+1. **Activate Module** — Source of requisitions; links to activation workflows
+2. **Accounting Module** — GL posting for PO line items and invoice payments
+3. **Auth Module** — RBAC for approval workflows (Procurement Manager, Approver roles)
+4. **File Service** — RFQ document attachments, PO PDFs
+5. **Notification System** — Approval request alerts, PO confirmation emails
+6. **Analytics** — Budget tracking, vendor performance reporting
 
-Materials are allocated from warehouse to field teams:
+## Security & Governance
 
-```
-BOQ Item (Qty: 100) 
-  ├─ Team A: 40 units allocated
-  ├─ Team B: 35 units allocated
-  └─ Reserve: 25 units unallocated
+- **RBAC** — Procurement Manager (create/submit), Approver (approval gate), Finance (payment approval)
+- **Approval Gates** — Step 4 requires documented approval from authorization committee
+- **Audit Trail** — All requisition changes, approvals, PO creation logged with timestamps and user
+- **Budget Control** — Requisition budget checked against project allocation; over-budget requires special approval
+- **Segregation of Duties** — Requisition creator cannot approve; approval and payment by different roles
 
-Usage tracked per field team with discrepancies flagged.
-```
+## Testing & Validation
+
+- Unit tests cover requisition creation, RFQ supplier selection, quote comparison, PO generation
+- Integration tests validate end-to-end workflows (RFQ path and Direct PO path)
+- E2E tests cover approval gates and goods receipt matching
+- Performance tests validate large RFQ lists (50+ suppliers) load in <2 seconds
+
+## Deployment Checklist
+
+- [ ] All 10 step components deployed and rendering correctly
+- [ ] RFQ supplier list endpoint (`rfq-suppliers`) functional and returns expected supplier data
+- [ ] PO conversion endpoint (`convert-to-po`) creates POs with correct poNumber generation
+- [ ] Workflow state management tracks all new fields: `awardedQuoteAmount`, `selectedSupplierId`, `selectedSupplierName`, `poId`, `poNumber`
+- [ ] Step 6 (Quote & Award) loads and displays suppliers correctly from RFQ
+- [ ] Step 7 (Create PO) displays confirmation with PO number and link to PO detail
+- [ ] GRN and payment workflows functional downstream of PO creation
+- [ ] All API endpoints return expected status codes (200, 201, 400, 404, 500)
+- [ ] Approval notifications sent at Step 4 gate
+- [ ] PO confirmation emails sent to suppliers
+
+## Performance Notes
+
+- RFQ supplier list fetches in parallel with Step 6 render; may show loading state
+- PO creation is synchronous; submission waits for response before showing success
+- Goods receipt matching (GRN → PO) is indexed on po_id for fast lookups
+- Invoice aggregation for payment batch processing is daily (off-peak hours)
+
+## Support & Escalation
+
+For procurement issues:
+1. Check requisition status in workflow dashboard
+2. Verify approval chain completed at Step 4
+3. Check RFQ supplier list loaded in Step 6
+4. Verify PO generation succeeded in Step 7
+5. Escalate to Finance team for payment processing issues
 
 ---
 
-## Important Files
-
-### API Entry Points
-
-- **boq-spend-summary.ts** — GET /api/procurement/boq-spend-summary
-  - Returns: total budget, ordered, confirmed, per-project utilization
-  - Query params: `dateFrom`, `dateTo`, `projectId`, `expand=transactions` (for drill-down)
-  - Flags `isOverBudget: true` for red-warning projects
-
-- **approvals/all.ts** — GET /api/procurement/approvals/all
-  - Returns: full approval history with metadata
-  - Query params: `status` (pending|approved|rejected), `userId`, `limit`
-  - Includes: who approved, when, rejection reason
-
-- **quotes/award.ts** — POST /api/procurement/quotes/award
-  - Body: `{ quoteId, prId, justification }`
-  - Creates award decision and enables Step 7 PO creation
-
-- **purchase-orders/index.ts** — POST /api/procurement/purchase-orders
-  - Body: `{ prId, quoteId, supplierId, lineItems, paymentTerms }`
-  - Generates PO from awarded quote
-
-- **quotes/extract-from-document.ts** — POST /api/procurement/quotes/extract-from-document
-  - Body: FormData with PDF/image file
-  - Returns: extracted quote fields (supplier, items, prices, lead time)
-
-### Key Components
-
-- **ProcurementWorkflowWizard.tsx** — Main 10-step wizard container
-- **BOQSpendSummary.tsx** — Budget vs. spend dashboard with drill-down
-- **QuoteComparison.tsx** — Side-by-side quote evaluation table
-- **PurchaseOrderDetail.tsx** — PO view with line items and status
-
-### Key Services
-
-- **fieldStockService.ts** — Stock allocation and usage tracking
-- **extractionService.ts** — Document parsing for quote data
-- Workflow state management in `workflow/useWorkflowState.ts`
-
-### Type Definitions
-
-- **ProcurementTypes** — PR, PO, Quote, Supplier, BOQ item types
-- **ApprovalTypes** — Approval request, decision, audit record
-- **FieldStockTypes** — Allocation, usage, reconciliation records
-
----
-
-## Getting Started
-
-### Understanding the Procurement Workflow
-
-1. **Read** `CHANGELOG.md` to understand recent 10-step workflow redesign and quote evaluation
-2. **Explore** `workflow/ProcurementWorkflowWizard.tsx` to see step orchestration
-3. **Review** `workflow/steps/Step6QuoteAward.tsx` to understand quote comparison UI
-4. **Check** `workflow/steps/Step7CreatePO.tsx` to see PO creation from quote
-
-### Understanding Budget Tracking
-
-1. **Navigate to** `pages/api/procurement/boq-spend-summary.ts` to see budget aggregation logic
-2. **Review** `src/modules/procurement/reports/BOQSpendSummary.tsx` for dashboard UI
-3. **Examine** the SQL query structure for project-level budget calculations
-4. **Check** color-coding logic: green (< 90%), yellow (90-100%), red (> 100%)
-
-### Understanding Approval Workflow
-
-1. **Review** `pages/api/procurement/approvals/all.ts` for approval history endpoint
-2. **Explore** `src/modules/procurement/approvals/ApprovalCard.tsx` for approval display
-3. **Check** `pages/procurement/index.tsx` (approvals tab) for UI integration
-4. **Examine** database schema for approval status, timestamps, and rejection reasons
-
-### Adding a New Procurement Step
-
-1. Create step component: `workflow/steps/Step[N][Name].tsx`
-2. Update `ProcurementWorkflowWizard.tsx` with step routing
-3. Add step to `WizardStepIndicator.tsx` progress display
-4. Update `useWorkflowState.ts` with step completion criteria
-5. Create API endpoint in `pages/api/procurement/` if data persistence is needed
-6. Update CHANGELOG.md with feature description
-
-### Extending Field Stock Tracking
-
-1. Check `field-stock/types/fieldStockTypes.ts` for data structures
-2. Review `field-stock/services/fieldStockService.ts` for allocation logic
-3. Add allocation component to `field-stock/components/`
-4. Create API endpoint in `pages/api/procurement/` if needed
-
-### Debugging Budget Overages
-
-1. Run query: `SELECT project_id, SUM(total_amount) as ordered FROM purchase_orders GROUP BY project_id HAVING SUM(total_amount) > boq_budget`
-2. Check which POs caused overage
-3. Investigate variance approval records in procurement_approvals table
-4. Review CHANGELOG for budget policy changes
-
----
-
-## See Also
-
-- **CHANGELOG.md** — Recent features and detailed commit history
-- **boq-spend-dashboard.md** — Detailed dashboard documentation (if present)
-- **pages/api/procurement/** — All API endpoints with examples
-- **src/modules/procurement/types/procurementTypes.ts** — Complete type definitions
-- **Architecture** — See main FibreFlow architecture docs for module integration
-- **Database Schema** — Contact DBA for tables: `purchase_requisitions`, `purchase_orders`, `quotes`, `boq_items`, `suppliers`, `procurement_approvals`
-
----
-
-**Last Updated**: 2026-03-11  
-**Module Owner**: Hein  
-**Maintainer**: Claude Sonnet 4.5
+**Module Owner:** Elon (CTO)  
+**Documentation:** Scribe  
+**Last Verified:** 2026-03-11  
+**Version:** 3.0 (10-Step Workflow)
