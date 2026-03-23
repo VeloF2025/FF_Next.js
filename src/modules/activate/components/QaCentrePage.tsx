@@ -811,23 +811,19 @@ function QaCentrePageContent() {
                     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                   };
 
-                  // Get QA Review Status — differentiate AI vs Human
+                  // Get QA Review Status: Pending → AI Review → Human ✓
                   const getQaReviewStatus = () => {
-                    const isAutoQaDecision = drop.qaDecisionBy?.startsWith('system:');
-                    if (drop.feedbackSent && !isAutoQaDecision) {
+                    // Feedback sent = completed by human
+                    if (drop.feedbackSent) {
                       return { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
                     }
-                    if (drop.feedbackSent && isAutoQaDecision) {
-                      return { label: 'AI Sent', color: 'bg-purple-600 text-purple-100' };
-                    }
-                    if (drop.autoQaProcessed) {
+                    // Auto-QA processed but no feedback yet = awaiting human review
+                    if (drop.autoQaProcessed || drop.qaDecisionBy?.startsWith('system:')) {
                       return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
-                    if (drop.qaDecision && !isAutoQaDecision) {
+                    // Human decision made but feedback not yet sent
+                    if (drop.qaDecision) {
                       return { label: 'Reviewed', color: 'bg-green-700 text-green-100' };
-                    }
-                    if (drop.qaDecision && isAutoQaDecision) {
-                      return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
                     return { label: 'Pending', color: 'bg-gray-600 text-gray-200' };
                   };
