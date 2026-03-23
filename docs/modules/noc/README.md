@@ -1,277 +1,237 @@
-# NOC Module
+# NOC (Network Operations Centre) Module
 
-**Module**: Network Operations Centre (NOC)
-**Status**: Active — Production
-**Last Updated**: 2026-03-13
-**Source**: `src/modules/noc/` | `app/(main)/noc/` | `app/api/noc/`
-
----
+**Last Updated:** 2026-03-11  
+**Commit:** 96d8cc9  
+**Status:** Production (v2.0+)
 
 ## Overview
 
-The NOC module is FibreFlow's central hub for managing fiber network faults, maintenance tickets, QA workflows, team handovers, and QContact synchronisation. It replaces six parallel Excel spreadsheets with a fully integrated digital workflow.
+The NOC module (formerly Maintenance) provides centralized ticket management, escalation tracking, risk acceptance workflows, and data synchronization for network operations and maintenance coordination. It integrates with QContact for team management, handles Power+ (PP) data ticket enrichment, and tracks repeat faults with automated escalation.
 
-## History
+## Module Purpose
 
-This module was originally named **maintenance** (`src/modules/maintenance/`). It was renamed to **noc** in commit [`96d8cc9`](https://github.com) on 2026-03-11 to better reflect its scope — the module covers the full Network Operations Centre function, not just reactive maintenance.
+- **Ticket Lifecycle Management** — Create, track, and resolve maintenance tickets with integrated escalation pipelines
+- **Data Synchronization** — QContact sync, alignment reporting, weekly imports, and WhatsApp tracking
+- **Escalation Handling** — Automated repeat-fault detection and escalation alerts
+- **Risk Acceptance** — Review, approve, and track risk acceptance workflows for ongoing risks
+- **Team Management** — Maintain team structure, roles, and responsibilities
+- **PP Data Enrichment** — Automatically enrich Power+ (PP) data tickets with project metadata, location data, PON, GPS, and client contact information
 
-The rename was a complete refactor: all directories, imports, exports, navigation config, sidebar sections, data-sync groups, and API routes were updated in a single commit. The database schema and data were not migrated — the rename was code-only.
+## Key Features
 
----
+### 1. Ticketing Dashboard
+- Real-time ticket overview with SLA tracking
+- Quick-action ticket creation and assignment
+- Status filtering and sorting by priority/team
 
-## Module Scope
+### 2. Data Synchronization Workflows
+- **QContact Integration** — Manual sync triggers with audit logging and alignment reports
+- **Three-Way Alignment** — Compare QContact teams vs local team assignments vs PP tickets
+- **Weekly Imports** — Bulk import facility with progress tracking and error handling
+- **WhatsApp Tracking** — Monitor WA conversations linked to tickets
 
-| Area | Description |
-|------|-------------|
-| **Tickets** | Create, triage, and resolve fault/maintenance tickets from multiple sources (WhatsApp, manual, weekly import) |
-| **Escalations** | Track and resolve repeat fault escalations at pole/PON/zone/DR level |
-| **Handover** | Immutable snapshot-based handover from Build → QA → NOC |
-| **Risks** | QA risk acceptance tracking with documented exceptions and expiry dates |
-| **Teams** | NOC team management and member assignment |
-| **QContact Sync** | Bidirectional sync with QContact CRM (inbound + outbound, webhook handler) |
-| **Weekly Import** | Excel weekly report import wizard (93+ items per import) |
-| **WhatsApp** | WAHA-based WhatsApp notifications and DR photo processing |
-| **Analytics** | Fault trend analysis, SLA compliance, workload charts |
-| **Data Sync** | Data-sync group integration for OLT and NOC data streams |
+### 3. Escalations & Alerts
+- **Repeat Fault Detection** — Identify recurring faults with geographic clustering
+- **Escalation Alerts** — Automatic notifications when escalation thresholds are breached
+- **Fault Trend Analysis** — Historical analysis of fault patterns by geography and category
 
----
+### 4. Handover Management
+- Pending handover queue with driver/site/coordinator handover types
+- Bulk handover operations with status tracking
+
+### 5. Risk Acceptance Workflows
+- Active risk review with expiration tracking
+- Risk resolution with notes and compliance logging
+
+### 6. Team Management
+- Role-based team structure (NOC Coordinator, Team Lead, Technician)
+- Team assignment and capacity tracking
 
 ## API Endpoints
 
-All endpoints live under `/api/noc/` (previously `/api/maintenance/`).
-
-### Tickets
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/tickets` | List tickets (filterable by status, priority, assignment) |
-| POST | `/api/noc/tickets` | Create new ticket |
-| GET | `/api/noc/tickets/[id]` | Get ticket detail |
-| PUT | `/api/noc/tickets/[id]` | Update ticket |
-| DELETE | `/api/noc/tickets/[id]` | Delete ticket |
-| GET | `/api/noc/tickets/[id]/activities` | Activity log |
-| GET/POST | `/api/noc/tickets/[id]/notes` | Notes (internal, client, system) |
-| DELETE | `/api/noc/tickets/[id]/notes/[noteId]` | Delete note |
-| GET/POST | `/api/noc/tickets/[id]/attachments` | Photo and document attachments |
-| PUT | `/api/noc/tickets/[id]/handover` | Submit handover |
-| GET | `/api/noc/tickets/[id]/handover-history` | Handover audit trail |
-| POST | `/api/noc/tickets/[id]/fault-cause` | Record fault cause |
-| GET/POST | `/api/noc/tickets/[id]/verification` | Verification state |
-| PUT | `/api/noc/tickets/[id]/verification/[step]` | Complete a verification step |
-| POST | `/api/noc/tickets/[id]/verification/complete` | Finalise verification |
-| GET | `/api/noc/tickets/[id]/qa-readiness` | QA readiness status |
-| POST | `/api/noc/tickets/[id]/qa-readiness-check` | Run QA readiness check |
-| POST | `/api/noc/tickets/[id]/risk-acceptance` | Submit risk acceptance |
-| GET | `/api/noc/tickets/[id]/risk-acceptances` | List risk acceptances |
+### Ticket & Data Management
+- **GET** `/api/noc/dashboard/summary` — Retrieve ticket summary stats (SLA, count by status)
+- **GET** `/api/noc/dashboard/sla` — SLA compliance details by team
+- **GET** `/api/noc/dashboard/workload` — Workload distribution across teams
+- **GET** `/api/noc/dr-lookup/[drNumber]` — Look up ticket by DR number
+- **GET** `/api/noc/attachments/[id]` — Retrieve ticket attachment
+- **POST** `/api/noc/attachments` — Upload ticket attachment
+- **PATCH** `/api/noc/attachments/[id]` — Update attachment metadata
 
 ### Escalations
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/escalations` | List escalations |
-| POST | `/api/noc/escalations` | Create escalation |
-| GET/PUT | `/api/noc/escalations/[id]` | Get or update escalation |
-| POST | `/api/noc/escalations/[id]/resolve` | Resolve escalation |
+- **GET** `/api/noc/escalations` — List active escalations with alert status
+- **GET** `/api/noc/escalations/[id]` — Retrieve escalation details
+- **POST** `/api/noc/escalations/[id]/resolve` — Mark escalation as resolved
 
-### Teams
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/teams` | List NOC teams |
-| POST | `/api/noc/teams` | Create team |
-| GET/PUT/DELETE | `/api/noc/teams/[id]` | Team CRUD |
-| GET/POST | `/api/noc/teams/[id]/members` | Team membership |
+### Handovers
+- **GET** `/api/noc/handovers/pending` — List pending handovers (filterable by type)
+- **POST** `/api/noc/handovers/import/weekly/[id]/progress` — Retrieve weekly import progress
 
-### Attachments
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/attachments` | List attachments |
-| GET/DELETE | `/api/noc/attachments/[id]` | Attachment CRUD |
+### Risk Acceptance
+- **GET** `/api/noc/risk-acceptances` — Query risks (filterable: active, expiring, resolved)
+- **POST** `/api/noc/risk-acceptances/[id]/resolve` — Resolve a risk acceptance record
+
+### Analytics
+- **GET** `/api/noc/analytics/fault-trends` — Historical fault trend analysis by geography/category
 
 ### QContact Sync
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET/POST | `/api/noc/sync/qcontact` | Trigger / status of QContact sync |
-| GET | `/api/noc/sync/qcontact/log` | Sync audit log |
-| GET | `/api/noc/sync/qcontact/status` | Current sync status |
-| POST | `/api/noc/sync/fibertime` | FiberTime sync trigger |
-| POST | `/api/noc/webhooks/qcontact` | Inbound QContact webhook |
-| GET | `/api/noc/notifications/status` | Notification delivery status |
-| POST | `/api/noc/notifications/whatsapp` | Send WhatsApp notification |
+- **POST** `/api/noc/cron/sync-qcontact` — Trigger manual QContact synchronization
 
-### Analytics & Dashboard
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/dashboard/summary` | Summary metrics |
-| GET | `/api/noc/dashboard/sla` | SLA compliance data |
-| GET | `/api/noc/dashboard/workload` | Workload distribution |
-| GET | `/api/noc/analytics/fault-trends` | Fault trend analysis |
-| GET | `/api/noc/repeat-faults/check` | Repeat fault detection |
+### PP Data Ticket Enrichment
+- **PATCH** `/api/activate/pp-data-tickets` — Backfill existing tickets with project data, location, PON, GPS, and client metadata
 
-### Import & Other
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/noc/import/weekly` | Import history list |
-| POST | `/api/noc/import/weekly` | Start import batch |
-| POST | `/api/noc/import/weekly/parse` | Parse Excel file |
-| GET/PUT | `/api/noc/import/weekly/[id]` | Import batch detail |
-| GET | `/api/noc/import/weekly/[id]/progress` | Import progress |
-| GET | `/api/noc/import/weekly/history` | Full import history |
-| GET | `/api/noc/dr-lookup/[drNumber]` | DR number lookup from SOW |
-| GET | `/api/noc/users` | Users assignable to tickets |
-| GET | `/api/noc/risk-acceptances` | All risk acceptances |
+## Data Enrichment (PP Data Tickets)
 
-### PP Data Ticket Enrichment (Activate module integration)
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/activate/pp-data-tickets` | Create NOC tickets for PP Data records |
-| **PATCH** | **`/api/activate/pp-data-tickets`** | **Backfill existing PP Data tickets with enrichment data** |
+The NOC module automatically enriches Power+ (PP) data tickets with comprehensive project and location information:
 
-The PATCH endpoint was added in commit `96d8cc9` specifically for bulk backfilling. It should not be confused with the POST (create) path.
+### Enrichment Data Sources
+- **Project & Location Data** — Linked from `drops` table and `onemap_properties`
+- **Fields Enriched:**
+  - `project_id` — Associated project (set on all new/backfilled tickets)
+  - `address` — Full street address from location data
+  - `zone` — Service zone classification
+  - `PON` — Point-of-Network identifier
+  - `GPS` — Geographic coordinates (latitude, longitude)
+  - `client_name` — Client contact name
+  - `client_email` — Client email address
+  - `client_contact` — Client phone/contact info
 
----
+### Backfill Operation
+- **Commit 96d8cc9** backfilled **372 existing PP tickets** across all projects
+- All tickets now include `project_id`
+- 7 tickets with associated Delivery Records (DRs) enriched with zone/PON/GPS/address/client data
+- Backfill is idempotent — safe to re-run
 
-## PP Data Enrichment Workflow
+### Usage
+```bash
+# Backfill existing tickets with available project data
+PATCH /api/activate/pp-data-tickets
 
-PP Data tickets (created via the Activate module) can be enriched with network context from two sources:
-
-1. **`drops` table** — Provides: `project_id`, `zone_no`, `pon_no`, `pole_number`, GPS coordinates (`latitude`, `longitude`), `installed_by_name`, `installed_at`
-2. **`onemap_properties` table** — Provides: `location_address`, GPS coordinates, `pons`, `sections`, `contact_name + contact_surname` (client name), `contact_number`, `email_address`, `installer_name`, `installation_date`
-
-The join key is `drops.drop_number = onemap_properties.drop_number`, matched via the ticket's DR number.
-
-### Enriched fields on `noc_tickets` (or equivalent)
-- `project_id` — from drops or resolved from project name
-- `address` — onemap address preferred, falls back to drops address
-- `zone` — from drops `zone_no`
-- `pon` — from drops `pon_no` or onemap `pons`
-- `pole_number` — from drops or onemap
-- GPS: `lat` / `lng` — onemap preferred, drops as fallback
-- `client_name` — `contact_name + contact_surname` from onemap_properties
-- `client_contact` — `contact_number` from onemap_properties
-- `client_email` — `email_address` from onemap_properties
-- `installer_name` / `installed_at` — from onemap or drops
-
-### Backfill Status (as of 2026-03-11, commit `96d8cc9`)
-- **372 existing PP Data tickets** backfilled — all now have `project_id`
-- **7 tickets** had DR numbers — enriched with zone, PON, GPS, address, and client data
-- Remaining 365 tickets enriched with `project_id` only (no DR number present)
-
----
-
-## Data Flow: Drops → PP Data Ticket
-
-```
-Activate module (PP Data tab)
-  └─ CreatePPTicketsModal
-       └─ POST /api/activate/pp-data-tickets
-            ├─ Creates NOC ticket via ticketService.createTicket()
-            └─ Enriches via drops + onemap_properties (if DR number present)
-
-Backfill (one-time / admin):
-  └─ PATCH /api/activate/pp-data-tickets
-       └─ Iterates existing PP Data tickets
-            └─ Fetches enrichment per DR number
-            └─ Updates ticket fields in bulk
+# Response includes: tickets_updated, tickets_with_dr, enrichment_summary
 ```
 
----
+## Bug Fixes (Commit 96d8cc9)
 
-## Bug Fixes (commit `96d8cc9`)
+### PP Data Ticket Creation
+- **Issue:** Assigned team name→UUID mismatch caused 500 error when team selection happened
+- **Fix:** Correct team object serialization in ticket creation payload
 
-Two bugs in the original PP ticket creation flow were fixed:
-
-1. **`assigned_team` name→UUID mismatch** — Ticket creation was sending team name strings instead of team UUIDs, causing a 500 error when a team was selected. Fixed by resolving team UUIDs before submission.
-2. **`[object Object]` toast error** — API error responses were not being unwrapped before display. Fixed by extracting `error.message` from the API error response object.
-
----
-
-## Verification Workflows
-
-The NOC module supports **type-specific verification checklists** for different ticket types. Previously, all tickets used the same 12-step new installation checklist. Now each ticket type has a tailored checklist that matches the actual work being done.
-
-### Verification Step Counts by Ticket Type
-
-| Ticket Type | Steps | Focus |
-|-------------|-------|-------|
-| **new_installation** | 12 | Full fiber installation workflow |
-| **fault_repair** | 7 | Fault assessment → repair → verification |
-| **ont_swap** | 7 | Document old ONT → swap → activate → verify |
-| **modification** | 6 | Assess → plan → modify → verify |
-| **incident** | 7 | Impact → containment → RCA → restore |
-| **olt_investigation** | 4 | Review OLT data → cross-ref → verify → resolve |
-| **serial_mismatch** | 3 | Review → physical check → resolve |
-| **pre_provision** | 3 | OES review → 1Map search → resolve |
-| **hse_incident** | 6 | Scene assessment → RCA → corrective actions |
-| **hse_near_miss** | 3 | Document → factors → corrective actions |
-
-**API Behavior**: `GET /api/noc/tickets/[id]/verification` returns type-specific steps based on `ticket.type`. Unknown ticket types fall back to the 12-step new_installation checklist.
-
-**Photo Upload**: Verification photo upload supports **clipboard paste** (Ctrl+V / Cmd+V) in addition to drag-drop and click-to-upload.
-
-**Source**: `src/modules/noc/constants/verificationSteps.ts` — all step definitions are code-based (no DB migration required).
-
-See **[CHANGELOG.md](./CHANGELOG.md)** for details (commit `a63c493`, 2026-03-13).
-
----
+### Error Messaging
+- **Issue:** API errors displayed as `[object Object]` toast notifications
+- **Fix:** Extract and display `error.message` from API response bodies
 
 ## Module Structure
 
-```
-src/modules/noc/
-├── __tests__/          # Unit and integration tests
-│   ├── api/            # API route tests
-│   ├── components/     # Component tests
-│   ├── hooks/          # Hook tests
-│   ├── services/       # Service layer tests
-│   └── utils/          # Utility tests
-├── components/         # React components
-│   ├── Dashboard/      # Ticketing dashboard + SLA cards
-│   ├── Escalation/     # Escalation management
-│   ├── FaultAttribution/
-│   ├── Handover/       # Handover wizard + history
-│   ├── KanbanBoard/    # Kanban ticket view
-│   ├── QAReadiness/    # QA readiness checks
-│   ├── QContact/       # QContact sync UI
-│   ├── TicketDetail/   # Full ticket detail panel
-│   ├── TicketForm/     # Create/edit ticket form
-│   ├── TicketList/     # Ticket list + filters
-│   ├── Verification/   # Type-specific verification checklists (3-12 steps)
-│   ├── WeeklyImport/   # Excel import wizard
-│   └── WATrackingDashboard.tsx
-├── constants/          # Ticket status, types, fault causes, etc.
-├── hooks/              # useTickets, useTicket, useHandover, useVerification, etc.
-├── jobs/               # QContact sync background job
-├── migrations/         # PostgreSQL migration files (4 migrations)
-├── services/           # Business logic
-│   ├── ticketService.ts
-│   ├── ticketEnrichmentService.ts
-│   ├── escalationService.ts
-│   ├── handoverService.ts
-│   ├── verificationService.ts
-│   ├── qaReadinessService.ts
-│   ├── qcontactSyncOrchestrator.ts
-│   └── whatsappService.ts
-├── types/              # TypeScript definitions
-└── utils/              # Helpers (SLA calc, fault patterns, etc.)
-```
+### Frontend Components (`app/(main)/noc/`)
+- **Dashboard** — Main landing page with ticket summary
+- **Data Sync** — QContact sync, alignment, weekly imports, WA tracking
+- **Escalations** — Repeat fault alerts and escalation list/map
+- **Handovers** — Pending handover queue and history
+- **Risks** — Active risk acceptance reviews
+- **Teams** — Team management and RBAC
+- **Tickets** — Individual ticket detail page and list
+- **Tickets/New** — New ticket creation wizard
+
+### API Routes (`app/api/noc/`)
+- **analytics/fault-trends** — Fault trend analysis pipeline
+- **attachments/[id]** — Attachment CRUD operations
+- **cron/sync-qcontact** — Scheduled QContact sync
+- **dashboard/** — Summary, SLA, workload endpoints
+- **dr-lookup/[drNumber]** — DR search functionality
+- **escalations/** — Escalation list, detail, resolution
+- **handovers/** — Pending queue and import tracking
+- **import/** — Weekly import progress tracking
+- **risk-acceptances/** — Risk query and resolution
+- **teams/** — Team list and assignment
+
+### Modules & Hooks
+- **Components** — Reusable UI components (Dashboard, QContact, Escalation, Handover, Risk, Team components)
+- **Hooks** — Custom React hooks for data fetching (useQContactSync, useTeams)
+- **Types** — TypeScript type definitions (escalation, handover, riskAcceptance, team)
+- **Utils** — Utility functions for data transformation
+
+## Database Schema
+
+### Primary Tables
+- `noc_tickets` — Ticket master with status, SLA tracking
+- `noc_escalations` — Escalation records with alert thresholds
+- `noc_handovers` — Handover queue entries
+- `noc_risk_acceptances` — Risk records with expiry and status
+- `noc_teams` — NOC team structure and RBAC
+- `noc_qcontact_sync` — Sync history and audit logs
+
+### Related Tables
+- `pp_data_tickets` — Power+ enriched data tickets
+- `drops` — Location/project reference data
+- `onemap_properties` — Geographic data source
+
+## Integration Points
+
+1. **QContact System** — Team data source for sync and alignment
+2. **Activate Module** — PP data ticket creation and enrichment (via `/api/activate/pp-data-tickets`)
+3. **Auth Module** — RBAC and user context
+4. **Notification System** — Alert dispatch for escalations
+5. **File Service** — Attachment storage and retrieval
+6. **Analytics** — Fault trend aggregation
+
+## Security Measures
+
+- RBAC enforced at endpoint level (NOC Coordinator, Team Lead, Technician roles)
+- Ticket assignment restricted to authorized teams
+- Risk acceptance sign-off audit trail
+- Escalation alert notifications sent only to assigned teams
+
+## Testing & Validation
+
+- Unit tests cover ticket creation, enrichment, escalation detection, and team assignment
+- Integration tests validate QContact sync workflow and alignment reporting
+- E2E tests cover handover queue and risk acceptance flows
+
+## Dependencies
+
+- `qcontact-sync-plugin` — QContact integration client
+- `pp-data-enrichment` — Data enrichment pipeline
+- `fault-detection` — Escalation threshold engine
+- `audit-logger` — Compliance and audit trail recording
+
+## Migration Notes
+
+**From Maintenance → NOC (Commit 96d8cc9):**
+- Complete directory rename: `/app/(main)/maintenance/` → `/app/(main)/noc/`
+- Config rename: `maintenanceConfig` → `nocConfig`
+- API path updates: `/api/maintenance/*` → `/api/noc/*`
+- All imports updated throughout codebase (56 files)
+- **BREAKING:** Any client-side links to `/maintenance/*` routes will 404 — update navigation
+- **BREAKING:** API clients using `/api/maintenance/*` paths must update to `/api/noc/*`
+
+## Deployment Checklist
+
+- [ ] Verify QContact sync is functional (manual test via Data Sync > QContact)
+- [ ] Test PP data ticket creation and enrichment (Activate module)
+- [ ] Verify escalation alerts trigger on repeat faults
+- [ ] Confirm team RBAC applies correctly to ticket assignments
+- [ ] Test attachment upload/download
+- [ ] Verify risk acceptance workflow end-to-end
+- [ ] Check that all `/api/noc/*` endpoints return expected status codes
+- [ ] Monitor for stale `/api/maintenance/*` requests in error logs (404s indicate client updates needed)
+
+## Performance Notes
+
+- QContact sync is asynchronous; large team imports may take 30-60 seconds
+- Fault trend analysis queries last 90 days; older faults are archived
+- Ticket search is indexed on `dr_number` and `status` for fast lookups
+
+## Support & Escalation
+
+For NOC module issues:
+1. Check QContact sync status in Data Sync dashboard
+2. Review alignment report for data mismatches
+3. Check escalation alert thresholds vs recent fault volume
+4. Verify team RBAC assignments
+5. Contact Platform team for database schema questions
 
 ---
 
-## Test Status
-
-As of 2026-03-12, **6 test failures** exist in the NOC module (`src/modules/noc/__tests__/`). These are pre-existing failures unrelated to the module rename — the rename itself was a mechanical find-and-replace of import paths. The failures are tracked separately.
-
----
-
-## Known Integrations
-
-| System | Direction | Mechanism |
-|--------|-----------|-----------|
-| **QContact** | Bidirectional | REST sync + webhook (`/api/noc/webhooks/qcontact`) |
-| **WhatsApp (WAHA)** | Outbound | `/api/noc/notifications/whatsapp` |
-| **Activate module** | Inbound | `/api/activate/pp-data-tickets` creates NOC tickets |
-| **Data Sync** | Outbound | NocGroup in data-sync dashboard |
-| **OLT Report** | Inbound | `/api/system/olt-report/tickets` creates NOC tickets |
-| **FiberTime** | Outbound | `/api/noc/sync/fibertime` |
-
----
-
-*Last updated: 2026-03-13 · Source commits: [`96d8cc9`](https://github.com) (2026-03-11, module rename + PP enrichment), [`a63c493`](https://github.com) (2026-03-13, type-specific verification)*
+**Last Updated:** 2026-03-11 (Commit 96d8cc9)  
+**Owner:** Platform Team  
+**Status:** Production
