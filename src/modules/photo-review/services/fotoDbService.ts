@@ -148,7 +148,8 @@ export async function saveEvaluation(evaluation: EvaluationResult): Promise<Eval
         passed_steps = ${evaluation.passed_steps},
         step_results = ${stepResultsJson}::jsonb,
         markdown_report = ${evaluation.markdown_report || null},
-        feedback_sent = ${evaluation.feedback_sent},
+        -- Never allow saveEvaluation to set feedback_sent=true; only human send-feedback can
+        feedback_sent = false,
         evaluation_date = ${evaluation.evaluation_date || new Date()},
         updated_at = NOW()
       WHERE drop_number = ${evaluation.dr_number}
@@ -168,13 +169,30 @@ export async function saveEvaluation(evaluation: EvaluationResult): Promise<Eval
 }
 
 /**
- * Mark feedback as sent
+ * Mark feedback as sent — ONLY allowed for human-reviewed DRs
+ * Auto-QA processed DRs must go through /api/activate/send-feedback with human auth
  * @param drNumber - Drop record number
  * @returns Updated evaluation result
  */
 export async function markFeedbackSent(drNumber: string): Promise<EvaluationResult> {
   try {
     const sql = getDbConnection();
+
+    // Guard: refuse to mark feedback_sent on auto-QA DRs without human review
+    const [row] = await sql`
+      SELECT qa_decision_by, human_reviewer_id, auto_qa_processed
+      FROM dr_photo_unified_reviews
+      WHERE drop_number = ${drNumber}
+    `;
+
+    if (row) {
+      const isAutoQa = row.qa_decision_by?.startsWith('system:') || row.auto_qa_processed;
+      const hasHumanReview = !!row.human_reviewer_id;
+      if (isAutoQa && !hasHumanReview) {
+        log.error(`Blocked markFeedbackSent for auto-QA DR ${drNumber} — no human review`, {}, 'fotoDbService');
+        throw new Error('Cannot send feedback on auto-QA DR without human review');
+      }
+    }
 
     await sql`
       UPDATE dr_photo_unified_reviews
