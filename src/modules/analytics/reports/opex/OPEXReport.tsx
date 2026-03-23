@@ -49,8 +49,6 @@ export default function OPEXReport() {
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
             <th className={th} style={{ minWidth: 220 }}>Category</th>
-            <th className={thR}>FY26</th>
-            <th className={thR}>FY27</th>
             {months.map((m) => (
               <th key={m} className={thR}>{m}</th>
             ))}
@@ -61,8 +59,6 @@ export default function OPEXReport() {
           {rows.filter((r) => !r.isTotal).map((row, i) => (
             <tr key={row.category} className={i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
               <td className="px-3 py-2 text-gray-200 whitespace-nowrap" style={{ minWidth: 220 }}>{row.category}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy26)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.fy27)}</td>
               {months.map((m) => (
                 <td key={m} className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(row.monthly[m] ?? 0)}</td>
               ))}
@@ -73,8 +69,6 @@ export default function OPEXReport() {
         <tfoot>
           <tr className="border-t-2 border-gray-500 font-bold" style={{ backgroundColor: '#1a3a4a' }}>
             <td className="px-3 py-2.5 text-white">Total</td>
-            <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.fy26 ?? 0)}</td>
-            <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.fy27 ?? 0)}</td>
             {months.map((m) => (
               <td key={m} className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(grandTotals?.monthly?.[m] ?? 0)}</td>
             ))}

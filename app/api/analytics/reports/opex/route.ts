@@ -1,18 +1,16 @@
 /**
  * GET /api/analytics/reports/opex
  *
- * Returns Operational Expenses pivot from the "OPEX" worksheet only.
- * No type toggle — OPEX tab contains only operational expense categories.
- *
- * Sheet structure:
- *   Row 0 (header): "Operations Expenses" | "FY 26" | "FY 27" | "FY28" | <date serials col 4+>
- *   Rows 1+: category name | FY26 | FY27 | FY28 | monthly values...
- *   Last row: "Total"
+ * Returns Operational Expenses pivot from the "Data" worksheet.
+ * Filter: Column D (OPEX/CAPEX, col index 3) == "OPEX"
+ * Group by: Category (col 10)
+ * Value: Amount Excl. VAT (col 6)
+ * Month: Date-M serial (col 1)
  *
  * Access restricted via RBAC (analytics.reports / view) or user allowlist.
  */
 
-// 🟢 WORKING: OPEX GET handler — reads live SharePoint OPEX worksheet
+// 🟢 WORKING: OPEX GET handler — reads Data tab, filters col 3 == "OPEX"
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
@@ -53,8 +51,6 @@ function toStr(cell: unknown): string {
 
 export interface OPEXRow {
   category: string;
-  fy26: number;
-  fy27: number;
   monthly: Record<string, number>;
   grandTotal: number;
   isTotal?: boolean;
@@ -63,7 +59,7 @@ export interface OPEXRow {
 export interface OPEXData {
   rows: OPEXRow[];
   months: string[];
-  grandTotals: { fy26: number; fy27: number; monthly: Record<string, number>; total: number };
+  grandTotals: { monthly: Record<string, number>; total: number };
 }
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
@@ -83,61 +79,65 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   logger.info('OPEX report requested', { userId });
 
   try {
-    const { values } = await getWorksheetRange('OPEX');
-    if (!values || values.length < 2) throw new Error('OPEX sheet returned insufficient data');
+    const { values } = await getWorksheetRange('Data');
+    if (!values || values.length < 2) throw new Error('Data sheet returned insufficient data');
 
-    // Header row (index 0): col 0 = title, col 1 = FY26, col 2 = FY27, col 3 = FY28, col 4+ = date serials
-    const headerRow = values[0] as unknown[];
-    const monthColumns: { col: number; key: string }[] = [];
-    for (let col = 4; col < headerRow.length; col++) {
-      const cell = headerRow[col];
-      if (typeof cell === 'number' && cell > 40_000) {
-        monthColumns.push({ col, key: excelSerialToMonthKey(cell) });
-      }
+    // Data tab columns (confirmed from live workbook):
+    // col 1  = Date-M (Excel serial)
+    // col 3  = OPEX/CAPEX — filter == "OPEX"
+    // col 6  = Amount Excl. VAT
+    // col 10 = Category
+
+    const accumulator = new Map<string, Map<string, number>>(); // category → monthKey → sum
+    const monthKeySet = new Set<string>();
+
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i] as unknown[];
+
+      // Filter: OPEX/CAPEX column must equal "OPEX"
+      if (toStr(row[3]) !== 'OPEX') continue;
+
+      const dateMSerial = toNumber(row[1]);
+      if (dateMSerial <= 0) continue;
+      const monthKey = excelSerialToMonthKey(dateMSerial);
+
+      const category = toStr(row[10]) || '(Uncategorised)';
+      const amount = toNumber(row[6]);
+
+      monthKeySet.add(monthKey);
+      if (!accumulator.has(category)) accumulator.set(category, new Map());
+      const catMap = accumulator.get(category)!;
+      catMap.set(monthKey, (catMap.get(monthKey) ?? 0) + amount);
     }
 
-    const monthKeySet = new Set(monthColumns.map((m) => m.key));
     const months = Array.from(monthKeySet).sort((a, b) => monthKeySortValue(a) - monthKeySortValue(b));
 
     const rows: OPEXRow[] = [];
     const gtMonthly: Record<string, number> = {};
     months.forEach((m) => (gtMonthly[m] = 0));
-    let gtFY26 = 0, gtFY27 = 0, gtTotal = 0;
+    let gtTotal = 0;
 
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const category = toStr(row[0]);
-      if (!category) continue;
-
-      const fy26 = toNumber(row[1]);
-      const fy27 = toNumber(row[2]);
+    for (const [category, catMap] of accumulator) {
       const monthly: Record<string, number> = {};
       let rowTotal = 0;
-
-      for (const { col, key } of monthColumns) {
-        const val = toNumber(row[col]);
-        monthly[key] = (monthly[key] ?? 0) + val;
+      for (const m of months) {
+        const val = catMap.get(m) ?? 0;
+        monthly[m] = val;
         rowTotal += val;
+        gtMonthly[m] = (gtMonthly[m] ?? 0) + val;
       }
-
-      const isTotal = category.toLowerCase() === 'total';
-      rows.push({ category: isTotal ? 'Total' : category, fy26, fy27, monthly, grandTotal: rowTotal, isTotal });
-
-      if (!isTotal) {
-        gtFY26 += fy26;
-        gtFY27 += fy27;
-        gtTotal += rowTotal;
-        for (const m of months) gtMonthly[m] = (gtMonthly[m] ?? 0) + (monthly[m] ?? 0);
-      }
+      gtTotal += rowTotal;
+      rows.push({ category, monthly, grandTotal: rowTotal });
     }
 
-    const data: OPEXData = {
-      rows,
-      months,
-      grandTotals: { fy26: gtFY26, fy27: gtFY27, monthly: gtMonthly, total: gtTotal },
-    };
+    // Sort by category name
+    rows.sort((a, b) => a.category.localeCompare(b.category));
 
-    return NextResponse.json({ success: true, data, meta: { generatedAt: new Date().toISOString(), sources: ['OPEX'] } });
+    logger.info('OPEX data parsed', { categories: rows.length, months: months.length });
+
+    const data: OPEXData = { rows, months, grandTotals: { monthly: gtMonthly, total: gtTotal } };
+    return NextResponse.json({ success: true, data, meta: { generatedAt: new Date().toISOString(), sources: ['Data'] } });
+
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error('OPEX fetch failed', { error: message });
