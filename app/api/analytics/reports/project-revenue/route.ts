@@ -3,6 +3,7 @@
  *
  * Returns Cost Centre Profitability: COS vs Revenue per project.
  * Sources: "FT_Revenue" (actual invoiced revenue) + "Project_Costing" (COS Total).
+ * Both sources are required — 500 if either fails.
  *
  * Access restricted to authorised users via RBAC (analytics.reports / view)
  * or direct user-ID allowlist.
@@ -24,7 +25,7 @@ const ALLOWED_USERS = new Set([
 ]);
 
 // 🟢 WORKING: Cost Centre Profitability response types — COS vs Revenue per project
-export interface ProjectProfitabilityRow {
+export interface ProjectProfitability {
   project: string;
   revenue: number;
   cos: number;
@@ -38,7 +39,7 @@ export interface CostCentreRevenueItem {
   cos: number;
   grossProfit: number;
   margin: number;
-  children: ProjectProfitabilityRow[];
+  children: ProjectProfitability[];
 }
 
 interface ApiResponse {
@@ -58,13 +59,17 @@ function findColContains(headers: unknown[], include: string): number {
   return headers.findIndex((h) => String(h ?? '').toLowerCase().includes(incL));
 }
 
+function normalize(s: string): string {
+  return s.trim().toLowerCase();
+}
+
 /**
  * Parse "FT_Revenue" worksheet.
  * Header row at index 0.
  * col 6 = "Project Name", col 9 = " Debit Excl VAT" (detect by "debit excl").
- * Returns Map<projectName, totalRevenue>.
+ * Returns Map<normalizedProjectName, totalRevenue>.
  */
-function parseFTRevenue(values: unknown[][]): Map<string, number> {
+function parseFTRevenue(values: unknown[][]): Map<string, { display: string; total: number }> {
   const headers = (values[0] ?? []) as unknown[];
   logger.info('FT_Revenue headers', { headers: headers.slice(0, 15) });
 
@@ -83,15 +88,21 @@ function parseFTRevenue(values: unknown[][]): Map<string, number> {
 
   logger.info('FT_Revenue column detection', { projectCol, debitCol });
 
-  const grouped = new Map<string, number>();
+  const grouped = new Map<string, { display: string; total: number }>();
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i] as unknown[];
     const project = String(row[projectCol] ?? '').trim();
     const amount = toNumber(row[debitCol]);
     if (!project && amount === 0) continue;
-    const key = project || '(Unassigned)';
-    grouped.set(key, (grouped.get(key) ?? 0) + amount);
+    const display = project || '(Unassigned)';
+    const key = normalize(display);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.total += amount;
+    } else {
+      grouped.set(key, { display, total: amount });
+    }
   }
 
   logger.info('FT_Revenue parsed', { projects: grouped.size });
@@ -101,11 +112,13 @@ function parseFTRevenue(values: unknown[][]): Map<string, number> {
 /**
  * Parse "Project_Costing" worksheet.
  * Header row at index 2 (rows 0+1 are meta/section headers).
- * col 3 = project name, col 9 = "COS - Total".
- * Data rows start at index 3, stop when col 3 is empty.
- * Returns Map<projectName, cosTotal>.
+ * col 3 = project name, col 9 = "COS - Total" (detect by cos+total, fallback col 9).
+ * Data rows start at index 3, skip rows where col 3 is empty.
+ * Returns Map<normalizedProjectName, { display, cos }>.
  */
-function parseProjectCosting(values: unknown[][]): Map<string, number> {
+function parseProjectCosting(
+  values: unknown[][]
+): Map<string, { display: string; cos: number }> {
   if (values.length < 4) {
     logger.warn('Project_Costing: insufficient rows', { rowCount: values.length });
     return new Map();
@@ -114,14 +127,25 @@ function parseProjectCosting(values: unknown[][]): Map<string, number> {
   const headers = (values[2] ?? []) as unknown[];
   logger.info('Project_Costing headers (row 2)', { headers: headers.slice(0, 15) });
 
-  const cosMap = new Map<string, number>();
+  // COS Total — detect by contains("cos") AND contains("total"), fallback col 9
+  let cosCol = headers.findIndex(
+    (h) =>
+      String(h ?? '').toLowerCase().includes('cos') &&
+      String(h ?? '').toLowerCase().includes('total')
+  );
+  if (cosCol < 0) cosCol = 9;
+
+  logger.info('Project_Costing column detection', { cosCol });
+
+  const cosMap = new Map<string, { display: string; cos: number }>();
 
   for (let i = 3; i < values.length; i++) {
     const row = values[i] as unknown[];
     const project = String(row[3] ?? '').trim();
-    if (!project) break; // stop at first empty project name
-    const cos = toNumber(row[9]);
-    cosMap.set(project, cos);
+    if (!project) continue; // skip empty project name rows
+    const cos = toNumber(row[cosCol]);
+    const key = normalize(project);
+    cosMap.set(key, { display: project, cos });
   }
 
   logger.info('Project_Costing parsed', { projects: cosMap.size });
@@ -130,19 +154,29 @@ function parseProjectCosting(values: unknown[][]): Map<string, number> {
 
 /**
  * Merge FT_Revenue + Project_Costing into a single CostCentreRevenueItem.
+ * Case-insensitive name matching via normalized keys.
+ * Projects with revenue but no COS → cos=0.
+ * Projects with COS but no revenue → revenue=0.
  */
 function buildProfitabilityItem(
-  revenueMap: Map<string, number>,
-  cosMap: Map<string, number>
+  revenueMap: Map<string, { display: string; total: number }>,
+  cosMap: Map<string, { display: string; cos: number }>
 ): CostCentreRevenueItem {
-  const children: ProjectProfitabilityRow[] = Array.from(revenueMap.entries())
-    .map(([project, revenue]) => {
-      const cos = cosMap.get(project) ?? 0;
-      const grossProfit = revenue - cos;
-      const margin = revenue !== 0 ? grossProfit / revenue : 0;
-      return { project, revenue, cos, grossProfit, margin };
-    })
-    .sort((a, b) => b.revenue - a.revenue);
+  // Union of all project keys
+  const allKeys = new Set([...revenueMap.keys(), ...cosMap.keys()]);
+
+  const children: ProjectProfitability[] = Array.from(allKeys).map((key) => {
+    const rev = revenueMap.get(key);
+    const cost = cosMap.get(key);
+    const display = rev?.display ?? cost?.display ?? key;
+    const revenue = rev?.total ?? 0;
+    const cos = cost?.cos ?? 0;
+    const grossProfit = revenue - cos;
+    const margin = revenue !== 0 ? grossProfit / revenue : 0;
+    return { project: display, revenue, cos, grossProfit, margin };
+  });
+
+  children.sort((a, b) => b.revenue - a.revenue);
 
   const totalRevenue = children.reduce((s, c) => s + c.revenue, 0);
   const totalCos = children.reduce((s, c) => s + c.cos, 0);
@@ -159,7 +193,7 @@ function buildProfitabilityItem(
   };
 }
 
-// 🟢 WORKING: Cost Centre Profitability GET handler — FT_Revenue + Project_Costing
+// 🟢 WORKING: Cost Centre Profitability GET handler — FT_Revenue + Project_Costing (both required)
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   // --- Authentication ---
   const cookieStore = await cookies();
@@ -197,15 +231,17 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
   logger.info('Cost centre profitability requested', { userId });
 
   try {
-    // Fetch both sheets in parallel — Project_Costing failure is non-fatal
+    // Fetch both sheets in parallel — both required for profitability view
     const [ftResult, costingResult] = await Promise.allSettled([
       getWorksheetRange('FT_Revenue'),
       getWorksheetRange('Project_Costing'),
     ]);
 
-    // FT_Revenue is required
     if (ftResult.status === 'rejected') {
       throw new Error(`FT_Revenue fetch failed: ${String(ftResult.reason)}`);
+    }
+    if (costingResult.status === 'rejected') {
+      throw new Error(`Project_Costing fetch failed: ${String(costingResult.reason)}`);
     }
 
     const ftValues = ftResult.value.values ?? [];
@@ -213,21 +249,10 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       throw new Error('FT_Revenue sheet returned no data rows');
     }
 
+    const costingValues = costingResult.value.values ?? [];
+
     const revenueMap = parseFTRevenue(ftValues);
-
-    // Project_Costing is optional — degrade gracefully to COS = 0
-    let cosMap = new Map<string, number>();
-    const sources = ['FT_Revenue'];
-
-    if (costingResult.status === 'fulfilled') {
-      const costingValues = costingResult.value.values ?? [];
-      cosMap = parseProjectCosting(costingValues);
-      sources.push('Project_Costing');
-    } else {
-      logger.warn('Project_Costing fetch failed — COS will be 0 for all projects', {
-        error: String(costingResult.reason),
-      });
-    }
+    const cosMap = parseProjectCosting(costingValues);
 
     const ft = buildProfitabilityItem(revenueMap, cosMap);
 
@@ -237,7 +262,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       meta: {
         generatedAt: new Date().toISOString(),
         itemCount: 1,
-        sources,
+        sources: ['FT_Revenue', 'Project_Costing'],
       },
     };
 
