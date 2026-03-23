@@ -115,21 +115,18 @@ export function ContractorImport({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Import Contractors" className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          aria-hidden="true"
-          onClick={handleClose}
-        />
-
-        {/* Modal panel */}
-        <div className={`relative inline-block bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full ${className}`}>
+      <div className="fixed inset-0 bg-black/50" onClick={handleClose} aria-hidden="true" />
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="relative w-full max-w-2xl bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Import Contractors</h2>
+          <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {step === 'upload' && 'Upload Contractor Data'}
+              {step === 'preview' && 'Review Contractor Data'}
+              {step === 'importing' && 'Importing Contractors'}
+              {step === 'results' && 'Import Complete'}
+            </h2>
             <button
-              type="button"
               onClick={handleClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
               aria-label="Close dialog"
@@ -138,53 +135,63 @@ export function ContractorImport({
             </button>
           </div>
 
-          {/* Body */}
-          <div className="px-6 py-4">
-            {/* Error banner */}
+          {/* Content */}
+          <div className="p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-                {error}
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
-
-            {/* Step: upload */}
             {step === 'upload' && (
-              <div className="space-y-4">
-                <ContractorImportInstructions />
-                <ContractorFileDropZone
-                  onFileSelect={handleFileSelect}
-                  isProcessing={isProcessing}
-                />
-              </div>
+              <ContractorFileDropZone
+                onFileSelect={handleFileSelect}
+                isProcessing={isProcessing}
+              />
             )}
-
-            {/* Step: preview */}
             {step === 'preview' && importData && (
               <ContractorFilePreview
                 data={importData}
                 options={importOptions}
                 onOptionsChange={setImportOptions}
                 onImport={handleImport}
-                onCancel={handleClose}
+                onCancel={handleReset}
                 isProcessing={isProcessing}
               />
             )}
-
-            {/* Step: importing */}
             {step === 'importing' && (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4" />
-                <p className="text-sm text-gray-600">Importing contractors, please wait...</p>
+              <div className="py-12 text-center">
+                <div className="inline-block">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                </div>
+                <p className="mt-4 text-gray-600">Importing contractors...</p>
               </div>
             )}
-
-            {/* Step: results */}
             {step === 'results' && importResult && (
               <ContractorImportResults
                 result={importResult}
                 onClose={handleClose}
                 onImportMore={handleReset}
               />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 bg-gray-50">
+            {step === 'upload' && (
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+            {step === 'results' && (
+              <button
+                onClick={handleClose}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Done
+              </button>
             )}
           </div>
         </div>
