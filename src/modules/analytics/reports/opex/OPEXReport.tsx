@@ -126,15 +126,16 @@ export default function OPEXReport() {
   const categories = activeRows.map((r) => r.category);
   const anySelected = selectedCategories.size > 0;
 
-  // Build chart data — include __total__ key for top label
+  // Build chart data — zero out unselected categories so bars physically shrink
   const chartData = months.map((m) => {
     const entry: Record<string, number | string> = { month: m };
     let monthTotal = 0;
     for (const row of activeRows) {
       const val = Math.round(row.monthly[m] ?? 0);
-      entry[row.category] = val;
-      // If filtering, only count selected in total
-      if (!anySelected || selectedCategories.has(row.category)) monthTotal += val;
+      // If filter active: only include selected categories in bar data
+      const effective = anySelected && !selectedCategories.has(row.category) ? 0 : val;
+      entry[row.category] = effective;
+      monthTotal += effective;
     }
     entry['__total__'] = monthTotal;
     return entry;
@@ -221,7 +222,6 @@ export default function OPEXReport() {
             />
             {categories.map((cat, idx) => {
               const colour = PALETTE[idx % PALETTE.length];
-              const dimmed = anySelected && !selectedCategories.has(cat);
               const isLast = idx === categories.length - 1;
               return (
                 <Bar
@@ -229,7 +229,7 @@ export default function OPEXReport() {
                   dataKey={cat}
                   stackId="opex"
                   fill={colour}
-                  fillOpacity={dimmed ? 0.15 : 1}
+                  fillOpacity={1}
                   maxBarSize={48}
                   isAnimationActive={false}
                 >
