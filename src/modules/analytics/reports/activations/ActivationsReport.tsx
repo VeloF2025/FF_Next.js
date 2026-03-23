@@ -368,24 +368,25 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
         {drillMonth ? 'Weekly activations for selected month' : 'Click a bar to drill into weekly view'}
       </p>
 
-      <div className="h-[480px]">
+      <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} layout="vertical" margin={{ top: 8, right: 56, bottom: 8, left: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" horizontal={false} />
+          <BarChart data={chartData} margin={{ top: 24, right: 16, bottom: 60, left: 16 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
             <XAxis
-              type="number"
+              type="category"
+              dataKey="label"
               tick={{ fill: '#9CA3AF', fontSize: 11 }}
               axisLine={{ stroke: '#4B5563' }}
               tickLine={false}
-              allowDecimals={false}
+              angle={-35}
+              textAnchor="end"
+              interval={0}
             />
             <YAxis
-              type="category"
-              dataKey="label"
-              width={70}
               tick={{ fill: '#9CA3AF', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
+              allowDecimals={false}
             />
             <Tooltip
               {...TOOLTIP_STYLE}
@@ -397,7 +398,7 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
                 dataKey={projectName}
                 stackId="acts"
                 fill={PALETTE[idx % PALETTE.length]}
-                maxBarSize={24}
+                maxBarSize={48}
                 isAnimationActive={false}
                 cursor={drillMonth ? 'default' : 'pointer'}
                 onClick={(entry: ChartEntry) => {
@@ -406,10 +407,10 @@ function ActivationsChart({ years, allProjects }: { years: ActivationYear[]; all
               />
             ))}
             {/* Invisible bar carries total label so it survives project filtering */}
-            <Bar dataKey="__total__" stackId="__label__" fill="transparent" maxBarSize={24} isAnimationActive={false}>
+            <Bar dataKey="__total__" stackId="__label__" fill="transparent" maxBarSize={48} isAnimationActive={false}>
               <LabelList
                 dataKey="__total__"
-                position="right"
+                position="top"
                 style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
                 formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')}
               />
