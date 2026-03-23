@@ -287,19 +287,24 @@ async function writeSummary(meetingId: number, summary: MeetingSummary): Promise
 }
 
 /**
- * Replace all AI-extracted action items for a meeting with the latest set.
- * Skips the INSERT entirely when the list is empty.
+ * Replace action items of a given source for a meeting with the latest set.
+ * Only deletes items matching the source type so visual items are preserved
+ * when re-processing transcripts and vice versa.
  */
-async function writeActionItems(meetingId: number, items: ActionItem[]): Promise<void> {
-  // Delete previous AI-extracted items so re-processing is idempotent
-  await sql`DELETE FROM meeting_action_items WHERE meeting_id = ${meetingId}`;
+async function writeActionItems(
+  meetingId: number,
+  items: ActionItem[],
+  source: string = 'transcript'
+): Promise<void> {
+  // Delete previous items of this source type only (preserves other sources)
+  await sql`DELETE FROM meeting_action_items WHERE meeting_id = ${meetingId} AND (source = ${source} OR source IS NULL)`;
 
   if (items.length === 0) return;
 
   for (const item of items) {
     await sql`
-      INSERT INTO meeting_action_items (meeting_id, description, assignee_name, status, priority)
-      VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority})
+      INSERT INTO meeting_action_items (meeting_id, description, assignee_name, status, priority, source)
+      VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority}, ${source})
     `;
   }
 }
