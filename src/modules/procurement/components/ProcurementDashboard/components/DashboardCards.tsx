@@ -25,18 +25,24 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {cards.map((card) => {
         const Icon = card.icon;
+        const descriptionId = `card-desc-${card.title.replace(/\s+/g, '-').toLowerCase()}`;
         
         return (
           <Link
             key={card.title}
             href={card.link}
-            className="bg-card overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
+            aria-label={card.title}
+            aria-describedby={descriptionId}
+            className="bg-card overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-teal-500 rounded-lg"
           >
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className={`p-3 rounded-md ${(colorMap[card.color] ?? colorMap.blue).bg}`}>
-                    <Icon className={`h-6 w-6 ${(colorMap[card.color] ?? colorMap.blue).text}`} />
+                    <Icon 
+                      aria-hidden="true"
+                      className={`h-6 w-6 ${(colorMap[card.color] ?? colorMap.blue).text}`} 
+                    />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -51,7 +57,7 @@ export function DashboardCards({ cards }: DashboardCardsProps) {
                 </div>
               </div>
               <div className="mt-3">
-                <p className="text-sm text-muted-foreground">{card.description}</p>
+                <p id={descriptionId} className="text-sm text-muted-foreground">{card.description}</p>
               </div>
             </div>
           </Link>
