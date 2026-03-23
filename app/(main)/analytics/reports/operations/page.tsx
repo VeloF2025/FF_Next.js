@@ -1,17 +1,12 @@
 /**
- * Analytics Reports — Operations sub-page (placeholder)
- * 🟢 WORKING: Coming soon placeholder
+ * Analytics Reports — Operations tab
+ * 🟢 WORKING: Activations report — year/month/week drill-down table + bar chart
  */
 
 export const dynamic = 'force-dynamic';
 
+import ActivationsReport from '@/modules/analytics/reports/activations/ActivationsReport';
+
 export default function OperationsReportsPage() {
-  return (
-    <div className="p-8 text-center text-gray-400">
-      <p className="text-lg font-medium text-gray-300">Operations Reports</p>
-      <p className="text-sm mt-2">
-        Coming soon — Lew will advise reports for this section.
-      </p>
-    </div>
-  );
+  return <ActivationsReport />;
 }
