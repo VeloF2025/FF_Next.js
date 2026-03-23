@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell,
+  Tooltip, ResponsiveContainer, Cell, LabelList,
 } from 'recharts';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle, ChevronLeft } from 'lucide-react';
 import { ReportTabLayout } from '../ReportTabLayout';
@@ -225,6 +225,12 @@ function ActivationsChart({ years }: { years: ActivationYear[] }) {
               {chartData.map((_, idx) => (
                 <Cell key={idx} fill="#3b82f6" />
               ))}
+              <LabelList
+                dataKey="activations"
+                position="top"
+                style={{ fill: '#E5E7EB', fontSize: 11, fontWeight: 600 }}
+                formatter={(v: number) => v > 0 ? v.toLocaleString() : ''}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
