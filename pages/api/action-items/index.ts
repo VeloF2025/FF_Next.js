@@ -27,41 +27,41 @@ async function handler(
         overdue,
       } = req.query as Partial<Record<keyof ActionItemFilters, string>>;
 
-      // Simple approach: Fetch all and filter in code
-      // This is acceptable for moderate datasets (<10k items)
-      let items = await sql`
-        SELECT
-          ai.id,
-          ai.meeting_id,
-          ai.description,
-          ai.assignee_name,
-          ai.assignee_email,
-          ai.status::text,
-          ai.priority::text,
-          ai.due_date,
-          ai.completed_date,
-          ai.mentioned_at,
-          ai.created_at,
-          ai.updated_at,
-          ai.tags,
-          ai.notes,
-          m.title as meeting_title,
-          m.meeting_date,
-          m.transcript_url
-        FROM meeting_action_items ai
-        LEFT JOIN meetings m ON ai.meeting_id = m.id
-        ORDER BY
-          CASE
-            WHEN ai.status::text = 'pending' THEN 1
-            WHEN ai.status::text = 'in_progress' THEN 2
-            WHEN ai.status::text = 'completed' THEN 3
-            WHEN ai.status::text = 'cancelled' THEN 4
-          END,
-          ai.created_at DESC
-        LIMIT 500
-      `;
+      // Use SQL filter for meeting_id (avoids LIMIT cutting off results)
+      // Other filters applied in JS for simplicity
+      const meetingIdNum = meeting_id ? parseInt(meeting_id) : null;
 
-      // Apply filters in JavaScript
+      let items = meetingIdNum
+        ? await sql`
+            SELECT
+              ai.id, ai.meeting_id, ai.description, ai.assignee_name, ai.assignee_email,
+              ai.status::text, ai.priority::text, ai.due_date, ai.completed_date,
+              ai.mentioned_at, ai.created_at, ai.updated_at, ai.tags, ai.notes,
+              m.title as meeting_title, m.meeting_date, m.transcript_url
+            FROM meeting_action_items ai
+            LEFT JOIN meetings m ON ai.meeting_id = m.id
+            WHERE ai.meeting_id = ${meetingIdNum}
+            ORDER BY
+              CASE WHEN ai.status::text = 'pending' THEN 1 WHEN ai.status::text = 'in_progress' THEN 2
+                   WHEN ai.status::text = 'completed' THEN 3 ELSE 4 END,
+              ai.created_at DESC
+          `
+        : await sql`
+            SELECT
+              ai.id, ai.meeting_id, ai.description, ai.assignee_name, ai.assignee_email,
+              ai.status::text, ai.priority::text, ai.due_date, ai.completed_date,
+              ai.mentioned_at, ai.created_at, ai.updated_at, ai.tags, ai.notes,
+              m.title as meeting_title, m.meeting_date, m.transcript_url
+            FROM meeting_action_items ai
+            LEFT JOIN meetings m ON ai.meeting_id = m.id
+            ORDER BY
+              CASE WHEN ai.status::text = 'pending' THEN 1 WHEN ai.status::text = 'in_progress' THEN 2
+                   WHEN ai.status::text = 'completed' THEN 3 ELSE 4 END,
+              ai.created_at DESC
+            LIMIT 500
+          `;
+
+      // Apply remaining filters in JavaScript
       if (status) {
         const statuses = status.split(',');
         items = items.filter(item => statuses.includes(item.status));
@@ -70,11 +70,6 @@ async function handler(
       if (assignee_name) {
         const search = assignee_name.toLowerCase();
         items = items.filter(item => item.assignee_name?.toLowerCase().includes(search));
-      }
-
-      if (meeting_id) {
-        const id = parseInt(meeting_id);
-        items = items.filter(item => item.meeting_id === id);
       }
 
       if (priority) {
