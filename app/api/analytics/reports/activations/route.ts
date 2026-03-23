@@ -7,7 +7,7 @@
  * Access restricted via RBAC (analytics.reports / view) or user allowlist.
  */
 
-// 🟢 WORKING: Activations GET handler — OES activations year/month/week hierarchy
+// 🟢 WORKING: Activations GET handler — OES activations year/month/week hierarchy with per-project breakdown
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
@@ -31,6 +31,7 @@ export interface ActivationWeek {
   weekLabel: string;
   activations: number;
   revenue: number;
+  projects: Array<{ projectId: string; projectName: string; count: number }>;
 }
 
 export interface ActivationMonth {
@@ -39,6 +40,7 @@ export interface ActivationMonth {
   activations: number;
   revenue: number;
   weeks: ActivationWeek[];
+  projects: Array<{ projectId: string; projectName: string; count: number }>; // aggregated from weeks
 }
 
 export interface ActivationYear {
@@ -46,11 +48,13 @@ export interface ActivationYear {
   activations: number;
   revenue: number;
   months: ActivationMonth[];
+  projects: Array<{ projectId: string; projectName: string; count: number }>; // aggregated from months
 }
 
 export interface ActivationsData {
   years: ActivationYear[];
   totals: { activations: number; revenue: number };
+  allProjects: string[]; // sorted unique project names across all data
 }
 
 interface DbRow {
@@ -59,6 +63,8 @@ interface DbRow {
   project_name: string;
   count: string;
 }
+
+type ProjectEntry = { projectId: string; projectName: string; count: number };
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -83,9 +89,26 @@ function monthKeyFromWeekStart(weekStart: string): string {
 }
 
 function monthLabelFromKey(monthKey: string): string {
-  const [yearStr, monStr] = monthKey.split('-');
+  const parts = monthKey.split('-');
+  const yearStr = parts[0] ?? '';
+  const monStr = parts[1] ?? '1';
   const month = parseInt(monStr, 10) - 1;
-  return `${MONTH_NAMES[month]} ${yearStr}`;
+  return `${MONTH_NAMES[month] ?? ''} ${yearStr}`.trim();
+}
+
+function aggregateProjects(projectArrays: ProjectEntry[][]): ProjectEntry[] {
+  const map = new Map<string, ProjectEntry>();
+  for (const arr of projectArrays) {
+    for (const p of arr) {
+      const existing = map.get(p.projectName);
+      if (existing) {
+        existing.count += p.count;
+      } else {
+        map.set(p.projectName, { ...p });
+      }
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
@@ -132,11 +155,22 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       ORDER BY DATE_TRUNC('week', oes.activation_date) DESC, p.project_name ASC
     `);
 
-    // Aggregate week totals
+    // Group rows by week — collect totals and per-project arrays
     const weekTotals = new Map<string, number>();
+    const weekProjectsMap = new Map<string, ProjectEntry[]>();
+
     for (const row of result.rows) {
       const prev = weekTotals.get(row.week_start) ?? 0;
       weekTotals.set(row.week_start, prev + Number(row.count));
+
+      if (!weekProjectsMap.has(row.week_start)) {
+        weekProjectsMap.set(row.week_start, []);
+      }
+      weekProjectsMap.get(row.week_start)!.push({
+        projectId: row.project_id,
+        projectName: row.project_name,
+        count: Number(row.count),
+      });
     }
 
     // Build Year → Month → Week hierarchy
@@ -148,7 +182,7 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       const monthKey = monthKeyFromWeekStart(weekStart);
 
       if (!yearMap.has(year)) {
-        yearMap.set(year, { year, activations: 0, revenue: 0, months: [] });
+        yearMap.set(year, { year, activations: 0, revenue: 0, months: [], projects: [] });
       }
       const yearEntry = yearMap.get(year)!;
 
@@ -160,15 +194,18 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
           activations: 0,
           revenue: 0,
           weeks: [],
+          projects: [],
         };
         yearEntry.months.push(monthEntry);
       }
 
+      const weekProjects = weekProjectsMap.get(weekStart) ?? [];
       const week: ActivationWeek = {
         weekStart,
         weekLabel: buildWeekLabel(weekStart),
         activations: total,
         revenue: total * REVENUE_PER_ACTIVATION,
+        projects: weekProjects,
       };
       monthEntry.weeks.push(week);
       monthEntry.activations += total;
@@ -177,22 +214,34 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
       yearEntry.revenue += total * REVENUE_PER_ACTIVATION;
     }
 
-    // Sort: years DESC, months DESC, weeks DESC (already DESC from SQL)
+    // Sort: years DESC, months DESC, weeks DESC — then aggregate projects bottom-up
     const years = Array.from(yearMap.values()).sort((a, b) => b.year - a.year);
     for (const yr of years) {
       yr.months.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
       for (const mo of yr.months) {
         mo.weeks.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+        mo.projects = aggregateProjects(mo.weeks.map((w) => w.projects));
+      }
+      yr.projects = aggregateProjects(yr.months.map((m) => m.projects));
+    }
+
+    // Build allProjects: sorted unique project names across all data
+    const allProjectNamesSet = new Set<string>();
+    for (const yr of years) {
+      for (const p of yr.projects) {
+        allProjectNamesSet.add(p.projectName);
       }
     }
+    const allProjects = Array.from(allProjectNamesSet).sort();
 
     const totalActivations = years.reduce((s, y) => s + y.activations, 0);
     const data: ActivationsData = {
       years,
       totals: { activations: totalActivations, revenue: totalActivations * REVENUE_PER_ACTIVATION },
+      allProjects,
     };
 
-    logger.info('Activations report built', { years: years.length, totalActivations });
+    logger.info('Activations report built', { years: years.length, totalActivations, projects: allProjects.length });
     return NextResponse.json({ success: true, data });
   } catch (error) {
     logger.error('Failed to build activations report', { error });
