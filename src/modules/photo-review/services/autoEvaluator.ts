@@ -52,8 +52,9 @@ const CONFIG = {
   // Dry run mode (test without actually sending feedback)
   DRY_RUN: process.env.AUTO_EVALUATOR_DRY_RUN === 'true',
 
-  // Auto-send feedback (false = human approval required)
-  AUTO_SEND_FEEDBACK: process.env.AUTO_EVALUATOR_SEND_FEEDBACK === 'true', // Default: false
+  // Auto-send feedback DISABLED - feedback must always be sent by a human operator
+  // See fix/human-qa-feedback-guard: env var no longer honored
+  AUTO_SEND_FEEDBACK: false,
 };
 
 // ==================== HELPER FUNCTIONS ====================
@@ -78,48 +79,8 @@ async function isAlreadyEvaluated(drNumber: string): Promise<boolean> {
   }
 }
 
-/**
- * Send WhatsApp feedback for evaluation
- * Calls existing /api/foto/feedback endpoint
- */
-async function sendAutoFeedback(
-  drNumber: string,
-  project?: string
-): Promise<boolean> {
-  try {
-    if (CONFIG.DRY_RUN) {
-      log.debug('autoEvaluator', { message: `[DRY RUN] Would send feedback for ${drNumber} to project: ${project}` });
-      return true;
-    }
-
-    // Call internal API (same server)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3005';
-    const response = await fetch(`${baseUrl}/api/foto/feedback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        dr_number: drNumber,
-        project: project,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `Feedback API returned ${response.status}`
-      );
-    }
-
-    const result = await response.json();
-    log.debug('autoEvaluator', { message: `[AUTO] Feedback sent for ${drNumber}`, result: result.message });
-    return true;
-  } catch (error) {
-    log.error('autoEvaluator', { message: `[AUTO] Failed to send feedback for ${drNumber}`, error });
-    return false;
-  }
-}
+// sendAutoFeedback REMOVED — feedback must always be sent by a human operator
+// See fix/human-qa-feedback-guard for context
 
 // ==================== CORE AUTO-EVALUATION ====================
 
@@ -188,15 +149,9 @@ export async function autoEvaluateDrop(
     log.debug('autoEvaluator', { message: `[AUTO] Saving evaluation for ${drNumber}...` });
     const saved = await saveEvaluation(evaluation);
 
-    // 5. Send WhatsApp feedback (only if AUTO_SEND_FEEDBACK is enabled)
-    let feedbackSent = false;
-    if (CONFIG.AUTO_SEND_FEEDBACK) {
-      log.debug('autoEvaluator', { message: `[AUTO] Sending feedback for ${drNumber}...` });
-      feedbackSent = await sendAutoFeedback(drNumber, project);
-    } else {
-      log.debug('autoEvaluator', { message: `[AUTO] Feedback NOT sent for ${drNumber} - requires human approval` });
-      // Human agent will review and send feedback manually via UI
-    }
+    // 5. Feedback is NEVER sent automatically — requires human HITL approval
+    const feedbackSent = false;
+    log.debug('autoEvaluator', { message: `[AUTO] Feedback NOT sent for ${drNumber} - requires human approval` });
 
     const processingTime = Date.now() - startTime;
 
