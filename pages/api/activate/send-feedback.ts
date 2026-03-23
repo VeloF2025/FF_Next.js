@@ -15,7 +15,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { apiResponse, ErrorCode } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
-import { withAuth } from '@/lib/auth';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
@@ -89,6 +89,10 @@ async function handlePost(
       createTask,
       qaFindings,
     } = req.body as SendFeedbackRequest;
+
+    // Get authenticated user who is sending feedback
+    const authReq = req as AuthenticatedNextApiRequest;
+    const reviewerUserId = authReq.user?.id;
 
     if (!dropNumber) {
       return apiResponse.error(res, ErrorCode.BAD_REQUEST, 'dropNumber is required');
@@ -247,7 +251,7 @@ async function handlePost(
     // 8. Update database with feedback status
     // Use group message ID for threading if available, otherwise use technician private message ID
     const sentMessageId = sendResults.group?.messageId || sendResults.technicianPrivate?.messageId;
-    await updateFeedbackStatus(dropNumber, feedbackMessage, sentMessageId, groupId);
+    await updateFeedbackStatus(dropNumber, feedbackMessage, sentMessageId, groupId, reviewerUserId);
 
     // 9. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
     let taskId: string | null = null;
@@ -672,7 +676,8 @@ async function updateFeedbackStatus(
   dropNumber: string,
   message: string,
   sentMessageId?: string,
-  groupJid?: string
+  groupJid?: string,
+  reviewerUserId?: string
 ): Promise<void> {
   try {
     await pool.query(
@@ -682,6 +687,13 @@ async function updateFeedbackStatus(
         feedback_sent = true,
         feedback_message = $1,
         feedback_sent_at = NOW(),
+        -- Record the human reviewer who pressed Send
+        reviewed_by = COALESCE($5, reviewed_by),
+        human_reviewer_id = COALESCE($5, human_reviewer_id),
+        human_review_status = 'completed',
+        human_review_completed_at = NOW(),
+        -- Clear system decision-by so UI shows Human ✓ instead of AI Review
+        qa_decision_by = COALESCE($5, qa_decision_by),
         -- Store our feedback message ID for future threading (re-reviews)
         -- Only update if we don't already have an original message ID
         wa_message_id = COALESCE(wa_message_id, $3),
@@ -689,11 +701,12 @@ async function updateFeedbackStatus(
         updated_at = NOW()
       WHERE drop_number = $2;
       `,
-      [message, dropNumber, sentMessageId || null, groupJid || null]
+      [message, dropNumber, sentMessageId || null, groupJid || null, reviewerUserId || null]
     );
 
     log.info(`Updated feedback status for ${dropNumber}`, {
       storedMessageId: !!sentMessageId,
+      reviewerUserId,
     });
   } catch (error) {
     log.error('Failed to update feedback status', { dropNumber, error });
