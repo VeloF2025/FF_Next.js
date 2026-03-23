@@ -292,7 +292,7 @@ export async function runAutoDetect(oesBatchId: string): Promise<AutoDetectResul
                      WHERE oes_batch_id = $2 ORDER BY id DESC LIMIT 1)`,
         [error instanceof Error ? error.message : 'Unknown error', oesBatchId]
       );
-    } catch { /* best effort */ }
+    } catch (logError) { log.warn('Failed to update error status in olt_auto_detect_runs', { logError }, 'oltAutoDetectService'); }
     throw error;
   } finally {
     client.release();

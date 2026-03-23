@@ -31,7 +31,7 @@ async function getVatRate(): Promise<number> {
       const rate = Number(rows[0].value);
       if (rate > 0 && rate < 1) return rate;
     }
-  } catch { /* use default */ }
+  } catch (error) { log.warn('Failed to fetch VAT rate from DB, using default', { error }, 'drcVatService'); }
   return DEFAULT_VAT_RATE;
 }
 

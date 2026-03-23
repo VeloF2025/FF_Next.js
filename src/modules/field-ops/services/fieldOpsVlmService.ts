@@ -86,7 +86,7 @@ function parseVlmResponse(text: string): VlmResult {
         feedback: String(p.feedback || ''),
       };
     }
-  } catch { /* fall through */ }
+  } catch (error) { logger.debug('VLM JSON parse failed, falling through to text analysis', { error }); }
 
   const lower = text.toLowerCase();
   const valid = lower.includes('pass') || lower.includes('acceptable');
