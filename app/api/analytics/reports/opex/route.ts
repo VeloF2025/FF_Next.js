@@ -7,10 +7,15 @@
  * Value: Amount Excl. VAT (col 6)
  * Month: Date-M serial (col 1)
  *
+ * FY definitions:
+ *   FY26 = Apr-2025 → Mar-2026 (actuals)
+ *   FY27 = Apr-2026 → Mar-2027 (actuals when available)
+ *   FY28 = Apr-2027 → Mar-2028 (actuals when available)
+ *
  * Access restricted via RBAC (analytics.reports / view) or user allowlist.
  */
 
-// 🟢 WORKING: OPEX GET handler — reads Data tab, filters col 3 == "OPEX"
+// 🟢 WORKING: OPEX GET handler — Data tab, col D == OPEX, FY26/27/28 + monthly actuals
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createLogger } from '@/lib/logger';
@@ -27,14 +32,31 @@ const ALLOWED_USERS = new Set([
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+function excelSerialToDate(serial: number): Date {
+  return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+}
+
 function excelSerialToMonthKey(serial: number): string {
-  const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
-  return `${date.getUTCFullYear()}-${MONTH_NAMES[date.getUTCMonth()]}`;
+  const d = excelSerialToDate(serial);
+  return `${d.getUTCFullYear()}-${MONTH_NAMES[d.getUTCMonth()]}`;
 }
 
 function monthKeySortValue(key: string): number {
   const [yearStr, monStr] = key.split('-');
   return parseInt(yearStr, 10) * 12 + MONTH_NAMES.indexOf(monStr);
+}
+
+/** Returns FY label for a date: FY26 = Apr-2025→Mar-2026, FY27 = Apr-2026→Mar-2027, etc. */
+function getFY(serial: number): 'FY26' | 'FY27' | 'FY28' | null {
+  const d = excelSerialToDate(serial);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth(); // 0=Jan … 11=Dec
+  // Financial year starts April (month 3)
+  const fyYear = month >= 3 ? year + 1 : year; // Apr-2025→Mar-2026 = FY2026
+  if (fyYear === 2026) return 'FY26';
+  if (fyYear === 2027) return 'FY27';
+  if (fyYear === 2028) return 'FY28';
+  return null;
 }
 
 function toNumber(cell: unknown): number {
@@ -51,15 +73,17 @@ function toStr(cell: unknown): string {
 
 export interface OPEXRow {
   category: string;
+  fy26: number;
+  fy27: number;
+  fy28: number;
   monthly: Record<string, number>;
   grandTotal: number;
-  isTotal?: boolean;
 }
 
 export interface OPEXData {
   rows: OPEXRow[];
   months: string[];
-  grandTotals: { monthly: Record<string, number>; total: number };
+  grandTotals: { fy26: number; fy27: number; fy28: number; monthly: Record<string, number>; total: number };
 }
 
 export async function GET(_req: NextRequest): Promise<NextResponse> {
@@ -82,60 +106,65 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     const { values } = await getWorksheetRange('Data');
     if (!values || values.length < 2) throw new Error('Data sheet returned insufficient data');
 
-    // Data tab columns (confirmed from live workbook):
-    // col 1  = Date-M (Excel serial)
-    // col 3  = OPEX/CAPEX — filter == "OPEX"
-    // col 6  = Amount Excl. VAT
-    // col 10 = Category
-
-    const accumulator = new Map<string, Map<string, number>>(); // category → monthKey → sum
+    // category → { fy26, fy27, fy28, monthly: { monthKey → sum } }
+    const accumulator = new Map<string, { fy26: number; fy27: number; fy28: number; monthly: Map<string, number> }>();
     const monthKeySet = new Set<string>();
 
     for (let i = 1; i < values.length; i++) {
       const row = values[i] as unknown[];
-
-      // Filter: OPEX/CAPEX column must equal "OPEX"
       if (toStr(row[3]) !== 'OPEX') continue;
 
       const dateMSerial = toNumber(row[1]);
       if (dateMSerial <= 0) continue;
-      const monthKey = excelSerialToMonthKey(dateMSerial);
 
+      const monthKey = excelSerialToMonthKey(dateMSerial);
+      const fy = getFY(dateMSerial);
       const category = toStr(row[10]) || '(Uncategorised)';
       const amount = toNumber(row[6]);
 
       monthKeySet.add(monthKey);
-      if (!accumulator.has(category)) accumulator.set(category, new Map());
-      const catMap = accumulator.get(category)!;
-      catMap.set(monthKey, (catMap.get(monthKey) ?? 0) + amount);
+
+      if (!accumulator.has(category)) {
+        accumulator.set(category, { fy26: 0, fy27: 0, fy28: 0, monthly: new Map() });
+      }
+      const entry = accumulator.get(category)!;
+      if (fy === 'FY26') entry.fy26 += amount;
+      else if (fy === 'FY27') entry.fy27 += amount;
+      else if (fy === 'FY28') entry.fy28 += amount;
+      entry.monthly.set(monthKey, (entry.monthly.get(monthKey) ?? 0) + amount);
     }
 
     const months = Array.from(monthKeySet).sort((a, b) => monthKeySortValue(a) - monthKeySortValue(b));
 
     const rows: OPEXRow[] = [];
+    let gtFY26 = 0, gtFY27 = 0, gtFY28 = 0, gtTotal = 0;
     const gtMonthly: Record<string, number> = {};
     months.forEach((m) => (gtMonthly[m] = 0));
-    let gtTotal = 0;
 
-    for (const [category, catMap] of accumulator) {
+    for (const [category, entry] of accumulator) {
       const monthly: Record<string, number> = {};
       let rowTotal = 0;
       for (const m of months) {
-        const val = catMap.get(m) ?? 0;
+        const val = entry.monthly.get(m) ?? 0;
         monthly[m] = val;
         rowTotal += val;
         gtMonthly[m] = (gtMonthly[m] ?? 0) + val;
       }
+      gtFY26 += entry.fy26;
+      gtFY27 += entry.fy27;
+      gtFY28 += entry.fy28;
       gtTotal += rowTotal;
-      rows.push({ category, monthly, grandTotal: rowTotal });
+      rows.push({ category, fy26: entry.fy26, fy27: entry.fy27, fy28: entry.fy28, monthly, grandTotal: rowTotal });
     }
 
-    // Sort by category name
     rows.sort((a, b) => a.category.localeCompare(b.category));
 
     logger.info('OPEX data parsed', { categories: rows.length, months: months.length });
 
-    const data: OPEXData = { rows, months, grandTotals: { monthly: gtMonthly, total: gtTotal } };
+    const data: OPEXData = {
+      rows, months,
+      grandTotals: { fy26: gtFY26, fy27: gtFY27, fy28: gtFY28, monthly: gtMonthly, total: gtTotal },
+    };
     return NextResponse.json({ success: true, data, meta: { generatedAt: new Date().toISOString(), sources: ['Data'] } });
 
   } catch (error) {
