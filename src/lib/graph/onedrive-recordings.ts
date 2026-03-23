@@ -42,7 +42,7 @@ export interface OneDriveScrapeResult {
  * Lists all .mp4 files in a user's OneDrive /Recordings/ folder.
  * Returns empty array if folder doesn't exist or access is denied.
  */
-async function listUserRecordings(userId: string): Promise<DriveItem[]> {
+export async function listUserRecordings(userId: string): Promise<DriveItem[]> {
   const url =
     `${GRAPH_BASE}/users/${userId}/drive/root:/Recordings:/children` +
     `?$select=id,name,size,createdDateTime,lastModifiedDateTime,createdBy` +
@@ -74,7 +74,7 @@ async function listUserRecordings(userId: string): Promise<DriveItem[]> {
  * Uses the @microsoft.graph.downloadUrl for direct download (no auth needed on that URL).
  * Falls back to /content endpoint if download URL is not present.
  */
-async function downloadDriveItem(
+export async function downloadDriveItem(
   userId: string,
   itemId: string,
   destPath: string
@@ -115,7 +115,7 @@ async function downloadDriveItem(
  * Format: "Meeting Title-YYYYMMDD_HHMMSS-Meeting Recording.mp4"
  * Also handles: "Meeting Title (YYYY-MM-DD HH_MM_SS).mp4"
  */
-function parseRecordingFilename(name: string): { title: string; date: Date | null } {
+export function parseRecordingFilename(name: string): { title: string; date: Date | null } {
   // Pattern 1: "Title-20260313_100000-Meeting Recording.mp4"
   const m1 = name.match(/^(.+?)-(\d{8})_(\d{6})-Meeting Recording\.mp4$/i);
   if (m1) {

@@ -8,6 +8,7 @@ import {
   resolveOnlineMeeting,
   fetchAndStoreTranscript,
   fetchAndStoreRecording,
+  findAndStoreOneDriveRecording,
 } from './meeting-helpers';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -124,6 +125,8 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
     // 5. Fetch transcript and recording
     // Try organizer first, then fall back to all participants (handles "Meet Now" calls
     // where the onlineMeeting resource may be under a different participant)
+    let hasRecording = false;
+
     if (callRecord.joinWebUrl) {
       const { userId: resolvedUserId, meetingInfo } = await resolveOnlineMeeting(
         callRecord.joinWebUrl,
@@ -140,6 +143,20 @@ export async function processMeetingFromCallRecord(callRecordId: string): Promis
       if (meetingInfo?.id && resolvedUserId) {
         await fetchAndStoreTranscript(meetingId, resolvedUserId, meetingInfo.id);
         await fetchAndStoreRecording(meetingId, resolvedUserId, meetingInfo.id);
+        hasRecording = true;
+      }
+    }
+
+    // 5b. OneDrive fallback — if Graph resolution failed, search OneDrive /Recordings/
+    if (!hasRecording) {
+      const found = await findAndStoreOneDriveRecording(
+        meetingId,
+        callRecord.startDateTime,
+        organizerParticipant,
+        participants
+      );
+      if (found) {
+        log.info('Recording recovered via OneDrive fallback', { meetingId }, LOGGER);
       }
     }
 
