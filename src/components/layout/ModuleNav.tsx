@@ -86,8 +86,6 @@ export interface ModuleNavProps {
   tabs: Tab[];
   getActiveTabId: (pathname: string, query: Record<string, string | string[] | undefined>) => string;
   accentColor: AccentColor;
-  /** WCAG 4.1.2: Accessible label for the nav landmark */
-  navLabel?: string;
 }
 
 // ─── Shared static classes ────────────────────────────────────────────────────
@@ -142,8 +140,7 @@ function SubMenuItems({ items, asPath, onClose, accent }: SubMenuItemsProps) {
               key={item.href}
               href={item.href}
               onClick={onClose}
-              role="menuitem"
-              className={`${makeLinkCls(isLinkActive(item.href, asPath), accent)} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current`}
+              className={makeLinkCls(isLinkActive(item.href, asPath), accent)}
             >
               {item.label}
             </Link>
@@ -159,11 +156,10 @@ function SubMenuItems({ items, asPath, onClose, accent }: SubMenuItemsProps) {
           >
             <div className={makeSectionCls(isHov, false, accent)}>
               <span className="font-medium">{item.section}</span>
-              {/* WCAG 1.1.1: aria-hidden on decorative icon */}
-              <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" aria-hidden="true" />
+              <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" />
             </div>
             {isHov && (
-              <div onMouseEnter={clear} onMouseLeave={delayed} className={panelCls} role="menu">
+              <div onMouseEnter={clear} onMouseLeave={delayed} className={panelCls}>
                 <SubMenuItems items={item.items} asPath={asPath} onClose={onClose} accent={accent} />
               </div>
             )}
@@ -184,15 +180,13 @@ interface FlatDropdownProps {
 /** Simple flat dropdown (no flyout sections) */
 function FlatDropdown({ items, asPath, onClose, accent }: FlatDropdownProps) {
   return (
-    // WCAG 1.3.1: role="menu" for semantic dropdown structure
-    <div role="menu" className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40">
+    <div className="absolute top-full left-0 bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[220px] py-1 z-40">
       {items.map(item => (
         <Link
           key={item.href}
           href={item.href}
           onClick={onClose}
-          role="menuitem"
-          className={`${makeLinkCls(isLinkActive(item.href, asPath), accent)} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current`}
+          className={makeLinkCls(isLinkActive(item.href, asPath), accent)}
         >
           {item.label}
         </Link>
@@ -220,15 +214,13 @@ function FlyoutDropdown({ tab, asPath, onClose, accent }: FlyoutDropdownProps) {
 
   return (
     <div className="absolute top-full left-0 z-40">
-      {/* WCAG 1.3.1: role="menu" for semantic dropdown structure */}
-      <div role="menu" className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[200px] py-1">
+      <div className="bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)] rounded-b-lg shadow-xl min-w-[200px] py-1">
         {tab.topItems?.map(item => (
           <Link
             key={item.href}
             href={item.href}
             onClick={onClose}
-            role="menuitem"
-            className="block px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+            className="block px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)] hover:bg-[var(--ff-bg-primary)] transition-colors"
           >
             {item.label}
           </Link>
@@ -248,11 +240,10 @@ function FlyoutDropdown({ tab, asPath, onClose, accent }: FlyoutDropdownProps) {
             >
               <div className={makeSectionCls(isHovered, false, accent)}>
                 <span className="font-medium">{section.section}</span>
-                {/* WCAG 1.1.1: aria-hidden on decorative icon */}
-                <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" aria-hidden="true" />
+                <ChevronRight className="h-3.5 w-3.5 ml-6 flex-shrink-0" />
               </div>
               {isHovered && (
-                <div onMouseEnter={clearTimer} onMouseLeave={delayedClose} className={panelCls} role="menu">
+                <div onMouseEnter={clearTimer} onMouseLeave={delayedClose} className={panelCls}>
                   <SubMenuItems items={section.items} asPath={asPath} onClose={onClose} accent={accent} />
                 </div>
               )}
@@ -273,7 +264,7 @@ function FlyoutDropdown({ tab, asPath, onClose, accent }: FlyoutDropdownProps) {
  * @param getActiveTabId  Route-to-tab resolver for the owning module
  * @param accentColor     Tailwind color token used for active-state highlights
  */
-export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel = 'Module navigation' }: ModuleNavProps) {
+export function ModuleNav({ tabs, getActiveTabId, accentColor }: ModuleNavProps) {
   const router = useRouter();
   const [openTab, setOpenTab] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
@@ -289,30 +280,20 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel = 'Modul
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  /** WCAG 2.1.1: Close open menu on Escape key */
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && openTab !== null) setOpenTab(null);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [openTab]);
-
   /** Close open menu on route change */
   useEffect(() => { setOpenTab(null); }, [router.pathname]);
 
   const hasFlyout = (t: Tab) => t.items?.some(isFlyout) ?? false;
 
   return (
-    // WCAG 4.1.2: aria-label identifies nav landmark
-    <nav ref={navRef} aria-label={navLabel} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
+    <nav ref={navRef} className="bg-[var(--ff-bg-secondary)] border-b border-[var(--ff-border-light)] relative z-30">
       <div className="flex items-center gap-0 px-2">
         {tabs.map(t => (
           <div key={t.id} className="relative">
             {t.href ? (
               <Link
                 href={t.href}
-                className={`block px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+                className={`block px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   activeTab === t.id
                     ? `${accent.activeBorder} ${accent.activeText}`
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
@@ -323,30 +304,21 @@ export function ModuleNav({ tabs, getActiveTabId, accentColor, navLabel = 'Modul
             ) : (
               <button
                 onClick={() => setOpenTab(openTab === t.id ? null : t.id)}
-                // WCAG 4.1.2: aria-expanded announces open/closed state to screen readers
-                aria-expanded={openTab === t.id}
-                aria-haspopup="true"
-                aria-controls={`menu-${t.id}`}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors inline-flex items-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${
+                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors inline-flex items-center gap-1 ${
                   activeTab === t.id
                     ? `${accent.activeBorder} ${accent.activeText}`
                     : 'border-transparent text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'
                 }`}
               >
                 {t.label}
-                {/* WCAG 1.1.1: aria-hidden on decorative chevron icon */}
-                <ChevronDown aria-hidden="true" className={`h-3 w-3 transition-transform ${openTab === t.id ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-3 w-3 transition-transform ${openTab === t.id ? 'rotate-180' : ''}`} />
               </button>
             )}
 
             {t.items && openTab === t.id && (
-              // WCAG 1.3.1: id matches aria-controls on trigger button
-              <div id={`menu-${t.id}`}>
-                {hasFlyout(t)
-                  ? <FlyoutDropdown tab={t} asPath={router.asPath} onClose={() => setOpenTab(null)} accent={accent} />
-                  : <FlatDropdown items={t.items as DropdownItem[]} asPath={router.asPath} onClose={() => setOpenTab(null)} accent={accent} />
-                }
-              </div>
+              hasFlyout(t)
+                ? <FlyoutDropdown tab={t} asPath={router.asPath} onClose={() => setOpenTab(null)} accent={accent} />
+                : <FlatDropdown items={t.items as DropdownItem[]} asPath={router.asPath} onClose={() => setOpenTab(null)} accent={accent} />
             )}
           </div>
         ))}

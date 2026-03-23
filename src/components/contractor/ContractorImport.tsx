@@ -115,20 +115,14 @@ export function ContractorImport({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Import Contractors" className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="fixed inset-0 bg-black/50" onClick={handleClose} aria-hidden="true" />
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="relative w-full max-w-2xl bg-white rounded-lg shadow-xl">
+      <div className="min-h-full flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
           {/* Header */}
-          <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {step === 'upload' && 'Upload Contractor Data'}
-              {step === 'preview' && 'Review Contractor Data'}
-              {step === 'importing' && 'Importing Contractors'}
-              {step === 'results' && 'Import Complete'}
-            </h2>
+          <div className="flex items-center justify-between p-6 border-b">
+            <h2 className="text-xl font-semibold">Import Contractors</h2>
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
@@ -137,63 +131,54 @@ export function ContractorImport({
 
           {/* Content */}
           <div className="p-6">
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            )}
             {step === 'upload' && (
               <ContractorFileDropZone
                 onFileSelect={handleFileSelect}
                 isProcessing={isProcessing}
+                error={error}
               />
             )}
+
             {step === 'preview' && importData && (
               <ContractorFilePreview
                 data={importData}
                 options={importOptions}
                 onOptionsChange={setImportOptions}
                 onImport={handleImport}
-                onCancel={handleReset}
                 isProcessing={isProcessing}
+                error={error}
               />
             )}
+
             {step === 'importing' && (
-              <div className="py-12 text-center">
-                <div className="inline-block">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+                  <p className="text-gray-600">Processing import...</p>
                 </div>
-                <p className="mt-4 text-gray-600">Importing contractors...</p>
               </div>
             )}
+
             {step === 'results' && importResult && (
               <ContractorImportResults
                 result={importResult}
-                onClose={handleClose}
-                onImportMore={handleReset}
+                onReset={handleReset}
               />
             )}
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3 bg-gray-50">
-            {step === 'upload' && (
+          {step === 'upload' && (
+            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-between items-center text-sm text-gray-600">
+              <ContractorImportInstructions />
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-gray-700 hover:text-gray-900"
               >
                 Cancel
               </button>
-            )}
-            {step === 'results' && (
-              <button
-                onClick={handleClose}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                Done
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

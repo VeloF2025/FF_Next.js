@@ -167,14 +167,19 @@ export function parseGPSCoordinates(input: string): { lat: number; lng: number }
   // Capture everything (including optional minus) up to a direction letter
   const dmsPattern = /(-?[\d°'′"″.\s]+)\s*([NSEW])\s*[,;]?\s*(-?[\d°'′"″.\s]+)\s*([NSEW])/i;
   const dmsMatch = cleanInput.match(dmsPattern);
-  if (dmsMatch) {
-    const [, coord1, dir1, coord2, dir2] = dmsMatch;
+  if (dmsMatch && dmsMatch.length >= 5) {
+    const coord1 = dmsMatch[1];
+    const dir1 = dmsMatch[2];
+    const coord2 = dmsMatch[3];
+    const dir2 = dmsMatch[4];
 
-    const lat = parseCoordinate(coord1.trim(), dir1);
-    const lng = parseCoordinate(coord2.trim(), dir2);
+    if (coord1 && dir1 && coord2 && dir2) {
+      const lat = parseCoordinate(coord1.trim(), dir1);
+      const lng = parseCoordinate(coord2.trim(), dir2);
 
-    if (lat !== null && lng !== null) {
-      return { lat, lng };
+      if (lat !== null && lng !== null) {
+        return { lat, lng };
+      }
     }
   }
 

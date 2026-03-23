@@ -7,5 +7,5 @@ import { ModuleNav } from '../layout/ModuleNav';
 import { TABS, getActiveTabId } from './procurementNavConfig';
 
 export function ProcurementNav() {
-  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="blue" navLabel="Procurement navigation" />;
+  return <ModuleNav tabs={TABS} getActiveTabId={getActiveTabId} accentColor="blue" />;
 }
