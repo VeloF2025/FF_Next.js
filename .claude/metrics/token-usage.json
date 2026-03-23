@@ -21,12 +21,12 @@
     "812e6eb4-cf2b-4a5a-b549-40579f2b07a8": {
       "session_id": "812e6eb4-cf2b-4a5a-b549-40579f2b07a8",
       "started_at": "2026-03-22T11:40:06.448Z",
-      "total_input_tokens": 5374,
+      "total_input_tokens": 5471,
       "total_output_tokens": 0,
-      "total_cost_usd": 0.016122,
-      "tool_calls": 88,
+      "total_cost_usd": 0.016413,
+      "tool_calls": 89,
       "tools_used": {
-        "Bash": 37,
+        "Bash": 38,
         "Agent": 4,
         "Read": 24,
         "ToolSearch": 2,
