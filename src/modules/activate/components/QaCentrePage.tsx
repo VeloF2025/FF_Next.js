@@ -813,12 +813,13 @@ function QaCentrePageContent() {
 
                   // Get QA Review Status: Pending → AI Review → Human ✓
                   const getQaReviewStatus = () => {
-                    // Feedback sent = completed by human
-                    if (drop.feedbackSent) {
+                    const isAutoQaDecision = drop.qaDecisionBy?.startsWith('system:');
+                    // Feedback sent by a human reviewer (not auto-QA)
+                    if (drop.feedbackSent && !isAutoQaDecision) {
                       return { label: 'Human ✓', color: 'bg-green-700 text-green-100' };
                     }
-                    // Auto-QA processed but no feedback yet = awaiting human review
-                    if (drop.autoQaProcessed || drop.qaDecisionBy?.startsWith('system:')) {
+                    // Auto-QA processed (with or without feedback sent) = awaiting human review
+                    if (drop.autoQaProcessed || isAutoQaDecision) {
                       return { label: 'AI Review', color: 'bg-purple-600 text-purple-100' };
                     }
                     // Human decision made but feedback not yet sent
