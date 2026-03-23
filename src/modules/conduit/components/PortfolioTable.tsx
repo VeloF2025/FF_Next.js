@@ -27,12 +27,15 @@ interface KpiCardProps {
   valueClass?: string;
 }
 
-function KpiCard({ label, value, sub, valueClass = 'text-white' }: KpiCardProps) {
+function KpiCard({ label, value, sub, valueClass = 'text-foreground' }: KpiCardProps) {
+  // Create aria-label with full semantic meaning: "Total Homes: 1,234"
+  const ariaLabel = `${label}: ${value}${sub ? ` — ${sub}` : ''}`;
+  
   return (
-    <div className="rounded-lg border border-gray-700 bg-gray-800 px-5 py-4 min-w-[160px]">
-      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-1">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${valueClass}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
+    <div className="rounded-lg border border-gray-700 bg-card px-5 py-4 min-w-[160px]" role="region" aria-label={ariaLabel}>
+      <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">{label}</p>
+      <p className={`text-xl font-bold tabular-nums ${valueClass}`} aria-hidden="false">{value}</p>
+      {sub && <p className="text-xs text-muted-foreground/70 mt-0.5" aria-hidden="true">{sub}</p>}
     </div>
   );
 }
@@ -263,7 +266,7 @@ function ProjectsGrid({
   };
 
   const TOTAL_COLS = 13;
-  const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide';
+  const th = 'px-3 py-2.5 text-xs font-bold text-foreground uppercase tracking-wide';
 
   const totals = projects.reduce(
     (acc, p) => {
@@ -284,7 +287,12 @@ function ProjectsGrid({
     <div className="space-y-6">
       {/* KPI tiles */}
       {error && (
-        <div className="flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2 text-sm">
+        <div 
+          className="flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 rounded px-3 py-2 text-sm"
+          role="alert"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
         </div>
       )}
@@ -293,33 +301,42 @@ function ProjectsGrid({
         <KpiCard label="FC Activations" value={fNum(totals.fc_activation)} sub="forecasted connected homes" />
         <KpiCard label="Total Revenue" value={fZAR(totals.revenue)} sub="forecasted revenue" />
         <KpiCard label="Total COS" value={fZAR(totals.cos_total)} sub="forecasted cost of sales" />
-        <KpiCard label="Total Profit" value={fZAR(totals.profit)} sub="forecasted profit" valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'} />
-        <KpiCard label="Portfolio GP%" value={fPct(totalGP)} sub="forecasted gross profit"
-          valueClass={totalGP >= 0.30 ? 'text-emerald-400' : totalGP >= 0.10 ? 'text-amber-400' : 'text-red-400'} />
+        <KpiCard 
+          label="Total Profit" 
+          value={fZAR(totals.profit)} 
+          sub="forecasted profit" 
+          valueClass={totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'} 
+        />
+        <KpiCard 
+          label="Portfolio GP%" 
+          value={fPct(totalGP)} 
+          sub="forecasted gross profit"
+          valueClass={totalGP >= 0.30 ? 'text-emerald-400' : totalGP >= 0.10 ? 'text-amber-400' : 'text-red-400'} 
+        />
       </div>
 
       {/* Add Project button + inline form */}
       {showAddButton && !showAddForm && (
         <button
           onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950"
         >
           <Plus className="w-4 h-4" />
           Add Project
         </button>
       )}
       {showAddButton && showAddForm && (
-        <div className="rounded-lg border border-gray-600 bg-gray-800 p-4 space-y-4">
+        <div className="rounded-lg border border-gray-600 bg-card p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white">New Project</h3>
-            <button onClick={() => { setShowAddForm(false); setAddError(null); }} className="text-gray-500 hover:text-white">
+            <h3 className="text-sm font-bold text-foreground">New Project</h3>
+            <button onClick={() => { setShowAddForm(false); setAddError(null); }} className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-teal-500 rounded">
               <X className="w-4 h-4" />
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2 flex flex-col gap-1">
-              <label htmlFor="add-project-name" className="text-xs text-gray-400 font-medium">Project Name</label>
+              <label htmlFor="add-project-name" className="text-xs text-muted-foreground font-medium">Project Name</label>
               <input
                 id="add-project-name"
                 type="text"
@@ -328,11 +345,11 @@ function ProjectsGrid({
                 onKeyDown={e => e.key === 'Enter' && submitAdd()}
                 placeholder="e.g. Mamelodi POP 2"
                 autoFocus
-                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="add-project-po-count" className="text-xs text-gray-400 font-medium">PO Count</label>
+              <label htmlFor="add-project-po-count" className="text-xs text-muted-foreground font-medium">PO Count</label>
               <input
                 id="add-project-po-count"
                 type="text"
@@ -341,11 +358,11 @@ function ProjectsGrid({
                 onChange={e => setAddForm(f => ({ ...f, po_count: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && submitAdd()}
                 placeholder="e.g. 12000"
-                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="add-project-rate" className="text-xs text-gray-400 font-medium">Rate (R)</label>
+              <label htmlFor="add-project-rate" className="text-xs text-muted-foreground font-medium">Rate (R)</label>
               <input
                 id="add-project-rate"
                 type="text"
@@ -354,11 +371,11 @@ function ProjectsGrid({
                 onChange={e => setAddForm(f => ({ ...f, rate: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && submitAdd()}
                 placeholder="2700"
-                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="add-project-uptake" className="text-xs text-gray-400 font-medium">Uptake %</label>
+              <label htmlFor="add-project-uptake" className="text-xs text-muted-foreground font-medium">Uptake %</label>
               <input
                 id="add-project-uptake"
                 type="text"
@@ -367,7 +384,7 @@ function ProjectsGrid({
                 onChange={e => setAddForm(f => ({ ...f, uptake: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && submitAdd()}
                 placeholder="60"
-                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-teal-500 transition-colors"
+                className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-foreground placeholder-muted-foreground outline-none focus:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors"
               />
             </div>
           </div>
@@ -382,14 +399,14 @@ function ProjectsGrid({
             <button
               onClick={submitAdd}
               disabled={adding}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800"
             >
               {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               {adding ? 'Adding…' : 'Add Project'}
             </button>
             <button
               onClick={() => { setShowAddForm(false); setAddError(null); }}
-              className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+              className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 rounded"
             >
               Cancel
             </button>
@@ -401,20 +418,20 @@ function ProjectsGrid({
       <div className="overflow-x-auto rounded-lg border border-gray-700 shadow-sm">
         <table className="min-w-max w-full border-collapse text-sm">
           <thead>
-            <tr style={{ backgroundColor: '#1a3a4a' }}>
-              <th className={th} style={{ width: 32 }}></th>
-              <th className={`${th} text-left`} style={{ minWidth: 200 }}>{tableLabel}</th>
-              <th className={`${th} text-right`} style={{ minWidth: 90 }}>PO Count</th>
-              <th className={`${th} text-right`} style={{ minWidth: 80 }}>Rate</th>
-              <th className={`${th} text-right`} style={{ minWidth: 80 }}>Uptake</th>
-              <th className={`${th} text-right`} style={{ minWidth: 110 }}>FC Activations</th>
-              <th className={`${th} text-right`} style={{ minWidth: 120 }}>Revenue</th>
-              <th className={`${th} text-right`} style={{ minWidth: 120 }}>COS Total</th>
-              <th className={`${th} text-right`} style={{ minWidth: 120 }}>Profit</th>
-              <th className={`${th} text-right`} style={{ minWidth: 70 }}>GP%</th>
-              <th className={`${th} text-right`} style={{ minWidth: 100 }}>Cost/Home</th>
-              <th className={`${th} text-right`} style={{ minWidth: 60 }}>Build Duration</th>
-              <th className={th} style={{ minWidth: 200 }}></th>
+            <tr className="bg-card">
+              <th className={th} style={{ width: 32 }} scope="col" aria-label="Expand row"></th>
+              <th className={`${th} text-left`} style={{ minWidth: 200 }} scope="col">{tableLabel}</th>
+              <th className={`${th} text-right`} style={{ minWidth: 90 }} scope="col">PO Count</th>
+              <th className={`${th} text-right`} style={{ minWidth: 80 }} scope="col">Rate</th>
+              <th className={`${th} text-right`} style={{ minWidth: 80 }} scope="col">Uptake</th>
+              <th className={`${th} text-right`} style={{ minWidth: 110 }} scope="col">FC Activations</th>
+              <th className={`${th} text-right`} style={{ minWidth: 120 }} scope="col">Revenue</th>
+              <th className={`${th} text-right`} style={{ minWidth: 120 }} scope="col">COS Total</th>
+              <th className={`${th} text-right`} style={{ minWidth: 120 }} scope="col">Profit</th>
+              <th className={`${th} text-right`} style={{ minWidth: 70 }} scope="col">GP%</th>
+              <th className={`${th} text-right`} style={{ minWidth: 100 }} scope="col">Cost/Home</th>
+              <th className={`${th} text-right`} style={{ minWidth: 60 }} scope="col">Build Duration</th>
+              <th className={th} style={{ minWidth: 200 }} scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -423,16 +440,17 @@ function ProjectsGrid({
               const isExpanded = expanded.has(project.id);
               const isSaving = saving[project.id] ?? false;
               const justSaved = saved[project.id] ?? false;
-              const rowBg = i % 2 === 0 ? '#111827' : '#1f2937';
+              const rowBg = i % 2 === 0 ? 'bg-gray-950/40' : 'bg-gray-900/40';
               return [
-                <tr key={project.id} style={{ backgroundColor: rowBg }} className="hover:bg-gray-700/30 transition-colors">
+                <tr key={project.id} className={`${rowBg} hover:bg-gray-700/30 transition-colors`}>
                   <td
                     role="button"
                     tabIndex={0}
-                    className="px-2 py-2 text-center cursor-pointer text-gray-400 hover:text-white border border-gray-700"
+                    className="px-2 py-2 text-center cursor-pointer text-muted-foreground hover:text-foreground border border-gray-700"
                     onClick={() => toggleExpand(project.id)}
                     aria-label={isExpanded ? `Collapse ${project.name} details` : `Expand ${project.name} details`}
                     aria-expanded={isExpanded}
+                    aria-controls={`detail-${project.id}`}
                     onKeyDown={e => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
@@ -442,8 +460,8 @@ function ProjectsGrid({
                   >
                     {isExpanded ? <ChevronDown className="w-4 h-4 inline" /> : <ChevronRight className="w-4 h-4 inline" />}
                   </td>
-                  <td className="px-3 py-2 text-sm font-medium text-gray-200 border border-gray-700 cursor-pointer hover:text-white" onClick={() => toggleExpand(project.id)}>{project.name}</td>
-                  <td className="px-3 py-2 text-sm text-right bg-gray-800/40 border border-gray-700 text-gray-300 tabular-nums">{fNum(project.po_count)}</td>
+                  <td className="px-3 py-2 text-sm font-medium text-foreground border border-gray-700 cursor-pointer hover:text-white" onClick={() => toggleExpand(project.id)}>{project.name}</td>
+                  <td className="px-3 py-2 text-sm text-right bg-gray-800/40 border border-gray-700 text-foreground tabular-nums">{fNum(project.po_count)}</td>
                   <EditableCell value={project.inputs_json.rate} onCommit={v => updateInputs(project.id, 'rate', v)} />
                   <EditableCell value={project.inputs_json.uptake} type="percent" onCommit={v => updateInputs(project.id, 'uptake', v)} />
                   <ReadCell value={calc.fc_activation} format="num" />
@@ -452,7 +470,7 @@ function ProjectsGrid({
                   <ReadCell value={calc.profit} />
                   <ReadCell value={calc.gross_profit_pct} format="pct" />
                   <ReadCell value={calc.cost_per_home} />
-                  <td className="px-2 py-2 text-right text-sm tabular-nums text-gray-300 border border-gray-700 bg-gray-900">{project.build_duration_months}</td>
+                  <td className="px-2 py-2 text-right text-sm tabular-nums text-foreground border border-gray-700 bg-gray-900">{project.build_duration_months}</td>
                   <td className="px-2 py-2 text-center border border-gray-700 bg-gray-900">
                     <div className="flex items-center gap-1 justify-center whitespace-nowrap">
                       {showBaselineButton && (
@@ -460,7 +478,7 @@ function ProjectsGrid({
                           onClick={() => saveBaseline(project)}
                           disabled={baselining[project.id]}
                           title="Save to Baseline"
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-800 hover:bg-indigo-700 text-indigo-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-800 hover:bg-indigo-700 text-indigo-200 disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-indigo-500 outline-none"
                         >
                           {baselining[project.id]
                             ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -470,7 +488,7 @@ function ProjectsGrid({
                           {baselining[project.id] ? 'Saving…' : baselined[project.id] ? 'Saved!' : 'Baseline'}
                         </button>
                       )}
-                      <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-700 hover:bg-teal-600 text-white disabled:opacity-40 transition-colors">
+                      <button onClick={() => saveProject(project)} disabled={isSaving || project.is_baseline_locked} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-teal-500 outline-none">
                         {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : justSaved ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Save className="w-3 h-3" />}
                         {isSaving ? 'Saving' : justSaved ? 'Saved' : 'Save'}
                       </button>
@@ -479,7 +497,7 @@ function ProjectsGrid({
                           onClick={() => demoteProject(project)}
                           disabled={promoting[project.id]}
                           title={demoteLabel}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-400 hover:text-gray-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-gray-500 outline-none"
                         >
                           {promoting[project.id]
                             ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -492,7 +510,7 @@ function ProjectsGrid({
                           onClick={() => promoteProject(project)}
                           disabled={promoting[project.id]}
                           title={promoteLabel}
-                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-indigo-700 text-gray-300 hover:text-white disabled:opacity-40 transition-colors whitespace-nowrap"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-indigo-700 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors whitespace-nowrap focus-visible:ring-2 focus-visible:ring-indigo-500 outline-none"
                         >
                           {promoting[project.id]
                             ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -507,20 +525,20 @@ function ProjectsGrid({
                             <button
                               onClick={() => deleteProject(project)}
                               disabled={deleting[project.id]}
-                              className="px-2 py-1 rounded text-xs font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors"
+                              className="px-2 py-1 rounded text-xs font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-40 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
                             >
                               {deleting[project.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Yes'}
                             </button>
                             <button
                               onClick={() => setConfirmDelete(null)}
-                              className="px-2 py-1 rounded text-xs text-gray-400 hover:text-white transition-colors"
+                              className="px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:ring-2 focus-visible:ring-gray-500 outline-none"
                             >No</button>
                           </span>
                         ) : (
                           <button
                             onClick={() => setConfirmDelete(project.id)}
                             title="Delete project"
-                            className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                            className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 outline-none"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -530,7 +548,7 @@ function ProjectsGrid({
                   </td>
                 </tr>,
                 isExpanded ? (
-                  <tr key={`${project.id}-detail`}>
+                  <tr key={`${project.id}-detail`} id={`detail-${project.id}`}>
                     <td colSpan={TOTAL_COLS} className="p-0 border border-gray-600 max-w-0 overflow-hidden">
                       <ProjectDetailPanel project={project} onProjectUpdate={updated => setProjects(prev => prev.map(p => p.id === updated.id ? updated : p))} />
                     </td>
@@ -540,15 +558,15 @@ function ProjectsGrid({
             })}
           </tbody>
           <tfoot>
-            <tr style={{ backgroundColor: '#1a3a4a' }}>
-              <td colSpan={2} className="px-3 py-2.5 text-sm font-bold text-white">TOTAL</td>
-              <td className="px-3 py-2.5 text-sm text-right font-bold text-white tabular-nums">{fNum(totals.po_count)}</td>
+            <tr className="bg-card">
+              <td colSpan={2} className="px-3 py-2.5 text-sm font-bold text-foreground">TOTAL</td>
+              <td className="px-3 py-2.5 text-sm text-right font-bold text-foreground tabular-nums">{fNum(totals.po_count)}</td>
               <td colSpan={2}></td>
-              <td className="px-3 py-2.5 text-sm text-right font-bold text-white tabular-nums">{fNum(totals.fc_activation)}</td>
-              <td className="px-3 py-2.5 text-sm text-right font-bold text-white tabular-nums">{fZAR(totals.revenue)}</td>
-              <td className="px-3 py-2.5 text-sm text-right font-bold text-white tabular-nums">{fZAR(totals.cos_total)}</td>
-              <td className={`px-3 py-2.5 text-sm text-right font-bold tabular-nums ${totals.profit < 0 ? 'text-red-300' : 'text-emerald-300'}`}>{fZAR(totals.profit)}</td>
-              <td className={`px-3 py-2.5 text-sm text-right font-bold tabular-nums ${totalGP < 0 ? 'text-red-300' : 'text-emerald-300'}`}>{fPct(totalGP)}</td>
+              <td className="px-3 py-2.5 text-sm text-right font-bold text-foreground tabular-nums">{fNum(totals.fc_activation)}</td>
+              <td className="px-3 py-2.5 text-sm text-right font-bold text-foreground tabular-nums">{fZAR(totals.revenue)}</td>
+              <td className="px-3 py-2.5 text-sm text-right font-bold text-foreground tabular-nums">{fZAR(totals.cos_total)}</td>
+              <td className={`px-3 py-2.5 text-sm text-right font-bold tabular-nums ${totals.profit < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{fZAR(totals.profit)}</td>
+              <td className={`px-3 py-2.5 text-sm text-right font-bold tabular-nums ${totalGP < 0 ? 'text-red-400' : 'text-emerald-400'}`}>{fPct(totalGP)}</td>
               <td colSpan={3}></td>
             </tr>
           </tfoot>
