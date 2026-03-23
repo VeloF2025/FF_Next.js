@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { OPEXData } from '@/app/api/analytics/reports/opex/route';
 
-export type { OPEXData };
+export type { OPEXData, OPEXRow };
 
 interface ApiResponse {
   success: boolean;
