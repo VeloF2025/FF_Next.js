@@ -234,7 +234,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const { build_duration_months: dur, start_date, inputs_json: inp } = project;
   const { service_rates: sr, material_rates: mr, monthly_opex: mo, lump_costs: lc } = inp;
   const fc_activation = project.po_count * inp.uptake;
-  const isWip = project.status === 'wip';
+  const isWip = project.status === 'wip' || project.status === 'scoping';
   const ftName = project.ft_project_name;
 
   const [plan, setPlan] = useState<MonthlyPlanEntry[]>(() =>
