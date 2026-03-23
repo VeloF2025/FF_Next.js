@@ -20,6 +20,14 @@ import pool from '@/lib/db';
 import { PHOTO_TYPE_TO_STEP, STEP_LABELS, STEP_DESCRIPTIONS } from '@/modules/activate/utils/stepMapper';
 import { logFeedbackSent } from '@/modules/activate/services/activityLogService';
 
+interface HumanEdit {
+  filename: string;
+  originalStep: number;
+  newStep: number;
+  decision: string;
+  comment: string;
+}
+
 interface SendFeedbackRequest {
   dropNumber: string;
   message?: string; // Optional: if not provided, will auto-generate
@@ -37,6 +45,7 @@ interface SendFeedbackRequest {
     reasons?: string[];
     notes?: string;
   };
+  humanEdits?: HumanEdit[]; // HITL step corrections to persist to auto_qa_results snapshot
 }
 
 interface Photo {
@@ -88,6 +97,7 @@ async function handlePost(
       sendStaffPrivate,
       createTask,
       qaFindings,
+      humanEdits,
     } = req.body as SendFeedbackRequest;
 
     // Get authenticated user who is sending feedback
@@ -252,6 +262,11 @@ async function handlePost(
     // Use group message ID for threading if available, otherwise use technician private message ID
     const sentMessageId = sendResults.group?.messageId || sendResults.technicianPrivate?.messageId;
     await updateFeedbackStatus(dropNumber, feedbackMessage, sentMessageId, groupId, reviewerUserId);
+
+    // 8b. Persist HITL corrections to auto_qa_results snapshot so they survive page reloads
+    if (humanEdits && humanEdits.length > 0) {
+      await persistHumanEditsToSnapshot(dropNumber, humanEdits, decision);
+    }
 
     // 9. Create follow-up task if requested or if decision is FAIL/REWORK_NEEDED
     let taskId: string | null = null;
@@ -711,6 +726,87 @@ async function updateFeedbackStatus(
   } catch (error) {
     log.error('Failed to update feedback status', { dropNumber, error });
     throw error;
+  }
+}
+
+/**
+ * Persist HITL step corrections to the auto_qa_results JSONB snapshot.
+ * This ensures corrections survive page reloads (the snapshot is what the UI reads on load).
+ */
+async function persistHumanEditsToSnapshot(
+  dropNumber: string,
+  edits: HumanEdit[],
+  finalDecision?: string
+): Promise<void> {
+  try {
+    const result = await pool.query(
+      `SELECT auto_qa_results FROM dr_photo_unified_reviews WHERE drop_number = $1`,
+      [dropNumber]
+    );
+    if (result.rows.length === 0 || !result.rows[0].auto_qa_results) return;
+
+    const snapshot = result.rows[0].auto_qa_results;
+
+    // Apply each edit to the photos array in the snapshot
+    for (const edit of edits) {
+      const photo = snapshot.photos?.find((p: { filename: string }) => p.filename === edit.filename);
+      if (photo) {
+        photo.step = edit.newStep;
+        photo.stepLabel = edit.newStep > 0 ? `Step ${edit.newStep}` : 'Duplicate';
+        photo.decision = edit.decision;
+        photo.comment = edit.comment;
+      }
+    }
+
+    // Recalculate missing steps in the snapshot
+    if (snapshot.photos) {
+      const coveredSteps = new Set(
+        snapshot.photos
+          .filter((p: { filename: string; step: number }) => !p.filename.startsWith('missing_step_') && p.step > 0)
+          .map((p: { step: number }) => p.step)
+      );
+      // Remove old missing_step entries
+      snapshot.photos = snapshot.photos.filter(
+        (p: { filename: string }) => !p.filename.startsWith('missing_step_')
+      );
+      // Add back only actually missing steps
+      for (let s = 1; s <= 10; s++) {
+        if (!coveredSteps.has(s)) {
+          snapshot.photos.push({
+            filename: `missing_step_${s}`,
+            step: s,
+            stepLabel: `Step ${s}`,
+            tier: 'human_required',
+            decision: 'FAIL',
+            comment: `Step ${s}: Photo missing - please upload this step`,
+            confidence: 0,
+          });
+        }
+      }
+      // Update summary
+      if (snapshot.summary) {
+        const realPhotos = snapshot.photos.filter(
+          (p: { filename: string }) => !p.filename.startsWith('missing_step_')
+        );
+        snapshot.summary.passed = realPhotos.filter((p: { decision: string }) => p.decision === 'PASS').length;
+        snapshot.summary.failed = realPhotos.filter((p: { decision: string }) => p.decision === 'FAIL').length + (10 - coveredSteps.size);
+        if (finalDecision) {
+          snapshot.summary.decision = finalDecision;
+        }
+      }
+    }
+
+    await pool.query(
+      `UPDATE dr_photo_unified_reviews
+       SET auto_qa_results = $1, updated_at = NOW()
+       WHERE drop_number = $2`,
+      [JSON.stringify(snapshot), dropNumber]
+    );
+
+    log.info(`Persisted ${edits.length} HITL edits to auto_qa_results snapshot for ${dropNumber}`);
+  } catch (error) {
+    // Non-fatal: feedback was already sent, this is a best-effort persistence
+    log.error('Failed to persist human edits to snapshot', { dropNumber, error });
   }
 }
 
