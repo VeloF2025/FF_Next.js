@@ -75,4 +75,10 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     description: 'Coming soon — operational vs capital expenditure split',
     category: 'financial',
   },
+  {
+    id: 'activations',
+    name: 'Activations',
+    description: 'OES activations by year, month and week with revenue estimate',
+    category: 'operational',
+  },
 ];
