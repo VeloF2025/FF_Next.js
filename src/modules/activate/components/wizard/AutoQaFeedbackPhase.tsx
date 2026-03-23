@@ -44,7 +44,21 @@ export function AutoQaFeedbackPhase({
   const [missingSteps, setMissingSteps] = useState<AutoQaPhotoResult[]>(() =>
     autoQaResults.photos.filter((p) => p.filename.startsWith('missing_step_'))
   );
-  const [feedbackMessage, setFeedbackMessage] = useState(autoQaResults.feedbackMessage);
+  // If feedbackMessage was cleared (HITL overrides applied on load), auto-generate
+  const hasOverrides = autoQaResults.photos.some((p: AutoQaPhotoResult & { edited?: boolean }) => p.edited);
+  const [feedbackMessage, setFeedbackMessage] = useState(() => {
+    if (!autoQaResults.feedbackMessage || hasOverrides) {
+      // Regenerate from current (possibly overridden) photo data
+      const allPhotos = autoQaResults.photos;
+      return generateFeedbackMessage(
+        dropNumber,
+        autoQaResults.summary.decision,
+        allPhotos,
+        autoQaResults.validations
+      );
+    }
+    return autoQaResults.feedbackMessage;
+  });
   const [decision, setDecision] = useState<QaDecision>(autoQaResults.summary.decision);
   const [sendDestination, setSendDestination] = useState<'private' | 'group' | 'both'>('both');
   const [isSending, setIsSending] = useState(false);
@@ -158,6 +172,21 @@ export function AutoQaFeedbackPhase({
           }),
         }).catch((err) => {
           log.warn('Failed to record HITL correction', { error: err }, 'AutoQaFeedback');
+        });
+
+        // Persist step override to vlm_categorization_results + photos_metadata (fire-and-forget)
+        fetch('/api/activate/update-photo-step', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dropNumber,
+            photoFilename: currentPhoto.filename,
+            newStep: isDuplicate ? 0 : newStep,
+            reason: isDuplicate ? 'Duplicate photo' : 'HITL step correction',
+          }),
+        }).catch((err) => {
+          log.warn('Failed to persist photo step override', { error: err }, 'AutoQaFeedback');
         });
       }
     }

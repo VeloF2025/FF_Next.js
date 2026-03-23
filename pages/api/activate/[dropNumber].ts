@@ -187,7 +187,8 @@ async function handleGet(
         -- Auto-QA fields
         auto_qa_processed,
         auto_qa_processed_at,
-        auto_qa_results
+        auto_qa_results,
+        vlm_categorization_results
       FROM dr_photo_unified_reviews
       WHERE drop_number = $1
       LIMIT 1;
@@ -202,7 +203,63 @@ async function handleGet(
       return apiResponse.notFound(res, 'Unified Review', dropNumber);
     }
 
-    const review = result.rows[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const review = result.rows[0] as any;
+
+    // Apply HITL step corrections from vlm_categorization_results to auto_qa_results snapshot
+    // This ensures the feedback phase always reflects the latest human overrides
+    if (review.auto_qa_results?.photos && review.vlm_categorization_results) {
+      const vlmResults = review.vlm_categorization_results as Array<{
+        photo_filename: string;
+        human_override_step: number | null;
+        human_override_reason: string | null;
+        vlm_predicted_step: number;
+      }>;
+      const overrideMap = new Map<string, number>();
+      for (const vlm of vlmResults) {
+        if (vlm.human_override_step !== null && vlm.human_override_step !== undefined) {
+          overrideMap.set(vlm.photo_filename, vlm.human_override_step);
+        }
+      }
+      if (overrideMap.size > 0) {
+        // Apply overrides to snapshot photos
+        for (const photo of review.auto_qa_results.photos) {
+          if (photo.filename.startsWith('missing_step_')) continue;
+          const override = overrideMap.get(photo.filename);
+          if (override !== undefined && override !== photo.step) {
+            photo.step = override;
+            photo.stepLabel = override > 0 ? `Step ${override}` : 'Duplicate';
+            photo.edited = true;
+          }
+        }
+        // Recalculate missing steps
+        const coveredSteps = new Set(
+          review.auto_qa_results.photos
+            .filter((p: { filename: string; step: number }) => !p.filename.startsWith('missing_step_') && p.step > 0)
+            .map((p: { step: number }) => p.step)
+        );
+        review.auto_qa_results.photos = review.auto_qa_results.photos.filter(
+          (p: { filename: string }) => !p.filename.startsWith('missing_step_')
+        );
+        for (let s = 1; s <= 10; s++) {
+          if (!coveredSteps.has(s)) {
+            review.auto_qa_results.photos.push({
+              filename: `missing_step_${s}`,
+              step: s,
+              stepLabel: `Step ${s}`,
+              tier: 'human_required',
+              decision: 'FAIL',
+              comment: `Step ${s}: Photo missing - please upload this step`,
+              confidence: 0,
+            });
+          }
+        }
+        // Force feedback message regeneration in UI with corrected data
+        review.auto_qa_results.feedbackMessage = null;
+      }
+    }
+    // Remove vlm_categorization_results from response (large, internal only)
+    delete review.vlm_categorization_results;
 
     // Check data quality using stored data (no API calls)
     const qualityInfo = await checkDataQuality(dropNumber, review);
