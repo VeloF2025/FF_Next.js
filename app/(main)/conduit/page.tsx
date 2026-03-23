@@ -71,7 +71,7 @@ export default async function ConduitPage() {
         prospectiveProjects={prospectiveProjects}
         executableProjects={executableProjects}
         wipProjects={wipProjects}
-        scopingProjects={scopingProjects}
+        initialScopingProjects={scopingProjects}
         initialBaselines={baselines}
       />
     </div>

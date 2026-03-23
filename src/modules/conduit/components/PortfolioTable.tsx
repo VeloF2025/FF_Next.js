@@ -11,7 +11,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked } from 'lucide-react';
+import { ChevronRight, ChevronDown, Save, Loader2, CheckCircle2, AlertCircle, Plus, X, ArrowRight, Trash2, BookMarked, Copy } from 'lucide-react';
 import type { ConduitProject } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -56,6 +56,8 @@ export interface ProjectsGridProps {
   showDeleteButton?: boolean;
   showBaselineButton?: boolean;
   onBaselineSaved?: () => void;
+  showCopyToScopingButton?: boolean;
+  onProjectCopied?: (project: ConduitProject) => void;
 }
 
 export function ProjectsGrid({
@@ -66,6 +68,8 @@ export function ProjectsGrid({
   showDeleteButton = false,
   showBaselineButton = false,
   onBaselineSaved,
+  showCopyToScopingButton = false,
+  onProjectCopied,
 }: ProjectsGridProps) {
   const [projects, setProjects] = useState<ConduitProject[]>(initialProjects);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -73,6 +77,25 @@ export function ProjectsGrid({
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [promoting, setPromoting] = useState<Record<string, boolean>>({});
+  const [copying, setCopying] = useState<Record<string, boolean>>({});
+
+  const copyToScoping = async (project: ConduitProject) => {
+    setCopying(prev => ({ ...prev, [project.id]: true }));
+    try {
+      const res = await fetch('/api/conduit/projects/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId: project.id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const { data } = await res.json() as { data: ConduitProject };
+      onProjectCopied?.(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Copy failed');
+    } finally {
+      setCopying(prev => ({ ...prev, [project.id]: false }));
+    }
+  };
 
   const promoteProject = async (project: ConduitProject) => {
     if (!promoteToStatus) return;
@@ -518,6 +541,17 @@ export function ProjectsGrid({
                           {promoting[project.id] ? '…' : promoteLabel}
                         </button>
                       )}
+                      {showCopyToScopingButton && (
+                        <button
+                          onClick={() => copyToScoping(project)}
+                          disabled={copying[project.id]}
+                          title="Copy to Scoping"
+                          className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-cyan-800 hover:bg-cyan-700 text-cyan-200 disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          {copying[project.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                          {copying[project.id] ? '…' : '→ Scoping'}
+                        </button>
+                      )}
                       {showDeleteButton && (
                         confirmDelete === project.id ? (
                           <span className="flex items-center gap-1">
@@ -585,9 +619,10 @@ interface PortfolioTableProps {
   executableProjects:  ConduitProject[];
   wipProjects:         ConduitProject[];
   onBaselineSaved?: () => void;
+  onProjectCopiedToScoping?: (project: ConduitProject) => void;
 }
 
-export function PortfolioTable({ prospectiveProjects, executableProjects, wipProjects, onBaselineSaved }: PortfolioTableProps) {
+export function PortfolioTable({ prospectiveProjects, executableProjects, wipProjects, onBaselineSaved, onProjectCopiedToScoping }: PortfolioTableProps) {
   const [prospective, setProspective] = useState<ConduitProject[]>(prospectiveProjects);
   const [executable,  setExecutable]  = useState<ConduitProject[]>(executableProjects);
   const [wip,         setWip]         = useState<ConduitProject[]>(wipProjects);
@@ -653,6 +688,8 @@ export function PortfolioTable({ prospectiveProjects, executableProjects, wipPro
             tableLabel="Project Scope — WIP"
             defaultStatus="wip"
             showAddButton={false}
+            showCopyToScopingButton
+            onProjectCopied={onProjectCopiedToScoping}
           />
         ) : (
           <div className="rounded-lg border border-gray-700 bg-gray-800/40 p-8 text-center text-gray-500">

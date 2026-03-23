@@ -14,18 +14,19 @@ import type { ConduitProject } from '../types';
 import type { ConduitBaseline } from '../types';
 
 interface Props {
-  prospectiveProjects: ConduitProject[];
-  executableProjects:  ConduitProject[];
-  wipProjects:         ConduitProject[];
-  scopingProjects:     ConduitProject[];
-  initialBaselines:    ConduitBaseline[];
+  prospectiveProjects:  ConduitProject[];
+  executableProjects:   ConduitProject[];
+  wipProjects:          ConduitProject[];
+  initialScopingProjects: ConduitProject[];
+  initialBaselines:     ConduitBaseline[];
 }
 
 type Tab = 'current' | 'baseline' | 'scoping';
 
-export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, scopingProjects, initialBaselines }: Props) {
+export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, initialScopingProjects, initialBaselines }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('current');
   const [baselines, setBaselines] = useState<ConduitBaseline[]>(initialBaselines);
+  const [scopingProjects, setScopingProjects] = useState<ConduitProject[]>(initialScopingProjects);
 
   const handleBaselineSaved = useCallback(async () => {
     try {
@@ -74,6 +75,7 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
           executableProjects={executableProjects}
           wipProjects={wipProjects}
           onBaselineSaved={handleBaselineSaved}
+          onProjectCopiedToScoping={p => setScopingProjects(prev => [...prev, p])}
         />
       )}
 
@@ -97,6 +99,7 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
             showAddButton
             showDeleteButton
           />
+
         </div>
       )}
     </div>
