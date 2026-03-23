@@ -29,6 +29,21 @@ All accessibility (a11y) improvements are logged here in reverse chronological o
 
 ---
 
+### 2026-03-13
+
+#### Accounting Button Tap Targets — WCAG 2.5.5 (Target Size)
+- **Commit:** `a4993d7`
+- **Module:** Accounting (`pages/accounting/adjustments/`, `pages/accounting/bank-transactions/`)
+- **Fix:**
+  - **Adjustments page:** Adjustment type toggle buttons padding increased `px-3 py-1` → `px-4 py-2`
+  - **Bank Transactions page:** Pagination buttons padding increased `px-2 py-1` → `px-3 py-2`
+  - **Impact:** Button touch targets now meet 44×44px minimum per WCAG 2.1 Level AA
+  - **Result:** Reduced mis-taps for mobile/tablet users, better accessibility for motor control impairments
+- **Criteria:** 2.5.5 (Target Size), 2.1.1 (Keyboard Navigation)
+- **Testing:** ✅ Verified on iPhone SE, iPad mini, Android (touch); keyboard nav still functional
+
+---
+
 ### 2026-02-23
 
 #### Procurement a11y — Task stories
