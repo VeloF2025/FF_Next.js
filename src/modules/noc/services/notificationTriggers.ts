@@ -361,9 +361,9 @@ export class NotificationTriggerService {
   ): Promise<{ id: string; name: string; phone: string | null; type: RecipientType } | null> {
     const ticket = event.ticket;
 
-    // Check if assigned to user
+    // Check if assigned to user (assigned_to is staff.id)
     if (ticket.assigned_to) {
-      const user = await this.lookupUser(ticket.assigned_to);
+      const user = await this.lookupUserByStaffId(ticket.assigned_to);
       if (user) {
         return {
           ...user,
@@ -398,20 +398,24 @@ export class NotificationTriggerService {
   }
 
   /**
-   * Lookup user by ID
-   * 🟢 WORKING: Fetches user details from database
+   * Lookup user by staff ID (ticket.assigned_to references staff.id)
+   * Resolves staff.id → users record via email match
    */
-  private async lookupUser(userId: string): Promise<UserLookup | null> {
+  private async lookupUserByStaffId(staffId: string): Promise<UserLookup | null> {
     try {
       const user = await queryOne<UserLookup>(
-        `SELECT id, first_name || ' ' || last_name AS name, phone_number AS phone FROM users WHERE id = $1`,
-        [userId]
+        `SELECT u.id, u.first_name || ' ' || u.last_name AS name, u.phone_number AS phone
+         FROM staff s
+         JOIN users u ON LOWER(u.email) = LOWER(s.email)
+         WHERE s.id = $1 AND u.is_active = TRUE
+         LIMIT 1`,
+        [staffId]
       );
       return user;
     } catch (error) {
-      logger.error('Failed to lookup user', {
+      logger.error('Failed to lookup user from staff', {
         error: error instanceof Error ? error.message : 'Unknown',
-        userId,
+        staffId,
       });
       return null;
     }
@@ -612,6 +616,21 @@ export function resetDefaultNotificationTriggerService(): void {
 }
 
 // ============================================================================
+// Staff → User ID Resolution
+// ============================================================================
+
+/**
+ * Resolve a staff.id to the corresponding users.id by matching email.
+ * Ticket assigned_to references staff.id, but notifications need users.id.
+ * Delegates to the service singleton's lookupUserByStaffId to avoid duplicate SQL.
+ */
+async function resolveUserIdFromStaff(staffId: string): Promise<string | null> {
+  const service = getDefaultNotificationTriggerService();
+  const user = await service['lookupUserByStaffId'](staffId);
+  return user?.id ?? null;
+}
+
+// ============================================================================
 // Email Body Builder
 // ============================================================================
 
@@ -636,35 +655,39 @@ function buildAssignmentEmailBody(ticket: Ticket): string {
 
 /**
  * Trigger notification on ticket assignment
- * 🟢 WORKING: Convenience function for ticket assignment event
+ * Resolves staff.id → users.id before sending email/in-app notifications.
  *
  * @param ticket - Assigned ticket
  * @param previousStatus - Previous ticket status
  * @returns Trigger result
- *
- * @example
- * await triggerOnTicketAssignment(ticket, TicketStatus.OPEN);
  */
 export async function triggerOnTicketAssignment(
   ticket: Ticket,
   previousStatus: TicketStatus
 ): Promise<TriggerResult> {
-  // UNS: fire-and-forget in-app notification + email
+  // ticket.assigned_to is staff.id — resolve to users.id for email/in-app
   if (ticket.assigned_to) {
-    const emailPayload = {
-      event_type: 'noc.ticket_assigned',
-      title: `Ticket ${ticket.ticket_uid} assigned to you`,
-      body: buildAssignmentEmailBody(ticket),
-      action_url: `/noc/tickets/${ticket.id}`,
-      source_module: 'maintenance',
-      source_id: ticket.id,
-      recipient_user_ids: [ticket.assigned_to],
-    };
+    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (userId) {
+      const emailPayload = {
+        event_type: 'noc.ticket_assigned',
+        title: `Ticket ${ticket.ticket_uid} assigned to you`,
+        body: buildAssignmentEmailBody(ticket),
+        action_url: `/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [userId],
+      };
 
-    notify(emailPayload).catch(() => {});
-    deliverEmail(ticket.assigned_to, emailPayload, null).catch((err) => {
-      logger.error('Failed to send assignment email', { error: err, ticket_id: ticket.id });
-    });
+      notify(emailPayload).catch(() => {});
+      deliverEmail(userId, emailPayload, null).catch((err) => {
+        logger.error('Failed to send assignment email', { error: err, ticket_id: ticket.id });
+      });
+    } else {
+      logger.warn('Cannot send assignment notification — no matching user for staff', {
+        ticket_id: ticket.id, staff_id: ticket.assigned_to,
+      });
+    }
   }
 
   const service = getDefaultNotificationTriggerService();
@@ -680,30 +703,37 @@ export async function triggerOnTicketAssignment(
 
 /**
  * Trigger notification on QA rejection
- * 🟢 WORKING: Convenience function for QA rejection event
+ * Resolves staff.id → users.id before sending in-app notifications.
  *
  * @param ticket - Rejected ticket
  * @param rejectionReason - Reason for rejection
  * @returns Trigger result
- *
- * @example
- * await triggerOnQARejection(ticket, 'Missing photos for steps 5 and 7');
  */
 export async function triggerOnQARejection(
   ticket: Ticket,
   rejectionReason?: string
 ): Promise<TriggerResult> {
-  // UNS: fire-and-forget in-app notification
+  // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    notify({
-      event_type: 'noc.qa_rejected',
-      title: `Ticket ${ticket.ticket_uid} rejected by QA`,
-      body: rejectionReason || 'Please review QA feedback',
-      action_url: `/app/noc/tickets/${ticket.id}`,
-      source_module: 'maintenance',
-      source_id: ticket.id,
-      recipient_user_ids: [ticket.assigned_to],
-    }).catch(() => {});
+    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (userId) {
+      notify({
+        event_type: 'noc.qa_rejected',
+        title: `Ticket ${ticket.ticket_uid} rejected by QA`,
+        body: rejectionReason || 'Please review QA feedback',
+        action_url: `/app/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [userId],
+      }).catch((err) => {
+        logger.error('Failed to send QA rejection notification', { error: err, ticketId: ticket.id });
+      });
+    } else {
+      logger.warn('Cannot send rejection notification — no matching user for staff', {
+        staffId: ticket.assigned_to,
+        ticketId: ticket.id,
+      });
+    }
   }
 
   const service = getDefaultNotificationTriggerService();
@@ -719,25 +749,32 @@ export async function triggerOnQARejection(
 
 /**
  * Trigger notification on ticket closure
- * 🟢 WORKING: Convenience function for ticket closure event
+ * Resolves staff.id → users.id before sending in-app notifications.
  *
  * @param ticket - Closed ticket
  * @returns Trigger result
- *
- * @example
- * await triggerOnTicketClosure(ticket);
  */
 export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerResult> {
-  // UNS: fire-and-forget in-app notification
+  // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    notify({
-      event_type: 'noc.ticket_closed',
-      title: `Ticket ${ticket.ticket_uid} closed`,
-      action_url: `/app/noc/tickets/${ticket.id}`,
-      source_module: 'maintenance',
-      source_id: ticket.id,
-      recipient_user_ids: [ticket.assigned_to],
-    }).catch(() => {});
+    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (userId) {
+      notify({
+        event_type: 'noc.ticket_closed',
+        title: `Ticket ${ticket.ticket_uid} closed`,
+        action_url: `/app/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [userId],
+      }).catch((err) => {
+        logger.error('Failed to send closure notification', { error: err, ticketId: ticket.id });
+      });
+    } else {
+      logger.warn('Cannot send closure notification — no matching user for staff', {
+        staffId: ticket.assigned_to,
+        ticketId: ticket.id,
+      });
+    }
   }
 
   const service = getDefaultNotificationTriggerService();
@@ -752,28 +789,28 @@ export async function triggerOnTicketClosure(ticket: Ticket): Promise<TriggerRes
 
 /**
  * Trigger notification on SLA warning
- * 🟢 WORKING: Convenience function for SLA warning event
+ * Resolves staff.id → users.id before sending in-app notifications.
  *
  * @param ticket - Ticket approaching SLA deadline
  * @returns Trigger result
- *
- * @example
- * await triggerOnSLAWarning(ticket);
  */
 export async function triggerOnSLAWarning(ticket: Ticket): Promise<TriggerResult> {
-  // UNS: fire-and-forget in-app notification
+  // ticket.assigned_to is staff.id — resolve to users.id
   if (ticket.assigned_to) {
-    notify({
-      event_type: 'noc.sla_warning',
-      title: `SLA Warning — Ticket ${ticket.ticket_uid}`,
-      body: ticket.sla_due_at
-        ? `Due at ${new Date(ticket.sla_due_at).toLocaleString('en-ZA')}`
-        : 'SLA deadline approaching',
-      action_url: `/app/noc/tickets/${ticket.id}`,
-      source_module: 'maintenance',
-      source_id: ticket.id,
-      recipient_user_ids: [ticket.assigned_to],
-    }).catch(() => {});
+    const userId = await resolveUserIdFromStaff(ticket.assigned_to);
+    if (userId) {
+      notify({
+        event_type: 'noc.sla_warning',
+        title: `SLA Warning — Ticket ${ticket.ticket_uid}`,
+        body: ticket.sla_due_at
+          ? `Due at ${new Date(ticket.sla_due_at).toLocaleString('en-ZA')}`
+          : 'SLA deadline approaching',
+        action_url: `/app/noc/tickets/${ticket.id}`,
+        source_module: 'maintenance',
+        source_id: ticket.id,
+        recipient_user_ids: [userId],
+      }).catch(() => {});
+    }
   }
 
   const service = getDefaultNotificationTriggerService();
@@ -838,7 +875,7 @@ async function lookupTeamMembers(
 
 /**
  * Trigger notification on ticket team assignment
- * Notifies all active members of the assigned team via in-app + WA
+ * Notifies all active members of the assigned team via in-app + email + WA
  *
  * @param ticket - Ticket assigned to a team
  * @returns Array of trigger results (one per member with a phone)
@@ -861,6 +898,7 @@ export async function triggerOnTeamAssignment(
   }
 
   // UNS: fire-and-forget in-app notification + email to all members
+  // lookupTeamMembers already resolves to users.id via email join
   const memberIds = members.map((m) => m.id);
   const teamEmailPayload = {
     event_type: 'noc.ticket_team_assigned',
