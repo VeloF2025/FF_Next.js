@@ -24,10 +24,6 @@ const PALETTE = [
   '#38bdf8','#f472b6','#a3e635','#fb7185','#818cf8',
 ];
 
-function fZAR(v: number): string {
-  if (v === 0) return '—';
-  return `R ${v.toLocaleString('en-ZA').replace(/,/g, ' ')}`;
-}
 
 const TOOLTIP_STYLE = {
   contentStyle: { backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: 6, color: '#F9FAFB', fontSize: 12 },
@@ -72,7 +68,19 @@ function ProjectLegend({ projects, colors, selected, onToggle }: ProjectLegendPr
 
 // ── Table ────────────────────────────────────────────────────────────────────
 
-function ActivationsTable({ years }: { years: ActivationYear[] }) {
+function getProjectCount(
+  projects: Array<{ projectName: string; count: number }>,
+  name: string
+): number {
+  return projects.find((p) => p.projectName === name)?.count ?? 0;
+}
+
+interface ActivationsTableProps {
+  years: ActivationYear[];
+  allProjects: string[];
+}
+
+function ActivationsTable({ years, allProjects }: ActivationsTableProps) {
   const initExpand = () => {
     const m = new Map<string, boolean>();
     for (const y of years) m.set(`year-${y.year}`, true);
@@ -92,16 +100,22 @@ function ActivationsTable({ years }: { years: ActivationYear[] }) {
   const thR = 'px-3 py-2.5 text-right text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
 
   const totalActivations = years.reduce((s, y) => s + y.activations, 0);
-  const totalRevenue = years.reduce((s, y) => s + y.revenue, 0);
+
+  // Grand total per project across all years
+  const projectGrandTotals = allProjects.map((name) =>
+    years.reduce((s, y) => s + getProjectCount(y.projects, name), 0)
+  );
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-700">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
-            <th className={th} style={{ minWidth: 280 }}>Period</th>
-            <th className={thR}>Activations</th>
-            <th className={thR}>Revenue (R)</th>
+            <th className={th} style={{ minWidth: 220 }}>Period</th>
+            {allProjects.map((name) => (
+              <th key={name} className={thR} style={{ minWidth: 90 }}>{name}</th>
+            ))}
+            <th className={thR} style={{ minWidth: 100 }}>Total Activations</th>
           </tr>
         </thead>
         <tbody>
@@ -117,12 +131,19 @@ function ActivationsTable({ years }: { years: ActivationYear[] }) {
                   style={{ backgroundColor: '#1a3a4a' }}
                   onClick={() => toggle(yearKey)}
                 >
-                  <td className="px-3 py-2.5 text-white font-bold flex items-center gap-2" style={{ minWidth: 280 }}>
+                  <td className="px-3 py-2.5 text-white font-bold flex items-center gap-2" style={{ minWidth: 220 }}>
                     {yearOpen ? <ChevronDown className="w-4 h-4 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 flex-shrink-0" />}
                     {year.year}
                   </td>
+                  {allProjects.map((name) => {
+                    const count = getProjectCount(year.projects, name);
+                    return (
+                      <td key={name} className="px-3 py-2.5 text-right tabular-nums text-white font-bold whitespace-nowrap">
+                        {count > 0 ? count.toLocaleString() : '—'}
+                      </td>
+                    );
+                  })}
                   <td className="px-3 py-2.5 text-right tabular-nums text-white font-bold whitespace-nowrap">{year.activations.toLocaleString()}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-white font-bold whitespace-nowrap">{fZAR(year.revenue)}</td>
                 </tr>
 
                 {/* Month rows */}
@@ -141,16 +162,30 @@ function ActivationsTable({ years }: { years: ActivationYear[] }) {
                           {monthOpen ? <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />}
                           {month.monthLabel}
                         </td>
+                        {allProjects.map((name) => {
+                          const count = getProjectCount(month.projects, name);
+                          return (
+                            <td key={name} className="px-3 py-2 text-right tabular-nums text-gray-200 font-semibold whitespace-nowrap">
+                              {count > 0 ? count.toLocaleString() : '—'}
+                            </td>
+                          );
+                        })}
                         <td className="px-3 py-2 text-right tabular-nums text-gray-200 font-semibold whitespace-nowrap">{month.activations.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-200 font-semibold whitespace-nowrap">{fZAR(month.revenue)}</td>
                       </tr>
 
                       {/* Week rows */}
                       {monthOpen && month.weeks.map((week, wi) => (
                         <tr key={week.weekStart} className={wi % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
                           <td className="px-3 py-2 text-gray-400 whitespace-nowrap pl-14">{week.weekLabel}</td>
+                          {allProjects.map((name) => {
+                            const count = getProjectCount(week.projects, name);
+                            return (
+                              <td key={name} className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">
+                                {count > 0 ? count.toLocaleString() : '—'}
+                              </td>
+                            );
+                          })}
                           <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{week.activations.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-300 whitespace-nowrap">{fZAR(week.revenue)}</td>
                         </tr>
                       ))}
                     </>
@@ -163,8 +198,12 @@ function ActivationsTable({ years }: { years: ActivationYear[] }) {
         <tfoot>
           <tr className="border-t-2 border-gray-500 font-bold" style={{ backgroundColor: '#1a3a4a' }}>
             <td className="px-3 py-2.5 text-white">Total</td>
+            {projectGrandTotals.map((total, idx) => (
+              <td key={allProjects[idx]} className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">
+                {total > 0 ? total.toLocaleString() : '—'}
+              </td>
+            ))}
             <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{totalActivations.toLocaleString()}</td>
-            <td className="px-3 py-2.5 text-right tabular-nums text-white whitespace-nowrap">{fZAR(totalRevenue)}</td>
           </tr>
         </tfoot>
       </table>
@@ -463,7 +502,7 @@ export default function ActivationsReport() {
 
   return (
     <ReportTabLayout
-      tableContent={<ActivationsTable years={years} />}
+      tableContent={<ActivationsTable years={years} allProjects={allProjects} />}
       chartsContent={<ActivationsChart years={years} allProjects={allProjects} />}
     />
   );
