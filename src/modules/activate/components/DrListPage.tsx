@@ -84,8 +84,43 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
     ? projects
     : projectStats.map(s => s.project).filter(Boolean);
 
+  // Billing cycle: Sunday 22:00 SAST to next Sunday 22:00 SAST
+  // For DATE-based filtering, Monday is the effective first full day of each cycle
+  const getCycleDates = useCallback((which: 'current' | 'previous') => {
+    const now = new Date();
+    const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const day = sast.getUTCDay(); // 0=Sun, 1=Mon, ...
+    const hour = sast.getUTCHours();
+
+    // Days since the last cycle boundary (Sunday 22:00 SAST)
+    let daysSinceBoundary: number;
+    if (day === 0) {
+      daysSinceBoundary = hour >= 22 ? 0 : 7;
+    } else {
+      daysSinceBoundary = day;
+    }
+
+    // Monday after the boundary Sunday = effective cycle start
+    const cycleStart = new Date(sast);
+    cycleStart.setUTCDate(cycleStart.getUTCDate() - daysSinceBoundary + 1);
+    const cycleEnd = new Date(cycleStart);
+    cycleEnd.setUTCDate(cycleEnd.getUTCDate() + 6); // Sunday
+
+    if (which === 'previous') {
+      cycleStart.setUTCDate(cycleStart.getUTCDate() - 7);
+      cycleEnd.setUTCDate(cycleEnd.getUTCDate() - 7);
+    }
+
+    const todaySAST = sast.toISOString().split('T')[0] as string;
+
+    return {
+      from: cycleStart.toISOString().split('T')[0] as string,
+      to: which === 'current' ? todaySAST : cycleEnd.toISOString().split('T')[0] as string,
+    };
+  }, []);
+
   // Quick filter handler for project table
-  const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'last7days' | 'all') => {
+  const handleQuickFilter = useCallback((filter: 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all') => {
     const todayStr = getTodaySAST();
 
     switch (filter) {
@@ -97,32 +132,35 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
         setFilters(prev => ({ ...prev, dateFrom: yesterdayStr, dateTo: yesterdayStr }));
         break;
       }
-      case 'last7days': {
-        const last7DaysDate = new Date(todayStr);
-        last7DaysDate.setDate(last7DaysDate.getDate() - 7);
-        const last7DaysStr = last7DaysDate.toISOString().split('T')[0] as string;
-        setFilters(prev => ({ ...prev, dateFrom: last7DaysStr, dateTo: todayStr }));
+      case 'currentCycle': {
+        const cycle = getCycleDates('current');
+        setFilters(prev => ({ ...prev, dateFrom: cycle.from, dateTo: cycle.to }));
+        break;
+      }
+      case 'previousCycle': {
+        const cycle = getCycleDates('previous');
+        setFilters(prev => ({ ...prev, dateFrom: cycle.from, dateTo: cycle.to }));
         break;
       }
       case 'all':
         setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }));
         break;
     }
-  }, [setFilters]);
+  }, [setFilters, getCycleDates]);
 
   // Get active quick filter
-  const getActiveQuickFilter = (): 'today' | 'yesterday' | 'last7days' | 'all' => {
+  const getActiveQuickFilter = (): 'today' | 'yesterday' | 'currentCycle' | 'previousCycle' | 'all' => {
     if (!filters.dateFrom && !filters.dateTo) return 'all';
 
     const todayStr = getTodaySAST();
     const yesterdayStr = getYesterdaySAST();
-    const last7DaysDate = new Date(todayStr);
-    last7DaysDate.setDate(last7DaysDate.getDate() - 7);
-    const last7DaysStr = last7DaysDate.toISOString().split('T')[0] as string;
+    const currentCycle = getCycleDates('current');
+    const previousCycle = getCycleDates('previous');
 
     if (filters.dateFrom === todayStr && filters.dateTo === todayStr) return 'today';
     if (filters.dateFrom === yesterdayStr && filters.dateTo === yesterdayStr) return 'yesterday';
-    if (filters.dateFrom === last7DaysStr && filters.dateTo === todayStr) return 'last7days';
+    if (filters.dateFrom === currentCycle.from && filters.dateTo === currentCycle.to) return 'currentCycle';
+    if (filters.dateFrom === previousCycle.from && filters.dateTo === previousCycle.to) return 'previousCycle';
 
     return 'all';
   };
@@ -546,19 +584,28 @@ function DashboardPageContent({ showTab }: { showTab: TabType }) {
 
                 {/* Quick Filter Buttons */}
                 <div className="flex gap-2">
-                  {(['today', 'yesterday', 'last7days', 'all'] as const).map((filter) => (
-                    <button
-                      key={filter}
-                      onClick={() => handleQuickFilter(filter)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        getActiveQuickFilter() === filter
-                          ? 'bg-[var(--ff-primary-500)] text-white'
-                          : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]/80'
-                      }`}
-                    >
-                      {filter === 'today' ? 'Today' : filter === 'yesterday' ? 'Yesterday' : filter === 'last7days' ? 'Last 7 days' : 'All'}
-                    </button>
-                  ))}
+                  {(['today', 'yesterday', 'currentCycle', 'previousCycle', 'all'] as const).map((filter) => {
+                    const labels: Record<typeof filter, string> = {
+                      today: 'Today',
+                      yesterday: 'Yesterday',
+                      currentCycle: 'Current Cycle',
+                      previousCycle: 'Previous Cycle',
+                      all: 'All',
+                    };
+                    return (
+                      <button
+                        key={filter}
+                        onClick={() => handleQuickFilter(filter)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          getActiveQuickFilter() === filter
+                            ? 'bg-[var(--ff-primary-500)] text-white'
+                            : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]/80'
+                        }`}
+                      >
+                        {labels[filter]}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="overflow-x-auto">
