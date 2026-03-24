@@ -587,7 +587,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       {/* ── Prerequisites & Milestones (collapsible) ───────────────────── */}
       <div className="rounded-lg border border-gray-700 overflow-hidden">
         <button
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-semibold text-white"
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
           onClick={() => setMilestonesOpen(v => !v)}
         >
           <span>Prerequisites &amp; Milestones</span>
@@ -606,7 +606,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       {/* ── Monthly Forecast (collapsible) ────────────────────────────── */}
       <div className="rounded-lg border border-gray-700 overflow-hidden">
         <button
-          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-semibold text-white"
+          className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
           onClick={() => setForecastOpen(v => !v)}
         >
           <span>Monthly Forecast</span>
