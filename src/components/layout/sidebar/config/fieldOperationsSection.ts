@@ -5,7 +5,7 @@
  * Currently only Civil QA (Construction QA); more items can be added as tabs.
  */
 
-import { HardHat } from 'lucide-react';
+import { HardHat, LineChart } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const fieldOperationsSection: NavSection = {
@@ -21,6 +21,14 @@ export const fieldOperationsSection: NavSection = {
       shortLabel: 'Field Ops',
       permissions: [],
       rbacKey: 'construction-qa',
+    },
+    {
+      to: '/conduit',
+      icon: LineChart,
+      label: 'Conduit',
+      shortLabel: 'Conduit',
+      permissions: [],
+      rbacKey: 'conduit',
     },
   ],
 };
