@@ -239,10 +239,10 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
 
   useEffect(() => {
     if (!isWip || !project.ft_project_name) return;
-    fetch(`/api/conduit/actuals?project=${encodeURIComponent(project.ft_project_name)}`)
+    fetch(`/api/conduit/actuals?project=${encodeURIComponent(project.ft_project_name)}`, { credentials: 'include' })
       .then(r => r.json())
       .then((d: { data?: ConduitActual[] }) => { if (d.data) setActuals(d.data); })
-      .catch(() => {});
+      .catch((err) => { log.warn('Failed to fetch conduit actuals', { error: String(err) }); });
   }, [isWip, project.ft_project_name]);
 
   // EAC calculations
