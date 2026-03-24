@@ -197,7 +197,7 @@ function PhaseSection({
   readOnly: boolean;
   onFieldChange: (id: string, field: string, value: string | null) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const completed = rows.filter(r => r.status === 'Completed').length;
 
   return (
