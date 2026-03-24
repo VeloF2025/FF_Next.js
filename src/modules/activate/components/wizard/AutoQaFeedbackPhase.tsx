@@ -207,11 +207,20 @@ export function AutoQaFeedbackPhase({
       })),
       ...missingSteps,
     ];
+    // Recompute stepCoverage from current photo assignments (not stale snapshot)
+    const coveredSteps = photos.map((p) => p.step).filter((s) => s > 0);
+    const coveredSet = new Set(coveredSteps);
+    const covered = Array.from(coveredSet).sort((a, b) => a - b);
+    const missing = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !coveredSet.has(s));
+    const updatedValidations = {
+      ...autoQaResults.validations,
+      stepCoverage: { covered, missing, total: 10, coveragePercent: covered.length / 10 },
+    };
     const newMessage = generateFeedbackMessage(
       dropNumber,
       decision,
       allPhotos,
-      autoQaResults.validations
+      updatedValidations
     );
     setFeedbackMessage(newMessage);
     setFeedbackStale(false);
@@ -245,14 +254,19 @@ export function AutoQaFeedbackPhase({
           dropNumber,
           project,
           decision,
-          message: feedbackStale ? generateFeedbackMessage(
-            dropNumber, decision,
-            [...photos.map((p) => ({
-              filename: p.filename, step: p.step, stepLabel: p.stepLabel,
-              tier: p.tier, decision: p.decision, comment: p.comment, confidence: p.confidence,
-            })), ...missingSteps],
-            autoQaResults.validations
-          ) : feedbackMessage,
+          message: feedbackStale ? (() => {
+            const cs = new Set(photos.map((p) => p.step).filter((s) => s > 0));
+            const cov = Array.from(cs).sort((a, b) => a - b);
+            const mis = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !cs.has(s));
+            return generateFeedbackMessage(
+              dropNumber, decision,
+              [...photos.map((p) => ({
+                filename: p.filename, step: p.step, stepLabel: p.stepLabel,
+                tier: p.tier, decision: p.decision, comment: p.comment, confidence: p.confidence,
+              })), ...missingSteps],
+              { ...autoQaResults.validations, stepCoverage: { covered: cov, missing: mis, total: 10, coveragePercent: cov.length / 10 } }
+            );
+          })() : feedbackMessage,
           destination: sendDestination,
           qaFindings: {
             photoCoverage: {
