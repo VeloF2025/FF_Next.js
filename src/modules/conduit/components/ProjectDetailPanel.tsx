@@ -458,6 +458,31 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
       {/* ── COS Summary bar ────────────────────────────────────────────── */}
       <CosSummaryBar project={project} />
 
+      {/* ── Save bar ───────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
+        >
+          {saving ? (
+            <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
+          ) : saved ? (
+            <><CheckCircle2 className="w-4 h-4 text-emerald-300" />Saved</>
+          ) : (
+            <><Save className="w-4 h-4" />Save {project.name}</>
+          )}
+        </button>
+        {saveError && (
+          <span className="flex items-center gap-1 text-sm text-red-400">
+            <AlertCircle className="w-4 h-4" />{saveError}
+          </span>
+        )}
+        <span className="text-xs text-gray-500">
+          Changes are live in the summary table immediately. Save to persist.
+        </span>
+      </div>
+
       {/* ── Project Details (collapsible) ──────────────────────────────── */}
       <div className="rounded-lg border border-gray-700 overflow-hidden">
         <button
@@ -557,31 +582,6 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         </InputSection>
 
         </div>}
-      </div>
-
-      {/* ── Save bar ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-500 text-white disabled:opacity-50 transition-colors"
-        >
-          {saving ? (
-            <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
-          ) : saved ? (
-            <><CheckCircle2 className="w-4 h-4 text-emerald-300" />Saved</>
-          ) : (
-            <><Save className="w-4 h-4" />Save {project.name}</>
-          )}
-        </button>
-        {saveError && (
-          <span className="flex items-center gap-1 text-sm text-red-400">
-            <AlertCircle className="w-4 h-4" />{saveError}
-          </span>
-        )}
-        <span className="text-xs text-gray-500">
-          Changes are live in the summary table immediately. Save to persist.
-        </span>
       </div>
 
       {/* ── Prerequisites & Milestones (collapsible) ───────────────────── */}
