@@ -9,12 +9,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['DELETE']);
   }
 
   try {
@@ -22,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { removedBy, removalReason, hardDelete } = req.body;
 
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Assignment ID is required' });
+      return apiResponse.badRequest(res, 'Assignment ID is required');
     }
 
     // Check if assignment exists
@@ -31,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (existing.length === 0) {
-      return res.status(404).json({ error: 'Assignment not found' });
+      return apiResponse.notFound(res, 'Assignment not found');
     }
 
     if (hardDelete === true) {

@@ -16,6 +16,7 @@ import type {
   VehicleAssignmentCreate,
   VehicleAssignmentUpdate,
 } from '@/types/staff';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffVehiclesAPI');
@@ -24,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { staffId, id, activeOnly } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   // GET - Fetch vehicle assignments
@@ -118,7 +119,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const body = req.body as VehicleAssignmentCreate;
 
       if (!body.vehicleRegistration || !body.assignmentStart) {
-        return res.status(400).json({ error: 'Vehicle registration and assignment start date are required' });
+        return apiResponse.badRequest(res, 'Vehicle registration and assignment start date are required');
       }
 
       // Check for valid driver's license
@@ -215,7 +216,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!created) {
-        return res.status(500).json({ error: 'Failed to create vehicle assignment' });
+        return apiResponse.internalError(res, new Error('Failed to create vehicle assignment'));
       }
 
       // Update staff has_company_vehicle flag
@@ -248,7 +249,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // PUT - Update vehicle assignment
   if (req.method === 'PUT') {
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Vehicle assignment ID is required' });
+      return apiResponse.badRequest(res, 'Vehicle assignment ID is required');
     }
 
     try {
@@ -261,7 +262,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!existing) {
-        return res.status(404).json({ error: 'Vehicle assignment not found' });
+        return apiResponse.notFound(res, 'Vehicle assignment not found');
       }
 
       const [updated] = await sql`
@@ -291,7 +292,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!updated) {
-        return res.status(500).json({ error: 'Failed to update vehicle assignment' });
+        return apiResponse.internalError(res, new Error('Failed to update vehicle assignment'));
       }
 
       logger.info('Vehicle assignment updated', { staffId, vehicleId: id });
@@ -310,7 +311,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // DELETE - Deactivate vehicle assignment (soft delete)
   if (req.method === 'DELETE') {
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Vehicle assignment ID is required' });
+      return apiResponse.badRequest(res, 'Vehicle assignment ID is required');
     }
 
     try {
@@ -321,7 +322,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!existing) {
-        return res.status(404).json({ error: 'Vehicle assignment not found' });
+        return apiResponse.notFound(res, 'Vehicle assignment not found');
       }
 
       await sql`
@@ -364,7 +365,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PUT', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

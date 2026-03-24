@@ -15,6 +15,7 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
 import { logDocumentDownloaded } from '@/services/staff/staffAuditService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentDownloadAPI');
@@ -24,13 +25,13 @@ const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { documentId, inline } = req.query;
 
   if (!documentId || typeof documentId !== 'string') {
-    return res.status(400).json({ error: 'Document ID is required' });
+    return apiResponse.badRequest(res, 'Document ID is required');
   }
 
   try {
@@ -40,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     const filePath = (document.file_path || document.file_url) as string;
@@ -48,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const mimeType = document.mime_type as string || 'application/octet-stream';
 
     if (!filePath) {
-      return res.status(404).json({ error: 'File path not found' });
+      return apiResponse.notFound(res, 'File path not found');
     }
 
     // Build VF Storage URL

@@ -13,6 +13,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { apiResponse } from '@/lib/apiResponse';
 
 const execAsync = promisify(exec);
 
@@ -23,13 +24,13 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { key } = req.query;
 
   if (!key || typeof key !== 'string') {
-    return res.status(400).json({ error: 'Photo key parameter required' });
+    return apiResponse.badRequest(res, 'Photo key parameter required');
   }
 
   try {

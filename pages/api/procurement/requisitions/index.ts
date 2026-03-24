@@ -6,7 +6,7 @@ import type {
 } from '@/types/procurement/requisition.types';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql, logCreate } from '@/lib/db-logger';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
 

@@ -11,10 +11,11 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { generateContractorDocumentReport } from '@/modules/contractor-documents-report/services/documentReportService';
 import { generateContractorReportCSV } from '@/modules/contractor-documents-report/services/documentExportService';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
@@ -22,7 +23,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Validation
     if (!contractorId || typeof contractorId !== 'string') {
-      return res.status(400).json({ error: 'Contractor ID is required' });
+      return apiResponse.badRequest(res, 'Contractor ID is required');
     }
 
     if (!format || (format !== 'csv' && format !== 'pdf')) {
@@ -33,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const report = await generateContractorDocumentReport(contractorId);
 
     if (!report) {
-      return res.status(404).json({ error: 'Contractor not found' });
+      return apiResponse.notFound(res, 'Contractor not found');
     }
 
     // Export as CSV
@@ -53,10 +54,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(501).json({ error: 'PDF export not yet implemented' });
     }
 
-    return res.status(400).json({ error: 'Invalid format' });
+    return apiResponse.badRequest(res, 'Invalid format');
   } catch (error) {
     log.error('[contractors-documents-export] Error', { error });
-    return res.status(500).json({ error: 'Internal server error' });
+    return apiResponse.internalError(res, new Error('Internal server error'));
   }
 }
 

@@ -26,7 +26,6 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
     return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET']);
   }
 

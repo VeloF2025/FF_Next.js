@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { safeObjectQuery, safeMutation } from '../../../lib/safe-query';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -26,7 +27,7 @@ async function handler(
       const { technicianId, deviceId } = req.query;
       
       if (!technicianId) {
-        return res.status(400).json({ error: 'Technician ID required' });
+        return apiResponse.badRequest(res, 'Technician ID required');
       }
       
       // Return minimal sync status for now
@@ -43,7 +44,7 @@ async function handler(
       res.status(200).json(syncStatus);
     } catch (error) {
       log.error('Error getting sync status', { error });
-      res.status(500).json({ error: 'Failed to get sync status' });
+      apiResponse.internalError(res, new Error('Failed to get sync status'));
     }
   } else if (req.method === 'POST') {
     // Handle field data sync
@@ -51,9 +52,7 @@ async function handler(
       const syncData: SyncData = req.body;
       
       if (!syncData.technicianId || !syncData.deviceId) {
-        return res.status(400).json({ 
-          error: 'Missing required fields: technicianId and deviceId' 
-        });
+        return apiResponse.badRequest(res, 'Missing required fields: technicianId and deviceId');
       }
       
       // For now, acknowledge the sync but don't process
@@ -74,7 +73,7 @@ async function handler(
       res.status(200).json(syncResult);
     } catch (error) {
       log.error('Error syncing field data', { error });
-      res.status(500).json({ error: 'Failed to sync field data' });
+      apiResponse.internalError(res, new Error('Failed to sync field data'));
     }
   } else if (req.method === 'PUT') {
     // Resolve sync conflicts
@@ -90,10 +89,10 @@ async function handler(
       });
     } catch (error) {
       log.error('Error resolving sync conflicts', { error });
-      res.status(500).json({ error: 'Failed to resolve sync conflicts' });
+      apiResponse.internalError(res, new Error('Failed to resolve sync conflicts'));
     }
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PUT']);
   }
 }
 

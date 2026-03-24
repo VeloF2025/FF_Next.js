@@ -2,12 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '@/lib/db/pool';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

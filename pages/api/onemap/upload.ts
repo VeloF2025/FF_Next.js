@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import fs from 'fs';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Configure formidable to handle file uploads
 export const config = {
@@ -254,7 +255,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const form = formidable({
@@ -266,7 +267,7 @@ async function handler(
     const file = Array.isArray(files.file) ? files.file[0] : files.file;
     
     if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     // Validate magic bytes match Excel format
@@ -274,7 +275,7 @@ async function handler(
     const { valid: magicValid } = validateExcelMagicBytes(Buffer.from(fileBuffer));
     if (!magicValid) {
       fs.unlinkSync(file.filepath);
-      return res.status(400).json({ error: 'File content does not match Excel format (.xls or .xlsx).' });
+      return apiResponse.badRequest(res, 'File content does not match Excel format (.xls or .xlsx).');
     }
 
     // Create import record
@@ -336,10 +337,7 @@ async function handler(
 
   } catch (error) {
     log.error('File upload error', { error });
-    return res.status(500).json({
-      error: 'Failed to process file',
-      details: error.message
-    });
+    return apiResponse.internalError(res, error, 'Failed to process file');
   }
 }
 

@@ -7,19 +7,20 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const meetingId = req.query.id as string;
   const exportType = req.query.type as string;
 
   if (!['summary', 'transcript', 'action-items'].includes(exportType)) {
-    return res.status(400).json({ error: 'type must be summary, transcript, or action-items' });
+    return apiResponse.badRequest(res, 'type must be summary, transcript, or action-items');
   }
 
   try {
@@ -29,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!meeting) {
-      return res.status(404).json({ error: 'Meeting not found' });
+      return apiResponse.notFound(res, 'Meeting not found');
     }
 
     const date = meeting.meeting_date
@@ -94,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
 
       if (!transcript) {
-        return res.status(404).json({ error: 'No transcript available' });
+        return apiResponse.notFound(res, 'No transcript available');
       }
 
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -134,7 +135,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   } catch (error) {
     log.error('Export error:', error);
-    return res.status(500).json({ error: 'Export failed' });
+    return apiResponse.internalError(res, new Error('Export failed'));
   }
 }
 

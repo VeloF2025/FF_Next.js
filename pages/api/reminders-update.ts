@@ -2,16 +2,17 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['PUT']);
   }
 
   const userId = (req as any).user?.id;
-  if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+  if (!userId) return apiResponse.unauthorized(res);
 
   try {
     const { id, title, description, due_date, priority, status } = req.body;

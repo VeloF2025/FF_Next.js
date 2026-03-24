@@ -19,6 +19,7 @@ import { log } from '@/lib/logger';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -45,7 +46,7 @@ export const config = {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   let tempFilePath: string | null = null;
@@ -68,9 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Validate required fields
     if (!contractorId || !documentType || !documentName || !uploadedBy) {
-      return res.status(400).json({
-        error: 'Missing required fields: contractorId, documentType, documentName, uploadedBy'
-      });
+      return apiResponse.badRequest(res, 'Missing required fields: contractorId, documentType, documentName, uploadedBy');
     }
 
     // Get uploaded file
@@ -78,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const file = fileArray[0];
 
     if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     // Store temp file path for cleanup
@@ -95,17 +94,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',      // .xlsx
     ];
     if (!allowedTypes.includes(file.mimetype || '')) {
-      return res.status(400).json({
-        error: `Invalid file type. Allowed: PDF, JPG, PNG, Word (DOC/DOCX), Excel (XLS/XLSX)`
-      });
+      return apiResponse.badRequest(res, `Invalid file type. Allowed: PDF, JPG, PNG, Word (DOC/DOCX), Excel (XLS/XLSX)`);
     }
 
     // Validate file size (10MB max)
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      return res.status(400).json({
-        error: 'File too large. Maximum size: 10MB'
-      });
+      return apiResponse.badRequest(res, 'File too large. Maximum size: 10MB');
     }
 
     // Read file buffer
@@ -115,9 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { valid, detectedType } = validateMagicBytes(fileBuffer);
     if (!valid) {
       await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'CONTRACTORS_DOCUMENTS_UPLOAD'));
-      return res.status(400).json({
-        error: `File content does not match an allowed type (detected: ${detectedType}). Allowed: PDF, JPG, PNG, Word, Excel`
-      });
+      return apiResponse.badRequest(res, `File content does not match an allowed type (detected: ${detectedType}). Allowed: PDF, JPG, PNG, Word, Excel`);
     }
 
     // Upload to VF Storage API

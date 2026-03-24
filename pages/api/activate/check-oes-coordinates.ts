@@ -9,7 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, AuthenticatedNextApiRequest } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,

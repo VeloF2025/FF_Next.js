@@ -16,6 +16,7 @@ import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR, markFeedbackSent, getDropSubmitterPhone } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Project WhatsApp group mappings (same as wa-monitor)
 const PROJECT_GROUPS: Record<string, { jid: string; name: string }> = {
@@ -114,7 +115,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

@@ -10,6 +10,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
@@ -19,7 +20,7 @@ async function handler(
   const { supplierId: id } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid supplier ID' });
+    return apiResponse.badRequest(res, 'Invalid supplier ID');
   }
 
   try {
@@ -33,7 +34,7 @@ async function handler(
       case 'DELETE':
         return handleDelete(id, req, res);
       default:
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PUT', 'DELETE']);
     }
   } catch (error) {
     log.error(`Supplier compliance API error for ${id}:`, { data: error }, 'api');
@@ -167,9 +168,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     const userId = (req as any).user?.id;
     
     if (!documentId) {
-      return res.status(400).json({
-        error: 'Missing document ID'
-      });
+      return apiResponse.badRequest(res, 'Missing document ID');
     }
 
     const actualUserId = userId || 'system'; // userId already from req.user above
@@ -254,9 +253,7 @@ async function handleDelete(id: string, req: NextApiRequest, res: NextApiRespons
     const { documentId } = req.body;
     
     if (!documentId) {
-      return res.status(400).json({
-        error: 'Missing document ID'
-      });
+      return apiResponse.badRequest(res, 'Missing document ID');
     }
 
     await sql`

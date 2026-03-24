@@ -12,7 +12,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withErrorHandler } from '@/lib/api-error-handler';
 import { getSql } from '@/lib/neon-sql';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import type { AuthorizedLocation, LocationType } from '@/modules/fleet/types';
 import { withAuth } from '@/lib/auth';
 

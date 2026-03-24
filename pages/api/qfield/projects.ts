@@ -8,11 +8,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') return handleGet(req, res);
   if (req.method === 'POST') return handlePost(req, res);
-  return res.status(405).json({ success: false, error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 async function handleGet(_req: NextApiRequest, res: NextApiResponse) {

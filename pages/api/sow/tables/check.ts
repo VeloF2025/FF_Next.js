@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 /**
  * SOW Tables Check API Route
@@ -12,14 +13,14 @@ async function handler(
 ) {
   // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
     // Get authentication from Clerk
     const userId = (req as AuthenticatedNextApiRequest).user.id;
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.unauthorized(res);
     }
 
     // Proxy to backend API server

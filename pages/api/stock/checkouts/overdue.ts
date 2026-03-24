@@ -8,12 +8,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const sql = neon(DATABASE_URL);
@@ -41,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).json({ data: checkouts });
   } catch (error) {
     log.error('Failed to fetch overdue checkouts', { error }, 'StockCheckoutsOverdue');
-    return res.status(500).json({ error: 'Failed to fetch overdue checkouts' });
+    return apiResponse.internalError(res, new Error('Failed to fetch overdue checkouts'));
   }
 }
 

@@ -23,6 +23,7 @@ import type {
   OverallStage,
 } from '@/types/pon-stages.types';
 import { BUILD_STAGES } from '@/types/pon-stages.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 interface RawRow {
   zone_no: number;
@@ -100,7 +101,7 @@ async function handler(
   res: NextApiResponse<PonStagesResponse | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { projectId, zone } = req.query;
@@ -108,7 +109,7 @@ async function handler(
   const zoneFilter = zone ? Number(Array.isArray(zone) ? zone[0] : zone) : null;
 
   if (!projectIdStr) {
-    return res.status(400).json({ error: 'Missing projectId' });
+    return apiResponse.badRequest(res, 'Missing projectId');
   }
 
   try {
@@ -121,7 +122,7 @@ async function handler(
       );
 
       if (projectResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Project not found' });
+        return apiResponse.notFound(res, 'Project not found');
       }
 
       const projectName = projectResult.rows[0]!.project_name;

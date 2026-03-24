@@ -26,6 +26,7 @@ import {
 } from '@/modules/photo-review/services/fotoBossService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Feature flags
 const USE_BOSS_PRIMARY = process.env.USE_BOSS_PRIMARY !== 'false'; // Default: true (BOSS is primary)
@@ -37,7 +38,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('maintenance:wa-dr-photos');
 
@@ -25,14 +26,14 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
     const { dropNumber } = req.query;
 
     if (!dropNumber || typeof dropNumber !== 'string') {
-      return res.status(400).json({ error: 'dropNumber is required' });
+      return apiResponse.badRequest(res, 'dropNumber is required');
     }
 
     const sql = neon(process.env.DATABASE_URL!);
@@ -79,7 +80,7 @@ async function handler(
     });
   } catch (error) {
     logger.error({ error }, 'Error fetching DR photos');
-    return res.status(500).json({ error: 'Failed to fetch photos' });
+    return apiResponse.internalError(res, new Error('Failed to fetch photos'));
   }
 }
 

@@ -4,6 +4,7 @@ import { withAuth, withRole } from '@/lib/auth';
 import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import { cachedQuery } from '@/lib/queryCache';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Initialize Neon client with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -17,7 +18,7 @@ export default withAuth(withRole('manager')(withErrorHandler(async (
   res: NextApiResponse
 ) => {
   if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     return;
   }
 

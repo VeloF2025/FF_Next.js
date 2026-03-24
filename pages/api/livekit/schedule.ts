@@ -7,6 +7,7 @@ import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -200,7 +201,7 @@ async function handler(
             const { title, description, scheduledAt, durationMinutes = 60, attendees = [] } = req.body as ScheduleMeetingRequest;
 
             if (!title || !scheduledAt) {
-                return res.status(400).json({ error: 'Title and scheduledAt are required' });
+                return apiResponse.badRequest(res, 'Title and scheduledAt are required');
             }
 
             // Generate room name
@@ -265,7 +266,7 @@ async function handler(
             const { id } = req.query;
 
             if (!id) {
-                return res.status(400).json({ error: 'Meeting ID is required' });
+                return apiResponse.badRequest(res, 'Meeting ID is required');
             }
 
             await sql`
@@ -281,7 +282,7 @@ async function handler(
         }
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
 }
 
 export default withAuth(sendMeetingInvite);

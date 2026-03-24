@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 export interface StaffPerformanceMetrics {
   staffId: string;
@@ -72,13 +73,13 @@ async function handler(
   res: NextApiResponse<StaffPerformanceMetrics | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { staffId, dateFrom, dateTo } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'staffId is required' });
+    return apiResponse.badRequest(res, 'staffId is required');
   }
 
   // Default date range: last 30 days
@@ -101,7 +102,7 @@ async function handler(
     );
 
     if (staffResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Staff member not found' });
+      return apiResponse.notFound(res, 'Staff member not found');
     }
 
     const staff = staffResult.rows[0];

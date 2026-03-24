@@ -4,6 +4,7 @@ import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
+import { apiResponse } from '@/lib/apiResponse';
 
 const RECORDINGS_PATH = '/opt/recordings';
 
@@ -84,18 +85,18 @@ async function handler(
             const { filename } = req.query;
 
             if (!filename || typeof filename !== 'string') {
-                return res.status(400).json({ error: 'Filename is required' });
+                return apiResponse.badRequest(res, 'Filename is required');
             }
 
             // Security: Prevent path traversal
             if (filename.includes('..') || filename.includes('/')) {
-                return res.status(400).json({ error: 'Invalid filename' });
+                return apiResponse.badRequest(res, 'Invalid filename');
             }
 
             const filePath = path.join(RECORDINGS_PATH, filename);
 
             if (!fs.existsSync(filePath)) {
-                return res.status(404).json({ error: 'Recording not found' });
+                return apiResponse.notFound(res, 'Recording not found');
             }
 
             fs.unlinkSync(filePath);
@@ -113,7 +114,7 @@ async function handler(
         }
     }
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'DELETE']);
 }
 
 export default withAuth(handler);

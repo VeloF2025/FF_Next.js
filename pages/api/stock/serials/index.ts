@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, hasRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
@@ -21,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { stockItemId } = req.query;
 
       if (!stockItemId || typeof stockItemId !== 'string') {
-        return res.status(400).json({ error: 'stockItemId query parameter is required' });
+        return apiResponse.badRequest(res, 'stockItemId query parameter is required');
       }
 
       const serials = await sql`
@@ -52,20 +53,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json({ data: serials });
     } catch (error) {
       log.error('Failed to fetch serials', { error }, 'StockSerials');
-      return res.status(500).json({ error: 'Failed to fetch serials' });
+      return apiResponse.internalError(res, new Error('Failed to fetch serials'));
     }
   }
 
   if (req.method === 'POST') {
     if (!hasRole(user, 'manager')) {
-      return res.status(403).json({ error: 'Manager role or higher required' });
+      return apiResponse.forbidden(res, 'Manager role or higher required');
     }
 
     try {
       const { stockItemId, serialNumber, notes } = req.body;
 
       if (!stockItemId || !serialNumber) {
-        return res.status(400).json({ error: 'stockItemId and serialNumber are required' });
+        return apiResponse.badRequest(res, 'stockItemId and serialNumber are required');
       }
 
       // Verify stock item exists
@@ -73,7 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         SELECT id, category FROM stock_items WHERE id = ${stockItemId}
       `;
       if (!item) {
-        return res.status(404).json({ error: 'Stock item not found' });
+        return apiResponse.notFound(res, 'Stock item not found');
       }
 
       const [serial] = await sql`
@@ -89,11 +90,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(409).json({ error: 'Serial number already exists for this item' });
       }
       log.error('Failed to create serial', { error }, 'StockSerials');
-      return res.status(500).json({ error: 'Failed to create serial' });
+      return apiResponse.internalError(res, new Error('Failed to create serial'));
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(handler);

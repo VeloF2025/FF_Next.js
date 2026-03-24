@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffProjectsAPI');
@@ -34,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { staffId, activeOnly } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   // GET - Fetch projects for staff member
@@ -97,7 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { projectId, role, startDate, endDate } = req.body;
 
       if (!projectId) {
-        return res.status(400).json({ error: 'Project ID is required' });
+        return apiResponse.badRequest(res, 'Project ID is required');
       }
 
       // Get the current user for assigned_by
@@ -136,7 +137,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         logger.info('Staff project assignment reactivated', { staffId, projectId });
 
         if (!updated) {
-          return res.status(500).json({ error: 'Failed to update assignment' });
+          return apiResponse.internalError(res, new Error('Failed to update assignment'));
         }
 
         // Sync project count after reactivation
@@ -160,7 +161,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         `;
 
         if (!assignment) {
-          return res.status(500).json({ error: 'Failed to fetch updated assignment' });
+          return apiResponse.internalError(res, new Error('Failed to fetch updated assignment'));
         }
 
         return res.status(200).json({
@@ -194,7 +195,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       logger.info('Staff assigned to project', { staffId, projectId });
 
       if (!created) {
-        return res.status(500).json({ error: 'Failed to create assignment' });
+        return apiResponse.internalError(res, new Error('Failed to create assignment'));
       }
 
       // Sync project count after new assignment
@@ -218,7 +219,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!assignment) {
-        return res.status(500).json({ error: 'Failed to fetch created assignment' });
+        return apiResponse.internalError(res, new Error('Failed to fetch created assignment'));
       }
 
       return res.status(201).json({
@@ -232,7 +233,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

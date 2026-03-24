@@ -10,6 +10,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -237,7 +238,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     } catch (error) {
       log.error('Error fetching stock items', { error });
-      return res.status(500).json({ error: 'Failed to fetch stock items' });
+      return apiResponse.internalError(res, new Error('Failed to fetch stock items'));
     }
   }
 
@@ -248,7 +249,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       // Validate required fields
       if (!body.itemCode || !body.name || !body.category) {
-        return res.status(400).json({ error: 'Item code, name, and category are required' });
+        return apiResponse.badRequest(res, 'Item code, name, and category are required');
       }
 
       // Check for duplicate item code
@@ -285,11 +286,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
         return res.status(409).json({ error: 'Item with this code already exists' });
       }
-      return res.status(500).json({ error: 'Failed to create stock item' });
+      return apiResponse.internalError(res, new Error('Failed to create stock item'));
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

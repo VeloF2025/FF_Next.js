@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -31,7 +32,7 @@ const MAX_ITEMS = 5; // Dashboard is always pinned, plus 5 custom items
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = (req as any).user?.id;
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!userId) return apiResponse.unauthorized(res);
 
   try {
     if (req.method === 'GET') {
@@ -122,7 +123,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     }
 
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
   } catch (error) {
     log.error('Sidebar preferences API error', { error });
     return res.status(500).json({

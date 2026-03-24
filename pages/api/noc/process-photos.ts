@@ -14,6 +14,7 @@ import {
   getPhotoStats,
 } from '@/modules/noc/services/maintenancePhotoService';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('api:maintenance:process-photos');
 
@@ -82,10 +83,7 @@ async function handler(
     }
   }
 
-  return res.status(405).json({
-    success: false,
-    error: 'Method not allowed',
-  });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(handler);

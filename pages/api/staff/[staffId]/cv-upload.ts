@@ -12,6 +12,7 @@ import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { uploadStaffDocument, deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffCVUploadAPI');
@@ -46,7 +47,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { staffId } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   // POST - Upload CV
@@ -58,7 +59,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!staff) {
-        return res.status(404).json({ error: 'Staff member not found' });
+        return apiResponse.notFound(res, 'Staff member not found');
       }
 
       // Parse form data
@@ -71,7 +72,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const file = Array.isArray(files.file) ? files.file[0] : files.file;
 
       if (!file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+        return apiResponse.badRequest(res, 'No file uploaded');
       }
 
       // Validate file type
@@ -100,7 +101,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { valid: magicValid } = validateMagicBytes(fileBuffer);
       if (!magicValid) {
         fs.unlinkSync(file.filepath);
-        return res.status(400).json({ error: 'File content does not match an allowed type (PDF, DOC, DOCX).' });
+        return apiResponse.badRequest(res, 'File content does not match an allowed type (PDF, DOC, DOCX).');
       }
       const extension = file.originalFilename?.split('.').pop() || 'pdf';
       const filename = `cv-${Date.now()}.${extension}`;
@@ -144,11 +145,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!staff) {
-        return res.status(404).json({ error: 'Staff member not found' });
+        return apiResponse.notFound(res, 'Staff member not found');
       }
 
       if (!staff.cv_url) {
-        return res.status(404).json({ error: 'No CV found for this staff member' });
+        return apiResponse.notFound(res, 'No CV found for this staff member');
       }
 
       // Delete from storage
@@ -181,7 +182,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['POST', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

@@ -12,6 +12,7 @@ import { withAuth } from '@/lib/auth';
 import type { ContractorProject, ContractorProjectWithDetails } from '@/types/contractor-project.types';
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
@@ -19,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } else if (req.method === 'POST') {
     return handlePost(req, res);
   } else {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 }
 
@@ -30,9 +31,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // At least one filter must be provided
     if (!contractorId && !projectId) {
-      return res.status(400).json({
-        error: 'Either contractorId or projectId is required'
-      });
+      return apiResponse.badRequest(res, 'Either contractorId or projectId is required');
     }
 
     // Build query with explicit branches to avoid conditional SQL fragments (Neon rule)

@@ -9,19 +9,20 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['PUT']);
   }
 
   try {
     const { id } = req.query;
 
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Assignment ID is required' });
+      return apiResponse.badRequest(res, 'Assignment ID is required');
     }
 
     const {
@@ -50,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (existing.length === 0) {
-      return res.status(404).json({ error: 'Assignment not found' });
+      return apiResponse.notFound(res, 'Assignment not found');
     }
 
     // Fetch current assignment

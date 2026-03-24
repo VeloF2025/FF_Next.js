@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import { withAuth } from '@/lib/auth/middleware';
 import { log } from '@/lib/logger';
 import { getVlmMetrics, getModuleAccuracySummaries } from '@/services/vlmLearningService';

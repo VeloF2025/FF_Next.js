@@ -22,6 +22,7 @@ import {
   getFlaggedDRs,
 } from '@/modules/noc/services/waMaintenanceProcessor';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('api:maintenance:wa-messages');
 
@@ -38,10 +39,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({
-      success: false,
-      error: 'Method not allowed',
-    });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

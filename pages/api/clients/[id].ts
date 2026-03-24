@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -60,7 +61,7 @@ async function handler(
 
   try {
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Client ID is required' });
+      return apiResponse.badRequest(res, 'Client ID is required');
     }
 
     switch (req.method) {
@@ -180,7 +181,7 @@ async function handler(
       }
 
       default:
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
     log.error('Client API error', { error });

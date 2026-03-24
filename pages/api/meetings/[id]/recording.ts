@@ -5,6 +5,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import * as fs from 'fs';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -33,7 +34,7 @@ interface MeetingRecordingRow {
  */
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     return;
   }
 
@@ -42,7 +43,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const isHein = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
-    res.status(403).json({ error: 'User email is required for recording access' });
+    apiResponse.forbidden(res, 'User email is required for recording access');
     return;
   }
 
@@ -50,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   const meetingId = typeof rawId === 'string' ? Number(rawId) : NaN;
 
   if (isNaN(meetingId) || meetingId <= 0) {
-    res.status(400).json({ error: 'Invalid meeting ID' });
+    apiResponse.badRequest(res, 'Invalid meeting ID');
     return;
   }
 
@@ -77,12 +78,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
 
     if (!meeting) {
       // Return 403 rather than 404 to avoid leaking meeting existence to non-participants
-      res.status(403).json({ error: 'Meeting not found or you are not a participant' });
+      apiResponse.forbidden(res, 'Meeting not found or you are not a participant');
       return;
     }
 
     if (!meeting.recording_path) {
-      res.status(404).json({ error: 'No recording available for this meeting' });
+      apiResponse.notFound(res, 'No recording available for this meeting');
       return;
     }
 
@@ -92,7 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
         { meetingId, path: meeting.recording_path },
         LOGGER
       );
-      res.status(404).json({ error: 'Recording file not found on disk' });
+      apiResponse.notFound(res, 'Recording file not found on disk');
       return;
     }
 
@@ -154,7 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void>
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     log.error('Recording handler error', { meetingId, error: errorMsg }, LOGGER);
-    res.status(500).json({ error: 'Failed to stream recording' });
+    apiResponse.internalError(res, new Error('Failed to stream recording'));
   }
 }
 

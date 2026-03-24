@@ -4,7 +4,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 async function handler(
     req: NextApiRequest,
     res: NextApiResponse

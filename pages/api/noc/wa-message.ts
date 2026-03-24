@@ -16,6 +16,7 @@ import {
   type IncomingWAMessage,
   type ProcessedMessage,
 } from '@/modules/noc/services/waMaintenanceProcessor';
+import { apiResponse } from '@/lib/apiResponse';
 const logger = createLogger('api:maintenance:wa-message');
 
 // Shared secret for Bridge authentication (same as whatsapp/inbound)
@@ -40,10 +41,7 @@ async function handler(
 ) {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      error: 'Method not allowed',
-    });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -56,10 +54,7 @@ async function handler(
     }
     if (body.secret !== BRIDGE_SECRET) {
       logger.warn('Invalid or missing bridge secret');
-      return res.status(401).json({
-        success: false,
-        error: 'Unauthorized: invalid bridge secret',
-      });
+      return apiResponse.unauthorized(res);
     }
 
     // Validate required fields

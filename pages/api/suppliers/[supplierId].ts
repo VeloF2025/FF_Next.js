@@ -8,6 +8,7 @@ import { NeonSupplierService } from '@/services/suppliers/neonSupplierService';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -15,7 +16,7 @@ async function handler(
   const { supplierId: id } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid supplier ID' });
+    return apiResponse.badRequest(res, 'Invalid supplier ID');
   }
 
   try {
@@ -27,7 +28,7 @@ async function handler(
       case 'DELETE':
         return handleDelete(id, req, res);
       default:
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
     }
   } catch (error) {
     log.error(`Supplier API error for ${id}:`, { data: error }, 'api');
@@ -64,9 +65,7 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
     const { data } = req.body;
     
     if (!data) {
-      return res.status(400).json({
-        error: 'Missing update data'
-      });
+      return apiResponse.badRequest(res, 'Missing update data');
     }
 
     // Check if supplier exists

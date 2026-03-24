@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 /**
  * Database Info API Route
  * Gets database version and connection information
@@ -11,7 +12,7 @@ async function handler(
 ) {
   // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

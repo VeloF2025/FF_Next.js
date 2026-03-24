@@ -17,19 +17,20 @@ import type {
   ActivatorPerformance,
   InstallerPerformance
 } from '@/types/technician.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { id, dateFrom, dateTo } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'id is required' });
+    return apiResponse.badRequest(res, 'id is required');
   }
 
   // Default date range: last 30 days
@@ -56,7 +57,7 @@ async function handler(
     );
 
     if (techResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Technician not found' });
+      return apiResponse.notFound(res, 'Technician not found');
     }
 
     const tech = techResult.rows[0];

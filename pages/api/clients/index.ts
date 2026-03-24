@@ -4,6 +4,7 @@ import { safeArrayQuery } from '../../../lib/safe-query';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '../../../lib/api-error-handler';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Transform database client record to frontend Client type
 function transformClient(dbClient: Record<string, unknown>) {
@@ -289,7 +290,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       }
 
       default:
-        res.status(405).json({ success: false, error: 'Method not allowed' });
+        apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     }
   } catch (error) {
     log.error('Client API request failed', { error, method: req.method, path: '/api/clients' }, 'ClientsAPI');

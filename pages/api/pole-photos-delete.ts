@@ -12,6 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 const sql = neon(process.env.DATABASE_URL!);
 
 // Valid photo types
@@ -36,7 +37,7 @@ async function handler(
   res: NextApiResponse<DeleteResponse>
 ) {
   if (req.method !== 'DELETE') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['DELETE']);
   }
 
   try {

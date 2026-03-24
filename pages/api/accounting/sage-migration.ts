@@ -15,7 +15,6 @@ import {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
     return apiResponse.methodNotAllowed(res, req.method || '', ['GET']);
   }
 

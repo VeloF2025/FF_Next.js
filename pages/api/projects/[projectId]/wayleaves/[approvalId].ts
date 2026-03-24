@@ -31,7 +31,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'DELETE':
       return handleDelete(req as AuthenticatedNextApiRequest, res, projectId, approvalId);
     default:
-      res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'PUT', 'DELETE']);
   }
 }

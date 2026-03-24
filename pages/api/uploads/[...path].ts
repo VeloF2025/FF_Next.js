@@ -13,6 +13,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import path from 'path';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // MIME type mapping for common file types
 const MIME_TYPES: Record<string, string> = {
@@ -34,7 +35,7 @@ const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
@@ -43,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const forceDownload = download === 'true' || download === '1';
 
     if (!pathSegments || !Array.isArray(pathSegments)) {
-      return res.status(400).json({ error: 'Invalid file path' });
+      return apiResponse.badRequest(res, 'Invalid file path');
     }
 
     // Join path segments and sanitize
@@ -51,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Prevent path traversal attacks
     if (filePath.includes('..') || filePath.startsWith('/')) {
-      return res.status(400).json({ error: 'Invalid file path' });
+      return apiResponse.badRequest(res, 'Invalid file path');
     }
 
     // Proxy request to VF Storage
@@ -60,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return res.status(404).json({ error: 'File not found' });
+        return apiResponse.notFound(res, 'File not found');
       }
       throw new Error(`VF Storage returned ${response.status}`);
     }
@@ -87,7 +88,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(200).send(fileBuffer);
   } catch (error) {
     log.error('File serving error', { error });
-    return res.status(500).json({ error: 'Failed to serve file' });
+    return apiResponse.internalError(res, new Error('Failed to serve file'));
   }
 }
 

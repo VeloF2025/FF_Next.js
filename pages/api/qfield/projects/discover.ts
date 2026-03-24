@@ -8,10 +8,11 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import { getProjects } from '@/modules/qfield-sync/services/qfieldcloudApiService';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

@@ -12,6 +12,7 @@ import { neon } from '@neondatabase/serverless';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { SageClient } from '@/services/sage';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger({ module: 'api:sage:oauth:callback' });
 
@@ -20,7 +21,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { code, state, error, error_description } = req.query;

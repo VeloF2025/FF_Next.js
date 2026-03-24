@@ -8,6 +8,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { execSync } from 'child_process';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Cache the version at module load time (once per server start)
 let cachedVersion: string | null = null;
@@ -36,7 +37,7 @@ function getVersion(): string {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const version = getVersion();

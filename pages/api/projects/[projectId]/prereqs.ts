@@ -19,6 +19,7 @@ import type {
   PrereqPhase,
 } from '@/types/pon-stages.types';
 import { PREREQ_PHASE_LABELS } from '@/types/pon-stages.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 /** Map DB stage values to prereq phases */
 const STAGE_TO_PHASE: Record<string, PrereqPhase> = {
@@ -55,7 +56,7 @@ async function handler(
     return handlePatch(req, res, projectIdStr);
   }
 
-  return res.status(405).json({ success: false, error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PATCH']);
 }
 
 /**

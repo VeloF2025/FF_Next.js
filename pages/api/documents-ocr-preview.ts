@@ -29,6 +29,7 @@ import {
 import { getDocumentTypeName, buildTopGuesses } from '@/services/ocr/documentClassificationService';
 import { uploadForOcr, cleanupOcrTempFiles } from '@/services/ocr/ocrTempStorageService';
 import type { OcrPreviewResponse } from '@/services/ocr/types';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Disable body parser for file uploads
 export const config = { api: { bodyParser: false } };
@@ -38,7 +39,7 @@ async function handler(
   res: NextApiResponse<OcrPreviewResponse | { error: string }>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const startTime = Date.now();
@@ -53,10 +54,10 @@ async function handler(
     const entityType = (Array.isArray(fields.entityType) ? fields.entityType[0] : fields.entityType) ?? 'staff';
     const documentType = Array.isArray(fields.documentType) ? fields.documentType[0] : fields.documentType;
 
-    if (!staffId) return res.status(400).json({ error: 'staffId is required' });
+    if (!staffId) return apiResponse.badRequest(res, 'staffId is required');
 
     const uploadedFile = Array.isArray(files.file) ? files.file[0] : files.file;
-    if (!uploadedFile) return res.status(400).json({ error: 'No file uploaded' });
+    if (!uploadedFile) return apiResponse.badRequest(res, 'No file uploaded');
 
     const isPdf = isPdfFile(uploadedFile);
     log.info('OCR Preview request', {

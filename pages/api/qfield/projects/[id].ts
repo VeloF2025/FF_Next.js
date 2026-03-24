@@ -9,6 +9,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -19,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') return handleGet(id, res);
   if (req.method === 'PUT') return handlePut(id, req, res);
   if (req.method === 'DELETE') return handleDelete(id, res);
-  return res.status(405).json({ success: false, error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
 }
 
 async function handleGet(id: string, res: NextApiResponse) {

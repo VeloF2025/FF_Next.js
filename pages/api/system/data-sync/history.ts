@@ -15,6 +15,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import type { SyncHistoryEntry, SyncOperationType } from '@/modules/data-sync/types';
+import { apiResponse } from '@/lib/apiResponse';
 
 const rawSql = neon(process.env.DATABASE_URL!);
 
@@ -55,7 +56,7 @@ async function autoCompleteStaleOperations(): Promise<void> {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

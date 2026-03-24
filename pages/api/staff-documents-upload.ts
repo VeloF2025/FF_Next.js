@@ -19,6 +19,7 @@ import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { DocumentType } from '@/types/staff-document.types';
 import { logDocumentUploaded } from '@/services/staff/staffAuditService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentsUploadAPI');
@@ -61,7 +62,7 @@ export const config = {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const tempFilePaths: string[] = [];
@@ -184,7 +185,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       fileBack = fileBackArray[0];
 
       if (!fileFront || !fileBack) {
-        return res.status(400).json({ error: 'No file uploaded. Please select a document.' });
+        return apiResponse.badRequest(res, 'No file uploaded. Please select a document.');
       }
 
       validateFile(fileFront, 'front');
@@ -195,7 +196,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       validateFile(file, 'document');
       tempFilePaths.push(file.filepath);
     } else {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     // Check if VF Storage is available (required)
@@ -224,7 +225,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const frontBuffer = await fs.promises.readFile(fileFront.filepath);
       const frontValidation = validateMagicBytes(frontBuffer);
       if (!frontValidation.valid) {
-        return res.status(400).json({ error: 'Front file content does not match an allowed type.' });
+        return apiResponse.badRequest(res, 'Front file content does not match an allowed type.');
       }
       const frontResult = await uploadStaffDocument(
         staffId,
@@ -241,7 +242,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const backBuffer = await fs.promises.readFile(fileBack.filepath);
       const backValidation = validateMagicBytes(backBuffer);
       if (!backValidation.valid) {
-        return res.status(400).json({ error: 'Back file content does not match an allowed type.' });
+        return apiResponse.badRequest(res, 'Back file content does not match an allowed type.');
       }
       const backResult = await uploadStaffDocument(
         staffId,
@@ -263,7 +264,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const fileBuffer = await fs.promises.readFile(file.filepath);
       const { valid: magicValid } = validateMagicBytes(fileBuffer);
       if (!magicValid) {
-        return res.status(400).json({ error: 'File content does not match an allowed type (PDF, JPG, PNG, Word, Excel).' });
+        return apiResponse.badRequest(res, 'File content does not match an allowed type (PDF, JPG, PNG, Word, Excel).');
       }
       const vfResult = await uploadStaffDocument(
         staffId,

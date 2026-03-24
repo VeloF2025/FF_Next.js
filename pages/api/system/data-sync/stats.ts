@@ -11,12 +11,13 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { createLoggedSql } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
 import type { DataSyncStats } from '@/modules/data-sync/types';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

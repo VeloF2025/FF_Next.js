@@ -12,6 +12,7 @@ import { uploadStaffDocument, deleteStaffDocument, isVFStorageAvailable } from '
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffProfilePhotoAPI');
@@ -27,13 +28,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { staffId } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   // Verify staff exists
   const [staff] = await sql`SELECT id, name FROM staff WHERE id = ${staffId}`;
   if (!staff) {
-    return res.status(404).json({ error: 'Staff member not found' });
+    return apiResponse.notFound(res, 'Staff member not found');
   }
 
   if (req.method === 'POST') {
@@ -41,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   } else if (req.method === 'DELETE') {
     return handleDelete(req, res, staffId);
   } else {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST', 'DELETE']);
   }
 }
 
@@ -61,7 +62,7 @@ async function handleUpload(req: NextApiRequest, res: NextApiResponse, staffId: 
     const file = fileArray[0];
 
     if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     tempFilePath = file.filepath;
@@ -69,13 +70,13 @@ async function handleUpload(req: NextApiRequest, res: NextApiResponse, staffId: 
     // Validate file type (images only)
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.mimetype || '')) {
-      return res.status(400).json({ error: 'Only JPEG, PNG, and WebP images are allowed' });
+      return apiResponse.badRequest(res, 'Only JPEG, PNG, and WebP images are allowed');
     }
 
     // Validate file size (max 5MB for profile photos)
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      return res.status(400).json({ error: 'File too large. Maximum size: 5MB' });
+      return apiResponse.badRequest(res, 'File too large. Maximum size: 5MB');
     }
 
     // Upload to VF Storage

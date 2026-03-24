@@ -13,6 +13,7 @@ import { createLogger } from '@/lib/logger';
 import sharp from 'sharp';
 import { withAuth } from '@/lib/auth';
 import { recordCorrectExtraction } from '@/services/vlmLearningService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ExtractIdPhotoAPI');
@@ -30,18 +31,18 @@ interface BoundingBox {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 
   const { staffId } = req.query;
   const { documentUrl, force } = req.body;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   if (!documentUrl) {
-    return res.status(400).json({ error: 'Document URL is required' });
+    return apiResponse.badRequest(res, 'Document URL is required');
   }
 
   try {

@@ -14,6 +14,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 // Disable default body parser for file uploads
 export const config = {
   api: {
@@ -57,7 +58,7 @@ async function handler(
   res: NextApiResponse<UploadResponse>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

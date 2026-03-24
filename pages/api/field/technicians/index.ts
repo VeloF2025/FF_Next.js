@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/api-error-handler';
 import { withAuth } from '@/lib/auth';
 import { createLoggedSql, logCreate, logUpdate } from '@/lib/db-logger';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Initialize database connection with logging
 const sql = createLoggedSql(process.env.DATABASE_URL!);
@@ -85,7 +86,7 @@ export default withAuth(withErrorHandler(async (
       });
     } catch (error) {
       log.error('Error fetching technicians', { error });
-      res.status(500).json({ error: 'Failed to fetch technicians' });
+      apiResponse.internalError(res, new Error('Failed to fetch technicians'));
     }
   } else if (req.method === 'POST') {
     try {
@@ -130,10 +131,10 @@ export default withAuth(withErrorHandler(async (
       });
     } catch (error) {
       log.error('Error adding technician', { error });
-      res.status(500).json({ error: 'Failed to add technician' });
+      apiResponse.internalError(res, new Error('Failed to add technician'));
     }
   } else {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 }))
 

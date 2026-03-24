@@ -11,13 +11,14 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { itemId } = req.query;
 
   if (!itemId || typeof itemId !== 'string') {
-    return res.status(400).json({ error: 'Invalid item ID' });
+    return apiResponse.badRequest(res, 'Invalid item ID');
   }
 
   // GET - Get single stock item
@@ -28,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!item) {
-        return res.status(404).json({ error: 'Stock item not found' });
+        return apiResponse.notFound(res, 'Stock item not found');
       }
 
       // Get supplier codes for this item
@@ -50,7 +51,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       });
     } catch (error) {
       log.error('Error fetching stock item', { error });
-      return res.status(500).json({ error: 'Failed to fetch stock item' });
+      return apiResponse.internalError(res, new Error('Failed to fetch stock item'));
     }
   }
 
@@ -61,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const [existing] = await sql`SELECT id FROM stock_items WHERE id = ${itemId}`;
       if (!existing) {
-        return res.status(404).json({ error: 'Stock item not found' });
+        return apiResponse.notFound(res, 'Stock item not found');
       }
 
       // Check for duplicate item code if changing
@@ -109,7 +110,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Item with this code already exists' });
       }
-      return res.status(500).json({ error: 'Failed to update stock item' });
+      return apiResponse.internalError(res, new Error('Failed to update stock item'));
     }
   }
 
@@ -118,7 +119,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const [existing] = await sql`SELECT id, odoo_product_id FROM stock_items WHERE id = ${itemId}`;
       if (!existing) {
-        return res.status(404).json({ error: 'Stock item not found' });
+        return apiResponse.notFound(res, 'Stock item not found');
       }
 
       // Warn if Odoo-synced item
@@ -141,11 +142,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json({ success: true, message: 'Stock item deleted successfully' });
     } catch (error) {
       log.error('Error deleting stock item', { error });
-      return res.status(500).json({ error: 'Failed to delete stock item' });
+      return apiResponse.internalError(res, new Error('Failed to delete stock item'));
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

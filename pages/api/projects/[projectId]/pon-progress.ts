@@ -12,6 +12,7 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import type { ProgressCategory, ProgressStatus, PonDailyLogEntry } from '@/types/pon-stages.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 function deriveStatus(pct: number, targetDate: string | null): ProgressStatus {
   if (pct >= 100) return 'complete';
@@ -29,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const projectIdStr = Array.isArray(projectId) ? projectId[0] : projectId;
 
   if (!projectIdStr) {
-    return res.status(400).json({ error: 'Missing projectId' });
+    return apiResponse.badRequest(res, 'Missing projectId');
   }
 
   if (req.method === 'GET') {
@@ -38,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'PUT') {
     return handlePut(req as AuthenticatedNextApiRequest, res, projectIdStr);
   }
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT']);
 }
 
 async function handleGet(req: NextApiRequest, res: NextApiResponse, projectId: string) {
@@ -54,7 +55,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, projectId: s
       [projectId]
     );
     if (projResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Project not found' });
+      return apiResponse.notFound(res, 'Project not found');
     }
     const projectName = projResult.rows[0]!.project_name;
 
@@ -194,7 +195,7 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse,
   };
 
   if (!pon_stage_id || !action) {
-    return res.status(400).json({ error: 'Missing pon_stage_id or action' });
+    return apiResponse.badRequest(res, 'Missing pon_stage_id or action');
   }
 
   const client = await pool.connect();
@@ -205,14 +206,14 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse,
       [pon_stage_id, projectId]
     );
     if (verify.rows.length === 0) {
-      return res.status(404).json({ error: 'PON not found in this project' });
+      return apiResponse.notFound(res, 'PON not found in this project');
     }
 
     if (action === 'set_target') {
       const { category, target_date } = req.body as { category?: string; target_date?: string | null };
       const validCats: ProgressCategory[] = ['cwc', 'optical', 'activation', 'maintenance'];
       if (!category || !validCats.includes(category as ProgressCategory)) {
-        return res.status(400).json({ error: 'Invalid category' });
+        return apiResponse.badRequest(res, 'Invalid category');
       }
       await client.query(
         `UPDATE pon_stage_tracking SET ${category}_target_date = $1 WHERE id = $2`,
@@ -237,7 +238,7 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse,
         daily_log?: { category?: string; activity?: string; delay_reason?: string | null; date?: string };
       };
       if (!daily_log?.category || !daily_log?.activity) {
-        return res.status(400).json({ error: 'Missing daily_log.category or daily_log.activity' });
+        return apiResponse.badRequest(res, 'Missing daily_log.category or daily_log.activity');
       }
       const logDate = daily_log.date || new Date().toISOString().split('T')[0];
       const userName = req.user?.name || req.user?.email || 'Unknown';
@@ -253,7 +254,7 @@ async function handlePut(req: AuthenticatedNextApiRequest, res: NextApiResponse,
       return res.status(200).json({ success: true });
     }
 
-    return res.status(400).json({ error: `Unknown action: ${action}` });
+    return apiResponse.badRequest(res, `Unknown action: ${action}`);
   } catch (error) {
     log.error('Failed to update PON progress', { error, projectId }, 'PonProgress');
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });

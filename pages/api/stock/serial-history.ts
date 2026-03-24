@@ -9,12 +9,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const sql = neon(DATABASE_URL);
@@ -23,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { serialId } = req.query;
 
     if (!serialId || typeof serialId !== 'string') {
-      return res.status(400).json({ error: 'serialId query parameter is required' });
+      return apiResponse.badRequest(res, 'serialId query parameter is required');
     }
 
     // Verify serial exists
@@ -35,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!serial) {
-      return res.status(404).json({ error: 'Serial unit not found' });
+      return apiResponse.notFound(res, 'Serial unit not found');
     }
 
     const history = await sql`
@@ -63,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     log.error('Failed to fetch serial history', { error }, 'StockSerialHistory');
-    return res.status(500).json({ error: 'Failed to fetch serial history' });
+    return apiResponse.internalError(res, new Error('Failed to fetch serial history'));
   }
 }
 

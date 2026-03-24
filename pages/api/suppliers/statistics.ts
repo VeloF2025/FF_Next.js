@@ -8,13 +8,14 @@ import { NeonSupplierService } from '@/services/suppliers/neonSupplierService';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
     if (req.method !== 'GET') {
-      return res.status(405).json({ error: 'Method not allowed' });
+      return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     }
 
     // Get all suppliers to calculate statistics

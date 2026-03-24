@@ -2,18 +2,19 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   const { projectId } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {
-    return res.status(400).json({ error: 'Project ID is required' });
+    return apiResponse.badRequest(res, 'Project ID is required');
   }
 
   try {
@@ -37,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const { data } = req.body;
         
         if (!data || !Array.isArray(data)) {
-          return res.status(400).json({ error: 'Invalid fibre data' });
+          return apiResponse.badRequest(res, 'Invalid fibre data');
         }
 
         // Clear existing data

@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, hasRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
@@ -15,27 +16,27 @@ const CHECKOUT_ELIGIBLE_CATEGORIES = ['tools', 'assets', 'ppe'];
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const sql = neon(DATABASE_URL);
   const user = (req as any).user;
 
   if (!hasRole(user, 'manager')) {
-    return res.status(403).json({ error: 'Manager role or higher required' });
+    return apiResponse.forbidden(res, 'Manager role or higher required');
   }
 
   try {
     const { serialId, projectId, jobSiteName, expectedReturnDate } = req.body;
 
     if (!serialId || !expectedReturnDate) {
-      return res.status(400).json({ error: 'serialId and expectedReturnDate are required' });
+      return apiResponse.badRequest(res, 'serialId and expectedReturnDate are required');
     }
 
     // Validate return date is in the future
     const returnDate = new Date(expectedReturnDate);
     if (returnDate <= new Date()) {
-      return res.status(400).json({ error: 'Expected return date must be in the future' });
+      return apiResponse.badRequest(res, 'Expected return date must be in the future');
     }
 
     // Fetch serial with stock item info
@@ -54,11 +55,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!serial) {
-      return res.status(404).json({ error: 'Serial unit not found' });
+      return apiResponse.notFound(res, 'Serial unit not found');
     }
 
     if (serial.status !== 'available') {
-      return res.status(400).json({ error: `Unit is currently ${serial.status}, cannot check out` });
+      return apiResponse.badRequest(res, `Unit is currently ${serial.status}, cannot check out`);
     }
 
     if (!CHECKOUT_ELIGIBLE_CATEGORIES.includes(serial.category)) {
@@ -108,7 +109,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     log.error('Failed to check out tool', { error }, 'StockCheckout');
-    return res.status(500).json({ error: 'Failed to check out tool' });
+    return apiResponse.internalError(res, new Error('Failed to check out tool'));
   }
 }
 

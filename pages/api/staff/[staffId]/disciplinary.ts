@@ -16,6 +16,7 @@ import type {
   DisciplinaryIncidentCreate,
   DisciplinaryIncidentUpdate,
 } from '@/types/staff';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDisciplinaryAPI');
@@ -24,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { staffId, id } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   // GET - Fetch disciplinary incidents
@@ -94,7 +95,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const body = req.body as DisciplinaryIncidentCreate;
 
       if (!body.incidentDate || !body.incidentType || !body.description) {
-        return res.status(400).json({ error: 'Incident date, type, and description are required' });
+        return apiResponse.badRequest(res, 'Incident date, type, and description are required');
       }
 
       const [created] = await sql`
@@ -125,7 +126,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!created) {
-        return res.status(500).json({ error: 'Failed to create disciplinary incident' });
+        return apiResponse.internalError(res, new Error('Failed to create disciplinary incident'));
       }
 
       logger.info('Disciplinary incident created', { staffId, incidentId: created.id });
@@ -155,7 +156,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // PUT - Update disciplinary incident
   if (req.method === 'PUT') {
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Incident ID is required' });
+      return apiResponse.badRequest(res, 'Incident ID is required');
     }
 
     try {
@@ -168,7 +169,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!existing) {
-        return res.status(404).json({ error: 'Disciplinary incident not found' });
+        return apiResponse.notFound(res, 'Disciplinary incident not found');
       }
 
       const [updated] = await sql`
@@ -191,7 +192,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!updated) {
-        return res.status(500).json({ error: 'Failed to update disciplinary incident' });
+        return apiResponse.internalError(res, new Error('Failed to update disciplinary incident'));
       }
 
       logger.info('Disciplinary incident updated', { staffId, incidentId: id });
@@ -221,7 +222,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // DELETE - Delete disciplinary incident
   if (req.method === 'DELETE') {
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Incident ID is required' });
+      return apiResponse.badRequest(res, 'Incident ID is required');
     }
 
     try {
@@ -232,7 +233,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!existing) {
-        return res.status(404).json({ error: 'Disciplinary incident not found' });
+        return apiResponse.notFound(res, 'Disciplinary incident not found');
       }
 
       await sql`DELETE FROM disciplinary_incidents WHERE id = ${id}`;
@@ -250,7 +251,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PUT', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

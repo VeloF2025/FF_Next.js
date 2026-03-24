@@ -10,6 +10,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffPhotoCompareAPI');
@@ -19,13 +20,13 @@ const VLLM_ENDPOINT = process.env.VLLM_ENDPOINT || 'http://100.96.203.105:8100';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 
   const { staffId } = req.query;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   try {
@@ -37,19 +38,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!staff) {
-      return res.status(404).json({ error: 'Staff member not found' });
+      return apiResponse.notFound(res, 'Staff member not found');
     }
 
     if (!staff.id_photo_url) {
-      return res.status(400).json({
-        error: 'No ID photo available. Upload an SA ID or Passport document first.'
-      });
+      return apiResponse.badRequest(res, 'No ID photo available. Upload an SA ID or Passport document first.');
     }
 
     if (!staff.profile_photo_url) {
-      return res.status(400).json({
-        error: 'No profile photo available. Upload a profile photo first.'
-      });
+      return apiResponse.badRequest(res, 'No profile photo available. Upload a profile photo first.');
     }
 
     // Check if VLLM is available (use /v1/models endpoint)

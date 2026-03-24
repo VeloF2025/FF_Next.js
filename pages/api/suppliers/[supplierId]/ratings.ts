@@ -9,6 +9,7 @@ import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 const sql = neon(process.env.DATABASE_URL!);
 
 async function handler(
@@ -18,7 +19,7 @@ async function handler(
   const { supplierId: id } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid supplier ID' });
+    return apiResponse.badRequest(res, 'Invalid supplier ID');
   }
 
   try {
@@ -28,7 +29,7 @@ async function handler(
       case 'POST':
         return handlePost(id, req, res);
       default:
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
     }
   } catch (error) {
     log.error(`Supplier ratings API error for ${id}:`, { data: error }, 'api');

@@ -10,6 +10,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createLogger } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('maintenance:wa-photos');
 
@@ -22,25 +23,25 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
     const { path } = req.query;
 
     if (!path || !Array.isArray(path) || path.length < 2) {
-      return res.status(400).json({ error: 'Invalid path. Expected: /group_jid/filename' });
+      return apiResponse.badRequest(res, 'Invalid path. Expected: /group_jid/filename');
     }
 
     const [groupJid, filename] = path;
 
     if (!groupJid || !filename) {
-      return res.status(400).json({ error: 'Invalid path. Expected: /group_jid/filename' });
+      return apiResponse.badRequest(res, 'Invalid path. Expected: /group_jid/filename');
     }
 
     // Validate filename to prevent directory traversal
     if (filename.includes('..') || filename.includes('/')) {
-      return res.status(400).json({ error: 'Invalid filename' });
+      return apiResponse.badRequest(res, 'Invalid filename');
     }
 
     // Fetch photo from VPS via SSH/SCP or HTTP proxy
@@ -53,7 +54,7 @@ async function handler(
 
     if (!response.ok) {
       logger.error({ status: response.status, groupJid, filename }, 'Failed to fetch photo from VPS');
-      return res.status(404).json({ error: 'Photo not found' });
+      return apiResponse.notFound(res, 'Photo not found');
     }
 
     const contentType = response.headers.get('content-type') || 'image/jpeg';
@@ -64,7 +65,7 @@ async function handler(
     res.send(Buffer.from(buffer));
   } catch (error) {
     logger.error({ error }, 'Error serving maintenance photo');
-    return res.status(500).json({ error: 'Failed to fetch photo' });
+    return apiResponse.internalError(res, new Error('Failed to fetch photo'));
   }
 }
 

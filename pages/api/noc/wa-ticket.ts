@@ -19,6 +19,7 @@ import {
 } from '@/modules/noc/types/ticket';
 import { updateMaintenanceFlagStatus } from '@/modules/noc/services/waMaintenanceProcessor';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('api:maintenance:wa-ticket');
 
@@ -55,10 +56,7 @@ async function handler(
 ) {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      error: 'Method not allowed',
-    });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

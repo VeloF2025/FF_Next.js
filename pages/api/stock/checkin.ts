@@ -8,26 +8,27 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, hasRole } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const sql = neon(DATABASE_URL);
   const user = (req as any).user;
 
   if (!hasRole(user, 'manager')) {
-    return res.status(403).json({ error: 'Manager role or higher required' });
+    return apiResponse.forbidden(res, 'Manager role or higher required');
   }
 
   try {
     const { checkoutId, conditionNotes } = req.body;
 
     if (!checkoutId) {
-      return res.status(400).json({ error: 'checkoutId is required' });
+      return apiResponse.badRequest(res, 'checkoutId is required');
     }
 
     // Fetch checkout record
@@ -42,11 +43,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!checkout) {
-      return res.status(404).json({ error: 'Checkout record not found' });
+      return apiResponse.notFound(res, 'Checkout record not found');
     }
 
     if (checkout.status !== 'checked_out') {
-      return res.status(400).json({ error: 'This item has already been returned' });
+      return apiResponse.badRequest(res, 'This item has already been returned');
     }
 
     // Update checkout record
@@ -88,7 +89,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     log.error('Failed to check in tool', { error }, 'StockCheckin');
-    return res.status(500).json({ error: 'Failed to check in tool' });
+    return apiResponse.internalError(res, new Error('Failed to check in tool'));
   }
 }
 

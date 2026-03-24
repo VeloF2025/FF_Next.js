@@ -14,6 +14,7 @@ import { log } from '@/lib/logger';
 import { getStaffById, getStaffList } from '@/services/staff/staffGetService';
 import { createStaff, deleteStaffMember } from '@/services/staff/staffCreateService';
 import { updateStaff } from '@/services/staff/staffUpdateDeleteService';
+import { apiResponse } from '@/lib/apiResponse';
 
 export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextApiResponse) => {
   const authReq = req as AuthenticatedNextApiRequest;
@@ -82,7 +83,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
 
       // -----------------------------------------------------------------------
       default:
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'PUT', 'DELETE']);
     }
   } catch (error: unknown) {
     log.error('Staff API Error', { error });

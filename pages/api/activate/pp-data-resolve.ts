@@ -17,6 +17,7 @@ import pool from '@/lib/db';
 import { createOneMapClient } from '@/services/onemap';
 import { extractWaPhotoSerials } from '@/modules/activate/services/serialVerificationService';
 import { logTicketActivity } from '@/modules/noc/services/ticketService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('PPDataResolve');
 
@@ -877,7 +878,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { action } = req.body;

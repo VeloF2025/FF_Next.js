@@ -8,6 +8,7 @@ import {
   renewSubscription,
   createWebhookSubscription,
 } from '@/lib/graph/subscriptions';
+import { apiResponse } from '@/lib/apiResponse';
 
 const LOGGER = 'GraphSubRenewal';
 
@@ -33,7 +34,7 @@ export default async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     return;
   }
 
@@ -41,7 +42,7 @@ export default async function handler(
 
   if (!cronSecret) {
     log.error('CRON_SECRET is not configured', {}, LOGGER);
-    res.status(500).json({ error: 'Server misconfiguration' });
+    apiResponse.internalError(res, new Error('Server misconfiguration'));
     return;
   }
 
@@ -52,7 +53,7 @@ export default async function handler(
       { ip: req.headers['x-forwarded-for'] ?? req.socket.remoteAddress },
       LOGGER
     );
-    res.status(401).json({ error: 'Unauthorized' });
+    apiResponse.unauthorized(res);
     return;
   }
 

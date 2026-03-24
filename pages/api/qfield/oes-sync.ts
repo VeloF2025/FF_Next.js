@@ -8,6 +8,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // VPS Configuration - Updated Jan 2026 to use Velocity Server
 const VPS_HOST = process.env.VPS_HOST || '100.96.203.105';
@@ -17,7 +18,7 @@ const SSH_KEY_PATH = process.env.VPS_SSH_KEY_PATH || '/home/velo/.ssh/id_rsa';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -25,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const { projectId } = req.body;
 
     if (!projectId || typeof projectId !== 'string') {
-      return res.status(400).json({ error: 'projectId is required' });
+      return apiResponse.badRequest(res, 'projectId is required');
     }
 
     log.info('api/qfield/oes-sync', { action: 'startSync', projectId });

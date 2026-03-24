@@ -7,25 +7,26 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['PUT']);
   }
 
   try {
     const { id, ...updates } = req.body;
 
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Invalid or missing ID' });
+      return apiResponse.badRequest(res, 'Invalid or missing ID');
     }
 
     // Check if contractor exists
     const [existing] = await sql`SELECT id FROM contractors WHERE id = ${id}`;
     if (!existing) {
-      return res.status(404).json({ error: 'Contractor not found' });
+      return apiResponse.notFound(res, 'Contractor not found');
     }
 
     // Update contractor
@@ -68,7 +69,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         error: 'Contractor with this registration number or email already exists'
       });
     }
-    return res.status(500).json({ error: 'Failed to update contractor' });
+    return apiResponse.internalError(res, new Error('Failed to update contractor'));
   }
 }
 

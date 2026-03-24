@@ -3,7 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import { transcribeAudio } from '@/lib/recording-bot/transcriber';
 import { processWithLLM } from '@/lib/llm/meeting-processor';
 

@@ -14,6 +14,7 @@ import { promisify } from 'util';
 import { withAuth, withPermission } from '@/lib/auth/middleware';
 import path from 'path';
 import fs from 'fs';
+import { apiResponse } from '@/lib/apiResponse';
 
 const execAsync = promisify(exec);
 const MINIO_BUCKET = process.env.MINIO_BUCKET || 'qfieldcloud-prod';
@@ -29,13 +30,13 @@ let spTokenCache: { token: string; expiresAt: number } | null = null;
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { key, source = 'qfield' } = req.query;
 
   if (!key || typeof key !== 'string') {
-    return res.status(400).json({ error: 'Photo key parameter required' });
+    return apiResponse.badRequest(res, 'Photo key parameter required');
   }
 
   try {
@@ -55,10 +56,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return await proxyStoragePhoto(key, res);
     }
 
-    return res.status(400).json({ error: `Unsupported photo source: ${source}` });
+    return apiResponse.badRequest(res, `Unsupported photo source: ${source}`);
   } catch (error) {
     log.error('Proxy error', { module: 'cqa-photo-proxy', error: (error as Error).message, source, key }, 'cqa-photo-proxy');
-    return res.status(500).json({ error: 'Failed to proxy photo' });
+    return apiResponse.internalError(res, new Error('Failed to proxy photo'));
   }
 }
 
@@ -184,7 +185,7 @@ async function resolveLatestVersion(objectPath: string): Promise<string | null> 
 async function proxyStoragePhoto(storageKey: string, res: NextApiResponse): Promise<void> {
   const normalized = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, '');
   if (normalized.includes('..') || normalized.startsWith('/')) {
-    res.status(400).json({ error: 'Invalid storage key' });
+    apiResponse.badRequest(res, 'Invalid storage key');
     return;
   }
 
@@ -218,7 +219,7 @@ async function proxyLocalPhoto(storageKey: string, res: NextApiResponse): Promis
   // Prevent path traversal
   const normalized = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, '');
   if (normalized.includes('..') || normalized.startsWith('/')) {
-    res.status(400).json({ error: 'Invalid local storage key' });
+    apiResponse.badRequest(res, 'Invalid local storage key');
     return;
   }
 

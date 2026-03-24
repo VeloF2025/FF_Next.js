@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 type ErrorSeverity = 'fatal' | 'error' | 'warning' | 'info' | 'debug';
 
 interface ErrorContext {
@@ -139,8 +140,7 @@ async function handler(
 ): Promise<void> {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -148,7 +148,7 @@ async function handler(
 
     // Validate error event
     if (!isValidErrorEvent(errorEvent)) {
-      return res.status(400).json({ error: 'Invalid error event data' });
+      return apiResponse.badRequest(res, 'Invalid error event data');
     }
 
     // Check if should ignore
@@ -172,7 +172,7 @@ async function handler(
     res.status(200).json({ received: true });
   } catch (error) {
     log.error('[Error Tracking API] Error', { error });
-    res.status(500).json({ error: 'Internal server error' });
+    apiResponse.internalError(res, new Error('Internal server error'));
   }
 }
 

@@ -10,6 +10,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { createLogger } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('ProjectStaffAPI');
@@ -35,7 +36,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { projectId, activeOnly, staffId: staffIdToRemove } = req.query;
 
   if (!projectId || typeof projectId !== 'string') {
-    return res.status(400).json({ error: 'Project ID is required' });
+    return apiResponse.badRequest(res, 'Project ID is required');
   }
 
   // GET - Fetch staff for project
@@ -107,7 +108,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { staffId, role, startDate, endDate } = req.body;
 
       if (!staffId) {
-        return res.status(400).json({ error: 'Staff ID is required' });
+        return apiResponse.badRequest(res, 'Staff ID is required');
       }
 
       // Get the current user for assigned_by
@@ -146,7 +147,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         logger.info('Staff assignment reactivated', { staffId, projectId });
 
         if (!updated) {
-          return res.status(500).json({ error: 'Failed to update assignment' });
+          return apiResponse.internalError(res, new Error('Failed to update assignment'));
         }
 
         // Sync project count after reactivation
@@ -183,7 +184,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       logger.info('Staff assigned to project', { staffId, projectId });
 
       if (!created) {
-        return res.status(500).json({ error: 'Failed to create assignment' });
+        return apiResponse.internalError(res, new Error('Failed to create assignment'));
       }
 
       // Sync project count after new assignment
@@ -204,7 +205,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'DELETE') {
     try {
       if (!staffIdToRemove || typeof staffIdToRemove !== 'string') {
-        return res.status(400).json({ error: 'Staff ID is required in query params' });
+        return apiResponse.badRequest(res, 'Staff ID is required in query params');
       }
 
       const [updated] = await sql`
@@ -218,7 +219,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!updated) {
-        return res.status(404).json({ error: 'Assignment not found' });
+        return apiResponse.notFound(res, 'Assignment not found');
       }
 
       // Sync project count after removal
@@ -237,7 +238,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

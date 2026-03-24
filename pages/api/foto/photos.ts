@@ -9,6 +9,7 @@ import { withAuth } from '@/lib/auth';
 import type { DropRecord, Photo } from '@/modules/photo-review/types';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // BOSS VPS API base URL (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
@@ -56,7 +57,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

@@ -8,12 +8,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -21,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Validate required fields
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Document ID is required' });
+      return apiResponse.badRequest(res, 'Document ID is required');
     }
 
     if (!action || !['approve', 'reject'].includes(action)) {
@@ -29,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     if (!verifiedBy) {
-      return res.status(400).json({ error: 'verifiedBy is required' });
+      return apiResponse.badRequest(res, 'verifiedBy is required');
     }
 
     // Check if document exists
@@ -38,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!existing) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     // Update document verification status

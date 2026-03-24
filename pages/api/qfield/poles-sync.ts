@@ -2,19 +2,20 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { spawn } from 'child_process';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { projectId } = req.body;
 
   if (!projectId) {
-    return res.status(400).json({ error: 'projectId is required' });
+    return apiResponse.badRequest(res, 'projectId is required');
   }
 
   // Set headers for Server-Sent Events

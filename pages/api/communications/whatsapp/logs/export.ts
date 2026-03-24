@@ -9,6 +9,7 @@ import ws from 'ws';
 import type { WaMessageLogFilters } from '@/modules/communications/whatsapp/types/wa-admin.types';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Configure Neon WebSocket
 neonConfig.webSocketConstructor = ws;
@@ -22,8 +23,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
@@ -148,7 +148,7 @@ async function handler(
 
   } catch (error) {
     log.error('[WA Logs Export API] Error', { error });
-    return res.status(500).json({ error: 'Failed to export logs' });
+    return apiResponse.internalError(res, new Error('Failed to export logs'));
   }
 }
 

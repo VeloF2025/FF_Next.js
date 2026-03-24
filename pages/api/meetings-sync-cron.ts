@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { syncFirefliesToNeon } from '@/services/fireflies/firefliesService';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,7 +18,7 @@ export default async function handler(
 ) {
   // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   // Check authorization
@@ -26,7 +27,7 @@ export default async function handler(
 
   if (!cronSecret) {
     log.error('cronTask', { action: 'meetings-sync', error: 'CRON_SECRET not configured' });
-    return res.status(500).json({ error: 'Server misconfiguration' });
+    return apiResponse.internalError(res, new Error('Server misconfiguration'));
   }
 
   if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
@@ -35,14 +36,14 @@ export default async function handler(
       error: 'Unauthorized cron attempt',
       ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress
     });
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   try {
     const apiKey = process.env.FIREFLIES_API_KEY;
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'FIREFLIES_API_KEY not configured' });
+      return apiResponse.internalError(res, new Error('FIREFLIES_API_KEY not configured'));
     }
 
     log.debug('cronTask', { action: 'meetings-sync', step: 'start', timestamp: new Date().toISOString() });

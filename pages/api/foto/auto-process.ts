@@ -17,6 +17,7 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { autoProcessDropsBatch, type AutoProcessorStats } from '@/modules/photo-review/services/autoEvaluator';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // ==================== CONFIGURATION ====================
 
@@ -142,10 +143,7 @@ async function handler(
 ) {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({
-      error: 'Method not allowed',
-      message: 'This endpoint only accepts POST requests'
-    });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   // Check if feature is enabled
@@ -166,10 +164,7 @@ async function handler(
   if (CONFIG.API_KEY) {
     const providedKey = req.headers['x-api-key'] || req.query.api_key;
     if (providedKey !== CONFIG.API_KEY) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Invalid or missing API key'
-      });
+      return apiResponse.unauthorized(res);
     }
   }
 

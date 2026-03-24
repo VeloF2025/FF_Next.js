@@ -14,13 +14,14 @@ import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import type { ApplyTemplateResponse } from '@/types/pon-stages.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ success: boolean; data?: ApplyTemplateResponse; error?: string }>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { projectId } = req.query;

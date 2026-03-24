@@ -8,13 +8,14 @@ import { withAuth } from '@/lib/auth';
 import { getEvaluationByDR } from '@/modules/photo-review/services/fotoDbService';
 import { validateDrNumber } from '@/modules/photo-review/utils/drValidator';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

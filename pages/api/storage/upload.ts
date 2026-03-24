@@ -13,6 +13,7 @@ import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Allowed MIME types and their magic bytes for validation
 const ALLOWED_TYPES: Record<string, number[][]> = {
@@ -56,7 +57,7 @@ async function handler(
   res: NextApiResponse<UploadResponse>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

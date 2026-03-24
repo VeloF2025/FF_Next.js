@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 /**
  * Vercel Cron Job: Sync Action Items from Fireflies Meetings
@@ -24,7 +25,7 @@ export default async function handler(
   if (process.env.NODE_ENV === 'production' && cronSecret) {
     if (authHeader !== `Bearer ${cronSecret}`) {
       log.error('cronTask', { action: 'sync-action-items', error: 'Unauthorized request' });
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.unauthorized(res);
     }
   }
 

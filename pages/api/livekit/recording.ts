@@ -7,6 +7,7 @@ import { startRecording, stopRecording } from '@/modules/livekit/services/liveki
 import type { RecordingRequest, RecordingResponse } from '@/modules/livekit/types/livekit.types';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -16,7 +17,7 @@ async function handler(
 ) {
     // Only allow POST
     if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
     }
 
     try {

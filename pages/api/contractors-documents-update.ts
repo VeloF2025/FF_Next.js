@@ -8,12 +8,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['PUT']);
   }
 
   try {
@@ -30,7 +31,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Validate required field
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Document ID is required' });
+      return apiResponse.badRequest(res, 'Document ID is required');
     }
 
     // Check if document exists
@@ -39,7 +40,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!existing) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     // Update document

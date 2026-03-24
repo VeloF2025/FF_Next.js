@@ -17,6 +17,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { photoTypeToStep } from '@/modules/activate/utils/stepMapper';
+import { apiResponse } from '@/lib/apiResponse';
 
 const ONEMAP_HOST = process.env.ONEMAP_HOST || 'http://100.96.203.105:8003';
 
@@ -186,8 +187,7 @@ export default async function handler(
 ): Promise<void> {
   // Accept both GET and POST for flexibility
   if (req.method !== 'GET' && req.method !== 'POST') {
-    res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 
   // Verify cron secret in production (if configured)
@@ -197,7 +197,7 @@ export default async function handler(
   if (process.env.NODE_ENV === 'production' && cronSecret) {
     if (authHeader !== `Bearer ${cronSecret}`) {
       log.error('BackfillOneMap', 'Unauthorized request');
-      return res.status(401).json({ error: 'Unauthorized' });
+      return apiResponse.unauthorized(res);
     }
   }
 

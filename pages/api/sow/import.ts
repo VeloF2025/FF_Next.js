@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { processPoles, processDrops, processFibre } from '../../../src/services/sow/processor/dataProcessors';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -20,10 +21,10 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   try {

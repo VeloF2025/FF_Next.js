@@ -18,6 +18,7 @@ import https from 'https';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
+import { apiResponse } from '@/lib/apiResponse';
 
 // QFieldCloud Configuration
 const QFIELD_API_URL = process.env.QFIELD_API_URL || 'https://qfield.fibreflow.app/api/v1';
@@ -336,7 +337,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {

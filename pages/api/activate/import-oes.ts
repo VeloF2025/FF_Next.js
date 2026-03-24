@@ -27,6 +27,7 @@ import {
   triggerPpActivationCheck,
   triggerOntSwapConfirmation,
 } from '@/modules/activate/services/oes/oesPostImportService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const logger = createLogger('api/activate/import-oes');
 
@@ -64,7 +65,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -74,7 +75,7 @@ async function handler(
     const uploadedFile = Array.isArray(fileField) ? fileField[0] : fileField;
 
     if (!uploadedFile) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     const filePath = uploadedFile.filepath;

@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Only allow fetching from known internal hosts
 const ALLOWED_HOSTS = [
@@ -30,18 +31,18 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { url } = req.query;
 
   if (!url || typeof url !== 'string') {
-    return res.status(400).json({ error: 'URL parameter required' });
+    return apiResponse.badRequest(res, 'URL parameter required');
   }
 
   if (!isAllowedUrl(url)) {
     log.warn('foto-photo-proxy', { url }, 'Blocked request to disallowed host');
-    return res.status(403).json({ error: 'URL host not allowed' });
+    return apiResponse.forbidden(res, 'URL host not allowed');
   }
 
   try {

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { execSync } from 'child_process'
 import { log } from '@/lib/logger'
+import { apiResponse } from '@/lib/apiResponse';
 
 interface ServiceHealth {
   name: string
@@ -105,7 +106,7 @@ async function getGitHubStatus() {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<DeployHealthResponse | { error: string }>) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET'])
   }
 
   try {
@@ -125,6 +126,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     })
   } catch (e) {
     log.error('deploy-health check', { error: e instanceof Error ? e.message : String(e) })
-    return res.status(500).json({ error: 'Internal server error' })
+    return apiResponse.internalError(res, new Error('Internal server error'))
   }
 }

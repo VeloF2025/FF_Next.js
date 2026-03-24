@@ -12,6 +12,7 @@ import { createLogger } from '@/lib/logger';
 import { recordOcrCorrections } from '@/modules/qa-learning';
 import { logDocumentVerified, logDocumentRejected } from '@/services/staff/staffAuditService';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentVerifyAPI');
@@ -29,13 +30,13 @@ async function getVerifierName(verifierId: string): Promise<string> {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { documentId } = req.query;
 
   if (!documentId || typeof documentId !== 'string') {
-    return res.status(400).json({ error: 'Document ID is required' });
+    return apiResponse.badRequest(res, 'Document ID is required');
   }
 
   try {
@@ -54,7 +55,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!originalDoc) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     const documentType = originalDoc.document_type as string;
@@ -116,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!updated) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     logger.info('Document verification updated', { documentId, status, verifierId });
@@ -185,7 +186,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!document) {
-      return res.status(404).json({ error: 'Document not found after verification' });
+      return apiResponse.notFound(res, 'Document not found after verification');
     }
 
     return res.status(200).json({

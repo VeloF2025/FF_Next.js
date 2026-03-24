@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Initialize database connection
 const sql = neon(process.env.DATABASE_URL!);
@@ -26,7 +27,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const userId = (req as AuthenticatedNextApiRequest).user?.id;
 
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   switch (req.method) {
@@ -113,15 +114,15 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
     
     // Validate input
     if (!type || !['poles', 'drops', 'fibre'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid SOW type. Must be poles, drops, or fibre' });
+      return apiResponse.badRequest(res, 'Invalid SOW type. Must be poles, drops, or fibre');
     }
     
     if (!projectId || !Number.isInteger(projectId)) {
-      return res.status(400).json({ error: 'Valid project ID is required' });
+      return apiResponse.badRequest(res, 'Valid project ID is required');
     }
     
     if (!data || !Array.isArray(data) || data.length === 0) {
-      return res.status(400).json({ error: 'Data array is required and cannot be empty' });
+      return apiResponse.badRequest(res, 'Data array is required and cannot be empty');
     }
     
     // Verify project exists
@@ -130,7 +131,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
     `;
     
     if (!projectResult[0]) {
-      return res.status(404).json({ error: 'Project not found' });
+      return apiResponse.notFound(res, 'Project not found');
     }
     
     // Process SOW data
@@ -185,7 +186,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
     });
   } catch (error) {
     log.error('Error in POST /api/sow', { error });
-    return res.status(500).json({ error: 'Internal server error' });
+    return apiResponse.internalError(res, new Error('Internal server error'));
   }
 }
 
@@ -194,7 +195,7 @@ async function handleGetStatus(req: NextApiRequest, res: NextApiResponse, userId
   const { id } = req.query;
   
   if (!id) {
-    return res.status(400).json({ error: 'Import ID is required' });
+    return apiResponse.badRequest(res, 'Import ID is required');
   }
   
   try {
@@ -205,13 +206,13 @@ async function handleGetStatus(req: NextApiRequest, res: NextApiResponse, userId
     `;
     
     if (!sowImport[0]) {
-      return res.status(404).json({ error: 'Import not found' });
+      return apiResponse.notFound(res, 'Import not found');
     }
 
     return res.status(200).json(sowImport[0]);
   } catch (error) {
     log.error('Error in GET /api/sow/status', { error });
-    return res.status(500).json({ error: 'Failed to fetch import status' });
+    return apiResponse.internalError(res, new Error('Failed to fetch import status'));
   }
 }
 

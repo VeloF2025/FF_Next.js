@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 /**
  * Global Search API Route
@@ -14,7 +15,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const client = await pool.connect();
@@ -23,7 +24,7 @@ async function handler(
     const { q, type = 'all', limit = 20 } = req.query;
 
     if (!q || typeof q !== 'string') {
-      return res.status(400).json({ error: 'Search query is required' });
+      return apiResponse.badRequest(res, 'Search query is required');
     }
 
     // Use the global_search function we created

@@ -5,7 +5,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, withRole } from '@/lib/auth';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 
 async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {

@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 // BOSS VPS API for photos (migrated to Velocity Server)
 const BOSS_API_URL = process.env.BOSS_VPS_API_URL || 'http://100.96.203.105:8001';
 // VLM API for evaluation
@@ -48,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const actionPath = Array.isArray(action) ? action.join('/') : action;
 
     if (!drNumber) {
-        return res.status(400).json({ error: 'DR number required' });
+        return apiResponse.badRequest(res, 'DR number required');
     }
 
     switch (actionPath) {
@@ -64,7 +65,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 // Get photos for a DR from BOSS VPS
 async function handlePhotos(req: NextApiRequest, res: NextApiResponse, drNumber: string) {
     if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
     }
 
     try {
@@ -114,7 +115,7 @@ async function handlePhotos(req: NextApiRequest, res: NextApiResponse, drNumber:
 // Evaluate all photos for a DR using VLM
 async function handleEvaluate(req: NextApiRequest, res: NextApiResponse, drNumber: string) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
     }
 
     try {

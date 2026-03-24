@@ -6,7 +6,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { extractLicenseDiskDetails } from '@/modules/fleet/services/fleetVlmService';
 import type { LicenseDiskExtractionResult } from '@/modules/fleet/types/check-in.types';

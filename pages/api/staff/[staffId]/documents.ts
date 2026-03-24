@@ -10,6 +10,7 @@ import { createLogger } from '@/lib/logger';
 import type { DocumentType, VerificationStatus } from '@/types/staff-document.types';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { canAccessStaffDocuments } from '@/services/staff/staffAccessService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentsAPI');
@@ -19,7 +20,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
   const userId = req.user.id;
 
   if (!staffId || typeof staffId !== 'string') {
-    return res.status(400).json({ error: 'Staff ID is required' });
+    return apiResponse.badRequest(res, 'Staff ID is required');
   }
 
   if (req.method === 'GET') {
@@ -122,7 +123,7 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

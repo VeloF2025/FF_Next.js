@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { sql } from '../../../lib/db.mjs';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 type SummarData = {
   success: boolean;
@@ -20,7 +21,7 @@ async function handler(
 
   // Check authentication
   if (!userId) {
-    return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   try {

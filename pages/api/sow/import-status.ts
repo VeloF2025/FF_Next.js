@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@neondatabase/serverless';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -18,7 +19,7 @@ async function handler(
 ) {
   // Check authentication
   if (!userId) {
-    return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   try {

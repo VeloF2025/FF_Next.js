@@ -3,6 +3,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { processMeetingFromCallRecord } from '@/lib/graph/meeting-processor';
+import { apiResponse } from '@/lib/apiResponse';
 
 export const config = {
   api: {
@@ -65,7 +66,7 @@ export default async function handler(
   }
 
   if (req.method === 'GET') {
-    res.status(400).json({ error: 'Missing validationToken' });
+    apiResponse.badRequest(res, 'Missing validationToken');
     return;
   }
 
@@ -73,7 +74,7 @@ export default async function handler(
   // POST — incoming change notifications
   // -------------------------------------------------------------------------
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
+    apiResponse.methodNotAllowed(res, req.method!, ['GET']);
     return;
   }
 

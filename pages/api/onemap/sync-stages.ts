@@ -17,6 +17,7 @@ import { withAuth } from '@/lib/auth';
 import { createOneMapClient, SITE_PROJECT_MAP } from '@/services/onemap/oneMapClient';
 import type { ParsedStageRecord } from '@/services/onemap/oneMapClient';
 import type { BuildStage, StageSyncResult } from '@/types/pon-stages.types';
+import { apiResponse } from '@/lib/apiResponse';
 
 interface PonAggregation {
   zone_no: number;
@@ -77,7 +78,7 @@ async function handler(
   res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const startTime = Date.now();

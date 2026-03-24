@@ -11,6 +11,7 @@ import { deleteStaffDocument } from '@/services/vfStorageAdapter';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
 import { createLogger } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 const logger = createLogger('StaffDocumentAPI');
@@ -19,7 +20,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { documentId } = req.query;
 
   if (!documentId || typeof documentId !== 'string') {
-    return res.status(400).json({ error: 'Document ID is required' });
+    return apiResponse.badRequest(res, 'Document ID is required');
   }
 
   // GET - Fetch single document
@@ -37,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
+        return apiResponse.notFound(res, 'Document not found');
       }
 
       return res.status(200).json({
@@ -70,7 +71,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!updated) {
-        return res.status(404).json({ error: 'Document not found' });
+        return apiResponse.notFound(res, 'Document not found');
       }
 
       logger.info('Document updated', { documentId });
@@ -95,7 +96,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
+        return apiResponse.notFound(res, 'Document not found');
       }
 
       // Delete from VF Storage
@@ -142,7 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
 }
 
 export default withAuth(withArcjetProtection(handler, aj));

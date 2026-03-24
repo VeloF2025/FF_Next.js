@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';import { withAuth, withRole, type AuthenticatedNextApiRequest } from '@/lib/auth/middleware';
+import { apiResponse } from '@/lib/apiResponse';
 
 const MC_BASE = 'http://127.0.0.1:3847/api';
 
@@ -7,7 +8,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = (req as AuthenticatedNextApiRequest).user;
 
   if (user.role !== 'super_admin' && user.role !== 'system') {
-    return res.status(403).json({ error: 'Forbidden: SUPER_ADMIN required' });
+    return apiResponse.forbidden(res, 'Forbidden: SUPER_ADMIN required');
   }
 
   const { path } = req.query;

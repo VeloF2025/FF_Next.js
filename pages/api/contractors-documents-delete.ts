@@ -11,12 +11,13 @@ import { withAuth } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { vfStorage } from '@/services/vfStorageAdapter';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -24,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Validate required field
     if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'Document ID is required' });
+      return apiResponse.badRequest(res, 'Document ID is required');
     }
 
     // Get document to get file path
@@ -33,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     `;
 
     if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
+      return apiResponse.notFound(res, 'Document not found');
     }
 
     // Delete from VF Storage

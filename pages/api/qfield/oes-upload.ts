@@ -11,6 +11,7 @@ import fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const execAsync = promisify(exec);
 
@@ -38,7 +39,7 @@ export const config = {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   let tempFilePath: string | undefined;
@@ -52,7 +53,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const file = fileArray[0];
 
     if (!file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     tempFilePath = file.filepath;
@@ -68,17 +69,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const isValidExtension = /\.(xlsx|xls|csv)$/i.test(file.originalFilename || '');
 
     if (!allowedTypes.includes(file.mimetype || '') && !isValidExtension) {
-      return res.status(400).json({
-        error: 'Invalid file type. Please upload Excel (.xlsx, .xls) or CSV file.'
-      });
+      return apiResponse.badRequest(res, 'Invalid file type. Please upload Excel (.xlsx, .xls) or CSV file.');
     }
 
     // Validate file size (50MB max)
     const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
-      return res.status(400).json({
-        error: 'File too large. Maximum size: 50MB'
-      });
+      return apiResponse.badRequest(res, 'File too large. Maximum size: 50MB');
     }
 
     // Validate magic bytes for binary formats (Excel). CSV has no magic bytes.
@@ -88,7 +85,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { valid: magicValid } = validateExcelMagicBytes(fileBuffer);
       if (!magicValid) {
         await fs.promises.unlink(file.filepath).catch((e) => log.debug('Temp file cleanup failed', { error: e instanceof Error ? e.message : 'unknown' }, 'qfield'));
-        return res.status(400).json({ error: 'File content does not match Excel format (.xls or .xlsx).' });
+        return apiResponse.badRequest(res, 'File content does not match Excel format (.xls or .xlsx).');
       }
     }
 

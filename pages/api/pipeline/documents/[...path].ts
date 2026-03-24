@@ -11,19 +11,20 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const VF_STORAGE_URL = process.env.VF_STORAGE_URL || 'http://100.96.203.105:8091';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
     // Get the path segments
     const pathSegments = req.query.path;
     if (!pathSegments || !Array.isArray(pathSegments) || pathSegments.length < 3) {
-      return res.status(400).json({ error: 'Invalid document path' });
+      return apiResponse.badRequest(res, 'Invalid document path');
     }
 
     // Build the storage API URL
@@ -38,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        return res.status(404).json({ error: 'Document not found' });
+        return apiResponse.notFound(res, 'Document not found');
       }
       throw new Error(`Storage API error: ${response.status}`);
     }

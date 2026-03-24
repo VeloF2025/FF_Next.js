@@ -9,7 +9,7 @@ import {
   withAuth,
   type AuthenticatedNextApiRequest,
 } from '@/lib/auth';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(
   req: AuthenticatedNextApiRequest,

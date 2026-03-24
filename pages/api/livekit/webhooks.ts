@@ -6,6 +6,7 @@ import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { WebhookReceiver } from 'livekit-server-sdk';
 import { neon } from '@neondatabase/serverless';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -35,7 +36,7 @@ async function handler(
     res: NextApiResponse
 ) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
     }
 
     try {

@@ -3,6 +3,7 @@ import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { syncFirefliesToNeon } from '@/services/fireflies/firefliesService';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,7 +18,7 @@ async function handler(
   const isHein = userEmail === 'hein@velocityfibre.co.za';
 
   if (!userEmail) {
-    return res.status(403).json({ error: 'User email required for meeting access' });
+    return apiResponse.forbidden(res, 'User email required for meeting access');
   }
 
   if (req.method === 'GET') {
@@ -58,7 +59,7 @@ async function handler(
             `;
 
         if (!meeting) {
-          return res.status(403).json({ error: 'Not authorized to view this meeting' });
+          return apiResponse.forbidden(res, 'Not authorized to view this meeting');
         }
 
         return res.status(200).json({ meeting });
@@ -227,7 +228,7 @@ async function handler(
       const apiKey = process.env.FIREFLIES_API_KEY;
 
       if (!apiKey) {
-        return res.status(500).json({ error: 'FIREFLIES_API_KEY not configured' });
+        return apiResponse.internalError(res, new Error('FIREFLIES_API_KEY not configured'));
       }
 
       const count = await syncFirefliesToNeon(apiKey, sql);
@@ -244,7 +245,7 @@ async function handler(
     }
   }
 
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 export default withAuth(handler);

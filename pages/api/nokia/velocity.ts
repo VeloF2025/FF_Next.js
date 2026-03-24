@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
 import { neon } from '@neondatabase/serverless';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -156,11 +157,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       message: 'Use import script for bulk imports'
     });
   } else {
-    res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).json({
-      success: false,
-      error: 'Method not allowed'
-    });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
   }
 }
 

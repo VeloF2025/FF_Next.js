@@ -9,6 +9,7 @@ import { SupplierStatus } from '@/types/supplier/base.types';
 import { log } from '@/lib/logger';
 
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -20,7 +21,7 @@ async function handler(
       case 'POST':
         return handlePost(req, res);
       default:
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
     }
   } catch (error) {
     log.error('Supplier API error:', { data: error }, 'api');

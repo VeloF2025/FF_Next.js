@@ -13,6 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, ajStrict } from '@/lib/arcjet';
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
@@ -21,7 +22,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { contractorId: id } = req.query;
 
   if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid contractor ID' });
+    return apiResponse.badRequest(res, 'Invalid contractor ID');
   }
 
   // GET - Get single contractor
@@ -32,13 +33,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
 
       if (!contractor) {
-        return res.status(404).json({ error: 'Contractor not found' });
+        return apiResponse.notFound(res, 'Contractor not found');
       }
 
       return res.status(200).json({ data: mapDbToContractor(contractor) });
     } catch (error) {
       log.error('Error fetching contractor', { error });
-      return res.status(500).json({ error: 'Failed to fetch contractor' });
+      return apiResponse.internalError(res, new Error('Failed to fetch contractor'));
     }
   }
 
@@ -49,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
       const [existing] = await sql`SELECT id FROM contractors WHERE id = ${id}`;
       if (!existing) {
-        return res.status(404).json({ error: 'Contractor not found' });
+        return apiResponse.notFound(res, 'Contractor not found');
       }
 
       const [updated] = await sql`
@@ -89,7 +90,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Contractor with this registration number or email already exists' });
       }
-      return res.status(500).json({ error: 'Failed to update contractor' });
+      return apiResponse.internalError(res, new Error('Failed to update contractor'));
     }
   }
 
@@ -98,19 +99,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const [existing] = await sql`SELECT id FROM contractors WHERE id = ${id}`;
       if (!existing) {
-        return res.status(404).json({ error: 'Contractor not found' });
+        return apiResponse.notFound(res, 'Contractor not found');
       }
 
       await sql`DELETE FROM contractors WHERE id = ${id}`;
       return res.status(200).json({ success: true, message: 'Contractor deleted successfully' });
     } catch (error) {
       log.error('Error deleting contractor', { error });
-      return res.status(500).json({ error: 'Failed to delete contractor' });
+      return apiResponse.internalError(res, new Error('Failed to delete contractor'));
     }
   }
 
   // Method not allowed
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'PUT', 'DELETE']);
 }
 
 // Export with Arcjet protection and auth

@@ -68,7 +68,6 @@ async function handler(
         }
 
       default:
-        res.setHeader('Allow', ['GET', 'POST']);
         return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET','POST','PUT','DELETE']);
     }
   } catch (error) {

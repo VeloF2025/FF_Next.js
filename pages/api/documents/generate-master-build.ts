@@ -16,18 +16,19 @@ import {
   generateMasterBuildAgreement,
   type ContractorDocData,
 } from '@/services/documents/documentGenerationService';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   const { contractorId, agreementDate, effectiveDate } = req.body;
 
   if (!contractorId) {
-    return res.status(400).json({ error: 'contractorId is required' });
+    return apiResponse.badRequest(res, 'contractorId is required');
   }
 
   try {
@@ -51,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const contractor = contractorResult[0];
 
     if (!contractor) {
-      return res.status(404).json({ error: 'Contractor not found' });
+      return apiResponse.notFound(res, 'Contractor not found');
     }
 
     // Build the full address

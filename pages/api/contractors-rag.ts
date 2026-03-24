@@ -12,12 +12,13 @@ import { neon } from '@neondatabase/serverless';
 import { calculateContractorRag, prepareRagInputFromDbRow, calculateBulkRag } from '@/modules/rag/services/ragCalculationService';
 import type { ContractorRagStatus } from '@/modules/rag/types/rag.types';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {
@@ -28,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const ragStatus = await getContractorRag(contractorId);
 
       if (!ragStatus) {
-        return res.status(404).json({ error: 'Contractor not found' });
+        return apiResponse.notFound(res, 'Contractor not found');
       }
 
       return res.status(200).json({

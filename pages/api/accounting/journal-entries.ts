@@ -61,7 +61,6 @@ async function handler(req: AuthenticatedNextApiRequest, res: NextApiResponse) {
     }
   }
 
-  res.setHeader('Allow', ['GET', 'POST']);
   return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
 }
 

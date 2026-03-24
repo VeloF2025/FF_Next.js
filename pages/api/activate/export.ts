@@ -14,7 +14,7 @@
  */
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { apiResponse, ErrorCode } from '@/lib/apiResponse';
+import { apiResponse } from '@/lib/apiResponse';
 
 import * as XLSX from 'xlsx';
 import { withAuth, withRole } from '@/lib/auth';

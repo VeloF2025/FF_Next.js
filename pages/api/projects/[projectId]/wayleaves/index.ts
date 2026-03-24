@@ -25,7 +25,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     case 'POST':
       return handlePost(req as AuthenticatedNextApiRequest, res, projectId);
     default:
-      res.setHeader('Allow', ['GET', 'POST']);
       return apiResponse.methodNotAllowed(res, req.method || 'UNKNOWN', ['GET', 'POST']);
   }
 }

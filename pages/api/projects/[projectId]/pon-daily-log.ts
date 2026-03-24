@@ -9,10 +9,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import pool from '@/lib/db';
 import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   const { projectId, pon_stage_id, category, from } = req.query;
@@ -20,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const ponStageId = Array.isArray(pon_stage_id) ? pon_stage_id[0] : pon_stage_id;
 
   if (!projectIdStr || !ponStageId) {
-    return res.status(400).json({ error: 'Missing projectId or pon_stage_id' });
+    return apiResponse.badRequest(res, 'Missing projectId or pon_stage_id');
   }
 
   const client = await pool.connect();
@@ -31,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       [ponStageId, projectIdStr]
     );
     if (verify.rows.length === 0) {
-      return res.status(404).json({ error: 'PON not found in this project' });
+      return apiResponse.notFound(res, 'PON not found in this project');
     }
 
     let query = `

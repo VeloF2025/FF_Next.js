@@ -7,6 +7,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
+import { apiResponse } from '@/lib/apiResponse';
 interface WebVitalsMetric {
   id: string;
   name: 'FCP' | 'LCP' | 'CLS' | 'FID' | 'TTFB' | 'INP';
@@ -77,8 +78,7 @@ async function handler(
 ): Promise<void> {
   // Only accept POST requests
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -86,7 +86,7 @@ async function handler(
 
     // Validate metric data
     if (!isValidMetric(metric)) {
-      return res.status(400).json({ error: 'Invalid metric data' });
+      return apiResponse.badRequest(res, 'Invalid metric data');
     }
 
     // Store or forward metric
@@ -96,7 +96,7 @@ async function handler(
     res.status(200).json({ received: true });
   } catch (error) {
     log.error('web-vitals', { action: 'handleMetric', error });
-    res.status(500).json({ error: 'Internal server error' });
+    apiResponse.internalError(res, new Error('Internal server error'));
   }
 }
 

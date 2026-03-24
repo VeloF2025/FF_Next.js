@@ -13,6 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import { withArcjetProtection, aj } from '@/lib/arcjet';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 
 const getSql = () => neon(process.env.DATABASE_URL!);
 
@@ -31,7 +32,7 @@ async function handler(
 ) {
   const userId = (req as AuthenticatedNextApiRequest).user?.id;
   if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return apiResponse.unauthorized(res);
   }
 
   const sql = getSql();
@@ -247,7 +248,7 @@ async function handler(
   }
 
   // Method not allowed
-  return res.status(405).json({ error: 'Method not allowed' });
+  return apiResponse.methodNotAllowed(res, req.method!, ['GET', 'POST']);
 }
 
 // Export with Arcjet protection

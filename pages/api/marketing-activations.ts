@@ -3,10 +3,11 @@ import { withAuth } from '@/lib/auth';
 
 import { log } from '@/lib/logger';
 import { sql } from '@/lib/db-pool';
+import { apiResponse } from '@/lib/apiResponse';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['GET']);
   }
 
   try {

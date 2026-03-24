@@ -22,6 +22,7 @@ import fs from 'fs';
 import { log } from '@/lib/logger';
 import { withAuth, withRole } from '@/lib/auth';
 import pool from '@/lib/db';
+import { apiResponse } from '@/lib/apiResponse';
 
 // Disable body parser for file uploads
 export const config = {
@@ -448,7 +449,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -458,7 +459,7 @@ async function handler(
     const uploadedFile = Array.isArray(fileField) ? fileField[0] : fileField;
 
     if (!uploadedFile) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return apiResponse.badRequest(res, 'No file uploaded');
     }
 
     const filePath = uploadedFile.filepath;

@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { withAuth } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { apiResponse } from '@/lib/apiResponse';
 const VLM_URL = process.env.VLM_API_URL || 'http://100.96.203.105:8100';
 const VLM_MODEL = process.env.VLM_MODEL || 'dr-verifier';
 
@@ -175,18 +176,18 @@ Return JSON with: {
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
     }
 
     const { step, imageBase64, housingType, drNumber } = req.body;
 
     if (!step || !imageBase64) {
-        return res.status(400).json({ error: 'Missing required fields: step, imageBase64' });
+        return apiResponse.badRequest(res, 'Missing required fields: step, imageBase64');
     }
 
     const stepNumber = parseInt(step, 10);
     if (stepNumber < 1 || stepNumber > 11) {
-        return res.status(400).json({ error: 'Invalid step number (1-11)' });
+        return apiResponse.badRequest(res, 'Invalid step number (1-11)');
     }
 
     // Get step-specific prompt
