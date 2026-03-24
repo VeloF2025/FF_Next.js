@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
     const result = await sql`
-      INSERT INTO conduit_milestones (project_id, milestone_item_id, status)
-      SELECT ${projectId}, id, 'Not Started'
+      INSERT INTO conduit_milestones (project_id, milestone_item_id, phase, item_name, status)
+      SELECT ${projectId}, id, phase, item_name, 'Not Started'
       FROM conduit_milestone_items
       ON CONFLICT (project_id, milestone_item_id) DO NOTHING
     `;
