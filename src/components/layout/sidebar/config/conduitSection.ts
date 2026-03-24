@@ -7,7 +7,7 @@ import { LineChart } from 'lucide-react';
 import type { NavSection } from './types';
 
 export const conduitSection: NavSection = {
-  section: 'CONDUIT',
+  section: 'Conduit',
   sectionId: 'conduit',
   sectionLink: '/conduit',
   isCollapsible: false,
