@@ -26,6 +26,7 @@ import { useMyTeams } from '@/modules/noc/hooks/useMyTeams';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { Search, Users, User, Filter, X, Calendar } from 'lucide-react';
+import { TicketSummaryTiles } from '@/modules/noc/components/TicketList/TicketSummaryTiles';
 import type { TicketFilters } from '@/modules/noc/types/ticket';
 
 type ViewMode = 'table' | 'kanban' | 'grid';
@@ -329,6 +330,9 @@ export default function TicketsListPageClient() {
             </Link>
           </div>
         </div>
+
+        {/* Summary Tiles — reactive to current filters */}
+        <TicketSummaryTiles filters={filters} />
 
         {/* View Content */}
         <div className="flex-1">
