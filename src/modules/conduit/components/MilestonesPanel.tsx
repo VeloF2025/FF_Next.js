@@ -36,6 +36,9 @@ interface SelectLists {
   Status: string[];
 }
 
+/** Staff member sourced from the HR staff table. */
+type StaffOption = { id: string; name: string };
+
 interface Props {
   projectId: string;
   readOnly?: boolean;
@@ -70,12 +73,14 @@ function MilestoneRowItem({
   row,
   index,
   selectLists,
+  staffList,
   readOnly,
   onFieldChange,
 }: {
   row: MilestoneRow;
   index: number;
   selectLists: SelectLists;
+  staffList: StaffOption[];
   readOnly: boolean;
   onFieldChange: (id: string, field: string, value: string | null) => void;
 }) {
@@ -108,13 +113,17 @@ function MilestoneRowItem({
       </td>
 
       <td className="px-2 py-1">
-        <input
-          type="text"
+        <select
           disabled={readOnly}
-          defaultValue={row.velocity_responsible ?? ''}
-          onBlur={e => handleBlur('velocity_responsible', e.target.value)}
-          className={inputBase}
-        />
+          value={row.velocity_responsible ?? ''}
+          onChange={e => handleSelectChange('velocity_responsible', e.target.value)}
+          className={`${inputBase} bg-gray-900`}
+        >
+          <option value="">—</option>
+          {staffList.map(s => (
+            <option key={s.id} value={s.name}>{s.name}</option>
+          ))}
+        </select>
       </td>
 
       <td className="px-2 py-1">
@@ -188,12 +197,14 @@ function PhaseSection({
   phase,
   rows,
   selectLists,
+  staffList,
   readOnly,
   onFieldChange,
 }: {
   phase: string;
   rows: MilestoneRow[];
   selectLists: SelectLists;
+  staffList: StaffOption[];
   readOnly: boolean;
   onFieldChange: (id: string, field: string, value: string | null) => void;
 }) {
@@ -242,6 +253,7 @@ function PhaseSection({
                   row={row}
                   index={i}
                   selectLists={selectLists}
+                  staffList={staffList}
                   readOnly={readOnly}
                   onFieldChange={onFieldChange}
                 />
@@ -259,6 +271,7 @@ function PhaseSection({
 export function MilestonesPanel({ projectId, readOnly = false }: Props) {
   const [rows, setRows] = useState<MilestoneRow[]>([]);
   const [selectLists, setSelectLists] = useState<SelectLists>({ Responsible: [], Status: [] });
+  const [staffList, setStaffList] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchMilestones = useCallback(async (): Promise<MilestoneRow[]> => {
@@ -275,15 +288,20 @@ export function MilestonesPanel({ projectId, readOnly = false }: Props) {
       try {
         setLoading(true);
 
-        const [milestones, slRes] = await Promise.all([
+        const [milestones, slRes, staffRes] = await Promise.all([
           fetchMilestones(),
           fetch('/api/conduit/selectlists'),
+          fetch('/api/conduit/staff'),
         ]);
 
         if (cancelled) return;
 
         const slData = await slRes.json() as { data: SelectLists };
         setSelectLists(slData.data ?? { Responsible: [], Status: [] });
+
+        if (!staffRes.ok) throw new Error('Failed to fetch staff');
+        const staffData = await staffRes.json() as { data: StaffOption[] };
+        if (staffData.data) setStaffList(staffData.data);
 
         if (milestones.length === 0) {
           // Auto-init rows from conduit_milestone_items for this project
@@ -363,6 +381,7 @@ export function MilestonesPanel({ projectId, readOnly = false }: Props) {
             phase={phase}
             rows={phaseRows}
             selectLists={selectLists}
+            staffList={staffList}
             readOnly={readOnly}
             onFieldChange={handleFieldChange}
           />
