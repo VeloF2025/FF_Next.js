@@ -289,6 +289,10 @@ export function UserPermissionsModal({
       })();
 
       return matchesSearch && matchesOverrideFilter;
+    }).sort(([keyA, groupA], [keyB, groupB]) => {
+      const labelA = groupA.module?.label ?? keyA;
+      const labelB = groupB.module?.label ?? keyB;
+      return labelA.localeCompare(labelB);
     });
   }, [groupedPermissions, searchTerm, showOnlyOverrides, localActions, serverPermissions]);
 
