@@ -5,6 +5,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { notify } from '@/modules/notifications/services';
+import { completeApprovalActionItem } from '@/lib/action-items/procurementActions';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -68,6 +69,11 @@ export default withAuth(withErrorHandler(async (
       `Approval approved: ${request.document_type} ${request.document_id}`,
       { approvalRequestId: id, approvedBy: userId },
       'procurement'
+    );
+
+    // Complete the approval action item
+    completeApprovalActionItem(id as string, userId).catch(err =>
+      log.error('Failed to complete approval action item', { error: err }, 'procurement')
     );
 
     // UNS: Notify the requester that their request was approved

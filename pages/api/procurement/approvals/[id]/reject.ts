@@ -5,6 +5,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { notify } from '@/modules/notifications/services';
+import { completeApprovalActionItem, createRejectionFollowUp } from '@/lib/action-items/procurementActions';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -72,6 +73,21 @@ export default withAuth(withErrorHandler(async (
       `Approval rejected: ${request.document_type} ${request.document_id}`,
       { approvalRequestId: id, rejectedBy: userId, reason: reason.trim() },
       'procurement'
+    );
+
+    // Complete the approval action item + create follow-up for requester
+    completeApprovalActionItem(id as string, userId).catch(err =>
+      log.error('Failed to complete rejection action item', { error: err }, 'procurement')
+    );
+    createRejectionFollowUp({
+      approvalRequestId: id as string,
+      documentType: request.document_type,
+      documentNumber: request.document_number || '',
+      requestedByUserId: request.requested_by,
+      requestedByName: request.requested_by_name || 'Unknown',
+      rejectionReason: reason.trim(),
+    }).catch(err =>
+      log.error('Failed to create rejection follow-up', { error: err }, 'procurement')
     );
 
     // UNS: Notify the requester that their request was rejected

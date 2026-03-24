@@ -5,6 +5,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { log } from '@/lib/logger';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { notify } from '@/modules/notifications/services';
+import { createApprovalActionItem } from '@/lib/action-items/procurementActions';
 
 const sql = createLoggedSql(process.env.DATABASE_URL!);
 
@@ -126,6 +127,20 @@ export default withAuth(withErrorHandler(async (
           `;
 
           const approverIds = approvers.map((a: Record<string, unknown>) => a.id as string);
+
+          // Create action items for each approver
+          for (const approver of approvers) {
+            createApprovalActionItem({
+              approvalRequestId: String(id),
+              documentType: 'purchase_requisition',
+              documentNumber: updated!.requisition_number,
+              documentAmount: amount,
+              approverUserId: approver.id as string,
+              approverName: approver.name as string,
+              requestedByName: userName || 'Unknown',
+            }).catch(err => log.error('PR action item failed', { error: err }, 'procurement'));
+          }
+
           if (approverIds.length > 0) {
             const formattedAmount = new Intl.NumberFormat('en-ZA', {
               style: 'currency', currency: 'ZAR',

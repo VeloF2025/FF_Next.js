@@ -12,6 +12,11 @@ import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { postPurchaseOrderToGL } from '@/modules/accounting/services/glCrossModuleHooks';
 import { notify } from '@/modules/notifications/services';
+import {
+  createApprovalActionItem,
+  completeApprovalActionItem,
+  createRejectionFollowUp,
+} from '@/lib/action-items/procurementActions';
 
 const sql: any = neon(process.env.DATABASE_URL!);
 
@@ -276,10 +281,24 @@ class POApprovalService {
         amount: totalAmount,
       });
 
-      // Notify approvers via bell notification + inbox message
+      // Create action items for approvers
       const approvers = await this.getApproversForLevel(level);
       const approverIds = approvers.map(a => a.id);
 
+      for (const approver of approvers) {
+        createApprovalActionItem({
+          approvalRequestId,
+          documentType: 'purchase_order',
+          documentNumber: po.po_number,
+          documentAmount: totalAmount,
+          approverUserId: approver.id,
+          approverName: approver.name,
+          requestedByName,
+          dueDate: dueDate.toISOString(),
+        }).catch(err => log.error('PO action item failed', { error: err }, 'procurement'));
+      }
+
+      // Notify approvers via bell notification + inbox message
       if (approverIds.length > 0) {
         const formattedAmount = new Intl.NumberFormat('en-ZA', {
           style: 'currency', currency: 'ZAR',
@@ -408,6 +427,13 @@ class POApprovalService {
       postPurchaseOrderToGL(poId, approverId).catch(err => {
         log.warn('Failed to post PO to GL (non-blocking)', { poId, approverId, error: err });
       });
+
+      // Complete the approval action item
+      if (po.current_approval_request_id) {
+        completeApprovalActionItem(po.current_approval_request_id, approverId).catch(err =>
+          log.warn('Failed to complete PO approval action item', { error: err }, 'procurement')
+        );
+      }
 
       // Notify requester via bell + inbox
       const approvalRequest = po.current_approval_request_id
@@ -574,12 +600,35 @@ class POApprovalService {
         )
       `;
 
+      // Complete approval action item + create follow-up for requester
+      if (po.current_approval_request_id) {
+        completeApprovalActionItem(po.current_approval_request_id, rejecterId).catch(err =>
+          log.warn('Failed to complete PO rejection action item', { error: err }, 'procurement')
+        );
+      }
+
       // Notify requester via bell + inbox
       const approvalRequest = po.current_approval_request_id
         ? (await sql`SELECT requested_by, requested_by_name FROM approval_requests WHERE id = ${po.current_approval_request_id}`)[0]
         : null;
 
       if (approvalRequest?.requested_by) {
+        // Guard: only create follow-up when we have a real approval request ID.
+        // po.current_approval_request_id is cleared to NULL before this block,
+        // so we reference the variable captured before the UPDATE above.
+        if (po.current_approval_request_id) {
+          createRejectionFollowUp({
+            approvalRequestId: po.current_approval_request_id,
+            documentType: 'purchase_order',
+            documentNumber: po.po_number,
+            requestedByUserId: approvalRequest.requested_by,
+            requestedByName: approvalRequest.requested_by_name || 'Unknown',
+            rejectionReason: reason,
+          }).catch(err => log.warn('PO rejection follow-up failed', { error: err }, 'procurement'));
+        } else {
+          log.warn('Skipping rejection follow-up: no approval_request_id on PO', { poId }, 'procurement');
+        }
+
         notify({
           event_type: 'procurement.rejected',
           title: `PO ${po.po_number} rejected`,

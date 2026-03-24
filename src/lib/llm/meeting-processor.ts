@@ -14,6 +14,7 @@ import { getOpenAIClient } from './client';
 import { chunkTranscript } from './chunker';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
+import { resolveUserByName } from '@/lib/action-items/resolveUser';
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -290,6 +291,11 @@ async function writeSummary(meetingId: number, summary: MeetingSummary): Promise
  * Replace action items of a given source for a meeting with the latest set.
  * Only deletes items matching the source type so visual items are preserved
  * when re-processing transcripts and vice versa.
+ * Auto-resolves assignee_name → assigned_to_user_id via fuzzy match.
+ *
+ * User resolution is batched: unique assignee names are resolved in parallel
+ * before the INSERT loop, eliminating N+1 queries when multiple items share
+ * the same assignee or when the LLM produces a large action-item list.
  */
 async function writeActionItems(
   meetingId: number,
@@ -301,10 +307,25 @@ async function writeActionItems(
 
   if (items.length === 0) return;
 
+  // Batch-resolve unique assignee names before the INSERT loop.
+  // Each distinct name triggers at most one DB lookup regardless of how many
+  // items share the same assignee.
+  const uniqueNames = [...new Set(items.map((item) => item.assignee))];
+  const userIdMap = new Map<string, string | null>();
+
+  await Promise.all(
+    uniqueNames.map(async (name) => {
+      const userId = await resolveUserByName(name);
+      userIdMap.set(name, userId);
+    })
+  );
+
   for (const item of items) {
+    const userId = userIdMap.get(item.assignee) ?? null;
+
     await sql`
-      INSERT INTO action_items (meeting_id, description, assignee_name, status, priority, source)
-      VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority}, ${source})
+      INSERT INTO action_items (meeting_id, description, assignee_name, assigned_to_user_id, status, priority, source, source_type, source_id)
+      VALUES (${meetingId}, ${item.description}, ${item.assignee}, ${userId}, 'pending', ${item.priority}, ${source}, 'meeting', ${String(meetingId)})
     `;
   }
 }
