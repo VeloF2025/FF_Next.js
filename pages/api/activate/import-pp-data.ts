@@ -78,6 +78,7 @@ async function handler(
     const dateFrom = req.query.dateFrom as string;
     const dateTo = req.query.dateTo as string;
     const search = (req.query.search as string || '').trim();
+    const priority = req.query.priority as string;
 
     let whereClause = '';
     const params: (string | number)[] = [];
@@ -92,6 +93,10 @@ async function handler(
     } else if (status) {
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
+    }
+    if (priority) {
+      whereClause += ` AND mt.priority = $${paramIndex++}`;
+      params.push(priority);
     }
     if (dateFrom) {
       whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
@@ -115,7 +120,7 @@ async function handler(
     );
 
     const dataResult = await pool.query(
-      `SELECT pp.*, mt.ticket_uid,
+      `SELECT pp.*, mt.ticket_uid, mt.priority AS ticket_priority,
               COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
               dur.sender_phone AS wa_phone,
@@ -152,6 +157,7 @@ async function handler(
   if (action === 'export') {
     const project = req.query.project as string;
     const status = req.query.status as string;
+    const exportPriority = req.query.priority as string;
     const exportDateFrom = req.query.dateFrom as string;
     const exportDateTo = req.query.dateTo as string;
 
@@ -169,6 +175,10 @@ async function handler(
       whereClause += ` AND pp.resolution_status = $${paramIndex++}`;
       params.push(status);
     }
+    if (exportPriority) {
+      whereClause += ` AND mt.priority = $${paramIndex++}`;
+      params.push(exportPriority);
+    }
     if (exportDateFrom) {
       whereClause += ` AND pp.date_registered >= $${paramIndex++}::date`;
       params.push(exportDateFrom);
@@ -181,12 +191,14 @@ async function handler(
     const dataResult = await pool.query(
       `SELECT pp.serial_number, pp.project, pp.date_registered, pp.resolution_status,
               pp.resolved_drop_number, pp.resolved_source, pp.resolved_at,
+              mt.priority AS ticket_priority,
               COALESCE(oa.team, d.installed_by_name) AS oes_team,
               oa.activation_date,
               dur.sender_phone AS wa_phone,
               COALESCE(wc.formal_name, wc.wa_display_name) AS wa_name,
               wc.team AS wa_team
        FROM oes_pp_data pp
+       LEFT JOIN maintenance_tickets mt ON pp.maintenance_ticket_id = mt.id
        LEFT JOIN oes_activations oa ON oa.drop_number = pp.resolved_drop_number
        LEFT JOIN drops d ON d.drop_number = pp.resolved_drop_number
        LEFT JOIN dr_photo_unified_reviews dur ON dur.drop_number = pp.resolved_drop_number
@@ -219,6 +231,7 @@ async function handler(
       'WA Technician': r.wa_name || '',
       'WA Phone': r.wa_phone || '',
       'WA Team': r.wa_team || '',
+      'Priority': r.ticket_priority ? (r.ticket_priority === 'high' ? 'High' : 'Normal') : '',
     }));
 
     const wb = XLSX.utils.book_new();
