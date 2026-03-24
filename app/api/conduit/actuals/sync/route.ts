@@ -101,13 +101,13 @@ function ensureEntry(
 /**
  * Processes the Data worksheet and accumulates COS actuals into the map.
  *
- * Column indices (0-based):
- *   0  = Invoice Date
+ * Column indices (0-based, verified against live Data tab 2026-03-24):
+ *   0  = Date
  *   1  = Date_M
- *   3  = Type
- *   5  = Amount Excl VAT
- *   10 = Category T2
- *   15 = Cost Centre T2
+ *   2  = Type          (was incorrectly 3)
+ *   6  = Amount Excl VAT (was incorrectly 5)
+ *   11 = Category T2   (was incorrectly 10)
+ *   16 = Cost Centre T2 (was incorrectly 15)
  */
 function processDataTab(
   rows: unknown[][],
@@ -119,13 +119,13 @@ function processDataTab(
     const row = rows[i];
     if (!Array.isArray(row)) continue;
 
-    const type = String(row[3] ?? '').trim();
+    const type = String(row[2] ?? '').trim();
     if (type !== 'Expense') continue;
 
-    const categoryT2 = String(row[10] ?? '').trim();
+    const categoryT2 = String(row[11] ?? '').trim();
     if (!categoryT2.startsWith('COS')) continue;
 
-    const costCentreT2 = String(row[15] ?? '').trim();
+    const costCentreT2 = String(row[16] ?? '').trim();
     if (EXCLUDED_COST_CENTRES.has(costCentreT2)) continue;
 
     const monthStr = parseDateM(row[1]);
@@ -134,7 +134,7 @@ function processDataTab(
     // Enforce cutoff
     if (new Date(monthStr) >= cutoff) continue;
 
-    const amount = parseFloat(String(row[5] ?? '0').replace(/[^0-9.-]/g, '')) || 0;
+    const amount = parseFloat(String(row[6] ?? '0').replace(/[^0-9.-]/g, '')) || 0;
 
     const key = `${costCentreT2}||${monthStr}`;
     const entry = ensureEntry(agg, key);
