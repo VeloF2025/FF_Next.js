@@ -19,6 +19,7 @@ interface PPRecord {
   resolved_at: string | null;
   maintenance_ticket_id: string | null;
   ticket_uid: string | null;
+  ticket_priority: string | null;
   oes_team: string | null;
   activation_date: string | null;
   wa_phone: string | null;
@@ -79,6 +80,7 @@ export function PPDataTab() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [lookupStatus, setLookupStatus] = useState<LookupStatus | null>(null);
@@ -99,7 +101,7 @@ export function PPDataTab() {
   }, [searchText]);
 
   // Clear selection when filters or page change
-  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo, debouncedSearch]);
+  useEffect(() => { setSelectedIds([]); }, [page, filterProject, filterStatus, filterPriority, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -120,6 +122,7 @@ export function PPDataTab() {
       });
       if (filterProject) params.set('project', filterProject);
       if (filterStatus) params.set('status', filterStatus);
+      if (filterPriority) params.set('priority', filterPriority);
       if (filterDateFrom) params.set('dateFrom', filterDateFrom);
       if (filterDateTo) params.set('dateTo', filterDateTo);
       if (debouncedSearch) params.set('search', debouncedSearch);
@@ -133,7 +136,7 @@ export function PPDataTab() {
     } catch {
       // Non-fatal
     }
-  }, [page, filterProject, filterStatus, filterDateFrom, filterDateTo, debouncedSearch]);
+  }, [page, filterProject, filterStatus, filterPriority, filterDateFrom, filterDateTo, debouncedSearch]);
 
   const fetchLookupStatus = useCallback(async () => {
     try {
@@ -500,6 +503,16 @@ export function PPDataTab() {
               <option value="located_local">Found (Local)</option>
               <option value="activated">Activated</option>
             </select>
+            <select
+              value={filterPriority}
+              onChange={(e) => { setFilterPriority(e.target.value); setPage(1); }}
+              className="px-3 py-1.5 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
+                         text-[var(--ff-text-primary)] text-sm"
+            >
+              <option value="">All Priorities</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
             <div className="flex items-center gap-1.5">
               <label className="text-xs text-[var(--ff-text-tertiary)]">From</label>
               <input
@@ -533,6 +546,7 @@ export function PPDataTab() {
                   const params = new URLSearchParams({ action: 'export' });
                   if (filterProject) params.set('project', filterProject);
                   if (filterStatus) params.set('status', filterStatus);
+                  if (filterPriority) params.set('priority', filterPriority);
                   if (filterDateFrom) params.set('dateFrom', filterDateFrom);
                   if (filterDateTo) params.set('dateTo', filterDateTo);
                   window.open(`/api/activate/import-pp-data?${params}`, '_blank');
@@ -569,6 +583,7 @@ export function PPDataTab() {
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">WA Technician</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Source</th>
                   <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Ticket</th>
+                  <th className="px-3 py-2 text-left text-[var(--ff-text-secondary)]">Priority</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
@@ -631,12 +646,25 @@ export function PPDataTab() {
                           <span className="text-[var(--ff-text-tertiary)]">-</span>
                         )}
                       </td>
+                      <td className="px-3 py-2">
+                        {record.ticket_priority ? (
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            record.ticket_priority === 'high'
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                              : 'bg-gray-100 dark:bg-gray-800/30 text-gray-700 dark:text-gray-300'
+                          }`}>
+                            {record.ticket_priority === 'high' ? 'High' : 'Normal'}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--ff-text-tertiary)]">-</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
+                    <td colSpan={12} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">
                       No records found
                     </td>
                   </tr>

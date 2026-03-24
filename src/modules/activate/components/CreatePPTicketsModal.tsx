@@ -37,6 +37,18 @@ export function CreatePPTicketsModal({
   const [notes, setNotes] = useState('');
   const [assignedTeamId, setAssignedTeamId] = useState<string | null>(null);
 
+  // Auto-assign priority based on notes content
+  const computeAutoPriority = (text: string): string => {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed === 'No information on 1Map') return 'normal';
+    return 'high';
+  };
+
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    setPriority(computeAutoPriority(value));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg w-full max-w-md p-6 space-y-4">
@@ -92,7 +104,7 @@ export function CreatePPTicketsModal({
             </label>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => handleNotesChange(e.target.value)}
               placeholder="Additional notes for the tickets..."
               rows={3}
               className="w-full px-3 py-2 rounded bg-[var(--ff-bg-secondary)] border border-[var(--ff-border-light)]
