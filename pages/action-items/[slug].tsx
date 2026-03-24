@@ -5,10 +5,12 @@ import { OverdueActionItems } from '@/modules/action-items/pages/OverdueActionIt
 import { ActionItemsByMeeting } from '@/modules/action-items/pages/ActionItemsByMeeting';
 import { ActionItemsByAssignee } from '@/modules/action-items/pages/ActionItemsByAssignee';
 import { ActionItemsSearch } from '@/modules/action-items/pages/ActionItemsSearch';
+import { MyActionItems } from '@/modules/action-items/pages/MyActionItems';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
 const components = {
+  'my-actions': MyActionItems,
   pending: PendingActionItems,
   completed: CompletedActionItems,
   overdue: OverdueActionItems,

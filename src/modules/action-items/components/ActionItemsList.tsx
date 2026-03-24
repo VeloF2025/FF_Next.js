@@ -5,6 +5,7 @@ import { CheckCircle, Clock, AlertCircle, Calendar, User, ExternalLink } from 'l
 import { notificationService } from '@/services/core/NotificationService';
 import { ActionItem } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
+import { SourceBadge } from './SourceBadge';
 import { log } from '@/lib/logger';
 
 interface ActionItemsListProps {
@@ -117,6 +118,11 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                 {/* Meeting timestamp */}
                 {item.mentioned_at && (
                   <span className="text-xs text-[var(--ff-text-secondary)]">@ {item.mentioned_at}</span>
+                )}
+
+                {/* Source badge */}
+                {item.source_type && item.source_type !== 'meeting' && (
+                  <SourceBadge source={item.source_type} />
                 )}
 
                 {/* Priority */}

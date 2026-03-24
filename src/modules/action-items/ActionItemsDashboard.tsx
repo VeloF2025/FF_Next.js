@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Calendar, Users, Filter, Inbox } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { ActionItemStats } from '@/types/action-items.types';
 import { actionItemsService } from '@/services/action-items/actionItemsService';
@@ -28,6 +28,13 @@ export function ActionItemsDashboard() {
   }, []);
 
   const cards = [
+    {
+      title: 'My Actions',
+      description: 'Action items assigned to you across all modules',
+      icon: Inbox,
+      color: 'bg-[var(--ff-primary)]',
+      onClick: () => router.push('/action-items/my-actions'),
+    },
     {
       title: 'Pending Actions',
       description: 'View all pending action items',
@@ -79,7 +86,7 @@ export function ActionItemsDashboard() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[var(--ff-text-primary)]">Action Items</h1>
-        <p className="text-[var(--ff-text-secondary)] mt-1">Track and manage action items from meetings</p>
+        <p className="text-[var(--ff-text-secondary)] mt-1">Track and manage action items from meetings, procurement, NOC, and more</p>
       </div>
 
       {/* Summary Stats */}
