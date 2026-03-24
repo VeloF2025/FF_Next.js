@@ -226,7 +226,7 @@ function PhaseSection({
               <tr className="bg-gray-850 border-b border-gray-700">
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 180 }}>Item</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Responsible</th>
-                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Velocity Person</th>
+                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Velocity Staff Member</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>FT Person</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Planned</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Due</th>
