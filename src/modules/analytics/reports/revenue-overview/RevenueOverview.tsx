@@ -22,22 +22,22 @@ function fZAR(value: number): { text: string; negative: boolean } {
 function NumCell({ value }: { value: number }) {
   const { text, negative } = fZAR(value);
   return (
-    <td className={`px-3 py-1.5 text-xs text-right whitespace-nowrap ${negative ? 'text-red-400' : 'text-gray-200'}`}>
+    <td className={`px-3 py-1.5 text-xs text-right whitespace-nowrap ${negative ? 'text-red-400' : 'text-[var(--ff-text)]'}`}>
       {text}
     </td>
   );
 }
 
 function RowEl({ row, months }: { row: CashflowRow; months: string[] }) {
-  const labelClass = row.isBold ? 'font-bold border-t border-gray-600' : '';
+  const labelClass = row.isBold ? 'font-bold border-t border-[var(--ff-border)]' : '';
 
   // Compute total across all months
   const total = months.reduce((sum, m) => sum + (row.monthly[m] ?? 0), 0);
 
   return (
-    <tr className="border-b border-gray-800 hover:bg-gray-750">
+    <tr className="border-b border-[var(--ff-border)] hover:bg-[var(--ff-surface-hover)]">
       <td
-        className={`px-3 py-1.5 text-xs text-gray-200 whitespace-nowrap ${labelClass}`}
+        className={`px-3 py-1.5 text-xs text-[var(--ff-text)] whitespace-nowrap ${labelClass}`}
         style={{ minWidth: 200 }}
       >
         {row.label}
@@ -55,7 +55,7 @@ function RowEl({ row, months }: { row: CashflowRow; months: string[] }) {
 
 function CashflowStatementTable({ rows, months }: { rows: CashflowRow[]; months: string[] }) {
   return (
-    <div className="overflow-x-auto rounded border border-gray-700">
+    <div className="overflow-x-auto rounded border border-[var(--ff-border)]">
       <table className="min-w-full text-xs">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
@@ -92,7 +92,7 @@ export default function RevenueOverview() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-[var(--ff-text-muted)]">
         <Loader2 className="w-6 h-6 animate-spin mr-2" />
         Loading cashflow data&hellip;
       </div>
@@ -120,7 +120,7 @@ export default function RevenueOverview() {
         <CashflowStatementTable rows={cashflowData.rows} months={cashflowData.months} />
       }
       chartsContent={
-        <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
+        <div className="flex items-center justify-center h-64 text-[var(--ff-text-muted)] text-sm">
           Charts coming soon
         </div>
       }

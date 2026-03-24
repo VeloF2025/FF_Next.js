@@ -23,7 +23,7 @@ export default function RevenueByClient() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
+      <div className="flex items-center justify-center h-64 text-[var(--ff-text-muted)]">
         <Loader2 className="w-6 h-6 animate-spin mr-2" />
         Loading revenue by client&hellip;
       </div>
@@ -43,7 +43,7 @@ export default function RevenueByClient() {
   const total = rows.reduce((sum, r) => sum + r.revenue, 0);
 
   const tableContent = (
-    <div className="overflow-x-auto rounded border border-gray-700">
+    <div className="overflow-x-auto rounded border border-[var(--ff-border)]">
       <table className="min-w-full text-xs">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>
@@ -56,15 +56,15 @@ export default function RevenueByClient() {
           {rows.map((row) => {
             const pct = total > 0 ? ((row.revenue / total) * 100).toFixed(1) : '0.0';
             return (
-              <tr key={row.client} className="border-b border-gray-800 hover:bg-gray-750">
-                <td className="px-3 py-1.5 text-xs text-gray-200">{row.client}</td>
-                <td className="px-3 py-1.5 text-xs text-right text-gray-200">{fZAR(row.revenue)}</td>
-                <td className="px-3 py-1.5 text-xs text-right text-gray-400">{pct}%</td>
+              <tr key={row.client} className="border-b border-[var(--ff-border)] hover:bg-[var(--ff-surface-hover)]">
+                <td className="px-3 py-1.5 text-xs text-[var(--ff-text)]">{row.client}</td>
+                <td className="px-3 py-1.5 text-xs text-right text-[var(--ff-text)]">{fZAR(row.revenue)}</td>
+                <td className="px-3 py-1.5 text-xs text-right text-[var(--ff-text-muted)]">{pct}%</td>
               </tr>
             );
           })}
           {rows.length > 0 && (
-            <tr className="border-t border-gray-600">
+            <tr className="border-t border-[var(--ff-border)]">
               <td className="px-3 py-2 text-xs font-bold text-white">Total</td>
               <td className="px-3 py-2 text-xs text-right font-bold text-white">{fZAR(total)}</td>
               <td className="px-3 py-2 text-xs text-right font-bold text-white">100.0%</td>
@@ -72,7 +72,7 @@ export default function RevenueByClient() {
           )}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={3} className="px-3 py-6 text-center text-gray-500">
+              <td colSpan={3} className="px-3 py-6 text-center text-[var(--ff-text-muted)]">
                 No data available
               </td>
             </tr>
@@ -86,7 +86,7 @@ export default function RevenueByClient() {
     <ReportTabLayout
       tableContent={tableContent}
       chartsContent={
-        <div className="flex items-center justify-center h-40 text-gray-500 text-sm">
+        <div className="flex items-center justify-center h-40 text-[var(--ff-text-muted)] text-sm">
           Charts coming soon
         </div>
       }

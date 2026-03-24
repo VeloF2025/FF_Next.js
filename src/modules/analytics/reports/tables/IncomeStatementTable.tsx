@@ -19,7 +19,7 @@ function Cell({ value, align = 'right' }: { value: number; align?: 'left' | 'rig
   const { text, negative } = fZAR(value);
   return (
     <td
-      className={`px-3 py-1.5 text-xs whitespace-nowrap ${align === 'right' ? 'text-right' : 'text-left'} ${negative ? 'text-red-400' : 'text-gray-200'}`}
+      className={`px-3 py-1.5 text-xs whitespace-nowrap ${align === 'right' ? 'text-right' : 'text-left'} ${negative ? 'text-red-400' : 'text-[var(--ff-text)]'}`}
     >
       {text}
     </td>
@@ -41,16 +41,16 @@ function RowEl({ row, months }: { row: IncomeStatementRow; months: string[] }) {
   }
 
   const labelClass = row.isTotal
-    ? 'font-bold border-t border-gray-600'
+    ? 'font-bold border-t border-[var(--ff-border)]'
     : row.isBold
     ? 'font-semibold'
     : row.isIndented
-    ? 'pl-6 text-gray-400'
+    ? 'pl-6 text-[var(--ff-text-muted)]'
     : '';
 
   return (
-    <tr className="border-b border-gray-800 hover:bg-gray-750">
-      <td className={`px-3 py-1.5 text-xs text-gray-200 whitespace-nowrap ${labelClass}`} style={{ minWidth: 220 }}>{row.label}</td>
+    <tr className="border-b border-[var(--ff-border)] hover:bg-[var(--ff-surface-hover)]">
+      <td className={`px-3 py-1.5 text-xs text-[var(--ff-text)] whitespace-nowrap ${labelClass}`} style={{ minWidth: 220 }}>{row.label}</td>
       <Cell value={row.fy26} />
       <Cell value={row.fy27} />
       <Cell value={row.fy28} />
@@ -65,7 +65,7 @@ export function IncomeStatementTable({ data }: Props) {
   const { rows, months } = data;
 
   return (
-    <div className="overflow-x-auto rounded border border-gray-700">
+    <div className="overflow-x-auto rounded border border-[var(--ff-border)]">
       <table className="min-w-full text-xs">
         <thead>
           <tr style={{ backgroundColor: '#1a3a4a' }}>

@@ -24,7 +24,7 @@ export function ExpensePivotTable({ pivot }: Props) {
   const th = 'px-3 py-2.5 text-xs font-bold text-white uppercase tracking-wide whitespace-nowrap';
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-700">
+    <div className="overflow-x-auto rounded-lg border border-[var(--ff-border)]">
       <table className="min-w-max w-full text-sm border-collapse">
         <thead>
           {/* Year group spans */}
@@ -52,11 +52,11 @@ export function ExpensePivotTable({ pivot }: Props) {
               const yrMonths = yearGroups[yr] ?? [];
               return [
                 ...yrMonths.map(mk => (
-                  <th key={mk} className="px-3 py-1.5 text-right text-xs font-medium text-gray-300 whitespace-nowrap border-l border-gray-700">
+                  <th key={mk} className="px-3 py-1.5 text-right text-xs font-medium text-[var(--ff-text-secondary)] whitespace-nowrap border-l border-[var(--ff-border)]">
                     {mk.split('-')[1]}
                   </th>
                 )),
-                <th key={`${yr}-total`} className="px-3 py-1.5 text-right text-xs font-semibold text-gray-200 whitespace-nowrap border-l border-teal-700 bg-teal-900/30">
+                <th key={`${yr}-total`} className="px-3 py-1.5 text-right text-xs font-semibold text-[var(--ff-text)] whitespace-nowrap border-l border-teal-700 bg-teal-900/30">
                   {yr} Total
                 </th>,
               ];
@@ -65,39 +65,39 @@ export function ExpensePivotTable({ pivot }: Props) {
         </thead>
         <tbody>
           {rows.map((row, idx) => (
-            <tr key={row.category} className={idx % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800/60'}>
-              <td className="sticky left-0 z-10 px-3 py-2 font-medium text-gray-200 bg-inherit border-r border-gray-700 whitespace-nowrap max-w-xs truncate">
+            <tr key={row.category} className={idx % 2 === 0 ? 'bg-[var(--ff-bg)]' : 'bg-[var(--ff-surface)]/60'}>
+              <td className="sticky left-0 z-10 px-3 py-2 font-medium text-[var(--ff-text)] bg-inherit border-r border-[var(--ff-border)] whitespace-nowrap max-w-xs truncate">
                 {row.category}
               </td>
               {years.map(yr => {
                 const yrMonths = yearGroups[yr] ?? [];
                 return [
                   ...yrMonths.map(mk => (
-                    <td key={mk} className="px-3 py-2 text-right tabular-nums text-gray-400 border-l border-gray-800">
+                    <td key={mk} className="px-3 py-2 text-right tabular-nums text-[var(--ff-text-muted)] border-l border-[var(--ff-border)]">
                       {fZAR(row.monthly[mk] ?? 0)}
                     </td>
                   )),
-                  <td key={`${yr}-total`} className="px-3 py-2 text-right tabular-nums font-semibold text-gray-200 border-l border-teal-900 bg-teal-900/20">
+                  <td key={`${yr}-total`} className="px-3 py-2 text-right tabular-nums font-semibold text-[var(--ff-text)] border-l border-teal-900 bg-teal-900/20">
                     {fZAR(row.yearTotals[yr] ?? 0)}
                   </td>,
                 ];
               })}
-              <td className="px-3 py-2 text-right tabular-nums font-bold text-white bg-gray-700/50">
+              <td className="px-3 py-2 text-right tabular-nums font-bold text-white bg-[var(--ff-surface)]/50">
                 {fZAR(row.grandTotal)}
               </td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="border-t-2 border-gray-500 font-bold" style={{ backgroundColor: '#1a3a4a' }}>
-            <td className="sticky left-0 z-10 px-3 py-2.5 text-white bg-inherit border-r border-gray-600">
+          <tr className="border-t-2 border-[var(--ff-border)] font-bold" style={{ backgroundColor: '#1a3a4a' }}>
+            <td className="sticky left-0 z-10 px-3 py-2.5 text-white bg-inherit border-r border-[var(--ff-border)]">
               Grand Total
             </td>
             {years.map(yr => {
               const yrMonths = yearGroups[yr] ?? [];
               return [
                 ...yrMonths.map(mk => (
-                  <td key={mk} className="px-3 py-2.5 text-right tabular-nums text-gray-100 border-l border-gray-700">
+                  <td key={mk} className="px-3 py-2.5 text-right tabular-nums text-[var(--ff-text)] border-l border-[var(--ff-border)]">
                     {fZAR(grandTotals.monthly[mk] ?? 0)}
                   </td>
                 )),
@@ -106,7 +106,7 @@ export function ExpensePivotTable({ pivot }: Props) {
                 </td>,
               ];
             })}
-            <td className="px-3 py-2.5 text-right tabular-nums text-white bg-gray-700/50">
+            <td className="px-3 py-2.5 text-right tabular-nums text-white bg-[var(--ff-surface)]/50">
               {fZAR(grandTotals.grandTotal)}
             </td>
           </tr>
