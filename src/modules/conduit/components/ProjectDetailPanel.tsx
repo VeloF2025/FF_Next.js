@@ -18,7 +18,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { log } from '@/lib/logger';
-import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry } from '../types';
+import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry, ConduitActual } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { MonthlyForecastGrid } from './MonthlyForecastGrid';
 import { MilestonesPanel } from './MilestonesPanel';
@@ -210,25 +210,100 @@ function InputSection({ title, children }: { title: string; children: React.Reac
 
 // ─── COS Summary bar + expandable breakdown ──────────────────────────────────
 
+type SummaryTile =
+  | { label: string; value: number; color: string }
+  | { label: string; gp: number; color: string };
+
+function renderTile(item: SummaryTile) {
+  return (
+    <div key={item.label} className="flex flex-col min-w-[100px]">
+      <span className="text-xs text-gray-500">{item.label}</span>
+      <span className={`text-sm font-bold tabular-nums ${'gp' in item ? item.color : item.color}`}>
+        {'gp' in item
+          ? `${(item.gp * 100).toFixed(1)}%`
+          : fZAR(item.value)}
+      </span>
+    </div>
+  );
+}
+
 function CosSummaryBar({ project }: { project: ConduitProject }) {
   const [open, setOpen] = useState(false);
   const c = calcConduit(project);
   const b = c.breakdown;
   const dur = project.build_duration_months;
 
-  // % of COS Total for each cost bucket (null = not a cost bucket)
-  const cosPct = (v: number) => c.cos_total > 0 ? `${((v / c.cos_total) * 100).toFixed(1)}%` : null;
+  // EAC (Revised Forecast) — WIP and Scoping projects only
+  const isWip = project.status === 'wip' || project.status === 'scoping';
+  const [actuals, setActuals] = useState<ConduitActual[]>([]);
 
-  const summary = [
-    { label: 'Revenue',      value: c.revenue,      color: 'text-teal-400',                                                                   pct: null },
-    { label: 'COS Services', value: c.cos_services, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_services) },
-    { label: 'COS Material', value: c.cos_material, color: 'text-gray-300',                                                                   pct: cosPct(c.cos_material) },
-    { label: 'COS OPEX',     value: c.cos_opex,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_opex) },
-    { label: 'COS Lump',     value: c.cos_lump,     color: 'text-gray-300',                                                                   pct: cosPct(c.cos_lump) },
-    { label: 'COS Total',    value: c.cos_total,    color: 'text-amber-400',                                                                  pct: null },
-    { label: 'Profit',       value: c.profit,       color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400',                              pct: null },
-    { label: 'GP%',          gp: c.gross_profit_pct, color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400', pct: null },
-    { label: 'Cost/Home',    value: c.cost_per_home, color: 'text-gray-300',                                                                  pct: null },
+  useEffect(() => {
+    if (!isWip || !project.ft_project_name) return;
+    fetch(`/api/conduit/actuals?project=${encodeURIComponent(project.ft_project_name)}`)
+      .then(r => r.json())
+      .then((d: { data?: ConduitActual[] }) => { if (d.data) setActuals(d.data); })
+      .catch(() => {});
+  }, [isWip, project.ft_project_name]);
+
+  // EAC calculations
+  const now = new Date();
+  const cutoffStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+
+  const actualCOS = actuals
+    .filter(a => a.month.slice(0, 7) < cutoffStr)
+    .reduce((s, a) => s + a.cos_actual, 0);
+
+  const actualRevenue = actuals
+    .filter(a => a.month.slice(0, 7) < cutoffStr)
+    .reduce((s, a) => s + a.revenue_actual, 0);
+
+  // Elapsed project months (started before cutoff)
+  let elapsedMonths = 0;
+  if (project.start_date) {
+    const base = new Date(project.start_date);
+    for (let i = 0; i < dur; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (monthKey < cutoffStr) elapsedMonths++;
+    }
+  }
+  const remainingMonths = Math.max(0, dur - elapsedMonths);
+  const forecastCOS = dur > 0 ? (remainingMonths / dur) * c.cos_total : 0;
+
+  // Forecast revenue from monthly_plan for months >= cutoff
+  const rate = project.inputs_json.rate;
+  const monthlyPlan = project.inputs_json.monthly_plan ?? [];
+  let forecastRevenue = 0;
+  if (project.start_date) {
+    const base = new Date(project.start_date);
+    for (let i = 0; i < monthlyPlan.length; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (monthKey >= cutoffStr) {
+        forecastRevenue += (monthlyPlan[i]?.activations ?? 0) * rate;
+      }
+    }
+  }
+
+  const eacCOS = actualCOS + forecastCOS;
+  const eacRevenue = actualRevenue + forecastRevenue;
+  const eacProfit = eacRevenue - eacCOS;
+  const eacGP = eacRevenue > 0 ? eacProfit / eacRevenue : 0;
+
+  const fcTiles: SummaryTile[] = [
+    { label: 'Revenue (FC)',   value: c.revenue,    color: 'text-teal-400' },
+    { label: 'COS Total (FC)', value: c.cos_total,  color: 'text-amber-400' },
+    { label: 'Profit (FC)',    value: c.profit,     color: c.profit >= 0 ? 'text-emerald-400' : 'text-red-400' },
+    { label: 'GP% (FC)',       gp: c.gross_profit_pct,
+      color: c.gross_profit_pct >= 0.30 ? 'text-emerald-400' : c.gross_profit_pct >= 0.10 ? 'text-amber-400' : 'text-red-400' },
+  ];
+
+  const eacTiles: SummaryTile[] = [
+    { label: 'Revenue (EAC)',   value: eacRevenue, color: 'text-teal-400' },
+    { label: 'COS Total (EAC)', value: eacCOS,     color: 'text-amber-400' },
+    { label: 'Profit (EAC)',    value: eacProfit,  color: eacProfit >= 0 ? 'text-emerald-400' : 'text-red-400' },
+    { label: 'GP% (EAC)',       gp: eacGP,
+      color: eacGP >= 0.30 ? 'text-emerald-400' : eacGP >= 0.10 ? 'text-amber-400' : 'text-red-400' },
   ];
 
   const serviceLines = [
@@ -256,21 +331,28 @@ function CosSummaryBar({ project }: { project: ConduitProject }) {
 
   return (
     <div className="rounded-lg border border-gray-700 overflow-hidden">
-      {/* Summary row */}
-      <div className="flex flex-wrap gap-3 p-3 bg-gray-900">
-        {summary.map(item => (
-          <div key={item.label} className="flex flex-col min-w-[100px]">
-            <span className="text-xs text-gray-500">{item.label}</span>
-            <span className={`text-sm font-bold tabular-nums ${item.color}`}>
-              {'gp' in item
-                ? `${((item.gp ?? 0) * 100).toFixed(1)}%`
-                : fZAR('value' in item ? (item.value ?? 0) : 0)}
-            </span>
-            {item.pct && (
-              <span className="text-[10px] text-gray-500 tabular-nums">{item.pct} of COS</span>
-            )}
+      {/* Summary row — Forecast + optional EAC segments */}
+      <div className="flex flex-row flex-wrap bg-gray-900">
+        {/* Forecast segment */}
+        <div className="flex flex-col gap-1 p-3">
+          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Forecast</span>
+          <div className="flex flex-wrap gap-4">
+            {fcTiles.map(renderTile)}
           </div>
-        ))}
+        </div>
+
+        {/* Divider */}
+        {isWip && <div className="w-px bg-gray-700 self-stretch" />}
+
+        {/* Revised Forecast (EAC) segment — WIP/Scoping only */}
+        {isWip && (
+          <div className="flex flex-col gap-1 p-3 bg-gray-900/50">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">Revised Forecast (EAC)</span>
+            <div className="flex flex-wrap gap-4">
+              {eacTiles.map(renderTile)}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Toggle */}
