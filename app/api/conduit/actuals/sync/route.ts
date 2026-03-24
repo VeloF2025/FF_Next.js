@@ -1,126 +1,276 @@
 /**
  * POST /api/conduit/actuals/sync
  *
- * Pulls FT_Revenue sheet from the Shareholder Model Excel (via Graph API),
- * aggregates actual COS + activations by project + month,
- * and upserts into conduit_actuals.
+ * Pulls two worksheets from the Shareholder Model Excel (via Graph API) and
+ * upserts aggregated actuals into conduit_actuals by project + month.
  *
- * Logic:
- * - Source: FT_Revenue worksheet, Type='invoice' rows only
- * - project: col 8 (Project)
- * - month: col 2 (Date_M) — bucketed to first of month
- * - cos_actual: sum of col 10 (Debit Excl VAT) per project+month
- * - activations: sum of col 14 (Activations) per project+month
- * - cos_breakdown: grouped by col 9 (Type) — Activations, Backhaul, Fuel, Plinth, etc.
- * - Period: only months BEFORE current month (end of previous month rule)
+ * Sources:
+ *  - Data tab       → cos_actual + cos_breakdown (Type=Expense, Category T2 starts with "COS")
+ *  - FT_Revenue tab → revenue_actual + activations (Type=invoice)
+ *
+ * Cutoff rule: only months whose first day is strictly before the first day of
+ * the current UTC month are included (i.e. current month is excluded).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth-mock';
 import { neon } from '@neondatabase/serverless';
 import { getWorksheetRange } from '@/lib/graph/sharepoint-excel';
+import { createLogger } from '@/lib/logger';
 
+const logger = createLogger('conduit:actuals:sync');
 const sql = neon(process.env.DATABASE_URL!);
 
+/** Projects to exclude from the Data tab Cost Centre T2 column. */
+const EXCLUDED_COST_CENTRES = new Set([
+  'OPEX', 'Revenue', 'Loan', 'Tools', 'Fixed Assets', 'None', 'Liabilities', '',
+]);
+
+/** Aggregated actuals per project+month key (`"project||YYYY-MM-01"`). */
 interface MonthlyActual {
   cos_actual: number;
-  activations: number;
   cos_breakdown: Record<string, number>;
+  revenue_actual: number;
+  activations: number;
+}
+
+/**
+ * Parses a Date_M cell value into a YYYY-MM-01 string.
+ *
+ * Graph API may return:
+ *  - A number (Excel serial: days since 1899-12-30)
+ *  - An ISO string ("YYYY-MM-..." or "DD/MM/YYYY" or "MM/YYYY")
+ *
+ * Returns null if the value cannot be parsed.
+ */
+function parseDateM(val: unknown): string | null {
+  if (!val) return null;
+
+  if (typeof val === 'number') {
+    // Excel serial date: days since Dec 30 1899 (UTC)
+    const d = new Date(Date.UTC(1899, 11, 30) + val * 86400000);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
+  }
+
+  if (typeof val === 'string') {
+    // ISO format: YYYY-MM-...
+    const isoMatch = val.match(/^(\d{4})-(\d{2})/);
+    if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-01`;
+
+    // Slash-delimited: DD/MM/YYYY or MM/YYYY
+    const parts = val.split('/');
+    if (parts.length === 3 && parts[2] && parts[1]) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-01`;
+    }
+    if (parts.length === 2 && parts[1] && parts[0]) {
+      return `${parts[1]}-${parts[0].padStart(2, '0')}-01`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns the first day of the current UTC month as a Date.
+ * Only records whose month is strictly before this cutoff are synced.
+ */
+function getUtcCutoff(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/**
+ * Ensures the aggregation map has an entry for a given key.
+ */
+function ensureEntry(
+  agg: Map<string, MonthlyActual>,
+  key: string,
+): MonthlyActual {
+  if (!agg.has(key)) {
+    agg.set(key, {
+      cos_actual: 0,
+      cos_breakdown: {},
+      revenue_actual: 0,
+      activations: 0,
+    });
+  }
+  return agg.get(key)!;
+}
+
+/**
+ * Processes the Data worksheet and accumulates COS actuals into the map.
+ *
+ * Column indices (0-based):
+ *   0  = Invoice Date
+ *   1  = Date_M
+ *   3  = Type
+ *   5  = Amount Excl VAT
+ *   10 = Category T2
+ *   15 = Cost Centre T2
+ */
+function processDataTab(
+  rows: unknown[][],
+  agg: Map<string, MonthlyActual>,
+  cutoff: Date,
+): void {
+  // Skip header row (index 0)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row)) continue;
+
+    const type = String(row[3] ?? '').trim();
+    if (type !== 'Expense') continue;
+
+    const categoryT2 = String(row[10] ?? '').trim();
+    if (!categoryT2.startsWith('COS')) continue;
+
+    const costCentreT2 = String(row[15] ?? '').trim();
+    if (EXCLUDED_COST_CENTRES.has(costCentreT2)) continue;
+
+    const monthStr = parseDateM(row[1]);
+    if (!monthStr) continue;
+
+    // Enforce cutoff
+    if (new Date(monthStr) >= cutoff) continue;
+
+    const amount = parseFloat(String(row[5] ?? '0').replace(/[^0-9.-]/g, '')) || 0;
+
+    const key = `${costCentreT2}||${monthStr}`;
+    const entry = ensureEntry(agg, key);
+    entry.cos_actual += amount;
+    entry.cos_breakdown[categoryT2] = (entry.cos_breakdown[categoryT2] ?? 0) + amount;
+  }
+}
+
+/**
+ * Processes the FT_Revenue worksheet and accumulates revenue + activations.
+ *
+ * Column indices (0-based):
+ *   0  = Invoice Date
+ *   1  = Date_M
+ *   3  = Type
+ *   7  = Project
+ *   8  = Cost Type
+ *   9  = Debit Excl VAT
+ *   13 = Activations
+ */
+function processFtRevenueTab(
+  rows: unknown[][],
+  agg: Map<string, MonthlyActual>,
+  cutoff: Date,
+): void {
+  // Skip header row (index 0)
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row)) continue;
+
+    const type = String(row[3] ?? '').trim();
+    if (type !== 'invoice') continue;
+
+    const project = String(row[7] ?? '').trim();
+    if (!project) continue;
+
+    const monthStr = parseDateM(row[1]);
+    if (!monthStr) continue;
+
+    // Enforce cutoff
+    if (new Date(monthStr) >= cutoff) continue;
+
+    const debit = parseFloat(String(row[9] ?? '0').replace(/[^0-9.-]/g, '')) || 0;
+    const acts = parseFloat(String(row[13] ?? '0')) || 0;
+
+    const key = `${project}||${monthStr}`;
+    const entry = ensureEntry(agg, key);
+    entry.revenue_actual += debit;
+    entry.activations += acts;
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    // Fetch FT_Revenue sheet
-    const { values } = await getWorksheetRange('FT_Revenue');
-
-    if (!values || values.length < 2) {
-      return NextResponse.json({ error: 'FT_Revenue sheet is empty' }, { status: 500 });
+    if (!auth?.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Cutoff: exclude current month and future
-    const now = new Date();
-    const cutoff = new Date(now.getFullYear(), now.getMonth(), 1); // first of current month
+    const cutoff = getUtcCutoff();
+    logger.info('Starting actuals sync', { cutoff: cutoff.toISOString() });
 
-    // Aggregate: project+month → totals
+    // Fetch both worksheets in parallel
+    const [dataResult, revenueResult] = await Promise.all([
+      getWorksheetRange('Data'),
+      getWorksheetRange('FT_Revenue'),
+    ]);
+
+    if (!dataResult.values || dataResult.values.length < 2) {
+      return NextResponse.json({ error: 'Data sheet is empty or missing' }, { status: 500 });
+    }
+    if (!revenueResult.values || revenueResult.values.length < 2) {
+      return NextResponse.json({ error: 'FT_Revenue sheet is empty or missing' }, { status: 500 });
+    }
+
+    logger.info('Worksheets fetched', {
+      dataRows: dataResult.values.length,
+      revenueRows: revenueResult.values.length,
+    });
+
+    // Aggregate both tabs into a single map keyed by "project||YYYY-MM-01"
     const agg = new Map<string, MonthlyActual>();
+    processDataTab(dataResult.values, agg, cutoff);
+    processFtRevenueTab(revenueResult.values, agg, cutoff);
 
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i] as unknown[];
-      const invoiceType = String(row[3] ?? '').trim();
-      if (invoiceType !== 'invoice') continue;
+    logger.info('Aggregation complete', { entries: agg.size });
 
-      const project  = String(row[7] ?? '').trim();
-      const dateM    = row[1];   // Date_M — date object or ISO string
-      const costType = String(row[8] ?? '').trim();
-      const debit    = parseFloat(String(row[9] ?? '0').replace(/[^0-9.]/g, '')) || 0;
-      const acts     = parseFloat(String(row[13] ?? '0')) || 0;
+    // Upsert each entry into conduit_actuals
+    let synced = 0;
+    const uniqueMonths = new Set<string>();
+    const uniqueProjects = new Set<string>();
 
-      if (!project || !dateM) continue;
-
-      // Parse month — Graph API returns Excel serial numbers (days since 1899-12-30)
-      let monthDate: Date;
-      if (typeof dateM === 'number') {
-        // Excel serial date: days since Dec 30 1899
-        monthDate = new Date(Date.UTC(1899, 11, 30) + dateM * 86400000);
-      } else if (dateM instanceof Date) {
-        monthDate = dateM;
-      } else {
-        monthDate = new Date(String(dateM));
-      }
-      if (isNaN(monthDate.getTime())) continue;
-
-      // Enforce cutoff — skip current month and future
-      const monthFirst = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-      if (monthFirst >= cutoff) continue;
-
-      const monthKey = `${project}||${monthFirst.toISOString().slice(0, 10)}`;
-
-      if (!agg.has(monthKey)) {
-        agg.set(monthKey, { cos_actual: 0, activations: 0, cos_breakdown: {} });
-      }
-      const entry = agg.get(monthKey)!;
-      entry.cos_actual += debit;
-      entry.activations += acts;
-      entry.cos_breakdown[costType] = (entry.cos_breakdown[costType] ?? 0) + debit;
-    }
-
-    // Upsert into conduit_actuals
-    let upserted = 0;
     for (const [key, data] of agg) {
-      const [project, month] = key.split('||');
+      const separatorIdx = key.indexOf('||');
+      const projectName = key.slice(0, separatorIdx);
+      const month = key.slice(separatorIdx + 2);
+
       await sql`
-        INSERT INTO conduit_actuals (project_name, month, cos_actual, activations, cos_breakdown, synced_at)
+        INSERT INTO conduit_actuals
+          (project_name, month, cos_actual, cos_breakdown, revenue_actual, activations, synced_at)
         VALUES (
-          ${project},
+          ${projectName},
           ${month}::date,
           ${data.cos_actual},
-          ${Math.round(data.activations)},
           ${JSON.stringify(data.cos_breakdown)}::jsonb,
+          ${data.revenue_actual},
+          ${Math.round(data.activations)},
           now()
         )
         ON CONFLICT (project_name, month) DO UPDATE SET
           cos_actual    = EXCLUDED.cos_actual,
-          activations   = EXCLUDED.activations,
           cos_breakdown = EXCLUDED.cos_breakdown,
-          synced_at     = now()
+          revenue_actual = EXCLUDED.revenue_actual,
+          activations   = EXCLUDED.activations,
+          synced_at     = EXCLUDED.synced_at
       `;
-      upserted++;
+
+      synced++;
+      uniqueMonths.add(month);
+      uniqueProjects.add(projectName);
     }
 
+    logger.info('Actuals sync complete', { synced, projects: uniqueProjects.size });
+
     return NextResponse.json({
-      success: true,
-      upserted,
-      cutoff: cutoff.toISOString().slice(0, 7),
-      projects: [...new Set([...agg.keys()].map(k => k.split('||')[0]))],
+      synced,
+      months: [...uniqueMonths].sort(),
+      projects: [...uniqueProjects].sort(),
     });
   } catch (error) {
-    console.error('[conduit/actuals/sync]', error);
+    logger.error('Actuals sync failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Sync failed' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
