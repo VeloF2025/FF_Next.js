@@ -266,26 +266,28 @@ def minio_list_dcim_directory(qf_project_id):
             return {}
 
         # mc ls --recursive output lines look like:
-        #   [date] [time]     123  DCIM/IMG_0001.jpg/v20260310120500-7bc5005f
-        # We parse filename and the versioned segment from each entry.
+        #   [2026-03-09 12:09:23 UTC] 209KiB STANDARD civil-audit_20260309140815592.13.27 PM (1).jpeg/v20260309120923-5349f4c6
+        # Filenames can contain spaces and parentheses, so we can't split on whitespace.
+        # Instead, find "STANDARD " marker and take everything after it as the path.
         dcim_files = {}  # filename.jpg -> versioned storage key
         for line in result.stdout.strip().split("\n"):
-            parts = line.strip().split()
-            if not parts:
+            line = line.strip()
+            if not line:
                 continue
-            # Last token is the path relative to the dcim_prefix
-            rel_path = parts[-1].rstrip("/")  # e.g. DCIM/IMG_0001.jpg/v20260310...
+            # Extract path after "STANDARD " marker
+            std_idx = line.find(" STANDARD ")
+            if std_idx == -1:
+                continue
+            rel_path = line[std_idx + len(" STANDARD "):].rstrip("/")
             # Normalize: strip leading DCIM/ if mc includes it
             if rel_path.startswith("DCIM/"):
                 rel_path = rel_path[len("DCIM/"):]
-            # Expected format: filename.jpg/v{version}
-            slash_idx = rel_path.rfind("/")
-            if slash_idx == -1:
+            # Expected format: filename.jpg/v{version}  — find version segment from end
+            ver_match = re.search(r'/v(\d{14}-[a-fA-F0-9]+)$', rel_path)
+            if not ver_match:
                 continue
-            filename = rel_path[:slash_idx]   # e.g. IMG_0001.jpg
-            version_seg = rel_path[slash_idx + 1:]  # e.g. v20260310120500-7bc5005f
-            if not version_seg.startswith("v"):
-                continue
+            version_seg = "v" + ver_match.group(1)
+            filename = rel_path[:ver_match.start()]  # everything before /v...
             # Store: keep latest version (sorted lexicographically — timestamps are ISO-like)
             existing_ver = dcim_files.get(filename)
             if existing_ver is None or version_seg > existing_ver.rsplit("/", 1)[-1]:
@@ -309,12 +311,18 @@ def minio_download_latest(qf_project_id, gpkg_path, dest_path):
         if result.returncode != 0 or not result.stdout.strip():
             return None, None
 
-        # Parse versions, pick latest
+        # Parse versions, pick latest.
+        # Use STANDARD-marker parsing to handle filenames containing spaces.
         versions = []
         for line in result.stdout.strip().split("\n"):
-            parts = line.strip().split()
-            if parts:
-                ver = parts[-1].rstrip("/")
+            line = line.strip()
+            if not line:
+                continue
+            std_idx = line.find(" STANDARD ")
+            if std_idx == -1:
+                continue
+            ver = line[std_idx + len(" STANDARD "):].strip().rstrip("/")
+            if ver:
                 versions.append(ver)
         if not versions:
             return None, None
@@ -351,11 +359,18 @@ def minio_resolve_photo_version(qf_project_id, dcim_path):
         if result.returncode != 0 or not result.stdout.strip():
             return None
 
+        # Use STANDARD-marker parsing to handle filenames containing spaces.
         versions = []
         for line in result.stdout.strip().split("\n"):
-            parts = line.strip().split()
-            if parts:
-                versions.append(parts[-1].rstrip("/"))
+            line = line.strip()
+            if not line:
+                continue
+            std_idx = line.find(" STANDARD ")
+            if std_idx == -1:
+                continue
+            ver = line[std_idx + len(" STANDARD "):].strip().rstrip("/")
+            if ver:
+                versions.append(ver)
         if not versions:
             return None
 
