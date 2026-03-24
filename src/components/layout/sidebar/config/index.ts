@@ -16,5 +16,6 @@ export { analyticsSection } from './analyticsSection';
 export { communicationsSection } from './communicationsSection';
 export { activateSection } from './activateSection';
 export { fieldOperationsSection } from './fieldOperationsSection';
+export { conduitSection } from './conduitSection';
 export { systemSection } from './systemSection';
 export * from './types';

@@ -14,6 +14,7 @@ import {
   communicationsSection,
   activateSection,
   fieldOperationsSection,
+  conduitSection,
   systemSection,
 } from './config';
 
@@ -28,9 +29,10 @@ export const navItems: NavSection[] = [
   fleetSection,           // 8. FLEET - Vehicles for field ops
   peopleSection,          // 9. HUMAN RESOURCES - Staff
   fieldOperationsSection, // 10. FIELD OPERATIONS - Civil QA
-  analyticsSection,       // 11. ANALYTICS - Performance metrics
-  communicationsSection,  // 12. COMMUNICATIONS - WhatsApp, meetings
-  systemSection,          // 13. SYSTEM - Admin tools (always last)
+  conduitSection,         // 11. CONDUIT - Project financial scoping
+  analyticsSection,       // 12. ANALYTICS - Performance metrics
+  communicationsSection,  // 13. COMMUNICATIONS - WhatsApp, meetings
+  systemSection,          // 14. SYSTEM - Admin tools (always last)
   // contractorsSection - MOVED to projectSection
   // clientsSection - MOVED to projectSection
 ];
