@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Search, Star, Building2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Star, Building2, AlertCircle, LayoutGrid, List } from 'lucide-react';
 import { useSuppliers } from './hooks/useSuppliers';
 import { SupplierCard } from './components/SupplierCard';
+import { SupplierListRow } from './components/SupplierListRow';
 import { SupplierStatus, ProductCategory } from '@/types/supplier.types';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -17,6 +18,7 @@ export function SuppliersPage() {
   const [statusFilter, setStatusFilter] = useState<SupplierStatus | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<ProductCategory | 'all'>('all');
   const [showPreferredOnly, setShowPreferredOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   
   const { data: suppliers, isLoading, error } = useSuppliers({
     ...(statusFilter !== 'all' && { status: statusFilter }),
@@ -71,6 +73,23 @@ export function SuppliersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center bg-[var(--ff-bg-tertiary)] border border-[var(--ff-border-light)] rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('card')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'card' ? 'bg-[var(--ff-primary-500)] text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}
+              title="Card view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-[var(--ff-primary-500)] text-white' : 'text-[var(--ff-text-secondary)] hover:text-[var(--ff-text-primary)]'}`}
+              title="List view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
           <ExportCSVButton
             endpoint="/api/suppliers/suppliers-export"
             params={{
@@ -220,11 +239,27 @@ export function SuppliersPage() {
           ))}
         </div>
       ) : filteredSuppliers && filteredSuppliers.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredSuppliers.map((supplier) => (
-            <SupplierCard key={supplier.id} supplier={supplier} />
-          ))}
-        </div>
+        viewMode === 'card' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredSuppliers.map((supplier) => (
+              <SupplierCard key={supplier.id} supplier={supplier} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {/* List header */}
+            <div className="flex items-center gap-4 px-4 py-2 text-[11px] font-medium text-[var(--ff-text-tertiary)] uppercase tracking-wide">
+              <div className="flex-1">Supplier</div>
+              <div className="hidden md:block w-36 shrink-0">Category</div>
+              <div className="hidden lg:block w-48 shrink-0">Contact</div>
+              <div className="hidden sm:block w-24 shrink-0 text-right">Rating</div>
+              <div className="w-6 shrink-0" />
+            </div>
+            {filteredSuppliers.map((supplier) => (
+              <SupplierListRow key={supplier.id} supplier={supplier} />
+            ))}
+          </div>
+        )
       ) : (
         <div className="bg-[var(--ff-bg-secondary)] p-12 rounded-lg border border-[var(--ff-border-light)] text-center">
           <Building2 className="h-12 w-12 text-[var(--ff-text-tertiary)] mx-auto mb-4" />
