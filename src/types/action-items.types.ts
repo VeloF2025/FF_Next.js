@@ -1,10 +1,19 @@
 /**
  * Action Items Types
- * Extracted from Fireflies meeting summaries
+ * Extracted from Fireflies meeting summaries and other module sources.
+ * Table: action_items (renamed from meeting_action_items in migration 256)
  */
 
 export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export type ActionItemPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type ActionItemSourceType =
+  | 'meeting'
+  | 'procurement'
+  | 'noc'
+  | 'hns'
+  | 'qa'
+  | 'project'
+  | 'manual';
 
 export interface ActionItem {
   id: string;
@@ -16,6 +25,13 @@ export interface ActionItem {
   assignee_email?: string;
   status: ActionItemStatus;
   priority: ActionItemPriority;
+
+  // User linking (migration 256)
+  assigned_to_user_id?: string;
+  source_type?: ActionItemSourceType;
+  source_id?: string;
+  project_id?: string;
+  category?: string;
 
   // Timestamps
   due_date?: string;
@@ -36,10 +52,14 @@ export interface ActionItem {
   meeting_title?: string;
   meeting_date?: string;
   transcript_url?: string;
+
+  // Joined data (from users table)
+  assigned_user_name?: string;
+  assigned_user_avatar?: string;
 }
 
 export interface ActionItemCreateInput {
-  meeting_id: number;
+  meeting_id?: number;
   description: string;
   assignee_name?: string;
   assignee_email?: string;
@@ -49,6 +69,13 @@ export interface ActionItemCreateInput {
   mentioned_at?: string;
   tags?: string[];
   notes?: string;
+
+  // User linking (migration 256)
+  assigned_to_user_id?: string;
+  source_type?: ActionItemSourceType;
+  source_id?: string;
+  project_id?: string;
+  category?: string;
 }
 
 export interface ActionItemUpdateInput {
@@ -70,6 +97,11 @@ export interface ActionItemFilters {
   priority?: ActionItemPriority;
   search?: string;
   overdue?: boolean;
+
+  // User linking filters (migration 256)
+  assigned_to_user_id?: string;
+  source_type?: string;
+  project_id?: string;
 }
 
 export interface ActionItemStats {
@@ -78,6 +110,12 @@ export interface ActionItemStats {
   in_progress: number;
   completed: number;
   overdue: number;
+
+  // Source breakdown (migration 256)
+  from_meetings?: number;
+  from_procurement?: number;
+  from_noc?: number;
+  user_linked?: number;
 }
 
 // For parsing Fireflies action items text

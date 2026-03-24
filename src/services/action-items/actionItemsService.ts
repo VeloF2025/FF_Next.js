@@ -25,7 +25,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export const actionItemsService = {
   /**
-   * Fetch action items with optional filters
+   * Fetch action items with optional filters.
+   * Supports new fields: source_type, assigned_to_user_id, project_id (migration 256).
    */
   async getActionItems(filters?: ActionItemFilters): Promise<ActionItem[]> {
     const params = new URLSearchParams();
@@ -42,8 +43,24 @@ export const actionItemsService = {
     if (filters?.search) params.append('search', filters.search);
     if (filters?.overdue) params.append('overdue', 'true');
 
+    // New filters (migration 256)
+    if (filters?.assigned_to_user_id) {
+      params.append('assigned_to_user_id', filters.assigned_to_user_id);
+    }
+    if (filters?.source_type) params.append('source_type', filters.source_type);
+    if (filters?.project_id) params.append('project_id', filters.project_id);
+
     const url = params.toString() ? `${API_BASE}?${params}` : API_BASE;
     const response = await fetch(url);
+    return handleResponse<ActionItem[]>(response);
+  },
+
+  /**
+   * Fetch action items assigned to the currently authenticated user.
+   * Matches on assigned_to_user_id and legacy assignee_email.
+   */
+  async getMyItems(): Promise<ActionItem[]> {
+    const response = await fetch(`${API_BASE}/my-items`);
     return handleResponse<ActionItem[]>(response);
   },
 
@@ -90,7 +107,7 @@ export const actionItemsService = {
   },
 
   /**
-   * Get action items statistics
+   * Get action items statistics (includes source breakdown from migration 256)
    */
   async getStats(): Promise<ActionItemStats> {
     const response = await fetch(`${API_BASE}/stats`);

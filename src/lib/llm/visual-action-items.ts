@@ -265,7 +265,7 @@ export async function processVisualActionItems(
   // 3. Load existing transcript-based action items
   const existingItems = await sql`
     SELECT description, assignee_name as assignee, priority
-    FROM meeting_action_items
+    FROM action_items
     WHERE meeting_id = ${meetingId} AND (source = 'transcript' OR source IS NULL)
   `;
 
@@ -276,12 +276,12 @@ export async function processVisualActionItems(
   );
 
   // 5. Persist: remove old visual/merged items, insert new ones
-  await sql`DELETE FROM meeting_action_items WHERE meeting_id = ${meetingId} AND source IN ('visual', 'merged')`;
+  await sql`DELETE FROM action_items WHERE meeting_id = ${meetingId} AND source IN ('visual', 'merged')`;
 
   for (const item of result.items) {
     if (item.source === 'visual' || item.source === 'merged') {
       await sql`
-        INSERT INTO meeting_action_items (meeting_id, description, assignee_name, status, priority, source, visual_frame_ref)
+        INSERT INTO action_items (meeting_id, description, assignee_name, status, priority, source, visual_frame_ref)
         VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority}, ${item.source}, ${item.visualFrameRef})
       `;
     }

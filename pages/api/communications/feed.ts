@@ -166,9 +166,9 @@ async function fetchMeetingActions(
       ai.due_date,
       ai.created_at,
       m.title AS meeting_title
-    FROM meeting_action_items ai
+    FROM action_items ai
     LEFT JOIN meetings m ON ai.meeting_id = m.id
-    WHERE (ai.assignee_email = ${userEmail} OR ai.created_by = ${userId}::uuid)
+    WHERE (ai.assignee_email = ${userEmail} OR ai.created_by = ${userId}::uuid OR ai.assigned_to_user_id = ${userId}::uuid)
       AND ai.status::text IN ('pending', 'in_progress')
     ORDER BY ai.created_at DESC
     LIMIT 50

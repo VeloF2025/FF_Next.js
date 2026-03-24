@@ -25,7 +25,7 @@ async function handler(
           m.title as meeting_title,
           m.meeting_date,
           m.transcript_url
-        FROM meeting_action_items ai
+        FROM action_items ai
         LEFT JOIN meetings m ON ai.meeting_id = m.id
         WHERE ai.id = ${id}
       `;
@@ -93,7 +93,7 @@ async function handler(
       if (fields.status !== undefined) {
         // Most common case - status update
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             status = ${fields.status},
             completed_date = ${fields.completed_date || null},
@@ -103,7 +103,7 @@ async function handler(
         `;
       } else if (fields.description !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             description = ${fields.description},
             updated_at = NOW()
@@ -112,7 +112,7 @@ async function handler(
         `;
       } else if (fields.assignee_name !== undefined || fields.assignee_email !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             assignee_name = ${fields.assignee_name || null},
             assignee_email = ${fields.assignee_email || null},
@@ -122,7 +122,7 @@ async function handler(
         `;
       } else if (fields.priority !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             priority = ${fields.priority},
             updated_at = NOW()
@@ -131,7 +131,7 @@ async function handler(
         `;
       } else if (fields.due_date !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             due_date = ${fields.due_date},
             updated_at = NOW()
@@ -140,7 +140,7 @@ async function handler(
         `;
       } else if (fields.tags !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             tags = ${fields.tags},
             updated_at = NOW()
@@ -149,7 +149,7 @@ async function handler(
         `;
       } else if (fields.notes !== undefined) {
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET
             notes = ${fields.notes},
             updated_at = NOW()
@@ -159,7 +159,7 @@ async function handler(
       } else {
         // Fallback - just update timestamp
         result = await sql`
-          UPDATE meeting_action_items
+          UPDATE action_items
           SET updated_at = NOW()
           WHERE id = ${id}
           RETURNING *
@@ -181,7 +181,7 @@ async function handler(
   if (req.method === 'DELETE') {
     try {
       const [deleted] = await sql`
-        DELETE FROM meeting_action_items
+        DELETE FROM action_items
         WHERE id = ${id}
         RETURNING id
       `;

@@ -105,7 +105,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (exportType === 'action-items') {
       const items = await sql`
         SELECT description, assignee_name, status, priority, due_date
-        FROM meeting_action_items
+        FROM action_items
         WHERE meeting_id = ${meetingId}
         ORDER BY status ASC, created_at ASC
       `;

@@ -48,7 +48,7 @@ async function handler(
         // Check if already extracted
         const existing = await sql`
           SELECT COUNT(*)::int as count
-          FROM meeting_action_items
+          FROM action_items
           WHERE meeting_id = ${meeting.id}
         `;
 
@@ -70,7 +70,7 @@ async function handler(
           const assignee_email = findAssigneeEmail(item.assignee, meeting.participants);
 
           await sql`
-            INSERT INTO meeting_action_items (
+            INSERT INTO action_items (
               meeting_id,
               description,
               assignee_name,

@@ -43,8 +43,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       ),
       action_item_count AS (
         SELECT COUNT(*)::int AS cnt
-        FROM meeting_action_items ai
-        WHERE (ai.assignee_email = ${userEmail} OR ai.created_by = ${userId}::uuid)
+        FROM action_items ai
+        WHERE (ai.assignee_email = ${userEmail} OR ai.created_by = ${userId}::uuid OR ai.assigned_to_user_id = ${userId}::uuid)
           AND ai.status::text = 'pending'
       )
       SELECT

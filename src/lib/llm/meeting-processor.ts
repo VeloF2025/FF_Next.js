@@ -297,13 +297,13 @@ async function writeActionItems(
   source: string = 'transcript'
 ): Promise<void> {
   // Delete previous items of this source type only (preserves other sources)
-  await sql`DELETE FROM meeting_action_items WHERE meeting_id = ${meetingId} AND (source = ${source} OR source IS NULL)`;
+  await sql`DELETE FROM action_items WHERE meeting_id = ${meetingId} AND (source = ${source} OR source IS NULL)`;
 
   if (items.length === 0) return;
 
   for (const item of items) {
     await sql`
-      INSERT INTO meeting_action_items (meeting_id, description, assignee_name, status, priority, source)
+      INSERT INTO action_items (meeting_id, description, assignee_name, status, priority, source)
       VALUES (${meetingId}, ${item.description}, ${item.assignee}, 'pending', ${item.priority}, ${source})
     `;
   }
