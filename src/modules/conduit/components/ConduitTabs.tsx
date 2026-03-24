@@ -7,9 +7,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { LayoutGrid, BookMarked, Calculator } from 'lucide-react';
+import { LayoutGrid, BookMarked, Calculator, Settings } from 'lucide-react';
 import { PortfolioTable, ProjectsGrid } from './PortfolioTable';
 import { BaselineList } from './BaselineList';
+import { SelectListAdmin } from './SelectListAdmin';
 import type { ConduitProject } from '../types';
 import type { ConduitBaseline } from '../types';
 
@@ -21,7 +22,7 @@ interface Props {
   initialBaselines:     ConduitBaseline[];
 }
 
-type Tab = 'current' | 'baseline' | 'scoping';
+type Tab = 'current' | 'baseline' | 'scoping' | 'settings';
 
 export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, initialScopingProjects, initialBaselines }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('current');
@@ -66,6 +67,10 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
           <Calculator className="w-4 h-4" />
           Scoping
         </button>
+        <button className={tabClass('settings')} onClick={() => setActiveTab('settings')}>
+          <Settings className="w-4 h-4" />
+          Settings
+        </button>
       </div>
 
       {/* Tab content */}
@@ -100,6 +105,20 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
             showDeleteButton
           />
 
+        </div>
+      )}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold uppercase tracking-widest border border-gray-500 text-gray-400 px-3 py-1 rounded">
+              Settings
+            </span>
+            <div className="flex-1 border-t border-gray-700" />
+            <span className="text-xs text-gray-500">Manage milestone select list values</span>
+          </div>
+          <div className="rounded-lg border border-gray-700 overflow-hidden bg-gray-900/50">
+            <SelectListAdmin />
+          </div>
         </div>
       )}
     </div>

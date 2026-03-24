@@ -21,6 +21,7 @@ import { log } from '@/lib/logger';
 import type { ConduitProject, ConduitProjectInputs, MonthlyPlanEntry } from '../types';
 import { calcConduit } from '../hooks/useConduitCalc';
 import { MonthlyForecastGrid } from './MonthlyForecastGrid';
+import { MilestonesPanel } from './MilestonesPanel';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -354,6 +355,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [forecastOpen, setForecastOpen] = useState(initialProject.status === 'wip');
   const [inputsOpen, setInputsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [milestonesOpen, setMilestonesOpen] = useState(false);
 
   // Keep in sync if parent re-renders
   useEffect(() => {
@@ -580,6 +582,25 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         <span className="text-xs text-gray-500">
           Changes are live in the summary table immediately. Save to persist.
         </span>
+      </div>
+
+      {/* ── Prerequisites & Milestones (collapsible) ───────────────────── */}
+      <div className="rounded-lg border border-gray-700 overflow-hidden">
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 bg-gray-800 hover:bg-gray-700 transition-colors text-sm font-semibold text-white"
+          onClick={() => setMilestonesOpen(v => !v)}
+        >
+          <span>Prerequisites &amp; Milestones</span>
+          {milestonesOpen
+            ? <ChevronDown className="w-4 h-4 text-gray-400" />
+            : <ChevronRight className="w-4 h-4 text-gray-400" />}
+        </button>
+
+        {milestonesOpen && (
+          <div className="p-3 bg-gray-900">
+            <MilestonesPanel projectId={project.id} />
+          </div>
+        )}
       </div>
 
       {/* ── Monthly Forecast (collapsible) ────────────────────────────── */}
