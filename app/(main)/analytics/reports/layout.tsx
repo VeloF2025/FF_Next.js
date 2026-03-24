@@ -1,7 +1,8 @@
 /**
  * Analytics Reports Layout — shared layout for Financial + Operations sub-pages.
  * Contains the page header and horizontal tab navigation.
- * 🟢 WORKING: Tab active state detected from pathname
+ * Tabs are gated by sub-page RBAC keys — hidden if user lacks permission.
+ * 🟢 WORKING: Tab active state detected from pathname, RBAC-filtered
  */
 
 'use client';
@@ -11,14 +12,19 @@ import { usePathname } from 'next/navigation';
 import { BarChart2, Lock } from 'lucide-react';
 import { ModulePage } from '@/components/module-page';
 import { analyticsConfig } from '@/modules/navigation';
+import { usePermission } from '@/hooks/usePermission';
 
-const TABS = [
-  { label: 'Financial', href: '/analytics/reports/financial' },
-  { label: 'Operations', href: '/analytics/reports/operations' },
+const ALL_TABS = [
+  { label: 'Financial',   href: '/analytics/reports/financial',  rbacKey: 'analytics.reports.financial'  },
+  { label: 'Operations',  href: '/analytics/reports/operations', rbacKey: 'analytics.reports.operations' },
 ];
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { can } = usePermission();
+
+  // Only show tabs the user has view access to
+  const visibleTabs = ALL_TABS.filter(tab => can(tab.rbacKey, 'view'));
 
   return (
     <ModulePage config={analyticsConfig}>
@@ -37,8 +43,8 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
 
         {/* Tab Navigation */}
         <div className="flex gap-1 border-b border-gray-700 mb-6">
-          {TABS.map((tab) => {
-            const isActive = pathname.startsWith(tab.href);
+          {visibleTabs.map((tab) => {
+            const isActive = pathname?.startsWith(tab.href) ?? false;
             return (
               <Link
                 key={tab.href}

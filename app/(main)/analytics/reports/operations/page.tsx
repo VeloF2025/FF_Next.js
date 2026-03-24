@@ -1,5 +1,6 @@
 /**
- * Analytics Reports — Operations tab
+ * Analytics Reports — Operations sub-page
+ * Gated by analytics.reports.operations RBAC key.
  * 🟢 WORKING: Activations report — year/month/week drill-down table + bar chart
  */
 
@@ -8,5 +9,7 @@ export const dynamic = 'force-dynamic';
 import ActivationsReport from '@/modules/analytics/reports/activations/ActivationsReport';
 
 export default function OperationsReportsPage() {
+  // Auth + RBAC enforced client-side via usePermission in the layout tab filter,
+  // and server-side at the API routes.
   return <ActivationsReport />;
 }
