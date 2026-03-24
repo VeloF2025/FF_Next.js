@@ -786,6 +786,7 @@ export async function listTickets(
     const sql = `
       SELECT
         t.*,
+        t.type as ticket_type,
         CASE
           WHEN u.id IS NOT NULL THEN jsonb_build_object(
             'id', u.id,

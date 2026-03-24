@@ -115,7 +115,7 @@ function TicketGridRow({ ticket, isEven, onTicketClick }: { ticket: Ticket; isEv
         </span>
       </td>
       <td className="px-2 py-1.5 text-[var(--ff-text-secondary)] whitespace-nowrap">
-        {ticket.ticket_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+        {(ticket.ticket_type ?? '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
       </td>
       <td className="px-2 py-1.5">
         <span className={cn('inline-block px-1.5 py-0.5 rounded text-[10px] border whitespace-nowrap capitalize', STATUS_STYLES[ticket.status] ?? 'text-gray-400')}>
