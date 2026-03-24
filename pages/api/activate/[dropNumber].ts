@@ -254,6 +254,17 @@ async function handleGet(
             });
           }
         }
+        // Update stepCoverage in validations to match corrected photos
+        if (review.auto_qa_results.validations?.stepCoverage) {
+          const covered = Array.from(coveredSteps).sort((a: number, b: number) => a - b);
+          const missing = Array.from({ length: 10 }, (_, i) => i + 1).filter((s) => !coveredSteps.has(s));
+          review.auto_qa_results.validations.stepCoverage = {
+            covered,
+            missing,
+            total: 10,
+            coveragePercent: covered.length / 10,
+          };
+        }
         // Force feedback message regeneration in UI with corrected data
         review.auto_qa_results.feedbackMessage = null;
       }
