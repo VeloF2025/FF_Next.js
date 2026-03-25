@@ -6,10 +6,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import type { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import pool from '@/lib/db';
-import { apiResponse } from '@/lib/apiResponse';
-import { verifyToken } from '@/lib/auth';
+import { verifyToken } from '@/lib/auth/jwt';
+import { userHasPermission } from '@/lib/permissions';
 
 export interface BuildMilestoneRow {
   projectId: string;
@@ -36,21 +37,23 @@ export interface BuildMilestonesData {
 
 const ALLOWED_USERS = ['28ab98c1-df21-48f8-a30a-489cd09a0d39', '7d84184b-2a2b-4fbb-a52e-9815d0e92237'];
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(_req: NextRequest): Promise<NextResponse> {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1];
+    const cookieStore = await cookies();
+    const token = cookieStore.get('ff_auth_token')?.value;
     if (!token) {
-      return apiResponse(null, 'Unauthorized', 401);
+      return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }, { status: 401 });
     }
 
     const payload = await verifyToken(token);
-    if (!payload) {
-      return apiResponse(null, 'Invalid token', 401);
+    if (!payload?.sub) {
+      return NextResponse.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid token' } }, { status: 401 });
     }
 
-    // Check if user in allowlist
-    if (!ALLOWED_USERS.includes(payload.sub)) {
-      return apiResponse(null, 'Access denied', 403);
+    const userId = payload.sub;
+    const hasAccess = await userHasPermission(userId, 'analytics.reports', 'view');
+    if (!hasAccess && !ALLOWED_USERS.includes(userId)) {
+      return NextResponse.json({ success: false, error: { code: 'FORBIDDEN', message: 'Access restricted' } }, { status: 403 });
     }
 
     const query = `
@@ -101,12 +104,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       };
 
-      return apiResponse(data, 'Build milestones fetched', 200);
+      return NextResponse.json({ success: true, data });
     } finally {
       client.release();
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return apiResponse(null, message, 500);
+    return NextResponse.json({ success: false, error: { code: 'INTERNAL_ERROR', message } }, { status: 500 });
   }
 }
