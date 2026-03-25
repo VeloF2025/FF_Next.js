@@ -21,22 +21,23 @@ export function useMonitoringData() {
     const fetchMetrics = async () => {
       setIsLoading(true);
       try {
-        // Fetch Web Vitals
-        const vitalsRes = await fetch('/api/analytics/web-vitals/summary');
+        // Fetch all monitoring data in parallel
+        const [vitalsRes, errorsRes, healthRes] = await Promise.all([
+          fetch('/api/analytics/web-vitals/summary'),
+          fetch('/api/analytics/errors/summary'),
+          fetch('/api/health'),
+        ]);
+
         if (vitalsRes.ok) {
           const data = await vitalsRes.json();
           setWebVitals(data.metrics || []);
         }
 
-        // Fetch Recent Errors
-        const errorsRes = await fetch('/api/analytics/errors/summary');
         if (errorsRes.ok) {
           const data = await errorsRes.json();
           setErrors(data.errors || []);
         }
 
-        // Check System Health
-        const healthRes = await fetch('/api/health');
         if (healthRes.ok) {
           const data = await healthRes.json();
           setSystemHealth(data.health || systemHealth);

@@ -3,9 +3,13 @@ import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { cachedQuery } from '@/lib/queryCache';
 
 // Initialize Neon client
 const sql = neon(process.env.DATABASE_URL!);
+
+/** Cache TTL: 5 minutes — trend comparisons are expensive (multiple period queries) */
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function handler(
   req: NextApiRequest,
@@ -23,30 +27,39 @@ async function handler(
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-    // Get current period stats
-    const [currentPeriod, previousPeriod] = await Promise.all([
-      // Current 30 days
-      sql`
-        SELECT
-          (SELECT COUNT(*) FROM projects WHERE created_at >= ${thirtyDaysAgo}) as new_projects,
-          (SELECT COUNT(*) FROM staff WHERE created_at >= ${thirtyDaysAgo}) as new_staff,
-          (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${thirtyDaysAgo}) as new_poles,
-          (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${thirtyDaysAgo}) as new_drops,
-          (SELECT COALESCE(COUNT(*), 0) FROM sow_poles WHERE created_at >= ${thirtyDaysAgo}) +
-          (SELECT COALESCE(COUNT(*), 0) FROM sow_drops WHERE created_at >= ${thirtyDaysAgo}) as new_tasks
-      `,
-      
-      // Previous 30 days
-      sql`
-        SELECT
-          (SELECT COUNT(*) FROM projects WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_projects,
-          (SELECT COUNT(*) FROM staff WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_staff,
-          (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_poles,
-          (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_drops,
-          (SELECT COALESCE(COUNT(*), 0) FROM sow_poles WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) +
-          (SELECT COALESCE(COUNT(*), 0) FROM sow_drops WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_tasks
-      `
-    ]);
+    // Get current period stats, cached for 5 minutes
+    const cacheKey = `trends-${groupBy}`;
+    const [currentPeriod, previousPeriod] = await cachedQuery(
+      'reporting',
+      cacheKey,
+      async () => {
+        log.debug('Cache miss — querying database', { cacheKey }, 'AnalyticsDashboardTrends');
+        return Promise.all([
+          // Current 30 days
+          sql`
+            SELECT
+              (SELECT COUNT(*) FROM projects WHERE created_at >= ${thirtyDaysAgo}) as new_projects,
+              (SELECT COUNT(*) FROM staff WHERE created_at >= ${thirtyDaysAgo}) as new_staff,
+              (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${thirtyDaysAgo}) as new_poles,
+              (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${thirtyDaysAgo}) as new_drops,
+              (SELECT COALESCE(COUNT(*), 0) FROM sow_poles WHERE created_at >= ${thirtyDaysAgo}) +
+              (SELECT COALESCE(COUNT(*), 0) FROM sow_drops WHERE created_at >= ${thirtyDaysAgo}) as new_tasks
+          `,
+
+          // Previous 30 days
+          sql`
+            SELECT
+              (SELECT COUNT(*) FROM projects WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_projects,
+              (SELECT COUNT(*) FROM staff WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_staff,
+              (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_poles,
+              (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_drops,
+              (SELECT COALESCE(COUNT(*), 0) FROM sow_poles WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) +
+              (SELECT COALESCE(COUNT(*), 0) FROM sow_drops WHERE created_at >= ${sixtyDaysAgo} AND created_at < ${thirtyDaysAgo}) as prev_tasks
+          `
+        ]);
+      },
+      CACHE_TTL_MS
+    );
 
     const current: any = currentPeriod[0] || {};
     const previous: any = previousPeriod[0] || {};

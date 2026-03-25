@@ -66,7 +66,7 @@ async function handler(
     let resolvedDataType = dataType;
     if (!resolvedDataType) {
       try {
-        const { headers } = parseExcelFile(buffer);
+        const { headers } = await parseExcelFile(buffer);
         resolvedDataType = detectDataType(headers) || undefined;
 
         if (!resolvedDataType) {

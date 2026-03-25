@@ -69,6 +69,91 @@ function isSelectable(r: PPRecord): boolean {
   return r.maintenance_ticket_id === null && r.resolution_status !== 'activated';
 }
 
+/** Memoized table row to avoid re-rendering all rows when selection changes on a single row */
+const PPDataRow = React.memo(function PPDataRow({
+  record,
+  isSelected,
+  onToggleSelect,
+}: {
+  record: PPRecord;
+  isSelected: boolean;
+  onToggleSelect: (id: number) => void;
+}) {
+  const statusStyle = STATUS_COLORS[record.resolution_status] || { bg: 'bg-background/30', text: 'text-foreground', label: record.resolution_status };
+  const selectable = isSelectable(record);
+  return (
+    <tr className={`bg-[var(--ff-bg-secondary)] ${isSelected ? 'bg-blue-900/10' : ''}`}>
+      <td className="px-3 py-2">
+        {selectable ? (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(record.id)}
+            className="rounded border-gray-600"
+          />
+        ) : null}
+      </td>
+      <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">{record.serial_number}</td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">{record.project}</td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
+        {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
+      </td>
+      <td className="px-3 py-2">
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+          {statusStyle.label}
+        </span>
+      </td>
+      <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">
+        {record.resolved_drop_number || '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
+        {record.oes_team || '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
+        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
+      </td>
+      <td className="px-3 py-2 text-xs">
+        {record.wa_name ? (
+          <div>
+            <span className="text-[var(--ff-text-primary)]">{record.wa_name}</span>
+            {record.wa_phone && (
+              <span className="block text-[var(--ff-text-tertiary)] font-mono text-[10px]">{record.wa_phone}</span>
+            )}
+          </div>
+        ) : '-'}
+      </td>
+      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
+        {record.resolved_source || '-'}
+      </td>
+      <td className="px-3 py-2">
+        {record.ticket_uid ? (
+          <a
+            href={`/noc/tickets/${record.maintenance_ticket_id}`}
+            className="text-blue-400 hover:text-blue-300 text-xs font-mono"
+          >
+            {record.ticket_uid}
+          </a>
+        ) : (
+          <span className="text-[var(--ff-text-tertiary)]">-</span>
+        )}
+      </td>
+      <td className="px-3 py-2">
+        {record.ticket_priority ? (
+          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+            record.ticket_priority === 'high'
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+              : 'bg-gray-100 dark:bg-gray-800/30 text-gray-700 dark:text-gray-300'
+          }`}>
+            {record.ticket_priority === 'high' ? 'High' : 'Normal'}
+          </span>
+        ) : (
+          <span className="text-[var(--ff-text-tertiary)]">-</span>
+        )}
+      </td>
+    </tr>
+  );
+});
+
 export function PPDataTab() {
   const [isResolving, setIsResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -271,9 +356,9 @@ export function PPDataTab() {
     }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = useCallback((id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
+  }, []);
 
 
   return (
@@ -587,81 +672,14 @@ export function PPDataTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ff-border-light)]">
-                {records.map((record) => {
-                  const statusStyle = STATUS_COLORS[record.resolution_status] || { bg: 'bg-background/30', text: 'text-foreground', label: record.resolution_status };
-                  const selectable = isSelectable(record);
-                  return (
-                    <tr key={record.id} className={`bg-[var(--ff-bg-secondary)] ${selectedIds.includes(record.id) ? 'bg-blue-900/10' : ''}`}>
-                      <td className="px-3 py-2">
-                        {selectable ? (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(record.id)}
-                            onChange={() => toggleSelect(record.id)}
-                            className="rounded border-gray-600"
-                          />
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">{record.serial_number}</td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">{record.project}</td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
-                        {record.date_registered ? formatDisplayDate(record.date_registered) : '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                          {statusStyle.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-[var(--ff-text-primary)]">
-                        {record.resolved_drop_number || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-                        {record.oes_team || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)] text-xs">
-                        {record.activation_date ? formatDisplayDate(record.activation_date) : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {record.wa_name ? (
-                          <div>
-                            <span className="text-[var(--ff-text-primary)]">{record.wa_name}</span>
-                            {record.wa_phone && (
-                              <span className="block text-[var(--ff-text-tertiary)] font-mono text-[10px]">{record.wa_phone}</span>
-                            )}
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-[var(--ff-text-secondary)]">
-                        {record.resolved_source || '-'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {record.ticket_uid ? (
-                          <a
-                            href={`/noc/tickets/${record.maintenance_ticket_id}`}
-                            className="text-blue-400 hover:text-blue-300 text-xs font-mono"
-                          >
-                            {record.ticket_uid}
-                          </a>
-                        ) : (
-                          <span className="text-[var(--ff-text-tertiary)]">-</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {record.ticket_priority ? (
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            record.ticket_priority === 'high'
-                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                              : 'bg-gray-100 dark:bg-gray-800/30 text-gray-700 dark:text-gray-300'
-                          }`}>
-                            {record.ticket_priority === 'high' ? 'High' : 'Normal'}
-                          </span>
-                        ) : (
-                          <span className="text-[var(--ff-text-tertiary)]">-</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {records.map((record) => (
+                  <PPDataRow
+                    key={record.id}
+                    record={record}
+                    isSelected={selectedIds.includes(record.id)}
+                    onToggleSelect={toggleSelect}
+                  />
+                ))}
                 {records.length === 0 && (
                   <tr>
                     <td colSpan={12} className="px-3 py-8 text-center text-[var(--ff-text-tertiary)]">

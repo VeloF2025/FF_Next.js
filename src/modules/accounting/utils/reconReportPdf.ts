@@ -6,8 +6,7 @@
  * Dependencies: jsPDF + jspdf-autotable (already in package.json)
  */
 
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type { jsPDF } from 'jspdf';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,7 +159,8 @@ function paintSection(
   title: string,
   rows: ReconTx[],
   startY: number,
-  includeJournalRef: boolean
+  includeJournalRef: boolean,
+  autoTable: typeof import('jspdf-autotable').default
 ): number {
   const PAGE_W = doc.internal.pageSize.getWidth();
 
@@ -242,8 +242,10 @@ function paintFooters(doc: jsPDF): void {
  * Generate a landscape A4 PDF reconciliation report and return it as a Blob.
  * Call `URL.createObjectURL(blob)` to download in the browser.
  */
-// 🟢 WORKING: generateReconReport
-export function generateReconReport(data: ReconReportData): Blob {
+// WORKING: generateReconReport
+export async function generateReconReport(data: ReconReportData): Promise<Blob> {
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   // Page 1 header
@@ -253,10 +255,10 @@ export function generateReconReport(data: ReconReportData): Blob {
   let cursor = paintSummaryBox(doc, data, 37);
 
   // Matched transactions section
-  cursor = paintSection(doc, 'Matched Transactions', data.matchedTransactions, cursor, true);
+  cursor = paintSection(doc, 'Matched Transactions', data.matchedTransactions, cursor, true, autoTable);
 
   // Unmatched transactions section
-  paintSection(doc, 'Unmatched Transactions', data.unmatchedTransactions, cursor, false);
+  paintSection(doc, 'Unmatched Transactions', data.unmatchedTransactions, cursor, false, autoTable);
 
   // Page numbers across all pages
   paintFooters(doc);

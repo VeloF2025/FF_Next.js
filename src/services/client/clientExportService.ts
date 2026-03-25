@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { Client } from '@/types/client.types';
 import { clientCrudService } from './clientCrudService';
 
@@ -10,6 +9,7 @@ export const clientExportService = {
    * Export clients to Excel file
    */
   async exportToExcel(clients?: Client[]): Promise<Blob> {
+    const XLSX = await import('xlsx');
     // Get all clients if not provided
     const dataToExport = clients || await clientCrudService.getAll();
     
@@ -103,7 +103,8 @@ export const clientExportService = {
   /**
    * Download template Excel file for import
    */
-  getImportTemplate(): Blob {
+  async getImportTemplate(): Promise<Blob> {
+    const XLSX = await import('xlsx');
     const templateData = [
       {
         'name': 'ABC Corporation',

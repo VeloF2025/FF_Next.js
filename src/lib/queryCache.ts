@@ -378,6 +378,7 @@ export const CacheNamespaces = {
   RAG_SCORES: 'contractor_rag', // 1 min TTL
   ONBOARDING: 'contractor_onboarding', // 3 min TTL
   SOW: 'sow', // 5 min TTL
+  REPORTING: 'reporting', // 5 min TTL — dashboard stats, summary, trends
 } as const;
 
 /**
@@ -407,6 +408,9 @@ export function initializeCaches(): void {
 
   // SOW - low frequency, 5 min TTL
   queryCache.getCache(CacheNamespaces.SOW, 50, 5 * 60 * 1000);
+
+  // Reporting/Dashboard - medium frequency, 5 min TTL
+  queryCache.getCache(CacheNamespaces.REPORTING, 50, 5 * 60 * 1000);
 
   log.debug('queryCache', {
     message: 'Query Cache initialized',

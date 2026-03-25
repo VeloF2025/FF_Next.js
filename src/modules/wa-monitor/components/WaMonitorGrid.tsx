@@ -6,7 +6,18 @@
 
 'use client';
 
-import { DataGrid, GridColDef, GridToolbar } from '@mui/x-data-grid';
+import dynamic from 'next/dynamic';
+import type { GridColDef } from '@mui/x-data-grid';
+
+const DataGrid = dynamic(
+  () => import('@mui/x-data-grid').then(mod => mod.DataGrid),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-96 text-sm text-gray-400">Loading data grid...</div> }
+);
+
+const GridToolbar = dynamic(
+  () => import('@mui/x-data-grid').then(mod => mod.GridToolbar),
+  { ssr: false }
+);
 import type { QaReviewDrop } from '../types/wa-monitor.types';
 import { DropStatusBadge } from './DropStatusBadge';
 import { formatDateTime, formatRelativeTime } from '../utils/waMonitorHelpers';

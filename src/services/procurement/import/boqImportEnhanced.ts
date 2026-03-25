@@ -281,14 +281,16 @@ export class BOQImportEnhanced {
       }
     }
 
-    // Batch insert match history (non-blocking, errors don't fail import)
+    // Batch insert match history in a single query (non-blocking, errors don't fail import)
     if (!options.dryRun && matchHistoryBatch.length > 0) {
       try {
-        for (const entry of matchHistoryBatch) {
-          await this.materialMatcher.recordMatchHistory(boqId, entry.matchResult, options.userId);
-        }
+        await this.materialMatcher.recordMatchHistoryBatch(
+          boqId,
+          matchHistoryBatch.map(entry => entry.matchResult),
+          options.userId
+        );
       } catch (error) {
-        log.warn('Failed to record some match history', { data: { error: String(error) } }, 'boq-import');
+        log.warn('Failed to record match history batch', { data: { error: String(error) } }, 'boq-import');
       }
     }
 

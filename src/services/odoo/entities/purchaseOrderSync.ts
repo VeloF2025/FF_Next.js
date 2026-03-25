@@ -284,35 +284,29 @@ export async function syncPurchaseOrders(
           existingLines.map((l) => [l.odoo_line_id, l.id])
         );
 
+        // Separate lines into inserts and updates
+        const toInsert: { line: OdooPurchaseOrderLine; ffData: ReturnType<typeof mapOdooPOLineToFF> }[] = [];
+        const toUpdate: { lineId: string; ffData: ReturnType<typeof mapOdooPOLineToFF> }[] = [];
+
         for (const line of allLines) {
-          try {
-            const ffData = mapOdooPOLineToFF(line, poIdMap);
+          const ffData = mapOdooPOLineToFF(line, poIdMap);
+          if (!ffData.purchase_order_id) continue;
 
-            if (!ffData.purchase_order_id) {
-              // Skip lines for POs we don't have
-              continue;
-            }
+          const existingLineId = existingLinesByOdooId.get(line.id);
+          if (existingLineId) {
+            toUpdate.push({ lineId: existingLineId, ffData });
+          } else {
+            toInsert.push({ line, ffData });
+          }
+        }
 
-            const existingLineId = existingLinesByOdooId.get(line.id);
-
-            if (existingLineId) {
-              // Update existing line
-              await sql`
-                UPDATE purchase_order_items
-                SET
-                  item_description = ${ffData.item_description},
-                  quantity_ordered = ${ffData.quantity_ordered},
-                  quantity_received = ${ffData.quantity_received},
-                  quantity_invoiced = ${ffData.quantity_invoiced},
-                  uom = ${ffData.uom},
-                  unit_price = ${ffData.unit_price},
-                  total_price = ${ffData.total_price}
-                WHERE id = ${existingLineId}
-              `;
-              result.lineItems.updated++;
-            } else {
-              // Create new line
-              await sql`
+        // Batch INSERT new lines (chunks of 50 via Promise.allSettled)
+        const INSERT_BATCH_SIZE = 50;
+        for (let i = 0; i < toInsert.length; i += INSERT_BATCH_SIZE) {
+          const batch = toInsert.slice(i, i + INSERT_BATCH_SIZE);
+          const insertResults = await Promise.allSettled(
+            batch.map(({ ffData }) =>
+              sql`
                 INSERT INTO purchase_order_items (
                   purchase_order_id, odoo_line_id, item_description,
                   quantity_ordered, quantity_received, quantity_invoiced,
@@ -324,12 +318,48 @@ export async function syncPurchaseOrders(
                   ${ffData.uom}, ${ffData.unit_price}, ${ffData.total_price},
                   CURRENT_TIMESTAMP
                 )
-              `;
+              `
+            )
+          );
+          for (let j = 0; j < insertResults.length; j++) {
+            const insertResult = insertResults[j]!;
+            if (insertResult.status === 'fulfilled') {
               result.lineItems.created++;
+            } else {
+              const message = insertResult.reason instanceof Error ? insertResult.reason.message : 'Unknown error';
+              result.lineItems.errors.push(`Line ${batch[j]!.ffData.odoo_line_id}: ${message}`);
             }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            result.lineItems.errors.push(`Line ${line.id}: ${message}`);
+          }
+        }
+
+        // Batch UPDATE existing lines (chunks of 50 via Promise.all)
+        const UPDATE_BATCH_SIZE = 50;
+        for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH_SIZE) {
+          const batch = toUpdate.slice(i, i + UPDATE_BATCH_SIZE);
+          const updateResults = await Promise.allSettled(
+            batch.map(({ lineId, ffData }) =>
+              sql`
+                UPDATE purchase_order_items
+                SET
+                  item_description = ${ffData.item_description},
+                  quantity_ordered = ${ffData.quantity_ordered},
+                  quantity_received = ${ffData.quantity_received},
+                  quantity_invoiced = ${ffData.quantity_invoiced},
+                  uom = ${ffData.uom},
+                  unit_price = ${ffData.unit_price},
+                  total_price = ${ffData.total_price}
+                WHERE id = ${lineId}
+              `
+            )
+          );
+          for (let j = 0; j < updateResults.length; j++) {
+            const updateResult = updateResults[j]!;
+            if (updateResult.status === 'fulfilled') {
+              result.lineItems.updated++;
+            } else {
+              const message = updateResult.reason instanceof Error ? updateResult.reason.message : 'Unknown error';
+              result.lineItems.errors.push(`Line ${batch[j]!.ffData.odoo_line_id}: ${message}`);
+            }
           }
         }
       }

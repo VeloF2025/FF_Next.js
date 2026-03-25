@@ -402,8 +402,7 @@ export function AccessControlTab() {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchUsers();
-        await fetchRoles();
+        await Promise.all([fetchUsers(), fetchRoles()]);
       } else {
         setError(data.error?.message || 'Failed to update user role');
       }

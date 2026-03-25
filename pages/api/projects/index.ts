@@ -10,6 +10,7 @@ import { safeArrayQuery, safeMutation } from '../../../lib/safe-query';
 import { apiResponse } from '../../../lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { log } from '@/lib/logger';
+import { cachedQuery, CacheNamespaces, cacheInvalidation } from '@/lib/queryCache';
 
 // Create a new connection for each request
 const getSql = () => neon(process.env.DATABASE_URL!);
@@ -301,45 +302,52 @@ async function handler(
             { logError: true }
           );
         } else {
-          // No filters - get all
-          // DEBUG: Direct query without safeArrayQuery to see actual errors
+          // No filters - get all (used by dropdowns/selectors, cache for 5 min)
           try {
-            projects = await sql`
-              SELECT
-                p.id,
-                p.project_code,
-                p.project_name as name,
-                p.client_id,
-                p.description,
-                p.project_type as type,
-                p.status,
-                p.priority,
-                p.start_date,
-                p.end_date,
-                p.budget,
-                p.actual_cost,
-                p.project_manager,
-                p.progress,
-                p.location,
-                p.created_at,
-                p.updated_at,
-                c.company_name as client_name,
-                -- Budget health fields
-                p.budget_status,
-                p.budget_health,
-                p.budget_utilization,
-                -- Budget summary from project_budgets
-                pb.total_budget as budget_total,
-                pb.committed_amount as budget_committed,
-                pb.actual_amount as budget_actual,
-                pb.available_budget as budget_available
-              FROM projects p
-              LEFT JOIN clients c ON p.client_id = c.id
-              LEFT JOIN project_budgets pb ON pb.project_id = p.id
-              ORDER BY p.created_at DESC
-              LIMIT ${limitValue}
-            `;
-            log.info('Projects API - Direct query success', {
+            projects = await cachedQuery(
+              CacheNamespaces.PROJECTS,
+              `list-all-${limitValue}`,
+              async () => {
+                log.debug('Cache miss — querying projects list', {}, 'projects/index.ts');
+                return sql`
+                  SELECT
+                    p.id,
+                    p.project_code,
+                    p.project_name as name,
+                    p.client_id,
+                    p.description,
+                    p.project_type as type,
+                    p.status,
+                    p.priority,
+                    p.start_date,
+                    p.end_date,
+                    p.budget,
+                    p.actual_cost,
+                    p.project_manager,
+                    p.progress,
+                    p.location,
+                    p.created_at,
+                    p.updated_at,
+                    c.company_name as client_name,
+                    -- Budget health fields
+                    p.budget_status,
+                    p.budget_health,
+                    p.budget_utilization,
+                    -- Budget summary from project_budgets
+                    pb.total_budget as budget_total,
+                    pb.committed_amount as budget_committed,
+                    pb.actual_amount as budget_actual,
+                    pb.available_budget as budget_available
+                  FROM projects p
+                  LEFT JOIN clients c ON p.client_id = c.id
+                  LEFT JOIN project_budgets pb ON pb.project_id = p.id
+                  ORDER BY p.created_at DESC
+                  LIMIT ${limitValue}
+                `;
+              },
+              5 * 60 * 1000
+            );
+            log.info('Projects API - Query success', {
               data: { count: projects?.length || 0 }
             }, 'projects/index.ts');
           } catch (queryError: any) {
@@ -417,6 +425,8 @@ async function handler(
             result.error || 'Failed to create project'
           );
         }
+
+        cacheInvalidation.project();
 
         return res.status(201).json({
           success: true,

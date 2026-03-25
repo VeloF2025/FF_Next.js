@@ -5,6 +5,7 @@ import { log } from '@/lib/logger';
 import { withAuth } from '@/lib/auth';
 import { withErrorHandler } from '../../../lib/api-error-handler';
 import { apiResponse } from '@/lib/apiResponse';
+import { cachedQuery, CacheNamespaces, cacheInvalidation } from '@/lib/queryCache';
 
 // Transform database client record to frontend Client type
 function transformClient(dbClient: Record<string, unknown>) {
@@ -165,21 +166,27 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
                   ORDER BY c.company_name ASC NULLS LAST
                 `;
               } else {
-                return sql`
-                  SELECT
-                    c.*,
-                    sr.name as sales_rep_name,
-                    am.name as account_mgr_name,
-                    COUNT(DISTINCT p.id) as project_count,
-                    COUNT(DISTINCT CASE WHEN p.status = 'active' THEN p.id END) as active_projects,
-                    SUM(p.budget) as total_revenue
-                  FROM clients c
-                  LEFT JOIN projects p ON p.client_id = c.id::text::uuid
-                  LEFT JOIN staff sr ON sr.id = c.sales_representative_id
-                  LEFT JOIN staff am ON am.id = c.account_manager_id
-                  GROUP BY c.id, sr.name, am.name
-                  ORDER BY c.company_name ASC NULLS LAST
-                `;
+                // Unfiltered list — used by dropdowns/selectors, cache for 5 min
+                return cachedQuery(
+                  CacheNamespaces.CLIENTS,
+                  'list-all',
+                  async () => sql`
+                    SELECT
+                      c.*,
+                      sr.name as sales_rep_name,
+                      am.name as account_mgr_name,
+                      COUNT(DISTINCT p.id) as project_count,
+                      COUNT(DISTINCT CASE WHEN p.status = 'active' THEN p.id END) as active_projects,
+                      SUM(p.budget) as total_revenue
+                    FROM clients c
+                    LEFT JOIN projects p ON p.client_id = c.id::text::uuid
+                    LEFT JOIN staff sr ON sr.id = c.sales_representative_id
+                    LEFT JOIN staff am ON am.id = c.account_manager_id
+                    GROUP BY c.id, sr.name, am.name
+                    ORDER BY c.company_name ASC NULLS LAST
+                  `,
+                  5 * 60 * 1000
+                );
               }
             },
             { logError: true, retryCount: 2 }
@@ -231,6 +238,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           )
           RETURNING *
         `;
+        cacheInvalidation.client();
         res.status(201).json({ success: true, data: newClient[0] });
         break;
       }
@@ -275,6 +283,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           });
         }
         
+        cacheInvalidation.client(req.query.id as string);
         res.status(200).json({ success: true, data: updatedClient[0] });
         break;
       }
@@ -285,6 +294,7 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
           return res.status(400).json({ success: false, error: 'Client ID required' });
         }
         await sql`DELETE FROM clients WHERE id = ${req.query.id as string}`;
+        cacheInvalidation.client(req.query.id as string);
         res.status(200).json({ success: true, message: 'Client deleted successfully' });
         break;
       }

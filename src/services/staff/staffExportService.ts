@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { StaffMember } from '@/types/staff.types';
 import { staffNeonService } from './staffNeonService';
 import { formatDisplayDate } from '@/utils/dateFormat';
@@ -14,6 +13,7 @@ export const staffExportService = {
    * @param access - Access level to determine which columns to include
    */
   async exportToExcel(staff?: StaffMember[], access?: StaffAccessResult): Promise<Blob> {
+    const XLSX = await import('xlsx');
     // Get all staff if not provided
     const dataToExport = staff || await staffNeonService.getAll();
 
@@ -119,7 +119,8 @@ export const staffExportService = {
   /**
    * Download template Excel file for import
    */
-  getImportTemplate(): Blob {
+  async getImportTemplate(): Promise<Blob> {
+    const XLSX = await import('xlsx');
     const templateData = [
       {
         'name': 'John Doe',

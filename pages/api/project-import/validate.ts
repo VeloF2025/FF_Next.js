@@ -76,7 +76,7 @@ async function handler(
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       sheetName = workbook.SheetNames[0] || '';
-      parsedData = parseExcelFile(buffer);
+      parsedData = await parseExcelFile(buffer);
     } catch (parseError) {
       log.error('project-import-validate', { error: parseError instanceof Error ? parseError.message : String(parseError) });
       const error = parseError as Error;

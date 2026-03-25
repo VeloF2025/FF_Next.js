@@ -1,8 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { DataGrid, GridToolbar } from '@mui/x-data-grid';
+import dynamic from 'next/dynamic';
 import { Box, Tab, Tabs, Paper } from '@mui/material';
+
+const DataGrid = dynamic(
+  () => import('@mui/x-data-grid').then(mod => mod.DataGrid),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-96 text-sm text-gray-400">Loading data grid...</div> }
+);
+
+const GridToolbar = dynamic(
+  () => import('@mui/x-data-grid').then(mod => mod.GridToolbar),
+  { ssr: false }
+);
 import {
   TabPanel,
   StatsCards,

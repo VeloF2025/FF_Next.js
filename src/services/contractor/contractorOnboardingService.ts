@@ -83,37 +83,34 @@ class ContractorOnboardingService {
    * Initialize onboarding stages for a new contractor
    */
   async initializeOnboarding(contractorId: number | string): Promise<OnboardingStage[]> {
-    const stages: OnboardingStage[] = [];
+    // Batch insert all default stages in a single query using UNNEST
+    const stageNames = DEFAULT_STAGES.map(t => t.stageName);
+    const stageOrders = DEFAULT_STAGES.map(t => t.stageOrder);
+    const requiredDocs = DEFAULT_STAGES.map(t => JSON.stringify(t.requiredDocuments));
 
-    for (const template of DEFAULT_STAGES) {
-      const [stage] = await sql`
-        INSERT INTO contractor_onboarding_stages (
-          contractor_id,
-          stage_name,
-          stage_order,
-          status,
-          completion_percentage,
-          required_documents,
-          completed_documents
-        ) VALUES (
-          ${contractorId},
-          ${template.stageName},
-          ${template.stageOrder},
-          'pending',
-          0,
-          ${JSON.stringify(template.requiredDocuments)},
-          '[]'
-        )
-        ON CONFLICT (contractor_id, stage_name) DO NOTHING
-        RETURNING *
-      `;
+    const rows = await sql`
+      INSERT INTO contractor_onboarding_stages (
+        contractor_id,
+        stage_name,
+        stage_order,
+        status,
+        completion_percentage,
+        required_documents,
+        completed_documents
+      )
+      SELECT
+        ${contractorId},
+        unnest(${stageNames}::text[]),
+        unnest(${stageOrders}::integer[]),
+        'pending',
+        0,
+        unnest(${requiredDocs}::jsonb[]),
+        '[]'::jsonb
+      ON CONFLICT (contractor_id, stage_name) DO NOTHING
+      RETURNING *
+    `;
 
-      if (stage) {
-        stages.push(this.mapDbToStage(stage));
-      }
-    }
-
-    return stages;
+    return rows.map((row: any) => this.mapDbToStage(row));
   }
 
   /**
@@ -148,57 +145,34 @@ class ContractorOnboardingService {
     stageId: number,
     updates: UpdateStageRequest
   ): Promise<OnboardingStage> {
-    // Update status and related fields
-    if (updates.status !== undefined) {
-      if (updates.status === 'in_progress') {
-        await sql`
-          UPDATE contractor_onboarding_stages
-          SET status = ${updates.status}, started_at = NOW(), updated_at = NOW()
-          WHERE id = ${stageId}
-        `;
-      } else if (updates.status === 'completed') {
-        await sql`
-          UPDATE contractor_onboarding_stages
-          SET status = ${updates.status}, completed_at = NOW(), completion_percentage = 100, updated_at = NOW()
-          WHERE id = ${stageId}
-        `;
-      } else {
-        await sql`
-          UPDATE contractor_onboarding_stages
-          SET status = ${updates.status}, updated_at = NOW()
-          WHERE id = ${stageId}
-        `;
-      }
-    }
+    // Determine derived values based on status
+    const isStarting = updates.status === 'in_progress';
+    const isCompleting = updates.status === 'completed';
 
-    if (updates.completionPercentage !== undefined) {
-      await sql`
-        UPDATE contractor_onboarding_stages
-        SET completion_percentage = ${updates.completionPercentage}, updated_at = NOW()
-        WHERE id = ${stageId}
-      `;
-    }
+    // Resolve completion_percentage: 100 if completing, explicit value if provided, else keep existing
+    const completionPct = isCompleting
+      ? 100
+      : updates.completionPercentage ?? null;
 
-    if (updates.completedDocuments !== undefined) {
-      await sql`
-        UPDATE contractor_onboarding_stages
-        SET completed_documents = ${JSON.stringify(updates.completedDocuments)}, updated_at = NOW()
-        WHERE id = ${stageId}
-      `;
-    }
-
-    if (updates.notes !== undefined) {
-      await sql`
-        UPDATE contractor_onboarding_stages
-        SET notes = ${updates.notes}, updated_at = NOW()
-        WHERE id = ${stageId}
-      `;
-    }
-
-    // Fetch and return updated stage
+    // Combine all updates into a single query using COALESCE to preserve existing values
     const [updated] = await sql`
-      SELECT * FROM contractor_onboarding_stages
+      UPDATE contractor_onboarding_stages
+      SET
+        status = COALESCE(${updates.status ?? null}, status),
+        completion_percentage = COALESCE(${completionPct}, completion_percentage),
+        completed_documents = COALESCE(${updates.completedDocuments !== undefined ? JSON.stringify(updates.completedDocuments) : null}::jsonb, completed_documents),
+        notes = COALESCE(${updates.notes ?? null}, notes),
+        started_at = CASE
+          WHEN ${isStarting} THEN NOW()
+          ELSE started_at
+        END,
+        completed_at = CASE
+          WHEN ${isCompleting} THEN NOW()
+          ELSE completed_at
+        END,
+        updated_at = NOW()
       WHERE id = ${stageId}
+      RETURNING *
     `;
 
     return this.mapDbToStage(updated);

@@ -19,7 +19,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useUnifiedReview } from '../hooks/useUnifiedReview';
 import { STEP_LABELS } from '../types/unified.types';
@@ -41,7 +41,7 @@ interface UnifiedReviewCardProps {
 
 type TabKey = 'summary' | 'wizard' | 'photos' | 'feedback' | 'activity' | 'maintenance' | 'qa' | 'categorization';
 
-export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
+export const UnifiedReviewCard = React.memo(function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCardProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
   const [autoQaSkipDone, setAutoQaSkipDone] = useState(false);
@@ -215,7 +215,7 @@ export function UnifiedReviewCard({ dropNumber, onBackToList }: UnifiedReviewCar
       </div>
     </div>
   );
-}
+});
 
 /**
  * Tab 1: Manual QA

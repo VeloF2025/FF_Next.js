@@ -477,6 +477,46 @@ export class MaterialMatcher {
   }
 
   /**
+   * Batch record match history for audit (single INSERT with UNNEST)
+   */
+  async recordMatchHistoryBatch(
+    boqId: string,
+    matchResults: MaterialMatchResult[],
+    userId?: string
+  ): Promise<void> {
+    if (matchResults.length === 0) return;
+
+    const boqIds = matchResults.map(() => boqId);
+    const itemCodes = matchResults.map(r => r.inputItemCode || null);
+    const descriptions = matchResults.map(r => r.inputDescription);
+    const materialIds = matchResults.map(r => r.matchedMaterial?.id || null);
+    const matchTypes = matchResults.map(r => r.matchType);
+    const confidences = matchResults.map(r => r.matchConfidence);
+    const details = matchResults.map(r => JSON.stringify({
+      isNewMaterial: r.isNewMaterial,
+      potentialDuplicatesCount: r.potentialDuplicates?.length || 0,
+    }));
+    const createdBy = matchResults.map(() => userId || 'system');
+
+    await this.sql`
+      INSERT INTO material_match_history (
+        boq_id, input_item_code, input_description,
+        matched_material_id, match_type, match_confidence,
+        match_details, created_by
+      )
+      SELECT
+        unnest(${boqIds}::text[]),
+        unnest(${itemCodes}::text[]),
+        unnest(${descriptions}::text[]),
+        unnest(${materialIds}::text[]),
+        unnest(${matchTypes}::text[]),
+        unnest(${confidences}::numeric[]),
+        unnest(${details}::jsonb[]),
+        unnest(${createdBy}::text[])
+    `;
+  }
+
+  /**
    * Map database row to MaterialCatalog type
    */
   private mapToMaterial(row: Record<string, unknown>): MaterialCatalog {

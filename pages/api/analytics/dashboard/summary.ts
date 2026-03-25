@@ -3,9 +3,13 @@ import { withAuth, withRole } from '@/lib/auth';
 import { neon } from '@neondatabase/serverless';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/apiResponse';
+import { cachedQuery } from '@/lib/queryCache';
 
 // Initialize Neon client
 const sql = neon(process.env.DATABASE_URL!);
+
+/** Cache TTL: 5 minutes — summary aggregates across many tables */
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function handler(
   req: NextApiRequest,
@@ -41,49 +45,58 @@ async function handler(
         break;
     }
 
-    // Get summary statistics for the period
+    // Get summary statistics for the period, cached by period type
+    const cacheKey = `summary-${period}`;
     const [
       projectSummary,
       staffSummary,
       sowSummary,
       financialSummary
-    ] = await Promise.all([
-      // Project summary
-      sql`
-        SELECT 
-          COUNT(*) as total_projects,
-          COUNT(CASE WHEN created_at >= ${startDate} THEN 1 END) as new_projects,
-          COUNT(CASE WHEN status = 'active' OR status = 'in_progress' THEN 1 END) as active_projects,
-          COUNT(CASE WHEN status = 'completed' AND updated_at >= ${startDate} THEN 1 END) as recently_completed
-        FROM projects
-      `,
-      
-      // Staff summary
-      sql`
-        SELECT 
-          COUNT(*) as total_staff,
-          COUNT(CASE WHEN created_at >= ${startDate} THEN 1 END) as new_hires,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_staff
-        FROM staff
-      `,
-      
-      // SOW summary for the period
-      sql`
-        SELECT 
-          (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${startDate}) as poles_this_period,
-          (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${startDate}) as drops_this_period,
-          (SELECT COALESCE(SUM(length), 0) FROM sow_fibre WHERE created_at >= ${startDate}) as fiber_this_period
-      `,
-      
-      // Financial summary
-      sql`
-        SELECT 
-          COALESCE(SUM(budget), 0) as total_budget,
-          COALESCE(AVG(budget), 0) as average_budget
-        FROM projects
-        WHERE created_at >= ${startDate}
-      `
-    ]);
+    ] = await cachedQuery(
+      'reporting',
+      cacheKey,
+      async () => {
+        log.debug('Cache miss — querying database', { cacheKey }, 'AnalyticsDashboardSummary');
+        return Promise.all([
+          // Project summary
+          sql`
+            SELECT
+              COUNT(*) as total_projects,
+              COUNT(CASE WHEN created_at >= ${startDate} THEN 1 END) as new_projects,
+              COUNT(CASE WHEN status = 'active' OR status = 'in_progress' THEN 1 END) as active_projects,
+              COUNT(CASE WHEN status = 'completed' AND updated_at >= ${startDate} THEN 1 END) as recently_completed
+            FROM projects
+          `,
+
+          // Staff summary
+          sql`
+            SELECT
+              COUNT(*) as total_staff,
+              COUNT(CASE WHEN created_at >= ${startDate} THEN 1 END) as new_hires,
+              COUNT(CASE WHEN status = 'active' THEN 1 END) as active_staff
+            FROM staff
+          `,
+
+          // SOW summary for the period
+          sql`
+            SELECT
+              (SELECT COUNT(*) FROM sow_poles WHERE created_at >= ${startDate}) as poles_this_period,
+              (SELECT COUNT(*) FROM sow_drops WHERE created_at >= ${startDate}) as drops_this_period,
+              (SELECT COALESCE(SUM(length), 0) FROM sow_fibre WHERE created_at >= ${startDate}) as fiber_this_period
+          `,
+
+          // Financial summary
+          sql`
+            SELECT
+              COALESCE(SUM(budget), 0) as total_budget,
+              COALESCE(AVG(budget), 0) as average_budget
+            FROM projects
+            WHERE created_at >= ${startDate}
+          `
+        ]);
+      },
+      CACHE_TTL_MS
+    );
 
     const projectData: any = projectSummary[0] || {};
     const staffData: any = staffSummary[0] || {};

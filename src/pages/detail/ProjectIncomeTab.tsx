@@ -72,14 +72,12 @@ export function ProjectIncomeTab({ projectId }: ProjectIncomeTabProps) {
 
   const handlePOCreated = useCallback(async () => {
     setShowCreatePO(false);
-    await fetchClientPOs();
-    await fetchSummary();
+    await Promise.all([fetchClientPOs(), fetchSummary()]);
   }, [fetchClientPOs, fetchSummary]);
 
   const handleInvoiceGenerated = useCallback(async () => {
     setShowGenerateInvoice(false);
-    await fetchInvoices();
-    await fetchSummary();
+    await Promise.all([fetchInvoices(), fetchSummary()]);
   }, [fetchInvoices, fetchSummary]);
 
   if (loading) {

@@ -3,7 +3,6 @@
  * PRD-047: Main import logic for drops, poles, and fibre
  */
 
-import * as XLSX from 'xlsx';
 import { log } from '@/lib/logger';
 import { Client } from 'pg';
 import {
@@ -40,10 +39,11 @@ const DEFAULT_OPTIONS: ImportOptions = {
 /**
  * Parse Excel file from base64 or buffer
  */
-export function parseExcelFile(
+export async function parseExcelFile(
   data: string | Buffer,
   sheetName?: string
-): { headers: string[]; rows: Record<string, unknown>[] } {
+): Promise<{ headers: string[]; rows: Record<string, unknown>[] }> {
+  const XLSX = await import('xlsx');
   const workbook = XLSX.read(data, {
     type: typeof data === 'string' ? 'base64' : 'buffer',
     cellDates: true,
@@ -117,7 +117,7 @@ export async function validateImport(
   dataType: DataType,
   sheetName?: string
 ): Promise<ValidationResult> {
-  const { headers, rows } = parseExcelFile(data, sheetName);
+  const { headers, rows } = await parseExcelFile(data, sheetName);
   return validateDataset(rows, dataType, headers);
 }
 
@@ -173,7 +173,7 @@ export async function importData(
   }, 'project-import');
 
   // Parse Excel
-  const { headers, rows } = parseExcelFile(data);
+  const { headers, rows } = await parseExcelFile(data);
 
   // Validate first
   const validation = validateDataset(rows, dataType, headers);
@@ -347,6 +347,7 @@ export async function importMultiple(
   options: ImportOptions = {}
 ): Promise<Map<DataType, ImportResult>> {
   const results = new Map<DataType, ImportResult>();
+  const XLSX = await import('xlsx');
   const workbook = XLSX.read(data, {
     type: typeof data === 'string' ? 'base64' : 'buffer',
   });
