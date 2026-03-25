@@ -434,7 +434,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [forecastOpen, setForecastOpen] = useState(initialProject.status === 'wip');
+  const [forecastOpen, setForecastOpen] = useState(false);
   const [inputsOpen, setInputsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [milestonesOpen, setMilestonesOpen] = useState(false);
@@ -692,7 +692,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
           className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-750 text-xs font-semibold text-gray-300 hover:text-white transition-colors"
           onClick={() => setForecastOpen(v => !v)}
         >
-          <span>Monthly Forecast</span>
+          <span>Monthly Forecast / Actual</span>
           {forecastOpen
             ? <ChevronDown className="w-4 h-4 text-gray-400" />
             : <ChevronRight className="w-4 h-4 text-gray-400" />}

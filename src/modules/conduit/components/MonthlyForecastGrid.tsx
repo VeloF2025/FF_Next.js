@@ -26,8 +26,13 @@ function blank(): MonthlyPlanEntry {
            opex_sales: null, opex_ad_hoc: null };
 }
 
+function normEntry(e: MonthlyPlanEntry): MonthlyPlanEntry {
+  // Guard against undefined fields in entries saved before new fields were added
+  return { ...blank(), ...e, rfo: e.rfo ?? 0 };
+}
+
 function normPlan(p: MonthlyPlanEntry[] | undefined, dur: number): MonthlyPlanEntry[] {
-  const src = p ?? [];
+  const src = (p ?? []).map(normEntry);
   if (src.length === dur) return src;
   if (src.length > dur) return src.slice(0, dur);
   return [...src, ...Array.from({ length: dur - src.length }, blank)];
@@ -167,7 +172,7 @@ function ScopeTracker({
   const totals = useMemo(() => ({
     poles:       plan.reduce((s, e) => s + e.poles, 0),
     stringing_m: plan.reduce((s, e) => s + e.stringing_m, 0),
-    rfo:         plan.reduce((s, e) => s + e.rfo, 0),
+    rfo:         plan.reduce((s, e) => s + (e.rfo ?? 0), 0),
     pon:         plan.reduce((s, e) => s + e.pon, 0),
     activations: plan.reduce((s, e) => s + e.activations, 0),
   }), [plan]);
@@ -342,7 +347,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const T = useMemo(() => ({
     poles:        plan.reduce((s, e) => s + e.poles, 0),
     stringing_m:  plan.reduce((s, e) => s + e.stringing_m, 0),
-    rfo:          plan.reduce((s, e) => s + e.rfo, 0),
+    rfo:          plan.reduce((s, e) => s + (e.rfo ?? 0), 0),
     pon:          plan.reduce((s, e) => s + e.pon, 0),
     activations:  plan.reduce((s, e) => s + e.activations, 0),
     casuals:      derived.reduce((s, d) => s + d.casuals, 0),
@@ -449,7 +454,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                 <td className={tdLabel}>{label}</td>
                 {plan.map((e, m) => (
                   <td key={m} className="px-0.5 py-0.5 text-center">
-                    <RolloutCell value={e[field]} onChange={v => setRollout(m, field, v)} />
+                    <RolloutCell value={e[field] ?? 0} onChange={v => setRollout(m, field, v)} />
                   </td>
                 ))}
                 <td className={`${tdTotal} font-semibold text-gray-200`}>{fN(T[field]) || '—'}</td>
