@@ -82,16 +82,22 @@ export function MyActionItems() {
         </button>
       </div>
 
-      {/* Source filter pills */}
+      {/*
+        Source filter pills — aria-pressed buttons (not role=tablist/tab).
+        The tablist/tab pattern requires keyboard arrow-key navigation and a
+        tabpanel association; simple filter toggles use aria-pressed instead.
+        --ff-primary-600 and --ff-bg-tertiary are verified tokens in design-system.css.
+      */}
       {Object.keys(sources).length > 1 && (
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4" aria-label="Filter action items by source">
           <button
             type="button"
+            aria-pressed={filter === 'all'}
             onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-[var(--ff-primary-600)] focus:outline-none ${
               filter === 'all'
-                ? 'bg-[var(--ff-primary)] text-white'
-                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+                ? 'bg-[var(--ff-primary-600)] text-white'
+                : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
             }`}
           >
             All ({items.length})
@@ -100,11 +106,12 @@ export function MyActionItems() {
             <button
               type="button"
               key={src}
+              aria-pressed={filter === src}
               onClick={() => setFilter(src as GroupFilter)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors focus:ring-2 focus:ring-[var(--ff-primary-600)] focus:outline-none ${
                 filter === src
-                  ? 'bg-[var(--ff-primary)] text-white'
-                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)]'
+                  ? 'bg-[var(--ff-primary-600)] text-white'
+                  : 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-tertiary)]'
               }`}
             >
               <SourceBadge source={src} inline />

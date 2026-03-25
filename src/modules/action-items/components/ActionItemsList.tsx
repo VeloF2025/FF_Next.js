@@ -30,29 +30,31 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
     }
   };
 
+  // Fix #1: Use CSS variable tokens instead of hardcoded Tailwind colours
   const getStatusIcon = (status: ActionItem['status']) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="w-5 h-5 text-[var(--ff-success)]" />;
       case 'in_progress':
-        return <Clock className="w-5 h-5 text-blue-500" />;
+        return <Clock className="w-5 h-5 text-[var(--ff-warning)]" />;
       case 'cancelled':
-        return <AlertCircle className="w-5 h-5 text-gray-400" />;
+        return <AlertCircle className="w-5 h-5 text-[var(--ff-text-tertiary)]" />;
       default:
-        return <Clock className="w-5 h-5 text-yellow-500" />;
+        return <Clock className="w-5 h-5 text-[var(--ff-info)]" />;
     }
   };
 
+  // 🟢 WORKING: Priority badges use existing design system tokens (verified in design-system.css)
   const getPriorityBadge = (priority: ActionItem['priority']) => {
-    const colors = {
-      urgent: 'bg-red-500/20 text-red-400',
-      high: 'bg-orange-500/20 text-orange-400',
-      medium: 'bg-blue-500/20 text-blue-400',
-      low: 'bg-gray-500/20 text-gray-400',
+    const colors: Record<string, string> = {
+      urgent: 'bg-[var(--ff-error-light)] text-[var(--ff-error)]',
+      high: 'bg-[var(--ff-warning-light)] text-[var(--ff-warning)]',
+      medium: 'bg-[var(--ff-info-light)] text-[var(--ff-info)]',
+      low: 'bg-[var(--ff-bg-tertiary)] text-[var(--ff-text-tertiary)]',
     };
 
     return (
-      <span className={`px-2 py-0.5 text-xs font-medium rounded ${colors[priority]}`}>
+      <span className={`px-2 py-0.5 text-xs font-medium rounded ${colors[priority] ?? colors.low}`}>
         {priority}
       </span>
     );
@@ -77,11 +79,13 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
           }`}
         >
           <div className="flex items-start gap-4">
-            {/* Status Icon */}
+            {/* Status Icon — Fix #4: aria-label, aria-pressed, focus indicator, disabled state */}
             <button
               onClick={() => handleToggleComplete(item)}
               disabled={updatingId === item.id}
-              className="mt-1 hover:scale-110 transition-transform disabled:opacity-50"
+              aria-label={`Mark as ${item.status === 'completed' ? 'incomplete' : 'complete'}`}
+              aria-pressed={item.status === 'completed'}
+              className="mt-1 p-1 rounded hover:scale-110 transition-transform disabled:cursor-not-allowed disabled:text-[var(--ff-text-tertiary)] focus:ring-2 focus:ring-[var(--ff-primary-600)] focus:outline-none"
             >
               {getStatusIcon(item.status)}
             </button>
@@ -111,7 +115,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                 {item.meeting_title && (
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    <span className="truncate max-w-xs">{item.meeting_title}</span>
+                    <span className="truncate max-w-xs" title={item.meeting_title}>{item.meeting_title}</span>
                   </div>
                 )}
 
@@ -133,7 +137,7 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
                   <span
                     className={`text-xs ${
                       new Date(item.due_date) < new Date() && item.status !== 'completed'
-                        ? 'text-red-400 font-semibold'
+                        ? 'text-[var(--ff-error)] font-semibold'
                         : 'text-[var(--ff-text-secondary)]'
                     }`}
                   >
@@ -162,16 +166,16 @@ export function ActionItemsList({ items, onItemUpdated }: ActionItemsListProps) 
               )}
             </div>
 
-            {/* Meeting transcript link */}
+            {/* Meeting transcript link — Fix #5: aria-label, themed colour, focus indicator */}
             {item.transcript_url && (
               <a
                 href={item.transcript_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300"
-                title="View meeting transcript"
+                className="text-[var(--ff-primary-600)] hover:text-[var(--ff-primary-700)] rounded focus:ring-2 focus:ring-[var(--ff-primary-600)] focus:outline-none"
+                aria-label="View meeting transcript in new window"
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="w-4 h-4" aria-hidden="true" />
               </a>
             )}
           </div>
