@@ -149,7 +149,7 @@ class HotReloadOptimizer {
       // React and core libraries
       'react',
       'react-dom',
-      'react-router-dom',
+      'next/router',
       
       // Common components
       '@/components/ui/LoadingSpinner',
