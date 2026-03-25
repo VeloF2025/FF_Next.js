@@ -31,6 +31,8 @@ import { syncOutboundUpdate } from '@/modules/noc/services/qcontactSyncOutbound'
 import {
   triggerOnTicketAssignment,
   triggerOnTeamAssignment,
+  triggerCreatorStatusUpdate,
+  triggerOnReassignment,
 } from '@/modules/noc/services/notificationTriggers';
 import { markLinkedDataSyncResolved } from '@/modules/noc/services/dataSyncResolution';
 import type { UpdateTicketPayload } from '@/modules/noc/types/ticket';
@@ -244,17 +246,26 @@ export async function PUT(
         });
     }
 
-    // Fire assignment notifications (non-blocking)
+    // Fire notifications (non-blocking)
     if (oldTicket) {
       const assignedToChanged =
         body.assigned_to && body.assigned_to !== oldTicket.assigned_to;
       const teamChanged =
         body.assigned_team_id && body.assigned_team_id !== oldTicket.assigned_team_id;
+      const statusChanged =
+        body.status && body.status !== oldTicket.status;
 
+      // Notify new assignee (existing)
       if (assignedToChanged) {
         triggerOnTicketAssignment(updatedTicket, oldTicket.status)
           .catch(err => {
             logger.error('Assignment notification error', { ticketId, error: err.message });
+          });
+
+        // Notify old assignee + creator about the reassignment
+        triggerOnReassignment(updatedTicket, oldTicket.assigned_to)
+          .catch(err => {
+            logger.error('Reassignment notification error', { ticketId, error: err.message });
           });
       }
 
@@ -263,6 +274,17 @@ export async function PUT(
           .catch(err => {
             logger.error('Team assignment notification error', { ticketId, error: err.message });
           });
+      }
+
+      // Notify creator on status changes
+      if (statusChanged) {
+        triggerCreatorStatusUpdate(
+          updatedTicket,
+          oldTicket.status,
+          body.status as TicketStatus
+        ).catch(err => {
+          logger.error('Creator status notification error', { ticketId, error: err.message });
+        });
       }
     }
 
