@@ -75,6 +75,7 @@ function MilestoneRowItem({
   selectLists,
   staffList,
   readOnly,
+  hideDates,
   onFieldChange,
 }: {
   row: MilestoneRow;
@@ -82,6 +83,7 @@ function MilestoneRowItem({
   selectLists: SelectLists;
   staffList: StaffOption[];
   readOnly: boolean;
+  hideDates: boolean;
   onFieldChange: (id: string, field: string, value: string | null) => void;
 }) {
   const textClass = rowTextClass(row.status);
@@ -136,35 +138,41 @@ function MilestoneRowItem({
         />
       </td>
 
-      <td className="px-2 py-1">
-        <input
-          type="date"
-          disabled={readOnly}
-          defaultValue={formatDateValue(row.planned_date)}
-          onChange={e => { if (!readOnly) onFieldChange(row.id, 'planned_date', e.target.value || null); }}
-          className={`${inputBase} text-[11px]`}
-        />
-      </td>
+      {!hideDates && (
+        <td className="px-2 py-1">
+          <input
+            type="date"
+            disabled={readOnly}
+            defaultValue={formatDateValue(row.planned_date)}
+            onChange={e => { if (!readOnly) onFieldChange(row.id, 'planned_date', e.target.value || null); }}
+            className={`${inputBase} text-[11px]`}
+          />
+        </td>
+      )}
 
-      <td className="px-2 py-1">
-        <input
-          type="date"
-          disabled={readOnly}
-          defaultValue={formatDateValue(row.due_date)}
-          onChange={e => { if (!readOnly) onFieldChange(row.id, 'due_date', e.target.value || null); }}
-          className={`${inputBase} text-[11px]`}
-        />
-      </td>
+      {!hideDates && (
+        <td className="px-2 py-1">
+          <input
+            type="date"
+            disabled={readOnly}
+            defaultValue={formatDateValue(row.due_date)}
+            onChange={e => { if (!readOnly) onFieldChange(row.id, 'due_date', e.target.value || null); }}
+            className={`${inputBase} text-[11px]`}
+          />
+        </td>
+      )}
 
-      <td className="px-2 py-1">
-        <input
-          type="date"
-          disabled={readOnly}
-          defaultValue={formatDateValue(row.actual_date)}
-          onChange={e => { if (!readOnly) onFieldChange(row.id, 'actual_date', e.target.value || null); }}
-          className={`${inputBase} text-[11px]`}
-        />
-      </td>
+      {!hideDates && (
+        <td className="px-2 py-1">
+          <input
+            type="date"
+            disabled={readOnly}
+            defaultValue={formatDateValue(row.actual_date)}
+            onChange={e => { if (!readOnly) onFieldChange(row.id, 'actual_date', e.target.value || null); }}
+            className={`${inputBase} text-[11px]`}
+          />
+        </td>
+      )}
 
       <td className="px-2 py-1">
         <select
@@ -208,6 +216,7 @@ function PhaseSection({
   readOnly: boolean;
   onFieldChange: (id: string, field: string, value: string | null) => void;
 }) {
+  const hideDates = phase === 'Site Assignments';
   const [open, setOpen] = useState(false);
   const completed = rows.filter(r => r.status === 'Completed').length;
 
@@ -238,10 +247,10 @@ function PhaseSection({
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 180 }}>Item</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Responsible</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Staff Member</th>
-                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>FT Person</th>
-                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Planned</th>
-                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Due</th>
-                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Actual</th>
+                <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 160 }}>FiberTime Representative</th>
+                {!hideDates && <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Planned</th>}
+                {!hideDates && <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Due</th>}
+                {!hideDates && <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 100 }}>Actual</th>}
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 120 }}>Status</th>
                 <th className="px-2 py-1.5 text-left text-gray-400 font-medium whitespace-nowrap" style={{ minWidth: 180 }}>Comment</th>
               </tr>
@@ -255,6 +264,7 @@ function PhaseSection({
                   selectLists={selectLists}
                   staffList={staffList}
                   readOnly={readOnly}
+                  hideDates={hideDates}
                   onFieldChange={onFieldChange}
                 />
               ))}
