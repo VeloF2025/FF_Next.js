@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Plus, FileText, RefreshCw, FileDown } from 'lucide-react';
+import { Plus, FileText, RefreshCw, FileDown, X } from 'lucide-react';
 import { notificationService } from '@/services/core/NotificationService';
 import { ContractorDocument } from '@/types/contractor-document.types';
 import { DocumentCard } from './DocumentCard';
@@ -25,6 +25,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<ContractorDocument | null>(null);
 
   // Fetch documents
   const fetchDocuments = async () => {
@@ -114,6 +115,33 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
     } catch (err: unknown) {
       log.error(`Failed to ${action} document`, { error: err }, 'ContractorDocuments');
       const message = err instanceof Error ? err.message : `Failed to ${action} document`;
+      notificationService.error(message);
+    }
+  };
+
+  // Handle edit
+  const handleEdit = (documentId: string) => {
+    const doc = documents.find(d => d.id === documentId);
+    if (doc) setEditingDocument(doc);
+  };
+
+  const handleEditSave = async (updates: { issueDate?: string; expiryDate?: string; documentName?: string; notes?: string }) => {
+    if (!editingDocument) return;
+    try {
+      const response = await fetch('/api/contractors-documents-update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingDocument.id, ...updates }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update document');
+
+      setEditingDocument(null);
+      fetchDocuments();
+      notificationService.success('Document updated');
+    } catch (err: unknown) {
+      log.error('Failed to update document', { error: err }, 'ContractorDocuments');
+      const message = err instanceof Error ? err.message : 'Failed to update document';
       notificationService.error(message);
     }
   };
@@ -278,6 +306,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
                     document={doc}
                     onDelete={handleDelete}
                     onVerify={handleVerify}
+                    onEdit={handleEdit}
                     showVerifyButtons={false}
                   />
                 ))}
@@ -298,6 +327,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
                     document={doc}
                     onDelete={handleDelete}
                     onVerify={handleVerify}
+                    onEdit={handleEdit}
                     showVerifyButtons={true}
                   />
                 ))}
@@ -317,6 +347,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
                     key={doc.id}
                     document={doc}
                     onDelete={handleDelete}
+                    onEdit={handleEdit}
                   />
                 ))}
               </div>
@@ -335,6 +366,7 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
                     key={doc.id}
                     document={doc}
                     onDelete={handleDelete}
+                    onEdit={handleEdit}
                   />
                 ))}
               </div>
@@ -359,6 +391,108 @@ export function ContractorDocuments({ contractorId }: ContractorDocumentsProps) 
           onClose={() => setShowAgreementModal(false)}
         />
       )}
+
+      {/* Edit Document Modal */}
+      {editingDocument && (
+        <DocumentEditModal
+          document={editingDocument}
+          onSave={handleEditSave}
+          onClose={() => setEditingDocument(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DocumentEditModal({
+  document,
+  onSave,
+  onClose,
+}: {
+  document: ContractorDocument;
+  onSave: (updates: { issueDate?: string; expiryDate?: string; documentName?: string; notes?: string }) => void;
+  onClose: () => void;
+}) {
+  const [issueDate, setIssueDate] = useState(
+    document.issueDate ? new Date(document.issueDate).toISOString().split('T')[0] : ''
+  );
+  const [expiryDate, setExpiryDate] = useState(
+    document.expiryDate ? new Date(document.expiryDate).toISOString().split('T')[0] : ''
+  );
+  const [documentName, setDocumentName] = useState(document.documentName || '');
+  const [notes, setNotes] = useState(document.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    await onSave({
+      documentName: documentName || undefined,
+      issueDate: issueDate || undefined,
+      expiryDate: expiryDate || undefined,
+      notes: notes || undefined,
+    });
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-[var(--ff-bg-secondary)] rounded-lg border border-[var(--ff-border-light)] shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--ff-border-light)]">
+          <h3 className="text-lg font-semibold text-[var(--ff-text-primary)]">Edit Document</h3>
+          <button onClick={onClose} className="p-1 hover:bg-[var(--ff-bg-hover)] rounded">
+            <X className="h-5 w-5 text-[var(--ff-text-secondary)]" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Document Name</label>
+            <input
+              type="text"
+              value={documentName}
+              onChange={e => setDocumentName(e.target.value)}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Issue Date</label>
+              <input
+                type="date"
+                value={issueDate}
+                onChange={e => setIssueDate(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Expiry Date</label>
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={e => setExpiryDate(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 bg-[var(--ff-bg-primary)] border border-[var(--ff-border-light)] rounded-lg text-[var(--ff-text-primary)]"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] rounded-lg">
+              Cancel
+            </button>
+            <button type="submit" disabled={isSaving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

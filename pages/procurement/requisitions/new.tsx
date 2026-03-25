@@ -170,6 +170,11 @@ export default function NewRequisitionPage() {
       }
     });
 
+    // Validate cost allocation - at least one of project, cost center, or department
+    if (!projectId && !department) {
+      errors.project = 'Please assign a Project or Department';
+    }
+
     // Validate required date
     if (requiredDate) {
       const date = new Date(requiredDate);
@@ -288,7 +293,7 @@ export default function NewRequisitionPage() {
               {/* Project */}
               <div>
                 <label className="block text-sm font-medium text-[var(--ff-text-secondary)] mb-1">
-                  Project (Optional)
+                  Project <span className="text-yellow-400">(Recommended)</span>
                 </label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ff-text-tertiary)]" />

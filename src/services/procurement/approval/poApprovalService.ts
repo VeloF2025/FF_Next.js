@@ -100,6 +100,14 @@ class POApprovalService {
    * Get the appropriate approval level for a PO amount
    */
   async getApprovalLevelForAmount(amount: number): Promise<ApprovalLevel | null> {
+    const levels = await this.getApprovalLevelsForAmount(amount);
+    return levels.length > 0 ? levels[0]! : null;
+  }
+
+  /**
+   * Get ALL applicable approval levels for a PO amount (for sequential chain)
+   */
+  async getApprovalLevelsForAmount(amount: number): Promise<ApprovalLevel[]> {
     try {
       const result = await sql`
         SELECT
@@ -122,15 +130,9 @@ class POApprovalService {
           AND al.min_amount <= ${amount}
           AND (al.max_amount IS NULL OR al.max_amount > ${amount})
         ORDER BY al.level_number ASC
-        LIMIT 1
       `;
 
-      if (result.length === 0) {
-        return null;
-      }
-
-      const level = result[0]!;
-      return {
+      return result.map((level: any) => ({
         id: level.id,
         workflowId: level.workflow_id,
         levelNumber: level.level_number,
@@ -143,9 +145,9 @@ class POApprovalService {
         approverGroupIds: level.approver_group_ids,
         autoApprove: level.auto_approve,
         canDelegate: level.can_delegate,
-      };
+      }));
     } catch (error) {
-      log.error('Failed to get approval level', { amount, error });
+      log.error('Failed to get approval levels', { amount, error });
       throw error;
     }
   }
@@ -207,53 +209,65 @@ class POApprovalService {
 
       const totalAmount = parseFloat(po.total_amount) || 0;
 
-      // Get appropriate approval level
-      const level = await this.getApprovalLevelForAmount(totalAmount);
+      // Get ALL applicable approval levels
+      const levels = await this.getApprovalLevelsForAmount(totalAmount);
 
-      if (!level) {
+      if (levels.length === 0) {
         // No level found - auto-approve (workflow not configured)
         await this.updatePOStatus(poId, 'approved', requestedBy, 'Auto-approved (no workflow configured)');
         return { approvalRequest: null, autoApproved: true };
       }
 
-      // Check for auto-approve
-      if (level.autoApprove) {
-        await this.updatePOStatus(poId, 'approved', requestedBy, `Auto-approved (${level.name})`);
+      // Filter out auto-approve levels at the front of the chain
+      const firstNonAutoLevel = levels.findIndex(l => !l.autoApprove);
+      if (firstNonAutoLevel === -1) {
+        // All levels are auto-approve
+        await this.updatePOStatus(poId, 'approved', requestedBy, `Auto-approved (${levels[0]!.name})`);
         return { approvalRequest: null, autoApproved: true };
       }
 
-      // Create approval request
+      const level = levels[firstNonAutoLevel]!;
+
+      // Create approval requests for ALL non-auto levels
+      // First non-auto level is 'pending', subsequent are 'waiting'
       const dueDate = new Date();
-      dueDate.setHours(dueDate.getHours() + 48); // 48 hour deadline
+      dueDate.setHours(dueDate.getHours() + 48);
 
-      const approvalResult = await sql`
-        INSERT INTO approval_requests (
-          workflow_id,
-          level_id,
-          document_type,
-          document_id,
-          document_number,
-          document_amount,
-          requested_by,
-          requested_by_name,
-          status,
-          due_date
-        ) VALUES (
-          ${level.workflowId},
-          ${level.id},
-          'purchase_order',
-          ${poId},
-          ${po.po_number},
-          ${totalAmount},
-          ${requestedBy},
-          ${requestedByName},
-          'pending',
-          ${dueDate.toISOString()}
-        )
-        RETURNING id
-      `;
-
-      const approvalRequestId = approvalResult[0]!.id;
+      let approvalRequestId: string = '';
+      for (let i = firstNonAutoLevel; i < levels.length; i++) {
+        const lvl = levels[i]!;
+        if (lvl.autoApprove) continue;
+        const lvlStatus = i === firstNonAutoLevel ? 'pending' : 'waiting';
+        const approvalResult = await sql`
+          INSERT INTO approval_requests (
+            workflow_id,
+            level_id,
+            document_type,
+            document_id,
+            document_number,
+            document_amount,
+            requested_by,
+            requested_by_name,
+            status,
+            due_date
+          ) VALUES (
+            ${lvl.workflowId},
+            ${lvl.id},
+            'purchase_order',
+            ${poId},
+            ${po.po_number},
+            ${totalAmount},
+            ${requestedBy},
+            ${requestedByName},
+            ${lvlStatus},
+            ${dueDate.toISOString()}
+          )
+          RETURNING id
+        `;
+        if (i === firstNonAutoLevel) {
+          approvalRequestId = approvalResult[0]!.id;
+        }
+      }
 
       // Update PO status and link approval request
       await sql`

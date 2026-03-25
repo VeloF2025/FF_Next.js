@@ -136,7 +136,7 @@ export function ApprovalCard({ item, onApprove, onReject, actioningId }: Props) 
         <div className="flex items-center gap-4">
           {item.documentAmount != null && (
             <div className="text-right">
-              <div className="text-lg font-semibold text-[var(--ff-text-primary)]">{fmtZAR(item.documentAmount * 1.15)}</div>
+              <div className="text-lg font-semibold text-[var(--ff-text-primary)]">{fmtZAR(item.documentAmount)}</div>
               <div className="text-xs text-[var(--ff-text-tertiary)]">incl. VAT</div>
             </div>
           )}

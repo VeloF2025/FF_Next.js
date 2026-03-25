@@ -29,18 +29,25 @@ function fv(input: StaffUpdateInput, cc: string, sc?: string): unknown {
   return v !== undefined ? (v || null) : undefined;
 }
 
-/** UUID fields: empty string → null */
+/** UUID fields: empty string → null, validate format */
 function uv(input: StaffUpdateInput, cc: string, sc?: string): unknown {
   const v = input[cc] ?? (sc ? input[sc] : undefined);
   if (v === undefined) return undefined;
-  return (!v || v === '') ? null : v;
+  if (!v || v === '') return null;
+  // Validate UUID format to prevent PostgreSQL cast errors
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (typeof v === 'string' && !uuidRegex.test(v)) return null;
+  return v;
 }
 
-/** Date fields: empty string → null */
+/** Date fields: empty string → null, validate parseable */
 function dv(input: StaffUpdateInput, cc: string, sc?: string): unknown {
   const v = input[cc] ?? (sc ? input[sc] : undefined);
   if (v === undefined) return undefined;
-  return (!v || v === '') ? null : v;
+  if (!v || v === '') return null;
+  // Validate date is parseable to prevent PostgreSQL cast errors
+  if (typeof v === 'string' && isNaN(Date.parse(v))) return null;
+  return v;
 }
 
 /** JSONB fields: array → JSON string */

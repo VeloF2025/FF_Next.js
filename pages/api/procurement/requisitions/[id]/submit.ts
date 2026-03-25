@@ -79,47 +79,53 @@ export default withAuth(withErrorHandler(async (
       `;
 
       if (workflow) {
-        // Find applicable level based on amount
-        const [level] = await sql`
-          SELECT id FROM approval_levels
+        // Find ALL applicable levels based on amount, ordered by level_number
+        const levels = await sql`
+          SELECT id, level_number FROM approval_levels
           WHERE workflow_id = ${workflow.id}
           AND min_amount <= ${amount}
           AND (max_amount IS NULL OR max_amount >= ${amount})
-          ORDER BY level_number
-          LIMIT 1
+          ORDER BY level_number ASC
         `;
 
-        if (level) {
-          await sql`
-            INSERT INTO approval_requests (
-              workflow_id,
-              level_id,
-              document_type,
-              document_id,
-              document_number,
-              document_amount,
-              requested_by,
-              requested_by_name,
-              status
-            ) VALUES (
-              ${workflow.id},
-              ${level.id},
-              'purchase_requisition',
-              ${id},
-              ${updated!.requisition_number},
-              ${amount},
-              ${userId || 'system'},
-              ${userName || 'Unknown'},
-              'pending'
-            )
-          `;
+        if (levels.length > 0) {
+          // Create approval requests for ALL levels
+          // First level is 'pending', subsequent levels are 'waiting'
+          for (let i = 0; i < levels.length; i++) {
+            const level = levels[i]!;
+            const levelStatus = i === 0 ? 'pending' : 'waiting';
+            await sql`
+              INSERT INTO approval_requests (
+                workflow_id,
+                level_id,
+                document_type,
+                document_id,
+                document_number,
+                document_amount,
+                requested_by,
+                requested_by_name,
+                status
+              ) VALUES (
+                ${workflow.id},
+                ${level.id},
+                'purchase_requisition',
+                ${id},
+                ${updated!.requisition_number},
+                ${amount},
+                ${userId || 'system'},
+                ${userName || 'Unknown'},
+                ${levelStatus}
+              )
+            `;
+          }
           approvalCreated = true;
 
-          // Notify approvers via bell notification + inbox message
+          // Notify approvers for the FIRST level only (they act first)
+          const firstLevel = levels[0]!;
           const approvers = await sql`
             SELECT u.id, COALESCE(u.first_name || ' ' || u.last_name, u.email) as name, u.email
             FROM users u
-            JOIN approval_levels al ON al.id = ${level.id}
+            JOIN approval_levels al ON al.id = ${firstLevel.id}
             WHERE (
               (al.approver_type = 'user' AND u.id::text = al.approver_user_id::text)
               OR (al.approver_type = 'role' AND u.role = al.approver_role)

@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { FileText, Download, Trash2, Check, X, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
+import { FileText, Download, Trash2, Check, X, Clock, AlertTriangle, ExternalLink, Pencil } from 'lucide-react';
 import { ContractorDocument, DOCUMENT_TYPE_LABELS, STATUS_COLORS } from '@/types/contractor-document.types';
 import { log } from '@/lib/logger';
 
@@ -14,10 +14,11 @@ interface DocumentCardProps {
   document: ContractorDocument;
   onDelete: (documentId: string) => void;
   onVerify?: (documentId: string, action: 'approve' | 'reject') => void;
+  onEdit?: (documentId: string) => void;
   showVerifyButtons?: boolean;
 }
 
-export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons = false }: DocumentCardProps) {
+export function DocumentCard({ document, onDelete, onVerify, onEdit, showVerifyButtons = false }: DocumentCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -205,6 +206,18 @@ export function DocumentCard({ document, onDelete, onVerify, showVerifyButtons =
               <ExternalLink className="h-4 w-4" />
               View
             </a>
+
+            {/* Edit */}
+            {onEdit && (
+              <button
+                onClick={() => onEdit(document.id)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--ff-text-secondary)] hover:bg-[var(--ff-bg-hover)] rounded transition-colors"
+                title="Edit document details"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+            )}
 
             {/* Verify Buttons (Admin only) */}
             {showVerifyButtons && !document.isVerified && document.status === 'pending' && onVerify && (

@@ -96,6 +96,13 @@ export default withAuth(withErrorHandler(async (
         });
       }
 
+      // Require at least one cost allocation field
+      if (!body.projectId && !body.costCenterId && !body.department) {
+        return apiResponse.validationError(res, {
+          project: 'At least one of Project, Cost Center, or Department is required',
+        });
+      }
+
       // Insert requisition
       const [requisition] = await sql`
         INSERT INTO purchase_requisitions (

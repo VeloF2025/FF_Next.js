@@ -102,6 +102,14 @@ export default withAuth(withErrorHandler(async (req: NextApiRequest, res: NextAp
       });
     }
 
+    // Invalid input syntax (bad UUID, date, etc.)
+    if (dbError.code === '22P02') {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid data format: ${dbError.message}`,
+      });
+    }
+
     if (dbError.code === '23505') {
       if (dbError.constraint === 'staff_employee_id_unique') {
         return res.status(409).json({

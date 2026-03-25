@@ -62,8 +62,55 @@ export default withAuth(withErrorHandler(async (
       RETURNING *
     `;
 
-    // Update the source document status if applicable
-    await updateDocumentStatus(request.document_type, request.document_id, 'approved');
+    // Check if there are more levels waiting for this document
+    const nextWaiting = await sql`
+      SELECT ar.id, ar.level_id
+      FROM approval_requests ar
+      JOIN approval_levels al ON ar.level_id = al.id
+      WHERE ar.document_type = ${request.document_type}
+        AND ar.document_id = ${request.document_id}
+        AND ar.status = 'waiting'
+      ORDER BY al.level_number ASC
+      LIMIT 1
+    `;
+
+    if (nextWaiting.length > 0) {
+      // Promote next level to 'pending'
+      const nextRequest = nextWaiting[0]!;
+      await sql`
+        UPDATE approval_requests SET status = 'pending', updated_at = NOW()
+        WHERE id = ${nextRequest.id}
+      `;
+
+      // Notify next-level approvers
+      const nextApprovers = await sql`
+        SELECT u.id, COALESCE(u.first_name || ' ' || u.last_name, u.email) as name
+        FROM users u
+        JOIN approval_levels al ON al.id = ${nextRequest.level_id}
+        WHERE (
+          (al.approver_type = 'user' AND u.id::text = al.approver_user_id::text)
+          OR (al.approver_type = 'role' AND u.role = al.approver_role)
+        )
+      `;
+      const nextApproverIds = nextApprovers.map((a: Record<string, unknown>) => a.id as string);
+      if (nextApproverIds.length > 0) {
+        const docLabel = (request.document_type || '').replace(/_/g, ' ');
+        notify({
+          event_type: 'procurement.approval_needed',
+          title: `${request.document_number || docLabel} requires your approval`,
+          body: `Level ${userName} approved. Your approval is now needed.`,
+          action_url: '/procurement/purchase-orders',
+          source_module: 'procurement',
+          source_id: request.document_id,
+          recipient_user_ids: nextApproverIds,
+        }).catch(err => log.error('Failed to send next-level approval notification', { error: err }, 'procurement'));
+      }
+
+      log.info('Promoted next approval level', { nextRequestId: nextRequest.id, documentId: request.document_id }, 'procurement');
+    } else {
+      // All levels approved — update the source document status
+      await updateDocumentStatus(request.document_type, request.document_id, 'approved');
+    }
 
     log.info(
       `Approval approved: ${request.document_type} ${request.document_id}`,
