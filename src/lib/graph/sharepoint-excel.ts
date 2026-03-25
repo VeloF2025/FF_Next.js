@@ -122,10 +122,12 @@ export async function getGraphToken(): Promise<string> {
  */
 export async function getWorksheetRange(
   worksheet: string,
-  range?: string
+  range?: string,
+  overrideDriveId?: string,
+  overrideItemId?: string
 ): Promise<{ values: unknown[][] }> {
-  const driveId = process.env.SHAREHOLDER_MODEL_DRIVE_ID;
-  const itemId = process.env.SHAREHOLDER_MODEL_ITEM_ID;
+  const driveId = overrideDriveId ?? process.env.SHAREHOLDER_MODEL_DRIVE_ID;
+  const itemId = overrideItemId ?? process.env.SHAREHOLDER_MODEL_ITEM_ID;
 
   if (!driveId || !itemId) {
     throw new Error(

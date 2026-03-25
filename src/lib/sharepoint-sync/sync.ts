@@ -15,7 +15,7 @@ export async function syncTrackerForProject(
   config: SpTrackerConfig
 ): Promise<{ synced: number; error: string | null }> {
   try {
-    const { values } = await getWorksheetRange(config.sheet_name, 'A3:Z300');
+    const { values } = await getWorksheetRange(config.sheet_name, 'A3:Z300', config.drive_id, config.item_id);
 
     if (!values || values.length < 2) {
       return { synced: 0, error: `${config.project_name}: No data rows` };
