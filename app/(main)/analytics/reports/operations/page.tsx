@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import ActivationsReport from '@/modules/analytics/reports/activations/ActivationsReport';
+import BuildMilestonesReport from '@/modules/analytics/reports/build-milestones/BuildMilestonesReport';
 
 const OPERATIONS_REPORTS = [
   {
@@ -18,10 +19,16 @@ const OPERATIONS_REPORTS = [
     name: 'Activations',
     description: 'OES activations by year, month and week — project split with revenue estimate',
   },
+  {
+    id: 'build-milestones',
+    name: 'Build Milestone Overview',
+    description: 'RFO (Civil Work Complete) and ATP progress per project',
+  },
 ];
 
 const REPORT_COMPONENTS: Record<string, React.ComponentType> = {
   activations: ActivationsReport,
+  'build-milestones': BuildMilestonesReport,
 };
 
 export default function OperationsReportsPage() {
