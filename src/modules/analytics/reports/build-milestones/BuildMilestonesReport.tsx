@@ -20,7 +20,7 @@ import {
   Cell,
   LabelList,
 } from 'recharts';
-import { ReportTabLayout } from '../components/ReportTabLayout';
+import { ReportTabLayout } from '../ReportTabLayout';
 import { useBuildMilestonesData } from './useBuildMilestonesData';
 import type { BuildMilestoneRow } from '@/app/api/analytics/reports/build-milestones/route';
 
