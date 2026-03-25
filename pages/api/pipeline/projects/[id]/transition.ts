@@ -56,7 +56,10 @@ export default withAuth(withErrorHandler(async (
   try {
     // 1. Get the pipeline project
     const pipelineProject = await sql`
-      SELECT *
+      SELECT id, project_code, project_name, description, project_type, priority,
+             client_id, project_manager_id, area, municipality, province, address,
+             coordinates, estimated_value, target_start_date, target_completion_date,
+             pipeline_status, planned_project_id
       FROM pipeline_projects
       WHERE id = ${pipelineProjectId}
       AND is_deleted = false
@@ -134,7 +137,7 @@ export default withAuth(withErrorHandler(async (
         NOW(),
         NOW()
       )
-      RETURNING *
+      RETURNING id, project_code, project_name
     `;
 
     if (newProject.length === 0 || !newProject[0]) {

@@ -55,7 +55,10 @@ async function handleGet(
   // If current=true, only get the most recent active one
   if (current === 'true') {
     rows = await sql`
-      SELECT * FROM fleet_license_disc
+      SELECT id, vehicle_id, license_number, province, issue_date, expiry_date,
+             cost, arrears, penalties, total_paid, document_url,
+             renewal_reminder_days, reminder_sent_at, renewed_at, status, created_at, created_by
+      FROM fleet_license_disc
       WHERE vehicle_id = ${vehicleId}
         AND status = 'active'
       ORDER BY expiry_date DESC
@@ -63,14 +66,20 @@ async function handleGet(
     ` as LicenseDiscRow[];
   } else if (status && typeof status === 'string') {
     rows = await sql`
-      SELECT * FROM fleet_license_disc
+      SELECT id, vehicle_id, license_number, province, issue_date, expiry_date,
+             cost, arrears, penalties, total_paid, document_url,
+             renewal_reminder_days, reminder_sent_at, renewed_at, status, created_at, created_by
+      FROM fleet_license_disc
       WHERE vehicle_id = ${vehicleId}
         AND status = ${status}
       ORDER BY expiry_date DESC
     ` as LicenseDiscRow[];
   } else {
     rows = await sql`
-      SELECT * FROM fleet_license_disc
+      SELECT id, vehicle_id, license_number, province, issue_date, expiry_date,
+             cost, arrears, penalties, total_paid, document_url,
+             renewal_reminder_days, reminder_sent_at, renewed_at, status, created_at, created_by
+      FROM fleet_license_disc
       WHERE vehicle_id = ${vehicleId}
       ORDER BY expiry_date DESC
     ` as LicenseDiscRow[];
@@ -142,7 +151,9 @@ async function handlePost(
       ${body.renewalReminderDays || 30},
       'active'
     )
-    RETURNING *
+    RETURNING id, vehicle_id, license_number, province, issue_date, expiry_date,
+             cost, arrears, penalties, total_paid, document_url,
+             renewal_reminder_days, reminder_sent_at, renewed_at, status, created_at, created_by
   ` as LicenseDiscRow[];
 
   if (!rows[0]) {

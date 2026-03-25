@@ -16,7 +16,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const { status, limit = '100' } = req.query;
 
       let query = `
-        SELECT * FROM reminders
+        SELECT id, user_id, title, description, due_date, priority, status, created_at, updated_at
+        FROM reminders
         WHERE user_id = $1
       `;
 
@@ -61,7 +62,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const result = await sql`
         INSERT INTO reminders (user_id, title, description, due_date, priority)
         VALUES (${userId}, ${title}, ${description || null}, ${due_date || null}, ${priority})
-        RETURNING *
+        RETURNING id, user_id, title, description, due_date, priority, status, created_at, updated_at
       `;
 
       return res.status(201).json({

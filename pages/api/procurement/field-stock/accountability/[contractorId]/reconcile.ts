@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Check if record exists
     const existing = await sql`
-      SELECT * FROM contractor_stock_accountability
+      SELECT id FROM contractor_stock_accountability
       WHERE contractor_id = ${contractorId}
     `;
 
@@ -108,7 +108,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         last_reconciliation_by = ${reconciledBy},
         updated_at = NOW()
       WHERE contractor_id = ${contractorId}
-      RETURNING *
+      RETURNING
+        id, contractor_id, contractor_name,
+        total_issued_count, total_issued_value,
+        total_consumed_count, total_consumed_value,
+        total_returned_count, total_returned_value,
+        unaccounted_count, unaccounted_value,
+        pending_recovery_amount, recovered_amount,
+        is_blocked, blocked_reason, blocked_at, blocked_by,
+        last_reconciliation_date, last_reconciliation_by,
+        created_at, updated_at
     `;
 
     // Record history

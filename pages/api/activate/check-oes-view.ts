@@ -46,7 +46,7 @@ async function handler(
 
         // Get sample data
         const sampleResult = await pool.query(`
-          SELECT * FROM v_qfield_oes_activations LIMIT 5
+          SELECT * /* TODO: specify columns — diagnostic view sample */ FROM v_qfield_oes_activations LIMIT 5
         `);
         viewData = sampleResult.rows;
 

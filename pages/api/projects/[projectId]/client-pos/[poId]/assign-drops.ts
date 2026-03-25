@@ -28,7 +28,7 @@ export default withAuth(withErrorHandler(async (
 
   // Verify Client PO exists and is active/draft
   const clientPO = await sql`
-    SELECT * FROM client_purchase_orders
+    SELECT id, status FROM client_purchase_orders
     WHERE id = ${poId} AND project_id = ${projectId}
   `;
 

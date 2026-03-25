@@ -29,7 +29,7 @@ async function handler(
 
     // Use the global_search function we created
     const searchResults = await client.query(
-      'SELECT * FROM global_search($1, $2)',
+      'SELECT result_type, result_id, result_title, result_description, relevance FROM global_search($1, $2)',
       [q, parseInt(limit as string) || 20]
     );
 

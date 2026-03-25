@@ -35,7 +35,9 @@ export default withAuth(withErrorHandler(async (
   if (req.method === 'GET') {
     try {
       const result = await sql`
-        SELECT *
+        SELECT id, project_id, requirement_type, requirement_name, description,
+               is_completed, completed_at, completed_by, document_id, document_url,
+               expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
         FROM project_requirements
         WHERE id = ${requirementId}
         AND project_id = ${projectId}
@@ -68,7 +70,7 @@ export default withAuth(withErrorHandler(async (
 
       // Check requirement exists
       const existing = await sql`
-        SELECT * FROM project_requirements
+        SELECT id, is_completed FROM project_requirements
         WHERE id = ${requirementId}
         AND project_id = ${projectId}
       `;
@@ -128,7 +130,9 @@ export default withAuth(withErrorHandler(async (
           updated_at = NOW()
         WHERE id = ${requirementId}
         AND project_id = ${projectId}
-        RETURNING *
+        RETURNING id, project_id, requirement_type, requirement_name, description,
+                 is_completed, completed_at, completed_by, document_id, document_url,
+                 expiry_date, expiry_alert_sent, stage, sort_order, created_at, updated_at
       `;
 
       const updated = result[0] as Record<string, unknown> | undefined;
@@ -161,7 +165,7 @@ export default withAuth(withErrorHandler(async (
     try {
       // Check if it's a system requirement (seeded by default)
       const existing = await sql`
-        SELECT * FROM project_requirements
+        SELECT id, requirement_type FROM project_requirements
         WHERE id = ${requirementId}
         AND project_id = ${projectId}
       `;

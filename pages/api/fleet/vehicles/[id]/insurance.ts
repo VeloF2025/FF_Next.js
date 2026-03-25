@@ -51,7 +51,14 @@ async function handleGet(
   const { active, current } = req.query;
 
   let query = `
-    SELECT *
+    SELECT id, vehicle_id, insurance_company, policy_number, policy_type,
+           cover_amount, excess_amount, excess_theft, excess_third_party,
+           premium_monthly, premium_annual, payment_method, start_date, expiry_date,
+           insurer_contact_name, insurer_contact_phone, insurer_claims_phone, insurer_email,
+           broker_name, broker_company, broker_phone, broker_email,
+           roadside_assistance_number, towing_included, car_hire_included,
+           document_url, schedule_url, is_active, renewal_reminder_days,
+           reminder_sent_at, claims_count, last_claim_date, notes, created_at, updated_at
     FROM fleet_vehicle_insurance
     WHERE vehicle_id = $1
   `;
@@ -172,7 +179,14 @@ async function handlePost(
       30,
       ${body.notes || null}
     )
-    RETURNING *
+    RETURNING id, vehicle_id, insurance_company, policy_number, policy_type,
+             cover_amount, excess_amount, excess_theft, excess_third_party,
+             premium_monthly, premium_annual, payment_method, start_date, expiry_date,
+             insurer_contact_name, insurer_contact_phone, insurer_claims_phone, insurer_email,
+             broker_name, broker_company, broker_phone, broker_email,
+             roadside_assistance_number, towing_included, car_hire_included,
+             document_url, schedule_url, is_active, renewal_reminder_days,
+             reminder_sent_at, claims_count, last_claim_date, notes, created_at, updated_at
   ` as VehicleInsuranceRow[];
 
   if (!rows[0]) {

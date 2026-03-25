@@ -60,7 +60,11 @@ async function handler(
 
     // Get search results with pagination
     const query = await sql.unsafe(`
-      SELECT * FROM drops
+      SELECT id, project_id, drop_number, pole_number, cable_type, cable_spec,
+             cable_length, cable_capacity, start_point, end_point, latitude, longitude,
+             address, pon_no, zone_no, municipality, status, qc_status, customer_name,
+             raw_data, created_at, updated_at
+      FROM drops
       ${whereClause}
       ORDER BY created_at DESC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}

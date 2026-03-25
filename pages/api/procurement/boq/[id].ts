@@ -41,7 +41,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
   try {
     // Get BOQ details
     const boqResult = await sql`
-      SELECT * FROM boqs WHERE id::text = ${id}
+      SELECT id, project_id, title, description, version, status, file_name,
+             item_count, total_estimated_value, mapping_status, uploaded_by,
+             created_at, updated_at
+      FROM boqs WHERE id::text = ${id}
     `;
 
     if (boqResult.length === 0) {
@@ -52,7 +55,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, id: string) 
 
     // Get BOQ items with budget category names
     const items = await sql`
-      SELECT bi.*, bc.category_name as budget_category_name
+      SELECT bi.id, bi.boq_id, bi.line_number, bi.item_code, bi.description,
+             bi.quantity, bi.uom, bi.unit_price, bi.total_price, bi.category,
+             bi.stock_item_id, bi.stock_match_method, bi.stock_match_confidence,
+             bc.category_name as budget_category_name
       FROM boq_items bi
       LEFT JOIN budget_categories bc ON bi.budget_category_id = bc.id
       WHERE bi.boq_id::text = ${id}
@@ -108,7 +114,7 @@ async function handlePut(req: NextApiRequest, res: NextApiResponse, id: string) 
         status = COALESCE(${status}, status),
         updated_at = NOW()
       WHERE id::text = ${id}
-      RETURNING *
+      RETURNING id
     `;
 
     if (updated.length === 0) {

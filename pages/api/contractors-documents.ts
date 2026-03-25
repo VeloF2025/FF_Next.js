@@ -36,7 +36,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (documentType && status) {
       documents = await sql`
-        SELECT * FROM contractor_documents
+        SELECT id, contractor_id, document_type, document_name, document_number,
+               file_name, file_url, file_size, mime_type,
+               issue_date, expiry_date, is_expired, days_until_expiry,
+               is_verified, verified_by, verified_at, verification_notes,
+               status, rejection_reason, notes, tags, uploaded_by,
+               created_at, updated_at
+        FROM contractor_documents
         WHERE contractor_id = ${contractorId}
           AND document_type = ${documentType}
           AND status = ${status}
@@ -44,21 +50,39 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `;
     } else if (documentType) {
       documents = await sql`
-        SELECT * FROM contractor_documents
+        SELECT id, contractor_id, document_type, document_name, document_number,
+               file_name, file_url, file_size, mime_type,
+               issue_date, expiry_date, is_expired, days_until_expiry,
+               is_verified, verified_by, verified_at, verification_notes,
+               status, rejection_reason, notes, tags, uploaded_by,
+               created_at, updated_at
+        FROM contractor_documents
         WHERE contractor_id = ${contractorId}
           AND document_type = ${documentType}
         ORDER BY created_at DESC
       `;
     } else if (status) {
       documents = await sql`
-        SELECT * FROM contractor_documents
+        SELECT id, contractor_id, document_type, document_name, document_number,
+               file_name, file_url, file_size, mime_type,
+               issue_date, expiry_date, is_expired, days_until_expiry,
+               is_verified, verified_by, verified_at, verification_notes,
+               status, rejection_reason, notes, tags, uploaded_by,
+               created_at, updated_at
+        FROM contractor_documents
         WHERE contractor_id = ${contractorId}
           AND status = ${status}
         ORDER BY created_at DESC
       `;
     } else {
       documents = await sql`
-        SELECT * FROM contractor_documents
+        SELECT id, contractor_id, document_type, document_name, document_number,
+               file_name, file_url, file_size, mime_type,
+               issue_date, expiry_date, is_expired, days_until_expiry,
+               is_verified, verified_by, verified_at, verification_notes,
+               status, rejection_reason, notes, tags, uploaded_by,
+               created_at, updated_at
+        FROM contractor_documents
         WHERE contractor_id = ${contractorId}
         ORDER BY created_at DESC
       `;

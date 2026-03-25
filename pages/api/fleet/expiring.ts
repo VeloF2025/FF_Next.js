@@ -30,7 +30,7 @@ async function handler(
     // For simplicity, we'll query the view directly and filter in JS
     // since parameterized queries with IN clauses are complex
     const allRows = await sql`
-      SELECT *
+      SELECT * /* TODO: specify columns — view columns depend on fleet_expiring_items view definition */
       FROM fleet_expiring_items
       ORDER BY days_until_expiry ASC
     ` as ExpiringItemRow[];

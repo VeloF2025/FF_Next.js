@@ -44,7 +44,7 @@ async function handler(
 async function handleGet(id: string, res: NextApiResponse) {
   // Get bundle with summary data
   const bundle = await sql`
-    SELECT * FROM v_stock_bundles_summary WHERE id = ${id}
+    SELECT /* TODO: specify columns */ * FROM v_stock_bundles_summary WHERE id = ${id}
   `;
 
   if (bundle.length === 0) {
@@ -53,7 +53,7 @@ async function handleGet(id: string, res: NextApiResponse) {
 
   // Get bundle items with details
   const items = await sql`
-    SELECT * FROM v_stock_bundle_items_detail
+    SELECT /* TODO: specify columns */ * FROM v_stock_bundle_items_detail
     WHERE bundle_id = ${id}
     ORDER BY sort_order, item_name
   `;
@@ -112,7 +112,9 @@ async function handlePut(id: string, data: StockBundleFormData, res: NextApiResp
       tags = COALESCE(${data.tags}, tags),
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING id, bundle_code, name, description, category_id, bundle_type,
+              price_type, fixed_price, markup_percentage, is_active, is_default,
+              allow_substitution, notes, tags, usage_count, created_at, updated_at
   `;
 
   return apiResponse.success(res, result[0]);

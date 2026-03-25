@@ -65,7 +65,10 @@ async function handleGet(
   // If latest=true, only return the most recent reading
   if (latest === 'true') {
     const rows = await sql`
-      SELECT * FROM fleet_odometer_history
+      SELECT id, vehicle_id, check_record_id, reading, source, vlm_confidence,
+             previous_reading, km_since_last, discrepancy_flag, discrepancy_reason,
+             recorded_at, created_at
+      FROM fleet_odometer_history
       WHERE vehicle_id = ${vehicleId}
       ORDER BY recorded_at DESC
       LIMIT 1
@@ -80,7 +83,10 @@ async function handleGet(
 
   // Get paginated history
   const rows = await sql`
-    SELECT * FROM fleet_odometer_history
+    SELECT id, vehicle_id, check_record_id, reading, source, vlm_confidence,
+           previous_reading, km_since_last, discrepancy_flag, discrepancy_reason,
+           recorded_at, created_at
+    FROM fleet_odometer_history
     WHERE vehicle_id = ${vehicleId}
     ORDER BY recorded_at DESC
     LIMIT ${limitNum} OFFSET ${offsetNum}
@@ -189,7 +195,9 @@ async function handlePost(
       ${discrepancyResult.reason},
       NOW()
     )
-    RETURNING *
+    RETURNING id, vehicle_id, check_record_id, reading, source, vlm_confidence,
+              previous_reading, km_since_last, discrepancy_flag, discrepancy_reason,
+              recorded_at, created_at
   ` as FleetOdometerHistoryRow[];
 
   if (!rows[0]) {

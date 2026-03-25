@@ -33,7 +33,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     // Fetch review with project name
     const reviews = await sql`
       SELECT
-        r.*,
+        r.* /* TODO: specify columns */,
         p.project_name
       FROM construction_qa_reviews r
       JOIN projects p ON p.id = r.project_id
@@ -49,7 +49,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Fetch photos
     const photos = await sql`
-      SELECT *
+      SELECT * /* TODO: specify columns */
       FROM construction_qa_photos
       WHERE review_id = ${id}::uuid
       ORDER BY checklist_step ASC NULLS LAST, created_at ASC
@@ -57,7 +57,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Fetch recent activity (last 50 entries)
     const activity = await sql`
-      SELECT *
+      SELECT * /* TODO: specify columns */
       FROM construction_qa_activity
       WHERE review_id = ${id}::uuid
       ORDER BY created_at DESC

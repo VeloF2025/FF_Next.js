@@ -26,7 +26,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (category && trackingType && search) {
         // Branch 1: category AND trackingType AND search
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND category = ${category}
@@ -38,7 +42,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else if (category && search) {
         // Branch 2: category AND search
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND category = ${category}
@@ -49,7 +57,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else if (trackingType && search) {
         // Branch 3: trackingType AND search
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND tracking_type = ${trackingType}
@@ -60,7 +72,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else if (category) {
         // Branch 4: category only
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND category = ${category}
@@ -70,7 +86,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else if (trackingType) {
         // Branch 5: trackingType only
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND tracking_type = ${trackingType}
@@ -80,7 +100,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else if (search) {
         // Branch 6: search only
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
             AND (name ILIKE ${search} OR item_code ILIKE ${search})
@@ -90,7 +114,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       } else {
         // Branch 7: no filters
         rows = await sql`
-          SELECT *
+          SELECT
+            id, item_code, name, description, category, tracking_type,
+            uom, standard_cost, currency, min_stock_level, max_stock_level,
+            reorder_quantity, is_returnable, is_active, qty_available,
+            created_at, updated_at
           FROM stock_items
           WHERE is_active = true
           ORDER BY category, name
@@ -165,7 +193,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ${isReturnable ?? false},
           true
         )
-        RETURNING *
+        RETURNING
+          id, item_code, name, description, category, tracking_type,
+          uom, standard_cost, currency, min_stock_level, max_stock_level,
+          reorder_quantity, is_returnable, is_active,
+          created_at, updated_at
       `;
 
       log.info('Stock item created', { itemCode, name, category }, 'field-stock/items');

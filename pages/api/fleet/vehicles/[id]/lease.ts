@@ -49,7 +49,15 @@ async function handleGet(
   vehicleId: string
 ) {
   const rows = await sql`
-    SELECT *
+    SELECT id, vehicle_id, lease_type, company_name, company_registration,
+           company_vat, company_address, company_phone, company_email, company_website,
+           contract_number, quote_number, start_date, end_date, contract_duration_months,
+           monthly_cost, deposit_amount, deposit_refundable,
+           km_limit_monthly, km_limit_total, excess_km_rate, current_km, km_last_updated,
+           includes_maintenance, includes_tyres, includes_fuel_card, includes_tracking, includes_insurance,
+           account_manager, account_manager_phone, account_manager_email,
+           alternate_contact_name, alternate_contact_phone,
+           return_conditions, early_termination_fee, notes, created_at, updated_at
     FROM fleet_vehicle_lease
     WHERE vehicle_id = ${vehicleId}
   ` as VehicleLeaseRow[];
@@ -132,7 +140,15 @@ async function handlePut(
         notes = ${body.notes || null},
         updated_at = NOW()
       WHERE vehicle_id = ${vehicleId}
-      RETURNING *
+      RETURNING id, vehicle_id, lease_type, company_name, company_registration,
+               company_vat, company_address, company_phone, company_email, company_website,
+               contract_number, quote_number, start_date, end_date, contract_duration_months,
+               monthly_cost, deposit_amount, deposit_refundable,
+               km_limit_monthly, km_limit_total, excess_km_rate, current_km, km_last_updated,
+               includes_maintenance, includes_tyres, includes_fuel_card, includes_tracking, includes_insurance,
+               account_manager, account_manager_phone, account_manager_email,
+               alternate_contact_name, alternate_contact_phone,
+               return_conditions, early_termination_fee, notes, created_at, updated_at
     ` as VehicleLeaseRow[];
   } else {
     // Create new
@@ -208,7 +224,15 @@ async function handlePut(
         ${body.earlyTerminationFee || null},
         ${body.notes || null}
       )
-      RETURNING *
+      RETURNING id, vehicle_id, lease_type, company_name, company_registration,
+               company_vat, company_address, company_phone, company_email, company_website,
+               contract_number, quote_number, start_date, end_date, contract_duration_months,
+               monthly_cost, deposit_amount, deposit_refundable,
+               km_limit_monthly, km_limit_total, excess_km_rate, current_km, km_last_updated,
+               includes_maintenance, includes_tyres, includes_fuel_card, includes_tracking, includes_insurance,
+               account_manager, account_manager_phone, account_manager_email,
+               alternate_contact_name, alternate_contact_phone,
+               return_conditions, early_termination_fee, notes, created_at, updated_at
     ` as VehicleLeaseRow[];
   }
 

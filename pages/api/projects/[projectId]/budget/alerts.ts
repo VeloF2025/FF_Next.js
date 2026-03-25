@@ -77,7 +77,13 @@ export default withAuth(withErrorHandler(async (
       let alerts;
       if (status && severity) {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
             AND status = ${status}
             AND severity = ${severity}
@@ -85,14 +91,26 @@ export default withAuth(withErrorHandler(async (
         `;
       } else if (status) {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
             AND status = ${status}
           ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
         `;
       } else if (severity && !includeResolved) {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
             AND severity = ${severity}
             AND status != 'resolved'
@@ -100,20 +118,38 @@ export default withAuth(withErrorHandler(async (
         `;
       } else if (severity) {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
             AND severity = ${severity}
           ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
         `;
       } else if (includeResolved) {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
           ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
         `;
       } else {
         alerts = await sql`
-          SELECT * FROM budget_alerts
+          SELECT
+          id, project_budget_id, alert_type, severity,
+          threshold_percent, current_percent, amount_involved,
+          title, message, status,
+          acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+          created_at
+        FROM budget_alerts
           WHERE project_budget_id = ${budgetId}
             AND status != 'resolved'
           ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 WHEN 'info' THEN 3 END, created_at DESC
@@ -204,7 +240,12 @@ export default withAuth(withErrorHandler(async (
               resolved_by = NULL,
               resolved_at = NULL
           WHERE id = ${alertId}
-          RETURNING *
+          RETURNING
+            id, project_budget_id, alert_type, severity,
+            threshold_percent, current_percent, amount_involved,
+            title, message, status,
+            acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+            created_at
         `;
       } else if (acknowledgedAt) {
         result = await sql`
@@ -215,7 +256,12 @@ export default withAuth(withErrorHandler(async (
               resolved_by = ${userId},
               resolved_at = NOW()
           WHERE id = ${alertId}
-          RETURNING *
+          RETURNING
+            id, project_budget_id, alert_type, severity,
+            threshold_percent, current_percent, amount_involved,
+            title, message, status,
+            acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+            created_at
         `;
       } else {
         result = await sql`
@@ -226,7 +272,12 @@ export default withAuth(withErrorHandler(async (
               resolved_by = ${userId},
               resolved_at = NOW()
           WHERE id = ${alertId}
-          RETURNING *
+          RETURNING
+            id, project_budget_id, alert_type, severity,
+            threshold_percent, current_percent, amount_involved,
+            title, message, status,
+            acknowledged_by, acknowledged_at, resolved_by, resolved_at,
+            created_at
         `;
       }
 

@@ -46,7 +46,8 @@ export default withAuth(withErrorHandler(async (
     // 1. Get the GRN with its items
     const [grn] = await sql`
       SELECT
-        grn.*,
+        grn.id, grn.grn_number, grn.status, grn.supplier_id, grn.warehouse_id,
+        grn.purchase_order_id,
         COALESCE(s.company_name, s.name) as supplier_name,
         sl.name as warehouse_name
       FROM goods_receipt_notes grn
@@ -69,7 +70,11 @@ export default withAuth(withErrorHandler(async (
 
     // 3. Get GRN items
     const grnItems = await sql`
-      SELECT * FROM goods_receipt_items
+      SELECT
+        id, grn_id, po_item_id, stock_item_id, item_code, item_description,
+        quantity_received, quantity_rejected, uom, unit_cost, total_cost,
+        serial_numbers, lot_number, inspection_status
+      FROM goods_receipt_items
       WHERE grn_id = ${grnId}
     `;
 
@@ -112,7 +117,7 @@ export default withAuth(withErrorHandler(async (
         ${notes || `GRN confirmed: ${grn.grn_number}`},
         'fibreflow'
       )
-      RETURNING *
+      RETURNING id, reference_number, movement_type
     `;
 
     log.info('Created stock movement for GRN', {
@@ -207,7 +212,7 @@ export default withAuth(withErrorHandler(async (
         verified_at = NOW(),
         updated_at = NOW()
       WHERE id = ${grnId}
-      RETURNING *
+      RETURNING id, grn_number, status
     `;
 
     logUpdate('goods_receipt_note', grnId, {

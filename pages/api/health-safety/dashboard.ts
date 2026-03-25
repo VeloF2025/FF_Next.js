@@ -135,7 +135,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
               ORDER BY pc.next_audit_due ASC`,
 
       // Recent activity
-      sql`SELECT *
+      sql`SELECT id, entity_type, entity_id, action, details, created_at
       FROM hs_activity_log
       ORDER BY created_at DESC
       LIMIT 20`,

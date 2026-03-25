@@ -34,6 +34,7 @@ async function handler(
 async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   const { search, status, location_id, warehouse_id, category_id, project_id, stock_take_type } = req.query;
 
+  /* TODO: specify columns — v_stock_takes_summary is a view, result returned directly */
   let query = `SELECT * FROM v_stock_takes_summary WHERE 1=1`;
   const params: (string | boolean)[] = [];
   let paramIndex = 1;
@@ -129,7 +130,11 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${data.notes || null},
       ${data.tags || null}
     )
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      notes, tags, created_at, updated_at
   `;
 
   return apiResponse.created(res, result[0]);

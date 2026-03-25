@@ -49,7 +49,11 @@ async function handler(
 
       if (projectId) {
         query = await sql`
-          SELECT * FROM poles
+          SELECT id, project_id, pole_number, pole_id, latitude, longitude, status,
+                 type, pole_type, pole_spec, height, diameter, material, owner,
+                 pon_no, zone_no, address, municipality, project_ref, raw_data,
+                 created_at, updated_at
+          FROM poles
           WHERE project_id = ${projectId}
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
@@ -61,7 +65,11 @@ async function handler(
         `;
       } else {
         query = await sql`
-          SELECT * FROM poles
+          SELECT id, project_id, pole_number, pole_id, latitude, longitude, status,
+                 type, pole_type, pole_spec, height, diameter, material, owner,
+                 pon_no, zone_no, address, municipality, project_ref, raw_data,
+                 created_at, updated_at
+          FROM poles
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
         `;

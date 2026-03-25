@@ -32,7 +32,13 @@ export default withAuth(withErrorHandler(async (
     try {
       const result = await sql`
         SELECT
-          cpo.*,
+          cpo.id, cpo.po_number, cpo.reference, cpo.project_id, cpo.client_id,
+          cpo.contracted_drops, cpo.price_per_drop, cpo.total_value,
+          cpo.drops_assigned, cpo.drops_activated, cpo.amount_invoiced, cpo.amount_paid,
+          cpo.spares_allocated, cpo.spares_used, cpo.status,
+          cpo.po_date, cpo.valid_from, cpo.valid_to,
+          cpo.tax_rate, cpo.tax_inclusive, cpo.description, cpo.terms,
+          cpo.created_by, cpo.created_at, cpo.updated_at,
           c.company_name as client_name,
           p.project_name as project_name
         FROM client_purchase_orders cpo
@@ -118,7 +124,8 @@ export default withAuth(withErrorHandler(async (
 
       // Get existing
       const existing = await sql`
-        SELECT * FROM client_purchase_orders
+        SELECT id, status, total_value, contracted_drops, price_per_drop
+        FROM client_purchase_orders
         WHERE id = ${poId} AND project_id = ${projectId}
       `;
 
@@ -164,7 +171,7 @@ export default withAuth(withErrorHandler(async (
           status = COALESCE(${body.status}, status),
           updated_at = NOW()
         WHERE id = ${poId}
-        RETURNING *
+        RETURNING id
       `;
 
       const updated = result[0];
@@ -175,7 +182,13 @@ export default withAuth(withErrorHandler(async (
       // Get with joined data
       const refreshed = await sql`
         SELECT
-          cpo.*,
+          cpo.id, cpo.po_number, cpo.reference, cpo.project_id, cpo.client_id,
+          cpo.contracted_drops, cpo.price_per_drop, cpo.total_value,
+          cpo.drops_assigned, cpo.drops_activated, cpo.amount_invoiced, cpo.amount_paid,
+          cpo.spares_allocated, cpo.spares_used, cpo.status,
+          cpo.po_date, cpo.valid_from, cpo.valid_to,
+          cpo.tax_rate, cpo.tax_inclusive, cpo.description, cpo.terms,
+          cpo.created_by, cpo.created_at, cpo.updated_at,
           c.company_name as client_name,
           p.project_name as project_name
         FROM client_purchase_orders cpo

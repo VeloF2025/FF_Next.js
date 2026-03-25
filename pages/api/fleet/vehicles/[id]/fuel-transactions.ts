@@ -176,7 +176,12 @@ async function handleGet(
   // Paginated transactions, total count, and summary stats are all independent — run in parallel
   const [rows, countResult, statsResult] = await Promise.all([
     sql`
-      SELECT * FROM fleet_fuel_transactions
+      SELECT id, vehicle_id, transaction_date, amount_rand, litres, price_per_litre,
+             odometer_reading, km_since_last_fill, litres_per_100km,
+             station_name, station_location, receipt_photo_url, receipt_photo_key,
+             odometer_photo_url, odometer_photo_key, vlm_extracted, vlm_confidence,
+             vlm_raw_result, vlm_verified, source, recorded_by, created_at
+      FROM fleet_fuel_transactions
       WHERE vehicle_id = ${vehicleId}
       ORDER BY transaction_date DESC, created_at DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
@@ -327,7 +332,11 @@ async function handlePost(
       ${body.gpsLng || null},
       ${body.captureTimestamp ? new Date(body.captureTimestamp) : new Date()}
     )
-    RETURNING *
+    RETURNING id, vehicle_id, transaction_date, amount_rand, litres, price_per_litre,
+             odometer_reading, km_since_last_fill, litres_per_100km,
+             station_name, station_location, receipt_photo_url, receipt_photo_key,
+             odometer_photo_url, odometer_photo_key, vlm_extracted, vlm_confidence,
+             vlm_raw_result, vlm_verified, source, recorded_by, created_at
   ` as FuelTransactionRow[];
 
   if (!rows[0]) {
@@ -541,7 +550,12 @@ async function handlePatch(
 
   // Verify transaction exists and belongs to this vehicle
   const existingTx = await sql`
-    SELECT * FROM fleet_fuel_transactions
+    SELECT id, vehicle_id, transaction_date, amount_rand, litres, price_per_litre,
+           odometer_reading, km_since_last_fill, litres_per_100km,
+           station_name, station_location, receipt_photo_url, receipt_photo_key,
+           odometer_photo_url, odometer_photo_key, vlm_extracted, vlm_confidence,
+           vlm_raw_result, vlm_verified, source, recorded_by, created_at
+    FROM fleet_fuel_transactions
     WHERE id = ${body.transactionId} AND vehicle_id = ${vehicleId}
   ` as FuelTransactionRow[];
 
@@ -610,7 +624,11 @@ async function handlePatch(
       receipt_photo_url = ${receiptPhotoUrl},
       odometer_photo_url = ${odometerPhotoUrl}
     WHERE id = ${body.transactionId}
-    RETURNING *
+    RETURNING id, vehicle_id, transaction_date, amount_rand, litres, price_per_litre,
+             odometer_reading, km_since_last_fill, litres_per_100km,
+             station_name, station_location, receipt_photo_url, receipt_photo_key,
+             odometer_photo_url, odometer_photo_key, vlm_extracted, vlm_confidence,
+             vlm_raw_result, vlm_verified, source, recorded_by, created_at
   ` as FuelTransactionRow[];
 
   if (!rows[0]) {

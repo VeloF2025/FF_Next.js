@@ -37,7 +37,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get document from database
     const [document] = await sql`
-      SELECT * FROM staff_documents WHERE id = ${documentId}
+      SELECT id, staff_id, document_type, file_path, file_url, file_name, mime_type
+      FROM staff_documents WHERE id = ${documentId}
     `;
 
     if (!document) {

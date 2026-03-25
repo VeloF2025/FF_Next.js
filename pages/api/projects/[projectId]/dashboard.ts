@@ -29,7 +29,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get aggregated data from the dashboard view
     const dashboardData = await sql`
-      SELECT *
+      SELECT
+        id, project_code, project_name, status, progress,
+        start_date, end_date, client_id, client_name,
+        budget, total_budget, committed_amount, budget_actual_amount,
+        actual_cost, available_budget, budget_health,
+        staff_count, contractor_count, primary_manager_name,
+        latest_hs_score, last_audit_date,
+        open_tickets, resolved_this_month,
+        pending_pos, pending_rfqs, total_po_value
       FROM v_project_dashboard
       WHERE id = ${projectId}
     `;

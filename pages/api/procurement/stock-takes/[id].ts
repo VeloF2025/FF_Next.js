@@ -43,6 +43,7 @@ async function handler(
 
 async function handleGet(id: string, res: NextApiResponse) {
   // Get stock take with summary
+  /* TODO: specify columns — v_stock_takes_summary is a view, result is spread to response */
   const stockTake = await sql`
     SELECT * FROM v_stock_takes_summary WHERE id = ${id}
   `;
@@ -52,6 +53,7 @@ async function handleGet(id: string, res: NextApiResponse) {
   }
 
   // Get lines with details
+  /* TODO: specify columns — v_stock_take_lines_detail is a view, result is spread to response */
   const lines = await sql`
     SELECT * FROM v_stock_take_lines_detail
     WHERE stock_take_id = ${id}
@@ -93,7 +95,12 @@ async function handlePut(id: string, data: StockTakeFormData & { status?: string
       tags = COALESCE(${data.tags}, tags),
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      start_date, end_date, approved_at, approval_notes,
+      notes, tags, created_at, updated_at
   `;
 
   return apiResponse.success(res, result[0]);

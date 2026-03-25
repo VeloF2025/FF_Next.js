@@ -103,7 +103,7 @@ async function handlePut(
 
   // Get existing template first
   const existing = await pool.query(
-    'SELECT * FROM wa_message_templates WHERE template_key = $1',
+    'SELECT id, template_key, template_name, template_content, variables, category, enabled, is_default, created_at, updated_at FROM wa_message_templates WHERE template_key = $1',
     [key]
   );
 

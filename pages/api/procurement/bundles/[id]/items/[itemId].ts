@@ -46,7 +46,7 @@ async function handler(
 
 async function handleGet(itemId: string, res: NextApiResponse) {
   const item = await sql`
-    SELECT * FROM v_stock_bundle_items_detail WHERE id = ${itemId}
+    SELECT /* TODO: specify columns */ * FROM v_stock_bundle_items_detail WHERE id = ${itemId}
   `;
 
   if (item.length === 0) {
@@ -81,7 +81,9 @@ async function handlePut(itemId: string, data: StockBundleItemFormData, res: Nex
       notes = COALESCE(${data.notes}, notes),
       updated_at = NOW()
     WHERE id = ${itemId}
-    RETURNING *
+    RETURNING id, bundle_id, stock_item_id, quantity, uom, price_override,
+              discount_percentage, is_optional, is_configurable, min_quantity,
+              max_quantity, substitute_group, sort_order, notes, created_at, updated_at
   `;
 
   return apiResponse.success(res, result[0]);

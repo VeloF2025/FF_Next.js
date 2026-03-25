@@ -44,7 +44,12 @@ export default withAuth(withErrorHandler(async (
     try {
       const result = await sql`
         SELECT
-          ci.*,
+          ci.id, ci.invoice_number, ci.project_id, ci.client_id, ci.client_po_id,
+          ci.billing_period_start, ci.billing_period_end,
+          ci.subtotal, ci.tax_rate, ci.tax_amount, ci.total_amount, ci.amount_paid,
+          ci.status, ci.invoice_date, ci.due_date, ci.sent_at, ci.paid_at,
+          ci.notes, ci.internal_notes, ci.created_by,
+          ci.approved_by, ci.approved_at, ci.created_at, ci.updated_at,
           c.company_name as client_name,
           p.project_name as project_name,
           cpo.po_number as client_po_number
@@ -63,7 +68,11 @@ export default withAuth(withErrorHandler(async (
 
       // Get line items
       const items = await sql`
-        SELECT * FROM customer_invoice_items
+        SELECT
+          id, invoice_id, drop_id, oes_activation_id, drop_number,
+          activation_date, description, unit_price, quantity,
+          tax_amount, line_total, income_type, created_at
+        FROM customer_invoice_items
         WHERE invoice_id = ${invoiceId}
         ORDER BY created_at ASC
       `;
@@ -84,7 +93,7 @@ export default withAuth(withErrorHandler(async (
 
       // Get existing
       const existingPatch = await sql`
-        SELECT * FROM customer_invoices
+        SELECT id, status FROM customer_invoices
         WHERE id = ${invoiceId} AND project_id = ${projectId}
       `;
 
@@ -106,7 +115,7 @@ export default withAuth(withErrorHandler(async (
           internal_notes = COALESCE(${body.internalNotes}, internal_notes),
           updated_at = NOW()
         WHERE id = ${invoiceId}
-        RETURNING *
+        RETURNING id
       `;
 
       // Recalculate totals if tax rate changed
@@ -117,7 +126,12 @@ export default withAuth(withErrorHandler(async (
       // Get refreshed
       const refreshed = await sql`
         SELECT
-          ci.*,
+          ci.id, ci.invoice_number, ci.project_id, ci.client_id, ci.client_po_id,
+          ci.billing_period_start, ci.billing_period_end,
+          ci.subtotal, ci.tax_rate, ci.tax_amount, ci.total_amount, ci.amount_paid,
+          ci.status, ci.invoice_date, ci.due_date, ci.sent_at, ci.paid_at,
+          ci.notes, ci.internal_notes, ci.created_by,
+          ci.approved_by, ci.approved_at, ci.created_at, ci.updated_at,
           c.company_name as client_name,
           p.project_name as project_name,
           cpo.po_number as client_po_number
@@ -181,7 +195,8 @@ async function handleAction(
   userId: string
 ) {
   const existingAction = await sql`
-    SELECT * FROM customer_invoices
+    SELECT id, status, amount_paid, total_amount
+    FROM customer_invoices
     WHERE id = ${invoiceId} AND project_id = ${projectId}
   `;
 

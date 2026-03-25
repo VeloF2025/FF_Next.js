@@ -49,12 +49,16 @@ async function handleGet(contractorId: string, res: NextApiResponse) {
 
   // Get compliance record
   const [compliance] = await sql`
-    SELECT * FROM hs_contractor_compliance WHERE contractor_id = ${contractorId}
+    SELECT id, contractor_id, overall_score, rag_status, training_records,
+           last_audit_date, next_audit_due, notes, created_at, updated_at
+    FROM hs_contractor_compliance WHERE contractor_id = ${contractorId}
   `;
 
   // Get documents
   const documents = await sql`
-    SELECT * FROM hs_contractor_documents
+    SELECT id, contractor_id, document_type, document_name, file_url,
+           status, expiry_date, created_at, updated_at
+    FROM hs_contractor_documents
     WHERE contractor_id = ${contractorId}
     ORDER BY document_type, created_at DESC
   `;
@@ -196,7 +200,8 @@ async function handlePut(contractorId: string, req: NextApiRequest, res: NextApi
       notes = COALESCE(${notes}, hs_contractor_compliance.notes),
       next_audit_due = COALESCE(${next_audit_due}, hs_contractor_compliance.next_audit_due),
       updated_at = NOW()
-    RETURNING *
+    RETURNING id, contractor_id, overall_score, rag_status, training_records,
+              last_audit_date, next_audit_due, notes, created_at, updated_at
   `;
 
   // Recalculate score

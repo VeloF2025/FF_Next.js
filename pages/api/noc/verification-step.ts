@@ -62,7 +62,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Verify step exists and get current values
     const existing = (await sql`
-      SELECT * FROM maintenance_verification_steps
+      SELECT id, ticket_id, step_number, step_name, step_description,
+             is_complete, completed_at, completed_by, photo_required,
+             photo_url, photo_verified, notes, created_at
+      FROM maintenance_verification_steps
       WHERE ticket_id = ${ticketId} AND step_number = ${stepNum}
     `) as VerificationStep[];
 
@@ -89,7 +92,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         photo_verified = ${photoVerified},
         notes = ${payload.notes ?? currentStep.notes}
       WHERE ticket_id = ${ticketId} AND step_number = ${stepNum}
-      RETURNING *
+      RETURNING id, ticket_id, step_number, step_name, step_description,
+                is_complete, completed_at, completed_by, photo_required,
+                photo_url, photo_verified, notes, created_at
     `) as VerificationStep[];
 
     log.info('Updated verification step', { ticketId, stepNumber: stepNum });

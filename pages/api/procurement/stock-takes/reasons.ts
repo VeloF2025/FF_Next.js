@@ -22,6 +22,7 @@ async function handler(
   try {
     const { adjustment_type, is_active } = req.query;
 
+    /* TODO: specify columns — result returned directly to client */
     let query = `SELECT * FROM stock_adjustment_reasons WHERE 1=1`;
     const params: (string | boolean)[] = [];
     let paramIndex = 1;

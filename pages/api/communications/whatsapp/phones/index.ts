@@ -43,7 +43,7 @@ async function handleGet(
   const { service } = req.query;
 
   try {
-    let query = 'SELECT * FROM wa_phone_numbers';
+    let query = 'SELECT id, service, phone_number, display_name, role, status, created_at, updated_at FROM wa_phone_numbers';
     const params: string[] = [];
 
     if (service) {
@@ -112,7 +112,7 @@ async function handlePost(
          display_name = EXCLUDED.display_name,
          role = EXCLUDED.role,
          updated_at = NOW()
-       RETURNING *`,
+       RETURNING id, service, phone_number, display_name, role, status, created_at, updated_at`,
       [input.service, input.phone_number, input.display_name || null, input.role]
     );
 

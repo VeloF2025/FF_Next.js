@@ -52,9 +52,19 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, userId: stri
   try {
     // Fetch data from main tables (not sow_* tables)
     const [polesResult, dropsResult, fibreResult] = await Promise.all([
-      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_number LIMIT 1000`,
-      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_number LIMIT 1000`,
-      sql`SELECT * FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
+      sql`SELECT id, project_id, pole_number, pole_id, latitude, longitude, status,
+                 type, pole_type, pole_spec, height, diameter, material, owner,
+                 pon_no, zone_no, address, municipality, raw_data, created_at, updated_at
+          FROM poles WHERE project_id = ${projectId} ORDER BY pole_number LIMIT 1000`,
+      sql`SELECT id, project_id, drop_number, drop_id, pole_number, cable_type, cable_spec,
+                 cable_length, cable_capacity, start_point, end_point, latitude, longitude,
+                 address, pon_no, zone_no, municipality, status, qc_status, customer_name,
+                 raw_data, created_at, updated_at
+          FROM drops WHERE project_id = ${projectId} ORDER BY drop_number LIMIT 1000`,
+      sql`SELECT id, project_id, segment_id, from_pole, to_pole, cable_type,
+                 cable_size, length_m, route_type, installation_method, status,
+                 raw_data, created_at, updated_at
+          FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
     ]);
 
     // Get counts for summary
@@ -127,7 +137,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
     
     // Verify project exists
     const projectResult = await sql`
-      SELECT * FROM projects WHERE id = ${projectId} LIMIT 1
+      SELECT id, sow_data FROM projects WHERE id = ${projectId} LIMIT 1
     `;
     
     if (!projectResult[0]) {
@@ -155,9 +165,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
         ${new Date().toISOString()},
         ${userId}
       )
-      RETURNING *
+      RETURNING id, project_id, file_name, import_type, status, processed_records,
+               total_records, errors, imported_at, imported_by
     `;
-    
+
     // Update project with SOW data reference
     if (processedResult.success) {
       const currentSowData = projectResult[0].sow_data || {};
@@ -200,7 +211,9 @@ async function handleGetStatus(req: NextApiRequest, res: NextApiResponse, userId
   
   try {
     const sowImport = await sql`
-      SELECT * FROM sow_imports 
+      SELECT id, project_id, file_name, import_type, status, data,
+             processed_records, total_records, errors, imported_at, imported_by
+      FROM sow_imports
       WHERE id = ${Number(id)}
       LIMIT 1
     `;

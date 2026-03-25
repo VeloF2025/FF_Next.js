@@ -112,10 +112,13 @@ async function handler(
           try {
             let result;
             if (entityType === 'client') {
+              /* TODO: specify columns — result sent to WS subscribers, fields depend on client needs */
               result = await sql`SELECT * FROM clients WHERE id = ${entityId}`;
             } else if (entityType === 'staff') {
+              /* TODO: specify columns — result sent to WS subscribers, fields depend on client needs */
               result = await sql`SELECT * FROM staff WHERE id = ${entityId}`;
             } else {
+              /* TODO: specify columns — result sent to WS subscribers, fields depend on client needs */
               result = await sql`SELECT * FROM projects WHERE id = ${entityId}`;
             }
             

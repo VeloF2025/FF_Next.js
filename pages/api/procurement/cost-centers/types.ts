@@ -22,7 +22,7 @@ async function handler(
   try {
     const { is_active, hierarchy_level } = req.query;
 
-    let query = `SELECT * FROM cost_center_types WHERE 1=1`;
+    let query = `SELECT id, code, name, description, hierarchy_level, is_active, sort_order, created_at FROM cost_center_types WHERE 1=1`;
     const params: (string | boolean | number)[] = [];
     let paramIndex = 1;
 

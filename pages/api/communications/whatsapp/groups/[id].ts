@@ -85,7 +85,7 @@ async function handlePut(
 
   // Get existing group first
   const existing = await pool.query(
-    'SELECT * FROM wa_monitored_groups WHERE id = $1::uuid',
+    'SELECT id, group_jid, group_name, project_name, group_type, description, is_active, created_at, updated_at FROM wa_monitored_groups WHERE id = $1::uuid',
     [id]
   );
 
@@ -178,7 +178,7 @@ async function handleDelete(
 ) {
   // Get existing group first
   const existing = await pool.query(
-    'SELECT * FROM wa_monitored_groups WHERE id = $1::uuid',
+    'SELECT id, group_jid, group_name, project_name, group_type, description, is_active, created_at, updated_at FROM wa_monitored_groups WHERE id = $1::uuid',
     [id]
   );
 

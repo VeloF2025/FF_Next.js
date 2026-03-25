@@ -44,7 +44,8 @@ export default withAuth(withErrorHandler(async (
   try {
     // Get requisition details
     const requisitions = await sql`
-      SELECT * FROM purchase_requisitions WHERE id = ${requisitionId}
+      SELECT id, requisition_number, project_id, notes, requested_by
+      FROM purchase_requisitions WHERE id = ${requisitionId}
     `;
 
     if (requisitions.length === 0) {
@@ -70,7 +71,10 @@ export default withAuth(withErrorHandler(async (
 
     // Get requisition items
     const reqItems = await sql`
-      SELECT * FROM purchase_requisition_items WHERE requisition_id = ${requisitionId}
+      SELECT
+        id, requisition_id, item_description, quantity, uom, specifications,
+        estimated_unit_price, stock_item_id
+      FROM purchase_requisition_items WHERE requisition_id = ${requisitionId}
     `;
 
     // Generate RFQ number
@@ -99,7 +103,7 @@ export default withAuth(withErrorHandler(async (
         ${totalBudget},
         ${createdBy || requisition.requested_by || 'System'}
       )
-      RETURNING *
+      RETURNING id, rfq_number, project_id, title, status
     `;
 
     const rfq = insertedRfqs[0];
@@ -116,7 +120,7 @@ export default withAuth(withErrorHandler(async (
           ${rfqId},
           ${requisition.project_id},
           ${i + 1},
-          ${item.description},
+          ${item.item_description},
           ${item.quantity},
           ${item.uom || 'EA'},
           ${item.specifications || null},
@@ -135,7 +139,7 @@ export default withAuth(withErrorHandler(async (
             INSERT INTO rfq_suppliers (rfq_id, supplier_id, status)
             VALUES (${rfqId}, ${parseInt(supplierId)}, 'invited')
             ON CONFLICT (rfq_id, supplier_id) DO NOTHING
-            RETURNING *
+            RETURNING rfq_id, supplier_id
           `;
           if (result[0]) {
             addedSuppliers.push(result[0]);
@@ -162,7 +166,7 @@ export default withAuth(withErrorHandler(async (
       projectName,
       deadline,
       items: reqItems.map((item: Record<string, unknown>) => ({
-        description: item.description as string,
+        description: item.item_description as string,
         quantity: Number(item.quantity),
         uom: (item.uom as string) || 'EA',
         specifications: (item.specifications as string) || '',

@@ -49,7 +49,11 @@ async function handler(
 
       if (projectId) {
         query = await sql`
-          SELECT * FROM drops
+          SELECT id, project_id, drop_number, pole_number, cable_type, cable_spec,
+                 cable_length, cable_capacity, start_point, end_point, latitude, longitude,
+                 address, pon_no, zone_no, municipality, status, qc_status, customer_name,
+                 raw_data, created_at, updated_at
+          FROM drops
           WHERE project_id = ${projectId}
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
@@ -61,7 +65,11 @@ async function handler(
         `;
       } else {
         query = await sql`
-          SELECT * FROM drops
+          SELECT id, project_id, drop_number, pole_number, cable_type, cable_spec,
+                 cable_length, cable_capacity, start_point, end_point, latitude, longitude,
+                 address, pon_no, zone_no, municipality, status, qc_status, customer_name,
+                 raw_data, created_at, updated_at
+          FROM drops
           ORDER BY created_at DESC
           LIMIT ${limitNum} OFFSET ${offsetNum}
         `;

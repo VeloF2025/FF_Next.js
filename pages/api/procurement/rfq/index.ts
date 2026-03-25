@@ -55,7 +55,11 @@ export default withAuth(withErrorHandler(async (
       if (projectId && projectId !== 'all') {
         // Get RFQs for specific project
         rfqData = await sql`
-          SELECT * FROM rfqs
+          SELECT
+            id, rfq_number, project_id, requisition_id, title, description,
+            status, response_deadline, total_budget_estimate, created_by,
+            created_at, updated_at
+          FROM rfqs
           WHERE project_id = ${projectId}
           ORDER BY created_at DESC
         `;
@@ -64,7 +68,7 @@ export default withAuth(withErrorHandler(async (
         if (rfqData.length > 0) {
           const rfqIds = rfqData.map(r => r.id);
           itemsData = await sql`
-            SELECT * FROM rfq_items
+            SELECT id, rfq_id, description, quantity, uom, specifications, line_number, budget_price, stock_item_id FROM rfq_items
             WHERE rfq_id = ANY(${rfqIds})
             ORDER BY line_number
           `;
@@ -83,7 +87,9 @@ export default withAuth(withErrorHandler(async (
         // Get all RFQs with quotes count and requisition info
         rfqData = await sql`
           SELECT
-            r.*,
+            r.id, r.rfq_number, r.project_id, r.requisition_id, r.title, r.description,
+            r.status, r.response_deadline, r.total_budget_estimate, r.created_by,
+            r.created_at, r.updated_at,
             pr.requisition_number,
             pr.status as requisition_status,
             (SELECT COUNT(*) FROM quotes WHERE quotes.rfq_id = r.id)::int as quotes_received
@@ -97,7 +103,7 @@ export default withAuth(withErrorHandler(async (
         if (rfqData.length > 0) {
           const rfqIds = rfqData.slice(0, 20).map(r => r.id);
           itemsData = await sql`
-            SELECT * FROM rfq_items
+            SELECT id, rfq_id, description, quantity, uom, specifications, line_number, budget_price, stock_item_id FROM rfq_items
             WHERE rfq_id = ANY(${rfqIds})
             ORDER BY line_number
             LIMIT 200
@@ -257,7 +263,10 @@ export default withAuth(withErrorHandler(async (
           ${newRFQ.totalValue || 0},
           ${newRFQ.createdBy || 'System'}
         )
-        RETURNING *
+        RETURNING
+          id, rfq_number, project_id, requisition_id, title, description,
+          status, response_deadline, total_budget_estimate, created_by,
+          created_at, updated_at
       `;
 
       const rfqId = insertedRFQs[0]!.id;
@@ -272,7 +281,7 @@ export default withAuth(withErrorHandler(async (
               INSERT INTO rfq_suppliers (rfq_id, supplier_id, status)
               VALUES (${rfqId}, ${parseInt(supplierId)}, 'invited')
               ON CONFLICT (rfq_id, supplier_id) DO NOTHING
-              RETURNING *
+              RETURNING rfq_id, supplier_id
             `;
             if (result[0]) {
               insertedSuppliers.push(result[0]);

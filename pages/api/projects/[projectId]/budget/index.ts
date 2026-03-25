@@ -37,7 +37,13 @@ export default withAuth(withErrorHandler(async (
     try {
       // Get budget for project
       const budgets = await sql`
-        SELECT *
+        SELECT
+          id, project_id, source_type, boq_id,
+          total_budget, currency, committed_amount, actual_amount,
+          available_budget, variance_amount, variance_percent,
+          status, enforce_budget, allow_override,
+          alert_threshold_warning, alert_threshold_critical,
+          approved_by, approved_at, created_by, created_at, updated_at
         FROM project_budgets
         WHERE project_id = ${projectId}
       `;
@@ -67,7 +73,10 @@ export default withAuth(withErrorHandler(async (
 
       // Get categories for budget
       const categories = await sql`
-        SELECT *
+        SELECT
+          id, project_budget_id, category_code, category_name,
+          allocated_amount, committed_amount, actual_amount, available_amount,
+          is_custom, sort_order, created_at, updated_at
         FROM budget_categories
         WHERE project_budget_id = ${budget.id}
         ORDER BY sort_order ASC
@@ -146,7 +155,13 @@ export default withAuth(withErrorHandler(async (
           'draft',
           ${userId || 'system'}
         )
-        RETURNING *
+        RETURNING
+          id, project_id, source_type, boq_id,
+          total_budget, currency, committed_amount, actual_amount,
+          available_budget, variance_amount, variance_percent,
+          status, enforce_budget, allow_override,
+          alert_threshold_warning, alert_threshold_critical,
+          approved_by, approved_at, created_by, created_at, updated_at
       `;
 
       const newBudget = result[0];
@@ -220,7 +235,13 @@ export default withAuth(withErrorHandler(async (
           alert_threshold_critical = COALESCE(${body.alertThresholdCritical}, alert_threshold_critical),
           updated_at = NOW()
         WHERE id = ${budget.id}
-        RETURNING *
+        RETURNING
+          id, project_id, source_type, boq_id,
+          total_budget, currency, committed_amount, actual_amount,
+          available_budget, variance_amount, variance_percent,
+          status, enforce_budget, allow_override,
+          alert_threshold_warning, alert_threshold_critical,
+          approved_by, approved_at, created_by, created_at, updated_at
       `;
 
       const updated = result[0];

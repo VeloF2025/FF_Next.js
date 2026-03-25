@@ -291,7 +291,8 @@ async function processSyncPhotos(dropNumber: string): Promise<void> {
 
   // Get sync record
   const result = await sql`
-    SELECT * FROM sharepoint_dr_sync WHERE drop_number = ${dropNumber}
+    SELECT id, drop_number, folder_created, folder_id, folder_path, photos_uploaded, photos_total, last_sync_at
+    FROM sharepoint_dr_sync WHERE drop_number = ${dropNumber}
   `;
 
   if (result.length === 0) {

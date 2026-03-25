@@ -42,7 +42,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
 
     // Get cost center summary
     const costCenter = await sql`
-      SELECT * FROM v_cost_centers_summary WHERE id = ${id}::UUID
+      SELECT /* TODO: specify columns */ * FROM v_cost_centers_summary WHERE id = ${id}::UUID
     `;
 
     if (costCenter.length === 0) {
@@ -54,7 +54,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
     // Include children if requested
     if (include_children === 'true') {
       const children = await sql`
-        SELECT * FROM v_cost_centers_summary
+        SELECT /* TODO: specify columns */ * FROM v_cost_centers_summary
         WHERE parent_id = ${id}::UUID
         ORDER BY sort_order, code
       `;
@@ -64,7 +64,7 @@ async function handleGet(id: string, req: NextApiRequest, res: NextApiResponse) 
     // Include rollup totals if requested
     if (include_rollup === 'true') {
       const rollup = await sql`
-        SELECT * FROM rollup_cost_center_totals(${id}::UUID)
+        SELECT /* TODO: specify columns */ * FROM rollup_cost_center_totals(${id}::UUID)
       `;
       if (rollup.length > 0) {
         result.rollup_totals = rollup[0];
@@ -140,7 +140,9 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
         END,
         updated_at = NOW()
       WHERE id = ${id}::UUID
-      RETURNING *
+      RETURNING id, code, name, description, parent_id, cost_center_type_id,
+                project_id, allocated_budget, is_active, is_locked, sort_order,
+                metadata, reference_type, reference_id, created_at, updated_at
     `;
 
     return apiResponse.success(res, result[0]);

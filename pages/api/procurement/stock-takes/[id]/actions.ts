@@ -41,7 +41,7 @@ async function handler(
 
     // Get current stock take
     const stockTake = await sql`
-      SELECT * FROM stock_takes WHERE id = ${id}
+      SELECT id, status, reference_number, location_id FROM stock_takes WHERE id = ${id}
     `;
 
     if (stockTake.length === 0) {
@@ -89,7 +89,12 @@ async function handleStart(id: string, current: Record<string, unknown>, res: Ne
       start_date = NOW(),
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      start_date, end_date, approved_at, approval_notes,
+      notes, tags, created_at, updated_at
   `;
 
   return apiResponse.success(res, {
@@ -120,7 +125,12 @@ async function handleComplete(id: string, current: Record<string, unknown>, res:
       end_date = NOW(),
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      start_date, end_date, approved_at, approval_notes,
+      notes, tags, created_at, updated_at
   `;
 
   return apiResponse.success(res, {
@@ -147,7 +157,12 @@ async function handleApprove(
       approval_notes = ${data.approval_notes || null},
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      start_date, end_date, approved_at, approval_notes,
+      notes, tags, created_at, updated_at
   `;
 
   // Get ADJUST virtual location
@@ -268,7 +283,12 @@ async function handleCancel(id: string, current: Record<string, unknown>, res: N
       status = 'cancelled',
       updated_at = NOW()
     WHERE id = ${id}
-    RETURNING *
+    RETURNING
+      id, reference_number, name, description, status,
+      location_id, warehouse_id, category_id, project_id,
+      stock_take_type, count_method, scheduled_date,
+      start_date, end_date, approved_at, approval_notes,
+      notes, tags, created_at, updated_at
   `;
 
   return apiResponse.success(res, {

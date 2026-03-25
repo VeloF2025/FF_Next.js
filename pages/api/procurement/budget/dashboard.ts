@@ -53,7 +53,7 @@ async function handler(
 
     // Get all project budgets with summary
     const projectBudgets = await sql`
-      SELECT * FROM v_project_budgets_dashboard
+      SELECT /* TODO: specify columns */ * FROM v_project_budgets_dashboard
       ORDER BY utilization_percent DESC
     `;
 
@@ -77,7 +77,8 @@ async function handler(
     // Get recent transactions
     const recentTransactions = await sql`
       SELECT
-        bt.*,
+        bt.id, bt.project_budget_id, bt.transaction_type, bt.source_type,
+        bt.amount, bt.description, bt.reference_id, bt.created_by, bt.created_at,
         pb.project_id,
         p.project_code,
         p.project_name
@@ -91,7 +92,8 @@ async function handler(
     // Get active alerts
     const activeAlerts = await sql`
       SELECT
-        ba.*,
+        ba.id, ba.project_budget_id, ba.alert_type, ba.severity, ba.message,
+        ba.status, ba.created_at,
         pb.project_id,
         p.project_code,
         p.project_name

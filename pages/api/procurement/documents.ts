@@ -127,7 +127,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const rows = await sql`
-    SELECT * FROM procurement_documents
+    SELECT id, entity_type, entity_id, document_type, document_name,
+           file_url, file_path, file_size, mime_type, uploaded_by,
+           uploaded_by_name, uploaded_at, notes, is_active
+    FROM procurement_documents
     WHERE entity_type = ${entityType}
       AND entity_id = ${entityId}::uuid
       AND is_active = true
@@ -210,7 +213,9 @@ async function handlePost(
         ${result.url}, ${result.path}, ${file.size}, ${file.mimetype || ''},
         ${user.email}, ${user.name}, ${notes || null}
       )
-      RETURNING *
+      RETURNING id, entity_type, entity_id, document_type, document_name,
+                file_url, file_path, file_size, mime_type, uploaded_by,
+                uploaded_by_name, uploaded_at, notes, is_active
     `;
 
     log.info('Procurement document uploaded', {

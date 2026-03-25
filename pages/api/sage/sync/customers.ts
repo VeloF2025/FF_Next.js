@@ -24,7 +24,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const lastSync = await sql`
-        SELECT * FROM sage_sync_history
+        SELECT id, entity_type, status, records_processed, records_created,
+               records_updated, records_failed, error_message, created_at, completed_at
+        FROM sage_sync_history
         WHERE entity_type = 'customer'
         ORDER BY created_at DESC LIMIT 1
       `;

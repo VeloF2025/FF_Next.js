@@ -120,7 +120,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // Direct documents
   const directRows = await sql`
-    SELECT * FROM procurement_documents
+    SELECT id, entity_type, entity_id, document_type, document_name,
+           file_url, file_path, file_size, mime_type,
+           uploaded_by, uploaded_by_name, uploaded_at, notes, is_active
+    FROM procurement_documents
     WHERE entity_type = ${entityType}
       AND entity_id = ${entityId}::uuid
       AND is_active = true
@@ -129,7 +132,10 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // Cross-linked documents (via document_links)
   const linkedRows = await sql`
-    SELECT pd.*, dl.link_reason
+    SELECT pd.id, pd.entity_type, pd.entity_id, pd.document_type, pd.document_name,
+           pd.file_url, pd.file_path, pd.file_size, pd.mime_type,
+           pd.uploaded_by, pd.uploaded_by_name, pd.uploaded_at, pd.notes, pd.is_active,
+           dl.link_reason
     FROM document_links dl
     JOIN procurement_documents pd ON pd.id = dl.document_id
     WHERE dl.linked_entity_type = ${entityType}
@@ -208,7 +214,9 @@ async function handlePost(
         ${result.url}, ${result.path}, ${file.size}, ${file.mimetype || ''},
         ${user.email}, ${user.name}, ${notes || null}
       )
-      RETURNING *
+      RETURNING id, entity_type, entity_id, document_type, document_name,
+        file_url, file_path, file_size, mime_type,
+        uploaded_by, uploaded_by_name, uploaded_at, notes, is_active
     `;
 
     const docId = (row as Record<string, unknown>).id as string;

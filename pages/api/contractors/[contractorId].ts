@@ -29,7 +29,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const [contractor] = await sql`
-        SELECT * FROM contractors WHERE id = ${id}
+        SELECT id, company_name, registration_number, business_type, industry_category,
+               years_in_business, contact_person, email, phone, alternate_phone,
+               physical_address, city, province, postal_code,
+               bank_name, account_number, branch_code,
+               status, is_active, compliance_status, specializations, certifications,
+               notes, tags, created_at, updated_at
+        FROM contractors WHERE id = ${id}
       `;
 
       if (!contractor) {
@@ -81,7 +87,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tags = COALESCE(${body.tags}, tags),
           updated_at = NOW()
         WHERE id = ${id}
-        RETURNING *
+        RETURNING id, company_name, registration_number, business_type, industry_category,
+               years_in_business, contact_person, email, phone, alternate_phone,
+               physical_address, city, province, postal_code,
+               bank_name, account_number, branch_code,
+               status, is_active, compliance_status, specializations, certifications,
+               notes, tags, created_at, updated_at
       `;
 
       return res.status(200).json({ data: mapDbToContractor(updated) });

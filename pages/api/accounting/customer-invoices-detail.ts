@@ -21,7 +21,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (!id) return apiResponse.badRequest(res, 'id is required');
 
     const rows = (await sql`
-      SELECT ci.*, c.company_name AS client_name, p.project_name
+      SELECT ci.* /* TODO: specify columns */, c.company_name AS client_name, p.project_name
       FROM customer_invoices ci
       LEFT JOIN clients c ON c.id = ci.client_id
       LEFT JOIN projects p ON p.id = ci.project_id
@@ -30,7 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (rows.length === 0) return apiResponse.notFound(res, 'Invoice', id as string);
 
     const items = (await sql`
-      SELECT * FROM customer_invoice_items WHERE invoice_id = ${id as string}::UUID ORDER BY created_at
+      SELECT * /* TODO: specify columns */ FROM customer_invoice_items WHERE invoice_id = ${id as string}::UUID ORDER BY created_at
     `) as Row[];
 
     return apiResponse.success(res, { ...rows[0], items });

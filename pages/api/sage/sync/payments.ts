@@ -34,7 +34,8 @@ async function handler(
 
       // Get last sync info
       const lastSync = await sql`
-        SELECT *
+        SELECT id, entity_type, status, records_processed, records_created,
+               records_updated, records_failed, error_message, created_at, completed_at
         FROM sage_sync_history
         WHERE entity_type = 'supplier_payment'
         ORDER BY created_at DESC

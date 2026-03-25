@@ -56,7 +56,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Fetch current assignment
     const [current] = await sql`
-      SELECT * FROM contractor_projects WHERE id = ${id}
+      SELECT id, contractor_id, project_id, role, assignment_status,
+             start_date, end_date, actual_end_date, workload_percentage,
+             estimated_hours, actual_hours, performance_rating, quality_score,
+             safety_incidents, contract_value, payment_terms,
+             is_primary_contractor, is_active, notes, removal_reason,
+             assigned_by, removed_by, created_at, updated_at
+      FROM contractor_projects WHERE id = ${id}
     `;
 
     // Use provided values or keep current ones
@@ -103,7 +109,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         removal_reason = ${updatedData.removalReason},
         updated_at = NOW()
       WHERE id = ${id}
-      RETURNING *
+      RETURNING id, contractor_id, project_id, role, assignment_status,
+             start_date, end_date, actual_end_date, workload_percentage,
+             estimated_hours, actual_hours, performance_rating, quality_score,
+             safety_incidents, contract_value, payment_terms,
+             is_primary_contractor, is_active, notes, removal_reason,
+             assigned_by, removed_by, created_at, updated_at
     `;
 
     return res.status(200).json({

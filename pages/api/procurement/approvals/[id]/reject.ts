@@ -79,16 +79,18 @@ export default withAuth(withErrorHandler(async (
     completeApprovalActionItem(id as string, userId).catch(err =>
       log.error('Failed to complete rejection action item', { error: err }, 'procurement')
     );
-    createRejectionFollowUp({
-      approvalRequestId: id as string,
-      documentType: request.document_type,
-      documentNumber: request.document_number || '',
-      requestedByUserId: request.requested_by,
-      requestedByName: request.requested_by_name || 'Unknown',
-      rejectionReason: reason.trim(),
-    }).catch(err =>
-      log.error('Failed to create rejection follow-up', { error: err }, 'procurement')
-    );
+    if (request.requested_by) {
+      createRejectionFollowUp({
+        approvalRequestId: id as string,
+        documentType: request.document_type,
+        documentNumber: request.document_number || '',
+        requestedByUserId: request.requested_by,
+        requestedByName: request.requested_by_name || 'Unknown',
+        rejectionReason: reason.trim(),
+      }).catch(err =>
+        log.error('Failed to create rejection follow-up', { error: err }, 'procurement')
+      );
+    }
 
     // UNS: Notify the requester that their request was rejected
     if (request.requested_by) {

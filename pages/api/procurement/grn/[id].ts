@@ -26,7 +26,17 @@ export default withAuth(withErrorHandler(async (
       // Get GRN with related info
       const [grn] = await sql`
         SELECT
-          grn.*,
+          grn.id, grn.grn_number, grn.purchase_order_id, grn.supplier_id,
+          grn.delivery_date, grn.delivery_note_number, grn.carrier, grn.vehicle_number,
+          grn.warehouse_id, grn.receiving_bay, grn.status,
+          grn.inspection_required, grn.inspected_by, grn.inspected_at,
+          grn.inspection_status, grn.inspection_notes,
+          grn.total_items, grn.total_quantity_expected, grn.total_quantity_received,
+          grn.total_quantity_rejected,
+          grn.has_discrepancy, grn.discrepancy_notes, grn.discrepancy_resolved,
+          grn.discrepancy_resolved_by, grn.discrepancy_resolved_at,
+          grn.received_by, grn.received_by_name, grn.verified_by, grn.verified_at,
+          grn.notes, grn.created_at, grn.updated_at,
           po.po_number as purchase_order_number,
           COALESCE(s.company_name, s.name) as supplier_name,
           sl.name as warehouse_name
@@ -43,7 +53,13 @@ export default withAuth(withErrorHandler(async (
 
       // Get items
       const items = await sql`
-        SELECT * FROM goods_receipt_items
+        SELECT
+          id, grn_id, po_item_id, stock_item_id, item_code, item_description,
+          quantity_expected, quantity_received, quantity_rejected, uom,
+          serial_numbers, lot_number, batch_number, manufacture_date, expiry_date,
+          location_id, bin_location, inspection_status, rejection_reason, rejection_code,
+          unit_cost, total_cost, notes, created_at
+        FROM goods_receipt_items
         WHERE grn_id = ${id}
         ORDER BY created_at
       `;
@@ -148,7 +164,18 @@ export default withAuth(withErrorHandler(async (
           notes = COALESCE(${body.notes}, notes),
           updated_at = NOW()
         WHERE id = ${id}
-        RETURNING *
+        RETURNING
+          id, grn_number, purchase_order_id, supplier_id,
+          delivery_date, delivery_note_number, carrier, vehicle_number,
+          warehouse_id, receiving_bay, status,
+          inspection_required, inspected_by, inspected_at,
+          inspection_status, inspection_notes,
+          total_items, total_quantity_expected, total_quantity_received,
+          total_quantity_rejected,
+          has_discrepancy, discrepancy_notes, discrepancy_resolved,
+          discrepancy_resolved_by, discrepancy_resolved_at,
+          received_by, received_by_name, verified_by, verified_at,
+          notes, created_at, updated_at
       `;
 
       logUpdate('goods_receipt_note', id, body);

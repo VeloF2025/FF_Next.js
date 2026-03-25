@@ -107,7 +107,8 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
 
   // Get existing audit
   const [existing] = await sql`
-    SELECT * FROM hs_project_audits WHERE id = ${auditId}
+    SELECT id, project_id, status, overall_score, rag_status, completed_at
+    FROM hs_project_audits WHERE id = ${auditId}
   `;
 
   if (!existing) {
@@ -205,7 +206,8 @@ async function handlePut(auditId: string, req: NextApiRequest, res: NextApiRespo
       photos = COALESCE(${photos ? JSON.stringify(photos) : null}::jsonb, photos),
       completed_at = ${finalStatus === 'completed' || finalStatus === 'requires_action' ? new Date().toISOString() : existing.completed_at}
     WHERE id = ${auditId}
-    RETURNING *
+    RETURNING id, project_id, auditor_id, audit_date, status, overall_score,
+              rag_status, notes, photos, completed_at, created_at, updated_at
   `;
 
   // Update next audit due date in project config

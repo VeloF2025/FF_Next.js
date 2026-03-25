@@ -40,7 +40,8 @@ export default withAuth(withErrorHandler(async (
     // Fetch the requisition
     const requisitions = await sql`
       SELECT
-        pr.*,
+        pr.id, pr.requisition_number, pr.project_id, pr.cost_center_id,
+        pr.status, pr.currency, pr.notes,
         p.project_name as project_name
       FROM purchase_requisitions pr
       LEFT JOIN projects p ON pr.project_id = p.id
@@ -89,7 +90,11 @@ export default withAuth(withErrorHandler(async (
     if (body.itemIds && body.itemIds.length > 0) {
       // Convert itemIds to proper query
       itemsQuery = await sql`
-        SELECT * FROM purchase_requisition_items
+        SELECT
+          id, requisition_id, stock_item_id, boq_item_id, item_code,
+          item_description, quantity, uom, estimated_unit_price,
+          converted_to_po, po_id, created_at
+        FROM purchase_requisition_items
         WHERE requisition_id = ${id}
         AND id = ANY(${body.itemIds}::uuid[])
         AND converted_to_po = false
@@ -97,7 +102,11 @@ export default withAuth(withErrorHandler(async (
       `;
     } else {
       itemsQuery = await sql`
-        SELECT * FROM purchase_requisition_items
+        SELECT
+          id, requisition_id, stock_item_id, boq_item_id, item_code,
+          item_description, quantity, uom, estimated_unit_price,
+          converted_to_po, po_id, created_at
+        FROM purchase_requisition_items
         WHERE requisition_id = ${id}
         AND converted_to_po = false
         ORDER BY created_at
@@ -172,7 +181,7 @@ export default withAuth(withErrorHandler(async (
         ${user?.name || userId || 'system'},
         ${id}
       )
-      RETURNING *
+      RETURNING id, po_number, status, supplier_id
     `;
 
     const newPO = poResult[0]!;

@@ -22,7 +22,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       case 'GET': {
         // Fetch fibre data from the database
         const fibreData = await sql`
-          SELECT * FROM fibre_segments
+          SELECT id, project_id, segment_id, from_pole, to_pole, cable_type,
+                 cable_size, length_m, route_type, installation_method, status,
+                 zone_no, raw_data, created_at, updated_at
+          FROM fibre_segments
           WHERE project_id = ${projectId}
           ORDER BY segment_id, zone_no
         `;

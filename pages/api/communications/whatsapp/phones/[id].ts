@@ -55,7 +55,7 @@ async function handleGet(
 ) {
   try {
     const result = await pool.query(
-      'SELECT * FROM wa_phone_numbers WHERE id = $1',
+      'SELECT id, service, phone_number, display_name, role, status, created_at, updated_at FROM wa_phone_numbers WHERE id = $1',
       [phoneId]
     );
 
@@ -86,7 +86,7 @@ async function handlePut(
   try {
     // Get current phone
     const current = await pool.query(
-      'SELECT * FROM wa_phone_numbers WHERE id = $1',
+      'SELECT id, service, phone_number, display_name, role, status, created_at, updated_at FROM wa_phone_numbers WHERE id = $1',
       [phoneId]
     );
 
@@ -117,7 +117,7 @@ async function handlePut(
            status = COALESCE($3, status),
            updated_at = NOW()
        WHERE id = $4
-       RETURNING *`,
+       RETURNING id, service, phone_number, display_name, role, status, created_at, updated_at`,
       [display_name, role, status, phoneId]
     );
 
@@ -163,7 +163,7 @@ async function handleDelete(
   try {
     // Get phone before deletion
     const current = await pool.query(
-      'SELECT * FROM wa_phone_numbers WHERE id = $1',
+      'SELECT id, service, phone_number, display_name, role, status, created_at, updated_at FROM wa_phone_numbers WHERE id = $1',
       [phoneId]
     );
 

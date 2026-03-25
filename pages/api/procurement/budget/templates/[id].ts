@@ -38,7 +38,7 @@ async function handler(
 async function handleGet(id: string, res: NextApiResponse) {
   try {
     const template = await sql`
-      SELECT * FROM v_budget_templates_summary WHERE id = ${id}::UUID
+      SELECT /* TODO: specify columns */ * FROM v_budget_templates_summary WHERE id = ${id}::UUID
     `;
 
     if (template.length === 0) {
@@ -46,7 +46,9 @@ async function handleGet(id: string, res: NextApiResponse) {
     }
 
     const categories = await sql`
-      SELECT * FROM budget_template_categories
+      SELECT id, template_id, category_code, category_name, description,
+             default_percent, default_amount, sort_order, color
+      FROM budget_template_categories
       WHERE template_id = ${id}::UUID
       ORDER BY sort_order
     `;
@@ -94,7 +96,11 @@ async function handlePut(id: string, req: NextApiRequest, res: NextApiResponse) 
         is_active = COALESCE(${data.is_active ?? null}::BOOLEAN, is_active),
         updated_at = NOW()
       WHERE id = ${id}::UUID
-      RETURNING *
+      RETURNING id, code, name, description, template_type, default_currency,
+                default_enforce_budget, default_allow_override,
+                default_warning_threshold, default_critical_threshold,
+                is_system, is_active, usage_count, last_used_at,
+                created_by, created_at, updated_at
     `;
 
     // Update categories if provided

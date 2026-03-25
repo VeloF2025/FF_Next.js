@@ -49,7 +49,12 @@ async function handleGet(
   vehicleId: string
 ) {
   const rows = await sql`
-    SELECT *
+    SELECT id, vehicle_id, finance_company, finance_type, account_number,
+           vehicle_price, deposit_paid, finance_amount, interest_rate, term_months,
+           monthly_payment, balloon_payment, start_date, end_date, first_payment_date,
+           remaining_balance, payments_made, next_payment_date,
+           contact_name, contact_phone, contact_email, branch,
+           settlement_amount, settlement_valid_until, notes, created_at, updated_at
     FROM fleet_vehicle_finance
     WHERE vehicle_id = ${vehicleId}
   ` as VehicleFinanceRow[];
@@ -121,7 +126,12 @@ async function handlePut(
         notes = ${body.notes || null},
         updated_at = NOW()
       WHERE vehicle_id = ${vehicleId}
-      RETURNING *
+      RETURNING id, vehicle_id, finance_company, finance_type, account_number,
+               vehicle_price, deposit_paid, finance_amount, interest_rate, term_months,
+               monthly_payment, balloon_payment, start_date, end_date, first_payment_date,
+               remaining_balance, payments_made, next_payment_date,
+               contact_name, contact_phone, contact_email, branch,
+               settlement_amount, settlement_valid_until, notes, created_at, updated_at
     ` as VehicleFinanceRow[];
   } else {
     // Create new
@@ -177,7 +187,12 @@ async function handlePut(
         ${body.settlementValidUntil || null},
         ${body.notes || null}
       )
-      RETURNING *
+      RETURNING id, vehicle_id, finance_company, finance_type, account_number,
+               vehicle_price, deposit_paid, finance_amount, interest_rate, term_months,
+               monthly_payment, balloon_payment, start_date, end_date, first_payment_date,
+               remaining_balance, payments_made, next_payment_date,
+               contact_name, contact_phone, contact_email, branch,
+               settlement_amount, settlement_valid_until, notes, created_at, updated_at
     ` as VehicleFinanceRow[];
   }
 

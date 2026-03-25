@@ -56,7 +56,10 @@ async function handleGet(
   if (type && typeof type === 'string' && active !== undefined) {
     const isActive = active === 'true';
     rows = await sql`
-      SELECT * FROM fleet_vehicle_documents
+      SELECT id, vehicle_id, document_type, document_name, description,
+             file_url, file_size, mime_type, issue_date, expiry_date,
+             reference_number, notes, uploaded_by, is_active, created_at, updated_at
+      FROM fleet_vehicle_documents
       WHERE vehicle_id = ${vehicleId}
         AND document_type = ${type}
         AND is_active = ${isActive}
@@ -64,7 +67,10 @@ async function handleGet(
     ` as VehicleDocumentRow[];
   } else if (type && typeof type === 'string') {
     rows = await sql`
-      SELECT * FROM fleet_vehicle_documents
+      SELECT id, vehicle_id, document_type, document_name, description,
+             file_url, file_size, mime_type, issue_date, expiry_date,
+             reference_number, notes, uploaded_by, is_active, created_at, updated_at
+      FROM fleet_vehicle_documents
       WHERE vehicle_id = ${vehicleId}
         AND document_type = ${type}
       ORDER BY created_at DESC
@@ -72,14 +78,20 @@ async function handleGet(
   } else if (active !== undefined) {
     const isActive = active === 'true';
     rows = await sql`
-      SELECT * FROM fleet_vehicle_documents
+      SELECT id, vehicle_id, document_type, document_name, description,
+             file_url, file_size, mime_type, issue_date, expiry_date,
+             reference_number, notes, uploaded_by, is_active, created_at, updated_at
+      FROM fleet_vehicle_documents
       WHERE vehicle_id = ${vehicleId}
         AND is_active = ${isActive}
       ORDER BY created_at DESC
     ` as VehicleDocumentRow[];
   } else {
     rows = await sql`
-      SELECT * FROM fleet_vehicle_documents
+      SELECT id, vehicle_id, document_type, document_name, description,
+             file_url, file_size, mime_type, issue_date, expiry_date,
+             reference_number, notes, uploaded_by, is_active, created_at, updated_at
+      FROM fleet_vehicle_documents
       WHERE vehicle_id = ${vehicleId}
       ORDER BY created_at DESC
     ` as VehicleDocumentRow[];
@@ -136,7 +148,9 @@ async function handlePost(
       ${body.referenceNumber || null},
       ${body.notes || null}
     )
-    RETURNING *
+    RETURNING id, vehicle_id, document_type, document_name, description,
+             file_url, file_size, mime_type, issue_date, expiry_date,
+             reference_number, notes, uploaded_by, is_active, created_at, updated_at
   ` as VehicleDocumentRow[];
 
   if (!rows[0]) {

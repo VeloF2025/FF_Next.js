@@ -176,13 +176,19 @@ async function handleGet(
     let vehicleRows: VehiclePhotoRow[];
     if (type && typeof type === 'string') {
       vehicleRows = await sql`
-        SELECT * FROM fleet_vehicle_photos
+        SELECT id, vehicle_id, photo_type, file_url, file_key, file_size, mime_type,
+               check_record_id, fuel_transaction_id, vlm_processed, vlm_result,
+               vlm_confidence, captured_at, captured_by, notes, created_at
+        FROM fleet_vehicle_photos
         WHERE vehicle_id = ${vehicleId} AND photo_type = ${type}
         ORDER BY captured_at DESC, created_at DESC
       ` as VehiclePhotoRow[];
     } else {
       vehicleRows = await sql`
-        SELECT * FROM fleet_vehicle_photos
+        SELECT id, vehicle_id, photo_type, file_url, file_key, file_size, mime_type,
+               check_record_id, fuel_transaction_id, vlm_processed, vlm_result,
+               vlm_confidence, captured_at, captured_by, notes, created_at
+        FROM fleet_vehicle_photos
         WHERE vehicle_id = ${vehicleId}
         ORDER BY captured_at DESC, created_at DESC
       ` as VehiclePhotoRow[];
@@ -220,7 +226,10 @@ async function handleGet(
     let checkRows: CheckPhotoRow[];
     if (type && typeof type === 'string') {
       checkRows = await sql`
-        SELECT p.*, r.check_date, r.check_time, r.driver_name
+        SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
+               p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
+               p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
+               p.vlm_confidence, r.check_date, r.check_time, r.driver_name
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId} AND p.photo_type = ${type}
@@ -228,7 +237,10 @@ async function handleGet(
       ` as CheckPhotoRow[];
     } else {
       checkRows = await sql`
-        SELECT p.*, r.check_date, r.check_time, r.driver_name
+        SELECT p.id, p.record_id, p.response_id, p.photo_type, p.is_required,
+               p.file_url, p.file_path, p.file_size, p.latitude, p.longitude,
+               p.storage_service_url, p.captured_at, p.vlm_processed, p.vlm_result,
+               p.vlm_confidence, r.check_date, r.check_time, r.driver_name
         FROM fleet_check_photos p
         JOIN fleet_check_records r ON r.id = p.record_id
         WHERE r.vehicle_id = ${vehicleId}
@@ -364,7 +376,9 @@ async function handlePost(
       ${body.capturedBy || null},
       ${body.notes || null}
     )
-    RETURNING *
+    RETURNING id, vehicle_id, photo_type, file_url, file_key, file_size, mime_type,
+              check_record_id, fuel_transaction_id, vlm_processed, vlm_result,
+              vlm_confidence, captured_at, captured_by, notes, created_at
   ` as VehiclePhotoRow[];
 
   if (!rows[0]) {

@@ -24,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
       // Check if contractor exists
-      const [contractor] = await sql`SELECT * FROM contractors WHERE id = ${contractorId}`;
+      const [contractor] = await sql`SELECT id FROM contractors WHERE id = ${contractorId}`;
       if (!contractor) {
         return apiResponse.notFound(res, 'Contractor', contractorId);
       }
@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await contractorOnboardingService.completeOnboarding(contractorId);
 
       // Get updated contractor
-      const [updatedContractor] = await sql`SELECT * FROM contractors WHERE id = ${contractorId}`;
+      const [updatedContractor] = await sql`SELECT * /* TODO: specify columns */ FROM contractors WHERE id = ${contractorId}`;
 
       return apiResponse.success(
         res,

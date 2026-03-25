@@ -51,7 +51,10 @@ export default withAuth(withErrorHandler(async (
 
       // Get categories
       const categories = await sql`
-        SELECT *
+        SELECT
+          id, project_budget_id, category_code, category_name,
+          allocated_amount, committed_amount, actual_amount, available_amount,
+          is_custom, sort_order, created_at, updated_at
         FROM budget_categories
         WHERE project_budget_id = ${budgetId}
         ORDER BY sort_order ASC
@@ -143,7 +146,10 @@ export default withAuth(withErrorHandler(async (
           ${newSortOrder},
           ${userId || 'system'}
         )
-        RETURNING *
+        RETURNING
+          id, project_budget_id, category_code, category_name,
+          allocated_amount, committed_amount, actual_amount, available_amount,
+          is_custom, sort_order, created_by, created_at, updated_at
       `;
 
       const created = result[0];
@@ -187,7 +193,7 @@ export default withAuth(withErrorHandler(async (
 
       // Get category
       const categories = await sql`
-        SELECT bc.*, pb.project_id
+        SELECT bc.id, bc.is_custom, pb.project_id
         FROM budget_categories bc
         JOIN project_budgets pb ON pb.id = bc.project_budget_id
         WHERE bc.id = ${categoryId} AND pb.project_id = ${projectId}
@@ -205,7 +211,10 @@ export default withAuth(withErrorHandler(async (
           category_name = COALESCE(${categoryName || null}, category_name),
           updated_at = NOW()
         WHERE id = ${categoryId}
-        RETURNING *
+        RETURNING
+          id, project_budget_id, category_code, category_name,
+          allocated_amount, committed_amount, actual_amount, available_amount,
+          is_custom, sort_order, created_by, created_at, updated_at
       `;
 
       const updated = result[0];
@@ -236,7 +245,7 @@ export default withAuth(withErrorHandler(async (
 
       // Get category
       const categories = await sql`
-        SELECT bc.*, pb.project_id
+        SELECT bc.id, bc.is_custom, pb.project_id
         FROM budget_categories bc
         JOIN project_budgets pb ON pb.id = bc.project_budget_id
         WHERE bc.id = ${categoryId} AND pb.project_id = ${projectId}

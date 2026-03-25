@@ -29,25 +29,65 @@ async function handleList(req: NextApiRequest, res: NextApiResponse) {
 
     if (isBlocked === 'true' && hasUnaccounted === 'true') {
       result = await sql`
-        SELECT * FROM contractor_stock_accountability
+        SELECT
+          id, contractor_id, contractor_name,
+          total_issued_count, total_issued_value,
+          total_consumed_count, total_consumed_value,
+          total_returned_count, total_returned_value,
+          unaccounted_count, unaccounted_value,
+          pending_recovery_amount, recovered_amount,
+          is_blocked, blocked_reason, blocked_at, blocked_by,
+          last_reconciliation_date, last_reconciliation_by,
+          created_at, updated_at
+        FROM contractor_stock_accountability
         WHERE is_blocked = true AND unaccounted_count > 0
         ORDER BY unaccounted_value DESC
       `;
     } else if (isBlocked === 'true') {
       result = await sql`
-        SELECT * FROM contractor_stock_accountability
+        SELECT
+          id, contractor_id, contractor_name,
+          total_issued_count, total_issued_value,
+          total_consumed_count, total_consumed_value,
+          total_returned_count, total_returned_value,
+          unaccounted_count, unaccounted_value,
+          pending_recovery_amount, recovered_amount,
+          is_blocked, blocked_reason, blocked_at, blocked_by,
+          last_reconciliation_date, last_reconciliation_by,
+          created_at, updated_at
+        FROM contractor_stock_accountability
         WHERE is_blocked = true
         ORDER BY blocked_at DESC
       `;
     } else if (hasUnaccounted === 'true') {
       result = await sql`
-        SELECT * FROM contractor_stock_accountability
+        SELECT
+          id, contractor_id, contractor_name,
+          total_issued_count, total_issued_value,
+          total_consumed_count, total_consumed_value,
+          total_returned_count, total_returned_value,
+          unaccounted_count, unaccounted_value,
+          pending_recovery_amount, recovered_amount,
+          is_blocked, blocked_reason, blocked_at, blocked_by,
+          last_reconciliation_date, last_reconciliation_by,
+          created_at, updated_at
+        FROM contractor_stock_accountability
         WHERE unaccounted_count > 0
         ORDER BY unaccounted_value DESC
       `;
     } else {
       result = await sql`
-        SELECT * FROM contractor_stock_accountability
+        SELECT
+          id, contractor_id, contractor_name,
+          total_issued_count, total_issued_value,
+          total_consumed_count, total_consumed_value,
+          total_returned_count, total_returned_value,
+          unaccounted_count, unaccounted_value,
+          pending_recovery_amount, recovered_amount,
+          is_blocked, blocked_reason, blocked_at, blocked_by,
+          last_reconciliation_date, last_reconciliation_by,
+          created_at, updated_at
+        FROM contractor_stock_accountability
         ORDER BY contractor_name ASC
       `;
     }
@@ -104,7 +144,14 @@ async function handleCreate(req: NextApiRequest, res: NextApiResponse) {
         ${contractorName},
         0, 0, 0, 0, 0, 0, 0, 0, false, 0, 0
       )
-      RETURNING *
+      RETURNING
+        id, contractor_id, contractor_name,
+        total_issued_count, total_issued_value,
+        total_consumed_count, total_consumed_value,
+        total_returned_count, total_returned_value,
+        unaccounted_count, unaccounted_value,
+        is_blocked, pending_recovery_amount, recovered_amount,
+        created_at, updated_at
     `;
 
     log.info('Accountability record created', { contractorId, contractorName }, 'field-stock');

@@ -32,9 +32,19 @@ async function handler(
 
     // Get SOW data from main tables
     const [polesResult, dropsResult, fibreResult] = await Promise.all([
-      sql`SELECT * FROM poles WHERE project_id = ${projectId} ORDER BY pole_id LIMIT 1000`,
-      sql`SELECT * FROM drops WHERE project_id = ${projectId} ORDER BY drop_id LIMIT 1000`,
-      sql`SELECT * FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
+      sql`SELECT id, project_id, pole_number, pole_id, latitude, longitude, status,
+                 type, pole_type, pole_spec, height, diameter, material, owner,
+                 pon_no, zone_no, address, municipality, raw_data, created_at, updated_at
+          FROM poles WHERE project_id = ${projectId} ORDER BY pole_id LIMIT 1000`,
+      sql`SELECT id, project_id, drop_number, drop_id, pole_number, cable_type, cable_spec,
+                 cable_length, cable_capacity, start_point, end_point, latitude, longitude,
+                 address, pon_no, zone_no, municipality, status, qc_status, customer_name,
+                 raw_data, created_at, updated_at
+          FROM drops WHERE project_id = ${projectId} ORDER BY drop_id LIMIT 1000`,
+      sql`SELECT id, project_id, segment_id, from_pole, to_pole, cable_type,
+                 cable_size, length_m, route_type, installation_method, status,
+                 raw_data, created_at, updated_at
+          FROM fibre_segments WHERE project_id = ${projectId} ORDER BY segment_id LIMIT 1000`
     ]);
 
     // Get counts

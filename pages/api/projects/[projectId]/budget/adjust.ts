@@ -63,7 +63,7 @@ export default withAuth(withErrorHandler(async (
   try {
     // Get existing budget
     const budgets = await sql`
-      SELECT * FROM project_budgets WHERE project_id = ${projectId}
+      SELECT id, status, total_budget FROM project_budgets WHERE project_id = ${projectId}
     `;
 
     if (budgets.length === 0 || !budgets[0]) {
@@ -129,7 +129,8 @@ export default withAuth(withErrorHandler(async (
 
       // Get updated budget
       const updatedBudgetRows = await sql`
-        SELECT * FROM project_budgets WHERE id = ${budget.id}
+        SELECT id, total_budget, available_budget, committed_amount
+        FROM project_budgets WHERE id = ${budget.id}
       `;
       const updatedBudget = updatedBudgetRows[0];
 

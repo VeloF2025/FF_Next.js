@@ -36,7 +36,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
   // Use the summary view for list with calculated prices
   let query = `
-    SELECT * FROM v_stock_bundles_summary
+    SELECT /* TODO: specify columns */ * FROM v_stock_bundles_summary
     WHERE 1=1
   `;
 
@@ -130,7 +130,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
       ${data.notes || null},
       ${data.tags || null}
     )
-    RETURNING *
+    RETURNING id, bundle_code, name, description, category_id, bundle_type,
+              price_type, fixed_price, markup_percentage, is_active, is_default,
+              allow_substitution, notes, tags, usage_count, created_at, updated_at
   `;
 
   return apiResponse.created(res, result[0]);

@@ -25,7 +25,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
       const [item] = await sql`
-        SELECT * FROM stock_items WHERE id = ${itemId}
+        SELECT id, item_code, name, description, category, tracking_type, uom,
+               standard_cost, list_price, currency, min_stock_level, max_stock_level,
+               reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+               sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+               odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+        FROM stock_items WHERE id = ${itemId}
       `;
 
       if (!item) {
@@ -35,7 +40,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       // Get supplier codes for this item
       const supplierCodes = await sql`
         SELECT
-          sic.*,
+          sic.id, sic.stock_item_id, sic.supplier_id, sic.supplier_item_code,
+          sic.supplier_item_name, sic.supplier_price, sic.supplier_currency,
+          sic.price_valid_from, sic.price_valid_to, sic.lead_time_days,
+          sic.min_order_qty, sic.is_preferred, sic.is_active,
           s.name as supplier_name
         FROM supplier_item_codes sic
         JOIN suppliers s ON s.id = sic.supplier_id
@@ -101,7 +109,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           qty_on_order = COALESCE(${body.qtyOnOrder}, qty_on_order),
           updated_at = NOW()
         WHERE id = ${itemId}
-        RETURNING *
+        RETURNING id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
       `;
 
       return res.status(200).json({ data: mapDbToStockItem(updated) });

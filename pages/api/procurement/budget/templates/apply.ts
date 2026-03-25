@@ -57,7 +57,10 @@ async function handler(
 
     // Check if template exists
     const template = await sql`
-      SELECT * FROM budget_templates WHERE id = ${data.template_id}::UUID AND is_active = true
+      SELECT id, code, name, description, template_type, default_currency,
+             default_enforce_budget, default_allow_override, default_warning_threshold,
+             default_critical_threshold, is_active
+      FROM budget_templates WHERE id = ${data.template_id}::UUID AND is_active = true
     `;
 
     if (template.length === 0) {
@@ -66,7 +69,9 @@ async function handler(
 
     // Get template categories
     const templateCategories = await sql`
-      SELECT * FROM budget_template_categories
+      SELECT id, template_id, category_code, category_name, description,
+             default_percent, default_amount, sort_order, color
+      FROM budget_template_categories
       WHERE template_id = ${data.template_id}::UUID
       ORDER BY sort_order
     `;
@@ -99,7 +104,10 @@ async function handler(
         'draft',
         ${data.created_by || null}
       )
-      RETURNING *
+      RETURNING id, project_id, source_type, total_budget, available_budget,
+                committed_amount, actual_amount, currency, enforce_budget,
+                allow_override, alert_threshold_warning, alert_threshold_critical,
+                status, created_by, created_at
     `;
 
     const budgetRow = budget[0]!;
@@ -128,7 +136,9 @@ async function handler(
           ${allocatedAmount},
           ${cat.sort_order}
         )
-        RETURNING *
+        RETURNING id, project_budget_id, category_code, category_name,
+                  allocated_amount, committed_amount, actual_amount,
+                  available_amount, sort_order
       `;
 
       createdCategories.push(category[0]);

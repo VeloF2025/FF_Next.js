@@ -28,7 +28,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get the extraction
     const extractions = await sql`
-      SELECT * FROM quote_extractions WHERE id = ${extractionId}
+      SELECT
+        id, rfq_id, project_id, status,
+        extracted_supplier_name, extracted_supplier_email, extracted_supplier_phone,
+        extracted_supplier_vat, extracted_quote_number, extracted_quote_date,
+        extracted_valid_until, extracted_total, extracted_subtotal,
+        extracted_vat_amount, extracted_currency, extracted_payment_terms,
+        extracted_delivery_terms
+      FROM quote_extractions WHERE id = ${extractionId}
     `;
 
     if (extractions.length === 0) {

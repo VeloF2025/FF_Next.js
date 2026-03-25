@@ -76,14 +76,14 @@ async function handleGetHistory(req: NextApiRequest, res: NextApiResponse) {
     let rows;
     if (workspaceId) {
       rows = await sql`
-        SELECT * FROM exfo_sync_history
+        SELECT * /* TODO: specify columns */ FROM exfo_sync_history
         WHERE workspace_id = ${workspaceId}
         ORDER BY started_at DESC
         LIMIT ${limit}
       `;
     } else {
       rows = await sql`
-        SELECT * FROM exfo_sync_history
+        SELECT * /* TODO: specify columns */ FROM exfo_sync_history
         ORDER BY started_at DESC
         LIMIT ${limit}
       `;

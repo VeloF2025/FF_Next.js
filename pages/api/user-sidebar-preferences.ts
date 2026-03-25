@@ -38,7 +38,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
       // Get user preferences (return defaults if doesn't exist)
       const preferences = await sql`
-        SELECT * FROM user_sidebar_preferences
+        SELECT user_id, main_section_items, created_at, updated_at
+        FROM user_sidebar_preferences
         WHERE user_id = ${userId}
       `;
 
@@ -98,7 +99,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         DO UPDATE SET
           main_section_items = ${uniqueItems},
           updated_at = NOW()
-        RETURNING *
+        RETURNING user_id, main_section_items, created_at, updated_at
       `;
 
       return res.status(200).json({

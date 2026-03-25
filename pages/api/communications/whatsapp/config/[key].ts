@@ -106,7 +106,7 @@ async function handlePut(
 
   // Get existing config first
   const existing = await pool.query(
-    'SELECT * FROM wa_service_config WHERE config_key = $1',
+    'SELECT id, config_key, config_value, config_type, category, description, is_sensitive, updated_at, updated_by FROM wa_service_config WHERE config_key = $1',
     [key]
   );
 

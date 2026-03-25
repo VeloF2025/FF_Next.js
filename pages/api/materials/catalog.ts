@@ -107,7 +107,9 @@ async function handleGet(
 
     // Get materials
     const dataQuery = `
-      SELECT *
+      SELECT id, item_code, description, category, budget_category, uom,
+             standard_rate, keywords, normalized_description, status,
+             created_by, created_at, updated_at
       FROM material_catalog
       ${whereClause}
       ORDER BY ${sortColumn} ${sortDir}
@@ -190,7 +192,9 @@ async function handlePost(
         'active',
         ${'system'}
       )
-      RETURNING *
+      RETURNING id, item_code, description, category, budget_category, uom,
+                standard_rate, keywords, normalized_description, status,
+                created_by, created_at, updated_at
     `;
 
     const material = mapRowToMaterial(result[0]);

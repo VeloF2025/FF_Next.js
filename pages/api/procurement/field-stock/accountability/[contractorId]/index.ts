@@ -25,7 +25,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     // Get accountability record
     const accountabilityResult = await sql`
-      SELECT * FROM contractor_stock_accountability
+      SELECT /* TODO: specify columns */ * FROM contractor_stock_accountability
       WHERE contractor_id = ${contractorId}
     `;
 
@@ -58,7 +58,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Get unaccounted serials (issued but not consumed/returned)
     const unaccountedSerialsResult = await sql`
       SELECT
-        ss.*,
+        ss.id, ss.stock_item_id, ss.serial_number, ss.status,
+        ss.current_location_id, ss.updated_at,
         si.name as item_name,
         si.item_code,
         sl.name as location_name,
@@ -78,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Get recent activity history
     const historyResult = await sql`
-      SELECT * FROM stock_accountability_history
+      SELECT /* TODO: specify columns */ * FROM stock_accountability_history
       WHERE contractor_id = ${contractorId}
       ORDER BY performed_at DESC
       LIMIT 20
@@ -87,7 +88,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Get pending returns
     const pendingReturnsResult = await sql`
       SELECT
-        r.*,
+        r.id, r.status, r.return_date, r.contractor_id, r.notes, r.created_at,
         (
           SELECT COUNT(*) FROM stock_return_lines rl WHERE rl.return_id = r.id
         ) as line_count

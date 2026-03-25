@@ -49,7 +49,7 @@ async function handler(
 
 async function handleGet(bundleId: string, res: NextApiResponse) {
   const items = await sql`
-    SELECT * FROM v_stock_bundle_items_detail
+    SELECT /* TODO: specify columns */ * FROM v_stock_bundle_items_detail
     WHERE bundle_id = ${bundleId}
     ORDER BY sort_order, item_name
   `;
@@ -115,7 +115,9 @@ async function handlePost(bundleId: string, data: StockBundleItemFormData, res: 
       ${data.sort_order ?? maxSort[0]!.next_sort},
       ${data.notes || null}
     )
-    RETURNING *
+    RETURNING id, bundle_id, stock_item_id, quantity, uom, price_override,
+              discount_percentage, is_optional, is_configurable, min_quantity,
+              max_quantity, substitute_group, sort_order, notes, created_at, updated_at
   `;
 
   return apiResponse.created(res, result[0]);

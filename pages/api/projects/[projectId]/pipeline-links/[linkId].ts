@@ -43,7 +43,8 @@ async function handleGet(res: NextApiResponse, projectId: string, linkId: string
   try {
     const link = await sql`
       SELECT
-        ppl.*,
+        ppl.id, ppl.project_id, ppl.pipeline_project_id, ppl.is_primary,
+        ppl.notes, ppl.link_order, ppl.linked_at, ppl.updated_at,
         pp.project_name as pipeline_project_name,
         pp.pipeline_status,
         pp.area as pipeline_area,
@@ -100,7 +101,7 @@ async function handlePatch(
 
     // Verify link exists
     const existingLink = await sql`
-      SELECT * FROM project_pipeline_links
+      SELECT id, pipeline_project_id, is_primary FROM project_pipeline_links
       WHERE id = ${linkId} AND project_id = ${projectId}
     `;
 
@@ -139,7 +140,8 @@ async function handlePatch(
     // Fetch with joined details
     const link = await sql`
       SELECT
-        ppl.*,
+        ppl.id, ppl.project_id, ppl.pipeline_project_id, ppl.is_primary,
+        ppl.notes, ppl.link_order, ppl.linked_at, ppl.updated_at,
         pp.project_name as pipeline_project_name,
         pp.pipeline_status,
         pp.area as pipeline_area,
@@ -175,7 +177,7 @@ async function handleDelete(
   try {
     // Verify link exists and get its details
     const existingLink = await sql`
-      SELECT * FROM project_pipeline_links
+      SELECT id, is_primary, pipeline_project_id FROM project_pipeline_links
       WHERE id = ${linkId} AND project_id = ${projectId}
     `;
 

@@ -37,7 +37,11 @@ export default withAuth(withErrorHandler(async (
 async function handleGet(res: NextApiResponse, faultId: string) {
   try {
     const rows = await sql`
-      SELECT fr.*,
+      SELECT fr.id, fr.project_id, fr.serial_id, fr.stock_item_id, fr.fault_type,
+             fr.severity, fr.resolution_status, fr.description, fr.evidence_urls,
+             fr.reported_by, fr.reported_by_name, fr.reported_at, fr.supplier_id,
+             fr.location_id, fr.resolved_by, fr.resolved_at, fr.resolution_notes,
+             fr.created_at, fr.updated_at,
              si.item_code, si.description AS item_name,
              ss.serial_number, ss.status AS serial_status,
              COALESCE(s.company_name, s.name) AS supplier_name,
@@ -104,7 +108,7 @@ async function handlePut(
 
     // Fetch current state
     const current = await sql`
-      SELECT * FROM fault_reports WHERE id = ${faultId}::uuid
+      SELECT id, resolution_status, serial_id FROM fault_reports WHERE id = ${faultId}::uuid
     `;
     if (current.length === 0) {
       return apiResponse.notFound(res, 'Fault report', faultId);
@@ -129,7 +133,10 @@ async function handlePut(
           resolved_at        = CASE WHEN ${isResolving} THEN NOW() ELSE resolved_at END,
           updated_at         = NOW()
       WHERE id = ${faultId}::uuid
-      RETURNING *
+      RETURNING id, project_id, serial_id, stock_item_id, fault_type, severity,
+                resolution_status, description, evidence_urls, reported_by,
+                reported_by_name, reported_at, supplier_id, location_id,
+                resolved_by, resolved_at, resolution_notes, created_at, updated_at
     `;
 
     // If resolved/scrapped and serial exists, update serial status accordingly

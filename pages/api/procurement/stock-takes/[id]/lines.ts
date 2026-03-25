@@ -46,6 +46,7 @@ async function handler(
 async function handleGet(stockTakeId: string, req: NextApiRequest, res: NextApiResponse) {
   const { status, has_variance } = req.query;
 
+  /* TODO: specify columns — v_stock_take_lines_detail is a view, result returned directly */
   let query = `SELECT * FROM v_stock_take_lines_detail WHERE stock_take_id = $1`;
   const params: string[] = [stockTakeId];
   let paramIndex = 2;

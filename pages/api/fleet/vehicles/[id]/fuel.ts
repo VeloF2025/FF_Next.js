@@ -61,7 +61,9 @@ async function handleGet(
   // If latest=true, only return the most recent reading
   if (latest === 'true') {
     const rows = await sql`
-      SELECT * FROM fleet_fuel_history
+      SELECT id, vehicle_id, check_record_id, fuel_level, source, vlm_confidence,
+             previous_level, level_change, recorded_at, created_at
+      FROM fleet_fuel_history
       WHERE vehicle_id = ${vehicleId}
       ORDER BY recorded_at DESC
       LIMIT 1
@@ -156,7 +158,8 @@ async function handlePost(
       ${levelChange},
       NOW()
     )
-    RETURNING *
+    RETURNING id, vehicle_id, check_record_id, fuel_level, source, vlm_confidence,
+             previous_level, level_change, recorded_at, created_at
   ` as FleetFuelHistoryRow[];
 
   if (!rows[0]) {

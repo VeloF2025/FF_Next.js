@@ -246,13 +246,15 @@ export default withAuth(withErrorHandler(async (
 
       // Get updated budget
       const updatedBudgetResult = await sql`
-        SELECT * FROM project_budgets WHERE id = ${budgetId}
+        SELECT id, total_budget, source_type, boq_id
+        FROM project_budgets WHERE id = ${budgetId}
       `;
       const updatedBudget = updatedBudgetResult[0];
 
       // Get updated categories
       const categories = await sql`
-        SELECT * FROM budget_categories
+        SELECT category_code, category_name, allocated_amount
+        FROM budget_categories
         WHERE project_budget_id = ${budgetId}
         ORDER BY sort_order ASC
       `;

@@ -16,7 +16,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method === 'GET') {
       // Get user preferences (create default if doesn't exist)
       let preferences = await sql`
-        SELECT * FROM reminder_preferences
+        SELECT id, user_id, email, enabled, send_time, timezone, created_at, updated_at
+        FROM reminder_preferences
         WHERE user_id = ${userId}
       `;
 
@@ -25,7 +26,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         preferences = await sql`
           INSERT INTO reminder_preferences (user_id, email)
           VALUES (${userId}, ${email})
-          RETURNING *
+          RETURNING id, user_id, email, enabled, send_time, timezone, created_at, updated_at
         `;
       } else if (!preferences[0].email && email) {
         // Update existing preference with email if missing
@@ -33,7 +34,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           UPDATE reminder_preferences
           SET email = ${email}, updated_at = NOW()
           WHERE user_id = ${userId}
-          RETURNING *
+          RETURNING id, user_id, email, enabled, send_time, timezone, created_at, updated_at
         `;
       }
 
@@ -78,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         VALUES ($1)
         ON CONFLICT (user_id)
         DO UPDATE SET ${updates.join(', ')}
-        RETURNING *
+        RETURNING id, user_id, email, enabled, send_time, timezone, created_at, updated_at
       `;
 
       const result = await sql(query, params);

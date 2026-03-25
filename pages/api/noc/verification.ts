@@ -35,7 +35,10 @@ async function initializeVerificationSteps(
 ): Promise<VerificationStep[]> {
   // Check if steps already exist
   const existing = await sql`
-    SELECT * FROM maintenance_verification_steps
+    SELECT id, ticket_id, step_number, step_name, step_description,
+           is_complete, completed_at, completed_by, photo_required,
+           photo_url, photo_verified, notes, created_at
+    FROM maintenance_verification_steps
     WHERE ticket_id = ${ticketId}
     ORDER BY step_number
   `;
@@ -57,7 +60,10 @@ async function initializeVerificationSteps(
 
   // Fetch and return created steps
   const created = await sql`
-    SELECT * FROM maintenance_verification_steps
+    SELECT id, ticket_id, step_number, step_name, step_description,
+           is_complete, completed_at, completed_by, photo_required,
+           photo_url, photo_verified, notes, created_at
+    FROM maintenance_verification_steps
     WHERE ticket_id = ${ticketId}
     ORDER BY step_number
   `;

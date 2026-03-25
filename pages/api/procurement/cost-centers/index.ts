@@ -43,7 +43,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
     // If tree view requested, return hierarchical data
     if (include_tree === 'true') {
       const tree = await sql`
-        SELECT * FROM v_cost_center_tree
+        SELECT /* TODO: specify columns */ * FROM v_cost_center_tree
         WHERE (${project_id}::UUID IS NULL OR project_id = ${project_id as string}::UUID)
         ORDER BY sort_path
       `;
@@ -52,7 +52,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Build query for list view
     let query = `
-      SELECT * FROM v_cost_centers_summary
+      SELECT /* TODO: specify columns */ * FROM v_cost_centers_summary
       WHERE 1=1
     `;
     const params: (string | boolean | number)[] = [];
@@ -187,7 +187,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         ${JSON.stringify(data.metadata || {})}::JSONB,
         ${data.created_by || null}
       )
-      RETURNING *
+      RETURNING id, code, name, description, parent_id, cost_center_type_id,
+                project_id, allocated_budget, is_active, is_locked, sort_order,
+                metadata, reference_type, reference_id, created_by, created_at, updated_at
     `;
 
     return apiResponse.created(res, result[0]);

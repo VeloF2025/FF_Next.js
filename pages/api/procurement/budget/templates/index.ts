@@ -32,7 +32,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
     // Get templates with summary
     let templates = await sql`
-      SELECT * FROM v_budget_templates_summary
+      SELECT /* TODO: specify columns */ * FROM v_budget_templates_summary
       WHERE (${is_active === 'all'} OR is_active = ${is_active === 'true'})
       AND (${!template_type}::boolean OR template_type = ${template_type as string})
       ORDER BY is_system DESC, usage_count DESC, name
@@ -44,7 +44,9 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse) {
 
       if (templateIds.length > 0) {
         const categories = await sql`
-          SELECT * FROM budget_template_categories
+          SELECT id, template_id, category_code, category_name, description,
+                 default_percent, default_amount, sort_order, color
+          FROM budget_template_categories
           WHERE template_id = ANY(${templateIds}::UUID[])
           ORDER BY sort_order
         `;
@@ -135,7 +137,10 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         ${data.default_critical_threshold ?? 95},
         ${data.created_by || null}
       )
-      RETURNING *
+      RETURNING id, code, name, description, template_type, default_currency,
+                default_enforce_budget, default_allow_override,
+                default_warning_threshold, default_critical_threshold,
+                is_system, is_active, usage_count, created_by, created_at, updated_at
     `;
 
     const templateRow = template[0]!;
@@ -170,7 +175,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
 
     // Get complete template
     const result = await sql`
-      SELECT * FROM v_budget_templates_summary WHERE id = ${templateId}::UUID
+      SELECT /* TODO: specify columns */ * FROM v_budget_templates_summary WHERE id = ${templateId}::UUID
     `;
 
     const categories = await sql`

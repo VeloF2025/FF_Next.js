@@ -53,7 +53,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND category = ${category}
           AND qty_available > 0
@@ -70,7 +75,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND qty_available > 0
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND category = ${category}
           AND qty_available > 0
@@ -85,7 +95,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND category = ${category}
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND category = ${category}
           ORDER BY item_code ASC
@@ -99,7 +114,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND qty_available > 0
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND qty_available > 0
           ORDER BY item_code ASC
@@ -113,7 +133,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           AND odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           AND odoo_product_id IS NOT NULL
           ORDER BY item_code ASC
@@ -126,7 +151,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE (item_code ILIKE ${searchPattern} OR name ILIKE ${searchPattern} OR description ILIKE ${searchPattern})
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -137,7 +167,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE category = ${category} AND qty_available > 0 AND odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE category = ${category} AND qty_available > 0 AND odoo_product_id IS NOT NULL
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -148,7 +183,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE category = ${category} AND qty_available > 0
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE category = ${category} AND qty_available > 0
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -159,7 +199,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE category = ${category} AND odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE category = ${category} AND odoo_product_id IS NOT NULL
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -169,7 +214,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COUNT(*) as total FROM stock_items WHERE category = ${category}
         `;
         items = await sql`
-          SELECT * FROM stock_items WHERE category = ${category}
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items WHERE category = ${category}
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
         `;
@@ -179,7 +229,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           WHERE qty_available > 0 AND odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           WHERE qty_available > 0 AND odoo_product_id IS NOT NULL
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
@@ -189,7 +244,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COUNT(*) as total FROM stock_items WHERE qty_available > 0
         `;
         items = await sql`
-          SELECT * FROM stock_items WHERE qty_available > 0
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items WHERE qty_available > 0
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
         `;
@@ -198,14 +258,24 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SELECT COUNT(*) as total FROM stock_items WHERE odoo_product_id IS NOT NULL
         `;
         items = await sql`
-          SELECT * FROM stock_items WHERE odoo_product_id IS NOT NULL
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items WHERE odoo_product_id IS NOT NULL
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
         `;
       } else {
         countResult = await sql`SELECT COUNT(*) as total FROM stock_items`;
         items = await sql`
-          SELECT * FROM stock_items
+          SELECT id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
+          FROM stock_items
           ORDER BY item_code ASC
           LIMIT ${limitNum} OFFSET ${offset}
         `;
@@ -277,7 +347,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           ${body.saleOk || false}, ${body.qtyAvailable || 0},
           ${body.createdBy || 'api'}
         )
-        RETURNING *
+        RETURNING id, item_code, name, description, category, tracking_type, uom,
+                 standard_cost, list_price, currency, min_stock_level, max_stock_level,
+                 reorder_quantity, is_active, is_returnable, product_type, purchase_ok,
+                 sale_ok, qty_available, qty_reserved, qty_on_order, serial_number,
+                 odoo_product_id, odoo_synced_at, created_by, created_at, updated_at
       `;
 
       return res.status(201).json({ data: mapDbToStockItem(created as Record<string, unknown>) });

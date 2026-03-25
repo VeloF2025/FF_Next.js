@@ -58,7 +58,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Step 3: Check if trigger added it to sync queue
     log.debug('adminTest', { action: 'test-auto-sync', step: 'check-queue' });
     const queueItems = await sql`
-      SELECT * FROM onemap_sync_queue
+      SELECT id, drop_number, status, attempts, created_at
+      FROM onemap_sync_queue
       WHERE drop_number = ${testDropNumber}
     `;
 

@@ -315,7 +315,9 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
         ${(vlm_confidence || 1) < 0.6},
         'pending'
       )
-      RETURNING *
+      RETURNING id, photo_key, feature_id, feature_type, work_type, project_id,
+               vlm_confidence, vlm_feedback, vlm_raw_response, needs_retake,
+               workflow_status, created_at, validated_at
     `;
 
     return apiResponse.created(res, result[0]);

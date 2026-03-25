@@ -115,7 +115,11 @@ async function handleGet(
   // Build query based on filters
   if (resolved === 'true') {
     rows = await sql`
-      SELECT * FROM fleet_odometer_anomalies
+      SELECT id, vehicle_id, odometer_history_id, anomaly_type, odometer_reading,
+             previous_reading, odometer_diff, gps_distance_km, variance_percent,
+             severity, resolved, resolved_by, resolved_at, resolution_notes,
+             detected_at, created_at
+      FROM fleet_odometer_anomalies
       WHERE vehicle_id = ${vehicleId}
         AND resolved = true
       ORDER BY detected_at DESC
@@ -127,7 +131,11 @@ async function handleGet(
     ` as Array<{ total: string }>;
   } else if (resolved === 'false') {
     rows = await sql`
-      SELECT * FROM fleet_odometer_anomalies
+      SELECT id, vehicle_id, odometer_history_id, anomaly_type, odometer_reading,
+             previous_reading, odometer_diff, gps_distance_km, variance_percent,
+             severity, resolved, resolved_by, resolved_at, resolution_notes,
+             detected_at, created_at
+      FROM fleet_odometer_anomalies
       WHERE vehicle_id = ${vehicleId}
         AND resolved = false
       ORDER BY detected_at DESC
@@ -139,7 +147,11 @@ async function handleGet(
     ` as Array<{ total: string }>;
   } else if (severity && typeof severity === 'string') {
     rows = await sql`
-      SELECT * FROM fleet_odometer_anomalies
+      SELECT id, vehicle_id, odometer_history_id, anomaly_type, odometer_reading,
+             previous_reading, odometer_diff, gps_distance_km, variance_percent,
+             severity, resolved, resolved_by, resolved_at, resolution_notes,
+             detected_at, created_at
+      FROM fleet_odometer_anomalies
       WHERE vehicle_id = ${vehicleId}
         AND severity = ${severity}
       ORDER BY detected_at DESC
@@ -151,7 +163,11 @@ async function handleGet(
     ` as Array<{ total: string }>;
   } else {
     rows = await sql`
-      SELECT * FROM fleet_odometer_anomalies
+      SELECT id, vehicle_id, odometer_history_id, anomaly_type, odometer_reading,
+             previous_reading, odometer_diff, gps_distance_km, variance_percent,
+             severity, resolved, resolved_by, resolved_at, resolution_notes,
+             detected_at, created_at
+      FROM fleet_odometer_anomalies
       WHERE vehicle_id = ${vehicleId}
       ORDER BY detected_at DESC
       LIMIT ${limitNum} OFFSET ${offsetNum}
@@ -227,7 +243,10 @@ async function handlePatch(
       resolved_at = NOW(),
       resolution_notes = ${resolutionNotes || null}
     WHERE id = ${anomalyId}
-    RETURNING *
+    RETURNING id, vehicle_id, odometer_history_id, anomaly_type, odometer_reading,
+              previous_reading, odometer_diff, gps_distance_km, variance_percent,
+              severity, resolved, resolved_by, resolved_at, resolution_notes,
+              detected_at, created_at
   ` as OdometerAnomalyRow[];
 
   if (!rows[0]) {

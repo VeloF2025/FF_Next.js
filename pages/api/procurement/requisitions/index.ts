@@ -31,7 +31,9 @@ export default withAuth(withErrorHandler(async (
       // Get requisitions with item count
       const requisitions = await sql`
         SELECT
-          pr.*,
+          pr.id, pr.requisition_number, pr.project_id, pr.cost_center_id,
+          pr.department, pr.requested_by_name, pr.requested_date, pr.required_date,
+          pr.status, pr.urgency, pr.estimated_total, pr.currency, pr.created_at,
           p.project_name as project_name,
           cc.name as cost_center_name,
           cc.code as cost_center_code,
@@ -117,7 +119,7 @@ export default withAuth(withErrorHandler(async (
           ${body.notes || null},
           'draft'
         )
-        RETURNING *
+        RETURNING id, requisition_number, project_id
       `;
 
       // Insert items
@@ -166,11 +168,21 @@ export default withAuth(withErrorHandler(async (
 
       // Fetch the complete requisition with items
       const [fullRequisition] = await sql`
-        SELECT * FROM purchase_requisitions WHERE id = ${requisition!.id}
+        SELECT
+          id, requisition_number, project_id, cost_center_id, department,
+          requested_by, requested_by_name, requested_date, required_date,
+          status, estimated_total, currency, urgency, notes,
+          created_at, updated_at
+        FROM purchase_requisitions WHERE id = ${requisition!.id}
       `;
 
       const items = await sql`
-        SELECT * FROM purchase_requisition_items WHERE requisition_id = ${requisition!.id}
+        SELECT
+          id, requisition_id, stock_item_id, item_code, item_description,
+          quantity, uom, estimated_unit_price, estimated_total,
+          suggested_supplier_id, notes, converted_to_rfq, converted_to_po,
+          rfq_id, po_id, boq_item_id, item_type, created_at
+        FROM purchase_requisition_items WHERE requisition_id = ${requisition!.id}
       `;
 
       const result: PurchaseRequisition = {
