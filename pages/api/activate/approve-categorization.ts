@@ -156,6 +156,35 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             original_type: catResult.original_type,
           }));
 
+    // Auto-deduplicate: for steps 1-10, keep the FIRST photo and discard extras to step 0
+    let autoDiscardedCount = 0;
+    const seenSteps = new Set<number>();
+
+    for (let i = 0; i < photosToStore.length; i++) {
+      const photo = photosToStore[i]!;
+      const step = photo.step;
+
+      if (step >= 1 && step <= 10) {
+        if (seenSteps.has(step)) {
+          // Duplicate — move to step 0 (Discard)
+          photosToStore[i] = { ...photo, step: 0 };
+          // Update the categorization result too
+          const catResult = updatedResults.find((r) => r.photo_filename === photo.filename);
+          if (catResult) {
+            catResult.human_override_step = 0;
+            catResult.human_override_reason = `Auto-discarded: duplicate of Step ${step} (${STEP_LABELS[step] || 'Unknown'})`;
+          }
+          autoDiscardedCount++;
+        } else {
+          seenSteps.add(step);
+        }
+      }
+    }
+
+    if (autoDiscardedCount > 0) {
+      log.info('ApproveCategorization', `Auto-discarded ${autoDiscardedCount} duplicate photo(s) for ${dropNumber}`);
+    }
+
     // Update database
     await pool.query(
       `UPDATE dr_photo_unified_reviews
@@ -173,6 +202,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     log.info('ApproveCategorization', `Approved categorization for ${dropNumber}`, {
       approvedCount,
       overriddenCount,
+      autoDiscardedCount,
       totalPhotos: photosToStore.length,
     });
 
@@ -224,6 +254,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
       status: 'approved',
       approved_count: approvedCount,
       overridden_count: overriddenCount,
+      auto_discarded_count: autoDiscardedCount,
       photos_metadata: photosToStore,
     };
 
