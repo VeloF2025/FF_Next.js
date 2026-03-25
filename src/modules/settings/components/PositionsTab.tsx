@@ -97,12 +97,14 @@ function PositionCard({ position, onEdit, onDelete }: PositionCardProps) {
         <button
           onClick={() => onEdit(position)}
           className="p-1 text-[var(--ff-text-tertiary)] hover:text-blue-600"
+          aria-label={`Edit ${position.name} position`}
         >
           <Edit2 className="w-4 h-4" />
         </button>
         <button
           onClick={() => onDelete(position.id)}
           className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-600"
+          aria-label={`Delete ${position.name} position`}
         >
           <Trash2 className="w-4 h-4" />
         </button>

@@ -62,12 +62,14 @@ function DepartmentCard({ department, onEdit, onDelete }: DepartmentCardProps) {
           <button
             onClick={() => onEdit(department)}
             className="p-1 text-[var(--ff-text-tertiary)] hover:text-blue-600"
+            aria-label={`Edit ${department.name} department`}
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => onDelete(department.id)}
             className="p-1 text-[var(--ff-text-tertiary)] hover:text-red-600"
+            aria-label={`Delete ${department.name} department`}
           >
             <Trash2 className="w-4 h-4" />
           </button>
