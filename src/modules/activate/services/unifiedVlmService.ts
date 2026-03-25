@@ -14,6 +14,7 @@
  */
 
 import { log } from '@/lib/logger';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 
 interface Photo {
   filename: string;
@@ -116,8 +117,25 @@ async function evaluateStep(
   try {
     log.info(`Evaluating step ${step} for ${dropNumber}`, { photoCount: photos.length });
 
+    // Fetch HITL few-shot examples for construction photo QA (non-blocking on failure)
+    let fewShotSection = '';
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'construction_qa',
+        analysisType: 'construction_photo_qa',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        log.info(`Injecting ${examples.length} few-shot examples for construction_photo_qa step ${step}`);
+      }
+    } catch (fewShotError) {
+      log.warn(`Few-shot retrieval failed for step ${step} (continuing without): ${fewShotError}`);
+    }
+
     // Build prompt for this step
-    const prompt = buildStepPrompt(step, photos.length);
+    const prompt = buildStepPrompt(step, photos.length, fewShotSection);
 
     // Call VLM service
     const vlmResult = await callVLMService(photos, prompt);
@@ -189,7 +207,7 @@ async function callVLMService(
 /**
  * Build evaluation prompt for a specific step
  */
-function buildStepPrompt(step: number, photoCount: number): string {
+function buildStepPrompt(step: number, photoCount: number, fewShotSection?: string): string {
   const stepDescriptions: Record<number, string> = {
     1: 'House Photo - Verify clear view of property with visible address or landmarks',
     2: 'Cable from Pole - Check cable routing from pole to house is visible and properly secured',
@@ -207,7 +225,14 @@ function buildStepPrompt(step: number, photoCount: number): string {
 
   const stepDescription = stepDescriptions[step] || `Step ${step}`;
 
-  return `You are evaluating fiber installation photos for quality and compliance.
+  let prompt = '';
+
+  // Inject few-shot examples at the top if available
+  if (fewShotSection) {
+    prompt += `${fewShotSection}\n\n`;
+  }
+
+  prompt += `You are evaluating fiber installation photos for quality and compliance.
 
 Step ${step}: ${stepDescription}
 
@@ -231,6 +256,8 @@ Respond in JSON format:
   "passed": <boolean>,
   "comment": "<your evaluation comment>"
 }`;
+
+  return prompt;
 }
 
 /**

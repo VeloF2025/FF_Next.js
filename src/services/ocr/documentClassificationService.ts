@@ -8,16 +8,17 @@
 
 /** VLM extraction prompt keyed by document type */
 export const VLM_PROMPTS: Record<string, string> = {
-  drivers_license: `Extract all fields from this South African driver's license. Return JSON with:
-- licenseNumber: The license number (e.g., "6025000170N4")
-- idNumber: The 13-digit SA ID number
+  drivers_license: `Extract all fields from this South African driver's license (credit-card size smart card). Return JSON with:
+- licenseNumber: The license/card number (alphanumeric, e.g., "6025000170N4")
+- idNumber: The 13-digit SA ID number (YYMMDD SSSS C A Z — all digits, never letters)
 - fullName: Full name on the license
-- dateOfBirth: Date of birth (YYYY-MM-DD format)
+- dateOfBirth: Date of birth (YYYY-MM-DD format) — must match first 6 digits of idNumber
 - validFrom: License valid from date (YYYY-MM-DD)
 - validTo: License valid to/expiry date (YYYY-MM-DD)
-- licenseCodes: Vehicle codes (e.g., "EB", "C1")
+- licenseCodes: Vehicle codes (e.g., "EB", "C1", "A")
 - firstIssueDate: First issue date (YYYY-MM-DD)
 - restrictions: Any restrictions (number or text)
+CRITICAL: The idNumber is EXACTLY 13 digits. Common OCR errors: O→0, I→1, S→5, B→8. These are ALL digits.
 Return ONLY valid JSON, no other text.`,
 
   id_document: `Extract all fields from this South African ID document (Smart ID card or green ID book). Return JSON with:
@@ -43,39 +44,43 @@ Return ONLY valid JSON, no other text.`,
 CRITICAL: SA ID numbers are always exactly 13 digits. Verify your extracted idNumber has 13 digits before returning.
 Return ONLY valid JSON, no other text.`,
 
-  passport: `Extract all fields from this passport. Return JSON with:
-- passportNumber: The passport number
+  passport: `Extract all fields from this passport document. For South African passports, the number is typically "A" followed by 8 digits. Return JSON with:
+- passportNumber: The passport number (SA format: A + 8 digits, e.g., "A12345678")
 - surname: Surname/Last name
 - firstName: First/Given names
-- nationality: Nationality
+- nationality: Nationality (e.g., "South African" or ISO code "ZAF")
 - dateOfBirth: Date of birth (YYYY-MM-DD format)
 - gender: Gender (M/F or Male/Female)
 - placeOfBirth: Place of birth
 - dateOfIssue: Issue date (YYYY-MM-DD)
 - dateOfExpiry: Expiry date (YYYY-MM-DD)
 - issuingAuthority: Issuing authority/country
+If the MRZ (Machine Readable Zone) is visible at the bottom, cross-reference printed fields with MRZ data for accuracy.
+Common OCR confusions in MRZ: 0↔O, 1↔I, B↔8, D↔0, S↔5.
 Return ONLY valid JSON, no other text.`,
 
-  bank_statement: `Extract key fields from this bank statement or bank confirmation letter. Return JSON with:
-- bankName: Name of the bank
-- accountHolder: Account holder name
-- accountNumber: Bank account number
-- branchCode: Branch code (if visible)
-- accountType: Type of account (savings, cheque, etc.)
+  bank_statement: `Extract key fields from this South African bank statement or bank confirmation letter. Return JSON with:
+- bankName: Name of the bank (e.g., ABSA, FNB, Standard Bank, Nedbank, Capitec)
+- accountHolder: Account holder full name
+- accountNumber: Bank account number (typically 10-13 digits — all digits, no letters)
+- branchCode: Branch code if visible (6 digits, e.g., Capitec=470010, FNB=250655)
+- accountType: Type of account (savings, cheque, current, transmission, etc.)
 - statementDate: Statement date (YYYY-MM-DD) if visible
+Common OCR confusions in account numbers: 0↔O, 1↔I, 6↔G, 8↔B — these are ALL digits.
 Return ONLY valid JSON, no other text.`,
 
   // Alias for bank_details document type (used in UI)
-  bank_details: `Extract key fields from this bank statement or bank confirmation letter. Return JSON with:
-- bankName: Name of the bank
-- accountHolder: Account holder name
-- accountNumber: Bank account number
-- branchCode: Branch code (if visible)
-- accountType: Type of account (savings, cheque, etc.)
+  bank_details: `Extract key fields from this South African bank statement or bank confirmation letter. Return JSON with:
+- bankName: Name of the bank (e.g., ABSA, FNB, Standard Bank, Nedbank, Capitec)
+- accountHolder: Account holder full name
+- accountNumber: Bank account number (typically 10-13 digits — all digits, no letters)
+- branchCode: Branch code if visible (6 digits, e.g., Capitec=470010, FNB=250655)
+- accountType: Type of account (savings, cheque, current, transmission, etc.)
 - statementDate: Statement date (YYYY-MM-DD) if visible
+Common OCR confusions in account numbers: 0↔O, 1↔I, 6↔G, 8↔B — these are ALL digits.
 Return ONLY valid JSON, no other text.`,
 
-  employment_contract: `Extract key details from this employment contract/agreement. Focus on the front page, summary sections, and signature page. Return JSON with:
+  employment_contract: `Extract key details from this South African employment contract/agreement (BCEA-compliant). Focus on the front page, summary sections, and signature page. Return JSON with:
 - employeeName: Full name of the employee
 - employeeIdNumber: Employee's ID number if visible
 - companyName: Name of the employer/company
@@ -93,17 +98,19 @@ Return ONLY valid JSON, no other text.`,
 - employerSigned: Boolean - true if employer/company representative signature is present
 - witnessesSigned: Boolean - true if witness signatures are present (check for witness signature lines)
 - signatureNotes: Brief notes about signature status (e.g., "Employee and employer signed, witnesses not signed")
+Note: Employee ID numbers are 13-digit SA IDs (YYMMDD SSSS C A Z). Company registration format: "YYYY/NNNNNN/NN". Common OCR confusions: 0↔O, 1↔I, /↔1.
 Return ONLY valid JSON, no other text.`,
 
-  proof_of_residence: `Extract address information from this proof of residence document. Return JSON with:
+  proof_of_residence: `Extract address information from this South African proof of residence document (utility bill, bank statement, lease agreement, or municipal account). Return JSON with:
 - fullName: Name on the document
-- streetAddress: Street address
-- suburb: Suburb/Area
+- streetAddress: Street address (house number + street name)
+- suburb: Suburb/Area name
 - city: City/Town
-- province: Province/State
-- postalCode: Postal/ZIP code
-- documentDate: Date on the document (YYYY-MM-DD)
-- documentType: Type of document (utility bill, bank statement, etc.)
+- province: Province (Gauteng, Western Cape, KwaZulu-Natal, Eastern Cape, Free State, Limpopo, Mpumalanga, North West, Northern Cape)
+- postalCode: Postal code (4 digits, e.g., 0001=Pretoria, 2001=Johannesburg)
+- documentDate: Date on the document (YYYY-MM-DD) — must be recent (within 3 months)
+- documentType: Type of document (utility bill, bank statement, municipal account, lease agreement, etc.)
+Common OCR confusions in postal codes: 0↔O, 1↔I — postal codes are ALL digits.
 Return ONLY valid JSON, no other text.`,
 
   default: `Extract all visible text and data from this document. Identify the document type and extract relevant fields. Return JSON with:

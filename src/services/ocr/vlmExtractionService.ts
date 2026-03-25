@@ -8,7 +8,8 @@
  */
 
 import { log } from '@/lib/logger';
-import { VLM_PROMPTS, FIELD_MAPPINGS } from './documentClassificationService';
+import { FIELD_MAPPINGS } from './documentClassificationService';
+import { getEnhancedPrompt, getBasePrompt } from './documentPromptEnhancer';
 import { crossValidateSaIdWithDob } from './saIdValidationService';
 
 /** Standard shape for a single extracted field */
@@ -54,7 +55,14 @@ export async function callVlmForExtraction(
   fileUrl: string,
   documentType: string | undefined
 ): Promise<string> {
-  const prompt = VLM_PROMPTS[documentType ?? ''] ?? VLM_PROMPTS.default;
+  // Fetch enhanced prompt with SA context + HITL few-shot examples
+  let prompt: string;
+  try {
+    prompt = await getEnhancedPrompt(documentType);
+  } catch {
+    log.warn('Enhanced prompt failed, falling back to base prompt', { documentType });
+    prompt = getBasePrompt(documentType);
+  }
 
   log.info('Calling Qwen3-VL for OCR', { documentType, fileUrl });
 

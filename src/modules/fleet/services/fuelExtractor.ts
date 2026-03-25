@@ -48,22 +48,33 @@ Reply with JSON only:
 If fuel gauge not visible:
 {"level_category": null, "level": null, "confidence": 0, "description": "Fuel gauge not found"}`;
 
-const FUEL_RECEIPT_PROMPT = `You are analyzing a fuel station receipt or invoice photo.
+const FUEL_RECEIPT_PROMPT = `You are analyzing a South African fuel station receipt or invoice photo.
 
 TASK: Extract fuel purchase details from this receipt.
 
 INSTRUCTIONS:
-1. Find the total amount paid (in Rand/ZAR)
+1. Find the total amount paid (in Rand/ZAR) — format: R1,234.56 or ZAR 1234.56
 2. Find the number of litres purchased
 3. Find the price per litre (if shown)
-4. Find the date of the transaction
-5. Find the station name/brand (e.g., Shell, BP, Engen, Caltex, Total)
+4. Find the date of the transaction (DD/MM/YYYY or YYYY-MM-DD)
+5. Find the station name/brand
 6. Find the station location/address if visible
 
-SOUTH AFRICAN CONTEXT:
-- Currency is ZAR/Rand, written as R or ZAR
-- Common fuel types: 93, 95 (petrol/gasoline), Diesel, 500ppm
-- Common stations: Shell, BP, Engen, Caltex, Total, Sasol
+SOUTH AFRICAN FUEL STATION CONTEXT:
+- Currency: ZAR (Rand), written as "R" prefix, e.g. R850.50 or R1,234.56
+- Thousands separator is comma, decimal is period: R1,234.56
+- Common fuel types: 93 Unleaded, 95 Unleaded, Diesel 50ppm, Diesel 500ppm
+- Major station brands: Engen, Shell, Sasol, TotalEnergies, Caltex (rebranding to Astron), BP
+- VAT is 15%, often shown separately on receipt
+
+THERMAL RECEIPT OCR CHALLENGES:
+- Thermal paper fades — look for faint/partial text carefully
+- "R" prefix may be faint or cut off — infer currency from context
+- Decimal points may be barely visible — if amount seems 100x too large, likely missing decimal
+- "1" and "l" (lowercase L) are often confused in OCR
+- "0" and "O" are commonly swapped
+- Date formats vary: DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD
+- Station logos at top may be clearer than printed text below
 
 RESPONSE FORMAT (JSON only, no other text):
 {

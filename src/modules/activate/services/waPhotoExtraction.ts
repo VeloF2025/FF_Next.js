@@ -22,6 +22,7 @@ import {
   normalizeSerial,
   isPromptExampleSerial,
 } from './serialExtractor';
+import { getVlmFewShotExamples, buildVlmFewShotPrompt } from '@/services/vlmLearningService';
 
 // ============================================================================
 // TYPES
@@ -161,6 +162,24 @@ export async function extractSerialsFromWaPhoto(
       }
     }
 
+    // Inject HITL few-shot examples from past corrections (non-blocking on failure)
+    let waPhotoPrompt = WA_PHOTO_SERIAL_PROMPT;
+    try {
+      const examples = await getVlmFewShotExamples({
+        module: 'activate',
+        analysisType: 'wa_photo_serial',
+        maxExamples: 3,
+        prioritizeCanonical: true,
+      });
+      const fewShotSection = buildVlmFewShotPrompt(examples);
+      if (fewShotSection) {
+        waPhotoPrompt = `${fewShotSection}\n\n${WA_PHOTO_SERIAL_PROMPT}`;
+        vlmLogger.info(`Injecting ${examples.length} few-shot examples for wa_photo_serial`);
+      }
+    } catch (fewShotError) {
+      vlmLogger.warn(`Few-shot retrieval failed (continuing without): ${fewShotError}`);
+    }
+
     // Call VLM for both serials (or just UPS if barcode got ONT)
     const result = await callVlmExtraction<{
       ontSerial: {
@@ -173,7 +192,7 @@ export async function extractSerialsFromWaPhoto(
         serial: string | null;
         confidence: number;
       };
-    }>(base64, WA_PHOTO_SERIAL_PROMPT, 'WA photo serial extraction');
+    }>(base64, waPhotoPrompt, 'WA photo serial extraction');
 
     const processingTimeMs = Date.now() - startTime;
 
