@@ -29,17 +29,17 @@ export function PonTable({ pons, expandedZones, onToggleZone }: PonTableProps): 
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700">Zone</th>
-            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700">PON</th>
-            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700">Poles</th>
-            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700">Sign-ups</th>
-            <th scope="col" className="px-4 py-2 text-center font-medium text-gray-700">CWC</th>
-            <th scope="col" className="px-4 py-2 text-center font-medium text-gray-700">Optical</th>
-            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700">Activated</th>
-            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700">Available</th>
-            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700">Take-up %</th>
-            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700">Blockage</th>
+          <tr className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Zone</th>
+            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">PON</th>
+            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">Poles</th>
+            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">Sign-ups</th>
+            <th scope="col" className="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-300">CWC</th>
+            <th scope="col" className="px-4 py-2 text-center font-medium text-gray-700 dark:text-gray-300">Optical</th>
+            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">Activated</th>
+            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">Available</th>
+            <th scope="col" className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">Take-up %</th>
+            <th scope="col" className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Blockage</th>
           </tr>
         </thead>
         <tbody>
@@ -53,7 +53,7 @@ export function PonTable({ pons, expandedZones, onToggleZone }: PonTableProps): 
                     type="button"
                     onClick={() => onToggleZone(zone)}
                     aria-expanded={isExpanded}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 font-medium text-gray-800 border-b border-gray-200"
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-slate-700 font-medium text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-slate-700"
                   >
                     <span className="mr-2">{isExpanded ? '▼' : '▶'}</span>
                     Zone {zone} ({zonePons.length} PON{zonePons.length !== 1 ? 's' : ''})

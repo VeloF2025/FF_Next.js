@@ -114,11 +114,11 @@ export default function SpTrackerSandbox({ projectId }: SpTrackerSandboxProps): 
   }, []);
 
   if (loading) {
-    return <div className="p-4 text-gray-600">Loading tracker data...</div>;
+    return <div className="p-4 text-gray-600 dark:text-gray-400">Loading tracker data...</div>;
   }
 
   if (!data) {
-    return <div className="p-4 text-red-600">Failed to load tracker data</div>;
+    return <div className="p-4 text-red-600 dark:text-red-400">Failed to load tracker data</div>;
   }
 
   const summary = data.summary;
@@ -169,7 +169,7 @@ export default function SpTrackerSandbox({ projectId }: SpTrackerSandboxProps): 
       <BlockageSection pons={data.pons} />
 
       {/* PON Table */}
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
         <PonTable
           pons={data.pons}
           expandedZones={expandedZones}
@@ -178,8 +178,8 @@ export default function SpTrackerSandbox({ projectId }: SpTrackerSandboxProps): 
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <span className="text-xs text-gray-600">
+      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+        <span className="text-xs text-gray-600 dark:text-gray-400">
           Last synced: {data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : 'Never'}
         </span>
         <button

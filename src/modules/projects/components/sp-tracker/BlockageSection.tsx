@@ -28,16 +28,18 @@ export function BlockageSection({ pons }: BlockageSectionProps): ReactNode {
     <div
       className={`p-4 rounded-lg border ${
         blockageAlert
-          ? 'bg-red-50 border-red-200'
-          : 'bg-amber-50 border-amber-200'
+          ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+          : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
       }`}
     >
       <div className="flex items-center gap-2 mb-3">
-        <span className="font-medium text-gray-800">
+        <span className="font-medium text-gray-800 dark:text-gray-200">
           Blockages: {blockedPons.length} PON{blockedPons.length !== 1 ? 's' : ''}
         </span>
         {blockageAlert && (
-          <span className="text-xs font-medium text-red-700">⚠️ {blockedPercent.toFixed(1)}% blocked</span>
+          <span className="text-xs font-medium text-red-700 dark:text-red-400">
+            {blockedPercent.toFixed(1)}% blocked
+          </span>
         )}
       </div>
 
@@ -46,13 +48,13 @@ export function BlockageSection({ pons }: BlockageSectionProps): ReactNode {
           {Array.from(blockageMap.entries())
             .sort((a, b) => b[1] - a[1])
             .map(([reason, count]) => (
-              <li key={reason} className="text-sm text-gray-700">
+              <li key={reason} className="text-sm text-gray-700 dark:text-gray-300">
                 <span className="font-medium">{count}</span> — {reason}
               </li>
             ))}
         </ul>
       ) : (
-        <span className="text-sm text-gray-600">No blockages reported</span>
+        <span className="text-sm text-gray-600 dark:text-gray-400">No blockages reported</span>
       )}
     </div>
   );
