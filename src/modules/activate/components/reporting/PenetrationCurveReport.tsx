@@ -45,6 +45,14 @@ import type {
   PenetrationSeries,
 } from '../../types/reporting.types';
 
+// Series palette — hex values are intentional for Recharts SVG stroke compatibility.
+// Annotated with matching --ff-* design tokens where applicable:
+//   #3b82f6 = --ff-primary-500 / --ff-info
+//   #10b981 = --ff-success
+//   #f59e0b = --ff-warning
+//   #ef4444 = --ff-error
+//   #8b5cf6 = --ff-status-planning
+//   Remaining 5 have no --ff-* equivalent (intentionally distinct hues).
 const COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
@@ -232,7 +240,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
   const colorMap = useMemo(() => {
     const map = new Map<string, string>();
     if (data) {
-      data.series.forEach((s, idx) => map.set(s.key, COLORS[idx % COLORS.length]));
+      data.series.forEach((s, idx) => map.set(s.key, COLORS[idx % COLORS.length]!));
     }
     return map;
   }, [data]);
@@ -281,7 +289,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
     return (
       <div className="flex items-center justify-center p-16">
         <div className="text-center space-y-3">
-          <Loader2 className="h-10 w-10 animate-spin mx-auto text-blue-500" />
+          <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
           <p className="text-sm text-muted-foreground">Loading penetration curve...</p>
         </div>
       </div>
@@ -336,7 +344,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
           {groupBy === 'project' ? (
             <span className="font-semibold text-foreground">All Projects</span>
           ) : (
-            <button onClick={backToProjects} aria-label="Back to all projects" className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+            <button onClick={backToProjects} aria-label="Back to all projects" className="text-primary hover:text-primary/80 hover:underline font-medium">
               All Projects
             </button>
           )}
@@ -346,7 +354,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               {groupBy === 'zone' ? (
                 <span className="font-semibold text-foreground">{drill.projectLabel ?? 'Project'}</span>
               ) : (
-                <button onClick={backToZones} aria-label={`Back to ${drill.projectLabel ?? 'Project'} zones`} className="text-blue-500 hover:text-blue-600 hover:underline font-medium">
+                <button onClick={backToZones} aria-label={`Back to ${drill.projectLabel ?? 'Project'} zones`} className="text-primary hover:text-primary/80 hover:underline font-medium">
                   {drill.projectLabel ?? 'Project'}
                 </button>
               )}
@@ -369,7 +377,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
             </span>
           )}
           {groupBy === 'pon' && (
-            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+            <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               PON level — deepest
             </span>
           )}
@@ -417,7 +425,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               aria-pressed={granularity === 'daily'}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 granularity === 'daily'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-muted-foreground hover:bg-accent'
               }`}
             >
@@ -428,7 +436,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
               aria-pressed={granularity === 'weekly'}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                 granularity === 'weekly'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-muted-foreground hover:bg-accent'
               }`}
             >
@@ -445,33 +453,33 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         </p>
         <ResponsiveContainer width="100%" height="92%">
           <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--ff-gray-700)" opacity={0.5} />
             <XAxis
               dataKey="elapsed"
               type="number"
               domain={[0, maxElapsed]}
               ticks={xAxisTicks}
               tickFormatter={formatXTick}
-              stroke="#9ca3af"
-              tick={{ fontSize: 11, fill: '#9ca3af' }}
+              stroke="var(--ff-gray-400)"
+              tick={{ fontSize: 11, fill: 'var(--ff-gray-400)' }}
               tickLine={false}
               label={{
                 value: xAxisLabel,
                 position: 'insideBottom',
                 offset: -12,
-                style: { fontSize: 11, fill: '#9ca3af' },
+                style: { fontSize: 11, fill: 'var(--ff-gray-400)' },
               }}
             />
             <YAxis
               domain={[0, maxPenetration]}
               tickFormatter={(v: number) => `${v}%`}
-              stroke="#9ca3af"
-              tick={{ fontSize: 11, fill: '#9ca3af' }}
+              stroke="var(--ff-gray-400)"
+              tick={{ fontSize: 11, fill: 'var(--ff-gray-400)' }}
               tickLine={false}
               width={40}
             />
             {maxPenetration === 100 && (
-              <ReferenceLine y={100} stroke="#6b7280" strokeDasharray="4 2" strokeOpacity={0.3} />
+              <ReferenceLine y={100} stroke="var(--ff-gray-500)" strokeDasharray="4 2" strokeOpacity={0.3} />
             )}
             <Tooltip content={<CustomTooltip />} />
             <Legend
@@ -502,7 +510,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
                 type="monotone"
                 dataKey={series.key}
                 name={series.label}
-                stroke={colorMap.get(series.key) ?? '#6b7280'}
+                stroke={colorMap.get(series.key) ?? 'var(--ff-gray-500)'}
                 dot={false}
                 strokeWidth={2}
                 activeDot={{ r: 4, strokeWidth: 0 }}
@@ -524,7 +532,7 @@ export function PenetrationCurveReport({ filters, refreshKey }: PenetrationCurve
         }).map((series) => {
           const lastPoint = series.points[series.points.length - 1];
           const penetration = lastPoint?.penetration_pct ?? 0;
-          const color = colorMap.get(series.key) ?? '#6b7280';
+          const color = colorMap.get(series.key) ?? 'var(--ff-gray-500)';
           const pctFill = Math.min(penetration, 100);
           const daysActive = series.points.length > 0
             ? Math.round(
