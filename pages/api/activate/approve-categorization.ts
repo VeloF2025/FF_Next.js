@@ -23,6 +23,12 @@ import {
 } from '@/modules/activate/types/unified.types';
 import { recordCorrection, RecordCorrectionInput } from '@/modules/qa-learning';
 import { STEP_LABELS } from '@/modules/activate/utils/stepMapper';
+import {
+  fetchAndHashPhoto,
+  storePhotoHashes,
+  findCrossDRDuplicates,
+  recordHumanDuplicateDecision,
+} from '@/modules/activate/services/photoHashService';
 
 /**
  * POST /api/activate/approve-categorization
@@ -156,6 +162,82 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
             original_type: catResult.original_type,
           }));
 
+    // --- Cross-DR duplicate detection via SHA-256 hashing ---
+    // Hash all photos, store hashes, then check against known duplicates
+    let crossDRDuplicateCount = 0;
+    const photoHashes: Array<{ filename: string; hash: string }> = [];
+
+    try {
+      // Compute hashes for all photos (in parallel, with timeout tolerance)
+      const hashPromises = photosToStore.map(async (photo) => {
+        const url = photo.url || `/api/activate/photo/${dropNumber}/${photo.filename}`;
+        const hash = await fetchAndHashPhoto(url);
+        if (hash) {
+          photoHashes.push({ filename: photo.filename, hash });
+        }
+      });
+      await Promise.all(hashPromises);
+
+      if (photoHashes.length > 0) {
+        // Store all hashes
+        await storePhotoHashes(dropNumber, photoHashes);
+
+        // Check for cross-DR duplicates (photos humans have previously marked as step -1)
+        const duplicates = await findCrossDRDuplicates(dropNumber, photoHashes);
+
+        if (duplicates.size > 0) {
+          for (let i = 0; i < photosToStore.length; i++) {
+            const photo = photosToStore[i]!;
+            const matchedDRs = duplicates.get(photo.filename);
+            if (matchedDRs) {
+              // Auto-mark as Duplicate Photo (step -1)
+              photosToStore[i] = { ...photo, step: -1 };
+              const catResult = updatedResults.find((r) => r.photo_filename === photo.filename);
+              if (catResult) {
+                catResult.human_override_step = -1;
+                catResult.human_override_reason = `Auto-detected cross-DR duplicate (previously flagged in ${matchedDRs.join(', ')})`;
+              }
+              crossDRDuplicateCount++;
+            }
+          }
+          log.info('ApproveCategorization', `Auto-flagged ${crossDRDuplicateCount} cross-DR duplicate(s) for ${dropNumber}`);
+        }
+      }
+    } catch (hashError) {
+      // Non-fatal: if hashing fails, continue without cross-DR detection
+      log.warn('ApproveCategorization', 'Cross-DR duplicate detection failed (non-fatal)', {
+        dropNumber,
+        error: hashError instanceof Error ? hashError.message : String(hashError),
+      });
+    }
+
+    // --- Within-DR dedup: for steps 1-10, keep first photo, discard extras to step 0 ---
+    let autoDiscardedCount = 0;
+    const seenSteps = new Set<number>();
+
+    for (let i = 0; i < photosToStore.length; i++) {
+      const photo = photosToStore[i]!;
+      const step = photo.step;
+
+      if (step >= 1 && step <= 10) {
+        if (seenSteps.has(step)) {
+          photosToStore[i] = { ...photo, step: 0 };
+          const catResult = updatedResults.find((r) => r.photo_filename === photo.filename);
+          if (catResult) {
+            catResult.human_override_step = 0;
+            catResult.human_override_reason = `Auto-discarded: duplicate of Step ${step} (${STEP_LABELS[step] || 'Unknown'})`;
+          }
+          autoDiscardedCount++;
+        } else {
+          seenSteps.add(step);
+        }
+      }
+    }
+
+    if (autoDiscardedCount > 0) {
+      log.info('ApproveCategorization', `Auto-discarded ${autoDiscardedCount} within-DR duplicate(s) for ${dropNumber}`);
+    }
+
     // Update database
     await pool.query(
       `UPDATE dr_photo_unified_reviews
@@ -173,6 +255,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
     log.info('ApproveCategorization', `Approved categorization for ${dropNumber}`, {
       approvedCount,
       overriddenCount,
+      autoDiscardedCount,
+      crossDRDuplicateCount,
       totalPhotos: photosToStore.length,
     });
 
@@ -217,6 +301,19 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse): Promise<vo
         const successCount = results.filter((r) => r !== undefined).length;
         log.info('ApproveCategorization', `Recorded ${successCount}/${correctionsToRecord.length} corrections for HITL learning`);
       });
+    }
+
+    // HITL Learning: When human marks a photo as step -1 (Duplicate Photo),
+    // record the hash so future DRs with the same photo are auto-detected
+    for (const catResult of updatedResults) {
+      if (catResult.human_override_step === -1) {
+        recordHumanDuplicateDecision(dropNumber, catResult.photo_filename, approvedBy).catch((err) => {
+          log.warn('ApproveCategorization', 'Failed to record duplicate photo hash', {
+            photoFilename: catResult.photo_filename,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
     }
 
     const response: ApproveCategorizeResponse = {
