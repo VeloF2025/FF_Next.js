@@ -6,7 +6,7 @@
  * - sp_pon_tracker (PON-level detail)
  * - sp_project_summary (project summary metrics)
  *
- * Requires admin role.
+ * Requires auth.
  */
 
 import type { NextApiResponse } from 'next';
@@ -24,8 +24,7 @@ async function handler(
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
-    res.status(405).json(apiResponse(false, 'Method not allowed'));
-    return;
+    return apiResponse.methodNotAllowed(res, req.method!, ['POST']);
   }
 
   try {
@@ -36,14 +35,11 @@ async function handler(
     `;
 
     if (!configs.length) {
-      res.status(200).json(
-        apiResponse(true, 'No trackers enabled', {
-          synced: 0,
-          projects: [],
-          errors: [],
-        })
-      );
-      return;
+      return apiResponse.success(res, {
+        synced: 0,
+        projects: [],
+        errors: [],
+      });
     }
 
     let totalSynced = 0;
@@ -60,16 +56,14 @@ async function handler(
       }
     }
 
-    res.status(200).json(
-      apiResponse(true, 'Sync complete', {
-        synced: totalSynced,
-        projects: syncedProjects,
-        errors,
-      })
-    );
+    return apiResponse.success(res, {
+      synced: totalSynced,
+      projects: syncedProjects,
+      errors,
+    });
   } catch (err) {
     log.error('Tracker sync failed', { err }, 'sharepoint/sync-trackers');
-    res.status(500).json(apiResponse(false, 'Sync failed'));
+    return apiResponse.internalError(res, 'Sync failed');
   }
 }
 
