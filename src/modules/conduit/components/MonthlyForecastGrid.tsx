@@ -21,7 +21,7 @@ function mkLabel(start: string | null, i: number): string {
 }
 
 function blank(): MonthlyPlanEntry {
-  return { poles: 0, stringing_m: 0, pon: 0, activations: 0,
+  return { poles: 0, stringing_m: 0, rfo: 0, pon: 0, activations: 0,
            opex_casuals: null, opex_fuel: null, opex_overheads: null,
            opex_sales: null, opex_ad_hoc: null };
 }
@@ -161,21 +161,23 @@ function ScopeTracker({
   fcActivation,
 }: {
   plan: MonthlyPlanEntry[];
-  scope: { poles: number; stringing_m: number; pon: number };
+  scope: { poles: number; stringing_m: number; rfo: number; pon: number };
   fcActivation: number;
 }) {
   const totals = useMemo(() => ({
     poles:       plan.reduce((s, e) => s + e.poles, 0),
     stringing_m: plan.reduce((s, e) => s + e.stringing_m, 0),
+    rfo:         plan.reduce((s, e) => s + e.rfo, 0),
     pon:         plan.reduce((s, e) => s + e.pon, 0),
     activations: plan.reduce((s, e) => s + e.activations, 0),
   }), [plan]);
 
   const rows = [
-    { label: 'Poles',        planned: totals.poles,       total: scope.poles,       unit: '' },
-    { label: 'Stringing (m)', planned: totals.stringing_m, total: scope.stringing_m, unit: 'm' },
-    { label: "Optical / PON's (ATP)", planned: totals.pon, total: scope.pon, unit: '' },
-    { label: 'Activations',  planned: totals.activations, total: Math.round(fcActivation), unit: '' },
+    { label: 'Poles',                    planned: totals.poles,       total: scope.poles,       unit: '' },
+    { label: 'Stringing (m)',            planned: totals.stringing_m, total: scope.stringing_m, unit: 'm' },
+    { label: 'Ready For Optical (RFO)',  planned: totals.rfo,         total: scope.rfo ?? 0,    unit: '' },
+    { label: "Optical / PON's (ATP)",    planned: totals.pon,         total: scope.pon,         unit: '' },
+    { label: 'Activations',             planned: totals.activations, total: Math.round(fcActivation), unit: '' },
   ];
 
   return (
@@ -340,6 +342,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   const T = useMemo(() => ({
     poles:        plan.reduce((s, e) => s + e.poles, 0),
     stringing_m:  plan.reduce((s, e) => s + e.stringing_m, 0),
+    rfo:          plan.reduce((s, e) => s + e.rfo, 0),
     pon:          plan.reduce((s, e) => s + e.pon, 0),
     activations:  plan.reduce((s, e) => s + e.activations, 0),
     casuals:      derived.reduce((s, d) => s + d.casuals, 0),
@@ -357,7 +360,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
   }), [plan, derived]);
 
   // ── Plan update helpers ──────────────────────────────────────────────────
-  const setRollout = useCallback((month: number, field: keyof Pick<MonthlyPlanEntry,'poles'|'stringing_m'|'pon'|'activations'>, v: number) => {
+  const setRollout = useCallback((month: number, field: keyof Pick<MonthlyPlanEntry,'poles'|'stringing_m'|'rfo'|'pon'|'activations'>, v: number) => {
     setPlan(prev => {
       const next = prev.map((e, i) => i === month ? { ...e, [field]: v } : e);
       onPlanChange(next);
@@ -437,21 +440,10 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
               </tr>
             ))}
 
-            {/* Ready for Fibre (RFO) — placeholder, data source TBD */}
-            <tr className="border-b border-gray-800 hover:bg-gray-800/30">
-              <td className={`${tdLabel} text-gray-500`}>
-                <div>Ready for Fibre (RFO)</div>
-                <div className="text-[9px] text-gray-700">placeholder — data source pending</div>
-              </td>
-              {plan.map((_, m) => (
-                <td key={m} className="px-1 py-0.5 text-center text-[10px] text-gray-700">—</td>
-              ))}
-              <td className={tdTotal} />
-            </tr>
-
             {([
-              ["Optical / PON's (ATP)", 'pon'        ] as const,
-              ['Activations',           'activations'] as const,
+              ['Ready For Optical (RFO)', 'rfo'        ] as const,
+              ["Optical / PON's (ATP)",   'pon'        ] as const,
+              ['Activations',             'activations'] as const,
             ]).map(([label, field]) => (
               <tr key={field} className="border-b border-gray-800 hover:bg-gray-800/30">
                 <td className={tdLabel}>{label}</td>
@@ -598,7 +590,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                 <SectionHeader title="Rollout Plan — Actual" cols={dur} color="text-purple-400 bg-gray-850" />
 
                 {/* Placeholder rows for physical rollout */}
-                {(['Poles', 'Stringing (m)', 'Ready for Fibre (RFO)', "Optical / PON's (ATP)"] as string[]).map(label => (
+                {(['Poles', 'Stringing (m)', 'Ready For Optical (RFO)', "Optical / PON's (ATP)"] as string[]).map(label => (
                   <tr key={label} className="border-b border-gray-800">
                     <td className={`${tdLabel} text-gray-500`}>
                       <div>{label}</div>

@@ -486,7 +486,7 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
     setProject(p => {
       // Resize monthly_plan to match new duration
       const current = p.inputs_json.monthly_plan ?? [];
-      const blank = () => ({ poles: 0, stringing_m: 0, pon: 0, activations: 0,
+      const blank = () => ({ poles: 0, stringing_m: 0, rfo: 0, pon: 0, activations: 0,
                               opex_casuals: null, opex_fuel: null, opex_overheads: null,
                               opex_sales: null, opex_ad_hoc: null });
       const resized = v > current.length
@@ -628,7 +628,8 @@ export function ProjectDetailPanel({ project: initialProject, onProjectUpdate }:
         <InputSection title="Scope — Quantities to Build">
           <InputField label="Poles" value={inp.scope.poles}       onChange={v => setScope('poles', v)}       hint="count" />
           <InputField label="Stringing (m)" value={inp.scope.stringing_m} onChange={v => setScope('stringing_m', v)} hint="total meters" />
-          <InputField label="PON Count" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
+          <InputField label="Ready For Optical (RFO)" value={inp.scope.rfo ?? 0} onChange={v => setScope('rfo', v)} hint="count" />
+          <InputField label="Optical / PON's (ATP)" value={inp.scope.pon} onChange={v => setScope('pon', v)}         hint="count" />
         </InputSection>
 
         {/* Service Rates */}

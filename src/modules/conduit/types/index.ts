@@ -11,7 +11,8 @@
 export interface ScopeInputs {
   poles: number;        // number of poles to erect
   stringing_m: number;  // aerial cable run (meters)
-  pon: number;          // PON splitters to install
+  rfo: number;          // Ready For Optical (RFO)
+  pon: number;          // Optical / PON's (ATP) splitters to install
 }
 
 // ─── COS Input Rates ─────────────────────────────────────────────────────────
@@ -59,7 +60,8 @@ export interface MonthlyPlanEntry {
   // Rollout quantities (physical work this month)
   poles: number;
   stringing_m: number;
-  pon: number;
+  rfo: number;           // Ready For Optical (RFO)
+  pon: number;           // Optical / PON's (ATP)
   activations: number;
 
   // OPEX overrides — null means "use default from MonthlyOpex inputs"

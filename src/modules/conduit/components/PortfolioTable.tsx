@@ -158,7 +158,7 @@ export function ProjectsGrid({
     try {
       const defaultInputs = {
         rate, uptake,
-        scope:         { poles: 0, stringing_m: 0, pon: 0 },
+        scope:         { poles: 0, stringing_m: 0, rfo: 0, pon: 0 },
         service_rates: { pole_plant_each: 0, permissions_per_pole: 0, stringing_per_m: 0, optical_per_pon: 0, activation_each: 0, wayleave_incentive: 0 },
         material_rates:{ pole: 0, cable_per_m: 0, optical: 0, activation: 0 },
         monthly_opex:  { casuals: 0, fuel: 0, overheads: 0, sales: 0, ad_hoc: 0 },
