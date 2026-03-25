@@ -9,30 +9,22 @@
  * Requires admin role.
  */
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
 import { apiResponse } from '@/lib/api-response';
-import { requireAdmin } from '@/lib/auth-server';
+import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { syncTrackerForProject } from '@/lib/sharepoint-sync/sync';
 import type { SpTrackerConfig } from '@/lib/sharepoint-sync/types';
 
 const sql = neon(process.env.DATABASE_URL || '');
 
-export default async function handler(
-  req: NextApiRequest,
+async function handler(
+  req: AuthenticatedNextApiRequest,
   res: NextApiResponse
 ): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json(apiResponse(false, 'Method not allowed'));
-    return;
-  }
-
-  try {
-    await requireAdmin(req);
-  } catch (err) {
-    log.warn('Unauthorized tracker sync attempt', { err }, 'sharepoint/sync-trackers');
-    res.status(403).json(apiResponse(false, 'Unauthorized'));
     return;
   }
 
@@ -80,3 +72,5 @@ export default async function handler(
     res.status(500).json(apiResponse(false, 'Sync failed'));
   }
 }
+
+export default withAuth(handler);
