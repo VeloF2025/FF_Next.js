@@ -8,7 +8,7 @@
 import { useMemo, useCallback } from 'react';
 import { getGroupedTabConfig, TabGroup } from './ProjectDetailUtils';
 
-export type TabId = 'overview' | 'team' | 'procurement' | 'maintenance' | 'hierarchy' | 'sow' | 'boq' | 'agreements' | 'wayleaves' | 'timeline' | 'budget' | 'hs' | 'finance-dashboard' | 'income' | 'documents' | 'pon-stages' | 'pon-progress' | 'prereqs';
+export type TabId = 'overview' | 'team' | 'procurement' | 'maintenance' | 'hierarchy' | 'sow' | 'boq' | 'agreements' | 'wayleaves' | 'timeline' | 'budget' | 'hs' | 'finance-dashboard' | 'income' | 'documents' | 'pon-stages' | 'pon-progress' | 'prereqs' | 'sp-tracker';
 
 interface ProjectTabsProps {
   activeTab: TabId;

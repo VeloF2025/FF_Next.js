@@ -135,7 +135,7 @@ export async function getWorksheetRange(
     );
   }
 
-  const token = await getSharePointToken();
+  const token = await getGraphToken();
   const encodedSheet = encodeURIComponent(worksheet);
   const url = range
     ? `https://graph.microsoft.com/v1.0/drives/${driveId}/items/${itemId}/workbook/worksheets/${encodedSheet}/range(address='${encodeURIComponent(range)}')`
