@@ -8,7 +8,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
-import { apiResponse } from '@/lib/api-response';
+import { apiResponse } from '@/lib/apiResponse';
 
 const sql = neon(process.env.DATABASE_URL || '');
 

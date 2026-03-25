@@ -12,7 +12,7 @@
 import type { NextApiResponse } from 'next';
 import { neon } from '@/lib/db-neon';
 import { log } from '@/lib/logger';
-import { apiResponse } from '@/lib/api-response';
+import { apiResponse } from '@/lib/apiResponse';
 import { withAuth, type AuthenticatedNextApiRequest } from '@/lib/auth';
 import { syncTrackerForProject } from '@/lib/sharepoint-sync/sync';
 import type { SpTrackerConfig } from '@/lib/sharepoint-sync/types';
