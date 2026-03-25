@@ -174,7 +174,7 @@ function ScopeTracker({
   const rows = [
     { label: 'Poles',        planned: totals.poles,       total: scope.poles,       unit: '' },
     { label: 'Stringing (m)', planned: totals.stringing_m, total: scope.stringing_m, unit: 'm' },
-    { label: 'PON',          planned: totals.pon,         total: scope.pon,         unit: '' },
+    { label: "Optical / PON's (ATP)", planned: totals.pon, total: scope.pon, unit: '' },
     { label: 'Activations',  planned: totals.activations, total: Math.round(fcActivation), unit: '' },
   ];
 
@@ -423,24 +423,44 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
             <SectionHeader title="Rollout Plan — Forecast" cols={dur} color="text-emerald-400 bg-gray-850" />
 
             {([
-              ['Poles',          'poles'       ],
-              ['Stringing (m)',  'stringing_m' ],
-              ["Optical / PON's",'pon'         ],
-              ['Activations',    'activations' ],
-            ] as [string, keyof Pick<MonthlyPlanEntry,'poles'|'stringing_m'|'pon'|'activations'>][]).map(([label, field]) => (
+              ['Poles',         'poles'      ] as const,
+              ['Stringing (m)', 'stringing_m'] as const,
+            ]).map(([label, field]) => (
               <tr key={field} className="border-b border-gray-800 hover:bg-gray-800/30">
                 <td className={tdLabel}>{label}</td>
                 {plan.map((e, m) => (
                   <td key={m} className="px-0.5 py-0.5 text-center">
-                    <RolloutCell
-                      value={e[field]}
-                      onChange={v => setRollout(m, field, v)}
-                    />
+                    <RolloutCell value={e[field]} onChange={v => setRollout(m, field, v)} />
                   </td>
                 ))}
-                <td className={`${tdTotal} font-semibold text-gray-200`}>
-                  {fN(T[field]) || '—'}
-                </td>
+                <td className={`${tdTotal} font-semibold text-gray-200`}>{fN(T[field]) || '—'}</td>
+              </tr>
+            ))}
+
+            {/* Ready for Fibre (RFO) — placeholder, data source TBD */}
+            <tr className="border-b border-gray-800 hover:bg-gray-800/30">
+              <td className={`${tdLabel} text-gray-500`}>
+                <div>Ready for Fibre (RFO)</div>
+                <div className="text-[9px] text-gray-700">placeholder — data source pending</div>
+              </td>
+              {plan.map((_, m) => (
+                <td key={m} className="px-1 py-0.5 text-center text-[10px] text-gray-700">—</td>
+              ))}
+              <td className={tdTotal} />
+            </tr>
+
+            {([
+              ["Optical / PON's (ATP)", 'pon'        ] as const,
+              ['Activations',           'activations'] as const,
+            ]).map(([label, field]) => (
+              <tr key={field} className="border-b border-gray-800 hover:bg-gray-800/30">
+                <td className={tdLabel}>{label}</td>
+                {plan.map((e, m) => (
+                  <td key={m} className="px-0.5 py-0.5 text-center">
+                    <RolloutCell value={e[field]} onChange={v => setRollout(m, field, v)} />
+                  </td>
+                ))}
+                <td className={`${tdTotal} font-semibold text-gray-200`}>{fN(T[field]) || '—'}</td>
               </tr>
             ))}
 
@@ -578,7 +598,7 @@ export function MonthlyForecastGrid({ project, onPlanChange }: Props) {
                 <SectionHeader title="Rollout Plan — Actual" cols={dur} color="text-purple-400 bg-gray-850" />
 
                 {/* Placeholder rows for physical rollout */}
-                {(['Poles', 'Stringing (m)', "Optical / PON's"] as string[]).map(label => (
+                {(['Poles', 'Stringing (m)', 'Ready for Fibre (RFO)', "Optical / PON's (ATP)"] as string[]).map(label => (
                   <tr key={label} className="border-b border-gray-800">
                     <td className={`${tdLabel} text-gray-500`}>
                       <div>{label}</div>

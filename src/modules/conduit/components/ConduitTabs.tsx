@@ -25,7 +25,7 @@ interface Props {
 type Tab = 'current' | 'baseline' | 'scoping' | 'settings';
 
 export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjects, initialScopingProjects, initialBaselines }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>('current');
+  const [activeTab, setActiveTab] = useState<Tab>('scoping');
   const [baselines, setBaselines] = useState<ConduitBaseline[]>(initialBaselines);
   const [scopingProjects, setScopingProjects] = useState<ConduitProject[]>(initialScopingProjects);
 
@@ -50,6 +50,10 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
     <div>
       {/* Tab bar */}
       <div className="flex items-end gap-1 border-b border-gray-700 mb-6">
+        <button className={tabClass('scoping')} onClick={() => setActiveTab('scoping')}>
+          <Calculator className="w-4 h-4" />
+          Scoping
+        </button>
         <button className={tabClass('current')} onClick={() => setActiveTab('current')}>
           <LayoutGrid className="w-4 h-4" />
           Current
@@ -62,10 +66,6 @@ export function ConduitTabs({ prospectiveProjects, executableProjects, wipProjec
               {baselines.length}
             </span>
           )}
-        </button>
-        <button className={tabClass('scoping')} onClick={() => setActiveTab('scoping')}>
-          <Calculator className="w-4 h-4" />
-          Scoping
         </button>
         <button className={tabClass('settings')} onClick={() => setActiveTab('settings')}>
           <Settings className="w-4 h-4" />
