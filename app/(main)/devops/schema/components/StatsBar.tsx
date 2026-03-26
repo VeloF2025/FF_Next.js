@@ -1,6 +1,6 @@
 'use client';
 
-import { Database, Columns3, Link2, LucideIcon, AlertCircle } from 'lucide-react';
+import { Database, Columns, Link2, LucideIcon, AlertCircle } from 'lucide-react';
 import type { SchemaStats } from '../types';
 
 interface StatCardProps {
@@ -33,7 +33,7 @@ export function StatsBar({ stats }: StatsBarProps) {
     <div className="border-b border-[var(--ff-border-light)] bg-[var(--ff-bg-secondary)] px-6 py-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3">
         <StatCard icon={Database} label="Total Tables" value={stats.totalTables} color="bg-blue-600" />
-        <StatCard icon={Columns3} label="Total Columns" value={stats.totalColumns} color="bg-green-600" />
+        <StatCard icon={Columns} label="Total Columns" value={stats.totalColumns} color="bg-green-600" />
         <StatCard icon={Link2} label="FK Relationships" value={stats.totalForeignKeys} color="bg-purple-600" />
         <StatCard icon={AlertCircle} label="Isolated Tables" value={stats.isolatedTables} color="bg-amber-600" />
       </div>
