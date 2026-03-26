@@ -32,7 +32,7 @@ export const navItems: NavSection[] = [
   conduitSection,         // 11. CONDUIT - Project financial scoping
   analyticsSection,       // 12. ANALYTICS - Performance metrics
   communicationsSection,  // 13. COMMUNICATIONS - WhatsApp, meetings
-  systemSection,          // 14. SYSTEM - Admin tools (always last)
+  systemSection,          // 14. SYSTEM - Admin tools (always last, includes DevOps links)
   // contractorsSection - MOVED to projectSection
   // clientsSection - MOVED to projectSection
 ];

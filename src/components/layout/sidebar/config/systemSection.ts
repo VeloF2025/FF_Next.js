@@ -2,7 +2,7 @@
  * System section configuration
  */
 
-import { Settings, HeartPulse, Server, Database, Brain, Rocket } from 'lucide-react';
+import { Settings, HeartPulse, Server, Database, Brain, Rocket, Grid3x3, TableProperties } from 'lucide-react';
 // Hidden items - uncomment when ready: Download, FileDown, Activity, BarChart3
 import type { NavSection } from './types';
 import { Permission } from '@/types/auth.types';
@@ -91,6 +91,22 @@ export const systemSection: NavSection = {
     //   permissions: [],
     //   rbacKey: 'projects.imports',
     // },
+    {
+      to: '/devops/schema',
+      icon: Grid3x3,
+      label: 'Schema Explorer',
+      shortLabel: 'Schema',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'devops.schema',
+    },
+    {
+      to: '/devops/field-mapping',
+      icon: TableProperties,
+      label: 'Field Mapping',
+      shortLabel: 'Mapping',
+      permissions: [Permission.SYSTEM_ADMIN],
+      rbacKey: 'devops.field-mapping',
+    },
     {
       to: '/settings',
       icon: Settings,
